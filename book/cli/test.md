@@ -33,6 +33,33 @@ diagnostics = []
 # Omitted columns asserts zero result columns.
 ```
 
+## Unresolved input bindings
+
+`parameter_type_unresolved` is an error from analysis when the application's
+input binding cannot be finalized. It does not declare the SQL intrinsically
+invalid. Known output columns are still checked even when an input type is
+unresolved. For example, this contract expects the error and the known `text`
+result from a result cast:
+
+```toml
+[tests]
+queries = ["SELECT $1::text AS value"]
+
+[[tests.expected]]
+diagnostics = ["parameter_type_unresolved"]
+[[tests.expected.columns]]
+name = "value"
+type = { schema_name = "pg_catalog", local_name = "text", is_array = false }
+nullability = "unknown"
+```
+
+This test passes with status 0 when the diagnostic and column contract match;
+it does not assert a finalized executable application binding. An unexpected
+diagnostic or result-column difference still fails. The same input makes
+`analyze` exit with status 1. To explicitly select the input type, use
+`SELECT ${src:text}::text AS value`, whose expected diagnostic set is empty.
+See [parameter bindings](analyze.md#parameter-bindings).
+
 ## Expectations
 
 `--expect` reads a JSON, TOML, or YAML file, optionally followed by `#JSONPath`.

@@ -229,6 +229,50 @@ async fn query_rpc_reports_distinct_analysis_failures(#[case] sql: &str, #[case]
 }
 
 #[rstest::rstest]
+#[case::native("SELECT $1::text AS value", false)]
+#[case::application("SELECT ${src}::text AS value", false)]
+#[case::explicit_input("SELECT ${src:text}::text AS value", true)]
+#[tokio::test(flavor = "multi_thread")]
+async fn query_rpc_distinguishes_input_binding_from_known_output(
+    #[case] sql: &str,
+    #[case] complete: bool,
+) {
+    let project = query_project();
+    // The authenticated RPC must preserve completion and diagnostic severity
+    // independently of known output metadata. Real catalogs run in the SQL suite.
+    let mut connection = heavy::Connection::start(16384, 2).await;
+    connection.authenticate().await;
+    let initialized = connection
+        .rpc(
+            "initialize_schema_context",
+            &project.rpc_request("-- no project objects"),
+        )
+        .await;
+    let response = connection.rpc("analyze_query", &json!({"context_handle":initialized["result"]["context_handle"], "query":{"Text":sql}})).await;
+    let item = &response["result"]["queries"]["items"][0];
+    assert_eq!(item["complete"], complete, "{response}");
+    assert_eq!(item["result_columns"]["items"][0]["name"], "value");
+    assert_eq!(
+        item["result_columns"]["items"][0]["column_type"]["local_name"],
+        "text"
+    );
+    let parameter = &item["parameters"]["items"][0];
+    assert_eq!(parameter["parameter_index"], 1);
+    let problems = item["probrems"]["items"].as_array().unwrap();
+    if complete {
+        assert_eq!(parameter["parameter_type"]["local_name"], "text");
+        assert!(problems.is_empty(), "{response}");
+    } else {
+        assert!(parameter["parameter_type"].is_null());
+        assert_eq!(problems.len(), 1, "{response}");
+        assert_eq!(problems[0]["code"], "parameter_type_unresolved");
+        assert_eq!(problems[0]["severity"], "error");
+    }
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
+#[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
 async fn query_rpc_preserves_source_spans_and_independent_hint_state(
     #[values(false, true)] empty_catalog: bool,

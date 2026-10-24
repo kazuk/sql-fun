@@ -211,6 +211,13 @@ retains `query_name` and `query_finger_print`; they are not echoed.
 Only definite named SQL types are returned as typed parameter metadata, with
 array identity preserved by `is_array`. Unresolved parameter inference is a
 SQLAST diagnostic, not a candidate list or a server-side inference solver.
+Non-singleton and unrestricted input domains produce the error
+`parameter_type_unresolved` and `complete: false`: the application's binding
+contract cannot be finalized. This does not imply the SQL is intrinsically
+invalid or that PostgreSQL cannot prepare it. A known result-column type can
+still be returned independently of the missing input type. Explicit input hints
+such as `${src:text}` can finalize a binding where `${src}::text` only constrains
+the result of a cast. See [parameter analysis](../sql-analysis.md#parameter-analysis).
 Contradictory constraints retain their SQLAST diagnostics.
 A result-column `column_type: null` is preserved without inventing a type or
 adding an error solely for its absence. Anonymous dynamic types currently have

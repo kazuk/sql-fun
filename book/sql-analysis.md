@@ -464,10 +464,33 @@ inputs, rather than PostgreSQL's single signature inferred by an untyped
 `PREPARE`. For example, `SELECT ARRAY[$1,1]` admits an `integer` input with an
 `integer[]` result and a `bigint` input with a `bigint[]` result. PostgreSQL
 chooses `integer` when preparing that statement without parameter types.
-`ParameterConstraints::allows` checks admissible assignments; analysis does not
-select a final protocol binding. A result column's `col_type()` is absent when
+`ParameterConstraints::allows` checks admissible assignments; the internal
+SQLAST analysis retains alternatives without selecting a final protocol binding.
+A result column's `col_type()` is absent when
 several result types remain; inspect `ParameterConstraints::result_column`
 for its domain. An explicit SQL cast can narrow the result type.
+
+The public `analyze_query` API must finalize an application's input binding
+contract. If SQL inference or a supported explicit input type hint does not
+establish one input type, it returns `parameter_type_unresolved` as an error
+and marks the statement incomplete. This applies to non-singleton and
+unrestricted input domains. An empty domain instead retains its conflict
+diagnostics: no input assignment satisfies those requirements.
+
+An unresolved binding does not mean the SQL is intrinsically invalid or that
+PostgreSQL could not execute it with client-supplied parameter types. PostgreSQL's
+untyped `PREPARE` signature is not automatically selected as the application's
+binding. Known result-column metadata remains available even when an input
+binding is unresolved. For example, `SELECT $1::text AS value` has a known `text`
+result but its result cast need not determine a unique source type.
+
+For named application parameters, `SELECT ${src:text}::text AS value` explicitly
+supplies the input type and completes with a `text` binding. Likewise,
+`record_fun(${src:text}::text)` resolves the input binding when `record_fun` has
+a `text` argument. `${src}::text` only casts the result of the parameter
+expression. Use one placeholder style per input; do not mix named placeholders
+with native `$1` parameters. Explicit hints still undergo validation against
+all uses of the parameter.
 
 Parameters in supported ORDER BY, GROUP BY, HAVING, DISTINCT ON, LIMIT/OFFSET,
 aggregate FILTER/ordering, and window expressions participate in analysis,

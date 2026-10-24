@@ -14,7 +14,7 @@ pub(super) struct Expectation {
     columns: Vec<ExpectedColumn>,
 }
 
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExpectedColumn {
     name: String,
@@ -22,19 +22,63 @@ struct ExpectedColumn {
     column_type: Option<ExpectedType>,
     nullability: ExpectedNullability,
 }
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExpectedType {
     schema_name: String,
     local_name: String,
     is_array: bool,
 }
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum ExpectedNullability {
     NotNull,
     Nullable,
     Unknown,
+}
+
+impl std::fmt::Display for ExpectedColumn {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(output, "    name: {:?}", self.name)?;
+        if let Some(column_type) = &self.column_type {
+            writeln!(output, "    type: {column_type}")?;
+        } else {
+            writeln!(output, "    type: absent")?;
+        }
+        write!(output, "    nullability: {}", self.nullability)
+    }
+}
+impl std::fmt::Display for ExpectedType {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            output,
+            "{:?}.{:?}{}",
+            self.schema_name,
+            self.local_name,
+            if self.is_array { "[]" } else { "" }
+        )
+    }
+}
+impl std::fmt::Display for ExpectedNullability {
+    fn fmt(&self, output: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        output.write_str(match self {
+            Self::NotNull => "not_null",
+            Self::Nullable => "nullable",
+            Self::Unknown => "unknown",
+        })
+    }
+}
+
+fn code_list(codes: &[&String]) -> String {
+    if codes.is_empty() {
+        "    (none)".to_owned()
+    } else {
+        codes
+            .iter()
+            .map(|code| format!("    {code:?}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 impl ExpectedColumn {
@@ -101,7 +145,9 @@ impl Expectation {
         let unexpected: Vec<_> = actual.difference(&self.diagnostics).collect();
         if !missing.is_empty() || !unexpected.is_empty() {
             differences.push(format!(
-                "diagnostics: missing {missing:?}; unexpected {unexpected:?}"
+                "diagnostics:\n  missing:\n{}\n  unexpected:\n{}",
+                code_list(&missing),
+                code_list(&unexpected)
             ));
         }
         let mut columns: Vec<_> = item.result_columns().items().iter().collect();
@@ -117,9 +163,7 @@ impl Expectation {
             let actual = ExpectedColumn::from_api(actual)?;
             if *expected != actual {
                 differences.push(format!(
-                    "column {index}: expected {}; actual {}",
-                    ::serde_json::to_string(expected)?,
-                    ::serde_json::to_string(&actual)?
+                    "column {index}:\n  expected:\n{expected}\n  actual:\n{actual}"
                 ));
             }
         }
@@ -161,6 +205,53 @@ mod test_helpers;
 #[cfg(test)]
 mod test_comparison {
     use super::{Expectation, test_helpers};
+
+    #[test]
+    fn differences_separate_codes_and_expected_actual_column_fields() -> ::testresult::TestResult {
+        let expected = Expectation::parse(::serde_json::json!({
+            "diagnostics":["missing_b","missing_a"],
+            "columns":[{"name":"expected_id", "type":{"schema_name":"app", "local_name":"identifier", "is_array":true}, "nullability":"nullable"}]
+        }))?;
+        let actual = test_helpers::response(
+            &["unexpected_b", "unexpected_a"],
+            vec![test_helpers::column("actual_id", true, false, Some(true))],
+        );
+        assert_eq!(
+            expected.differences(&actual)?,
+            vec![
+                concat!(
+                    "diagnostics:\n  missing:\n    \"missing_a\"\n    \"missing_b\"",
+                    "\n  unexpected:\n    \"unexpected_a\"\n    \"unexpected_b\""
+                ),
+                concat!(
+                    "column 0:\n  expected:\n    name: \"expected_id\"",
+                    "\n    type: \"app\".\"identifier\"[]\n    nullability: nullable",
+                    "\n  actual:\n    name: \"actual_id\"\n    type: \"pg_catalog\".\"int4\"",
+                    "\n    nullability: not_null"
+                ),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn differences_show_absent_type_unknown_nullability_and_empty_code_side()
+    -> ::testresult::TestResult {
+        let expected = Expectation::parse(::serde_json::json!({
+            "diagnostics":[],"columns":[{"name":"id","nullability":"unknown"}]
+        }))?;
+        let actual = test_helpers::response(
+            &["warning_code"],
+            vec![test_helpers::column("id", true, false, Some(true))],
+        );
+        let differences = expected.differences(&actual)?;
+        assert!(
+            differences[0].contains("missing:\n    (none)\n  unexpected:\n    \"warning_code\"")
+        );
+        assert!(differences[1].contains("type: absent\n    nullability: unknown"));
+        Ok(())
+    }
+
     #[rstest::rstest]
     #[case::reordered_and_duplicate(r#"["a","b","a"]"#, vec!["b", "a", "b"], true)]
     #[case::missing(r#"["a","b"]"#, vec!["a"], false)]

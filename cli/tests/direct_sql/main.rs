@@ -78,7 +78,16 @@ async fn mixed_results_continue_and_parse_diagnostics_are_assertions() -> ::test
     assert!(report.contains("failures=\"3\""), "{report}");
     assert!(report.contains("errors=\"0\""), "{report}");
     assert!(report.contains("expected exactly one statement result, actual 2"));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("1 passed"));
+    assert!(
+        stdout.contains("diagnostics:\n    missing:\n      \"unexpected_expected_code\""),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains(&format!("\n\nFAIL {}[1]", suite.selection())),
+        "{stdout}"
+    );
     Ok(())
 }
 
@@ -296,5 +305,62 @@ async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::test
     assert!(stdout.contains("Relations (0):"), "{stdout}");
     assert!(stdout.contains("Column access (0):"), "{stdout}");
     assert!(String::from_utf8_lossy(&output.stderr).contains("query_parse"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn column_differences_are_readable_in_console_and_junit() -> ::testresult::TestResult {
+    // A real CLI run must deliver the same readable differences to both outputs.
+    let server = heavy::ApiServer::new()?;
+    let schema = SchemaFixture::with_query_schema("CREATE TABLE events (id int4 NOT NULL);")?;
+    let suite = Suite::new(
+        &["SELECT id FROM events"],
+        &::serde_json::json!([
+            {"diagnostics":[],"columns":[{"name":"renamed","type":{"schema_name":"app","local_name":"identifier","is_array":true},"nullability":"nullable"}]}
+        ]),
+    )?;
+    let output = server
+        .sql_command(&schema, "test")
+        .arg(suite.selection())
+        .arg("--expect")
+        .arg(suite.expected())
+        .arg("--junit-xml")
+        .arg(suite.report())
+        .output()
+        .await?;
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("column 0:\n    expected:\n      name: \"renamed\""),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("type: \"app\".\"identifier\"[]\n      nullability: nullable"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("actual:\n      name: \"id\""), "{stdout}");
+    assert!(
+        stdout.contains("type: \"pg_catalog\".\"int4\"\n      nullability: not_null"),
+        "{stdout}"
+    );
+    let report = suite.report_text()?;
+    let mut reader = ::quick_xml::Reader::from_str(&report);
+    let failure = loop {
+        match reader.read_event()? {
+            ::quick_xml::events::Event::Start(element) if element.name().as_ref() == "failure" => {
+                break reader
+                    .read_text(element.name())?
+                    .xml_content(::quick_xml::XmlVersion::Implicit1_0)
+                    .into_owned();
+            }
+            ::quick_xml::events::Event::Eof => panic!("missing failure in {report}"),
+            _ => {}
+        }
+    };
+    assert!(
+        failure.contains("column 0:\n  expected:\n    name:"),
+        "{failure}"
+    );
+    assert!(failure.contains("\n  actual:\n    name:"), "{failure}");
     Ok(())
 }

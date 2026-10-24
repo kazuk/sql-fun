@@ -36,7 +36,9 @@ impl Case {
         self.error.is_none() && self.failures.is_empty()
     }
     pub(super) fn print(&self) -> std::io::Result<()> {
-        let mut output = std::io::stdout().lock();
+        self.write_console(&mut std::io::stdout().lock())
+    }
+    fn write_console(&self, output: &mut impl Write) -> std::io::Result<()> {
         let status = if self.error.is_some() {
             "ERROR"
         } else if self.failures.is_empty() {
@@ -46,8 +48,39 @@ impl Case {
         };
         writeln!(output, "{status} {}", self.name)?;
         for message in self.error.iter().chain(self.failures.iter()) {
-            writeln!(output, "  {message}")?;
+            for line in message.lines() {
+                writeln!(output, "  {line}")?;
+            }
         }
+        if !self.passed() {
+            writeln!(output)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_console {
+    use super::Case;
+
+    #[test]
+    fn indents_each_detail_line_and_separates_failure_cases() -> ::testresult::TestResult {
+        let mut failed = Case::new("query[0]");
+        failed.set_failures(vec!["column 0:\n  expected:\n    name: \"id\"".into()]);
+        let mut error = Case::new("query[1]");
+        error.set_error("transport failure\nconnection closed");
+        let mut output = Vec::new();
+        failed.write_console(&mut output)?;
+        error.write_console(&mut output)?;
+        Case::new("query[2]").write_console(&mut output)?;
+        assert_eq!(
+            String::from_utf8(output)?,
+            concat!(
+                "FAIL query[0]\n  column 0:\n    expected:\n      name: \"id\"\n\n",
+                "ERROR query[1]\n  transport failure\n  connection closed\n\n",
+                "PASS query[2]\n",
+            )
+        );
         Ok(())
     }
 }

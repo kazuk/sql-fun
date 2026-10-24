@@ -59,8 +59,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 565 inputs for PostgreSQL 17 and 571 for
-PostgreSQL 18 (1136 total). These count positive contract inputs separately from
+manifest totals are 578 inputs for PostgreSQL 17 and 584 for
+PostgreSQL 18 (1162 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -103,3 +103,13 @@ now retain the unqualified function name, including diagnostic-bearing calls.
 These cases use the
 shared source and installed paths; parameter diagnostics retain their existing
 policy (tracked separately in #766).
+
+[Issue #766 evidence](inventory-parameter-bindings.md) records unresolved
+application input bindings as errors. The
+`parameter-bindings` fixture checks native and application placeholders,
+explicit input hints, known result columns with unresolved inputs, unrestricted
+and conflicting inputs, array-index assignment coercion, repeated placeholders
+and a later independent input. Both PostgreSQL 17/18 catalog installations run
+these contracts through the shared source and installed paths. Internal tests
+retain the distinction between empty, singleton, non-singleton and unrestricted
+domains; server and CLI tests check completion, severity and exit behavior.

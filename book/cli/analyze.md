@@ -35,6 +35,41 @@ Diagnostics are shown for every statement with SQL source context. Error
 diagnostics do not stop later inputs. Each input uses the same selected schema
 base, without inheriting changes from preceding inputs.
 
+## Parameter bindings
+
+Analysis finalizes the application's input binding contract. If SQL inference
+and supported explicit input type hints leave several possible input types or
+no type restriction, `parameter_type_unresolved` is an error. The statement is
+incomplete and `analyze` exits with status 1, while later inputs still run.
+Conflicting requirements instead retain their conflict diagnostics.
+
+This error does not mean PostgreSQL rejects the SQL. For example,
+`SELECT $1::text AS value` can be prepared by PostgreSQL but leaves the
+application's input binding unresolved here. Its `value` column is still
+reported as `pg_catalog.text`; known output columns do not establish a complete
+input binding. Analysis does not automatically choose PostgreSQL PREPARE's
+inferred parameter signature.
+
+Use the supported named-placeholder input hint to select the source type:
+
+```sql
+SELECT ${src:text}::text AS value;
+```
+
+This completes with a `text` input binding. `${src}::text` supplies a result cast
+and may leave multiple input types admissible. Similarly, for a function
+`record_fun(src text) RETURNS record`, the following explicit input hint
+resolves the binding while preserving the declared result columns:
+
+```sql
+SELECT a,b FROM record_fun(${src:text}::text) AS r(a int,b text);
+```
+
+Hints must be compatible with every use of the parameter. Use either named
+placeholders or native numbered parameters in one input, never both. See
+[parameter analysis](../sql-analysis.md#parameter-analysis) for the distinction
+between admissible type domains and the public binding contract.
+
 ## Schema loading
 
 Both `analyze` and `test` accept `--schema-level`:

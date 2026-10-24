@@ -428,12 +428,7 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
-            Self::ParameterTypeUnresolved(index) => DiagnosticMetadata::from(
-                format!(
-                    "SQL type of parameter ${index} is unresolved; supply an explicit SQL type hint"
-                )
-                .as_str(),
-            ),
+            Self::ParameterTypeUnresolved(_) => DiagnosticMetadata::from(self.diagnostic_message()),
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
             Self::Index(problem) => problem.render_metadata(),
             Self::UnreachableCoalesceArgument(..) => DiagnosticMetadata::from(
@@ -468,7 +463,7 @@ impl DiagnosticMessage for AnalysisProblem {
         match self {
             Self::ParameterTypeUnresolved(index) => {
                 format!(
-                    "SQL type of parameter ${index} is unresolved; supply an explicit SQL type hint"
+                    "application input binding for parameter ${index} is unresolved; supply a supported explicit input type hint; an SQL result cast may be insufficient"
                 )
             }
             Self::QueryAnalysis(problem) => problem.diagnostic_message(),
@@ -547,6 +542,16 @@ impl DiagnosticMessage for AnalysisProblem {
 #[cfg(test)]
 mod diagnostic_message_tests {
     use super::{AExprKind, AnalysisProblem, DiagnosticMessage, RuleProblem, TriggerProblem};
+
+    #[test]
+    fn unresolved_binding_messages_agree_and_remain_errors() {
+        let problem = AnalysisProblem::parameter_type_unresolved(2);
+        let expected = "application input binding for parameter $2 is unresolved; supply a supported explicit input type hint; an SQL result cast may be insufficient";
+        assert_eq!(problem.code(), "parameter_type_unresolved");
+        assert_eq!(problem.severity(), super::DiagnosticSeverity::Error);
+        assert_eq!(problem.diagnostic_message(), expected);
+        assert_eq!(problem.render_metadata().unwrap().message(), expected);
+    }
 
     #[test]
     fn rule_and_trigger_messages_explain_the_problem_without_debug_output() {
@@ -899,7 +904,7 @@ impl AnalysisProblem {
     pub fn query_analysis(stage: QueryAnalysisStage, message: &str) -> Self {
         Self::QueryAnalysis(QueryAnalysisProblem::new(stage, message))
     }
-    /// Report a parameter whose existing inference did not establish one type.
+    /// Report an application input binding whose inference did not establish one type.
     #[must_use]
     pub const fn parameter_type_unresolved(index: u32) -> Self {
         Self::ParameterTypeUnresolved(index)

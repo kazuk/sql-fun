@@ -35,6 +35,19 @@ You can build and run tests using the `check-test-flow` script.
   corresponding job has finished on the final PR head and its result has been
   verified.
 
+## SQLAST Regression Tests
+
+- When modifying `sql-fun-sqlast`, prefer `sql-fun test` fixtures against the
+  supported real builtin catalogs for SQL-observable diagnostics and result-column
+  semantics. Read [the suite README](tests/sqlast-regressions/README.md) for the
+  self-contained `{name, sql, expected}` format, manifest/version selection and
+  shared runner. Ensure cases participate in both maintained source-tree and
+  installed-distribution checks.
+- Keep Rust unit/integration tests for internal AST structure, parameter
+  constraint domains, bindings, catalog transitions and assertions not exposed by
+  the CLI. Apply [the type-system guideline](docs/internal-rules/sqlast-type-system-guideline.md)
+  and [Rust test-placement rules](docs/internal-rules/rust-coding-guideline.md#test-placement).
+
 ## Developer Workflow Compatibility
 
 - Treat the documented contributor workflow as a compatibility contract.

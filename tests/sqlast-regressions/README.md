@@ -15,9 +15,8 @@ nonempty and unique within the fixture. The runner validates object fields and
 case counts, then projects cases to temporary SQL and expectation arrays for the
 existing CLI input contract. CLI/JUnit identities retain the fixture basename
 and array index; each group log also maps those indices to case names.
-Expectations
-use the existing `sql-fun test` contract: complete diagnostic sets and exact
-ordered columns, including absent types and unknown nullability.
+Expectations use the existing `sql-fun test` contract: complete diagnostic sets
+and exact ordered columns, including absent types and unknown nullability.
 
 The internal runner requires `SQL_FUN_HOME`, `SQL_FUN_BIN`,
 `SQL_FUN_TEST_SERVER_BIN` and `SQL_FUN_REGRESSION_REPORT_DIR`. Its caller owns
@@ -52,3 +51,12 @@ See [the broad inventory](inventory-retained.md) and the detailed
 internal assertions remain in Rust. Counts refer to SQL inputs, not removed Rust
 tests: one old test may check multiple SQL expressions, and mixed tests retain
 internal assertions after their observable result assertions move to the CLI.
+
+The runner prints each manifest group's result, executed/expected case counts
+and wall-clock seconds measured with Bash `time` around the actual `sql-fun test`
+command. The final summary aggregates those command durations and reports total
+executed cases and cases/second. Build, server startup, catalog preparation,
+fixture projection, report processing/upload and negative controls are excluded
+from this timing. These values provide a baseline in source and installed CI
+logs; timing variation does not affect success and no performance threshold is
+enforced.

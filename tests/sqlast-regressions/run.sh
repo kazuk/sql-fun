@@ -52,6 +52,10 @@ project_cases() {
 total=0
 failed=0
 groups=0
+test_seconds=0
+# Bash time emits decimal seconds independent of the caller's numeric locale.
+export LC_ALL=C
+TIMEFORMAT='%3R'
 declare -A checked_versions=()
 declare -A selected_fixtures=()
 while IFS=$'\t' read -r fixture level schema count versions; do
@@ -100,14 +104,19 @@ METADATA
       >"$reports/$fixture-$version.log"
     rm -f "$reports/$fixture-$version.xml"
     status=0
-    "$SQL_FUN_BIN" "${args[@]}" test "$projected#$.sql" --expect "$projected#$.expected" \
-      --schema-level "$level" --junit-xml "$reports/$fixture-$version.xml" \
-      >>"$reports/$fixture-$version.log" 2>&1 || status=$?
+    group_failed=0
+    # Measure only the product invocation; parsing reports and setup are outside.
+    { time "$SQL_FUN_BIN" "${args[@]}" test "$projected#$.sql" --expect "$projected#$.expected" \
+        --schema-level "$level" --junit-xml "$reports/$fixture-$version.xml" \
+        >>"$reports/$fixture-$version.log" 2>&1;
+    } 2>"$runtime/test-seconds" || status=$?
+    elapsed=$(<"$runtime/test-seconds")
+    test_seconds=$(jq -n --argjson total "$test_seconds" --argjson elapsed "$elapsed" '($total + $elapsed) * 1000 | round / 1000')
     cat "$reports/$fixture-$version.log"
-    if (( status != 0 )); then failed=1; fi
+    if (( status != 0 )); then group_failed=1; fi
     if ! grep -F ' failures="0" errors="0"' "$reports/$fixture-$version.xml" >/dev/null 2>&1; then
       echo "JUnit report missing or contains failures/errors: $fixture PostgreSQL $version" >&2
-      failed=1
+      group_failed=1
     fi
     # Verify both the declared JUnit total and the actual testcase elements.
     actual=0
@@ -115,8 +124,11 @@ METADATA
       actual=$(sed -n 's/.*<testsuite name="sql-fun test" tests="\([0-9]*\)".*/\1/p' "$reports/$fixture-$version.xml")
     fi
     elements=$(grep -c '<testcase ' "$reports/$fixture-$version.xml" 2>/dev/null || true)
-    if [[ "$elements" != "$count" ]]; then echo "JUnit testcase count mismatch: expected $count, actual ${elements:-0}" >&2; failed=1; fi
-    if [[ "$actual" != "$count" ]]; then echo "Case count mismatch: expected $count, actual $actual" >&2; failed=1; fi
+    if [[ "$elements" != "$count" ]]; then echo "JUnit testcase count mismatch: expected $count, actual ${elements:-0}" >&2; group_failed=1; fi
+    if [[ "$actual" != "$count" ]]; then echo "Case count mismatch: expected $count, actual $actual" >&2; group_failed=1; fi
+    if (( group_failed != 0 )); then failed=1; result=FAIL; else result=PASS; fi
+    echo "== Result: $fixture PostgreSQL $version: $result; cases=$actual/$count; test-command=${elapsed}s; exit=$status" \
+      | tee -a "$reports/$fixture-$version.log"
     total=$((total + ${actual:-0}))
     groups=$((groups + 1))
   done
@@ -177,5 +189,7 @@ for version in "${!checked_versions[@]}"; do
   fi
   echo "PostgreSQL $version: negative controls verified (3 executed, 2 intentional failures, 1 pass; invalid selector and missing datasource rejected)"
 done
-echo "SQLAST regressions: $total executed cases in $groups groups; failure=$failed"
+rate=$(jq -n --argjson cases "$total" --argjson seconds "$test_seconds" \
+  'if $seconds > 0 then $cases / $seconds * 1000 | round / 1000 else 0 end')
+echo "SQLAST regressions: $total executed cases in $groups groups; failure=$failed; test-command-total=${test_seconds}s; cases/second=$rate"
 exit "$failed"

@@ -32,6 +32,16 @@ impl StarExpansion {
 }
 
 impl ResultColumn {
+    pub(crate) fn resolved(name: &ColumnName, expression: &SemScalarExpr) -> Self {
+        let mut column = Self::new(
+            &Some(name.clone()),
+            &expression.get_type(),
+            &expression.is_not_null(),
+        );
+        column.expression = Some(Box::new(expression.clone()));
+        column
+    }
+
     /// Construct result-column metadata without a retained expression.
     pub fn new(
         col_name: &Option<ColumnName>,
@@ -162,6 +172,10 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn cloned_suffix(&self, first: usize) -> Vec<ResultColumn> {
+        self.0[first..].to_vec()
+    }
+
     pub(crate) fn has_pending_stars(&self) -> bool {
         self.0.iter().any(ResultColumn::has_pending_star)
     }

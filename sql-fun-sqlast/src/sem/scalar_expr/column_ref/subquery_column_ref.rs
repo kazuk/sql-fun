@@ -67,3 +67,9 @@ impl SubQueryColumnRef {
         }
     }
 }
+
+impl SubQueryColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
+    }
+}

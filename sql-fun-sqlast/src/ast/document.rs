@@ -1,5 +1,6 @@
 mod deparse;
 mod merge;
+mod projection_walk;
 
 #[path = "postgres/document.rs"]
 mod postgres;

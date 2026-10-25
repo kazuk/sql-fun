@@ -181,6 +181,8 @@ pub(super) fn source_namespace_statement_at_version(
     context.set_get_search_path_result(&[SchemaName::from("a"), SchemaName::from("public")]);
     let schema = r#"
 CREATE TABLE a.t(id integer NOT NULL, only_a integer NOT NULL);
+CREATE TABLE a.zero_columns();
+CREATE TABLE a.mixed(id integer NOT NULL, other bigint NOT NULL);
 CREATE TABLE b.t(id bigint NOT NULL, only_b bigint NOT NULL);
 CREATE TABLE a.u(aid integer NOT NULL);
 CREATE TABLE b.u(bid bigint NOT NULL);
@@ -190,8 +192,27 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
     for statement in crate::parse_statements(schema, dialect) {
         context = statement.unwrap().analyze(context).unwrap().into_context();
     }
-    for (schema, name, source) in [("a", "v", "a.t"), ("b", "v", "b.t"), ("c", "t", "b.t")] {
-        let sql = format!("SELECT id FROM {source}");
+    let mixed = crate::sem::FullName::with_schema("a", "mixed");
+    context.set_get_type_impl_result(
+        &mixed,
+        &crate::sem::TypeDefinition::table_ref(&crate::sem::TableName::from(mixed.clone())),
+    );
+    context.setup_function(
+        "mixed_fun",
+        &[OverloadVariant::new(
+            &Some(TypeReference::from_full_name(mixed)),
+            &vec![],
+            false,
+            false,
+        )],
+    );
+    for (schema, name, source, projection) in [
+        ("a", "v", "a.t", "id"),
+        ("b", "v", "b.t", "id"),
+        ("c", "t", "b.t", "id"),
+        ("a", "mixed_v", "a.mixed", "id, other"),
+    ] {
+        let sql = format!("SELECT {projection} FROM {source}");
         let query = crate::parse_statements(&sql, dialect)
             .next()
             .unwrap()

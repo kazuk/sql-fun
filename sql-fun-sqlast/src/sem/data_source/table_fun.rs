@@ -156,6 +156,13 @@ impl TableFunctionDataSource {
     ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
         self.output.declaration(column, &self.alias)
     }
+    pub(super) fn output_type_declaration_at(
+        &self,
+        index: usize,
+    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+        self.output.declaration_at(index)
+    }
+
     /// Effective invocation columns, independently of the catalog return declaration.
     pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
         self.output.columns()
@@ -185,5 +192,45 @@ impl DataSource {
                 crate::sem::QueryNameResolution::function(resolved),
             ));
         }
+    }
+}
+
+impl TableFunctionDataSource {
+    pub(super) fn typed_projection_record(
+        &self,
+        alias: &AliasName,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<crate::sem::WildcardTypedRecord> {
+        crate::sem::WildcardTypedRecord::from_function(alias, &self.function, context, index)
+    }
+
+    pub(super) fn bind_projection_ordinal(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        alias: &AliasName,
+        column: &ColumnName,
+        index: usize,
+        nullable: bool,
+    ) -> Result<SemScalarExpr, crate::sem::AnalysisError> {
+        let (value, _) = crate::sem::ColumnReferenceExpr::function_source_ref(
+            context,
+            alias,
+            column,
+            Some(&self.function),
+            self.output_columns().column_at(index),
+            &self.args,
+            nullable,
+        )?;
+        Ok(value.with_function_type_declaration(self.output_type_declaration_at(index)))
+    }
+}
+
+impl TableFunctionDataSource {
+    pub(super) fn projection_is_table_dependent(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> bool {
+        self.function.table_output_depends_on_table(context)
     }
 }

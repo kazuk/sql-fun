@@ -110,7 +110,6 @@ impl Merge {
         let returning = ResultColumnCollection::resolve_for_merge(
             &self.returning_list,
             context,
-            &with,
             &returning_scope,
         )?;
         let mut statement = MergeStatement::new(
@@ -312,27 +311,27 @@ impl ResultColumnCollection {
     fn resolve_for_merge(
         targets: &[crate::ast::Target],
         context: &mut impl ParseContext,
-        with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target in targets {
-            if let Expr::Star(name) = &target.expression {
+            if let Some(name) = target.source_star_name() {
                 let qualifier = name.star_qualifier()?;
                 let projection_qualifier = qualifier.as_ref().map(|alias| {
                     scope
                         .merge_row_target(alias)
                         .map_or(alias, |(target, _, _)| target)
                 });
-                if results.expand_projection(
+                if !results.expand_projection(
                     context,
-                    with,
                     scope.sources(),
                     scope,
+                    target.projection_location(),
                     projection_qualifier,
-                    qualifier.as_ref(),
-                )? == 0
-                {
+                    qualifier
+                        .as_ref()
+                        .filter(|alias| scope.merge_row_target(alias).is_some()),
+                )? {
                     return Err(AnalysisError::unexpected_input_error(
                         "MERGE RETURNING star source is not visible",
                     ));

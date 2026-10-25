@@ -35,8 +35,11 @@ pub use self::{
     view::ViewDataSource,
 };
 pub(crate) use self::{
-    column_candidates::ColumnCandidates, function_columns::TableFunctionOutput,
-    join_expr::JoinUsingClause, namespace::SourceNamespace, projection::ProjectionColumn,
+    column_candidates::ColumnCandidates,
+    function_columns::TableFunctionOutput,
+    join_expr::JoinUsingClause,
+    namespace::SourceNamespace,
+    projection::{ProjectionColumn, WildcardProjection},
     qualified::QualifiedSource,
 };
 
@@ -80,6 +83,31 @@ pub enum DataSource {
 }
 
 impl DataSource {
+    pub(crate) fn projection_shape_is_resolved(&self) -> bool {
+        crate::sem::with_stack(|| match self {
+            Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
+            Self::DeferredTableFunc(source) => source.projection_shape_is_resolved(),
+            Self::RowFunctions(source) => source.projection_shape_is_resolved(),
+            Self::JoinExpr(source) => source.projection_shape_is_resolved(),
+            Self::Group(source) => source.projection_shape_is_resolved(),
+            Self::MergeRecord(source) => source.projection_shape_is_resolved(),
+            _ => true,
+        })
+    }
+
+    pub(crate) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        match self {
+            Self::Table(_) => true,
+            Self::JoinExpr(join) => join.projection_is_table_dependent(context),
+            Self::Group(group) => group.projection_is_table_dependent(context),
+            Self::MergeRecord(record) => record.projection_is_table_dependent(context),
+            Self::CallTableFunc(source) => source.projection_is_table_dependent(context),
+            Self::DeferredTableFunc(source) => source.projection_is_table_dependent(context),
+            Self::RowFunctions(source) => source.projection_is_table_dependent(context),
+            _ => false,
+        }
+    }
+
     pub(super) fn create_column_ref<'context, TParseContext>(
         &self,
         context: &'context mut TParseContext,

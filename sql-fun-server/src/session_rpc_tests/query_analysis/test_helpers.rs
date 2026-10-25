@@ -1,3 +1,5 @@
+pub(super) mod heavy;
+
 use crate::schema_cache::test_helpers::SchemaProject;
 
 /// A small int4 catalog with the comparison used by the RPC scenarios.
@@ -64,5 +66,43 @@ pub(super) async fn verify_query_collection_lifecycle(
             connection.rpc("read_collection", &read).await["error"]["data"],
             "InvalidCollectionHandle"
         );
+    }
+}
+
+/// Select rewrite policy without changing the fixture's shared schema inputs.
+pub(super) fn rewrite_request(
+    project: &SchemaProject,
+    schema: &str,
+    enabled: Option<bool>,
+) -> ::serde_json::Value {
+    let path = project.home().join("Cargo.toml");
+    let metadata = std::fs::read_to_string(&path).unwrap();
+    let marker = "\n[package.metadata.database.products.rewrite_options]";
+    let base = metadata
+        .split_once(marker)
+        .map_or(metadata.as_str(), |(base, _)| base);
+    let options = enabled.map_or_else(String::new, |enabled| {
+        format!("{marker}\nexpand_asterisk = {enabled}\n")
+    });
+    std::fs::write(path, format!("{base}{options}")).unwrap();
+    project.rpc_request(schema)
+}
+
+/// Diagnostic lookup over the query item's wire collection.
+pub(super) struct QueryProblems<'a>(&'a [::serde_json::Value]);
+
+impl<'a> From<&'a ::serde_json::Value> for QueryProblems<'a> {
+    fn from(item: &'a ::serde_json::Value) -> Self {
+        Self(
+            item["probrems"]["items"]
+                .as_array()
+                .expect("query diagnostic collection"),
+        )
+    }
+}
+
+impl<'a> QueryProblems<'a> {
+    pub(super) fn find(&self, code: &str) -> Option<&'a ::serde_json::Value> {
+        self.0.iter().find(|problem| problem["code"] == code)
     }
 }

@@ -11,6 +11,14 @@ pub struct GroupedDataSource {
 }
 
 impl GroupedDataSource {
+    pub(super) fn projection_shape_is_resolved(&self) -> bool {
+        self.source.projection_shape_is_resolved()
+    }
+
+    pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        self.source.projection_is_table_dependent(context)
+    }
+
     pub(super) fn sqlite_qualified_group_source<'a>(
         &'a self,
         context: &impl ParseContext,
@@ -147,5 +155,17 @@ impl GroupedDataSource {
     ) -> Result<(), crate::sem::AnalysisError> {
         self.source.walk(visitor)?;
         Ok(())
+    }
+}
+
+impl GroupedDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        source: &DataSource,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<ColumnName>, AnalysisError> {
+        let columns = self.projection_names(source, context, with)?;
+        Ok(super::projection::ProjectionColumns::from(columns).names())
     }
 }

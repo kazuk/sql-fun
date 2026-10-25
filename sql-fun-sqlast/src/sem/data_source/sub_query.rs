@@ -111,3 +111,9 @@ impl SubQueryDataSource {
         Ok(())
     }
 }
+
+impl SubQueryDataSource {
+    pub(super) fn projection_column_names(&self) -> Vec<ColumnName> {
+        self.select_statement.result_columns().names()
+    }
+}

@@ -2,7 +2,7 @@ pub(super) mod heavy;
 
 use std::fmt::Write;
 
-use ::serde_json::{Value, json};
+use ::serde_json::Value;
 use ::sql_fun_client::TcpJsonRpcClientAsync;
 use ::sql_fun_codegen::{QueryRequirement, QueryRequirements};
 use ::sql_fun_core::{
@@ -43,6 +43,15 @@ connector = "tokio-postgres"
         )
         .unwrap();
         Self(directory)
+    }
+
+    pub(super) fn enable_asterisk_expansion(&self) {
+        let path = self.0.path().join("metadata.toml");
+        let mut metadata = std::fs::read_to_string(&path).unwrap();
+        metadata.push_str(
+            "\n[package.metadata.database.first.rewrite_options]\nexpand_asterisk = true\n",
+        );
+        std::fs::write(path, metadata).unwrap();
     }
 
     pub(super) fn schema_hash(&self) -> String {
@@ -176,31 +185,31 @@ async fn peer_with_gate(
             }
             let second_failure = fail_method == Some("second_analysis") && analyses == 2;
             let response = if fail_method == Some(method) || second_failure {
-                json!({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32602,"message":"injected failure"}})
+                ::serde_json::json!({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32602,"message":"injected failure"}})
             } else {
                 let result = match method {
                     "initialize_schema_context" if fail_method == Some("missing_handle") => {
-                        json!({"context_handle":null,"schema_dump_hash":"hash","problems":page()})
+                        ::serde_json::json!({"context_handle":null,"schema_dump_hash":"hash","problems":page()})
                     }
                     "initialize_schema_context" => {
-                        json!({"context_handle":format!("context-{}",request["params"]["datasource"].as_str().unwrap()),"schema_dump_hash":"hash","problems":page()})
+                        ::serde_json::json!({"context_handle":format!("context-{}",request["params"]["datasource"].as_str().unwrap()),"schema_dump_hash":"hash","problems":page()})
                     }
                     "analyze_query" => response
                         .clone()
-                        .unwrap_or_else(|| json!({"queries":page()})),
+                        .unwrap_or_else(|| ::serde_json::json!({"queries":page()})),
                     "tokenize_sql" => {
                         let source = request["params"]["source"].as_str().unwrap();
                         if source.is_empty() {
                             page()
                         } else {
-                            json!({"handle":"tokens","total_length":1,"offset":0,
+                            ::serde_json::json!({"handle":"tokens","total_length":1,"offset":0,
                                 "require_release":false,
                                 "items":[{"kind":"keyword","start":0,"end":source.len()}]})
                         }
                     }
                     _ => panic!("unexpected method: {method}"),
                 };
-                json!({"jsonrpc":"2.0", "id":request["id"], "result":result})
+                ::serde_json::json!({"jsonrpc":"2.0", "id":request["id"], "result":result})
             };
             requests.push(request);
             stream
@@ -218,12 +227,12 @@ async fn peer_with_gate(
 }
 
 fn page() -> Value {
-    json!({"handle":"empty","total_length":0,"offset":0,"require_release":false,"items":[]})
+    ::serde_json::json!({"handle":"empty","total_length":0,"offset":0,"require_release":false,"items":[]})
 }
 
 /// A completed diagnostic collection for an analysis response fixture.
 pub(super) fn diagnostic_page(problems: &[::sql_fun_client::payloads::AnalysisProbrem]) -> Value {
-    json!({"handle":"diagnostics","total_length":problems.len(),"offset":0,
+    ::serde_json::json!({"handle":"diagnostics","total_length":problems.len(),"offset":0,
         "require_release":false,"items":problems})
 }
 
@@ -256,14 +265,14 @@ pub(super) async fn peer_with_response(
 }
 
 pub(super) fn successful_response(statement_count: usize) -> Value {
-    let statements = (0..statement_count).map(|index| json!({
+    let statements = (0..statement_count).map(|index| ::serde_json::json!({
         "query_span":null, "execute_sql":format!("SELECT {index}"), "complete":true, "query_kind":"Select",
         "probrems":page(), "accessing_relations":page(), "column_access":page(), "parameters":page(), "result_columns":page()
     })).collect::<Vec<_>>();
     let mut queries = page();
-    queries["total_length"] = json!(statement_count);
-    queries["items"] = json!(statements);
-    json!({"queries":queries})
+    queries["total_length"] = ::serde_json::json!(statement_count);
+    queries["items"] = ::serde_json::json!(statements);
+    ::serde_json::json!({"queries":queries})
 }
 
 /// A successful statement followed by an incomplete one, each with diagnostics.
@@ -294,7 +303,7 @@ pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
         AnalysisProbrem::new(advice.code(), DiagnosticSeverity::advice(), source, None)
             .with_semantic_problem(&advice),
     ]);
-    response["queries"]["items"][1]["complete"] = json!(false);
+    response["queries"]["items"][1]["complete"] = ::serde_json::json!(false);
     response["queries"]["items"][1]["execute_sql"] = Value::Null;
     response["queries"]["items"][1]["probrems"] = diagnostic_page(&[AnalysisProbrem::new(
         fallback.code(),
@@ -303,5 +312,40 @@ pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
         None,
     )
     .with_semantic_problem(&fallback)]);
+    response
+}
+
+/// A server response whose executable projection differs from its original star.
+pub(super) fn expanded_projection_response(sql: &str) -> Value {
+    use ::sql_fun_client::payloads::{
+        Nullability, ParameterDescribe, ResultSetColumn, TypeReference,
+    };
+    let parameters = vec![ParameterDescribe::new(
+        "lookup",
+        1,
+        Some(TypeReference::new("pg_catalog", "int4", false)),
+        Vec::new(),
+    )];
+    let columns = vec![
+        ResultSetColumn::new(
+            0,
+            "id",
+            Some(TypeReference::new("pg_catalog", "int4", false)),
+            Nullability::from_not_null(None),
+        ),
+        ResultSetColumn::new(
+            1,
+            "requested",
+            Some(TypeReference::new("pg_catalog", "int4", false)),
+            Nullability::from_not_null(None),
+        ),
+    ];
+    let mut response = successful_response(1);
+    let item = &mut response["queries"]["items"][0];
+    item["execute_sql"] = ::serde_json::json!(sql);
+    item["parameters"] = ::serde_json::json!({"handle":"bindings","total_length":parameters.len(),"offset":0,
+        "require_release":false,"items":parameters});
+    item["result_columns"] = ::serde_json::json!({"handle":"columns","total_length":columns.len(),"offset":0,
+        "require_release":false,"items":columns});
     response
 }

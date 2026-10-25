@@ -16,6 +16,10 @@ pub struct ImplicitCastExpr {
 }
 
 impl ImplicitCastExpr {
+    pub(crate) fn projection_operand(&self) -> (&SemScalarExpr, &TypeReference) {
+        (&self.value, &self.cast_target)
+    }
+
     /// create a implicit cast expression
     #[must_use]
     pub fn new(value: &SemScalarExpr, cast_target: &TypeReference) -> Self {
@@ -45,6 +49,10 @@ pub struct TypeCastExpr {
 }
 
 impl TypeCastExpr {
+    pub(crate) fn projection_operand(&self) -> (&SemScalarExpr, &TypeReference) {
+        (&self.arg, &self.target_type)
+    }
+
     pub(super) fn array_projection_name(&self) -> Option<&'static str> {
         self.arg.array_projection_name()
     }

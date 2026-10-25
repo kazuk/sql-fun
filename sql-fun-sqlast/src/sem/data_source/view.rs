@@ -120,3 +120,65 @@ impl ViewDataSource {
         Ok(())
     }
 }
+
+impl ViewDataSource {
+    pub(super) fn typed_projection_record(
+        &self,
+        alias: &AliasName,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<crate::sem::WildcardTypedRecord> {
+        crate::sem::WildcardTypedRecord::from_view(alias, &self.view, context, index)
+    }
+
+    pub(super) const fn wildcard_relation(&self) -> &crate::sem::FullName {
+        self.view.full_name()
+    }
+
+    pub(super) fn unaliased_projection_relation(
+        &self,
+        alias: &AliasName,
+    ) -> Option<&crate::sem::FullName> {
+        if !self.alias.is_explicit() && self.alias.name() == alias {
+            Some(self.view.full_name())
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn bind_projection_ordinal(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        alias: &AliasName,
+        column: &ColumnName,
+        index: usize,
+        nullable: bool,
+    ) -> crate::sem::SemScalarExpr {
+        let definition = if let Some(view) = context.get_view(&self.view) {
+            view.result_columns()
+                .get_column_at(index)
+                .map(crate::sem::ResultColumn::create_column_definition)
+        } else {
+            None
+        };
+        crate::sem::SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::view_column(
+            alias,
+            column,
+            &self.view,
+            definition.as_ref(),
+            nullable,
+        ))
+    }
+}
+
+impl ViewDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> Result<Vec<ColumnName>, crate::sem::AnalysisError> {
+        let Some(view) = context.get_view(&self.view) else {
+            return crate::sem::AnalysisError::raise_unexpected_none("star view");
+        };
+        Ok(view.result_columns().names())
+    }
+}

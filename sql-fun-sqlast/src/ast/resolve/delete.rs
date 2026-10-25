@@ -211,14 +211,13 @@ impl Delete {
             ResultColumnCollection::resolve_for_delete(
                 &self.returning,
                 context,
-                with,
                 &returning_from,
                 &scope,
             )
         } else {
             let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             scope.set_delete_returning_target(alias.name(), context);
-            ResultColumnCollection::resolve_for_delete(&self.returning, context, with, from, &scope)
+            ResultColumnCollection::resolve_for_delete(&self.returning, context, from, &scope)
         }
     }
 }

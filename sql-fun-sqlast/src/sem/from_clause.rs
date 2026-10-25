@@ -2,7 +2,8 @@ use crate::{
     ast::TryCollectFromWithTokens,
     sem::{
         AliasSpec, AnalysisError, DataSource, MergeMatchKind, Nullable, ParseContext, WithClause,
-        create_table::ColumnName, data_source::AliasName, data_source::MergeRecordRole,
+        create_table::ColumnName,
+        data_source::{AliasName, MergeRecordRole, WildcardProjection},
     },
     syn::ScanToken,
 };
@@ -30,6 +31,50 @@ struct MergeRowImageNullability {
 }
 
 impl FromClause {
+    pub(crate) fn wildcard_projection(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        qualifier: Option<&AliasName>,
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
+        if let Some(qualifier) = qualifier {
+            return match self.namespace().resolve_name(qualifier) {
+                Ok(Some(source)) => source.resolved_wildcard_projection(context, with),
+                Ok(None) => Ok(WildcardProjection::unresolved()),
+                Err(()) => WildcardProjection::ambiguous_alias(context, qualifier),
+            };
+        }
+        let mut columns = Vec::new();
+        let mut table_dependent = false;
+        for source in &self.0 {
+            columns.extend(source.projection_names(context, with, None)?);
+            table_dependent |= source.projection_is_table_dependent(context);
+        }
+        let source_found = !columns.is_empty()
+            || (!self.0.is_empty() && self.0.iter().all(DataSource::projection_shape_is_resolved));
+        Ok(WildcardProjection::new(
+            &columns,
+            source_found,
+            table_dependent,
+        ))
+    }
+
+    pub(crate) fn destination_wildcard_projection(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
+        if let Some(source) = self.0.last() {
+            Ok(WildcardProjection::new(
+                &source.projection_names(context, with, None)?,
+                source.projection_shape_is_resolved(),
+                source.projection_is_table_dependent(context),
+            ))
+        } else {
+            Ok(WildcardProjection::new(&[], false, false))
+        }
+    }
+
     pub(crate) fn joined_projection(
         &self,
         context: &impl ParseContext,
@@ -188,38 +233,6 @@ impl FromClause {
         self.0
             .iter()
             .find_map(|source| source.merge_row_target(alias))
-    }
-
-    pub(crate) fn projection_names(
-        &self,
-        context: &mut impl ParseContext,
-        with: &WithClause,
-        qualifier: Option<&AliasName>,
-    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
-        if let Some(qualifier) = qualifier
-            && self.namespace().resolve_name(qualifier).is_err()
-        {
-            return Ok(vec![crate::sem::data_source::ProjectionColumn::ambiguous(
-                context, qualifier,
-            )?]);
-        }
-        let mut names = Vec::new();
-        for source in &self.0 {
-            names.extend(source.projection_names(context, with, qualifier)?);
-        }
-        Ok(names)
-    }
-    /// UPDATE/DELETE RETURNING * selects the destination occurrence, even when
-    /// another source exposes the same local relation name.
-    pub(crate) fn destination_projection(
-        &self,
-        context: &impl ParseContext,
-        with: &WithClause,
-    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
-        let Some(source) = self.0.last() else {
-            return Ok(Vec::new());
-        };
-        source.projection_names(context, with, None)
     }
 
     pub(crate) fn single_relation_name(&self) -> Option<crate::sem::FullName> {

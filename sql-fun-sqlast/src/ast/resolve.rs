@@ -90,7 +90,39 @@ impl Name {
     }
 }
 
+impl Name {
+    fn append_row_projection(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        fields: &mut Vec<SemScalarExpr>,
+    ) -> Result<bool, AnalysisError> {
+        if self.is_empty() || context.dialect() != Dialect::postgres() {
+            return Ok(false);
+        }
+        let projection = if let Some(relation) = self.star_relation()? {
+            scope.relation_projection_names(context, &relation)?
+        } else if let Some(qualifier) = self.star_qualifier()? {
+            scope.projection_names(context, &qualifier)?
+        } else {
+            return Ok(false);
+        };
+        projection.append_row_fields(context, scope, fields)
+    }
+}
+
 impl Expr {
+    pub(in crate::ast) fn projection_base(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        match self {
+            Self::Indirection(indirection) => indirection.projection_base(context, scope),
+            _ => Ok(None),
+        }
+    }
+
     fn negated_literal(&self) -> Option<SemScalarExpr> {
         match self {
             Self::Literal(literal) => literal.negate(),
@@ -126,7 +158,7 @@ impl Expr {
             Self::Parameter(parameter) => Ok(context.parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
-            Self::Star(name) if context.dialect() == Dialect::postgres() && !name.0.is_empty() => {
+            Self::Star(name) if context.dialect() == Dialect::postgres() && !name.is_empty() => {
                 scope.resolve_whole_row(context, &name.full_name()?)
             }
             Self::Star(_) => Self::invalid_star_projection(context),
@@ -188,9 +220,16 @@ impl Expr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        Ok(SemScalarExpr::row(&Self::resolve_list(
-            items, context, scope,
-        )?))
+        let mut fields = Vec::new();
+        for item in items {
+            if let Self::Star(name) = item
+                && name.append_row_projection(context, scope, &mut fields)?
+            {
+                continue;
+            }
+            fields.push(item.resolve_in(context, scope)?);
+        }
+        Ok(SemScalarExpr::row(&fields))
     }
 
     fn resolve_array(
@@ -533,8 +572,15 @@ impl Cast {
             && let Some(source) = argument.get_type()
         {
             // Stored declarations may retain unqualified source names.
-            let source = context.canonicalize_type_ref(&source).unwrap_or(source);
-            if context.get_explicit_cast(&source, &target).is_none() {
+            let source = if source.is_dynamic() {
+                source
+            } else {
+                context.canonicalize_type_ref(&source).unwrap_or(source)
+            };
+            // A row constructor can be explicitly assigned a named row identity
+            // positionally, without a pg_cast entry for its anonymous type.
+            let exact_row_constructor = argument.accepts_exact_row_identity(context, &target);
+            if !exact_row_constructor && context.get_explicit_cast(&source, &target).is_none() {
                 context.report_analysis_problem(AnalysisProblem::explicit_cast_not_defined(
                     &source, &target,
                 ))?;

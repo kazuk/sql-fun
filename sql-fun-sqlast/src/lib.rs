@@ -24,6 +24,7 @@ mod sql_tokens;
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
 mod sqlite_parser;
+mod stack;
 mod trie_map;
 
 use sql_fun_core::IVec;

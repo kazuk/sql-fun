@@ -154,3 +154,20 @@ impl DeferredTableFunction {
         }
     }
 }
+
+impl DeferredTableFunction {
+    pub(super) fn projection_shape_is_resolved(&self) -> bool {
+        self.known_column_names().is_some()
+    }
+
+    pub(super) fn projection_is_table_dependent(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> bool {
+        if let Some(overload) = self.call().overload().as_ref() {
+            overload.table_output_depends_on_table(context)
+        } else {
+            false
+        }
+    }
+}

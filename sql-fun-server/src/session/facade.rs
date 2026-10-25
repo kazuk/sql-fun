@@ -40,6 +40,12 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
         self.contexts.resolve(handle)
     }
 
+    pub(super) fn expand_asterisk(&self, handle: &ContextHandle) -> bool {
+        self.contexts
+            .rewrite_options(handle)
+            .is_some_and(|options| options.expand_asterisk() == Some(true))
+    }
+
     pub(super) fn collection_count(&self) -> usize {
         self.state.collections.len()
     }
@@ -93,7 +99,10 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
     ) -> Result<SchemaContext, SqlFunServerApiError> {
         let initialization = Initialization::from_request(args)?;
         let schema = Arc::new(initialization.initialize(api).await?);
-        let context_handle = self.register_context(&schema)?;
+        let context_handle = self
+            .contexts
+            .register_with_options(&schema, *initialization.rewrite_options())
+            .map_err(|error| SqlFunServerApiError::new_unexpected(&error.to_string()))?;
         let retained = self.context(&context_handle).expect("registered schema");
         let diagnostics = Diagnostics::from(retained);
         let handle = self.register_collection(diagnostics, Diagnostics::len, Diagnostics::map)?;

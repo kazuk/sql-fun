@@ -90,3 +90,9 @@ impl ColumnReferenceExpr {
         ))
     }
 }
+
+impl ViewColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
+    }
+}

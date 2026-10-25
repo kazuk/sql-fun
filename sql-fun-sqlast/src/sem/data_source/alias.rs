@@ -36,6 +36,14 @@ pub struct AliasSpec {
 }
 
 impl AliasSpec {
+    pub(super) fn projection_name(
+        &self,
+        index: usize,
+        original: &crate::sem::ColumnName,
+    ) -> crate::sem::ColumnName {
+        self.derived_column_at(index).unwrap_or(original).clone()
+    }
+
     pub(crate) fn from_names(name: &str, columns: &[String]) -> Self {
         let mut derived_column_names = Vec::new();
         for column in columns {

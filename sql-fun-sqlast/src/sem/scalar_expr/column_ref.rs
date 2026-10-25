@@ -83,6 +83,19 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    /// SQL source spelling retained by a completed projection binding.
+    pub(crate) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
+        match self {
+            Self::TableColumn(value) => value.projection_reference(),
+            Self::SystemColumn(value) => value.projection_reference(),
+            Self::ViewColumn(value) => value.projection_reference(),
+            Self::TableFuncColumn(value) => value.projection_reference(),
+            Self::CteColumn(value) => value.projection_reference(),
+            Self::SubQueryColumn(value) => value.projection_reference(),
+            _ => None,
+        }
+    }
+
     pub(super) fn with_reference_name(
         self,
         alias: &crate::sem::AliasName,

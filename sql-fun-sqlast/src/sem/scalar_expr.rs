@@ -271,6 +271,29 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) fn accepts_exact_row_identity(
+        &self,
+        context: &impl crate::sem::ParseContext,
+        target: &TypeReference,
+    ) -> bool {
+        if !self.is_row_constructor() {
+            return false;
+        }
+        let Some(source) = self.get_type() else {
+            return false;
+        };
+        let Some(source_columns) = source.row_columns(context) else {
+            return false;
+        };
+        let Some(target_columns) = target.row_columns(context) else {
+            return false;
+        };
+        source_columns.matches_type_structure_with(&target_columns, PartialEq::eq)
+    }
+    const fn is_row_constructor(&self) -> bool {
+        matches!(self, Self::Row(_))
+    }
+
     pub(crate) const fn merge_action() -> Self {
         Self::MergeAction
     }

@@ -5,7 +5,7 @@ use std::process::Command;
 #[test]
 fn check_reports_missing_expand_before_reading_project_metadata() {
     let isolated = ::tempfile::tempdir().unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+    let output = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"))
         .current_dir(isolated.path())
         .env("PATH", isolated.path())
         .arg("check")
@@ -29,7 +29,7 @@ fn check_reports_missing_expand_before_reading_project_metadata() {
 fn help_does_not_require_expand() {
     let isolated = ::tempfile::tempdir().unwrap();
     for args in [vec!["--help"], vec!["check", "--help"]] {
-        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+        let output = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"))
             .current_dir(isolated.path())
             .env("PATH", isolated.path())
             .args(args)
@@ -46,7 +46,7 @@ mod unix {
     #[test]
     fn non_executable_expand_is_reported_as_missing() {
         let tools = test_helpers::expand_tools(false);
-        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+        let output = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"))
             .current_dir(tools.path())
             .env("PATH", tools.path())
             .args(["check", "--package", "fixture"])
@@ -60,7 +60,7 @@ mod unix {
     #[test]
     fn expansion_failure_is_not_reported_as_a_missing_prerequisite() {
         let tools = test_helpers::expand_tools(true);
-        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+        let output = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"))
             .current_dir(tools.path())
             .env("PATH", tools.path())
             .args(["check", "--package", "fixture"])
@@ -80,7 +80,7 @@ mod unix {
         let tools = test_helpers::empty_query_tools();
         let sentinel = tools.path().join("selected.develop.lock");
         let before = std::fs::read(&sentinel).unwrap();
-        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+        let output = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"))
             .current_dir(tools.path())
             .env("PATH", tools.path())
             .env("SQL_FUN_CHECK_PROGRESS", "silent")
@@ -115,7 +115,8 @@ mod unix {
         #[case] visible: bool,
     ) {
         let tools = test_helpers::expand_tools(true);
-        let mut command = Command::new(env!("CARGO_BIN_EXE_sql-fun"));
+        let mut command =
+            Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
         command
             .current_dir(tools.path())
             .env("PATH", tools.path())
@@ -140,7 +141,7 @@ mod unix {
 
     #[test]
     fn invalid_progress_is_an_argument_error() {
-        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+        let output = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"))
             .env("SQL_FUN_CHECK_PROGRESS", "unknown")
             .arg("check")
             .output()

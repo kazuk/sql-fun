@@ -30,11 +30,20 @@ impl SemScalarExprNode for NullIfExpr {
 
 impl ArithExpr {
     /// create instance
-    pub fn build_null_if<TParseContext>(
-        context: TParseContext,
+    pub fn build_null_if<TParseContext: crate::sem::ParseContext>(
+        mut context: TParseContext,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+        let value = Self::build_null_if_resolved(&mut context, lexpr, rexpr)?;
+        Ok((value, context))
+    }
+
+    pub(crate) fn build_null_if_resolved(
+        context: &mut impl crate::sem::ParseContext,
+        lexpr: Option<SemScalarExpr>,
+        rexpr: Option<SemScalarExpr>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         let Some(lexpr) = lexpr else {
             AnalysisError::raise_unexpected_none("nullif.lexpr")?
         };
@@ -42,11 +51,18 @@ impl ArithExpr {
             AnalysisError::raise_unexpected_none("nullif.rexpr")?
         };
 
-        let result = Self::NullIfExpr(Box::new(NullIfExpr {
-            return_value: lexpr,
-            comparison_value: rexpr,
-        }));
-        Ok((SemScalarExpr::Arith(result), context))
+        let binding = crate::sem::ResolvedOperator::comparison(
+            context,
+            &crate::sem::OperatorName::from_parts(None, "="),
+        );
+        let expression = crate::sem::SpecialOperatorExpr::resolve(
+            context,
+            crate::sem::SpecialOperatorKind::null_if(),
+            &[lexpr, rexpr],
+            None,
+            &[binding],
+        )?;
+        Ok(SemScalarExpr::special_operator(&expression))
     }
 }
 
@@ -64,11 +80,20 @@ impl NullIfExpr {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
-        if self.return_value.constraint_node().is_some()
-            || self.comparison_value.constraint_node().is_some()
-        {
-            parameters.special_operator("NULLIF", &[&self.return_value, &self.comparison_value]);
-        }
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        let binding = crate::sem::ResolvedOperator::comparison(
+            context,
+            &crate::sem::OperatorName::from_parts(None, "="),
+        );
+        let mut expression = crate::sem::SpecialOperatorExpr::resolve(
+            context,
+            crate::sem::SpecialOperatorKind::null_if(),
+            &[self.return_value.clone(), self.comparison_value.clone()],
+            None,
+            &[binding],
+        )?;
+        expression.collect_constraints(parameters, context)?;
+        Ok(Some(SemScalarExpr::special_operator(&expression)))
     }
 }

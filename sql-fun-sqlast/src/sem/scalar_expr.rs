@@ -19,6 +19,7 @@ mod min_max;
 mod named_arg;
 mod param_ref;
 mod resolved;
+mod special_operator;
 mod sql_value;
 mod sub_link;
 mod truth_test;
@@ -47,6 +48,7 @@ pub use self::{
     min_max::MinMaxExpr,
     named_arg::NamedArgExpr,
     param_ref::ParamRef,
+    special_operator::{SpecialComparison, SpecialOperatorExpr, SpecialOperatorKind},
     sql_value::SqlValueExpr,
     sub_link::SubLinkExpr,
     truth_test::TruthTestExpr,
@@ -141,6 +143,8 @@ pub enum SemScalarExpr {
     Grouping(GroupingExpr),
     /// arith expression
     Arith(ArithExpr),
+    /// Retained special and quantified comparisons with their semantic results.
+    SpecialOperator(Box<SpecialOperatorExpr>),
     /// type casting expression
     TypeCast(TypeCastExpr),
     /// cast expression
@@ -224,6 +228,7 @@ impl SemScalarExpr {
             Self::Coalesce(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
+            Self::SpecialOperator(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
             Self::NamedArg(value) => value.canonicalize_grouping_key(),
             Self::Constrained(value) => value.canonicalize_grouping_key(),
@@ -372,6 +377,7 @@ impl SemScalarExpr {
         match self {
             Self::Arith(value) => value.binding(),
             Self::Constrained(value) => value.operator_binding(),
+            Self::SpecialOperator(value) => value.comparison_binding(),
             _ => None,
         }
     }
@@ -424,6 +430,7 @@ impl SemScalarExpr {
             Self::Case(value) => value.node(),
             Self::TruthTest(value) => value.node(),
             Self::Coalesce(value) => value.node(),
+            Self::SpecialOperator(value) => value.node(),
             _ => None,
         }
     }
@@ -513,6 +520,7 @@ impl SemScalarExpr {
             Self::Const(scalar_const_expr) => scalar_const_expr.get_type(),
             Self::FuncCall(func_call_expr) => func_call_expr.get_type(),
             Self::Arith(arith_expr) => arith_expr.get_type(),
+            Self::SpecialOperator(value) => value.get_type(),
             Self::TypeCast(type_cast_expr) => type_cast_expr.get_type(),
             Self::Case(case_expr) => case_expr.get_type(),
             Self::Boolean(_boolean_expr) => Self::builtin_boolean_type(),
@@ -548,6 +556,7 @@ impl SemScalarExpr {
             Self::Const(scalar_const_expr) => scalar_const_expr.is_not_null(),
             Self::FuncCall(func_call_expr) => func_call_expr.is_not_null(),
             Self::Arith(arith_expr) => arith_expr.is_not_null(),
+            Self::SpecialOperator(value) => value.is_not_null(),
             Self::TypeCast(type_cast_expr) => type_cast_expr.is_not_null(),
             Self::Case(case_expr) => case_expr.is_not_null(),
             Self::Boolean(boolean_expr) => boolean_expr.is_not_null(),
@@ -629,6 +638,7 @@ impl SemScalarExpr {
             Self::ColumnRef(cr) => cr.get_column_name().to_string(),
             Self::FuncCall(call) => call.name().local_name(),
             Self::Arith(_arith_expr) => String::new(),
+            Self::SpecialOperator(_) => String::new(),
             Self::TypeCast(value) => value.array_projection_name().unwrap_or_default().to_owned(),
             Self::Case(_case_expr) => String::new(),
             Self::Boolean(_boolean_expr) => String::new(),
@@ -962,6 +972,7 @@ impl SemScalarExpr {
             Self::FuncCall(v) => v.walk(visitor)?,
             Self::NamedArg(v) => v.walk(visitor)?,
             Self::Arith(v) => v.walk(visitor)?,
+            Self::SpecialOperator(value) => value.walk(visitor)?,
             Self::TypeCast(v) => v.walk(visitor)?,
             Self::Case(v) => v.walk(visitor)?,
             Self::Boolean(v) => v.walk(visitor)?,
@@ -1036,6 +1047,7 @@ impl SemScalarExpr {
             Self::Case(value) => value.apply_constraints(constraints),
             Self::TruthTest(value) => value.apply_constraints(constraints),
             Self::Coalesce(value) => value.apply_constraints(constraints),
+            Self::SpecialOperator(value) => value.apply_constraints(constraints),
             _ => {}
         }
     }
@@ -1048,6 +1060,10 @@ impl SemScalarExpr {
             Self::Param(value) => Some(parameters.parameter(value.position(), value.constraint())),
             Self::ColumnRef(_) => parameters.column(self),
             Self::Arith(value) => value.collect_constraints(parameters, context)?,
+            Self::SpecialOperator(value) => {
+                value.collect_constraints(parameters, context)?;
+                None
+            }
             Self::FuncCall(value) => value.collect_constraints(parameters, context)?,
             Self::TypeCast(value) => value.collect_constraints(parameters, context)?,
             Self::Boolean(value) => value.collect_constraints(parameters, context),

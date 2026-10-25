@@ -29,6 +29,12 @@ pub(crate) trait SemanticVisitor {
     {
         columns.walk(self)
     }
+    fn special_operator(
+        &mut self,
+        _value: &mut crate::sem::scalar_expr::SpecialOperatorExpr,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
     fn array_subquery(
         &mut self,
         _value: &mut crate::sem::ArraySubqueryExpr,

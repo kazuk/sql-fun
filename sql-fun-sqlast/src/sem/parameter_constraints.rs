@@ -94,7 +94,7 @@ impl InputTypeConstraint {
 
     fn preimage(&self, projection: &TypeProjection) -> Self {
         match &self.0 {
-            Some(types) => Self::types(types.iter().filter_map(|ty| projection.inverse(ty))),
+            Some(types) => Self::types(types.iter().flat_map(|ty| projection.preimages(ty))),
             None => Self::any(),
         }
     }

@@ -2,6 +2,7 @@
 use crate::sem::traversal::SemanticVisitor;
 use crate::sem::{
     AliasName, AnalysisError, OperatorName, ResultColumnCollection, SelectStatement, SemScalarExpr,
+    TypeReference,
 };
 
 /// The completed outcome of resolving a clause name.
@@ -845,6 +846,49 @@ impl ResolvedOperator {
             }
         }
     }
+    pub(crate) fn comparison(context: &impl crate::sem::ParseContext, name: &OperatorName) -> Self {
+        let mut binding = Self::resolve(context, name, true, true);
+        if let Some(operator) = context.get_operator_op(name, true, true) {
+            binding.signatures = operator.parameter_signatures();
+        }
+        binding
+    }
+
+    pub(crate) fn known_comparison(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        left: &TypeReference,
+        right: &TypeReference,
+    ) -> Result<Option<[TypeReference; 2]>, AnalysisError> {
+        let definitions =
+            crate::sem::parameter_resolution::Signature::binary_definitions(&self.signatures);
+        let unknown = crate::sem::MinMaxExpr::unknown();
+        let (left, right) = if left == &unknown && right == &unknown {
+            (
+                crate::sem::PgBuiltInType::text(),
+                crate::sem::PgBuiltInType::text(),
+            )
+        } else if left == &unknown {
+            let ty = crate::sem::MinMaxExpr::base_type(context, right);
+            (ty.clone(), ty)
+        } else if right == &unknown {
+            let ty = crate::sem::MinMaxExpr::base_type(context, left);
+            (ty.clone(), ty)
+        } else {
+            (left.clone(), right.clone())
+        };
+        crate::sem::ArithExpr::known_comparison(context, &definitions, &left, &right)
+    }
+
+    pub(crate) fn comparison_signatures(&self) -> &[crate::sem::parameter_resolution::Signature] {
+        &self.signatures
+    }
+
+    /// SQL operator whose completed lookup this binding retains.
+    pub const fn name(&self) -> &OperatorName {
+        &self.name
+    }
+
     /// Name lookup outcome; overload/type selection is a subsequent operation.
     pub const fn resolution(&self) -> &QueryNameResolution {
         &self.resolution

@@ -6,6 +6,25 @@ use crate::sem::scalar_expr::{
 use crate::sem::{AnalysisError, SelectStatement, TypeReference};
 
 impl SemScalarExpr {
+    pub(crate) fn special_operator(value: &super::SpecialOperatorExpr) -> Self {
+        Self::SpecialOperator(Box::new(value.clone()))
+    }
+    /// Retained special comparison, including its analyzed query when applicable.
+    pub fn as_special_operator(&self) -> Option<&super::SpecialOperatorExpr> {
+        if let Self::SpecialOperator(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn comparison_operands(&self) -> Vec<Self> {
+        if let Self::Row(row) = self {
+            row.0.clone()
+        } else {
+            vec![self.clone()]
+        }
+    }
+
     pub(crate) fn truth_test(value: &super::TruthTestExpr) -> Self {
         Self::TruthTest(value.clone())
     }

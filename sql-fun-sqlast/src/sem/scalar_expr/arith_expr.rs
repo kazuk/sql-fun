@@ -94,7 +94,7 @@ impl ArithExpr {
             Self::UndefinedOperatorAny(call_site) => call_site.is_not_null(),
             Self::UndefinedOperatorAll(call_site) => call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_not_null(),
-            Self::Between(_) => todo!(),
+            Self::Between(_) => None,
         }
     }
 
@@ -115,7 +115,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => None,
-            Self::Between(_) => todo!(),
+            Self::Between(_) => Some(crate::sem::PgBuiltInType::bool()),
         }
     }
 
@@ -130,7 +130,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => return None,
-            Self::Between(_) => todo!(),
+            Self::Between(_) => return None,
         };
         if is_strict {
             if matches!(self.inputs_is_not_null(), Some(true)) {
@@ -185,15 +185,35 @@ impl BetweenExpr {
     fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
-        if self.left.constraint_node().is_some()
-            || self.start.constraint_node().is_some()
-            || self.end.constraint_node().is_some()
-        {
-            parameters.special_operator("BETWEEN", &[&self.left, &self.start, &self.end]);
-        }
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        let kind = if self.not {
+            crate::sem::SpecialOperatorKind::not_between()
+        } else {
+            crate::sem::SpecialOperatorKind::between()
+        };
+        let bindings = [
+            crate::sem::ResolvedOperator::comparison(
+                context,
+                &crate::sem::OperatorName::from_parts(None, ">="),
+            ),
+            crate::sem::ResolvedOperator::comparison(
+                context,
+                &crate::sem::OperatorName::from_parts(None, "<="),
+            ),
+        ];
+        let mut expression = crate::sem::SpecialOperatorExpr::resolve(
+            context,
+            kind,
+            &[self.left.clone(), self.start.clone(), self.end.clone()],
+            None,
+            &bindings,
+        )?;
+        expression.collect_constraints(parameters, context)?;
+        Ok(Some(SemScalarExpr::special_operator(&expression)))
     }
 }
+
 impl ArithExpr {
     pub(crate) fn collect_constraints(
         &self,
@@ -205,30 +225,12 @@ impl ArithExpr {
             Self::OpLeftUnary(v) => v.collect_constraints(parameters, context),
             Self::OpRightUnary(v) => v.collect_constraints(parameters, context),
             Self::UndefinedOperator(v) => v.collect_constraints(parameters, context),
-            Self::OpAnyBinary(v) => {
-                v.collect_constraints(parameters);
-                Ok(None)
-            }
-            Self::OpAllBinary(v) => {
-                v.collect_constraints(parameters);
-                Ok(None)
-            }
-            Self::UndefinedOperatorAny(v) => {
-                v.collect_constraints(parameters);
-                Ok(None)
-            }
-            Self::UndefinedOperatorAll(v) => {
-                v.collect_constraints(parameters);
-                Ok(None)
-            }
-            Self::NullIfExpr(v) => {
-                v.collect_constraints(parameters);
-                Ok(None)
-            }
-            Self::Between(v) => {
-                v.collect_constraints(parameters);
-                Ok(None)
-            }
+            Self::OpAnyBinary(v) => v.collect_constraints(parameters, context),
+            Self::OpAllBinary(v) => v.collect_constraints(parameters, context),
+            Self::UndefinedOperatorAny(v) => v.collect_constraints(parameters, context),
+            Self::UndefinedOperatorAll(v) => v.collect_constraints(parameters, context),
+            Self::NullIfExpr(v) => v.collect_constraints(parameters, context),
+            Self::Between(v) => v.collect_constraints(parameters, context),
         }
     }
 }

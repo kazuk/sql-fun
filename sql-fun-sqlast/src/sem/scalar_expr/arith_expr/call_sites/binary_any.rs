@@ -157,10 +157,27 @@ impl AnyBinaryCallSite {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
-        if self.left_arg.constraint_node().is_some() || self.right_arg.constraint_node().is_some() {
-            parameters.special_operator("ANY", &[&self.left_arg, &self.right_arg]);
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if self.left_arg.constraint_node().is_none() && self.right_arg.constraint_node().is_none() {
+            return Ok(None);
         }
+        let binding = self
+            .binding
+            .clone()
+            .map(|binding| *binding)
+            .unwrap_or_else(|| {
+                crate::sem::ResolvedOperator::comparison(context, &self.operator_name)
+            });
+        let mut expression = crate::sem::SpecialOperatorExpr::resolve(
+            context,
+            crate::sem::SpecialOperatorKind::array_any(),
+            &[self.left_arg.clone(), self.right_arg.clone()],
+            None,
+            &[binding],
+        )?;
+        expression.collect_constraints(parameters, context)?;
+        Ok(Some(SemScalarExpr::special_operator(&expression)))
     }
 }
 
@@ -168,10 +185,27 @@ impl UndefinedOperatorAnyCallSite {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
-        if self.larg.constraint_node().is_some() || self.rarg.constraint_node().is_some() {
-            parameters.special_operator("ANY", &[&self.larg, &self.rarg]);
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if self.larg.constraint_node().is_none() && self.rarg.constraint_node().is_none() {
+            return Ok(None);
         }
+        let binding = self
+            .binding
+            .clone()
+            .map(|binding| *binding)
+            .unwrap_or_else(|| {
+                crate::sem::ResolvedOperator::comparison(context, &self.operator_name)
+            });
+        let mut expression = crate::sem::SpecialOperatorExpr::resolve(
+            context,
+            crate::sem::SpecialOperatorKind::array_any(),
+            &[self.larg.clone(), self.rarg.clone()],
+            None,
+            &[binding],
+        )?;
+        expression.collect_constraints(parameters, context)?;
+        Ok(Some(SemScalarExpr::special_operator(&expression)))
     }
 }
 

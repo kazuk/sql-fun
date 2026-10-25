@@ -2,9 +2,9 @@
 use ::sql_fun_core::analysis_problem as diagnostic;
 pub use ::sql_fun_core::analysis_problem::{
     AlterColumnProblem, AnalysisProblem, ArrayProblem, CallArgumentProblem, ColumnAttributeProblem,
-    CreationProblem, DeleteProblem, DeleteProblemKind, DomainBaseTypeNameNotFound,
-    FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem, InsertProblemKind,
-    MinMaxProblem, NameResolution, OverloadResolution, OwnershipProblem,
+    ComparisonProblem, CreationProblem, DeleteProblem, DeleteProblemKind,
+    DomainBaseTypeNameNotFound, FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem,
+    InsertProblemKind, MinMaxProblem, NameResolution, OverloadResolution, OwnershipProblem,
     ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem,
     TableFunctionProblem, TriggerProblem, TruthTestProblem, UpdateProblem, UpdateProblemKind,
     ViewProblem,

@@ -16,6 +16,24 @@ use std::collections::BTreeMap;
 struct Outputs(Vec<Output>);
 
 impl Outputs {
+    fn values(&self, graph: &mut ConstraintGraph) -> Vec<SemScalarExpr> {
+        self.0
+            .iter()
+            .map(|output| {
+                let domain = output.constraint(graph).clone();
+                let node = output.node.unwrap_or_else(|| graph.node(&domain));
+                SemScalarExpr::constrained(&ConstrainedExpr::new(
+                    node,
+                    "query output",
+                    &[],
+                    &domain,
+                    None,
+                    &output.name,
+                ))
+            })
+            .collect()
+    }
+
     fn constraints(&self, graph: &ConstraintGraph) -> Vec<InputTypeConstraint> {
         self.0
             .iter()
@@ -347,8 +365,88 @@ impl ParameterResolution {
     ) -> SemScalarExpr {
         todo!("SQLite operator type constraints");
     }
-    pub(crate) fn special_operator(&mut self, _operation: &str, _arguments: &[&SemScalarExpr]) {
-        todo!("parameter constraints for this operator form");
+    fn comparison_input(&mut self, value: &SemScalarExpr) -> usize {
+        if crate::sem::MinMaxExpr::input_type(value) == Some(crate::sem::MinMaxExpr::unknown()) {
+            self.graph.node(&InputTypeConstraint::any())
+        } else {
+            self.input(value)
+        }
+    }
+
+    pub(crate) fn comparison(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        binding: &crate::sem::ResolvedOperator,
+        left: &SemScalarExpr,
+        right: &SemScalarExpr,
+        return_left: bool,
+    ) -> (usize, [usize; 2]) {
+        let inputs = [self.comparison_input(left), self.comparison_input(right)];
+        let domains = inputs.map(|node| self.graph.domain(node).clone());
+        let signatures = Signature::comparison_signatures(
+            binding.comparison_signatures(),
+            context,
+            &domains,
+            return_left,
+        );
+        let result = self.graph.node(&InputTypeConstraint::any());
+        let targets = [
+            self.graph.node(&InputTypeConstraint::any()),
+            self.graph.node(&InputTypeConstraint::any()),
+        ];
+        let alternatives = Signature::alternatives(&signatures, context, &domains);
+        self.graph.overload(
+            &[inputs[0], inputs[1], result, targets[0], targets[1]],
+            &alternatives,
+            "comparison",
+        );
+        (result, targets)
+    }
+
+    pub(crate) fn array_element(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        value: &SemScalarExpr,
+    ) -> SemScalarExpr {
+        let source = self.input(value);
+        let element = if let Some(ty) = value.get_type() {
+            let base = crate::sem::MinMaxExpr::base_type(context, &ty);
+            context.get_array_item_type(&base)
+        } else {
+            None
+        };
+        let domain = element
+            .as_ref()
+            .map(InputTypeConstraint::exact)
+            .unwrap_or_else(InputTypeConstraint::any);
+        let result = self.operation("array element", &[], &domain, None);
+        self.graph.project(
+            source,
+            result.constraint_node().expect("operation node"),
+            crate::sem::parameter_constraints::TypeProjection::array_item(context),
+        );
+        result
+    }
+
+    pub(crate) fn completed_values(&mut self) -> Vec<SemScalarExpr> {
+        self.completed.values(&mut self.graph)
+    }
+
+    pub(crate) fn result_node(
+        &mut self,
+        existing: Option<usize>,
+        domain: &InputTypeConstraint,
+    ) -> usize {
+        if let Some(node) = existing {
+            self.graph.restrict(node, domain);
+            node
+        } else {
+            self.graph.node(domain)
+        }
+    }
+
+    pub(crate) fn equal_nodes(&mut self, left: usize, right: usize) {
+        self.graph.equal(left, right);
     }
 
     fn input(&mut self, value: &SemScalarExpr) -> usize {
@@ -763,14 +861,107 @@ pub(crate) struct Signature {
     declared_inputs: Option<Vec<TypeReference>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     unrestricted_inputs: Vec<usize>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    retain_targets: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    invalid_comparison_result: bool,
 }
 impl Signature {
+    pub(crate) fn binary_definitions(
+        signatures: &[Self],
+    ) -> Vec<crate::sem::BinaryOperatorDefinition> {
+        signatures
+            .iter()
+            .filter_map(|signature| {
+                let [left, right] = signature.inputs.as_slice() else {
+                    return None;
+                };
+                Some(crate::sem::BinaryOperatorDefinition::new(
+                    left,
+                    right,
+                    &signature.result,
+                    false,
+                ))
+            })
+            .collect()
+    }
+
+    fn comparison_signatures(
+        signatures: &[Self],
+        context: &impl crate::sem::ParseContext,
+        domains: &[InputTypeConstraint],
+        return_left: bool,
+    ) -> Vec<Self> {
+        let mut results = Vec::new();
+        for signature in signatures {
+            if signature.inputs.len() != 2 {
+                continue;
+            }
+            let mut instantiated = Vec::new();
+            if signature
+                .inputs
+                .iter()
+                .any(|ty| !ty.is_dynamic() && ty.is_simple_infer_arg())
+            {
+                let mut seeds = context.type_references();
+                for domain in domains {
+                    seeds.extend(domain.admissible_types().unwrap_or(&[]).iter().cloned());
+                }
+                let arrays: Vec<_> = seeds.iter().map(TypeReference::array_type).collect();
+                seeds.extend(arrays);
+                for seed in seeds {
+                    let mut inference = crate::sem::type_system::SimpleInferContext::default();
+                    let Some(declared) = signature
+                        .inputs
+                        .iter()
+                        .find(|ty| !ty.is_dynamic() && ty.is_simple_infer_arg())
+                    else {
+                        continue;
+                    };
+                    if inference
+                        .push_input_param(declared, &seed, context)
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    let Ok(substitution) = inference.get_inference_result() else {
+                        continue;
+                    };
+                    let mut resolved = signature.clone();
+                    for input in &mut resolved.inputs {
+                        if !input.is_dynamic() && input.is_simple_infer_arg() {
+                            substitution.apply(input);
+                        }
+                    }
+                    resolved.declared_inputs = Some(signature.inputs.clone());
+                    if !instantiated.contains(&resolved) {
+                        instantiated.push(resolved);
+                    }
+                }
+            } else {
+                instantiated.push(signature.clone());
+            }
+            for mut signature in instantiated {
+                signature.retain_targets = true;
+                signature.invalid_comparison_result =
+                    signature.result != crate::sem::PgBuiltInType::bool();
+                if return_left {
+                    signature.result = signature.inputs[0].clone();
+                }
+                results.push(signature);
+            }
+        }
+        results
+    }
+
     pub(crate) fn new(inputs: &[TypeReference], result: &TypeReference) -> Self {
         Self {
             inputs: inputs.to_vec(),
             result: result.clone(),
             declared_inputs: None,
             unrestricted_inputs: Vec::new(),
+            retain_targets: false,
+            invalid_comparison_result: false,
         }
     }
     pub(crate) fn new_function(
@@ -798,7 +989,7 @@ impl Signature {
                 .inputs
                 .iter()
                 .chain([&self.result])
-                .all(Self::concrete_type)
+                .all(|ty| Self::concrete_type(ty) || (self.retain_targets && ty.is_dynamic()))
     }
 
     fn concrete_type(ty: &TypeReference) -> bool {
@@ -814,7 +1005,11 @@ impl Signature {
         catalog: &impl BaseParseContext,
         index: usize,
     ) -> std::collections::HashSet<TypeReference> {
-        catalog.cast_sources(&self.inputs[index], false)
+        if self.inputs[index].is_dynamic() {
+            std::collections::HashSet::from([self.inputs[index].clone()])
+        } else {
+            catalog.cast_sources(&self.inputs[index], false)
+        }
     }
 
     fn cast_score(
@@ -844,8 +1039,20 @@ impl Signature {
         excluded: &[Vec<TypeReference>],
     ) -> SignatureAlternative {
         let mut domains = inputs.to_vec();
-        domains.push(InputTypeConstraint::exact(&self.result));
-        SignatureAlternative::excluding(&domains, excluded)
+        domains.push(if self.invalid_comparison_result {
+            InputTypeConstraint::types([])
+        } else {
+            InputTypeConstraint::exact(&self.result)
+        });
+        let mut excluded = excluded.to_vec();
+        excluded.push(Vec::new());
+        if self.retain_targets {
+            for target in &self.inputs {
+                domains.push(InputTypeConstraint::exact(target));
+                excluded.push(Vec::new());
+            }
+        }
+        SignatureAlternative::excluding(&domains, &excluded)
     }
 
     // Partition source types by their cast scores against all candidates. Types
@@ -1046,6 +1253,16 @@ struct Collector<'a, C: crate::sem::ParseContext> {
 }
 
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, C> {
+    fn special_operator(
+        &mut self,
+        value: &mut crate::sem::scalar_expr::SpecialOperatorExpr,
+    ) -> Result<(), AnalysisError> {
+        if value.expand_pending_stars(self.context)? {
+            value.walk(self)?;
+        }
+        Ok(())
+    }
+
     fn array_subquery(
         &mut self,
         value: &mut crate::sem::ArraySubqueryExpr,
@@ -1261,6 +1478,17 @@ impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
     }
 }
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
+    fn special_operator(
+        &mut self,
+        value: &mut crate::sem::scalar_expr::SpecialOperatorExpr,
+    ) -> Result<(), AnalysisError> {
+        if value.expand_pending_stars(self.context)? {
+            self.expanded_arrays = true;
+            value.walk(self)?;
+        }
+        Ok(())
+    }
+
     fn array_subquery(
         &mut self,
         value: &mut crate::sem::ArraySubqueryExpr,

@@ -2,6 +2,7 @@
 mod alter_column;
 mod array;
 mod call_argument;
+mod comparison;
 mod creation;
 mod delete;
 mod index;
@@ -22,6 +23,7 @@ mod view;
 pub use self::alter_column::{AlterColumnProblem, ColumnAttributeProblem};
 pub use self::array::ArrayProblem;
 pub use self::call_argument::CallArgumentProblem;
+pub use self::comparison::{ComparisonColumns, ComparisonProblem};
 pub use self::creation::CreationProblem;
 pub use self::delete::{
     CursorNameProblem, CursorTargetMismatchProblem, DeleteProblem, DeleteProblemKind,
@@ -66,6 +68,8 @@ pub enum AnalysisProblem {
     Array(ArrayProblem),
     /// Invalid boolean input to a truth predicate.
     TruthTest(TruthTestProblem),
+    /// Invalid special or subquery comparison.
+    Comparison(ComparisonProblem),
     /// Invalid index alteration or a statistics warning.
     Index(IndexProblem),
     /// An ALTER COLUMN binding or attribute is invalid.
@@ -352,7 +356,13 @@ impl AnalysisProblem {
             _ => None,
         }
     }
-    /// A truth-test operand typing or literal-conversion failure.
+    /// A structured special-comparison failure.
+    #[must_use]
+    pub const fn comparison(problem: ComparisonProblem) -> Self {
+        Self::Comparison(problem)
+    }
+
+    /// Invalid input to a SQL truth predicate.
     #[must_use]
     pub const fn truth_test(problem: TruthTestProblem) -> Self {
         Self::TruthTest(problem)
@@ -397,6 +407,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.code(),
             Self::Array(problem) => problem.code(),
             Self::TruthTest(problem) => problem.code(),
+            Self::Comparison(problem) => problem.code(),
             Self::ParameterConstraint(_) => "parameter_constraint",
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -463,6 +474,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.render_metadata(),
             Self::Array(problem) => problem.render_metadata(),
             Self::TruthTest(problem) => problem.render_metadata(),
+            Self::Comparison(problem) => problem.render_metadata(),
             Self::ParameterConstraint(problem) => problem.render_metadata(),
             Self::NameResolution(problem) => return problem.render_metadata(),
             _ => return None,
@@ -481,6 +493,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::QueryAnalysis(problem) => problem.diagnostic_message(),
             Self::Array(problem) => problem.diagnostic_message(),
             Self::TruthTest(problem) => problem.diagnostic_message(),
+            Self::Comparison(problem) => problem.diagnostic_message(),
             Self::Index(problem) => problem.diagnostic_message(),
             Self::AlterColumn(problem) => problem.diagnostic_message(),
             Self::MinMax(problem) => problem.diagnostic_message(),

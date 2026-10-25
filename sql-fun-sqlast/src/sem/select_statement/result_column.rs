@@ -162,6 +162,13 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn comparison_values(&self) -> Vec<SemScalarExpr> {
+        self.0
+            .iter()
+            .filter_map(|column| column.expression().cloned())
+            .collect()
+    }
+
     pub(crate) fn has_pending_stars(&self) -> bool {
         self.0.iter().any(ResultColumn::has_pending_star)
     }

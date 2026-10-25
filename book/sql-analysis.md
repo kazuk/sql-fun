@@ -507,6 +507,27 @@ expression. Use one placeholder style per input; do not mix named placeholders
 with native `$1` parameters. Explicit hints still undergo validation against
 all uses of the parameter.
 
+Special-comparison support is under development. Parameter inference against
+catalogs containing range/multirange overloads and validation of multi-column
+row operators remain incomplete.
+
+Special comparisons also participate in parameter analysis: array `ANY`/`ALL`,
+`BETWEEN`/`NOT BETWEEN`, and `NULLIF`. For example, `$1 = ANY($2)` relates the
+first input to the second input's array element type through the comparison
+operator's implicit conversions. It does not require identical source types.
+`NULLIF` returns the first comparison argument's type after conversion:
+`NULLIF(1, 2.2)` has type `numeric`, and its result may be NULL.
+
+Array and subquery quantifiers have different operands. In
+`$1 = ANY(SELECT value FROM items)`, the comparison uses the output column's
+type, including when that column is itself an array. The analyzed expression
+retains the outer inputs, comparison bindings, and child query. Inspect
+`SemScalarExpr::as_special_operator()` for its form, operands, comparison
+coercion target domains, and result domain. A subquery's output width must
+match the number of outer comparison operands. Analysis reports static type
+and width errors; it does not execute queries or predict their runtime row
+counts or values.
+
 Parameters in supported ORDER BY, GROUP BY, HAVING, DISTINCT ON, LIMIT/OFFSET,
 aggregate FILTER/ordering, and window expressions participate in analysis,
 including nested queries. Parameter-dependent RANGE ordering and custom RANGE

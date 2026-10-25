@@ -13,6 +13,7 @@ pub(super) struct StructuralConstraint {
 #[derive(Clone, Debug)]
 pub(crate) enum TypeProjection {
     ArrayElement,
+    ArrayItem(ArrayItemProjection),
     ConstructArray,
     Array,
     Member {
@@ -21,7 +22,99 @@ pub(crate) enum TypeProjection {
     },
 }
 
+/// Context-prepared semantic element relationships, retained beyond analysis.
+#[derive(Clone, Debug)]
+pub(crate) struct ArrayItemProjection(Vec<(TypeReference, TypeReference)>);
+impl ArrayItemProjection {
+    fn retain(&mut self, source: &TypeReference, element: &TypeReference) {
+        if !self.0.iter().any(|(ty, _)| ty == source) {
+            self.0.push((source.clone(), element.clone()));
+        }
+    }
+    fn project(&self, source: &TypeReference) -> Option<TypeReference> {
+        if let Some((_, element)) = self.0.iter().find(|(ty, _)| ty == source) {
+            return Some(element.clone());
+        }
+        if source.is_array() == Some(true) {
+            Some(source.element_type())
+        } else {
+            None
+        }
+    }
+    fn preimages(&self, result: &TypeReference) -> Vec<TypeReference> {
+        let mut sources: Vec<_> = self
+            .0
+            .iter()
+            .filter(|(_, element)| element == result)
+            .map(|(ty, _)| ty.clone())
+            .collect();
+        if result.is_array() != Some(true) {
+            sources.push(result.array_type());
+        }
+        sources
+    }
+}
+
+#[cfg(test)]
+mod test_array_item_projection {
+    use super::{ArrayItemProjection, TypeProjection};
+    use crate::sem::{
+        ConstraintGraph, InputTypeConstraint, ParameterConstraints, PgBuiltInType, TypeDefinition,
+        TypeReference,
+    };
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn retained_vector_identity_is_an_alternative_to_an_ordinary_array() {
+        let vector = TypeReference::from_master_type_name("int2vector");
+        let element = PgBuiltInType::int2();
+        let mut facts = ArrayItemProjection(Vec::new());
+        facts.retain(&vector, &element);
+        assert_eq!(facts.project(&vector), Some(element.clone()));
+        assert!(facts.preimages(&element).contains(&vector));
+        assert!(facts.preimages(&element).contains(&element.array_type()));
+    }
+
+    #[test]
+    fn dynamic_array_relationship_survives_analysis_ownership() {
+        let element = PgBuiltInType::int4();
+        let array = TypeReference::dynamic(&TypeDefinition::array(&element));
+        let mut graph = ConstraintGraph::default();
+        let source = graph.parameter(1);
+        let result = graph.parameter(2);
+        graph.project(
+            source,
+            result,
+            TypeProjection::array_item(&crate::test_helpers::TestParseContext::default()),
+        );
+        graph.restrict(source, &InputTypeConstraint::exact(&array));
+        graph.solve().unwrap();
+        let constraints = ParameterConstraints::from_graph(&graph);
+        assert!(constraints.allows(&BTreeMap::from([(1, array.clone()), (2, element)])));
+        assert!(!constraints.allows(&BTreeMap::from([(1, array), (2, PgBuiltInType::text())])));
+    }
+}
+
 impl TypeProjection {
+    pub(crate) fn array_item(context: &impl ParseContext) -> Self {
+        let mut facts = ArrayItemProjection(Vec::new());
+        for source in context.type_references() {
+            let base = crate::sem::MinMaxExpr::base_type(context, &source);
+            if let Some(element) = context.get_array_item_type(&base) {
+                facts.retain(&source, &element);
+            }
+        }
+        Self::ArrayItem(facts)
+    }
+
+    pub(super) fn preimages(&self, result: &TypeReference) -> Vec<TypeReference> {
+        if let Self::ArrayItem(facts) = self {
+            facts.preimages(result)
+        } else {
+            self.inverse(result).into_iter().collect()
+        }
+    }
+
     pub(crate) const fn construct_array() -> Self {
         Self::ConstructArray
     }
@@ -42,6 +135,11 @@ impl TypeProjection {
     }
 
     pub(super) fn retain_owned(&mut self, source: &TypeReference) {
+        if let Self::ArrayItem(facts) = self
+            && source.is_array() == Some(true)
+        {
+            facts.retain(source, &source.element_type());
+        }
         if let Self::Member { definitions, .. } = self
             && source.type_definition().is_some()
         {
@@ -63,6 +161,13 @@ impl TypeProjection {
     }
 
     fn prepare(&mut self, context: &impl ParseContext, source: &TypeReference) {
+        if let Self::ArrayItem(facts) = self {
+            let base = crate::sem::MinMaxExpr::base_type(context, source);
+            if let Some(element) = context.get_array_item_type(&base) {
+                facts.retain(source, &element);
+            }
+            return;
+        }
         if !matches!(self, Self::Member { .. }) || source.is_array() != Some(false) {
             return;
         }
@@ -93,6 +198,9 @@ impl TypeProjection {
     }
 
     pub(super) fn project(&self, source: &TypeReference) -> Option<TypeReference> {
+        if let Self::ArrayItem(facts) = self {
+            return facts.project(source);
+        }
         if let Self::Member { name, definitions } = self {
             if source.is_array() != Some(false) {
                 return None;
@@ -121,6 +229,7 @@ impl TypeProjection {
         match self {
             Self::ConstructArray => unreachable!("array construction handled above"),
             Self::ArrayElement => Some(source.element_type()),
+            Self::ArrayItem(_) => unreachable!("semantic element projection handled above"),
             Self::Array => Some(source.clone()),
             Self::Member { .. } => unreachable!("member projection handled above"),
         }

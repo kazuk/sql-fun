@@ -26,7 +26,7 @@ impl ArraySubqueryExpr {
             invalid_shape: false,
             node: None,
         };
-        value.query.walk(&mut UnknownOutput { context, depth: 0 })?;
+        value.query.normalize_unknown_outputs(context)?;
         value.validate_shape(context)?;
         value.refresh_type();
         Ok(value)
@@ -135,6 +135,15 @@ impl SemScalarExprNode for ArraySubqueryExpr {
         } else {
             Some(true)
         }
+    }
+}
+
+impl SelectStatement {
+    pub(crate) fn normalize_unknown_outputs(
+        &mut self,
+        context: &impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        self.walk(&mut UnknownOutput { context, depth: 0 })
     }
 }
 

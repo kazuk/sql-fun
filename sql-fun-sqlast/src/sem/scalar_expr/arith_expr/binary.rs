@@ -54,6 +54,47 @@ impl ResolvedBinaryOperator {
 }
 
 impl ArithExpr {
+    pub(crate) fn known_comparison(
+        context: &mut impl crate::sem::ParseContext,
+        definitions: &[BinaryOperatorDefinition],
+        left: &crate::sem::TypeReference,
+        right: &crate::sem::TypeReference,
+    ) -> Result<Option<[crate::sem::TypeReference; 2]>, AnalysisError> {
+        // Preserve applicable domain-specific operators before comparing their
+        // base types. Domain normalization belongs to this comparison consumer.
+        let (left, right) = if BinaryCastCandidate::enumerate_from_context_resolved(
+            context,
+            definitions,
+            left,
+            right,
+        )
+        .is_empty()
+        {
+            (
+                crate::sem::MinMaxExpr::base_type(context, left),
+                crate::sem::MinMaxExpr::base_type(context, right),
+            )
+        } else {
+            (left.clone(), right.clone())
+        };
+        let definition = OperatorDefinition::binary(definitions);
+        let candidates = BinaryCastCandidate::resolve(context, &definition, &left, &right)?;
+        let [candidate] = candidates.as_slice() else {
+            return Ok(None);
+        };
+        let operator = candidate.operator();
+        if operator.get_return_type() != &crate::sem::PgBuiltInType::bool() {
+            context.report_analysis_problem(AnalysisProblem::comparison(
+                crate::sem::problem::ComparisonProblem::boolean_result(),
+            ))?;
+            return Ok(None);
+        }
+        Ok(Some([
+            operator.left_arg_type().clone(),
+            operator.right_arg_type().clone(),
+        ]))
+    }
+
     pub(super) fn resolve_overload_binary<TParseContext>(
         context: &mut TParseContext,
         operator_def: OperatorDefinition,

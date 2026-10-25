@@ -432,9 +432,16 @@ impl OperatorKind {
         right: bool,
     ) -> Result<Option<crate::sem::ResolvedOperator>, AnalysisError> {
         match self {
-            Self::Ordinary | Self::Any | Self::All => Ok(Some(
-                crate::sem::ResolvedOperator::resolve(context, &name.operator_name()?, left, right),
-            )),
+            Self::Any | Self::All => Ok(Some(crate::sem::ResolvedOperator::comparison(
+                context,
+                &name.operator_name()?,
+            ))),
+            Self::Ordinary => Ok(Some(crate::sem::ResolvedOperator::resolve(
+                context,
+                &name.operator_name()?,
+                left,
+                right,
+            ))),
             _ => Ok(None),
         }
     }
@@ -465,13 +472,14 @@ impl OperatorKind {
                         .0,
                 )
             }
-            Self::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
-            Self::Between | Self::NotBetween => self.resolve_between(left, right),
+            Self::NullIf => ArithExpr::build_null_if_resolved(context, left, right),
+            Self::Between | Self::NotBetween => self.resolve_between(context, left, right),
             _ => todo!("operator semantic analysis"),
         }
     }
     fn resolve_between(
         &self,
+        context: &mut impl ParseContext,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
     ) -> Result<SemScalarExpr, AnalysisError> {
@@ -480,11 +488,36 @@ impl OperatorKind {
         let Ok([start, end]): Result<[SemScalarExpr; 2], _> = values.try_into() else {
             return AnalysisError::raise_unexpected_input("BETWEEN bounds");
         };
-        Ok(if matches!(self, Self::NotBetween) {
-            ArithExpr::not_between(left, (start, end))
+        if context.dialect() == Dialect::sqlite() {
+            return Ok(if matches!(self, Self::NotBetween) {
+                ArithExpr::not_between(left, (start, end))
+            } else {
+                ArithExpr::between(left, (start, end))
+            });
+        }
+        let kind = if matches!(self, Self::NotBetween) {
+            crate::sem::SpecialOperatorKind::not_between()
         } else {
-            ArithExpr::between(left, (start, end))
-        })
+            crate::sem::SpecialOperatorKind::between()
+        };
+        let bindings = [
+            crate::sem::ResolvedOperator::comparison(
+                context,
+                &crate::sem::OperatorName::from_parts(None, ">="),
+            ),
+            crate::sem::ResolvedOperator::comparison(
+                context,
+                &crate::sem::OperatorName::from_parts(None, "<="),
+            ),
+        ];
+        let expression = crate::sem::SpecialOperatorExpr::resolve(
+            context,
+            kind,
+            &[left, start, end],
+            None,
+            &bindings,
+        )?;
+        Ok(SemScalarExpr::special_operator(&expression))
     }
 }
 
@@ -711,12 +744,46 @@ impl Subquery {
                 &crate::sem::problem::RuleProblem::definition(identity, detail),
             ))?;
         }
+        if context.dialect() == Dialect::postgres()
+            && let Some(kind) = self.kind.comparison_kind()
+        {
+            let Some(test) = self.test.as_ref() else {
+                return AnalysisError::raise_unexpected_none("subquery comparison operand");
+            };
+            let test = test.resolve_in(context, scope)?;
+            let operands = test.comparison_operands();
+            let name = if self.operator.0.is_empty() {
+                crate::sem::OperatorName::from_parts(None, "=")
+            } else {
+                self.operator.operator_name()?
+            };
+            let binding = crate::sem::ResolvedOperator::comparison(context, &name);
+            let bindings = vec![binding; operands.len()];
+            let query = self.query.resolve_in(context, Some(scope))?;
+            let expression = crate::sem::SpecialOperatorExpr::resolve(
+                context,
+                kind,
+                &operands,
+                Some(&query),
+                &bindings,
+            )?;
+            return Ok(SemScalarExpr::special_operator(&expression));
+        }
         let query = self.query.resolve_in(context, Some(scope))?;
         self.kind.resolve(context, &query)
     }
 }
 
 impl SubqueryKind {
+    const fn comparison_kind(&self) -> Option<crate::sem::SpecialOperatorKind> {
+        match self {
+            Self::Any => Some(crate::sem::SpecialOperatorKind::query_any()),
+            Self::All => Some(crate::sem::SpecialOperatorKind::query_all()),
+            Self::Row => Some(crate::sem::SpecialOperatorKind::query_row()),
+            _ => None,
+        }
+    }
+
     fn resolve(
         &self,
         context: &mut impl ParseContext,

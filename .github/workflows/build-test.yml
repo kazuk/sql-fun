@@ -80,6 +80,8 @@ jobs:
           GIT_ROOT="$(git rev-parse --show-toplevel)"
           export GIT_ROOT
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          export SQL_FUN_BIN="${GIT_ROOT}/target/debug/sql-fun"
+          export SQL_FUN_TEST_SERVER_BIN="${GIT_ROOT}/target/debug/sql-fun-server"
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache

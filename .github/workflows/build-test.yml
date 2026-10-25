@@ -157,7 +157,9 @@ jobs:
           restore-keys: |
             sccache-${{ runner.os }}-
 
-      - name: Build and test with all features
+      - name: Build all-features test archive and regression binaries
+        env:
+          SQL_FUN_CI_ARTIFACT_DIR: /github/home/sql-fun-workspace-ci
         run: |
           GIT_ROOT="$(git rev-parse --show-toplevel)"
           export GIT_ROOT
@@ -165,12 +167,46 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --all-features --step=workspace --nextest-extra="
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=build
+          if [ -d target/cargo-timings ]; then
+            cp -r target/cargo-timings "$SQL_FUN_CI_ARTIFACT_DIR/"
+          fi
+          sccache --show-stats
+
+      - name: Disk usage at all-features build peak
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache /github/home/sql-fun-workspace-ci; do
+            if [ -d "$path" ]; then
+              du -sh "$path"
+            fi
+          done
+
+      - name: Drop compilation artifacts before executing tests
+        run: |
+          cargo clean
+          df -h .
+          du -sh /github/home/sql-fun-workspace-ci
+
+      - name: Run archived all-features tests and SQLAST regressions
+        env:
+          SQL_FUN_CI_ARTIFACT_DIR: /github/home/sql-fun-workspace-ci
+        run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
             --config-file ./ci/nextest/config.toml
             --profile ci
-            --show-progress none
-            --timings"
-          sccache --show-stats
+            --show-progress none"
+      - name: Restore compilation timing reports
+        if: ${{ always() }}
+        run: |
+          if [ -d /github/home/sql-fun-workspace-ci/cargo-timings ]; then
+            mkdir -p target/cargo-timings
+            cp /github/home/sql-fun-workspace-ci/cargo-timings/*.html target/cargo-timings/
+          fi
 
       - name: Disk usage after build and test
         if: ${{ always() }}
@@ -209,9 +245,11 @@ jobs:
           path: target/nextest/ci/junit.xml
           reporter: java-junit
 
-      - name: Clean build artifacts before cache save
+      - name: Clean temporary test artifacts
         if: ${{ always() }}
-        run: cargo clean
+        run: |
+          cargo clean
+          rm -rf /github/home/sql-fun-workspace-ci
 
   msrv:
     needs: pr-freshness

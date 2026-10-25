@@ -524,6 +524,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid null-safe distinctness predicate.",
+                  "type": "object",
+                  "properties": {
+                    "Distinct": {
+                      "$ref": "#/$defs/DistinctProblem"
+                    }
+                  },
+                  "required": [
+                    "Distinct"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -550,7 +563,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "Invalid PostgreSQL GREATEST/LEAST common type or comparison capability.",
+                  "description": "Invalid `PostgreSQL` GREATEST/LEAST common type or comparison capability.",
                   "type": "object",
                   "properties": {
                     "MinMax": {
@@ -1149,7 +1162,7 @@
               ]
             },
             "ArrayProblem": {
-              "description": "A PostgreSQL ARRAY constructor type-resolution failure.",
+              "description": "A `PostgreSQL` ARRAY constructor type-resolution failure.",
               "oneOf": [
                 {
                   "description": "An empty constructor has no explicit element type.",
@@ -1214,7 +1227,7 @@
               "type": "string"
             },
             "TruthTestProblem": {
-              "description": "Invalid input to a PostgreSQL truth predicate.",
+              "description": "Invalid input to a `PostgreSQL` truth predicate.",
               "oneOf": [
                 {
                   "description": "The operand cannot be implicitly converted to boolean.",
@@ -1230,7 +1243,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "An unknown string literal is not valid PostgreSQL boolean input.",
+                  "description": "An unknown string literal is not valid `PostgreSQL` boolean input.",
                   "type": "object",
                   "properties": {
                     "InvalidLiteral": {
@@ -1242,6 +1255,57 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "DistinctProblem": {
+              "description": "Invalid operands or equality result for a null-safe distinctness predicate.",
+              "oneOf": [
+                {
+                  "description": "Explicit row constructors have different numbers of fields.",
+                  "type": "object",
+                  "properties": {
+                    "RowArity": {
+                      "$ref": "#/$defs/RowArity"
+                    }
+                  },
+                  "required": [
+                    "RowArity"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The selected equality operator does not return boolean.",
+                  "type": "object",
+                  "properties": {
+                    "EqualityResult": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "EqualityResult"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "RowArity": {
+              "description": "The field counts of an incompatible explicit row pair.",
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "right": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "left",
+                "right"
               ]
             },
             "IndexProblem": {
@@ -1297,7 +1361,7 @@
                   "const": "WrongKind"
                 },
                 {
-                  "description": "An option namespace is not accepted by PostgreSQL.",
+                  "description": "An option namespace is not accepted by `PostgreSQL`.",
                   "type": "string",
                   "const": "InvalidNamespace"
                 },
@@ -1342,7 +1406,7 @@
                   "const": "StatisticsTooLow"
                 },
                 {
-                  "description": "PostgreSQL lowers a statistics target above 10000 to 10000.",
+                  "description": "`PostgreSQL` lowers a statistics target above 10000 to 10000.",
                   "type": "string",
                   "const": "StatisticsClamped"
                 }
@@ -1410,7 +1474,7 @@
                   "const": "VirtualGenerated"
                 },
                 {
-                  "description": "The selected PostgreSQL version does not support this spelling.",
+                  "description": "The selected `PostgreSQL` version does not support this spelling.",
                   "type": "string",
                   "const": "Version"
                 },
@@ -1429,7 +1493,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "PostgreSQL limits the requested statistics target to 10000.",
+                  "description": "`PostgreSQL` limits the requested statistics target to 10000.",
                   "type": "object",
                   "properties": {
                     "StatisticsReduced": {
@@ -1497,7 +1561,7 @@
               ]
             },
             "MinMaxProblem": {
-              "description": "A PostgreSQL GREATEST/LEAST type-resolution failure.",
+              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
               "oneOf": [
                 {
                   "description": "No operand was supplied.",
@@ -1554,7 +1618,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "The result type has no PostgreSQL comparison implementation.",
+                  "description": "The result type has no `PostgreSQL` comparison implementation.",
                   "type": "object",
                   "properties": {
                     "NotOrdered": {
@@ -1885,7 +1949,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "No SQLite trigger matched an unbound requested name.",
+                  "description": "No `SQLite` trigger matched an unbound requested name.",
                   "type": "object",
                   "properties": {
                     "MissingName": {
@@ -2015,7 +2079,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "PostgreSQL does not allow this ALTER operation on a view.",
+                  "description": "`PostgreSQL` does not allow this ALTER operation on a view.",
                   "type": "string",
                   "const": "InvalidAlter"
                 }
@@ -2046,7 +2110,7 @@
                   "const": "Arity"
                 },
                 {
-                  "description": "A PostgreSQL destination column is assigned more than once.",
+                  "description": "A `PostgreSQL` destination column is assigned more than once.",
                   "type": "string",
                   "const": "DuplicateTarget"
                 },
@@ -2106,7 +2170,7 @@
                   "const": "ConflictPredicate"
                 },
                 {
-                  "description": "A non-final SQLite UPSERT clause omits its target.",
+                  "description": "A non-final `SQLite` UPSERT clause omits its target.",
                   "type": "string",
                   "const": "ConflictChain"
                 },
@@ -2216,7 +2280,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "DELETE is not permitted as a SQLite CTE body.",
+                  "description": "DELETE is not permitted as a `SQLite` CTE body.",
                   "type": "string",
                   "const": "SqliteCte"
                 },
@@ -2608,7 +2672,7 @@
               "oneOf": [
                 {
                   "title": "Domain base type not found : SF00001",
-                  "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- PostgreSQL extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
+                  "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- `PostgreSQL` extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
                     "DomainTypeNameNotFound": {
@@ -2622,7 +2686,7 @@
                 },
                 {
                   "title": "Function not found : SF00002",
-                  "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- PostgreSQL extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
+                  "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- `PostgreSQL` extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
                     "FunctionNotFound": {
@@ -4139,6 +4203,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid null-safe distinctness predicate.",
+                  "type": "object",
+                  "properties": {
+                    "Distinct": {
+                      "$ref": "#/$defs/DistinctProblem"
+                    }
+                  },
+                  "required": [
+                    "Distinct"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -4165,7 +4242,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "Invalid PostgreSQL GREATEST/LEAST common type or comparison capability.",
+                  "description": "Invalid `PostgreSQL` GREATEST/LEAST common type or comparison capability.",
                   "type": "object",
                   "properties": {
                     "MinMax": {
@@ -4764,7 +4841,7 @@
               ]
             },
             "ArrayProblem": {
-              "description": "A PostgreSQL ARRAY constructor type-resolution failure.",
+              "description": "A `PostgreSQL` ARRAY constructor type-resolution failure.",
               "oneOf": [
                 {
                   "description": "An empty constructor has no explicit element type.",
@@ -4829,7 +4906,7 @@
               "type": "string"
             },
             "TruthTestProblem": {
-              "description": "Invalid input to a PostgreSQL truth predicate.",
+              "description": "Invalid input to a `PostgreSQL` truth predicate.",
               "oneOf": [
                 {
                   "description": "The operand cannot be implicitly converted to boolean.",
@@ -4845,7 +4922,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "An unknown string literal is not valid PostgreSQL boolean input.",
+                  "description": "An unknown string literal is not valid `PostgreSQL` boolean input.",
                   "type": "object",
                   "properties": {
                     "InvalidLiteral": {
@@ -4857,6 +4934,57 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "DistinctProblem": {
+              "description": "Invalid operands or equality result for a null-safe distinctness predicate.",
+              "oneOf": [
+                {
+                  "description": "Explicit row constructors have different numbers of fields.",
+                  "type": "object",
+                  "properties": {
+                    "RowArity": {
+                      "$ref": "#/$defs/RowArity"
+                    }
+                  },
+                  "required": [
+                    "RowArity"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The selected equality operator does not return boolean.",
+                  "type": "object",
+                  "properties": {
+                    "EqualityResult": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "EqualityResult"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "RowArity": {
+              "description": "The field counts of an incompatible explicit row pair.",
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "right": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "left",
+                "right"
               ]
             },
             "IndexProblem": {
@@ -4912,7 +5040,7 @@
                   "const": "WrongKind"
                 },
                 {
-                  "description": "An option namespace is not accepted by PostgreSQL.",
+                  "description": "An option namespace is not accepted by `PostgreSQL`.",
                   "type": "string",
                   "const": "InvalidNamespace"
                 },
@@ -4957,7 +5085,7 @@
                   "const": "StatisticsTooLow"
                 },
                 {
-                  "description": "PostgreSQL lowers a statistics target above 10000 to 10000.",
+                  "description": "`PostgreSQL` lowers a statistics target above 10000 to 10000.",
                   "type": "string",
                   "const": "StatisticsClamped"
                 }
@@ -5025,7 +5153,7 @@
                   "const": "VirtualGenerated"
                 },
                 {
-                  "description": "The selected PostgreSQL version does not support this spelling.",
+                  "description": "The selected `PostgreSQL` version does not support this spelling.",
                   "type": "string",
                   "const": "Version"
                 },
@@ -5044,7 +5172,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "PostgreSQL limits the requested statistics target to 10000.",
+                  "description": "`PostgreSQL` limits the requested statistics target to 10000.",
                   "type": "object",
                   "properties": {
                     "StatisticsReduced": {
@@ -5112,7 +5240,7 @@
               ]
             },
             "MinMaxProblem": {
-              "description": "A PostgreSQL GREATEST/LEAST type-resolution failure.",
+              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
               "oneOf": [
                 {
                   "description": "No operand was supplied.",
@@ -5169,7 +5297,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "The result type has no PostgreSQL comparison implementation.",
+                  "description": "The result type has no `PostgreSQL` comparison implementation.",
                   "type": "object",
                   "properties": {
                     "NotOrdered": {
@@ -5500,7 +5628,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "No SQLite trigger matched an unbound requested name.",
+                  "description": "No `SQLite` trigger matched an unbound requested name.",
                   "type": "object",
                   "properties": {
                     "MissingName": {
@@ -5630,7 +5758,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "PostgreSQL does not allow this ALTER operation on a view.",
+                  "description": "`PostgreSQL` does not allow this ALTER operation on a view.",
                   "type": "string",
                   "const": "InvalidAlter"
                 }
@@ -5661,7 +5789,7 @@
                   "const": "Arity"
                 },
                 {
-                  "description": "A PostgreSQL destination column is assigned more than once.",
+                  "description": "A `PostgreSQL` destination column is assigned more than once.",
                   "type": "string",
                   "const": "DuplicateTarget"
                 },
@@ -5721,7 +5849,7 @@
                   "const": "ConflictPredicate"
                 },
                 {
-                  "description": "A non-final SQLite UPSERT clause omits its target.",
+                  "description": "A non-final `SQLite` UPSERT clause omits its target.",
                   "type": "string",
                   "const": "ConflictChain"
                 },
@@ -5831,7 +5959,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "description": "DELETE is not permitted as a SQLite CTE body.",
+                  "description": "DELETE is not permitted as a `SQLite` CTE body.",
                   "type": "string",
                   "const": "SqliteCte"
                 },
@@ -6223,7 +6351,7 @@
               "oneOf": [
                 {
                   "title": "Domain base type not found : SF00001",
-                  "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- PostgreSQL extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
+                  "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- `PostgreSQL` extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
                     "DomainTypeNameNotFound": {
@@ -6237,7 +6365,7 @@
                 },
                 {
                   "title": "Function not found : SF00002",
-                  "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- PostgreSQL extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
+                  "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- `PostgreSQL` extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
                     "FunctionNotFound": {

@@ -416,23 +416,17 @@ impl OperatorExpr {
                 return Ok(value);
             }
         }
-        if context.dialect() == Dialect::sqlite()
-            && self.right.as_ref().is_some_and(Expr::is_null_literal)
-            && (self.name.0.as_slice() == ["is"] || self.name.0.as_slice() == ["is not"])
-        {
-            let argument = self
-                .left
-                .as_ref()
-                .expect("IS left operand")
-                .resolve_in(context, scope)?;
-            let negated = self.name.0.as_slice() == ["is not"];
-            return Ok(SemScalarExpr::null_test(&argument, negated));
-        }
         let left = Expr::resolve_optional(&self.left, context, scope)?;
         let right = Expr::resolve_optional(&self.right, context, scope)?;
+        if let Some(negated) = self.distinctness(context) {
+            let (Some(left), Some(right)) = (left, right) else {
+                return AnalysisError::raise_unexpected_input("distinctness operands");
+            };
+            return Ok(SemScalarExpr::distinct(crate::sem::DistinctExpr::resolve(
+                context, left, right, negated,
+            )?));
+        }
         if context.dialect() == Dialect::sqlite() && !self.kind.without_catalog_operator() {
-            // SQLite coercion/affinity is not PostgreSQL operator overload lookup.
-            // This was unimplemented by the SQLite analyzer before the migration.
             if left
                 .as_ref()
                 .is_some_and(|value| value.get_type().is_none())
@@ -460,9 +454,30 @@ impl OperatorExpr {
         }
         Ok(expression)
     }
+    fn distinctness(&self, context: &impl ParseContext) -> Option<bool> {
+        if let Some(negated) = self.kind.distinctness() {
+            return Some(negated);
+        }
+        if context.dialect() == Dialect::sqlite() {
+            return match self.name.0.as_slice() {
+                [name] if name == "is" => Some(true),
+                [name] if name == "is not" => Some(false),
+                _ => None,
+            };
+        }
+        None
+    }
 }
 
 impl OperatorKind {
+    const fn distinctness(&self) -> Option<bool> {
+        match self {
+            Self::Distinct => Some(false),
+            Self::NotDistinct => Some(true),
+            _ => None,
+        }
+    }
+
     fn resolve_operator_name(
         &self,
         context: &impl ParseContext,

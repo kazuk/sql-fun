@@ -268,6 +268,13 @@ impl ArithExpr {
 }
 
 impl ArithExpr {
+    pub(crate) fn binary_argument(&self, index: usize) -> Option<&SemScalarExpr> {
+        match self {
+            Self::OpBinary(value) => value.argument(index),
+            Self::UndefinedOperator(value) => value.argument(index),
+            _ => None,
+        }
+    }
     pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
         match self {
             Self::OpBinary(call) => call.set_binding(binding),

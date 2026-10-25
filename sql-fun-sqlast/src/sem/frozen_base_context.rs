@@ -306,6 +306,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::OperatorInfoRead for $context {
+            fn operator_result_is_not_null(&self, name: &crate::sem::OperatorName) -> Option<bool> {
+                crate::sem::OperatorInfoRead::operator_result_is_not_null(self.$catalog(), name)
+            }
+
             fn get_operator_op(
                 &self,
                 name: &crate::sem::OperatorName,

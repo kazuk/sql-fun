@@ -206,9 +206,9 @@ pub use self::{
     scalar_expr::{
         ArithExpr, ArrayExpr, ArraySubqueryExpr, ArraySubscript, ArraySubscripts, BooleanExpr,
         CaseExpr, CaseWhen, CoalesceExpr, CollateExpr, ColumnReferenceExpr, ConstrainedExpr,
-        CteColumnRef, ExistsExpr, FuncCallArgs, FuncCallExpr, FunctionBinding, GroupingArgument,
-        GroupingExpr, ImplicitCastExpr, IndirectionExpr, MergeRecordColumnRef, MinMaxExpr,
-        NamedArgExpr, NullTestExpr, OutputColumnRef, ParamRef, QualifiedColumnFailure,
+        CteColumnRef, DistinctExpr, ExistsExpr, FuncCallArgs, FuncCallExpr, FunctionBinding,
+        GroupingArgument, GroupingExpr, ImplicitCastExpr, IndirectionExpr, MergeRecordColumnRef,
+        MinMaxExpr, NamedArgExpr, NullTestExpr, OutputColumnRef, ParamRef, QualifiedColumnFailure,
         ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr,
         SubQueryColumnRef, SystemColumnRef, TableColumnRef, TruthTestExpr, TypeCastExpr,
         WholeRowExpr,

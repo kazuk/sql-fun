@@ -598,6 +598,21 @@ incomplete. SQLite COALESCE retains its operands without PostgreSQL common-type
 conversions; its parameter-dependent result typing remains incomplete, and its
 input parameters remain unconstrained by COALESCE.
 
+## Null-safe distinctness predicates
+
+PostgreSQL `IS DISTINCT FROM` and `IS NOT DISTINCT FROM` analyze operand
+bindings and equality-compatible parameter types. Builtin comparisons return a
+non-null boolean, including comparisons with NULL. A bare NULL does not require
+an equality operator or determine a parameter's input type: `$1 IS DISTINCT FROM
+NULL` still needs an input binding. A typed NULL, such as `NULL::integer`,
+participates in equality type checking. Explicit row pairs compare corresponding
+fields and must have the same number of fields. Custom equality implementations
+without a non-null result guarantee retain unknown result nullability.
+Domain and named composite operand matching still has the shared limitations
+tracked in [#799](https://github.com/kazuk/sql-fun/issues/799).
+SQLite supports the equivalent `IS` / `IS NOT` forms and their long spellings
+without PostgreSQL equality overload constraints.
+
 ## DELETE analysis
 
 PostgreSQL and SQLite DELETE analysis retains the qualified target, WITH

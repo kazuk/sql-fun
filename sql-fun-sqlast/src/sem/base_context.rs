@@ -238,6 +238,18 @@ impl FunctionInfoRead for BaseContext {
 }
 
 impl OperatorInfoRead for BaseContext {
+    fn operator_result_is_not_null(&self, name: &super::OperatorName) -> Option<bool> {
+        // The shipped equality implementations return a boolean for non-null
+        // operands. This guarantee does not extend to arbitrary SQL functions.
+        if *name == super::OperatorName::from_parts(None, "=")
+            && self.get_operator_op(name, true, true).is_some()
+        {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
     #[tracing::instrument(skip(self))]
     fn get_operator_op(
         &self,

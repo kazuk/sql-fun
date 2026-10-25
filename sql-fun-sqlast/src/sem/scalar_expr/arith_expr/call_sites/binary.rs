@@ -20,6 +20,14 @@ pub struct BinaryOpCallSite {
 }
 
 impl BinaryOpCallSite {
+    pub(crate) const fn argument(&self, index: usize) -> Option<&SemScalarExpr> {
+        match index {
+            0 => Some(&self.left_arg),
+            1 => Some(&self.right_arg),
+            _ => None,
+        }
+    }
+
     pub fn is_not_null(&self) -> Option<bool> {
         super::binary_is_not_null(&self.left_arg, &self.right_arg)
     }
@@ -121,6 +129,14 @@ pub struct UndefinedOperatorCallSite {
 }
 
 impl UndefinedOperatorCallSite {
+    pub(crate) const fn argument(&self, index: usize) -> Option<&SemScalarExpr> {
+        match index {
+            0 => self.larg.as_ref(),
+            1 => self.rarg.as_ref(),
+            _ => None,
+        }
+    }
+
     pub fn inputs_is_not_null(&self) -> Option<bool> {
         match (&self.larg, &self.rarg) {
             (Some(l), Some(r)) => {

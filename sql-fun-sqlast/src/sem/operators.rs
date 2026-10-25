@@ -146,6 +146,43 @@ impl UnaryOperatorDefinition {
 }
 
 impl OperatorDefinition {
+    // Instantiate simple array comparisons using the existing catalog type
+    // universe, retaining the existing operator signature ranking rules.
+    pub(crate) fn comparison_signatures(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> Vec<crate::sem::parameter_resolution::Signature> {
+        let mut signatures = self.parameter_signatures();
+        if let Some(overloads) = self.binary_overloads() {
+            for overload in overloads {
+                if overload.left_arg_type().is_any_array()
+                    && overload.right_arg_type().is_any_array()
+                {
+                    let arrays: std::collections::HashSet<_> = context
+                        .type_references()
+                        .into_iter()
+                        .map(|ty| ty.array_type())
+                        .collect();
+                    for array in arrays {
+                        // Concrete declarations with the same inputs take
+                        // precedence over an instantiated polymorphic declaration.
+                        if overloads.iter().any(|candidate| {
+                            candidate.left_arg_type() == &array
+                                && candidate.right_arg_type() == &array
+                        }) {
+                            continue;
+                        }
+                        signatures.push(crate::sem::parameter_resolution::Signature::new(
+                            &[array.clone(), array],
+                            overload.get_return_type(),
+                        ));
+                    }
+                }
+            }
+        }
+        signatures
+    }
+
     pub(crate) fn parameter_signatures(&self) -> Vec<crate::sem::parameter_resolution::Signature> {
         match self {
             Self::Binary(overloads) => overloads

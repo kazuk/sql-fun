@@ -9,7 +9,7 @@ use std::{
 const WAIT: Duration = Duration::from_secs(15);
 
 fn command() -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_sql-fun-server"));
+    let mut command = Command::new(std::env::var("SQL_FUN_TEST_SERVER_BIN").expect("SQL_FUN_TEST_SERVER_BIN must be set"));
     command
         .env_remove("SQL_FUN_SERVER_IDLE_TIMEOUT")
         .env_remove("REQUEST_LENGTH_LIMIT")

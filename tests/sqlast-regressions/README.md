@@ -59,8 +59,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 578 inputs for PostgreSQL 17 and 584 for
-PostgreSQL 18 (1162 total). These count positive contract inputs separately from
+manifest totals are 694 inputs for PostgreSQL 17 and 700 for
+PostgreSQL 18 (1394 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -113,3 +113,13 @@ and a later independent input. Both PostgreSQL 17/18 catalog installations run
 these contracts through the shared source and installed paths. Internal tests
 retain the distinction between empty, singleton, non-singleton and unrestricted
 domains; server and CLI tests check completion, severity and exit behavior.
+
+Issue #487 truth-test contracts live in `truth-tests.json`, selected with the
+small `truth-tests.sql` project schema on PostgreSQL 17/18. The 101 cases check
+all six predicates over boolean/NULL operands, literal spellings, nullable and
+required columns, domains, invalid inputs, failed bindings, and deferred
+parameter interactions. Diagnostics and exact ordered result-column names,
+types and nullability run through both source and installed CLI checks. Rust
+retains operand structure/coercions, serialization, binding outcomes and
+admissible parameter domains; synthetic cast contexts remain unit tests because
+they model conversion policies absent from the shipped catalog.

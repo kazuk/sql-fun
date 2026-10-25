@@ -82,21 +82,3 @@ pub(super) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::Se
 pub(super) fn bool_domain() -> TypeReference {
     TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "flag"))
 }
-
-pub(super) struct Problems<'a>(&'a [crate::sem::AnalysisProblem]);
-
-impl<'a> From<&'a SchemaFileContext> for Problems<'a> {
-    fn from(context: &'a SchemaFileContext) -> Self {
-        Self(context.problems())
-    }
-}
-
-impl Problems<'_> {
-    pub(super) fn has(&self, code: &str) -> bool {
-        self.0.iter().any(|problem| problem.code() == code)
-    }
-
-    pub(super) fn only(&self, code: &str) -> bool {
-        self.0.iter().all(|problem| problem.code() == code)
-    }
-}

@@ -17,4 +17,7 @@ deferred="deferred"
 
 # PostgreSQL boolean input accepts these prefixes and mixed-case spellings.
 [type.rust]
-extend-ignore-re = ['"tru"', '"fals"', '"  TrUe  "']
+extend-ignore-re = ['"tru"', '"fals"']
+
+[type.json]
+extend-ignore-re = ["'tru'", "'fals'", "'  TrUe  '"]

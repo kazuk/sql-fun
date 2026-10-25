@@ -17,7 +17,7 @@ SELECT * from function_name()
 ## Why
 
 - Type in `function_name`
-- PostgreSQL extension not enabled in context.
+- `PostgreSQL` extension not enabled in context.
 - When `function_name` defined in schema
   - Schema not specified.
   - Schema not in search path.

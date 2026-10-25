@@ -13,7 +13,7 @@ CREATE DOMAIN name AS base_type;
 ## Why
 
 - Typo in `base_type`.
-- PostgreSQL extension not enabled in context.
+- `PostgreSQL` extension not enabled in context.
 - When `base_type` defined in schema
   - Schema not specified.
   - Schema not in search path.

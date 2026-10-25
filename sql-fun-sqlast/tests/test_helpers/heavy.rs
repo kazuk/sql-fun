@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Load real PostgreSQL 18 metadata per test process. The full SQL schema
+/// Load real `PostgreSQL` 18 metadata per test process. The full SQL schema
 /// is parsed only for the catalog integration case; no setup is shared.
 pub(crate) fn analyze(
     sql: &str,

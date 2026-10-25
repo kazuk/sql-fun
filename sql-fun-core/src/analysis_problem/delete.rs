@@ -71,7 +71,7 @@ pub enum DeleteProblemKind {
     CursorTargetMismatch(CursorTargetMismatchProblem),
     /// A procedural cursor parameter needs an unavailable variable resolver.
     CursorParameter(i32),
-    /// DELETE is not permitted as a SQLite CTE body.
+    /// DELETE is not permitted as a `SQLite` CTE body.
     SqliteCte,
     /// Reading a DELETE CTE requires RETURNING.
     UnreadableCte(String),

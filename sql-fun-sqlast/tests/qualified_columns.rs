@@ -272,7 +272,7 @@ mod test_helpers {
                 .analyze(context)?)
         }
 
-        /// Loads the shipped PostgreSQL builtin catalog per invocation. The public
+        /// Loads the shipped `PostgreSQL` builtin catalog per invocation. The public
         /// schema/query boundary requires this catalog; initialization is not shared.
         pub(crate) fn analyze(
             sql: &str,

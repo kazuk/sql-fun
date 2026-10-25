@@ -10,7 +10,7 @@ pub enum ViewProblem {
     UnknownDefaultColumn(FullName, String),
     /// Explicitly loaded catalog data lacks required write facts.
     MissingMetadata(FullName),
-    /// PostgreSQL does not allow this ALTER operation on a view.
+    /// `PostgreSQL` does not allow this ALTER operation on a view.
     InvalidAlter,
 }
 impl ViewProblem {

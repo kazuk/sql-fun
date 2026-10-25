@@ -328,7 +328,7 @@ impl DataSource {
         }
     }
 
-    fn wildcard_relation(&self) -> Option<&FullName> {
+    const fn wildcard_relation(&self) -> Option<&FullName> {
         match self {
             Self::Table(source) => Some(source.wildcard_relation()),
             Self::View(source) => Some(source.wildcard_relation()),

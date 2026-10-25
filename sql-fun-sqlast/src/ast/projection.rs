@@ -42,7 +42,7 @@ impl ProjectionError {
     const fn incompatible() -> Self {
         Self::Incompatible
     }
-    fn missing<T>() -> Result<T, Self> {
+    const fn missing<T>() -> Result<T, Self> {
         Err(Self::Missing)
     }
 }
@@ -53,7 +53,7 @@ pub(in crate::ast) struct ProjectionScope<'a> {
     returning: bool,
 }
 impl<'a> ProjectionScope<'a> {
-    pub(in crate::ast) fn new(
+    pub(in crate::ast) const fn new(
         targets: &'a mut Vec<Target>,
         sources: &'a mut [FromItem],
         returning: bool,
@@ -90,7 +90,7 @@ impl LocationGroup {
             locations: targets.iter().map(Target::projection_location).collect(),
         }
     }
-    fn corresponds(&self, scope: &ProjectionScope<'_>) -> bool {
+    const fn corresponds(&self, scope: &ProjectionScope<'_>) -> bool {
         scope.has_layout(self.returning, self.locations.len())
     }
     fn contains(&self, location: usize) -> bool {
@@ -118,7 +118,7 @@ impl Target {
     pub(in crate::ast) const fn projection_location(&self) -> Option<usize> {
         self.location
     }
-    fn set_projection_location(&mut self, location: Option<usize>) {
+    const fn set_projection_location(&mut self, location: Option<usize>) {
         self.location = location;
     }
 }
@@ -214,7 +214,7 @@ impl ProjectionReplacements {
             .push(ProjectionReplacement::new(location, targets));
         Ok(())
     }
-    pub(in crate::ast) fn len(&self) -> usize {
+    pub(in crate::ast) const fn len(&self) -> usize {
         self.edits.len()
     }
     pub(in crate::ast) fn validate_wildcards(
@@ -236,7 +236,7 @@ struct ProjectionCheck {
     wrong_kind: bool,
 }
 impl ProjectionCheck {
-    fn new(location: usize, width: usize) -> Self {
+    const fn new(location: usize, width: usize) -> Self {
         Self {
             location,
             width,
@@ -252,7 +252,7 @@ impl ProjectionCheck {
         self.wrong_kind |= !target.is_projection_star();
         Some(self.width)
     }
-    fn validate(&self) -> Result<(), ProjectionError> {
+    const fn validate(&self) -> Result<(), ProjectionError> {
         if self.count == 0 {
             return ProjectionError::missing();
         }
@@ -284,7 +284,7 @@ impl ReplacementValidation {
         }
         None
     }
-    fn check_result(&mut self, returning: bool, original_width: usize, width: usize) {
+    const fn check_result(&mut self, returning: bool, original_width: usize, width: usize) {
         self.empty_returning |= returning && original_width > 0 && width == 0;
     }
     fn validate(&self) -> Result<(), ProjectionError> {
@@ -308,7 +308,7 @@ impl AstVisitorMut for ProjectionReplacements {
     }
 }
 impl ProjectionScope<'_> {
-    fn has_layout(&self, returning: bool, width: usize) -> bool {
+    const fn has_layout(&self, returning: bool, width: usize) -> bool {
         self.returning == returning && self.targets.len() == width
     }
     fn synchronize_locations(&mut self, locations: &[Option<usize>]) {
@@ -335,7 +335,7 @@ impl ProjectionScope<'_> {
     }
 }
 impl ProjectionReplacement {
-    fn check(&self) -> ProjectionCheck {
+    const fn check(&self) -> ProjectionCheck {
         ProjectionCheck::new(self.location, self.targets.len())
     }
 }
@@ -520,7 +520,7 @@ impl FromItem {
             }
         })
     }
-    fn is_derived_source(&self) -> bool {
+    const fn is_derived_source(&self) -> bool {
         matches!(self, Self::Query(_))
     }
 }
@@ -637,7 +637,7 @@ impl<'a> LocationCorrespondence<'a> {
             compatible: true,
         }
     }
-    fn complete(&self, group_count: usize) -> bool {
+    const fn complete(&self, group_count: usize) -> bool {
         self.compatible && self.index == group_count
     }
 }
@@ -653,7 +653,7 @@ impl SourceSet {
 }
 
 impl<'a, T> SourceApplication<'a, T> {
-    fn new(edits: &'a mut T) -> Self {
+    const fn new(edits: &'a mut T) -> Self {
         Self {
             edits,
             next: 0,

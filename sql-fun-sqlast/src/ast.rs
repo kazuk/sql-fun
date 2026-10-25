@@ -17,8 +17,11 @@ mod drop_behavior;
 mod mutation;
 mod ownership;
 mod postgres;
+mod projection;
 mod public;
+mod query_construction;
 mod resolve;
+mod rows_from;
 mod rule;
 #[cfg(feature = "sqlite")]
 mod sqlite;
@@ -26,13 +29,10 @@ mod sqlite;
 mod sqlite_retention;
 #[cfg(test)]
 mod tests;
+mod traversal;
 mod trigger;
 mod validation;
 mod view_definition;
-mod projection;
-mod traversal;
-mod query_construction;
-mod rows_from;
 mod wildcard;
 
 pub use self::deparse::DeparseError;

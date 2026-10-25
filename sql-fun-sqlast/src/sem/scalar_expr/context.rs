@@ -369,7 +369,11 @@ impl<'a> ScalarAnalysisContext<'a> {
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
-            projection_scope_id: parent.map_or(None, |parent| parent.projection_scope_id),
+            projection_scope_id: if let Some(parent) = parent {
+                parent.projection_scope_id
+            } else {
+                None
+            },
         }
     }
 

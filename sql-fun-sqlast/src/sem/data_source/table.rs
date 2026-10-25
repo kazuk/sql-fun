@@ -154,7 +154,7 @@ impl TableDataSource {
         crate::sem::WildcardTypedRecord::from_table(alias, &self.name, context, index)
     }
 
-    pub(super) fn wildcard_relation(&self) -> &crate::sem::FullName {
+    pub(super) const fn wildcard_relation(&self) -> &crate::sem::FullName {
         self.name.full_name()
     }
 
@@ -177,9 +177,11 @@ impl TableDataSource {
         index: usize,
         nullable: bool,
     ) -> crate::sem::SemScalarExpr {
-        let definition = context
-            .get_table(&self.name)
-            .and_then(|table| table.get_column_at(index));
+        let definition = if let Some(table) = context.get_table(&self.name) {
+            table.get_column_at(index)
+        } else {
+            None
+        };
         crate::sem::SemScalarExpr::column_reference(ColumnReferenceExpr::table_column(
             alias, column, &self.name, definition, nullable,
         ))

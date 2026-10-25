@@ -7,7 +7,7 @@ use crate::ast::{
 };
 
 impl TableFunctions {
-    pub(in crate::ast) fn has_invocations(&self, count: usize) -> bool {
+    pub(in crate::ast) const fn has_invocations(&self, count: usize) -> bool {
         count != 0 && self.calls.len() == count
     }
 
@@ -132,10 +132,10 @@ impl Expr {
     fn nonnegative_subquery(query: &Query) -> Self {
         Self::Operator(Box::new(OperatorExpr::nonnegative_subquery(query)))
     }
-    fn scalar_subquery(query: &Query) -> Self {
+    fn scalar_query_expression(query: &Query) -> Self {
         Self::Subquery(Box::new(Subquery::from_scalar_query(query)))
     }
-    fn zero() -> Self {
+    const fn zero() -> Self {
         Self::Literal(Literal::zero())
     }
 }
@@ -145,7 +145,7 @@ impl OperatorExpr {
         Self {
             name: Name::from_parts(&["pg_catalog".to_owned(), ">=".to_owned()]),
             kind: OperatorKind::ordinary(),
-            left: Some(Expr::scalar_subquery(query)),
+            left: Some(Expr::scalar_query_expression(query)),
             right: Some(Expr::zero()),
             escape: None,
         }
@@ -200,7 +200,7 @@ impl Call {
 }
 
 impl Window {
-    fn unpartitioned() -> Self {
+    const fn unpartitioned() -> Self {
         Self {
             reference_only: false,
             name: None,

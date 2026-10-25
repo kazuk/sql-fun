@@ -344,7 +344,7 @@ pub(crate) struct WildcardRowsSource {
 }
 
 impl WildcardRowsSource {
-    pub(crate) fn function_count(&self) -> usize {
+    pub(crate) const fn function_count(&self) -> usize {
         self.functions.len()
     }
 
@@ -414,7 +414,7 @@ pub(crate) struct WildcardRowsFunction {
     columns: Vec<String>,
 }
 impl WildcardRowsFunction {
-    fn column_count(&self) -> usize {
+    const fn column_count(&self) -> usize {
         self.columns.len()
     }
 
@@ -446,7 +446,7 @@ pub(crate) struct WildcardRowsProjection<'a> {
 }
 
 impl<'a> WildcardRowsProjection<'a> {
-    fn new(function: &'a WildcardRowsFunction, output_names: &'a [String]) -> Self {
+    const fn new(function: &'a WildcardRowsFunction, output_names: &'a [String]) -> Self {
         Self {
             function,
             output_names,

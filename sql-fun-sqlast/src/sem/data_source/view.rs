@@ -131,7 +131,7 @@ impl ViewDataSource {
         crate::sem::WildcardTypedRecord::from_view(alias, &self.view, context, index)
     }
 
-    pub(super) fn wildcard_relation(&self) -> &crate::sem::FullName {
+    pub(super) const fn wildcard_relation(&self) -> &crate::sem::FullName {
         self.view.full_name()
     }
 
@@ -154,10 +154,13 @@ impl ViewDataSource {
         index: usize,
         nullable: bool,
     ) -> crate::sem::SemScalarExpr {
-        let definition = context
-            .get_view(&self.view)
-            .and_then(|view| view.result_columns().get_column_at(index))
-            .map(crate::sem::ResultColumn::create_column_definition);
+        let definition = if let Some(view) = context.get_view(&self.view) {
+            view.result_columns()
+                .get_column_at(index)
+                .map(crate::sem::ResultColumn::create_column_definition)
+        } else {
+            None
+        };
         crate::sem::SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::view_column(
             alias,
             column,

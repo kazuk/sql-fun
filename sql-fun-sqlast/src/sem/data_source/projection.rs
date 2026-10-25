@@ -328,7 +328,7 @@ impl<'a> ProjectionColumn<'a> {
         }
         self
     }
-    fn requires_fixed_children(&self) -> bool {
+    const fn requires_fixed_children(&self) -> bool {
         self.origin.is_some() || self.rows_origin.is_some()
     }
     pub(crate) fn source_ordinal(&self) -> Option<(&str, usize)> {

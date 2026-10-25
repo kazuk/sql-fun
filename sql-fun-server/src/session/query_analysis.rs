@@ -367,7 +367,7 @@ struct StatementAnalysis<'a> {
 }
 
 impl<'a> StatementAnalysis<'a> {
-    fn new(
+    const fn new(
         statement: &'a Statement,
         bindings: &'a Bindings,
         source: &'a QuerySource,

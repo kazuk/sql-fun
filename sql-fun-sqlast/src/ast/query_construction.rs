@@ -49,7 +49,7 @@ impl Alias {
     }
 }
 impl Target {
-    pub(in crate::ast) fn source_star_name(&self) -> Option<&Name> {
+    pub(in crate::ast) const fn source_star_name(&self) -> Option<&Name> {
         self.expression.source_star_name()
     }
 

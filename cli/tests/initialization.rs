@@ -17,7 +17,8 @@ impl InitializedProject {
         self.directory.path().join("home")
     }
     fn command(&self) -> Command {
-        let mut command = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
+        let mut command =
+            Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
         command
             .current_dir(self.directory.path())
             .env_remove("SQL_FUN_DATABASE_URL")

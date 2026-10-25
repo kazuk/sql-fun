@@ -210,7 +210,9 @@ async fn missing_choices_fail_explicitly(
     #[case] setting: &str,
     #[case] diagnostic: &str,
 ) -> ::testresult::TestResult {
-    let mut command = ::tokio::process::Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
+    let mut command = ::tokio::process::Command::new(
+        std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"),
+    );
     command
         .arg("api")
         .env("USER", "unit-test")

@@ -115,7 +115,8 @@ mod unix {
         #[case] visible: bool,
     ) {
         let tools = test_helpers::expand_tools(true);
-        let mut command = Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
+        let mut command =
+            Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
         command
             .current_dir(tools.path())
             .env("PATH", tools.path())

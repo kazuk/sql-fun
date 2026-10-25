@@ -2,9 +2,7 @@
 
 use crate::ast::wildcard::WildcardRewriteError;
 use crate::ast::{
-    Alias, Call, CallKind, Cte, CteBody, DerivedTable, Dialect, Expr, FromItem, Join, JoinKind,
-    Literal, Name, OperatorExpr, OperatorKind, Order, Query, QueryBody, Relation, Select,
-    Statement, StatementNode, Subquery, SubqueryKind, TableFunctions, Target, Window, With,
+    Call, Cte, DerivedTable, Expr, FromItem, Join, Name, Query, Relation, TableFunctions, Target,
 };
 use crate::sem::WildcardRowsSource;
 
@@ -14,257 +12,134 @@ pub(super) fn freeze(
     resolved: &WildcardRowsSource,
     source: TableFunctions,
 ) -> Result<FromItem, WildcardRewriteError> {
-    if source.calls.len() != resolved.functions().len() || source.calls.is_empty() {
+    if !source.has_invocations(resolved.function_count()) {
         return Err(WildcardRewriteError::invalid(
             "ROWS FROM output layout does not match its original function invocations",
         ));
     }
-    let mut names = PrivateNames::new(&source, resolved)?;
-    let ordinal = names.next();
-    let mut zipped = None;
-    let mut entries = Vec::new();
-    let mut previous: Option<String> = None;
-    let mut targets = Vec::new();
-    let mut output_index = 0;
-    for (index, layout) in resolved.functions().iter().enumerate() {
-        let alias = names.next();
-        let input_alias = if let [column] = layout.columns() {
-            // A scalar invocation's default output name follows its table alias.
-            // Using its known output name also works for one-column composites,
-            // without an alias-column list that could relabel future columns.
-            column.clone()
+    if !resolved.has_valid_output_layout() {
+        return Err(WildcardRewriteError::invalid(
+            "ROWS FROM output labels do not match its fields",
+        ));
+    }
+    let mut builder = RowsProjectionBuilder::new(&source, resolved)?;
+    resolved
+        .try_project_functions(|index, projection| builder.freeze_function(index, projection))?;
+    Ok(builder.finish(resolved))
+}
+
+struct RowsProjectionBuilder<'a> {
+    source: &'a TableFunctions,
+    names: PrivateNames,
+    ordinal: String,
+    zipped: Option<FromItem>,
+    entries: Vec<Cte>,
+    previous: Option<String>,
+    targets: Vec<Target>,
+}
+
+impl<'a> RowsProjectionBuilder<'a> {
+    fn new(
+        source: &'a TableFunctions,
+        resolved: &WildcardRowsSource,
+    ) -> Result<Self, WildcardRewriteError> {
+        let mut names = PrivateNames::new(source, resolved)?;
+        let ordinal = names.next();
+        Ok(Self {
+            source,
+            names,
+            ordinal,
+            zipped: None,
+            entries: Vec::new(),
+            previous: None,
+            targets: Vec::new(),
+        })
+    }
+
+    fn freeze_function(
+        &mut self,
+        index: usize,
+        projection: &crate::sem::WildcardRowsProjection<'_>,
+    ) -> Result<(), WildcardRewriteError> {
+        let alias = self.names.next();
+        // Scalar default output labels follow the source alias. The known single
+        // label also works for one-column composites without a column alias list.
+        let input_alias = if let Some(column) = projection.singleton_column_name() {
+            column.to_owned()
         } else {
-            names.next()
+            self.names.next()
         };
-        let mut call = source.calls[index].clone();
-        if source.calls.len() == 1 && !source.columns.is_empty() {
-            call.columns = source.columns.clone();
-        }
-        let input = TableFunctions {
-            calls: vec![call],
-            alias: Some(Alias {
-                name: input_alias.clone(),
-                columns: Vec::new(),
-            }),
-            lateral: false,
-            ordinality: false,
-            rows_from: true,
-            columns: Vec::new(),
+        let Some(input) = self.source.isolated_invocation(index, &input_alias) else {
+            return Err(WildcardRewriteError::invalid(
+                "ROWS FROM invocation is missing",
+            ));
         };
-        let mut fields = Vec::new();
-        for column in layout.columns() {
-            fields.push(target(reference(&input_alias, column), column));
-            let output = resolved.output_names().get(output_index).ok_or_else(|| {
-                WildcardRewriteError::invalid("ROWS FROM has fewer output labels than fields")
-            })?;
-            targets.push(target(reference(&alias, column), output));
-            output_index += 1;
+        let fields = self.project_fields(projection, &input_alias, &alias);
+        let mut fixed = Query::projection(&fields, &[FromItem::functions(input)]);
+        if let Some(prior) = &self.previous {
+            fixed.after_materialized_source(prior);
         }
-        fields.push(target(Call::rows_ordinal(), &ordinal));
-        let mut fixed = query(fields, vec![FromItem::functions(input)]);
-        if let Some(prior) = &previous {
-            // FunctionScan evaluates complete invocations in source order. A hash
-            // FULL JOIN may request its right input first, so force the previous
-            // materialized source to completion before invoking this function.
-            fixed.rows_after(prior);
-        }
-        entries.push(Cte {
-            name: alias.clone(),
-            columns: Vec::new(),
-            materialized: Some(true),
-            body: CteBody::query(fixed),
-            search: None,
-            cycle: None,
-        });
-        previous = Some(alias.clone());
-        let individual = relation(&alias);
-        zipped = Some(if let Some(left) = zipped {
-            FromItem::join(Join {
-                left,
-                right: individual,
-                kind: JoinKind::rows_full(),
-                natural: false,
-                condition: None,
-                using: vec![ordinal.clone()],
-                using_alias: None,
-                alias: None,
-            })
+        self.entries.push(Cte::materialized_query(&alias, &fixed));
+        self.previous = Some(alias.clone());
+        let individual = FromItem::relation(Relation::local(&alias));
+        self.zipped = Some(if let Some(left) = self.zipped.take() {
+            FromItem::join(Join::full_using(&left, &individual, &self.ordinal))
         } else {
             individual
         });
+        Ok(())
     }
-    if resolved.has_ordinality() {
-        let output = resolved.output_names().get(output_index).ok_or_else(|| {
-            WildcardRewriteError::invalid("ROWS FROM has no output label for its ordinality")
-        })?;
-        targets.push(target(
-            Expr::projection_column(Name::local(&ordinal)),
-            output,
+
+    fn project_fields(
+        &mut self,
+        projection: &crate::sem::WildcardRowsProjection<'_>,
+        input_alias: &str,
+        output_alias: &str,
+    ) -> Vec<Target> {
+        let mut fields = Vec::new();
+        projection.project_columns(|column, output| {
+            self.project_field(&mut fields, input_alias, output_alias, column, output)
+        });
+        fields.push(Target::projection(
+            &Expr::projection_call(&Call::row_number()),
+            &self.ordinal,
         ));
-        output_index += 1;
+        fields
     }
-    if output_index != resolved.output_names().len() {
-        return Err(WildcardRewriteError::invalid(
-            "ROWS FROM has more output labels than resolved fields",
-        ));
+
+    fn project_field(
+        &mut self,
+        fields: &mut Vec<Target>,
+        input_alias: &str,
+        output_alias: &str,
+        column: &str,
+        output: &str,
+    ) {
+        fields.push(Target::projection(&reference(input_alias, column), column));
+        self.targets
+            .push(Target::projection(&reference(output_alias, column), output));
     }
-    let mut query = query(targets, vec![zipped.expect("nonempty calls")]);
-    query.with.entries = entries;
-    query.order.push(Order {
-        expression: Expr::projection_column(Name::local(&ordinal)),
-        descending: Some(false),
-        nulls_first: None,
-        using: None,
-    });
-    Ok(derived(query, resolved.alias()))
+
+    fn finish(mut self, resolved: &WildcardRowsSource) -> FromItem {
+        if let Some(output) = resolved.ordinality_name() {
+            self.targets.push(Target::projection(
+                &Expr::projection_column(&Name::local(&self.ordinal)),
+                output,
+            ));
+        }
+        let mut query = Query::projection(&self.targets, &[self.zipped.expect("nonempty calls")]);
+        query.order_materialized_sources(&self.entries, &self.ordinal);
+        FromItem::query(DerivedTable::lateral_projection(&query, resolved.alias()))
+    }
 }
 
 #[cfg(test)]
+mod test_helpers;
+#[cfg(test)]
 mod tests;
 
-fn target(expression: Expr, alias: &str) -> Target {
-    Target {
-        expression,
-        alias: Some(alias.to_owned()),
-        location: None,
-    }
-}
-
 fn reference(alias: &str, column: &str) -> Expr {
-    Expr::projection_column(Name::from_parts(&[alias.to_owned(), column.to_owned()]))
-}
-
-fn query(targets: Vec<Target>, from: Vec<FromItem>) -> Query {
-    Query {
-        with: With::default(),
-        body: QueryBody::projection_select(Select {
-            into: None,
-            distinct: None,
-            targets,
-            from,
-            predicate: None,
-            group: Vec::new(),
-            group_distinct: false,
-            having: None,
-            windows: Vec::new(),
-        }),
-        order: Vec::new(),
-        limit: None,
-        offset: None,
-        with_ties: false,
-        locks: Vec::new(),
-    }
-}
-
-fn derived(query: Query, alias: &str) -> FromItem {
-    FromItem::query(DerivedTable {
-        query,
-        alias: Some(Alias {
-            name: alias.to_owned(),
-            columns: Vec::new(),
-        }),
-        lateral: true,
-    })
-}
-
-fn relation(name: &str) -> FromItem {
-    FromItem::relation(Relation {
-        name: Name::local(name),
-        alias: None,
-        inherit: true,
-        persistence: String::new(),
-        indexed: None,
-        not_indexed: false,
-    })
-}
-
-impl Query {
-    fn rows_after(&mut self, prior: &str) {
-        let mut count = Call::rows_function("count");
-        count.star = true;
-        count.over = None;
-        let count = query(
-            vec![target(Expr::projection_call(count), "count")],
-            vec![relation(prior)],
-        );
-        let gate = Expr::rows_gate(count);
-        self.body.rows_predicate(gate);
-    }
-}
-
-impl QueryBody {
-    fn rows_predicate(&mut self, predicate: Expr) {
-        let Self::Select(select) = self else {
-            unreachable!("projection query")
-        };
-        select.predicate = Some(predicate);
-    }
-}
-
-impl Expr {
-    fn rows_gate(query: Query) -> Self {
-        Self::Operator(Box::new(OperatorExpr {
-            name: Name::from_parts(&["pg_catalog".to_owned(), ">=".to_owned()]),
-            kind: OperatorKind::ordinary(),
-            left: Some(Self::Subquery(Box::new(Subquery {
-                query,
-                kind: SubqueryKind::rows_scalar(),
-                test: None,
-                operator: Name::local(""),
-            }))),
-            right: Some(Self::Literal(Literal::rows_zero())),
-            escape: None,
-        }))
-    }
-}
-
-impl Literal {
-    const fn rows_zero() -> Self {
-        Self::Integer(0)
-    }
-}
-impl SubqueryKind {
-    const fn rows_scalar() -> Self {
-        Self::Scalar
-    }
-}
-
-impl JoinKind {
-    const fn rows_full() -> Self {
-        Self::Full
-    }
-}
-
-impl Call {
-    fn rows_ordinal() -> Expr {
-        Expr::projection_call(Self::rows_function("row_number"))
-    }
-
-    fn rows_function(name: &str) -> Self {
-        Self {
-            sql_syntax: false,
-            kind: CallKind::ordinary(),
-            name: Name::from_parts(&["pg_catalog".to_owned(), name.to_owned()]),
-            arguments: Vec::new(),
-            argument_locations: Vec::new(),
-            star: false,
-            distinct: false,
-            variadic: false,
-            within_group: false,
-            within_order: Vec::new(),
-            order: Vec::new(),
-            filter: None,
-            over: Some(Window {
-                reference_only: false,
-                name: None,
-                reference: None,
-                partition: Vec::new(),
-                order: Vec::new(),
-                frame: None,
-            }),
-            location: None,
-        }
-    }
+    Expr::projection_column(&Name::from_parts(&[alias.to_owned(), column.to_owned()]))
 }
 
 /// Generated names are ASCII, so literal containment conservatively excludes
@@ -280,24 +155,13 @@ impl PrivateNames {
         source: &TableFunctions,
         resolved: &WildcardRowsSource,
     ) -> Result<Self, WildcardRewriteError> {
-        let statement = Statement::from_node(
-            StatementNode::query(query(Vec::new(), vec![FromItem::functions(source.clone())])),
-            Dialect::postgres(),
-            crate::StringSpan::default(),
-        );
-        let mut reserved = statement
-            .deparse_sql(Dialect::postgres())
+        let mut reserved = source
+            .rendered_invocation()
             .map_err(|error| WildcardRewriteError::invalid(&error.to_string()))?;
-        for function in resolved.functions() {
-            for column in function.columns() {
-                reserved.push('\n');
-                reserved.push_str(column);
-            }
-        }
-        for column in resolved.output_names() {
+        resolved.visit_names(|column| {
             reserved.push('\n');
             reserved.push_str(column);
-        }
+        });
         Ok(Self { reserved, next: 0 })
     }
 
@@ -313,3 +177,6 @@ impl PrivateNames {
         }
     }
 }
+
+#[cfg(test)]
+mod private_names_tests;

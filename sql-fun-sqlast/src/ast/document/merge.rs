@@ -315,7 +315,7 @@ impl ResultColumnCollection {
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target in targets {
-            if let Expr::Star(name) = &target.expression {
+            if let Some(name) = target.source_star_name() {
                 let qualifier = name.star_qualifier()?;
                 let projection_qualifier = qualifier.as_ref().map(|alias| {
                     scope
@@ -326,7 +326,7 @@ impl ResultColumnCollection {
                     context,
                     scope.sources(),
                     scope,
-                    target.location,
+                    target.projection_location(),
                     projection_qualifier,
                     qualifier
                         .as_ref()

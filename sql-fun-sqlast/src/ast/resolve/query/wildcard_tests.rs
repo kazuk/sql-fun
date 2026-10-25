@@ -31,22 +31,7 @@ fn retains_groups_names_order_and_origins(
     );
     let groups = analyzed.context().analysis_state().wildcard_expansions();
     assert_eq!(groups.len(), locations.len());
-    for (index, group) in groups.iter().enumerate() {
-        assert_eq!(group.location(), Some(locations[index]));
-        assert_eq!(group.is_table_dependent(), dependencies[index]);
-        let actual: Vec<_> = group
-            .columns()
-            .iter()
-            .map(|column| column.column_name().as_ref().unwrap().as_str())
-            .collect();
-        assert_eq!(actual.join(","), names[index]);
-        assert!(
-            group
-                .columns()
-                .iter()
-                .all(|column| column.expression().is_some())
-        );
-    }
+    groups.assert_groups(locations, dependencies, names);
 }
 
 #[rstest::rstest]
@@ -146,13 +131,14 @@ fn classifies_function_output_by_its_resolved_shape(
 }
 
 #[rstest::rstest]
-#[case::explicit("SELECT r.* FROM ROWS FROM (row_fun(), pair_fun()) WITH ORDINALITY r(x,x,y,n)", "r", &["x", "x", "y", "n"], true)]
-#[case::implicit("SELECT row_fun.* FROM ROWS FROM (row_fun(), pair_fun())", "row_fun", &["a", "a", "b"], false)]
+#[case::explicit("SELECT r.* FROM ROWS FROM (row_fun(), pair_fun()) WITH ORDINALITY r(x,x,y,n)", "r", &["x", "x", "y", "n"], Some("n"), "0:a=x;1:a=x;1:b=y;")]
+#[case::implicit("SELECT row_fun.* FROM ROWS FROM (row_fun(), pair_fun())", "row_fun", &["a", "a", "b"], None, "0:a=a;1:a=a;1:b=b;")]
 fn rows_sources_retain_each_function_layout_before_aliasing(
     #[case] sql: &str,
     #[case] alias: &str,
     #[case] output_names: &[&str],
-    #[case] ordinality: bool,
+    #[case] ordinality: Option<&str>,
+    #[case] expected_layout: &str,
 ) {
     let (_, context) = super::test_helpers::table_function_query(sql, false);
     assert!(
@@ -165,10 +151,19 @@ fn rows_sources_retain_each_function_layout_before_aliasing(
         panic!("one resolved ROWS FROM source")
     };
     assert_eq!(source.alias(), alias);
-    assert_eq!(source.output_names(), output_names);
-    assert_eq!(source.functions()[0].columns(), &["a"]);
-    assert_eq!(source.functions()[1].columns(), &["a", "b"]);
-    assert_eq!(source.has_ordinality(), ordinality);
+    assert_eq!(source.function_count(), 2);
+    assert!(source.has_valid_output_layout());
+    let mut retained = String::new();
+    source
+        .try_project_functions(|index, projection| {
+            projection.project_columns(|physical, visible| {
+                retained.push_str(&format!("{index}:{physical}={visible};"))
+            });
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .unwrap();
+    assert_eq!(retained, expected_layout);
+    assert_eq!(source.ordinality_name(), ordinality);
     for index in 0..output_names.len() {
         assert_eq!(group.source_ordinal_at(index), Some((alias, index)));
     }
@@ -203,17 +198,7 @@ fn repeated_names_keep_their_resolved_relation_occurrence() {
     let analyzed = source_namespace_statement("SELECT a.t.*, b.t.* FROM a.t CROSS JOIN b.t");
     let groups = analyzed.context().analysis_state().wildcard_expansions();
     assert_eq!(groups.len(), 2);
-    for (group, schema) in groups.iter().zip(["a", "b"]) {
-        let reference = group.columns()[0]
-            .expression()
-            .unwrap()
-            .table_column_reference()
-            .unwrap();
-        assert_eq!(
-            reference.relation(),
-            &crate::sem::FullName::with_schema(schema, "t")
-        );
-    }
+    groups.assert_relation_schemas(&["a", "b"]);
 }
 
 #[test]
@@ -252,12 +237,9 @@ fn duplicate_source_metadata_retains_columns_reordered_by_outer_using() {
     let groups = analyzed.context().analysis_state().wildcard_expansions();
     let source = &groups[0].source_projections()[0];
     assert_eq!(source.alias(), "j");
-    let names: Vec<_> = source
+    source
         .columns()
-        .iter()
-        .map(|column| column.column_name().as_ref().unwrap().as_str())
-        .collect();
-    assert_eq!(names, ["id", "only_a", "id", "only_b", "aid"]);
+        .assert_retained_names("id,only_a,id,only_b,aid");
     assert_eq!(groups[0].source_ordinal_at(0), Some(("j", 4)));
     assert_eq!(groups[0].source_ordinal_at(1), Some(("j", 0)));
     assert_eq!(groups[0].source_ordinal_at(3), Some(("j", 2)));
@@ -268,9 +250,24 @@ fn unaliased_same_local_relations_retain_component_qualifiers() {
     let analyzed = source_namespace_statement("SELECT * FROM a.t FULL JOIN b.t USING(id)");
     let groups = analyzed.context().analysis_state().wildcard_expansions();
     let qualifiers = groups[0].qualifiers();
-    assert_eq!(qualifiers.len(), 2);
-    assert_eq!(qualifiers[0].parts(), ["a", "t"]);
-    assert_eq!(qualifiers[1].parts(), ["b", "t"]);
+    assert_eq!(
+        qualifiers
+            .reference_for(
+                &crate::sem::FullName::with_schema("a", "t"),
+                &crate::sem::AliasName::from("t")
+            )
+            .unwrap(),
+        ["a", "t"]
+    );
+    assert_eq!(
+        qualifiers
+            .reference_for(
+                &crate::sem::FullName::with_schema("b", "t"),
+                &crate::sem::AliasName::from("t")
+            )
+            .unwrap(),
+        ["b", "t"]
+    );
     assert_eq!(groups[0].reference_at(1).unwrap(), ["a", "t", "only_a"]);
 }
 
@@ -450,15 +447,9 @@ fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case]
         analyzed.context().reported_problems()
     );
     let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
-    for column in group.columns() {
-        let role = column
-            .expression()
-            .unwrap()
-            .merge_record_reference()
-            .unwrap()
-            .role();
-        assert_eq!(role, crate::sem::MergeRecordRole::source());
-    }
+    group
+        .columns()
+        .assert_merge_role(crate::sem::MergeRecordRole::source());
 }
 
 #[rstest::rstest]
@@ -468,11 +459,62 @@ fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case]
 fn unresolved_function_output_is_not_a_known_empty_projection(#[case] sql: &str) {
     let (_, context) = super::test_helpers::table_function_query(sql, false);
     assert!(
-        context
-            .reported_problems()
-            .iter()
-            .any(|problem| problem.code() == "query_reference_not_found"),
+        context.has_reported_problem("query_reference_not_found"),
         "{:?}",
         context.reported_problems()
     );
+}
+
+trait RetainedColumnsAssertions {
+    fn assert_retained_names(&self, expected: &str);
+    fn assert_merge_role(&self, expected: crate::sem::MergeRecordRole);
+}
+impl RetainedColumnsAssertions for [crate::sem::ResultColumn] {
+    fn assert_retained_names(&self, expected: &str) {
+        let names: Vec<_> = self
+            .iter()
+            .map(|column| column.column_name().as_ref().unwrap().as_str())
+            .collect();
+        assert_eq!(names.join(","), expected);
+        assert!(self.iter().all(|column| column.expression().is_some()));
+    }
+    fn assert_merge_role(&self, expected: crate::sem::MergeRecordRole) {
+        for column in self {
+            assert_eq!(
+                column
+                    .expression()
+                    .unwrap()
+                    .merge_record_reference()
+                    .unwrap()
+                    .role(),
+                expected
+            );
+        }
+    }
+}
+trait WildcardGroupsAssertions {
+    fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]);
+    fn assert_relation_schemas(&self, schemas: &[&str]);
+}
+impl WildcardGroupsAssertions for [crate::sem::WildcardExpansion] {
+    fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]) {
+        for (index, group) in self.iter().enumerate() {
+            assert_eq!(group.location(), Some(locations[index]));
+            assert_eq!(group.is_table_dependent(), dependencies[index]);
+            group.columns().assert_retained_names(names[index]);
+        }
+    }
+    fn assert_relation_schemas(&self, schemas: &[&str]) {
+        for (index, group) in self.iter().enumerate() {
+            let reference = group.columns()[0]
+                .expression()
+                .unwrap()
+                .table_column_reference()
+                .unwrap();
+            assert_eq!(
+                reference.relation(),
+                &crate::sem::FullName::with_schema(schemas[index], "t")
+            );
+        }
+    }
 }

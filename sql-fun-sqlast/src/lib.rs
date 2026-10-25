@@ -14,6 +14,7 @@ pub mod engine_specific;
 pub mod sem;
 pub mod syn;
 
+mod stack;
 mod identifier;
 mod parse_statements;
 mod placeholdered_sql;

@@ -1,4 +1,4 @@
-use crate::ast::{Dialect, Expr, Name, Target};
+use crate::ast::{Dialect, Name, Target};
 use crate::sem::problem::{DeleteProblemKind, InsertProblemKind, UpdateProblemKind};
 use crate::sem::{
     AliasName, AliasSpec, AnalysisError, AnalysisProblem, ColumnName, FromClause,
@@ -15,7 +15,7 @@ impl ResultColumnCollection {
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target in targets {
-            if let Expr::Star(name) = &target.expression {
+            if let Some(name) = target.source_star_name() {
                 name.require_returning_star(context, alias)?;
                 let first = results.len();
                 let mut index = 0;
@@ -32,7 +32,7 @@ impl ResultColumnCollection {
                 context
                     .analysis_state_mut()
                     .record_wildcard(crate::sem::WildcardExpansion::new(
-                        target.location,
+                        target.projection_location(),
                         &results,
                         first,
                         table.is_base_table(),
@@ -53,8 +53,8 @@ impl ResultColumnCollection {
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target_expr in targets {
-            if let Expr::Star(name) = &target_expr.expression {
-                if context.dialect() == Dialect::sqlite() && !name.0.is_empty() {
+            if let Some(name) = target_expr.source_star_name() {
+                if context.dialect() == Dialect::sqlite() && !name.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::update(
                         UpdateProblemKind::returning_qualifier(),
                         "SQLite RETURNING does not permit qualified stars",
@@ -66,7 +66,7 @@ impl ResultColumnCollection {
                     context,
                     from,
                     scope,
-                    target_expr.location,
+                    target_expr.projection_location(),
                     qualifier.as_ref(),
                     None,
                 )? {
@@ -90,8 +90,8 @@ impl ResultColumnCollection {
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target_expr in targets {
-            if let Expr::Star(name) = &target_expr.expression {
-                if context.dialect() == Dialect::sqlite() && !name.0.is_empty() {
+            if let Some(name) = target_expr.source_star_name() {
+                if context.dialect() == Dialect::sqlite() && !name.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::delete(
                         DeleteProblemKind::returning_qualifier(),
                     ))?;
@@ -109,7 +109,7 @@ impl ResultColumnCollection {
                     context,
                     from,
                     scope,
-                    target_expr.location,
+                    target_expr.projection_location(),
                     projection_qualifier,
                     qualifier
                         .as_ref()
@@ -192,39 +192,7 @@ impl ResultColumnCollection {
         location: Option<usize>,
         binding_qualifier: Option<&AliasName>,
     ) -> Result<bool, AnalysisError> {
-        let (columns, source_found, table_dependent) = projection.into_parts();
-        let first = self.len();
-        let references: Vec<_> = columns
-            .iter()
-            .map(|column| {
-                if let Some(alias) = binding_qualifier {
-                    Some(vec![
-                        alias.as_str().to_owned(),
-                        column.name().as_str().to_owned(),
-                    ])
-                } else {
-                    column.visible_reference()
-                }
-            })
-            .collect();
-        for column in &columns {
-            let value = if let Some(qualifier) = binding_qualifier {
-                scope
-                    .resolve_column(context, Some(qualifier), column.name())?
-                    .0
-            } else {
-                column.bind(context, scope)?
-            };
-            self.push_expression(column.name(), value);
-        }
-        let source_projections =
-            crate::sem::WildcardSourceProjection::from_columns(&columns, context, scope)?;
-        let mut expansion =
-            crate::sem::WildcardExpansion::new(location, self, first, table_dependent, &references);
-        expansion.retain_source_projections(&source_projections);
-        expansion.retain_projection_origins(&columns);
-        context.analysis_state_mut().record_wildcard(expansion);
-        Ok(source_found)
+        projection.append_results(context, scope, self, location, binding_qualifier)
     }
 }
 

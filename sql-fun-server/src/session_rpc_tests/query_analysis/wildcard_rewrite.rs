@@ -1,9 +1,8 @@
 use super::{
     catalog,
-    test_helpers::{query_project, rewrite_request},
+    test_helpers::{QueryProblems, query_project, rewrite_request},
 };
 use crate::test_helpers::heavy;
-use ::serde_json::json;
 
 const SCHEMA: &str =
     "CREATE TABLE entries(id int4 NOT NULL, value int4); CREATE TABLE other(id int4, extra int4);";
@@ -17,6 +16,11 @@ const SCHEMA: &str =
 #[case::full_join("SELECT * FROM entries FULL JOIN other USING (id)", 3, false)]
 #[case::natural_join("SELECT * FROM entries NATURAL JOIN other", 3, false)]
 #[case::duplicate_join_alias("SELECT j.*, j.value FROM (entries JOIN other ON true) j", 5, true)]
+#[case::correlated_duplicate_join_alias(
+    "SELECT EXISTS (SELECT j.*) FROM (entries CROSS JOIN other) AS j",
+    1,
+    true
+)]
 #[case::insert("INSERT INTO entries(id) VALUES (1) RETURNING *", 2, false)]
 #[case::update("UPDATE entries SET value = 1 RETURNING entries.*", 2, false)]
 #[case::delete("DELETE FROM entries RETURNING *", 2, false)]
@@ -36,7 +40,7 @@ async fn expands_server_sql_at_the_responsible_query_level(
             &rewrite_request(&project, SCHEMA, Some(true)),
         )
         .await;
-    let response = connection.rpc("analyze_query", &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}})).await;
+    let response = connection.rpc("analyze_query", &::serde_json::json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}})).await;
     let item = &response["result"]["queries"]["items"][0];
     assert_eq!(item["complete"], true, "{response}");
     assert_eq!(
@@ -75,7 +79,7 @@ async fn captures_policy_per_handle_without_polluting_the_shared_schema_cache() 
         let response = connection
             .rpc(
                 "analyze_query",
-                &json!({"context_handle": handle, "query": {"Text": "SELECT * FROM entries"}}),
+                &::serde_json::json!({"context_handle": handle, "query": {"Text": "SELECT * FROM entries"}}),
             )
             .await;
         let item = &response["result"]["queries"]["items"][0];
@@ -104,7 +108,7 @@ async fn reparses_imported_ctes_without_changing_bindings_or_input_spans() {
                 &rewrite_request(&project, SCHEMA, Some(enabled)),
             )
             .await;
-        let response = connection.rpc("analyze_query", &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}, "resolved_cte_catalog": dependencies})).await;
+        let response = connection.rpc("analyze_query", &::serde_json::json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}, "resolved_cte_catalog": dependencies})).await;
         let mut item = response["result"]["queries"]["items"][0].clone();
         assert_eq!(item["complete"], true, "{response}");
         let output = item["execute_sql"].as_str().unwrap();
@@ -149,7 +153,7 @@ async fn reparse_keeps_original_multistatement_parameter_and_diagnostic_coordina
                 &rewrite_request(&project, SCHEMA, Some(enabled)),
             )
             .await;
-        let response = connection.rpc("analyze_query", &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}})).await;
+        let response = connection.rpc("analyze_query", &::serde_json::json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}})).await;
         let mut items = response["result"]["queries"]["items"]
             .as_array()
             .unwrap()
@@ -196,15 +200,12 @@ async fn plain_rewrite_preserves_parser_anchored_diagnostic_spans() {
             .await;
         let response = connection.rpc(
             "analyze_query",
-            &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}}),
+            &::serde_json::json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}}),
         ).await;
         let item = &response["result"]["queries"]["items"][0];
         assert_eq!(item["complete"], false, "{response}");
-        let problem = item["probrems"]["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|problem| problem["code"] == "call_argument_duplicate_name")
+        let problem = QueryProblems::from(item)
+            .find("call_argument_duplicate_name")
             .expect("duplicate named argument diagnostic");
         assert_eq!(problem["presentation"]["source"], sql);
         assert_eq!(
@@ -245,11 +246,9 @@ async fn explicit_output_shape_survives_schema_additions_and_unreferenced_drops(
     .await;
     assert_eq!(item["complete"], false, "{item}");
     assert!(
-        item["probrems"]["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|problem| problem["code"] == "column_not_found_in_table"),
+        QueryProblems::from(&item)
+            .find("column_not_found_in_table")
+            .is_some(),
         "{item}"
     );
 }
@@ -280,14 +279,11 @@ async fn imported_cte_reparse_preserves_typed_diagnostic_coordinates(
                 &rewrite_request(&project, SCHEMA, Some(enabled)),
             )
             .await;
-        let response = connection.rpc("analyze_query", &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}, "resolved_cte_catalog": dependencies})).await;
+        let response = connection.rpc("analyze_query", &::serde_json::json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": sql}, "resolved_cte_catalog": dependencies})).await;
         let item = &response["result"]["queries"]["items"][0];
         assert_eq!(item["complete"], false, "{response}");
-        let problem = item["probrems"]["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|problem| problem["code"] == code)
+        let problem = QueryProblems::from(item)
+            .find(code)
             .expect("requested typed diagnostic");
         if let Some(original) = &original {
             assert_eq!(problem, original);

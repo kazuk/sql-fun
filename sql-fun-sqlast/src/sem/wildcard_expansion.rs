@@ -12,12 +12,13 @@ pub struct WildcardExpansion {
     location: Option<usize>,
     columns: Vec<ResultColumn>,
     table_dependent: bool,
+    source_scope_depth: usize,
     references: Vec<Option<Vec<String>>>,
     source_projections: Vec<WildcardSourceProjection>,
     source_ordinals: Vec<Option<(String, usize)>>,
-    qualifiers: Vec<WildcardQualifier>,
+    qualifiers: WildcardQualifiers,
     typed_records: Vec<Option<WildcardTypedRecord>>,
-    rows_sources: Vec<WildcardRowsSource>,
+    rows_sources: WildcardRowsSources,
 }
 
 impl WildcardExpansion {
@@ -30,16 +31,15 @@ impl WildcardExpansion {
     ) -> Self {
         Self {
             location,
-            columns: (first..results.len())
-                .filter_map(|index| results.get_column_at(index).cloned())
-                .collect(),
+            columns: results.cloned_suffix(first),
             table_dependent,
+            source_scope_depth: 0,
             references: references.to_vec(),
             source_projections: Vec::new(),
             source_ordinals: Vec::new(),
-            qualifiers: Vec::new(),
+            qualifiers: WildcardQualifiers::default(),
             typed_records: Vec::new(),
-            rows_sources: Vec::new(),
+            rows_sources: WildcardRowsSources::default(),
         }
     }
 
@@ -53,6 +53,13 @@ impl WildcardExpansion {
         &self.columns
     }
 
+    pub(crate) const fn source_scope_depth(&self) -> usize {
+        self.source_scope_depth
+    }
+    pub(crate) const fn retain_source_scope(&mut self, depth: usize) {
+        self.source_scope_depth = depth;
+    }
+
     pub(crate) fn reference_at(&self, index: usize) -> Option<&[String]> {
         self.references.get(index)?.as_deref()
     }
@@ -64,32 +71,23 @@ impl WildcardExpansion {
     pub(crate) fn typed_record_at(&self, index: usize) -> Option<&WildcardTypedRecord> {
         self.typed_records.get(index)?.as_ref()
     }
-    pub(crate) fn qualifiers(&self) -> &[WildcardQualifier] {
+    pub(crate) const fn qualifiers(&self) -> &WildcardQualifiers {
         &self.qualifiers
     }
 
     pub(crate) fn rows_sources(&self) -> &[WildcardRowsSource] {
-        &self.rows_sources
+        self.rows_sources.sources()
     }
-    pub(crate) fn retain_projection_origins(
-        &mut self,
-        columns: &[crate::sem::ProjectionColumn<'_>],
-    ) {
-        for column in columns {
-            column.collect_rows_sources(&mut self.rows_sources);
-        }
-        self.typed_records = columns.iter().map(|column| column.typed_record()).collect();
-        for column in columns {
-            column.collect_qualifiers(&mut self.qualifiers);
-        }
-        self.source_ordinals = columns
-            .iter()
-            .map(|column| {
-                column
-                    .source_ordinal()
-                    .map(|(alias, ordinal)| (alias.to_owned(), ordinal))
-            })
-            .collect();
+    pub(crate) fn retain_projection_origin(&mut self, column: &crate::sem::ProjectionColumn<'_>) {
+        column.collect_rows_sources(&mut self.rows_sources);
+        self.typed_records.push(column.typed_record());
+        column.collect_qualifiers(&mut self.qualifiers);
+        let ordinal = if let Some((alias, ordinal)) = column.source_ordinal() {
+            Some((alias.to_owned(), ordinal))
+        } else {
+            None
+        };
+        self.source_ordinals.push(ordinal);
     }
     pub(crate) fn source_ordinal_at(&self, index: usize) -> Option<(&str, usize)> {
         self.source_ordinals
@@ -114,72 +112,49 @@ pub(crate) struct WildcardSourceProjection {
     alias: String,
     columns: Vec<ResultColumn>,
     references: Vec<Option<Vec<String>>>,
-    qualifiers: Vec<WildcardQualifier>,
+    qualifiers: WildcardQualifiers,
     source_ordinals: Vec<Option<(String, usize)>>,
     source_projections: Vec<Self>,
     typed_records: Vec<Option<WildcardTypedRecord>>,
-    rows_sources: Vec<WildcardRowsSource>,
+    rows_sources: WildcardRowsSources,
 }
 
 impl WildcardSourceProjection {
-    pub(crate) fn from_columns(
-        source_columns: &[crate::sem::ProjectionColumn<'_>],
-        context: &mut impl crate::sem::ParseContext,
-        scope: &crate::sem::ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<Self>, crate::sem::AnalysisError> {
-        crate::sem::with_stack(|| {
-            let mut sources = Vec::new();
-            for column in source_columns {
-                column.collect_projection_sources(&mut sources);
-            }
-            let mut projections = Vec::new();
-            for source in sources {
-                let mut columns = ResultColumnCollection::default();
-                let mut references = Vec::new();
-                let mut qualifiers = Vec::new();
-                // These bindings already identify exact source occurrences. Building
-                // their expressions does not repeat alias or column-name resolution.
-                for column in source.columns() {
-                    column.collect_qualifiers(&mut qualifiers);
-                    columns.push_expression(column.name(), column.bind(context, scope)?);
-                    references.push(column.visible_reference());
-                }
-                projections.push(Self {
-                    alias: source.alias().as_str().to_owned(),
-                    columns: (0..columns.len())
-                        .map(|index| columns.get_column_at(index).unwrap().clone())
-                        .collect(),
-                    references,
-                    qualifiers,
-                    source_ordinals: source
-                        .columns()
-                        .iter()
-                        .map(|column| {
-                            column
-                                .source_ordinal()
-                                .map(|(alias, ordinal)| (alias.to_owned(), ordinal))
-                        })
-                        .collect(),
-                    source_projections: Self::from_columns(source.columns(), context, scope)?,
-                    typed_records: source
-                        .columns()
-                        .iter()
-                        .map(|column| column.typed_record())
-                        .collect(),
-                    rows_sources: {
-                        let mut rows = Vec::new();
-                        for column in source.columns() {
-                            column.collect_rows_sources(&mut rows);
-                        }
-                        rows
-                    },
-                });
-            }
-            Ok(projections)
-        })
+    pub(crate) fn new(alias: &crate::sem::AliasName) -> Self {
+        Self {
+            alias: alias.as_str().to_owned(),
+            columns: Vec::new(),
+            references: Vec::new(),
+            qualifiers: WildcardQualifiers::default(),
+            source_ordinals: Vec::new(),
+            source_projections: Vec::new(),
+            typed_records: Vec::new(),
+            rows_sources: WildcardRowsSources::default(),
+        }
+    }
+    pub(crate) fn append_bound_column(
+        &mut self,
+        column: &crate::sem::ProjectionColumn<'_>,
+        expression: &crate::sem::SemScalarExpr,
+    ) {
+        self.columns
+            .push(ResultColumn::resolved(column.name(), expression));
+        self.references.push(column.visible_reference());
+        self.typed_records.push(column.typed_record());
+        column.collect_qualifiers(&mut self.qualifiers);
+        column.collect_rows_sources(&mut self.rows_sources);
+        let ordinal = if let Some((alias, ordinal)) = column.source_ordinal() {
+            Some((alias.to_owned(), ordinal))
+        } else {
+            None
+        };
+        self.source_ordinals.push(ordinal);
+    }
+    pub(crate) fn retain_source_projections(&mut self, projections: &[Self]) {
+        self.source_projections = projections.to_vec();
     }
     pub(crate) fn rows_sources(&self) -> &[WildcardRowsSource] {
-        &self.rows_sources
+        self.rows_sources.sources()
     }
     pub(crate) fn typed_record_at(&self, index: usize) -> Option<&WildcardTypedRecord> {
         self.typed_records.get(index)?.as_ref()
@@ -193,7 +168,7 @@ impl WildcardSourceProjection {
             .as_ref()
             .map(|(alias, ordinal)| (alias.as_str(), *ordinal))
     }
-    pub(crate) fn qualifiers(&self) -> &[WildcardQualifier] {
+    pub(crate) const fn qualifiers(&self) -> &WildcardQualifiers {
         &self.qualifiers
     }
     pub(crate) fn alias(&self) -> &str {
@@ -207,6 +182,49 @@ impl WildcardSourceProjection {
     }
 }
 
+/// Canonical qualifiers retained for exact resolved source occurrences.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct WildcardQualifiers(Vec<WildcardQualifier>);
+impl WildcardQualifiers {
+    pub(crate) fn include(&mut self, qualifier: &WildcardQualifier) {
+        if !self
+            .0
+            .iter()
+            .any(|existing| existing.is_for(qualifier.relation(), qualifier.alias()))
+        {
+            self.0.push(qualifier.clone());
+        }
+    }
+    pub(crate) fn reference_for(
+        &self,
+        relation: &crate::sem::FullName,
+        alias: &crate::sem::AliasName,
+    ) -> Option<&[String]> {
+        self.0
+            .iter()
+            .find(|qualifier| qualifier.is_for(relation, alias))
+            .map(WildcardQualifier::parts)
+    }
+}
+
+/// Resolved ROWS FROM occurrences, deduplicated in one projection scope.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct WildcardRowsSources(Vec<WildcardRowsSource>);
+impl WildcardRowsSources {
+    pub(crate) fn include(&mut self, source: &WildcardRowsSource) {
+        if !self
+            .0
+            .iter()
+            .any(|existing| existing.alias() == source.alias())
+        {
+            self.0.push(source.clone());
+        }
+    }
+    fn sources(&self) -> &[WildcardRowsSource] {
+        &self.0
+    }
+}
+
 /// An already resolved relation occurrence's legal SQL qualifier.
 #[derive(Clone, Debug)]
 pub(crate) struct WildcardQualifier {
@@ -216,6 +234,10 @@ pub(crate) struct WildcardQualifier {
 }
 
 impl WildcardQualifier {
+    fn is_for(&self, relation: &crate::sem::FullName, alias: &crate::sem::AliasName) -> bool {
+        &self.relation == relation && &self.alias == alias
+    }
+
     pub(crate) fn new(
         relation: &crate::sem::FullName,
         alias: &crate::sem::AliasName,
@@ -247,6 +269,49 @@ pub(crate) struct WildcardTypedRecord {
 }
 
 impl WildcardTypedRecord {
+    pub(crate) fn from_table(
+        alias: &crate::sem::AliasName,
+        table: &crate::sem::TableName,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<Self> {
+        let column = context
+            .get_table(table)?
+            .get_column_at(index)?
+            .name()
+            .as_ref()?;
+        Some(Self::new(alias, table.full_name(), column))
+    }
+
+    pub(crate) fn from_view(
+        alias: &crate::sem::AliasName,
+        view: &crate::sem::ViewName,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<Self> {
+        let column = context
+            .get_view(view)?
+            .result_columns()
+            .get_column_at(index)?
+            .column_name()
+            .as_ref()?;
+        Some(Self::new(alias, view.full_name(), column))
+    }
+
+    pub(crate) fn from_function(
+        alias: &crate::sem::AliasName,
+        function: &crate::sem::OverloadVariant,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<Self> {
+        let table = function
+            .ret_type()
+            .as_ref()?
+            .definition_from_catalog(context)?
+            .row_table_name(context)?;
+        Self::from_table(alias, &table, context, index)
+    }
+
     pub(crate) fn new(
         alias: &crate::sem::AliasName,
         relation: &crate::sem::FullName,
@@ -279,6 +344,53 @@ pub(crate) struct WildcardRowsSource {
 }
 
 impl WildcardRowsSource {
+    pub(crate) fn function_count(&self) -> usize {
+        self.functions.len()
+    }
+
+    pub(crate) fn has_valid_output_layout(&self) -> bool {
+        let fields: usize = self
+            .functions
+            .iter()
+            .map(WildcardRowsFunction::column_count)
+            .sum();
+        self.output_names.len() == fields + usize::from(self.ordinality)
+    }
+
+    /// Associate each physical invocation's fields with the final aliased labels.
+    /// Callers validate the retained layout before emitting syntax.
+    pub(crate) fn try_project_functions<E>(
+        &self,
+        mut project: impl FnMut(usize, &WildcardRowsProjection<'_>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        let mut offset = 0;
+        for (index, function) in self.functions.iter().enumerate() {
+            let end = offset + function.column_count();
+            let projection = WildcardRowsProjection::new(function, &self.output_names[offset..end]);
+            project(index, &projection)?;
+            offset = end;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn ordinality_name(&self) -> Option<&str> {
+        if self.ordinality {
+            self.output_names.last().map(String::as_str)
+        } else {
+            None
+        }
+    }
+
+    /// Include physical and visible spellings when reserving private identifiers.
+    pub(crate) fn visit_names(&self, mut visit: impl FnMut(&str)) {
+        for function in &self.functions {
+            function.visit_names(&mut visit);
+        }
+        for name in &self.output_names {
+            visit(name);
+        }
+    }
+
     pub(crate) fn new(
         alias: &crate::sem::AliasName,
         functions: &[WildcardRowsFunction],
@@ -288,24 +400,12 @@ impl WildcardRowsSource {
         Self {
             alias: alias.as_str().to_owned(),
             functions: functions.to_vec(),
-            output_names: output_names
-                .iter()
-                .map(|name| name.as_str().to_owned())
-                .collect(),
+            output_names: output_names.iter().map(ToString::to_string).collect(),
             ordinality,
         }
     }
     pub(crate) fn alias(&self) -> &str {
         &self.alias
-    }
-    pub(crate) fn functions(&self) -> &[WildcardRowsFunction] {
-        &self.functions
-    }
-    pub(crate) fn output_names(&self) -> &[String] {
-        &self.output_names
-    }
-    pub(crate) const fn has_ordinality(&self) -> bool {
-        self.ordinality
     }
 }
 
@@ -314,15 +414,59 @@ pub(crate) struct WildcardRowsFunction {
     columns: Vec<String>,
 }
 impl WildcardRowsFunction {
-    pub(crate) fn from_columns(columns: &[crate::sem::ColumnName]) -> Self {
-        Self {
-            columns: columns
-                .iter()
-                .map(|name| name.as_str().to_owned())
-                .collect(),
+    fn column_count(&self) -> usize {
+        self.columns.len()
+    }
+
+    fn singleton_column_name(&self) -> Option<&str> {
+        if let [column] = self.columns.as_slice() {
+            Some(column)
+        } else {
+            None
         }
     }
-    pub(crate) fn columns(&self) -> &[String] {
-        &self.columns
+
+    fn visit_names(&self, visit: &mut impl FnMut(&str)) {
+        for column in &self.columns {
+            visit(column);
+        }
+    }
+
+    pub(crate) fn from_columns(columns: &[crate::sem::ColumnName]) -> Self {
+        Self {
+            columns: columns.iter().map(ToString::to_string).collect(),
+        }
+    }
+}
+
+/// One invocation's physical fields paired with their final output labels.
+pub(crate) struct WildcardRowsProjection<'a> {
+    function: &'a WildcardRowsFunction,
+    output_names: &'a [String],
+}
+
+impl<'a> WildcardRowsProjection<'a> {
+    fn new(function: &'a WildcardRowsFunction, output_names: &'a [String]) -> Self {
+        Self {
+            function,
+            output_names,
+        }
+    }
+
+    pub(crate) fn singleton_column_name(&self) -> Option<&str> {
+        self.function.singleton_column_name()
+    }
+
+    pub(crate) fn project_columns(&self, mut project: impl FnMut(&str, &str)) {
+        self.function
+            .project_columns(self.output_names, &mut project);
+    }
+}
+
+impl WildcardRowsFunction {
+    fn project_columns(&self, output_names: &[String], project: &mut impl FnMut(&str, &str)) {
+        for (column, output) in self.columns.iter().zip(output_names) {
+            project(column, output);
+        }
     }
 }

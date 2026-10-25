@@ -1,6 +1,6 @@
 use super::{query_project, rewrite_request};
 use crate::test_helpers::heavy::Connection;
-use ::serde_json::{Value, json};
+use ::serde_json::Value;
 
 /// Analyze one immutable schema snapshot through a fresh RPC connection.
 /// Each call starts a socket handler and a small synthetic catalog, rather than
@@ -27,7 +27,7 @@ pub(crate) async fn analyze_schema_snapshot(
     let response = connection
         .rpc(
             "analyze_query",
-            &json!({
+            &::serde_json::json!({
                 "context_handle": initialized["result"]["context_handle"],
                 "query": {"Text": sql}
             }),

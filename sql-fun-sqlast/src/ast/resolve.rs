@@ -91,6 +91,17 @@ impl Name {
 }
 
 impl Expr {
+    pub(in crate::ast) fn projection_base(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        match self {
+            Self::Indirection(indirection) => indirection.projection_base(context, scope),
+            _ => Ok(None),
+        }
+    }
+
     fn negated_literal(&self) -> Option<SemScalarExpr> {
         match self {
             Self::Literal(literal) => literal.negate(),
@@ -126,7 +137,7 @@ impl Expr {
             Self::Parameter(parameter) => Ok(context.parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
-            Self::Star(name) if context.dialect() == Dialect::postgres() && !name.0.is_empty() => {
+            Self::Star(name) if context.dialect() == Dialect::postgres() && !name.is_empty() => {
                 scope.resolve_whole_row(context, &name.full_name()?)
             }
             Self::Star(_) => Self::invalid_star_projection(context),
@@ -191,7 +202,7 @@ impl Expr {
         let mut fields = Vec::new();
         for item in items {
             if let Self::Star(name) = item
-                && !name.0.is_empty()
+                && !name.is_empty()
                 && context.dialect() == Dialect::postgres()
             {
                 let projection = if let Some(relation) = name.star_relation()? {
@@ -202,11 +213,7 @@ impl Expr {
                     fields.push(item.resolve_in(context, scope)?);
                     continue;
                 };
-                let (columns, found, _) = projection.into_parts();
-                if found {
-                    for column in columns {
-                        fields.push(column.bind(context, scope)?);
-                    }
+                if projection.append_row_fields(context, scope, &mut fields)? {
                     continue;
                 }
             }
@@ -562,14 +569,7 @@ impl Cast {
             };
             // A row constructor can be explicitly assigned a named row identity
             // positionally, without a pg_cast entry for its anonymous type.
-            let exact_row_constructor = argument.is_row_constructor()
-                && source
-                    .row_columns(context)
-                    .zip(target.row_columns(context))
-                    .is_some_and(|(source, target)| {
-                        source
-                            .matches_type_structure_with(&target, |source, target| source == target)
-                    });
+            let exact_row_constructor = argument.accepts_exact_row_identity(context, &target);
             if !exact_row_constructor && context.get_explicit_cast(&source, &target).is_none() {
                 context.report_analysis_problem(AnalysisProblem::explicit_cast_not_defined(
                     &source, &target,

@@ -19,6 +19,17 @@ pub struct DataSourceRowFunctions {
 }
 
 impl DataSourceRowFunctions {
+    pub(super) fn projection_shape_is_resolved(&self) -> bool {
+        self.functions
+            .iter()
+            .all(|function| function.source().projection_shape_is_resolved())
+    }
+    pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        self.functions
+            .iter()
+            .any(|function| function.source().projection_is_table_dependent(context))
+    }
+
     pub(super) fn matches_alias(&self, name: &AliasName) -> bool {
         self.alias.name() == name
     }
@@ -71,6 +82,15 @@ pub struct DataSourceRowsFromFunc {
     source: Box<DataSource>,
 }
 impl DataSourceRowsFromFunc {
+    fn wildcard_layout(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<crate::sem::WildcardRowsFunction, AnalysisError> {
+        let names = self.source.column_names(context, with)?;
+        Ok(crate::sem::WildcardRowsFunction::from_columns(&names))
+    }
+
     pub(crate) fn invocation(source: &DataSource) -> Self {
         Self {
             source: Box::new(source.clone()),
@@ -187,20 +207,11 @@ impl DataSourceRowFunctions {
             columns.append_ordinality(&self.alias);
         }
         let columns = columns.with_aliases(&self.alias);
-        if self
-            .functions
-            .iter()
-            .any(|function| function.source().projection_is_table_dependent(context))
-        {
+        if self.projection_is_table_dependent(context) {
             let functions = self
                 .functions
                 .iter()
-                .map(|function| {
-                    function
-                        .source()
-                        .column_names(context, with)
-                        .map(|columns| crate::sem::WildcardRowsFunction::from_columns(&columns))
-                })
+                .map(|function| function.wildcard_layout(context, with))
                 .collect::<Result<Vec<_>, _>>()?;
             let source = crate::sem::WildcardRowsSource::new(
                 self.alias.name(),

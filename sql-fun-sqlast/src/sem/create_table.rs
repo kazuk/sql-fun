@@ -409,6 +409,10 @@ impl CreateTable {
         self.columns.get_at(column_index)
     }
 
+    pub(crate) fn column_names(&self) -> Vec<ColumnName> {
+        self.columns.names()
+    }
+
     /// check column existing
     #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {

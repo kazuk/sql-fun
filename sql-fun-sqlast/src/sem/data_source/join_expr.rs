@@ -241,7 +241,9 @@ impl JoinExprDataSource {
         if self.matches_projection_qualifier(qualifier) {
             let columns = self.projection_names(context, with)?;
             return Ok(if let Some(alias) = &self.alias {
-                super::ProjectionColumn::alias_join_columns(columns, alias)
+                super::projection::ProjectionColumns::from(columns)
+                    .with_join_alias(alias)
+                    .into_columns()
             } else {
                 columns
             });
@@ -389,5 +391,16 @@ impl JoinExprDataSource {
                 .filter(|column| !merged.contains(column.name())),
         );
         columns
+    }
+}
+
+impl JoinExprDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        context: &impl crate::sem::ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<ColumnName>, crate::sem::AnalysisError> {
+        let columns = self.project(context, with, None)?;
+        Ok(super::projection::ProjectionColumns::from(columns).names())
     }
 }

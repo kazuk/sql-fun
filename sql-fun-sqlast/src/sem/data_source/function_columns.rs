@@ -207,6 +207,45 @@ impl From<Vec<ColumnName>> for OutputColumnNames {
 }
 
 impl OutputColumnNames {
+    pub(super) fn project<'a>(
+        self,
+        source: &'a crate::sem::DataSource,
+        alias: &AliasSpec,
+        nullable: bool,
+        context: &impl ParseContext,
+    ) -> Vec<super::ProjectionColumn<'a>> {
+        let names = self.with_derived_names(alias);
+        let duplicates = names.has_duplicates();
+        let mut columns = Vec::new();
+        for (index, name) in names.0.into_iter().enumerate() {
+            let source = super::QualifiedSource::new(source, alias.name())
+                .with_nullability(nullable)
+                .with_projection_ordinal(index);
+            let record = if duplicates {
+                source.typed_record(context, index)
+            } else {
+                None
+            };
+            columns.push(super::ProjectionColumn::new(&source, &name, &record));
+        }
+        columns
+    }
+    fn with_derived_names(self, alias: &AliasSpec) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .enumerate()
+                .map(|(index, name)| alias.projection_name(index, &name))
+                .collect(),
+        )
+    }
+    fn has_duplicates(&self) -> bool {
+        self.0
+            .iter()
+            .enumerate()
+            .any(|(index, name)| self.0[..index].contains(name))
+    }
+
     pub(super) fn append_function_columns(
         &mut self,
         source: &crate::sem::DataSource,

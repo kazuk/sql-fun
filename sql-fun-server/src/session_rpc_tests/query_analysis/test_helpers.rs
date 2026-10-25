@@ -87,3 +87,22 @@ pub(super) fn rewrite_request(
     std::fs::write(path, format!("{base}{options}")).unwrap();
     project.rpc_request(schema)
 }
+
+/// Diagnostic lookup over the query item's wire collection.
+pub(super) struct QueryProblems<'a>(&'a [::serde_json::Value]);
+
+impl<'a> From<&'a ::serde_json::Value> for QueryProblems<'a> {
+    fn from(item: &'a ::serde_json::Value) -> Self {
+        Self(
+            item["probrems"]["items"]
+                .as_array()
+                .expect("query diagnostic collection"),
+        )
+    }
+}
+
+impl<'a> QueryProblems<'a> {
+    pub(super) fn find(&self, code: &str) -> Option<&'a ::serde_json::Value> {
+        self.0.iter().find(|problem| problem["code"] == code)
+    }
+}

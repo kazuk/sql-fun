@@ -105,3 +105,18 @@ impl CteDataSource {
         Ok(())
     }
 }
+
+impl CteDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        with: &WithClause,
+    ) -> Result<Vec<ColumnName>, AnalysisError> {
+        let Some(cte) = with.get(&self.name) else {
+            return AnalysisError::raise_unexpected_none("star CTE");
+        };
+        let Some(columns) = cte.result_columns() else {
+            return AnalysisError::raise_unexpected_none("star CTE columns");
+        };
+        Ok(columns.names())
+    }
+}

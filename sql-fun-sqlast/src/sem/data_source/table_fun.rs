@@ -194,3 +194,34 @@ impl DataSource {
         }
     }
 }
+
+impl TableFunctionDataSource {
+    pub(super) fn typed_projection_record(
+        &self,
+        alias: &AliasName,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<crate::sem::WildcardTypedRecord> {
+        crate::sem::WildcardTypedRecord::from_function(alias, &self.function, context, index)
+    }
+
+    pub(super) fn bind_projection_ordinal(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        alias: &AliasName,
+        column: &ColumnName,
+        index: usize,
+        nullable: bool,
+    ) -> Result<SemScalarExpr, crate::sem::AnalysisError> {
+        let (value, _) = crate::sem::ColumnReferenceExpr::function_source_ref(
+            context,
+            alias,
+            column,
+            Some(&self.function),
+            self.output_columns().column_at(index),
+            &self.args,
+            nullable,
+        )?;
+        Ok(value.with_function_type_declaration(self.output_type_declaration_at(index)))
+    }
+}

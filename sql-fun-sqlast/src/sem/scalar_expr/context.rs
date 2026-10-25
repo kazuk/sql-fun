@@ -23,6 +23,7 @@ pub struct ScalarAnalysisContext<'a> {
     qualified_only: bool,
     rule: Option<RuleScope>,
     trigger_namespace: Option<crate::sem::SchemaName>,
+    projection_scope_id: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) const fn set_grouping_query(&mut self, id: usize) {
         self.grouping.set_query(id);
+        self.projection_scope_id = Some(id);
     }
 
     pub(crate) fn with_grouping_capture(
@@ -106,21 +108,24 @@ impl<'a> ScalarAnalysisContext<'a> {
     ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
         match self.from_clause.namespace().resolve_name(qualifier) {
             Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
-                source.projection_columns(context, &self.with_clause)?,
+                &source.projection_columns(context, &self.with_clause)?,
                 source.projection_shape_is_resolved(),
                 source.is_table_dependent(context),
             )),
             Err(()) => Ok(crate::sem::data_source::WildcardProjection::new(
-                vec![crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
+                &[crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
                 true,
                 false,
             )),
             Ok(None) => {
                 if let Some(parent) = &self.parent {
-                    parent.projection_names(context, qualifier)
+                    let mut projection = parent.projection_names(context, qualifier)?;
+                    projection
+                        .cross_parent_scope(self.projection_scope_id != parent.projection_scope_id);
+                    Ok(projection)
                 } else {
                     Ok(crate::sem::data_source::WildcardProjection::new(
-                        Vec::new(),
+                        &[],
                         false,
                         false,
                     ))
@@ -136,22 +141,25 @@ impl<'a> ScalarAnalysisContext<'a> {
     ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
         match self.from_clause.qualified_source(context, relation) {
             Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
-                source.projection_columns(context, &self.with_clause)?,
+                &source.projection_columns(context, &self.with_clause)?,
                 source.projection_shape_is_resolved(),
                 source.is_table_dependent(context),
             )),
             Err(()) => {
                 let columns = self.ambiguous_relation_projection(context)?;
                 Ok(crate::sem::data_source::WildcardProjection::new(
-                    columns, true, false,
+                    &columns, true, false,
                 ))
             }
             Ok(None) => {
                 if let Some(parent) = &self.parent {
-                    parent.relation_projection_names(context, relation)
+                    let mut projection = parent.relation_projection_names(context, relation)?;
+                    projection
+                        .cross_parent_scope(self.projection_scope_id != parent.projection_scope_id);
+                    Ok(projection)
                 } else {
                     Ok(crate::sem::data_source::WildcardProjection::new(
-                        Vec::new(),
+                        &[],
                         false,
                         false,
                     ))
@@ -318,6 +326,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             qualified_only: self.qualified_only,
             rule: self.rule.clone(),
             trigger_namespace: self.trigger_namespace.clone(),
+            projection_scope_id: self.projection_scope_id,
             with_clause: self.with_clause.clone(),
             from_clause: self.from_clause.clone(),
             parent: self
@@ -340,6 +349,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
+            projection_scope_id: None,
         }
     }
 
@@ -359,6 +369,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
+            projection_scope_id: parent.map_or(None, |parent| parent.projection_scope_id),
         }
     }
 
@@ -550,6 +561,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
+            projection_scope_id: None,
         }
     }
 }

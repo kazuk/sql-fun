@@ -1,51 +1,5 @@
-use super::{PrivateNames, freeze, query};
-use crate::ast::{Dialect, FromItem, QueryBody, Statement, StatementNode, TableFunctions};
-use crate::sem::{AliasName, ColumnName, WildcardRowsFunction, WildcardRowsSource};
-
-fn invocation(sql: &str) -> TableFunctions {
-    let statement = crate::parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap();
-    let StatementNode::Query(query) = statement.node else {
-        panic!("query")
-    };
-    let QueryBody::Select(mut select) = query.body else {
-        panic!("select")
-    };
-    let FromItem::Functions(source) = select.from.remove(0) else {
-        panic!("function")
-    };
-    source
-}
-
-fn layout(functions: &[&[&str]], outputs: &[&str], ordinality: bool) -> WildcardRowsSource {
-    let functions = functions
-        .iter()
-        .map(|columns| {
-            let columns = columns
-                .iter()
-                .map(|column| ColumnName::from(*column))
-                .collect::<Vec<_>>();
-            WildcardRowsFunction::from_columns(&columns)
-        })
-        .collect::<Vec<_>>();
-    let outputs = outputs
-        .iter()
-        .map(|column| ColumnName::from(*column))
-        .collect::<Vec<_>>();
-    WildcardRowsSource::new(&AliasName::from("r"), &functions, &outputs, ordinality)
-}
-
-fn rendered(source: FromItem) -> String {
-    Statement::from_node(
-        StatementNode::query(query(Vec::new(), vec![source])),
-        Dialect::postgres(),
-        crate::StringSpan::default(),
-    )
-    .deparse_sql(Dialect::postgres())
-    .unwrap()
-}
+use super::freeze;
+use super::test_helpers::{invocation, layout, rendered};
 
 #[rstest::rstest]
 #[case::plain(false)]
@@ -66,18 +20,8 @@ fn zips_fixed_function_projections_without_exposing_helper_columns(#[case] ordin
         ordinality,
     );
     let frozen = freeze(&resolved, source).unwrap();
-    let FromItem::Query(derived) = &frozen else {
-        panic!("fixed source")
-    };
-    assert_eq!(derived.alias.as_ref().unwrap().name, "r");
-    let QueryBody::Select(select) = &derived.query.body else {
-        panic!("fixed projection")
-    };
-    assert_eq!(select.targets.len(), outputs.len());
-    for (target, output) in select.targets.iter().zip(outputs) {
-        assert_eq!(target.alias.as_deref(), Some(*output));
-    }
     let sql = rendered(frozen);
+    assert!(sql.ends_with(r#") AS "r""#), "{sql}");
     ::pg_query::parse(&sql).unwrap();
     assert_eq!(
         sql.matches(r#""generate_series"(1, 2)"#).count(),
@@ -108,20 +52,12 @@ fn retains_per_function_record_definitions() {
     assert!(sql.contains(r#"AS ("id" "int4")"#), "{sql}");
 }
 
-#[test]
-fn private_names_do_not_shadow_correlated_bindings_or_output_columns() {
-    let source =
-        invocation("SELECT * FROM ROWS FROM (generate_series(1,__sql_fun_rows_0.id)) AS r");
-    let resolved = layout(&[&["__sql_fun_rows_1"]], &["__sql_fun_rows_2"], false);
-    let mut names = PrivateNames::new(&source, &resolved).unwrap();
-    assert_eq!(names.next(), "__sql_fun_rows_3");
-    assert_eq!(names.next(), "__sql_fun_rows_4");
-}
-
-#[test]
-fn mismatched_layout_rejects_before_building_a_source() {
+#[rstest::rstest]
+#[case::missing_function(&[])]
+#[case::missing_output(&[&["generate_series"][..]][..])]
+fn mismatched_layout_rejects_before_building_a_source(#[case] functions: &[&[&str]]) {
     let source = invocation("SELECT * FROM ROWS FROM (generate_series(1,2)) AS r");
-    let resolved = layout(&[], &[], false);
+    let resolved = layout(functions, &[], false);
     assert!(
         freeze(&resolved, source)
             .unwrap_err()

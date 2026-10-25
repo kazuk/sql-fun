@@ -39,17 +39,17 @@ impl FromClause {
         if let Some(qualifier) = qualifier {
             return match self.namespace().resolve_name(qualifier) {
                 Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
-                    source.projection_columns(context, with)?,
+                    &source.projection_columns(context, with)?,
                     source.projection_shape_is_resolved(),
                     source.is_table_dependent(context),
                 )),
                 Ok(None) => Ok(crate::sem::data_source::WildcardProjection::new(
-                    Vec::new(),
+                    &[],
                     false,
                     false,
                 )),
                 Err(()) => Ok(crate::sem::data_source::WildcardProjection::new(
-                    vec![crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
+                    &[crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
                     true,
                     false,
                 )),
@@ -64,7 +64,7 @@ impl FromClause {
         let source_found = !columns.is_empty()
             || (!self.0.is_empty() && self.0.iter().all(DataSource::projection_shape_is_resolved));
         Ok(crate::sem::data_source::WildcardProjection::new(
-            columns,
+            &columns,
             source_found,
             table_dependent,
         ))
@@ -77,13 +77,13 @@ impl FromClause {
     ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
         if let Some(source) = self.0.last() {
             Ok(crate::sem::data_source::WildcardProjection::new(
-                source.projection_names(context, with, None)?,
+                &source.projection_names(context, with, None)?,
                 source.projection_shape_is_resolved(),
                 source.projection_is_table_dependent(context),
             ))
         } else {
             Ok(crate::sem::data_source::WildcardProjection::new(
-                Vec::new(),
+                &[],
                 false,
                 false,
             ))

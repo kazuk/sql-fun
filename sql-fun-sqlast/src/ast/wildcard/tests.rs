@@ -1,6 +1,6 @@
 mod test_helpers;
 
-use self::test_helpers::{catalog, expansions, rewritten, statement};
+use self::test_helpers::{ResultShapeAssertions, catalog, expansions, rewritten, statement};
 use crate::ast::Dialect;
 use crate::sem::ParseContext;
 
@@ -14,6 +14,25 @@ use crate::sem::ParseContext;
 #[case::update("UPDATE t SET name = 1 RETURNING *", 1)]
 #[case::delete("DELETE FROM t RETURNING *", 1)]
 #[case::zero_columns("SELECT * FROM empty", 1)]
+#[case::correlated("SELECT EXISTS(SELECT j.*) FROM (t CROSS JOIN u) j", 1)]
+#[case::correlated_set(
+    "SELECT EXISTS(SELECT j.* UNION ALL SELECT j.*) FROM (t CROSS JOIN u) j",
+    2
+)]
+#[case::deep_correlation("SELECT EXISTS(SELECT EXISTS(SELECT j.*)) FROM (t CROSS JOIN u) j", 1)]
+#[case::empty_outer_projection("SELECT FROM (t CROSS JOIN u) j WHERE EXISTS(SELECT j.*)", 1)]
+#[case::shadowed_alias(
+    "SELECT EXISTS(SELECT j.* FROM (u CROSS JOIN t) j) FROM (t CROSS JOIN u) j",
+    1
+)]
+#[case::correlated_lateral(
+    "SELECT child.* FROM (t CROSS JOIN u) j CROSS JOIN LATERAL (SELECT j.*) child",
+    1
+)]
+#[case::nested_source_and_target_edits(
+    "SELECT k.* FROM ((SELECT j.* FROM (t CROSS JOIN u) j) child(a,b,id,d) CROSS JOIN t other) k",
+    2
+)]
 #[case::duplicate_join_alias("SELECT j.* FROM (t JOIN u ON true) AS j", 1)]
 #[case::mixed_duplicate_alias("SELECT * FROM (t JOIN u ON true) AS j CROSS JOIN t AS other", 1)]
 #[case::duplicate_alias_using(
@@ -44,13 +63,7 @@ fn rewrite_roundtrip_preserves_result_shape(#[case] sql: &str, #[case] expected:
     );
     let before = original.ast().result_columns().unwrap();
     let after = reparsed.ast().result_columns().unwrap();
-    assert_eq!(before.len(), after.len());
-    for ordinal in 0..before.len() {
-        let left = before.get_column_at(ordinal).unwrap();
-        let right = after.get_column_at(ordinal).unwrap();
-        assert_eq!(left.column_name(), right.column_name(), "{emitted}");
-        assert_eq!(left.col_type(), right.col_type(), "{emitted}");
-    }
+    before.assert_same_result_shape(after, &emitted);
 }
 
 #[rstest::rstest]
@@ -189,7 +202,7 @@ fn returning_row_image_qualification_is_preserved(#[case] sql: &str, #[case] qua
         .unwrap();
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
-        emitted.contains(&format!("\"{qualifier}\".\"id\"")),
+        emitted.contains(&format!(r#""{qualifier}"."id""#)),
         "{emitted}"
     );
     let pair = statement(&emitted).analyze(context()).unwrap();
@@ -233,13 +246,7 @@ fn rows_from_expansion_keeps_duplicate_outputs_stable(#[case] sql: &str) {
     );
     let before = original.ast().result_columns().unwrap();
     let after = rewritten.ast().result_columns().unwrap();
-    assert_eq!(before.len(), after.len(), "{emitted}");
-    for ordinal in 0..before.len() {
-        let left = before.get_column_at(ordinal).unwrap();
-        let right = after.get_column_at(ordinal).unwrap();
-        assert_eq!(left.column_name(), right.column_name(), "{emitted}");
-        assert_eq!(left.col_type(), right.col_type(), "{emitted}");
-    }
+    before.assert_same_result_shape(after, &emitted);
 }
 
 #[test]
@@ -376,11 +383,30 @@ fn merge_returning_fixes_its_source_projection(
     );
     let before = original.ast().result_columns().unwrap();
     let after = rewritten.ast().result_columns().unwrap();
-    assert_eq!(before.len(), after.len(), "{emitted}");
-    for ordinal in 0..before.len() {
-        let left = before.get_column_at(ordinal).unwrap();
-        let right = after.get_column_at(ordinal).unwrap();
-        assert_eq!(left.column_name(), right.column_name(), "{emitted}");
-        assert_eq!(left.col_type(), right.col_type(), "{emitted}");
-    }
+    before.assert_same_result_shape(after, &emitted);
+}
+
+#[test]
+fn a_late_invalid_target_preserves_sources_and_allows_retry() {
+    let groups = expansions(&statement("SELECT j.*, j.* FROM (t CROSS JOIN u) j"));
+    let mut owner = statement("SELECT j.*, 1   FROM (t CROSS JOIN u) j");
+    let before = owner.deparse_sql(Dialect::postgres()).unwrap();
+    assert!(
+        owner
+            .rewrite_wildcards(&groups)
+            .unwrap_err()
+            .is_wrong_node_kind()
+    );
+    assert_eq!(owner.deparse_sql(Dialect::postgres()).unwrap(), before);
+    let own_groups = expansions(&owner);
+    assert_eq!(owner.rewrite_wildcards(&own_groups).unwrap(), 1);
+    let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
+    assert!(
+        statement(&emitted)
+            .analyze(catalog())
+            .unwrap()
+            .context()
+            .reported_problems()
+            .is_empty()
+    );
 }

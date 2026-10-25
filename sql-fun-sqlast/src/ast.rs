@@ -29,6 +29,10 @@ mod tests;
 mod trigger;
 mod validation;
 mod view_definition;
+mod projection;
+mod traversal;
+mod query_construction;
+mod rows_from;
 mod wildcard;
 
 pub use self::deparse::DeparseError;

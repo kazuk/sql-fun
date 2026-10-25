@@ -395,12 +395,10 @@ impl crate::ast::Target {
         scope: &ScalarAnalysisContext<'_>,
         results: &mut ResultColumnCollection,
     ) -> Result<(), AnalysisError> {
-        if let Expr::Star(name) = &self.expression {
+        if let Some(name) = self.source_star_name() {
             return self.append_source_star(name, context, with, from, scope, results);
         }
-        if let Expr::Indirection(indirection) = &self.expression
-            && let Some(base) = indirection.projection_base(context, scope)?
-        {
+        if let Some(base) = self.expression.projection_base(context, scope)? {
             return results.append_composite_star(context, base);
         }
         let expression = self.expression.resolve_in(context, scope)?;
@@ -434,7 +432,7 @@ impl crate::ast::Target {
         } else {
             from.wildcard_projection(context, with, None)?
         };
-        let (columns, source_found, table_dependent) = projection.into_parts();
+        let source_found = projection.source_found();
         if !source_found && qualifier.is_some() {
             let base = name.resolve_column(context, scope)?;
             return results.append_composite_star(context, base);
@@ -444,27 +442,7 @@ impl crate::ast::Target {
                 crate::sem::problem::QueryProblem::reference_not_found("star source"),
             ))?;
         }
-        let first = results.len();
-        let references: Vec<_> = columns
-            .iter()
-            .map(crate::sem::ProjectionColumn::visible_reference)
-            .collect();
-        for column in &columns {
-            let expression = column.bind(context, scope)?;
-            results.push_expression(column.name(), expression);
-        }
-        let source_projections =
-            crate::sem::WildcardSourceProjection::from_columns(&columns, context, scope)?;
-        let mut expansion = crate::sem::WildcardExpansion::new(
-            self.location,
-            results,
-            first,
-            table_dependent,
-            &references,
-        );
-        expansion.retain_source_projections(&source_projections);
-        expansion.retain_projection_origins(&columns);
-        context.analysis_state_mut().record_wildcard(expansion);
+        projection.append_results(context, scope, results, self.location, None)?;
         Ok(())
     }
 }

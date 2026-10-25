@@ -157,3 +157,15 @@ impl GroupedDataSource {
         Ok(())
     }
 }
+
+impl GroupedDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        source: &DataSource,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<ColumnName>, AnalysisError> {
+        let columns = self.projection_names(source, context, with)?;
+        Ok(super::projection::ProjectionColumns::from(columns).names())
+    }
+}

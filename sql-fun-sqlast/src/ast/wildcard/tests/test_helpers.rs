@@ -120,3 +120,19 @@ pub(super) fn rows_catalog() -> TestParseContext {
     );
     context
 }
+
+/// Compare the observable projection contract without exposing collection walks.
+pub(super) trait ResultShapeAssertions {
+    fn assert_same_result_shape(&self, other: &Self, sql: &str);
+}
+impl ResultShapeAssertions for crate::sem::ResultColumnCollection {
+    fn assert_same_result_shape(&self, other: &Self, sql: &str) {
+        assert_eq!(self.len(), other.len(), "{sql}");
+        for ordinal in 0..self.len() {
+            let left = self.get_column_at(ordinal).unwrap();
+            let right = other.get_column_at(ordinal).unwrap();
+            assert_eq!(left.column_name(), right.column_name(), "{sql}");
+            assert_eq!(left.col_type(), right.col_type(), "{sql}");
+        }
+    }
+}

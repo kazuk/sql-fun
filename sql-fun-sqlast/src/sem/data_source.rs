@@ -87,10 +87,7 @@ impl DataSource {
         crate::sem::with_stack(|| match self {
             Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
             Self::DeferredTableFunc(source) => source.known_column_names().is_some(),
-            Self::RowFunctions(source) => source
-                .functions()
-                .iter()
-                .all(|function| function.source().projection_shape_is_resolved()),
+            Self::RowFunctions(source) => source.projection_shape_is_resolved(),
             Self::JoinExpr(source) => source.projection_shape_is_resolved(),
             Self::Group(source) => source.projection_shape_is_resolved(),
             Self::MergeRecord(source) => source.source().projection_shape_is_resolved(),
@@ -110,10 +107,7 @@ impl DataSource {
                 .overload()
                 .as_ref()
                 .is_some_and(|overload| overload.table_output_depends_on_table(context)),
-            Self::RowFunctions(source) => source
-                .functions()
-                .iter()
-                .any(|function| function.source().projection_is_table_dependent(context)),
+            Self::RowFunctions(source) => source.projection_is_table_dependent(context),
             _ => false,
         }
     }

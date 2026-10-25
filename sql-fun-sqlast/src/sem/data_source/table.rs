@@ -143,3 +143,57 @@ impl TableDataSource {
         Ok(())
     }
 }
+
+impl TableDataSource {
+    pub(super) fn typed_projection_record(
+        &self,
+        alias: &AliasName,
+        context: &impl crate::sem::ParseContext,
+        index: usize,
+    ) -> Option<crate::sem::WildcardTypedRecord> {
+        crate::sem::WildcardTypedRecord::from_table(alias, &self.name, context, index)
+    }
+
+    pub(super) fn wildcard_relation(&self) -> &crate::sem::FullName {
+        self.name.full_name()
+    }
+
+    pub(super) fn unaliased_projection_relation(
+        &self,
+        alias: &AliasName,
+    ) -> Option<&crate::sem::FullName> {
+        if !self.alias.is_explicit() && self.alias.name() == alias {
+            Some(self.name.full_name())
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn bind_projection_ordinal(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        alias: &AliasName,
+        column: &ColumnName,
+        index: usize,
+        nullable: bool,
+    ) -> crate::sem::SemScalarExpr {
+        let definition = context
+            .get_table(&self.name)
+            .and_then(|table| table.get_column_at(index));
+        crate::sem::SemScalarExpr::column_reference(ColumnReferenceExpr::table_column(
+            alias, column, &self.name, definition, nullable,
+        ))
+    }
+}
+
+impl TableDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> Result<Vec<ColumnName>, AnalysisError> {
+        let Some(table) = context.get_table(&self.name) else {
+            return AnalysisError::raise_unexpected_input("star relation missing");
+        };
+        Ok(table.column_names())
+    }
+}

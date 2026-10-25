@@ -57,6 +57,10 @@ struct Bindings {
 }
 
 impl Bindings {
+    fn type_hints(&self) -> Vec<Option<&str>> {
+        self.hints.iter().map(Option::as_deref).collect()
+    }
+
     fn from_query(query: &PlaceholderedSql) -> Result<Self, String> {
         let mut names = Vec::new();
         query.append_parameter_order(&mut names);
@@ -319,6 +323,28 @@ impl QueryResult {
         result
     }
 
+    fn report(&mut self, input: &StatementAnalysis<'_>, stage: QueryAnalysisStage, error: &str) {
+        self.problems.push(input.diagnostic(stage, error));
+    }
+
+    fn clear_output(
+        &mut self,
+        input: &StatementAnalysis<'_>,
+        stage: QueryAnalysisStage,
+        error: &str,
+    ) {
+        self.sql = None;
+        self.report(input, stage, error);
+    }
+
+    fn for_statement(statement: &Statement, mapping: &SourceMap) -> Self {
+        Self {
+            span: Some(mapping.statement_span(statement)),
+            kind: Some(query_kind(statement)),
+            ..Self::default()
+        }
+    }
+
     fn analyze(
         statement: &Statement,
         bindings: &Bindings,
@@ -327,110 +353,133 @@ impl QueryResult {
         mapping: &SourceMap,
         expand_asterisk: bool,
     ) -> Self {
-        let rendered = &mapping.rendered;
-        let base = schema.base_context();
-        let dialect = base.metadata().sql_dialect();
-        let mut result = Self {
-            span: Some(mapping.statement_span(statement)),
-            kind: Some(query_kind(statement)),
-            ..Self::default()
-        };
+        StatementAnalysis::new(statement, bindings, source, schema, mapping).run(expand_asterisk)
+    }
+}
+
+/// Coordinates query-local output preparation without replacing the shared parse context.
+struct StatementAnalysis<'a> {
+    statement: &'a Statement,
+    bindings: &'a Bindings,
+    source: &'a QuerySource,
+    schema: &'a InitializedSchema,
+    mapping: &'a SourceMap,
+}
+
+impl<'a> StatementAnalysis<'a> {
+    fn new(
+        statement: &'a Statement,
+        bindings: &'a Bindings,
+        source: &'a QuerySource,
+        schema: &'a InitializedSchema,
+        mapping: &'a SourceMap,
+    ) -> Self {
+        Self {
+            statement,
+            bindings,
+            source,
+            schema,
+            mapping,
+        }
+    }
+
+    fn run(&self, expand_asterisk: bool) -> QueryResult {
+        let base = self.schema.base_context();
+        let mut result = QueryResult::for_statement(self.statement, self.mapping);
         let mut context =
-            SchemaFileContext::new(&source.path, base, base.get_args(), base.metadata());
-        let statement_text = &rendered
-            [statement.span().offset()..statement.span().offset() + statement.span().len()];
-        let diagnostic_source = if mapping.expanded {
-            None
-        } else {
-            Some(statement_text)
-        };
-        context.set_diagnostic_source(statement_text);
-        context.set_statement_span(*statement.span());
-        let hints: Vec<_> = bindings.hints.iter().map(Option::as_deref).collect();
+            SchemaFileContext::new(&self.source.path, base, base.get_args(), base.metadata());
+        context.set_diagnostic_source(self.statement_text());
+        context.set_statement_span(*self.statement.span());
+        let hints = self.bindings.type_hints();
         if let Err(error) = context.setup_typehinting(&hints) {
-            result.problems.push(diagnostic(
-                &AnalysisProblem::query_analysis(QueryAnalysisStage::hint(), &error.to_string()),
-                &source.path,
-                diagnostic_source,
-                dialect,
-                statement.span().offset(),
-            ));
+            result.report(self, QueryAnalysisStage::hint(), &error.to_string());
             return result;
         }
-        // Preserve the pre-analysis rendering of the realized AST. Rewriting
-        // produces executable output in a separate post-analysis rendering.
-        match statement.deparse_sql(statement.dialect()) {
+        match self.statement.deparse_sql(self.statement.dialect()) {
             Ok(sql) => result.sql = Some(sql),
-            Err(error) => result.problems.push(diagnostic(
-                &AnalysisProblem::query_analysis(QueryAnalysisStage::deparse(), &error.to_string()),
-                &source.path,
-                diagnostic_source,
-                dialect,
-                statement.span().offset(),
-            )),
+            Err(error) => result.report(self, QueryAnalysisStage::deparse(), &error.to_string()),
         }
-        // Imported catalog CTEs have independently parsed target locations.
-        // Reparse their realized SQL to synchronize only projection locations;
-        // retain all original parser spans used by semantic diagnostics.
-        // Query/parameter spans always use the original statement and SourceMap.
-        let mut output_statement = if expand_asterisk {
-            let Some(sql) = result.sql.as_deref() else {
-                return result;
-            };
-            match prepare_output_statement(statement, sql, mapping.expanded) {
-                Ok(output) => Some(output),
-                Err(error) => {
-                    result.sql = None;
-                    result.problems.push(diagnostic(
-                        &AnalysisProblem::query_analysis(QueryAnalysisStage::parse(), &error),
-                        &source.path,
-                        diagnostic_source,
-                        dialect,
-                        statement.span().offset(),
-                    ));
-                    return result;
-                }
-            }
-        } else {
-            None
+        if expand_asterisk && result.sql.is_none() {
+            return result;
+        }
+        // Imported catalog CTEs need one projection coordinate space. Keep the
+        // original expression spans for diagnostics and query/parameter mapping.
+        let mut output = match self.prepare_output(&result, expand_asterisk) {
+            Ok(output) => output,
+            Err(error) => return self.output_failure(result, QueryAnalysisStage::parse(), &error),
         };
-        let analysis_statement = output_statement.as_ref().unwrap_or(statement);
-        match analysis_statement.analyze(context) {
-            Ok(pair) => {
-                if let Some(output) = &mut output_statement {
-                    let expansions = pair.context().analysis_state().wildcard_expansions();
-                    let rewritten = rewrite_executable_sql(output, expansions);
-                    match rewritten {
-                        Ok(sql) => result.sql = Some(sql),
-                        Err(error) => {
-                            result.sql = None;
-                            result.problems.push(diagnostic(
-                                &AnalysisProblem::query_analysis(
-                                    QueryAnalysisStage::deparse(),
-                                    &error,
-                                ),
-                                &source.path,
-                                diagnostic_source,
-                                dialect,
-                                statement.span().offset(),
-                            ));
-                        }
-                    }
-                }
-                result.describe(pair, bindings, source, statement, mapping);
-            }
-            Err(error) => result.problems.push(diagnostic(
-                &AnalysisProblem::query_analysis(
-                    QueryAnalysisStage::analysis(),
-                    &error.to_string(),
-                ),
-                &source.path,
-                diagnostic_source,
-                dialect,
-                statement.span().offset(),
-            )),
+        let statement = output.as_ref().unwrap_or(self.statement);
+        match statement.analyze(context) {
+            Ok(pair) => self.complete(&mut result, pair, output.as_mut()),
+            Err(error) => result.report(self, QueryAnalysisStage::analysis(), &error.to_string()),
         }
         result
+    }
+
+    fn statement_text(&self) -> &str {
+        let span = self.statement.span();
+        &self.mapping.rendered[span.offset()..span.offset() + span.len()]
+    }
+
+    fn prepare_output(
+        &self,
+        result: &QueryResult,
+        enabled: bool,
+    ) -> Result<Option<Statement>, String> {
+        if !enabled {
+            return Ok(None);
+        }
+        let Some(sql) = result.sql.as_deref() else {
+            return Err("query could not be rendered for wildcard expansion".to_owned());
+        };
+        prepare_output_statement(self.statement, sql, self.mapping.expanded).map(Some)
+    }
+
+    fn complete(
+        &self,
+        result: &mut QueryResult,
+        pair: ::sql_fun_sqlast::AstAndContextPair<SchemaFileContext>,
+        output: Option<&mut Statement>,
+    ) {
+        if let Some(output) = output {
+            let expansions = pair.context().analysis_state().wildcard_expansions();
+            match rewrite_executable_sql(output, expansions) {
+                Ok(sql) => result.sql = Some(sql),
+                Err(error) => result.clear_output(self, QueryAnalysisStage::deparse(), &error),
+            }
+        }
+        result.describe(
+            pair,
+            self.bindings,
+            self.source,
+            self.statement,
+            self.mapping,
+        );
+    }
+
+    fn output_failure(
+        &self,
+        mut result: QueryResult,
+        stage: QueryAnalysisStage,
+        error: &str,
+    ) -> QueryResult {
+        result.clear_output(self, stage, error);
+        result
+    }
+
+    fn diagnostic(&self, stage: QueryAnalysisStage, error: &str) -> AnalysisProbrem {
+        let source = if self.mapping.expanded {
+            None
+        } else {
+            Some(self.statement_text())
+        };
+        diagnostic(
+            &AnalysisProblem::query_analysis(stage, error),
+            &self.source.path,
+            source,
+            self.schema.base_context().metadata().sql_dialect(),
+            self.statement.span().offset(),
+        )
     }
 }
 
@@ -466,10 +515,10 @@ fn rewrite_executable_sql(
 /// Re-establish parser locations after structural catalog CTE insertion.
 fn parse_realized_statement(sql: &str, dialect: Dialect) -> Result<Statement, String> {
     let mut statements = parse_statements(sql, dialect);
-    let statement = statements
-        .next()
-        .ok_or_else(|| "deparsed query has no statement".to_owned())?
-        .map_err(|error| error.to_string())?;
+    let Some(statement) = statements.next() else {
+        return Err("deparsed query has no statement".to_owned());
+    };
+    let statement = statement.map_err(|error| error.to_string())?;
     if statements.next().is_some() {
         return Err("deparsed query must contain exactly one statement".to_owned());
     }

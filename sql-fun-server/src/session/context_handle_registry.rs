@@ -27,6 +27,26 @@ struct RegisteredContext {
     rewrite_options: ::sql_fun_core::RewriteOptions,
 }
 
+impl RegisteredContext {
+    fn new(
+        schema: &Arc<InitializedSchema>,
+        rewrite_options: &::sql_fun_core::RewriteOptions,
+    ) -> Self {
+        Self {
+            schema: Arc::clone(schema),
+            rewrite_options: *rewrite_options,
+        }
+    }
+
+    fn schema(&self) -> &InitializedSchema {
+        self.schema.as_ref()
+    }
+
+    fn rewrite_options(&self) -> &::sql_fun_core::RewriteOptions {
+        &self.rewrite_options
+    }
+}
+
 impl ContextHandleRegistry {
     pub(super) fn new() -> Self {
         Self {
@@ -51,10 +71,7 @@ impl ContextHandleRegistry {
         let handle = HANDLE_IDS.issue()?;
         self.schemas.insert(
             handle.clone(),
-            Box::new(RegisteredContext {
-                schema: Arc::clone(schema),
-                rewrite_options,
-            }),
+            Box::new(RegisteredContext::new(schema, &rewrite_options)),
         );
         Ok(handle)
     }
@@ -63,9 +80,7 @@ impl ContextHandleRegistry {
     ///
     /// The result borrows the registry, not a request, facade, or lock guard.
     pub(super) fn resolve(&self, handle: &ContextHandle) -> Option<&InitializedSchema> {
-        self.schemas
-            .get(handle)
-            .map(|context| context.schema.as_ref())
+        self.schemas.get(handle).map(|context| context.schema())
     }
 
     pub(super) fn rewrite_options(
@@ -74,7 +89,7 @@ impl ContextHandleRegistry {
     ) -> Option<&::sql_fun_core::RewriteOptions> {
         self.schemas
             .get(handle)
-            .map(|context| &context.rewrite_options)
+            .map(|context| context.rewrite_options())
     }
 }
 

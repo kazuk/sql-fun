@@ -23,18 +23,79 @@ struct ProjectionOrigin<'a> {
     ordinal: usize,
 }
 
+impl<'a> ProjectionOrigin<'a> {
+    const fn source(&self) -> &std::sync::Arc<ProjectionSource<'a>> {
+        &self.source
+    }
+    const fn ordinal(&self) -> usize {
+        self.ordinal
+    }
+
+    fn new(source: &std::sync::Arc<ProjectionSource<'a>>, ordinal: usize) -> Self {
+        Self {
+            source: std::sync::Arc::clone(source),
+            ordinal,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ProjectionSource<'a> {
     alias: AliasName,
     columns: Vec<ProjectionColumn<'a>>,
 }
 
-impl ProjectionSource<'_> {
-    pub(crate) const fn alias(&self) -> &AliasName {
+impl<'a> ProjectionSource<'a> {
+    const fn alias(&self) -> &AliasName {
         &self.alias
     }
-    pub(crate) fn columns(&self) -> &[ProjectionColumn<'_>] {
-        &self.columns
+    fn shares_alias(&self, other: &Self) -> bool {
+        self.alias == other.alias
+    }
+
+    fn new(alias: &AliasName, columns: &[ProjectionColumn<'a>]) -> Self {
+        Self {
+            alias: alias.clone(),
+            columns: columns.to_vec(),
+        }
+    }
+    fn resolve_wildcard(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<crate::sem::WildcardSourceProjection, AnalysisError> {
+        crate::sem::with_stack(|| {
+            let mut projection = crate::sem::WildcardSourceProjection::new(&self.alias);
+            let mut sources = ProjectionSources::default();
+            for column in &self.columns {
+                let expression = column.bind(context, scope)?;
+                projection.append_bound_column(column, &expression);
+                column.collect_projection_sources(&mut sources);
+            }
+            projection.retain_source_projections(&sources.resolve(context, scope)?);
+            Ok(projection)
+        })
+    }
+}
+
+#[derive(Default)]
+struct ProjectionSources<'a, 'b>(Vec<&'b ProjectionSource<'a>>);
+impl<'a, 'b> ProjectionSources<'a, 'b> {
+    fn include(&mut self, source: &'b ProjectionSource<'a>) {
+        if !self.0.iter().any(|existing| existing.shares_alias(source)) {
+            self.0.push(source);
+        }
+    }
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Vec<crate::sem::WildcardSourceProjection>, AnalysisError> {
+        let mut projections = Vec::new();
+        for source in &self.0 {
+            projections.push(source.resolve_wildcard(context, scope)?);
+        }
+        Ok(projections)
     }
 }
 
@@ -52,7 +113,33 @@ struct MergedProjection<'a> {
     nullable: bool,
 }
 
-impl MergedProjection<'_> {
+impl<'a> MergedProjection<'a> {
+    fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
+        self.left.collect_rows_sources(sources);
+        self.right.collect_rows_sources(sources);
+    }
+    fn collect_qualifiers(&self, qualifiers: &mut crate::sem::WildcardQualifiers) {
+        self.left.collect_qualifiers(qualifiers);
+        self.right.collect_qualifiers(qualifiers);
+    }
+
+    fn new(left: &ProjectionColumn<'a>, right: &ProjectionColumn<'a>) -> Self {
+        Self {
+            left: Box::new(left.clone()),
+            right: Box::new(right.clone()),
+            nullable: false,
+        }
+    }
+    const fn with_nullability(mut self, nullable: bool) -> Self {
+        self.nullable |= nullable;
+        self
+    }
+
+    fn collect_projection_sources<'b>(&'b self, sources: &mut ProjectionSources<'a, 'b>) {
+        self.left.collect_projection_sources(sources);
+        self.right.collect_projection_sources(sources);
+    }
+
     fn bind(
         &self,
         context: &mut impl ParseContext,
@@ -81,6 +168,38 @@ impl MergedProjection<'_> {
 }
 
 impl<'a> ProjectionBinding<'a> {
+    fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
+        if let Self::Merged(merged) = self {
+            merged.collect_rows_sources(sources);
+        }
+    }
+    fn collect_qualifiers(&self, qualifiers: &mut crate::sem::WildcardQualifiers) {
+        match self {
+            Self::Source(source) => source.retain_wildcard_qualifier(qualifiers),
+            Self::Merged(merged) => merged.collect_qualifiers(qualifiers),
+            Self::Expression(_) => {}
+        }
+    }
+
+    fn merged(left: &ProjectionColumn<'a>, right: &ProjectionColumn<'a>) -> Self {
+        Self::Merged(Box::new(MergedProjection::new(left, right)))
+    }
+    const fn is_merged(&self) -> bool {
+        matches!(self, Self::Merged(_))
+    }
+    fn visible_reference(&self, column: &ColumnName) -> Option<Vec<String>> {
+        match self {
+            Self::Source(source) => Some(source.projection_reference(column)),
+            _ => None,
+        }
+    }
+
+    fn collect_projection_sources<'b>(&'b self, sources: &mut ProjectionSources<'a, 'b>) {
+        if let Self::Merged(merged) = self {
+            merged.collect_projection_sources(sources);
+        }
+    }
+
     const fn source(source: QualifiedSource<'a>) -> Self {
         Self::Source(source)
     }
@@ -94,10 +213,7 @@ impl<'a> ProjectionBinding<'a> {
             Self::Expression(expression) => Self::Expression(Box::new(
                 expression.with_function_source_nullability(nullable),
             )),
-            Self::Merged(mut merged) => {
-                merged.nullable |= nullable;
-                Self::Merged(merged)
-            }
+            Self::Merged(merged) => Self::Merged(Box::new(merged.with_nullability(nullable))),
         }
     }
     fn bind_direct(
@@ -127,24 +243,60 @@ impl<'a> ProjectionBinding<'a> {
 }
 
 impl<'a> ProjectionColumn<'a> {
-    pub(crate) fn collect_rows_sources(&self, sources: &mut Vec<crate::sem::WildcardRowsSource>) {
-        if let Some((source, _)) = &self.rows_origin
-            && self
-                .alias
-                .as_ref()
-                .is_none_or(|alias| alias.as_str() == source.alias())
-            && !sources
-                .iter()
-                .any(|existing| existing.alias() == source.alias())
-        {
-            sources.push(source.as_ref().clone());
-        }
-        if let ProjectionBinding::Merged(merged) = &self.binding {
-            merged.left.collect_rows_sources(sources);
-            merged.right.collect_rows_sources(sources);
+    fn retain_rows_source(
+        &mut self,
+        source: &std::sync::Arc<crate::sem::WildcardRowsSource>,
+        index: usize,
+    ) {
+        self.rows_origin = Some((std::sync::Arc::clone(source), index));
+    }
+
+    fn with_occurrence(self, role: Option<super::MergeRecordRole>, nullable: bool) -> Self {
+        if let Some(role) = role {
+            self.with_merge(role, nullable)
+        } else {
+            self.with_nullability(nullable)
         }
     }
 
+    fn bind_projection(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        if let Some(qualifier) = binding_qualifier {
+            Ok(scope
+                .resolve_column(context, Some(qualifier), &self.name)?
+                .0)
+        } else {
+            self.bind(context, scope)
+        }
+    }
+    fn projection_reference(&self, binding_qualifier: Option<&AliasName>) -> Option<Vec<String>> {
+        if let Some(alias) = binding_qualifier {
+            Some(vec![
+                alias.as_str().to_owned(),
+                self.name.as_str().to_owned(),
+            ])
+        } else {
+            self.visible_reference()
+        }
+    }
+
+    pub(crate) fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
+        crate::sem::with_stack(|| {
+            if let Some((source, _)) = &self.rows_origin
+                && self
+                    .alias
+                    .as_ref()
+                    .is_none_or(|alias| alias.as_str() == source.alias())
+            {
+                sources.include(source);
+            }
+            self.binding.collect_rows_sources(sources);
+        });
+    }
     pub(crate) fn typed_record(&self) -> Option<crate::sem::WildcardTypedRecord> {
         if self.alias.is_none() {
             self.typed_record.clone()
@@ -153,80 +305,40 @@ impl<'a> ProjectionColumn<'a> {
         }
     }
 
-    pub(crate) fn collect_qualifiers(&self, qualifiers: &mut Vec<crate::sem::WildcardQualifier>) {
-        match &self.binding {
-            ProjectionBinding::Source(source) => {
-                if let Some(qualifier) = source.wildcard_qualifier()
-                    && !qualifiers.iter().any(|existing| {
-                        existing.relation() == qualifier.relation()
-                            && existing.alias() == qualifier.alias()
-                    })
-                {
-                    qualifiers.push(qualifier);
-                }
-            }
-            ProjectionBinding::Merged(merged) => {
-                merged.left.collect_qualifiers(qualifiers);
-                merged.right.collect_qualifiers(qualifiers);
-            }
-            ProjectionBinding::Expression(_) => {}
-        }
-    }
-
-    pub(super) fn alias_join_columns(
-        columns: Vec<Self>,
-        alias: &crate::sem::AliasSpec,
-    ) -> Vec<Self> {
-        let columns: Vec<_> = columns
-            .into_iter()
-            .enumerate()
-            .map(|(index, column)| {
-                if let Some(name) = alias.derived_column_at(index) {
-                    column.with_name(name)
-                } else {
-                    column
-                }
-            })
-            .collect();
-        let duplicates = columns.iter().enumerate().any(|(index, column)| {
-            columns[..index]
-                .iter()
-                .any(|other| other.name() == column.name())
+    pub(crate) fn collect_qualifiers(&self, qualifiers: &mut crate::sem::WildcardQualifiers) {
+        crate::sem::with_stack(|| {
+            self.binding.collect_qualifiers(qualifiers);
         });
-        let requires_fixed_children = columns
-            .iter()
-            .any(|column| column.origin.is_some() || column.rows_origin.is_some());
-        let source = if duplicates || requires_fixed_children {
-            Some(std::sync::Arc::new(ProjectionSource {
-                alias: alias.name().clone(),
-                columns: columns.clone(),
-            }))
-        } else {
-            None
-        };
-        columns
-            .into_iter()
-            .enumerate()
-            .map(|(ordinal, column)| {
-                let mut column = column.with_join_alias(alias.name());
-                if let Some(source) = &source {
-                    column.origin = Some(ProjectionOrigin {
-                        source: std::sync::Arc::clone(source),
-                        ordinal,
-                    });
-                }
-                column
-            })
-            .collect()
+    }
+    fn with_derived_name(mut self, alias: &crate::sem::AliasSpec, index: usize) -> Self {
+        if let Some(name) = alias.derived_column_at(index) {
+            self.name = name.clone();
+        }
+        self
+    }
+    fn with_source_alias(
+        mut self,
+        alias: &AliasName,
+        source: Option<&std::sync::Arc<ProjectionSource<'a>>>,
+        ordinal: usize,
+    ) -> Self {
+        self.alias = Some(alias.clone());
+        if let Some(source) = source {
+            self.origin = Some(ProjectionOrigin::new(source, ordinal));
+        }
+        self
+    }
+    fn requires_fixed_children(&self) -> bool {
+        self.origin.is_some() || self.rows_origin.is_some()
     }
     pub(crate) fn source_ordinal(&self) -> Option<(&str, usize)> {
         if let Some(origin) = &self.origin
             && self
                 .alias
                 .as_ref()
-                .is_none_or(|alias| alias == &origin.source.alias)
+                .is_none_or(|alias| alias == origin.source().alias())
         {
-            return Some((origin.source.alias.as_str(), origin.ordinal));
+            return Some((origin.source().alias().as_str(), origin.ordinal()));
         }
         if let Some((source, ordinal)) = &self.rows_origin
             && self
@@ -238,46 +350,39 @@ impl<'a> ProjectionColumn<'a> {
         }
         None
     }
-    pub(crate) fn collect_projection_sources<'b>(
-        &'b self,
-        sources: &mut Vec<&'b ProjectionSource<'a>>,
-    ) {
-        if let Some(origin) = &self.origin
-            && !sources
-                .iter()
-                .any(|source| source.alias == origin.source.alias)
-        {
-            sources.push(&origin.source);
-        }
-        if let ProjectionBinding::Merged(merged) = &self.binding {
-            merged.left.collect_projection_sources(sources);
-            merged.right.collect_projection_sources(sources);
-        }
+    fn collect_projection_sources<'b>(&'b self, sources: &mut ProjectionSources<'a, 'b>) {
+        crate::sem::with_stack(|| {
+            if let Some(origin) = &self.origin {
+                sources.include(origin.source());
+            }
+            self.binding.collect_projection_sources(sources);
+        });
     }
-
     pub(crate) fn visible_reference(&self) -> Option<Vec<String>> {
         if let Some(alias) = &self.alias {
             Some(vec![
                 alias.as_str().to_owned(),
                 self.name.as_str().to_owned(),
             ])
-        } else if let ProjectionBinding::Source(source) = &self.binding {
-            Some(source.projection_reference(&self.column))
         } else {
-            None
+            self.binding.visible_reference(&self.column)
         }
     }
     pub(super) const fn is_merged(&self) -> bool {
-        matches!(self.binding, ProjectionBinding::Merged(_))
+        self.binding.is_merged()
     }
-    fn new(source: QualifiedSource<'a>, name: ColumnName) -> Self {
+    pub(super) fn new(
+        source: &QualifiedSource<'a>,
+        name: &ColumnName,
+        typed_record: &Option<crate::sem::WildcardTypedRecord>,
+    ) -> Self {
         Self {
             column: name.clone(),
-            name,
+            name: name.clone(),
             alias: None,
-            binding: ProjectionBinding::source(source),
+            binding: ProjectionBinding::source(source.clone()),
             origin: None,
-            typed_record: None,
+            typed_record: typed_record.clone(),
             rows_origin: None,
             merge_record: None,
         }
@@ -303,11 +408,7 @@ impl<'a> ProjectionColumn<'a> {
             typed_record: None,
             rows_origin: None,
             merge_record: None,
-            binding: ProjectionBinding::Merged(Box::new(MergedProjection {
-                left: Box::new(left.clone()),
-                right: Box::new(right.clone()),
-                nullable: false,
-            })),
+            binding: ProjectionBinding::merged(left, right),
         }
     }
     pub(crate) fn ambiguous(
@@ -359,10 +460,6 @@ impl<'a> ProjectionColumn<'a> {
     }
     pub(super) fn with_join_alias(mut self, alias: &AliasName) -> Self {
         self.alias = Some(alias.clone());
-        self
-    }
-    pub(super) fn with_name(mut self, name: &ColumnName) -> Self {
-        self.name = name.clone();
         self
     }
     pub(super) fn bind_direct(
@@ -425,29 +522,10 @@ impl DataSource {
             let Some((source, nullable)) = self.resolve_alias(alias.name()) else {
                 continue;
             };
-            let names: Vec<_> = source
-                .column_names(context, with)?
-                .into_iter()
-                .enumerate()
-                .map(|(index, name)| alias.derived_column_at(index).cloned().unwrap_or(name))
-                .collect();
-            let duplicates = names
-                .iter()
-                .enumerate()
-                .any(|(index, name)| names[..index].contains(name));
-            for (index, name) in names.into_iter().enumerate() {
-                let qualified = QualifiedSource::new(source, alias.name())
-                    .with_nullability(nullable)
-                    .with_projection_ordinal(index);
-                let typed_record = if duplicates {
-                    qualified.typed_record(context, index)
-                } else {
-                    None
-                };
-                let mut column = ProjectionColumn::new(qualified, name);
-                column.typed_record = typed_record;
-                columns.push(column);
-            }
+            let names = super::function_columns::OutputColumnNames::from(
+                source.column_names(context, with)?,
+            );
+            columns.extend(names.project(source, &alias, nullable, context));
         }
         Ok(columns)
     }
@@ -457,51 +535,17 @@ impl DataSource {
         with: &WithClause,
     ) -> Result<Vec<ColumnName>, AnalysisError> {
         match self {
-            Self::Table(table) => {
-                let Some(table) = context.get_table(table.name()) else {
-                    return AnalysisError::raise_unexpected_input("star relation missing");
-                };
-                let mut names = Vec::new();
-                let mut index = 0;
-                while let Some(column) = table.get_column_at(index) {
-                    index += 1;
-                    if let Some(name) = column.name() {
-                        names.push(name.clone());
-                    }
-                }
-                Ok(names)
-            }
-            Self::CteQuery(cte) => {
-                let Some(cte) = with.get(cte.name()) else {
-                    return AnalysisError::raise_unexpected_none("star CTE");
-                };
-                let Some(columns) = cte.result_columns() else {
-                    return AnalysisError::raise_unexpected_none("star CTE columns");
-                };
-                Ok(columns.names())
-            }
-            Self::View(view) => {
-                let Some(view) = context.get_view(view.view_name()) else {
-                    return AnalysisError::raise_unexpected_none("star view");
-                };
-                Ok(view.result_columns().names())
-            }
-            Self::JoinExpr(join) => Ok(join
-                .project(context, with, None)?
-                .into_iter()
-                .map(|column| column.name().clone())
-                .collect()),
-            Self::Group(group) => Ok(group
-                .projection_names(self, context, with)?
-                .into_iter()
-                .map(|column| column.name().clone())
-                .collect()),
+            Self::Table(table) => table.projection_column_names(context),
+            Self::CteQuery(cte) => cte.projection_column_names(with),
+            Self::View(view) => view.projection_column_names(context),
+            Self::JoinExpr(join) => join.projection_column_names(context, with),
+            Self::Group(group) => group.projection_column_names(self, context, with),
             Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => Ok(Vec::new()),
             Self::CallTableFunc(source) => Ok(source.column_names()),
             Self::DeferredTableFunc(source) => Ok(source.column_names()),
             Self::RowFunctions(source) => source.column_names(context, with),
             Self::MergeRecord(record) => record.column_names(context, with),
-            Self::SubQuery(query) => Ok(query.select_statement().result_columns().names()),
+            Self::SubQuery(query) => Ok(query.projection_column_names()),
             _ => AnalysisError::raise_unexpected_input(
                 "star source has no enumerable result columns",
             ),
@@ -513,11 +557,73 @@ impl DataSource {
 #[derive(Default)]
 pub(super) struct ProjectionColumns<'a>(Vec<ProjectionColumn<'a>>);
 
+impl<'a> From<Vec<ProjectionColumn<'a>>> for ProjectionColumns<'a> {
+    fn from(columns: Vec<ProjectionColumn<'a>>) -> Self {
+        Self(columns)
+    }
+}
+
 impl<'a> ProjectionColumns<'a> {
+    pub(super) fn with_join_alias(self, alias: &crate::sem::AliasSpec) -> Self {
+        let named = self.with_derived_names(alias);
+        let source = if named.has_duplicate_names()
+            || named
+                .0
+                .iter()
+                .any(ProjectionColumn::requires_fixed_children)
+        {
+            Some(std::sync::Arc::new(ProjectionSource::new(
+                alias.name(),
+                &named.0,
+            )))
+        } else {
+            None
+        };
+        Self(
+            named
+                .0
+                .into_iter()
+                .enumerate()
+                .map(|(index, column)| {
+                    column.with_source_alias(alias.name(), source.as_ref(), index)
+                })
+                .collect(),
+        )
+    }
+    fn with_derived_names(self, alias: &crate::sem::AliasSpec) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .enumerate()
+                .map(|(index, column)| column.with_derived_name(alias, index))
+                .collect(),
+        )
+    }
+    fn has_duplicate_names(&self) -> bool {
+        self.0.iter().enumerate().any(|(index, column)| {
+            self.0[..index]
+                .iter()
+                .any(|other| other.name() == column.name())
+        })
+    }
+
+    pub(super) fn with_occurrence(
+        self,
+        role: Option<super::MergeRecordRole>,
+        nullable: bool,
+    ) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .map(|column| column.with_occurrence(role, nullable))
+                .collect(),
+        )
+    }
+
     pub(super) fn with_rows_source(mut self, source: &crate::sem::WildcardRowsSource) -> Self {
         let source = std::sync::Arc::new(source.clone());
         for (index, column) in self.0.iter_mut().enumerate() {
-            column.rows_origin = Some((std::sync::Arc::clone(&source), index));
+            column.retain_rows_source(&source, index);
         }
         self
     }
@@ -544,18 +650,12 @@ impl<'a> ProjectionColumns<'a> {
             .push(ProjectionColumn::expression(&name, &expression));
     }
     pub(super) fn with_aliases(self, alias: &crate::sem::AliasSpec) -> Self {
+        let named = self.with_derived_names(alias);
         Self(
-            self.0
+            named
+                .0
                 .into_iter()
-                .enumerate()
-                .map(|(index, column)| {
-                    let column = if let Some(name) = alias.derived_column_at(index) {
-                        column.with_name(name)
-                    } else {
-                        column
-                    };
-                    column.with_join_alias(alias.name())
-                })
+                .map(|column| column.with_join_alias(alias.name()))
                 .collect(),
         )
     }
@@ -598,22 +698,75 @@ pub(crate) struct WildcardProjection<'a> {
     columns: Vec<ProjectionColumn<'a>>,
     source_found: bool,
     table_dependent: bool,
+    source_scope_depth: usize,
 }
 
 impl<'a> WildcardProjection<'a> {
-    pub(crate) const fn new(
-        columns: Vec<ProjectionColumn<'a>>,
+    pub(crate) const fn source_found(&self) -> bool {
+        self.source_found
+    }
+    pub(crate) fn append_results(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        results: &mut crate::sem::ResultColumnCollection,
+        location: Option<usize>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<bool, AnalysisError> {
+        let first = results.len();
+        let mut references = Vec::new();
+        let mut sources = ProjectionSources::default();
+        for column in &self.columns {
+            let expression = column.bind_projection(context, scope, binding_qualifier)?;
+            results.push_expression(column.name(), expression);
+            references.push(column.projection_reference(binding_qualifier));
+            column.collect_projection_sources(&mut sources);
+        }
+        let mut expansion = crate::sem::WildcardExpansion::new(
+            location,
+            results,
+            first,
+            self.table_dependent,
+            &references,
+        );
+        expansion.retain_source_scope(self.source_scope_depth);
+        expansion.retain_source_projections(&sources.resolve(context, scope)?);
+        for column in &self.columns {
+            expansion.retain_projection_origin(column);
+        }
+        context.analysis_state_mut().record_wildcard(expansion);
+        Ok(self.source_found)
+    }
+
+    pub(crate) fn new(
+        columns: &[ProjectionColumn<'a>],
         source_found: bool,
         table_dependent: bool,
     ) -> Self {
         let source_found = !columns.is_empty() || source_found;
         Self {
-            columns,
+            columns: columns.to_vec(),
             source_found,
             table_dependent,
+            source_scope_depth: 0,
         }
     }
-    pub(crate) fn into_parts(self) -> (Vec<ProjectionColumn<'a>>, bool, bool) {
-        (self.columns, self.source_found, self.table_dependent)
+    pub(crate) const fn cross_parent_scope(&mut self, crosses_projection: bool) {
+        if crosses_projection {
+            self.source_scope_depth += 1;
+        }
+    }
+    pub(crate) fn append_row_fields(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        fields: &mut Vec<SemScalarExpr>,
+    ) -> Result<bool, AnalysisError> {
+        if self.source_found {
+            for column in &self.columns {
+                fields.push(column.bind(context, scope)?);
+            }
+        }
+        Ok(self.source_found)
     }
 }

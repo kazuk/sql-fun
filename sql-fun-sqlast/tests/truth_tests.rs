@@ -1,4 +1,4 @@
-//! Public truth-test analysis with the shipped PostgreSQL cast catalog.
+//! Public truth-test analysis with the shipped `PostgreSQL` cast catalog.
 mod test_helpers {
     pub(super) mod heavy;
 }

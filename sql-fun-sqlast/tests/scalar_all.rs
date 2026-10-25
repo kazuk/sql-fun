@@ -1,4 +1,4 @@
-//! Scalar ALL through PostgreSQL 18's shipped operator and cast metadata.
+//! Scalar ALL through `PostgreSQL` 18's shipped operator and cast metadata.
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::{FullName, PgBuiltInType, ViewInfoRead};
 

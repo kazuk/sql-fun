@@ -70,7 +70,7 @@ pub enum AnalysisProblem {
     Index(IndexProblem),
     /// An ALTER COLUMN binding or attribute is invalid.
     AlterColumn(ColumnAttributeProblem),
-    /// Invalid PostgreSQL GREATEST/LEAST common type or comparison capability.
+    /// Invalid `PostgreSQL` GREATEST/LEAST common type or comparison capability.
     MinMax(MinMaxProblem),
     /// A function invocation has an invalid argument order or repeated name.
     CallArgument(CallArgumentProblem),
@@ -364,7 +364,7 @@ impl AnalysisProblem {
         Self::Array(problem)
     }
 
-    /// Report a PostgreSQL GREATEST/LEAST semantic failure.
+    /// Report a `PostgreSQL` GREATEST/LEAST semantic failure.
     #[must_use]
     pub const fn min_max(problem: MinMaxProblem) -> Self {
         Self::MinMax(problem)

@@ -1,4 +1,4 @@
-//! Real PostgreSQL 18 catalog signatures and the shipped schema loading path.
+//! Real `PostgreSQL` 18 catalog signatures and the shipped schema loading path.
 use ::sql_fun_sqlast::{
     PostgresDialect, SqlFunArgs,
     ast::Dialect,

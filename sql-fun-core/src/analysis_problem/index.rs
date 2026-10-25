@@ -10,7 +10,7 @@ pub enum IndexProblemKind {
     MissingTarget,
     /// The visible relation is not an index.
     WrongKind,
-    /// An option namespace is not accepted by PostgreSQL.
+    /// An option namespace is not accepted by `PostgreSQL`.
     InvalidNamespace,
     /// A storage parameter is not supported by the access method.
     UnknownParameter,
@@ -28,7 +28,7 @@ pub enum IndexProblemKind {
     IncludedColumn,
     /// A statistics target is below -1.
     StatisticsTooLow,
-    /// PostgreSQL lowers a statistics target above 10000 to 10000.
+    /// `PostgreSQL` lowers a statistics target above 10000 to 10000.
     StatisticsClamped,
 }
 impl IndexProblemKind {

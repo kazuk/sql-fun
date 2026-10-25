@@ -9,7 +9,7 @@ pub enum TriggerProblem {
     Duplicate(TriggerIdentity),
     /// Requested trigger does not exist in the resolved relation namespace.
     Missing(TriggerIdentity),
-    /// No SQLite trigger matched an unbound requested name.
+    /// No `SQLite` trigger matched an unbound requested name.
     MissingName(DebugName),
     /// Unknown event column.
     Column(DebugName, String),

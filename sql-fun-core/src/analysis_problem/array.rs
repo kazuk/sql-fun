@@ -1,6 +1,6 @@
 use super::{DiagnosticMetadata, MinMaxProblem, TypeReference};
 
-/// A PostgreSQL ARRAY constructor type-resolution failure.
+/// A `PostgreSQL` ARRAY constructor type-resolution failure.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum ArrayProblem {

@@ -16,11 +16,11 @@ pub enum AlterColumnProblem {
     NotStoredGenerated,
     /// A virtual generated column does not support this operation.
     VirtualGenerated,
-    /// The selected PostgreSQL version does not support this spelling.
+    /// The selected `PostgreSQL` version does not support this spelling.
     Version,
     /// A statistics target is below -1.
     StatisticsTooLow(i32),
-    /// PostgreSQL limits the requested statistics target to 10000.
+    /// `PostgreSQL` limits the requested statistics target to 10000.
     StatisticsReduced(i32),
     /// The option is not a recognized column attribute.
     UnknownOption(String),

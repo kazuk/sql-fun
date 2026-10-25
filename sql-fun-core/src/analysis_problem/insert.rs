@@ -6,7 +6,7 @@ use super::DiagnosticMetadata;
 pub enum InsertProblemKind {
     /// Source and destination arity differ.
     Arity,
-    /// A PostgreSQL destination column is assigned more than once.
+    /// A `PostgreSQL` destination column is assigned more than once.
     DuplicateTarget,
     /// A destination view or assigned view column is read-only.
     ReadOnlyTarget,
@@ -30,7 +30,7 @@ pub enum InsertProblemKind {
     ConflictNameAmbiguous,
     /// A conflict predicate does not have boolean type.
     ConflictPredicate,
-    /// A non-final SQLite UPSERT clause omits its target.
+    /// A non-final `SQLite` UPSERT clause omits its target.
     ConflictChain,
     /// A CTE declares more names than its RETURNING output.
     CteAliases,

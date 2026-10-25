@@ -346,7 +346,7 @@ pub struct SqlFunMetadata {
     /// Database extensions
     extensions: Option<PostgresExtensionsCollection>,
 
-    /// Explicit PostgreSQL database identity for catalog-qualified SQL references.
+    /// Explicit `PostgreSQL` database identity for catalog-qualified SQL references.
     #[serde(
         rename = "database-name",
         default,

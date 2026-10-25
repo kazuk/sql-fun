@@ -1,12 +1,12 @@
 use super::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
 
-/// Invalid input to a PostgreSQL truth predicate.
+/// Invalid input to a `PostgreSQL` truth predicate.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum TruthTestProblem {
     /// The operand cannot be implicitly converted to boolean.
     OperandType(TypeReference),
-    /// An unknown string literal is not valid PostgreSQL boolean input.
+    /// An unknown string literal is not valid `PostgreSQL` boolean input.
     InvalidLiteral(String),
 }
 

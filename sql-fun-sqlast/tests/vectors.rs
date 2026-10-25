@@ -1,4 +1,4 @@
-//! PostgreSQL vector coercion and builtin polymorphism through SQL analysis.
+//! `PostgreSQL` vector coercion and builtin polymorphism through SQL analysis.
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::{CastInfoRead, TypeInfoRead, TypeReference};
 

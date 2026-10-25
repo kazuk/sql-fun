@@ -1,4 +1,4 @@
-//! Producer-output contracts for officially extracted PostgreSQL artifacts.
+//! Producer-output contracts for officially extracted `PostgreSQL` artifacts.
 mod support;
 
 #[rstest::rstest]

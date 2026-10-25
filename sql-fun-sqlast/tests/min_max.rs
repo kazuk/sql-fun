@@ -1,4 +1,4 @@
-//! PostgreSQL common-type semantics through the maintained public analysis API.
+//! `PostgreSQL` common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeInfoRead, TypeReference};
 use std::collections::BTreeMap;

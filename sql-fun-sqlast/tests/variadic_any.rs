@@ -1,4 +1,4 @@
-//! Heterogeneous variadic applicability using the shipped PostgreSQL 18 catalog.
+//! Heterogeneous variadic applicability using the shipped `PostgreSQL` 18 catalog.
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::{FullName, PgBuiltInType, TypeReference};
 
@@ -53,7 +53,7 @@ mod test_helpers {
         };
         use std::{collections::BTreeMap, path::PathBuf};
 
-        /// Load PostgreSQL 18 JSON and SQL catalogs for the actual format
+        /// Load `PostgreSQL` 18 JSON and SQL catalogs for the actual format
         /// declarations and builtin views. Repeated per test process, unshared.
         pub(crate) fn analyze_format()
         -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {

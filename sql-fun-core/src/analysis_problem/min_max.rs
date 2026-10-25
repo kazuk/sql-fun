@@ -1,6 +1,6 @@
 use super::{DiagnosticMetadata, TypeReference};
 
-/// A PostgreSQL GREATEST/LEAST type-resolution failure.
+/// A `PostgreSQL` GREATEST/LEAST type-resolution failure.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum MinMaxProblem {
@@ -12,7 +12,7 @@ pub enum MinMaxProblem {
     MissingTypeFacts(TypeReference),
     /// Comparison metadata is unavailable for the result type.
     MissingComparisonFacts(TypeReference),
-    /// The result type has no PostgreSQL comparison implementation.
+    /// The result type has no `PostgreSQL` comparison implementation.
     NotOrdered(TypeReference),
 }
 impl MinMaxProblem {

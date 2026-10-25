@@ -116,7 +116,7 @@ pub enum SqlDialect {
 
 impl SqlDialect {
     /// Compare identifier values, after SQL parsing or explicit alias selection.
-    /// PostgreSQL values preserve case; SQLite ignores ASCII case only.
+    /// `PostgreSQL` values preserve case; `SQLite` ignores ASCII case only.
     #[must_use]
     pub fn same_identifier(self, left: &str, right: &str) -> bool {
         match self {

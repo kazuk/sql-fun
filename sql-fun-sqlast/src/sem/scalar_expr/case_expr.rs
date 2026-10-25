@@ -752,16 +752,16 @@ impl CaseExpr {
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<(), AnalysisError> {
         if self.types.is_none()
-            && !self
+            && self
                 .arg_expr
                 .as_ref()
                 .as_ref()
-                .is_some_and(|value| value.constraint_node().is_some())
-            && !self
+                .is_some_and(|value| value.constraint_node().is_none())
+            && self
                 .default_expr
                 .as_ref()
                 .as_ref()
-                .is_some_and(|value| value.constraint_node().is_some())
+                .is_some_and(|value| value.constraint_node().is_none())
             && !self.when_exprs.iter().any(CaseWhen::has_constraints)
         {
             return Ok(());

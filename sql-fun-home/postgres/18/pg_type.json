@@ -1,327 +1,408 @@
 [
   {
     "category": "B",
-    "name": "bool"
+    "name": "bool",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "bytea"
+    "name": "bytea",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "char"
+    "name": "char",
+    "schema": "pg_catalog"
   },
   {
     "category": "S",
-    "name": "name"
+    "name": "name",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "int8"
+    "name": "int8",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "int2"
+    "name": "int2",
+    "schema": "pg_catalog"
   },
   {
     "category": "A",
-    "name": "int2vector"
+    "name": "int2vector",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "int4"
+    "name": "int4",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regproc"
+    "name": "regproc",
+    "schema": "pg_catalog"
   },
   {
     "category": "S",
-    "name": "text"
+    "name": "text",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "oid"
+    "name": "oid",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "tid"
+    "name": "tid",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "xid"
+    "name": "xid",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "cid"
+    "name": "cid",
+    "schema": "pg_catalog"
   },
   {
     "category": "A",
-    "name": "oidvector"
+    "name": "oidvector",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "pg_ddl_command"
+    "name": "pg_ddl_command",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "json"
+    "name": "json",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "xml"
+    "name": "xml",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "pg_node_tree"
+    "name": "pg_node_tree",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "table_am_handler"
+    "name": "table_am_handler",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "index_am_handler"
+    "name": "index_am_handler",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "point"
+    "name": "point",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "lseg"
+    "name": "lseg",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "path"
+    "name": "path",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "box"
+    "name": "box",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "polygon"
+    "name": "polygon",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "line"
+    "name": "line",
+    "schema": "pg_catalog"
   },
   {
     "category": "I",
-    "name": "cidr"
+    "name": "cidr",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "float4"
+    "name": "float4",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "float8"
+    "name": "float8",
+    "schema": "pg_catalog"
   },
   {
     "category": "X",
-    "name": "unknown"
+    "name": "unknown",
+    "schema": "pg_catalog"
   },
   {
     "category": "G",
-    "name": "circle"
+    "name": "circle",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "macaddr8"
+    "name": "macaddr8",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "money"
+    "name": "money",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "macaddr"
+    "name": "macaddr",
+    "schema": "pg_catalog"
   },
   {
     "category": "I",
-    "name": "inet"
+    "name": "inet",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "aclitem"
+    "name": "aclitem",
+    "schema": "pg_catalog"
   },
   {
     "category": "S",
-    "name": "bpchar"
+    "name": "bpchar",
+    "schema": "pg_catalog"
   },
   {
     "category": "S",
-    "name": "varchar"
+    "name": "varchar",
+    "schema": "pg_catalog"
   },
   {
     "category": "D",
-    "name": "date"
+    "name": "date",
+    "schema": "pg_catalog"
   },
   {
     "category": "D",
-    "name": "time"
+    "name": "time",
+    "schema": "pg_catalog"
   },
   {
     "category": "D",
-    "name": "timestamp"
+    "name": "timestamp",
+    "schema": "pg_catalog"
   },
   {
     "category": "D",
-    "name": "timestamptz"
+    "name": "timestamptz",
+    "schema": "pg_catalog"
   },
   {
     "category": "T",
-    "name": "interval"
+    "name": "interval",
+    "schema": "pg_catalog"
   },
   {
     "category": "D",
-    "name": "timetz"
+    "name": "timetz",
+    "schema": "pg_catalog"
   },
   {
     "category": "V",
-    "name": "bit"
+    "name": "bit",
+    "schema": "pg_catalog"
   },
   {
     "category": "V",
-    "name": "varbit"
+    "name": "varbit",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "numeric"
+    "name": "numeric",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "refcursor"
+    "name": "refcursor",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regprocedure"
+    "name": "regprocedure",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regoper"
+    "name": "regoper",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regoperator"
+    "name": "regoperator",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regclass"
+    "name": "regclass",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regtype"
+    "name": "regtype",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "record"
+    "name": "record",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "cstring"
+    "name": "cstring",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "any"
+    "name": "any",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anyarray"
+    "name": "anyarray",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "void"
+    "name": "void",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "trigger"
+    "name": "trigger",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "language_handler"
+    "name": "language_handler",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "internal"
+    "name": "internal",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anyelement"
+    "name": "anyelement",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "_record"
+    "name": "_record",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anynonarray"
+    "name": "anynonarray",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "uuid"
+    "name": "uuid",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "txid_snapshot"
+    "name": "txid_snapshot",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "fdw_handler"
+    "name": "fdw_handler",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "pg_lsn"
+    "name": "pg_lsn",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "tsm_handler"
+    "name": "tsm_handler",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "pg_ndistinct"
+    "name": "pg_ndistinct",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "pg_dependencies"
+    "name": "pg_dependencies",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anyenum"
+    "name": "anyenum",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "tsvector"
+    "name": "tsvector",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "tsquery"
+    "name": "tsquery",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "gtsvector"
+    "name": "gtsvector",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regconfig"
+    "name": "regconfig",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regdictionary"
+    "name": "regdictionary",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "jsonb"
+    "name": "jsonb",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anyrange"
+    "name": "anyrange",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "event_trigger"
+    "name": "event_trigger",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
@@ -357,7 +438,8 @@
           "is_array": false
         }
       }
-    }
+    },
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
@@ -393,7 +475,8 @@
           "is_array": false
         }
       }
-    }
+    },
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
@@ -429,7 +512,8 @@
           "is_array": false
         }
       }
-    }
+    },
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
@@ -465,7 +549,8 @@
           "is_array": false
         }
       }
-    }
+    },
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
@@ -501,7 +586,8 @@
           "is_array": false
         }
       }
-    }
+    },
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
@@ -537,90 +623,112 @@
           "is_array": false
         }
       }
-    }
+    },
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "jsonpath"
+    "name": "jsonpath",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regnamespace"
+    "name": "regnamespace",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regrole"
+    "name": "regrole",
+    "schema": "pg_catalog"
   },
   {
     "category": "N",
-    "name": "regcollation"
+    "name": "regcollation",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
-    "name": "int4multirange"
+    "name": "int4multirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
-    "name": "nummultirange"
+    "name": "nummultirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
-    "name": "tsmultirange"
+    "name": "tsmultirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
-    "name": "tstzmultirange"
+    "name": "tstzmultirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
-    "name": "datemultirange"
+    "name": "datemultirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "R",
-    "name": "int8multirange"
+    "name": "int8multirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anymultirange"
+    "name": "anymultirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anycompatiblemultirange"
+    "name": "anycompatiblemultirange",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "pg_brin_bloom_summary"
+    "name": "pg_brin_bloom_summary",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "pg_brin_minmax_multi_summary"
+    "name": "pg_brin_minmax_multi_summary",
+    "schema": "pg_catalog"
   },
   {
     "category": "Z",
-    "name": "pg_mcv_list"
+    "name": "pg_mcv_list",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "pg_snapshot"
+    "name": "pg_snapshot",
+    "schema": "pg_catalog"
   },
   {
     "category": "U",
-    "name": "xid8"
+    "name": "xid8",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anycompatible"
+    "name": "anycompatible",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anycompatiblearray"
+    "name": "anycompatiblearray",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anycompatiblenonarray"
+    "name": "anycompatiblenonarray",
+    "schema": "pg_catalog"
   },
   {
     "category": "P",
-    "name": "anycompatiblerange"
+    "name": "anycompatiblerange",
+    "schema": "pg_catalog"
   }
 ]

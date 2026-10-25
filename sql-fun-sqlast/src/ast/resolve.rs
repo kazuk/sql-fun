@@ -90,6 +90,27 @@ impl Name {
     }
 }
 
+impl Name {
+    fn append_row_projection(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        fields: &mut Vec<SemScalarExpr>,
+    ) -> Result<bool, AnalysisError> {
+        if self.is_empty() || context.dialect() != Dialect::postgres() {
+            return Ok(false);
+        }
+        let projection = if let Some(relation) = self.star_relation()? {
+            scope.relation_projection_names(context, &relation)?
+        } else if let Some(qualifier) = self.star_qualifier()? {
+            scope.projection_names(context, &qualifier)?
+        } else {
+            return Ok(false);
+        };
+        projection.append_row_fields(context, scope, fields)
+    }
+}
+
 impl Expr {
     pub(in crate::ast) fn projection_base(
         &self,
@@ -202,20 +223,9 @@ impl Expr {
         let mut fields = Vec::new();
         for item in items {
             if let Self::Star(name) = item
-                && !name.is_empty()
-                && context.dialect() == Dialect::postgres()
+                && name.append_row_projection(context, scope, &mut fields)?
             {
-                let projection = if let Some(relation) = name.star_relation()? {
-                    scope.relation_projection_names(context, &relation)?
-                } else if let Some(qualifier) = name.star_qualifier()? {
-                    scope.projection_names(context, &qualifier)?
-                } else {
-                    fields.push(item.resolve_in(context, scope)?);
-                    continue;
-                };
-                if projection.append_row_fields(context, scope, &mut fields)? {
-                    continue;
-                }
+                continue;
             }
             fields.push(item.resolve_in(context, scope)?);
         }

@@ -86,11 +86,11 @@ impl DataSource {
     pub(crate) fn projection_shape_is_resolved(&self) -> bool {
         crate::sem::with_stack(|| match self {
             Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
-            Self::DeferredTableFunc(source) => source.known_column_names().is_some(),
+            Self::DeferredTableFunc(source) => source.projection_shape_is_resolved(),
             Self::RowFunctions(source) => source.projection_shape_is_resolved(),
             Self::JoinExpr(source) => source.projection_shape_is_resolved(),
             Self::Group(source) => source.projection_shape_is_resolved(),
-            Self::MergeRecord(source) => source.source().projection_shape_is_resolved(),
+            Self::MergeRecord(source) => source.projection_shape_is_resolved(),
             _ => true,
         })
     }
@@ -100,13 +100,9 @@ impl DataSource {
             Self::Table(_) => true,
             Self::JoinExpr(join) => join.projection_is_table_dependent(context),
             Self::Group(group) => group.projection_is_table_dependent(context),
-            Self::MergeRecord(record) => record.source().projection_is_table_dependent(context),
-            Self::CallTableFunc(source) => source.function().table_output_depends_on_table(context),
-            Self::DeferredTableFunc(source) => source
-                .call()
-                .overload()
-                .as_ref()
-                .is_some_and(|overload| overload.table_output_depends_on_table(context)),
+            Self::MergeRecord(record) => record.projection_is_table_dependent(context),
+            Self::CallTableFunc(source) => source.projection_is_table_dependent(context),
+            Self::DeferredTableFunc(source) => source.projection_is_table_dependent(context),
             Self::RowFunctions(source) => source.projection_is_table_dependent(context),
             _ => false,
         }

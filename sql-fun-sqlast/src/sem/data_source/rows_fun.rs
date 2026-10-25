@@ -305,3 +305,17 @@ impl DataSourceRowsFromFunc {
         names.append_function_columns(&self.source)
     }
 }
+
+impl DataSourceRowFunctions {
+    pub(super) fn projection_names(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+        qualifier: Option<&AliasName>,
+    ) -> Result<Vec<super::ProjectionColumn<'_>>, AnalysisError> {
+        if qualifier.is_some_and(|name| !self.matches_alias(name)) {
+            return Ok(Vec::new());
+        }
+        Ok(self.project(context, with)?.into_columns())
+    }
+}

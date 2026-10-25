@@ -262,10 +262,7 @@ impl TypeDefinition {
     pub(crate) fn row_table_name(&self, context: &impl ParseContext) -> Option<TableName> {
         match self {
             Self::TableRef(name, _) => Some(name.clone()),
-            Self::Domain(domain) => domain
-                .base_type()?
-                .definition_from_catalog(context)?
-                .row_table_name(context),
+            Self::Domain(domain) => domain.row_table_name(context),
             _ => None,
         }
     }

@@ -46,10 +46,6 @@ impl ColumnReference for TableFunctionColumnRef {
 }
 
 impl TableFunctionColumnRef {
-    pub(super) const fn projection_alias(&self) -> &str {
-        self.alias.as_str()
-    }
-
     /// Declaration-local modifiers retained from the table invocation.
     pub const fn type_declaration(
         &self,
@@ -193,5 +189,11 @@ impl SemScalarExpr {
             reference.type_declaration = declaration.cloned();
         }
         self
+    }
+}
+
+impl TableFunctionColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
     }
 }

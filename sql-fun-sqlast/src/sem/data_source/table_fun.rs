@@ -225,3 +225,12 @@ impl TableFunctionDataSource {
         Ok(value.with_function_type_declaration(self.output_type_declaration_at(index)))
     }
 }
+
+impl TableFunctionDataSource {
+    pub(super) fn projection_is_table_dependent(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> bool {
+        self.function.table_output_depends_on_table(context)
+    }
+}

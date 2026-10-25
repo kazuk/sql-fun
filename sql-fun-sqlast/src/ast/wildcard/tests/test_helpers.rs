@@ -35,18 +35,23 @@ pub(super) fn catalog() -> TestParseContext {
     ] {
         let columns = names
             .iter()
-            .map(|name| {
-                ColumnDefinition::new(
-                    &Some(ColumnName::from(*name)),
-                    Some(&PgBuiltInType::int4()),
-                    Some(false),
-                    &[],
-                )
-            })
+            .copied()
+            .map(ColumnDefinition::wildcard_int4_column)
             .collect::<Vec<_>>();
         context.setup_table(name, &columns, &source_span());
     }
     context
+}
+
+impl ColumnDefinition {
+    fn wildcard_int4_column(name: &str) -> Self {
+        Self::new(
+            &Some(ColumnName::from(name)),
+            Some(&PgBuiltInType::int4()),
+            Some(false),
+            &[],
+        )
+    }
 }
 
 pub(super) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {

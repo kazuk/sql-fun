@@ -167,6 +167,12 @@ impl<'a> MergedProjection<'a> {
     }
 }
 
+impl<'a> From<MergedProjection<'a>> for ProjectionBinding<'a> {
+    fn from(projection: MergedProjection<'a>) -> Self {
+        Self::Merged(Box::new(projection))
+    }
+}
+
 impl<'a> ProjectionBinding<'a> {
     fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
         if let Self::Merged(merged) = self {
@@ -213,7 +219,7 @@ impl<'a> ProjectionBinding<'a> {
             Self::Expression(expression) => Self::Expression(Box::new(
                 expression.with_function_source_nullability(nullable),
             )),
-            Self::Merged(merged) => Self::Merged(Box::new(merged.with_nullability(nullable))),
+            Self::Merged(merged) => Self::from(merged.with_nullability(nullable)),
         }
     }
     fn bind_direct(
@@ -498,10 +504,7 @@ impl DataSource {
         qualifier: Option<&AliasName>,
     ) -> Result<Vec<ProjectionColumn<'_>>, AnalysisError> {
         if let Self::RowFunctions(source) = self {
-            if qualifier.is_some_and(|name| !source.matches_alias(name)) {
-                return Ok(Vec::new());
-            }
-            return Ok(source.project(context, with)?.into_columns());
+            return source.projection_names(context, with, qualifier);
         }
         if let Self::MergeRecord(record) = self {
             return record.projection_names(context, with, qualifier);
@@ -702,6 +705,26 @@ pub(crate) struct WildcardProjection<'a> {
 }
 
 impl<'a> WildcardProjection<'a> {
+    pub(crate) const fn unresolved() -> Self {
+        Self {
+            columns: Vec::new(),
+            source_found: false,
+            table_dependent: false,
+            source_scope_depth: 0,
+        }
+    }
+
+    pub(crate) fn ambiguous_alias(
+        context: &mut impl ParseContext,
+        qualifier: &AliasName,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::new(
+            &[ProjectionColumn::ambiguous(context, qualifier)?],
+            true,
+            false,
+        ))
+    }
+
     pub(crate) const fn source_found(&self) -> bool {
         self.source_found
     }

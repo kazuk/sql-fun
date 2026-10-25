@@ -2,7 +2,8 @@ use crate::{
     ast::TryCollectFromWithTokens,
     sem::{
         AliasSpec, AnalysisError, DataSource, MergeMatchKind, Nullable, ParseContext, WithClause,
-        create_table::ColumnName, data_source::AliasName, data_source::MergeRecordRole,
+        create_table::ColumnName,
+        data_source::{AliasName, MergeRecordRole, WildcardProjection},
     },
     syn::ScanToken,
 };
@@ -35,24 +36,12 @@ impl FromClause {
         context: &mut impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
-    ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
         if let Some(qualifier) = qualifier {
             return match self.namespace().resolve_name(qualifier) {
-                Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
-                    &source.projection_columns(context, with)?,
-                    source.projection_shape_is_resolved(),
-                    source.is_table_dependent(context),
-                )),
-                Ok(None) => Ok(crate::sem::data_source::WildcardProjection::new(
-                    &[],
-                    false,
-                    false,
-                )),
-                Err(()) => Ok(crate::sem::data_source::WildcardProjection::new(
-                    &[crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
-                    true,
-                    false,
-                )),
+                Ok(Some(source)) => source.resolved_wildcard_projection(context, with),
+                Ok(None) => Ok(WildcardProjection::unresolved()),
+                Err(()) => WildcardProjection::ambiguous_alias(context, qualifier),
             };
         }
         let mut columns = Vec::new();
@@ -63,7 +52,7 @@ impl FromClause {
         }
         let source_found = !columns.is_empty()
             || (!self.0.is_empty() && self.0.iter().all(DataSource::projection_shape_is_resolved));
-        Ok(crate::sem::data_source::WildcardProjection::new(
+        Ok(WildcardProjection::new(
             &columns,
             source_found,
             table_dependent,
@@ -74,19 +63,15 @@ impl FromClause {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
         if let Some(source) = self.0.last() {
-            Ok(crate::sem::data_source::WildcardProjection::new(
+            Ok(WildcardProjection::new(
                 &source.projection_names(context, with, None)?,
                 source.projection_shape_is_resolved(),
                 source.projection_is_table_dependent(context),
             ))
         } else {
-            Ok(crate::sem::data_source::WildcardProjection::new(
-                &[],
-                false,
-                false,
-            ))
+            Ok(WildcardProjection::new(&[], false, false))
         }
     }
 

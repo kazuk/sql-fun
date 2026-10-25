@@ -86,3 +86,9 @@ impl TableColumnRef {
         }
     }
 }
+
+impl TableColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
+    }
+}

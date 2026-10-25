@@ -92,6 +92,18 @@ impl<'a> QualifiedSource<'a> {
         &self.alias
     }
 
+    pub(crate) fn resolved_wildcard_projection(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<super::WildcardProjection<'a>, AnalysisError> {
+        Ok(super::WildcardProjection::new(
+            &self.projection_columns(context, with)?,
+            self.projection_shape_is_resolved(),
+            self.is_table_dependent(context),
+        ))
+    }
+
     pub(crate) fn projection_columns(
         &self,
         context: &impl ParseContext,
@@ -344,6 +356,18 @@ impl DataSource {
         }
     }
 
+    fn bind_named_projection_column(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        alias: &AliasName,
+        column: &ColumnName,
+        nullable: bool,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let (expression, _) = self.create_column_ref(context, with, alias, column, nullable)?;
+        Ok(expression)
+    }
+
     fn bind_projection_column(
         &self,
         context: &mut impl ParseContext,
@@ -354,9 +378,7 @@ impl DataSource {
         nullable: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let Some(ordinal) = ordinal else {
-            return Ok(self
-                .create_column_ref(context, with, alias, column, nullable)?
-                .0);
+            return self.bind_named_projection_column(context, with, alias, column, nullable);
         };
         match self {
             Self::Table(source) => {
@@ -368,9 +390,7 @@ impl DataSource {
             Self::CallTableFunc(source) => {
                 source.bind_projection_ordinal(context, alias, column, ordinal, nullable)
             }
-            _ => Ok(self
-                .create_column_ref(context, with, alias, column, nullable)?
-                .0),
+            _ => self.bind_named_projection_column(context, with, alias, column, nullable),
         }
     }
 }

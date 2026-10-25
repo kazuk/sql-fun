@@ -117,3 +117,14 @@ impl std::hash::Hash for CreateDomain {
         std::hash::Hash::hash(&self.base_type, state);
     }
 }
+
+impl CreateDomain {
+    pub(crate) fn row_table_name(
+        &self,
+        context: &impl ParseContext,
+    ) -> Option<crate::sem::TableName> {
+        self.base_type()?
+            .definition_from_catalog(context)?
+            .row_table_name(context)
+    }
+}

@@ -1,6 +1,8 @@
 use crate::sem::{
     AnalysisError, ColumnName, ColumnReferenceExpr, FromClause, ParseContext, SemScalarExpr,
-    WithClause, data_source::AliasName, scalar_expr::column_ref::UndefinedAliasColumnRef,
+    WithClause,
+    data_source::{AliasName, WildcardProjection},
+    scalar_expr::column_ref::UndefinedAliasColumnRef,
 };
 
 use std::borrow::Cow;
@@ -105,77 +107,60 @@ impl<'a> ScalarAnalysisContext<'a> {
         &self,
         context: &mut impl ParseContext,
         qualifier: &AliasName,
-    ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
         match self.from_clause.namespace().resolve_name(qualifier) {
-            Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
-                &source.projection_columns(context, &self.with_clause)?,
-                source.projection_shape_is_resolved(),
-                source.is_table_dependent(context),
-            )),
-            Err(()) => Ok(crate::sem::data_source::WildcardProjection::new(
-                &[crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
-                true,
-                false,
-            )),
-            Ok(None) => {
-                if let Some(parent) = &self.parent {
-                    let mut projection = parent.projection_names(context, qualifier)?;
-                    projection
-                        .cross_parent_scope(self.projection_scope_id != parent.projection_scope_id);
-                    Ok(projection)
-                } else {
-                    Ok(crate::sem::data_source::WildcardProjection::new(
-                        &[],
-                        false,
-                        false,
-                    ))
-                }
-            }
+            Ok(Some(source)) => source.resolved_wildcard_projection(context, &self.with_clause),
+            Err(()) => WildcardProjection::ambiguous_alias(context, qualifier),
+            Ok(None) => self.parent_projection_names(context, qualifier),
         }
+    }
+
+    fn parent_projection_names(
+        &self,
+        context: &mut impl ParseContext,
+        qualifier: &AliasName,
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
+        let Some(parent) = &self.parent else {
+            return Ok(WildcardProjection::unresolved());
+        };
+        let mut projection = parent.projection_names(context, qualifier)?;
+        projection.cross_parent_scope(self.projection_scope_id != parent.projection_scope_id);
+        Ok(projection)
     }
 
     pub(crate) fn relation_projection_names(
         &self,
         context: &mut impl ParseContext,
         relation: &crate::sem::FullName,
-    ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
         match self.from_clause.qualified_source(context, relation) {
-            Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
-                &source.projection_columns(context, &self.with_clause)?,
-                source.projection_shape_is_resolved(),
-                source.is_table_dependent(context),
-            )),
-            Err(()) => {
-                let columns = self.ambiguous_relation_projection(context)?;
-                Ok(crate::sem::data_source::WildcardProjection::new(
-                    &columns, true, false,
-                ))
-            }
-            Ok(None) => {
-                if let Some(parent) = &self.parent {
-                    let mut projection = parent.relation_projection_names(context, relation)?;
-                    projection
-                        .cross_parent_scope(self.projection_scope_id != parent.projection_scope_id);
-                    Ok(projection)
-                } else {
-                    Ok(crate::sem::data_source::WildcardProjection::new(
-                        &[],
-                        false,
-                        false,
-                    ))
-                }
-            }
+            Ok(Some(source)) => source.resolved_wildcard_projection(context, &self.with_clause),
+            Err(()) => self.ambiguous_relation_projection(context),
+            Ok(None) => self.parent_relation_projection_names(context, relation),
         }
+    }
+
+    fn parent_relation_projection_names(
+        &self,
+        context: &mut impl ParseContext,
+        relation: &crate::sem::FullName,
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
+        let Some(parent) = &self.parent else {
+            return Ok(WildcardProjection::unresolved());
+        };
+        let mut projection = parent.relation_projection_names(context, relation)?;
+        projection.cross_parent_scope(self.projection_scope_id != parent.projection_scope_id);
+        Ok(projection)
     }
 
     fn ambiguous_relation_projection(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+    ) -> Result<WildcardProjection<'_>, AnalysisError> {
         context.report_analysis_problem(crate::sem::AnalysisProblem::query(
             crate::sem::QueryProblem::ambiguous_reference("star source"),
         ))?;
-        Ok(Vec::new())
+        Ok(WildcardProjection::new(&[], true, false))
     }
 
     pub(crate) fn rule(

@@ -306,6 +306,26 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::OperatorInfoRead for $context {
+            fn btree_operator_negator_memberships(
+                &self,
+                operator: &crate::sem::FullName,
+                left: &crate::sem::TypeReference,
+                right: &crate::sem::TypeReference,
+            ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+                self.$catalog()
+                    .btree_operator_negator_memberships(operator, left, right)
+            }
+
+            fn btree_operator_memberships(
+                &self,
+                operator: &crate::sem::FullName,
+                left: &crate::sem::TypeReference,
+                right: &crate::sem::TypeReference,
+            ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+                self.$catalog()
+                    .btree_operator_memberships(operator, left, right)
+            }
+
             fn get_operator_op(
                 &self,
                 name: &crate::sem::OperatorName,

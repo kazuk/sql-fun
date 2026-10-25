@@ -46,6 +46,13 @@ impl PostgresBuiltinPaths {
         Self::path_exists_and_file(self.builtin_base_path.join("operator_classes.json"))
     }
 
+    /// Optional B-tree membership payload. Legacy catalogs do not provide it.
+    #[must_use]
+    pub fn btree_operator_memberships(&self) -> PathBuf {
+        self.builtin_base_path
+            .join("btree_operator_memberships.json")
+    }
+
     /// returns type data file path
     ///
     /// # Errors

@@ -138,6 +138,33 @@ where
 
 /// get operator definition
 pub trait OperatorInfoRead {
+    /// Memberships of this exact overload's catalog-declared negator.
+    /// This follows the requested operator's outgoing negator edge, without
+    /// assuming the reverse declaration. Consumers decide whether equality
+    /// negation is a legal row-comparison interpretation. Availability matches
+    /// `btree_operator_memberships`.
+    fn btree_operator_negator_memberships(
+        &self,
+        _operator: &FullName,
+        _left: &TypeReference,
+        _right: &TypeReference,
+    ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+        None
+    }
+
+    /// Exact qualified operator overload memberships. `None` means unavailable
+    /// metadata; `Some(empty)` is a completed negative lookup in the extracted
+    /// scope. No search path or implicit coercion is applied, and every
+    /// applicable family is retained.
+    fn btree_operator_memberships(
+        &self,
+        _operator: &FullName,
+        _left: &TypeReference,
+        _right: &TypeReference,
+    ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+        None
+    }
+
     /// get operator definition,
     ///
     /// `has_left`, `has_right` both true then returns Binary operator.

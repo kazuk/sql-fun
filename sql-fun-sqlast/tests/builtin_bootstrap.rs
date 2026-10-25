@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use ::clap::Parser;
 use ::sql_fun_sqlast::{
     PostgresDialect, SqlFunArgs,
-    sem::{BaseContext, BaseParseContext, FrozenBaseContext, FullName, TableName},
+    sem::{
+        BaseContext, BaseParseContext, BtreeOperatorMembership, FrozenBaseContext, FullName,
+        TableName,
+    },
 };
 
 #[rstest::rstest]
@@ -171,6 +174,34 @@ fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn s
 }
 
 fn assert_master_reads(context: &impl BaseParseContext) {
+    // Real producer/load/freeze/delegation continuity is the contract under test.
+    let left = ::sql_fun_sqlast::sem::TypeReference::from_master_type_name("int4");
+    let right = ::sql_fun_sqlast::sem::TypeReference::from_master_type_name("int8");
+    let members = context
+        .btree_operator_memberships(&FullName::with_schema("pg_catalog", "<"), &left, &right)
+        .expect("current catalog metadata");
+    assert_ne!(members, [] as [&BtreeOperatorMembership; 0]);
+    assert!(members.iter().any(|member| member.is_comparison()
+        && member.strategy() == 1
+        && member.family().name() == "integer_ops"));
+    let negated = context
+        .btree_operator_negator_memberships(
+            &FullName::with_schema("pg_catalog", "<>"),
+            &left,
+            &right,
+        )
+        .expect("negator metadata");
+    assert!(negated.iter().any(|member| member.is_comparison()
+        && member.strategy() == 3
+        && member.operator() == FullName::with_schema("pg_catalog", "=")));
+    let text = ::sql_fun_sqlast::sem::TypeReference::from_master_type_name("text");
+    assert_eq!(
+        context
+            .btree_operator_memberships(&FullName::with_schema("pg_catalog", "~~"), &text, &text)
+            .unwrap(),
+        [] as [&BtreeOperatorMembership; 0]
+    );
+
     let name = FullName::with_schema("pg_catalog", "C");
     assert_eq!(
         context

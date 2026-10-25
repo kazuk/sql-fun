@@ -37,6 +37,7 @@ pub struct BaseContext {
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
     masters: crate::sem::ConflictMasters,
+    btree_memberships: Option<crate::sem::btree_operator_memberships::BtreeOperatorMemberships>,
 }
 
 #[derive(serde::Deserialize)]
@@ -86,12 +87,21 @@ impl BaseContext {
             crate::sem::ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
         };
 
+        let btree_memberships =
+            if crate::ast::Dialect::from(metadata) == crate::ast::Dialect::sqlite() {
+                None
+            } else {
+                crate::sem::btree_operator_memberships::BtreeOperatorMemberships::load(
+                    &paths.btree_operator_memberships(),
+                )?
+            };
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
         Ok(Self {
             context_args: context_args.clone(),
             metadata: metadata.clone(),
             functions,
             masters,
+            btree_memberships,
             types: builtin_type_data,
             binary_ordered_types,
             casts,
@@ -238,6 +248,32 @@ impl FunctionInfoRead for BaseContext {
 }
 
 impl OperatorInfoRead for BaseContext {
+    fn btree_operator_negator_memberships(
+        &self,
+        operator: &FullName,
+        left: &TypeReference,
+        right: &TypeReference,
+    ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+        Some(
+            self.btree_memberships
+                .as_ref()?
+                .negator_lookup(operator, left, right),
+        )
+    }
+
+    fn btree_operator_memberships(
+        &self,
+        operator: &FullName,
+        left: &TypeReference,
+        right: &TypeReference,
+    ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+        Some(
+            self.btree_memberships
+                .as_ref()?
+                .lookup(operator, left, right),
+        )
+    }
+
     #[tracing::instrument(skip(self))]
     fn get_operator_op(
         &self,

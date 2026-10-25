@@ -7,6 +7,7 @@ mod alter_seq;
 mod alter_table;
 mod analysis_state;
 mod base_context;
+mod btree_operator_memberships;
 mod cast;
 mod column_constraints;
 mod comment;
@@ -117,6 +118,7 @@ pub use self::{
     alter_table::{AlterTable, AlterView},
     analysis_state::AnalysisState,
     base_context::BaseContext,
+    btree_operator_memberships::BtreeOperatorMembership,
     cast::{CastContext, CastDefinition},
     column_constraints::{
         AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,

@@ -271,3 +271,39 @@ in even for a single configured datasource, and incomplete `--yes` requests fail
 before home creation. PostgreSQL cases supply explicit engines/datasources,
 source, versions and home parameters. A connected server constrains the version
 choice; it is not permission to select that version automatically.
+
+## B-tree operator memberships
+
+Current extraction additionally writes `btree_operator_memberships.json`, an
+independently versioned format-1 object containing `memberships`. Each member
+retains the qualified operator and declared left/right type references, family
+identity (including access method), family left/right applicability types,
+strategy, purpose, nullable ordering sort-family, and catalog-declared negator.
+A separate negator-membership lookup follows the requested operator's outgoing
+negator declaration for row inequality; it does not invent a direct family
+membership for the negator.
+Array references identify the actual catalog element via
+`typelem`/`typarray`, never a name suffix.
+Ordering uses qualified textual identities with the C collation, not cluster OIDs.
+
+Scope includes bootstrap B-tree members and members whose family or operator
+namespace was explicitly selected, or whose family is referenced by an
+explicitly selected operator class. Referenced namespaces remain identities;
+they do not broaden extraction scope. Families with no operator class remain
+eligible. Search/comparison purpose is retained independently of operator names.
+
+Loading preserves older catalogs without this optional artifact as unsupported
+metadata (`None`), distinct from a completed empty membership lookup within
+the explicitly extracted scope. A present malformed or unsupported payload
+fails loading. Current extraction always writes
+the payload; refresh older generations before analyzing features requiring it.
+The existing operator/class and metadata formats remain unchanged. Analysis
+looks up original declared overload inputs (including polymorphic pseudo-types),
+not instantiated coercion targets. It reads facts through
+`OperatorInfoRead`/`ParseContext`; it does not read producer files, choose a
+family, or infer strategies from operator names.
+
+References: [pg_amop catalog
+contract](https://www.postgresql.org/docs/18/catalog-pg-amop.html)
+and [row comparison
+requirements](https://www.postgresql.org/docs/18/functions-comparisons.html#ROW-WISE-COMPARISON).

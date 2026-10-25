@@ -3,7 +3,9 @@
 Use `sql-fun extract` to obtain builtin catalogs for PostgreSQL 17 or 18.
 It writes `schema.sql`, catalog JSON files, and `metadata.json` to the directory
 you specify. Outputs include `collations.json` and `operator_classes.json` for
-collation and index operator-class definitions. Docker extraction also exports
+collation and index operator-class definitions. `btree_operator_memberships.json`
+provides comparison-family metadata; refresh older generations before using
+analysis features that require it. Docker extraction also exports
 and imports the server installation's
 extension SQL and control files. Extracted builtin views retain their options,
 column defaults and write rules/triggers. Function metadata distinguishes scalar,
@@ -78,9 +80,9 @@ your normal schema workflow.
 
 ## Include additional master definitions
 
-To include collations and operator classes from additional schemas, select each
-schema explicitly. Pass its exact name as one argument, without SQL identifier
-quoting inside the value:
+To include collations, operator classes, and B-tree operator memberships from
+additional schemas, select each schema explicitly. Pass its exact name as one
+argument, without SQL identifier quoting inside the value:
 
 ```sh
 sql-fun extract catalog --database-url 'host=db.example.org dbname=app' \
@@ -90,8 +92,11 @@ sql-fun extract catalog --database-url 'host=db.example.org dbname=app' \
 
 Repeated names are deduplicated. A nonexistent or empty name is an error.
 Selection includes user-created and installed extension definitions in those
-schemas, together with their referenced type/family identities. It does not
-export application tables, install extensions, or broaden other catalog files.
+schemas, together with their referenced type/family identities. B-tree members
+are included when their operator or family belongs to a selected schema, or
+when their family is referenced by a selected operator class. Referenced
+namespaces do not select other definitions. Selection does not export
+application tables, install extensions, or broaden other catalog files.
 Omitting this option retains builtin-only extraction. The selected scope is
 recorded in `metadata.json`.
 

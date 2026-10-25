@@ -116,6 +116,7 @@ pub(super) async fn extract(
         include_str!("sql/views.sql"),
         include_str!("sql/collations.sql"),
         include_str!("sql/operator_classes.sql"),
+        include_str!("sql/btree_operator_memberships.sql"),
     ];
     let mut sql = String::from(
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on; SET LOCAL extra_float_digits = 3; SET LOCAL timezone = 'UTC'; SET LOCAL statement_timeout = '60s';\nSHOW server_version_num;\n",
@@ -155,7 +156,11 @@ pub(super) async fn extract(
         write_json(&output.join(filename), &next_catalog(&mut lines)?)?;
     }
     std::fs::write(output.join("schema.sql"), render_schema(&mut lines)?)?;
-    for filename in ["collations.json", "operator_classes.json"] {
+    for filename in [
+        "collations.json",
+        "operator_classes.json",
+        "btree_operator_memberships.json",
+    ] {
         write_json(&output.join(filename), &next_catalog(&mut lines)?)?;
     }
     anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");

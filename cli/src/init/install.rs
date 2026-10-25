@@ -78,6 +78,24 @@ pub(super) fn validate(path: &Path, version: &PostgresVersion) -> Result<(), any
             anyhow::ensure!(valid_shape, "invalid builtin catalog structure in {name}");
         }
     }
+    // Optional on legacy format-1 installations; current extraction always emits it.
+    let memberships = path.join("btree_operator_memberships.json");
+    let membership_info = match fs::symlink_metadata(&memberships) {
+        Ok(info) => Some(info),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.into()),
+    };
+    if let Some(info) = membership_info {
+        anyhow::ensure!(
+            info.is_file() && !info.file_type().is_symlink(),
+            "invalid B-tree membership file"
+        );
+        let payload: serde_json::Value = serde_json::from_slice(&fs::read(memberships)?)?;
+        anyhow::ensure!(
+            payload["format_version"] == 1 && payload["memberships"].is_array(),
+            "unsupported B-tree membership payload"
+        );
+    }
     Ok(())
 }
 

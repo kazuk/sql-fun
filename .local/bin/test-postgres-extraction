@@ -134,6 +134,14 @@ def validate_masters(directory):
                and c["input_type"] == {"schema": "pg_catalog", "name": "int4"}
                and c["key_type"] is None for c in classes)
     assert any(c["key_type"] is not None for c in classes)
+    memberships = json.loads((directory / "btree_operator_memberships.json").read_text())
+    assert memberships["format_version"] == 1
+    members = memberships["memberships"]
+    assert any(m["operator"] == {"schema": "pg_catalog", "name": "<"}
+               and m["left"]["name"]["name"] == "int4"
+               and m["right"]["name"]["name"] == "int8"
+               and m["strategy"] == 1 and m["purpose"] == "s" for m in members)
+    assert not any(m["operator"]["name"] == "~~" for m in members)
     return collations, classes
 
 
@@ -153,6 +161,13 @@ CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE "other masters"."Type 雪"
  USING btree FAMILY "other masters"."Family 雪" AS
  OPERATOR 1 < (integer,integer), OPERATOR 3 = (integer,integer),
  FUNCTION 1 btint4cmp(integer,integer);
+CREATE OPERATOR {quoted}.## (FUNCTION=pg_catalog.int4lt, LEFTARG=integer, RIGHTARG=integer);
+CREATE OPERATOR FAMILY {quoted}."Custom A" USING btree;
+CREATE OPERATOR FAMILY {quoted}."Custom B" USING btree;
+ALTER OPERATOR FAMILY {quoted}."Custom A" USING btree ADD
+ OPERATOR 1 {quoted}.## (integer,integer), OPERATOR 1 < (integer,bigint);
+ALTER OPERATOR FAMILY {quoted}."Custom B" USING btree ADD
+ OPERATOR 5 {quoted}.## (integer,integer);
 CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE integer USING hash AS
  OPERATOR 1 = (integer,integer), FUNCTION 1 hashint4(integer);
 CREATE COLLATION {quoted}."Name 雪" FROM pg_catalog."C";
@@ -173,7 +188,7 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert metadata["format_version"] == 1
     assert metadata["definition_schemas"] == sorted([schema, extension_schema])
     for filename, digest in payload(builtin).items():
-        if filename not in ("collations.json", "operator_classes.json"):
+        if filename not in ("collations.json", "operator_classes.json", "btree_operator_memberships.json"):
             assert payload(selected)[filename] == digest, "additional scope changed existing catalogs"
     assert {c["schema"] for c in collations["collations"]} == {"pg_catalog", schema}
     encoding_variants = [c["encoding"] for c in collations["collations"]
@@ -185,6 +200,15 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert btree["input_type"] == {"schema": other, "name": "Type 雪"}
     assert btree["family"] == {"schema": other, "name": "Family 雪", "access_method": "btree"}
     assert not btree["default"]
+    members = json.loads((selected / "btree_operator_memberships.json").read_text())["memberships"]
+    custom_operator = [m for m in members if m["operator"] == {"schema": schema, "name": "##"}]
+    assert len(custom_operator) == 2 and {m["strategy"] for m in custom_operator} == {1, 5}
+    assert any(m["family"]["name"] == "Custom A" and m["left"]["name"]["name"] == "int4"
+               and m["right"]["name"]["name"] == "int8" for m in members)
+    custom_members = [m for m in members if m["family"]["schema"] == other]
+    assert {m["strategy"] for m in custom_members} == {1, 3}
+    assert all(m["family"]["name"] == "Family 雪" for m in custom_members)
+
     assert any(c["schema"] == extension_schema for c in classes), "installed extension masters lost"
     assert not any(c["schema"] == other for c in classes), "references must not broaden selection"
     repeated = destination / f"{major}-selected-repeat"
@@ -196,7 +220,7 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     imported = destination / f"{major}-selected-imported"
     run(binary, "extract", "import-extensions", "--catalog", str(selected), "--bundle", str(bundle_file),
         "--output", str(imported), env=environment)
-    for name in ("collations.json", "operator_classes.json", "metadata.json"):
+    for name in ("collations.json", "operator_classes.json", "btree_operator_memberships.json", "metadata.json"):
         assert (imported / name).read_bytes() == (selected / name).read_bytes()
     missing = destination / f"{major}-missing-schema"
     run(binary, "extract", "catalog", "--definition-schema", "unselected missing schema",

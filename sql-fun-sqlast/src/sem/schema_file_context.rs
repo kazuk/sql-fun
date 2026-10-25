@@ -447,6 +447,25 @@ mod test_index_lookup {
 }
 
 impl OperatorInfoRead for SchemaCatalog {
+    fn btree_operator_negator_memberships(
+        &self,
+        operator: &FullName,
+        left: &TypeReference,
+        right: &TypeReference,
+    ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+        self.base
+            .btree_operator_negator_memberships(operator, left, right)
+    }
+
+    fn btree_operator_memberships(
+        &self,
+        operator: &FullName,
+        left: &TypeReference,
+        right: &TypeReference,
+    ) -> Option<Vec<&crate::sem::BtreeOperatorMembership>> {
+        self.base.btree_operator_memberships(operator, left, right)
+    }
+
     fn get_operator_op(
         &self,
         name: &OperatorName,

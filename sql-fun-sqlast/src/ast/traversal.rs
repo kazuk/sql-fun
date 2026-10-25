@@ -94,6 +94,11 @@ walk_fields! {
 
 impl WalkSqlMut for Select {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        self.walk_with_order(visitor, &mut []);
+    }
+}
+impl Select {
+    fn walk_with_order(&mut self, visitor: &mut impl AstVisitorMut, order: &mut [Order]) {
         visitor.enter_projection(&mut ProjectionScope::new(
             &mut self.targets,
             &mut self.from,
@@ -107,6 +112,7 @@ impl WalkSqlMut for Select {
         self.group.walk_sql_mut(visitor);
         self.having.walk_sql_mut(visitor);
         self.windows.walk_sql_mut(visitor);
+        order.walk_sql_mut(visitor);
         visitor.leave_projection(&mut ProjectionScope::new(
             &mut self.targets,
             &mut self.from,
@@ -308,12 +314,33 @@ impl WalkSqlMut for Target {
 }
 impl WalkSqlMut for Query {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
-        visitor.enter_query(self);
-        self.with.walk_sql_mut(visitor);
-        self.body.walk_sql_mut(visitor);
-        self.order.walk_sql_mut(visitor);
-        self.limit.walk_sql_mut(visitor);
-        self.offset.walk_sql_mut(visitor);
-        visitor.leave_query(self);
+        crate::stack::with_stack(|| {
+            visitor.enter_query(self);
+            self.with.walk_sql_mut(visitor);
+            self.body.walk_with_order(visitor, &mut self.order);
+            // LIMIT/OFFSET resolve against the outer scope, without this SELECT's FROM.
+            self.limit.walk_sql_mut(visitor);
+            self.offset.walk_sql_mut(visitor);
+            visitor.leave_query(self);
+        });
+    }
+}
+impl QueryBody {
+    fn walk_with_order(&mut self, visitor: &mut impl AstVisitorMut, order: &mut [Order]) {
+        match self {
+            Self::Select(select) => select.walk_with_order(visitor, order),
+            _ => self.walk_unscoped_order(visitor, order),
+        }
+    }
+    fn walk_unscoped_order(&mut self, visitor: &mut impl AstVisitorMut, order: &mut [Order]) {
+        self.walk_sql_mut(visitor);
+        order.walk_sql_mut(visitor);
+    }
+}
+impl<T: WalkSqlMut> WalkSqlMut for [T] {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        for item in self {
+            item.walk_sql_mut(visitor);
+        }
     }
 }

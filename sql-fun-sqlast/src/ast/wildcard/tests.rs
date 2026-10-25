@@ -14,6 +14,7 @@ use crate::sem::ParseContext;
 #[case::update("UPDATE t SET name = 1 RETURNING *", 1)]
 #[case::delete("DELETE FROM t RETURNING *", 1)]
 #[case::zero_columns("SELECT * FROM empty", 1)]
+#[case::correlated_order("SELECT 1 FROM (t CROSS JOIN u) j ORDER BY EXISTS(SELECT j.*)", 1)]
 #[case::correlated("SELECT EXISTS(SELECT j.*) FROM (t CROSS JOIN u) j", 1)]
 #[case::correlated_set(
     "SELECT EXISTS(SELECT j.* UNION ALL SELECT j.*) FROM (t CROSS JOIN u) j",

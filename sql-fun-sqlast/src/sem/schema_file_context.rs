@@ -13,7 +13,6 @@ mod table_info;
 mod type_info;
 mod view_info;
 
-use crate::sem::{TableInfoRead, ViewInfoRead};
 use std::path::{Path, PathBuf};
 
 use sql_fun_core::SqlFunArgs;
@@ -26,12 +25,13 @@ use self::{
 
 use crate::{
     StringSpan, TrieMap,
+    context::ParseContext,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
         CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, FullName,
         GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan, ObjectKind,
-        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
-        SemScalarExpr, SourceAccessService, TypeReference, VariableSet,
+        OperatorDefinition, OperatorInfoRead, OperatorName, SchemaName, SemScalarExpr,
+        SourceAccessService, TableInfoRead, TypeReference, ViewInfoRead,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
@@ -250,7 +250,10 @@ impl IndexInfoRead for SchemaCatalog {
 #[cfg(test)]
 mod test_index_lookup {
     use self::test_helpers::{index, layer};
-    use crate::sem::{BaseParseContext, FullName, IndexInfoRead, ParseContext};
+    use crate::{
+        context::ParseContext,
+        sem::{BaseParseContext, FullName, IndexInfoRead},
+    };
 
     #[rstest::rstest]
     #[case::first(&["a", "b"], None, Some("a"))]
@@ -903,7 +906,10 @@ impl ParseContext for SchemaFileContext {
         Ok(self)
     }
 
-    fn apply_variable_set(mut self, variable_set: &VariableSet) -> Result<Self, AnalysisError> {
+    fn apply_variable_set(
+        mut self,
+        variable_set: &crate::sem::VariableSet,
+    ) -> Result<Self, AnalysisError> {
         let name = variable_set.name();
         self.catalog
             .variables

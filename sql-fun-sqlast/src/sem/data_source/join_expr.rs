@@ -1,6 +1,9 @@
-use crate::sem::{
-    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, ParseContext, SemScalarExpr, WithClause,
-    data_source::AliasName,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, ColumnName, DataSource, FullName, JoinKind, Nullable, SemScalarExpr, WithClause,
+        data_source::AliasName,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -63,8 +66,8 @@ impl JoinExprDataSource {
 
     pub(super) fn qualified_source<'a>(
         &'a self,
-        context: &impl crate::sem::ParseContext,
-        name: &crate::sem::FullName,
+        context: &impl ParseContext,
+        name: &FullName,
     ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
         if self.alias.is_some() {
             return Ok(None);
@@ -132,7 +135,7 @@ impl JoinExprDataSource {
         }
     }
 
-    pub(super) fn column_candidates<TParseContext: crate::sem::ParseContext>(
+    pub(super) fn column_candidates<TParseContext: ParseContext>(
         &self,
         column: &ColumnName,
         context: &TParseContext,
@@ -150,7 +153,7 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
-    pub(super) fn create_column_ref<'context, C: crate::sem::ParseContext>(
+    pub(super) fn create_column_ref<'context, C: ParseContext>(
         &self,
         context: &'context mut C,
         with: &WithClause,
@@ -187,7 +190,7 @@ impl JoinExprDataSource {
         Ok((value, context))
     }
 
-    pub(super) fn group_column_source<'a, C: crate::sem::ParseContext>(
+    pub(super) fn group_column_source<'a, C: ParseContext>(
         &'a self,
         column: &ColumnName,
         context: &C,
@@ -234,7 +237,7 @@ impl JoinExprDataSource {
 impl JoinExprDataSource {
     pub(super) fn project(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
     ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
@@ -277,7 +280,7 @@ impl JoinExprDataSource {
 
     pub(super) fn projection_names(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         with: &WithClause,
     ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
         let original_left = self.left.projection_names(context, with, None)?;
@@ -397,7 +400,7 @@ impl JoinExprDataSource {
 impl JoinExprDataSource {
     pub(super) fn projection_column_names(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         with: &WithClause,
     ) -> Result<Vec<ColumnName>, crate::sem::AnalysisError> {
         let columns = self.project(context, with, None)?;

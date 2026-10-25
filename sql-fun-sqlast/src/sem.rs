@@ -60,7 +60,7 @@ mod wildcard_expansion;
 pub use self::query_metadata::QueryMetadata;
 pub use self::with_typmod::WithTypmod;
 
-mod type_system;
+pub(crate) mod type_system;
 mod update_statement;
 mod variable_set;
 mod view_definition;
@@ -188,10 +188,10 @@ pub use self::{
         BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictArbiterInference,
         ConflictInfoRead, CursorInfo, DefaultSourceAccessService, DiagnosticContext,
         FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead,
-        ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext, RuleInfoRead, RuleInfoWrite,
-        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead,
-        TableInfoWrite, TriggerInfoRead, TriggerInfoWrite, TypeInfoRead, TypeInfoWrite,
-        ViewInfoRead, ViewInfoWrite,
+        ParameterTypeHintRead, ParameterTypeHintWrite, RuleInfoRead, RuleInfoWrite, SearchPathRead,
+        SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead, TableInfoWrite,
+        TriggerInfoRead, TriggerInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead,
+        ViewInfoWrite,
     },
     pg_type::{
         ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,
@@ -239,6 +239,7 @@ pub(crate) use self::{
     select_statement::{ResultColumn, SelectStatementNode},
     update_statement::{UpdateDestination, UpdatePredicate},
 };
+use crate::context::ParseContext;
 
 use crate::StringSpan;
 #[cfg(feature = "sqlite")]

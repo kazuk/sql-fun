@@ -1,6 +1,10 @@
-use crate::sem::{
-    AliasName, AnalysisError, ColumnName, DataSource, FullName, ParseContext, SemScalarExpr,
-    WithClause, data_source::MergeRecordRole,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasName, AnalysisError, ColumnName, DataSource, FullName, SemScalarExpr, TypeReference,
+        WholeRowExpr, WholeRowFields, WildcardQualifier, WildcardQualifiers, WildcardTypedRecord,
+        WithClause, data_source::MergeRecordRole,
+    },
 };
 
 /// A visible source occurrence, selected without a second lookup by bare alias.
@@ -23,22 +27,19 @@ impl<'a> QualifiedSource<'a> {
         &self,
         context: &impl ParseContext,
         index: usize,
-    ) -> Option<crate::sem::WildcardTypedRecord> {
+    ) -> Option<WildcardTypedRecord> {
         self.source
             .typed_projection_record(&self.alias, context, index)
     }
 
-    pub(super) fn retain_wildcard_qualifier(
-        &self,
-        qualifiers: &mut crate::sem::WildcardQualifiers,
-    ) {
+    pub(super) fn retain_wildcard_qualifier(&self, qualifiers: &mut WildcardQualifiers) {
         if let Some(qualifier) = self.wildcard_qualifier() {
             qualifiers.include(&qualifier);
         }
     }
 
-    pub(super) fn wildcard_qualifier(&self) -> Option<crate::sem::WildcardQualifier> {
-        Some(crate::sem::WildcardQualifier::new(
+    pub(super) fn wildcard_qualifier(&self) -> Option<WildcardQualifier> {
+        Some(WildcardQualifier::new(
             self.source.wildcard_relation()?,
             &self.alias,
             &self.projection_qualifier(),
@@ -241,9 +242,9 @@ impl QualifiedSource<'_> {
         levels_up: usize,
     ) -> Result<SemScalarExpr, AnalysisError> {
         if self.source.whole_row_is_missing() {
-            return crate::sem::WholeRowExpr::not_found(context, requested);
+            return WholeRowExpr::not_found(context, requested);
         }
-        let mut fields = crate::sem::WholeRowFields::default();
+        let mut fields = WholeRowFields::default();
         for column in self.projection_columns(context, with)? {
             fields.push(column.name(), &column.bind_direct(context, with)?);
         }
@@ -259,17 +260,15 @@ impl QualifiedSource<'_> {
         } else {
             Some(true)
         };
-        Ok(SemScalarExpr::whole_row(
-            &crate::sem::WholeRowExpr::resolved(
-                requested,
-                &self.alias,
-                self.source.whole_row_relation(),
-                type_ref.as_ref(),
-                levels_up,
-                not_null,
-                &fields,
-            ),
-        ))
+        Ok(SemScalarExpr::whole_row(&WholeRowExpr::resolved(
+            requested,
+            &self.alias,
+            self.source.whole_row_relation(),
+            type_ref.as_ref(),
+            levels_up,
+            not_null,
+            &fields,
+        )))
     }
 }
 
@@ -278,16 +277,13 @@ impl DataSource {
         matches!(self, Self::Unknown(..) | Self::UndefinedTableFunc(_))
     }
 
-    fn whole_row_type(&self, context: &impl ParseContext) -> Option<crate::sem::TypeReference> {
+    fn whole_row_type(&self, context: &impl ParseContext) -> Option<TypeReference> {
         if let Some(relation) = self.whole_row_relation() {
-            return Some(crate::sem::TypeReference::concrete_type_ref(
-                relation, false,
-            ));
+            return Some(TypeReference::concrete_type_ref(relation, false));
         }
         if let Self::CallTableFunc(function) = self {
             let ty = function.function().ret_type().as_ref()?;
-            if !ty.is_dynamic() && *ty != crate::sem::TypeReference::from_master_type_name("record")
-            {
+            if !ty.is_dynamic() && *ty != TypeReference::from_master_type_name("record") {
                 let matches_output = if let Some(columns) = ty.row_columns(context) {
                     columns.matches_type_structure_with(function.output_columns(), PartialEq::eq)
                 } else {
@@ -331,7 +327,7 @@ impl DataSource {
         alias: &AliasName,
         context: &impl ParseContext,
         index: usize,
-    ) -> Option<crate::sem::WildcardTypedRecord> {
+    ) -> Option<WildcardTypedRecord> {
         match self {
             Self::Table(source) => source.typed_projection_record(alias, context, index),
             Self::View(source) => source.typed_projection_record(alias, context, index),

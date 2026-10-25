@@ -1,7 +1,11 @@
-use crate::sem::scalar_expr::column_ref::ColumnReference;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable, OverloadVariant,
-    SemScalarExpr, TypeReference, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable,
+        OverloadVariant, SemScalarExpr, TypeReference, WithTypmod,
+        data_source::AliasName,
+        scalar_expr::{ColumnReferenceExpr, column_ref::ColumnReference},
+    },
 };
 
 use ::sql_fun_core::IVec;
@@ -11,7 +15,7 @@ pub struct TableFunctionColumnRef {
     alias: AliasName,
     column: ColumnName,
     column_def: Option<ColumnDefinition>,
-    type_declaration: Option<crate::sem::WithTypmod<crate::sem::TypeReference>>,
+    type_declaration: Option<WithTypmod<TypeReference>>,
     table_function: Option<OverloadVariant>,
     args: IVec<SemScalarExpr>,
     datasource_nullable: Nullable,
@@ -47,9 +51,7 @@ impl ColumnReference for TableFunctionColumnRef {
 
 impl TableFunctionColumnRef {
     /// Declaration-local modifiers retained from the table invocation.
-    pub const fn type_declaration(
-        &self,
-    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+    pub const fn type_declaration(&self) -> Option<&WithTypmod<TypeReference>> {
         self.type_declaration.as_ref()
     }
     pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
@@ -95,7 +97,7 @@ impl TableFunctionColumnRef {
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if column_def.is_none() {
             context.report_analysis_problem(
@@ -121,7 +123,7 @@ impl ColumnReferenceExpr {
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         TableFunctionColumnRef::function_source_ref(
             context,
@@ -137,7 +139,7 @@ impl ColumnReferenceExpr {
 
 impl ColumnReferenceExpr {
     pub(crate) fn function_output(
-        alias: &crate::sem::AliasSpec,
+        alias: &AliasSpec,
         definition: &ColumnDefinition,
     ) -> SemScalarExpr {
         let name = definition
@@ -183,7 +185,7 @@ impl SemScalarExpr {
 impl SemScalarExpr {
     pub(crate) fn with_function_type_declaration(
         mut self,
-        declaration: Option<&crate::sem::WithTypmod<crate::sem::TypeReference>>,
+        declaration: Option<&WithTypmod<TypeReference>>,
     ) -> Self {
         if let Self::ColumnRef(ColumnReferenceExpr::TableFuncColumn(reference)) = &mut self {
             reference.type_declaration = declaration.cloned();
@@ -193,7 +195,7 @@ impl SemScalarExpr {
 }
 
 impl TableFunctionColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

@@ -1,7 +1,10 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnCollection,
-    ColumnDefinition, ColumnName, FullName, OverloadVariant, ParseContext, TableFunctionProblem,
-    TypeReference,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnCollection,
+        ColumnDefinition, ColumnName, FullName, OverloadVariant, TableFunctionProblem,
+        TypeReference,
+    },
 };
 
 /// Output owned by one table-function invocation, independently of its signature.

@@ -1,5 +1,8 @@
-use crate::ast::Dialect;
-use crate::sem::{FullName, ParseContext, TableInfoRead, TriggerIdentity, TriggerInfoRead};
+use crate::{
+    ast::Dialect,
+    context::ParseContext,
+    sem::{FullName, TableInfoRead, TriggerIdentity, TriggerInfoRead},
+};
 
 #[rstest::rstest]
 #[case::function_when(
@@ -746,7 +749,7 @@ mod test_helpers {
         sql: &str,
         context: &mut TestParseContext,
     ) -> Result<crate::sem::SemAst, AnalysisError> {
-        crate::parse_statements(sql, crate::sem::ParseContext::dialect(context))
+        crate::parse_statements(sql, crate::context::ParseContext::dialect(context))
             .next()
             .unwrap()
             .unwrap()
@@ -757,7 +760,7 @@ mod test_helpers {
         sql: &str,
         context: SchemaFileContext,
     ) -> Result<crate::AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        crate::parse_statements(sql, crate::sem::ParseContext::dialect(&context))
+        crate::parse_statements(sql, crate::context::ParseContext::dialect(&context))
             .next()
             .unwrap()
             .unwrap()

@@ -1,9 +1,10 @@
 use crate::{
+    context::ParseContext,
     sem::{AstAndContextPair, ColumnDefinition, ColumnName, Nullable},
     syn::{ColumnDef, ListOpt, Opt},
 };
 
-use super::{AnalysisError, ColumnCollection, FullName, ParseContext, SemAst, TypeReference};
+use super::{AnalysisError, ColumnCollection, FullName, SemAst, TypeReference};
 
 /// collection for composite type field
 #[derive(Debug, Default, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

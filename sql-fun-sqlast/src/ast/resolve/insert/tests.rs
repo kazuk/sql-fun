@@ -3,7 +3,8 @@ mod views;
 
 use self::test_helpers::analyze;
 use crate::ast::Dialect;
-use crate::sem::{ColumnName, ParseContext, PgBuiltInType};
+use crate::context::ParseContext;
+use crate::sem::{ColumnName, PgBuiltInType};
 
 #[rstest::rstest]
 #[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *")]

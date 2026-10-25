@@ -1,17 +1,24 @@
-use crate::sem::{
-    AliasSpec, ColumnName, DataSource, Nullable, OverloadVariant, SemScalarExpr, WithClause,
-    data_source::AliasName,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, ColumnCollection, ColumnName, ColumnReferenceExpr, DataSource,
+        FullName, Nullable, OverloadVariant, QueryName, QueryNameResolution, SemScalarExpr,
+        TableFunctionProblem, TypeReference, WildcardTypedRecord, WithClause, WithTypmod,
+        data_source::AliasName, traversal::SemanticVisitor,
+    },
 };
 
 use ::sql_fun_core::IVec;
 
+use super::TableFunctionOutput;
+
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableFunctionDataSource {
     function: OverloadVariant,
-    function_name: Option<crate::sem::QueryName>,
+    function_name: Option<QueryName>,
     args: IVec<SemScalarExpr>,
     alias: AliasSpec,
-    output: super::TableFunctionOutput,
+    output: TableFunctionOutput,
 }
 
 impl super::DataSource {
@@ -27,7 +34,7 @@ impl super::DataSource {
 
 impl TableFunctionDataSource {
     /// Requested function name and its recorded search-path resolution.
-    pub const fn function_name(&self) -> Option<&crate::sem::QueryName> {
+    pub const fn function_name(&self) -> Option<&QueryName> {
         self.function_name.as_ref()
     }
     pub const fn function(&self) -> &OverloadVariant {
@@ -45,7 +52,7 @@ impl TableFunctionDataSource {
     ) -> DataSource {
         DataSource::CallTableFunc(Self {
             function_name: None,
-            output: super::TableFunctionOutput::declared(&function),
+            output: TableFunctionOutput::declared(&function),
             function,
             args,
             alias: alias.clone(),
@@ -75,17 +82,17 @@ impl TableFunctionDataSource {
         _with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         names.extend(self.output.candidates(column, &self.alias));
     }
 }
 
 impl TableFunctionDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         let mut args = self.args.to_vec();
         for argument in &mut args {
             argument.walk(visitor)?;
@@ -98,29 +105,29 @@ impl TableFunctionDataSource {
 impl TableFunctionDataSource {
     pub(super) fn apply_output(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
-        output: &super::TableFunctionOutput,
-    ) -> Result<(), crate::sem::AnalysisError> {
+        context: &mut impl ParseContext,
+        output: &TableFunctionOutput,
+    ) -> Result<(), AnalysisError> {
         self.output = output.clone();
         self.output.apply(context, &self.function, &self.alias)
     }
     pub(super) fn column_names(&self) -> Vec<ColumnName> {
         self.output.names()
     }
-    pub(super) fn bind_column<'a, C: crate::sem::ParseContext>(
+    pub(super) fn bind_column<'a, C: ParseContext>(
         &self,
         context: &'a mut C,
         alias: &AliasName,
         column: &ColumnName,
         nullable: bool,
-    ) -> Result<(SemScalarExpr, &'a mut C), crate::sem::AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'a mut C), AnalysisError> {
         if self.output.candidates(column, &self.alias).len() > 1 {
             return Ok((
-                crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(context, column)?,
+                ColumnReferenceExpr::ambiguous_column_resolved(context, column)?,
                 context,
             ));
         }
-        let (expression, context) = crate::sem::ColumnReferenceExpr::function_source_ref(
+        let (expression, context) = ColumnReferenceExpr::function_source_ref(
             context,
             alias,
             column,
@@ -142,8 +149,8 @@ impl TableFunctionDataSource {
     }
     pub(super) fn validate_aliases(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<(), crate::sem::AnalysisError> {
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
         self.output.validate_aliases(context, &self.alias)
     }
 }
@@ -153,43 +160,39 @@ impl TableFunctionDataSource {
     pub fn output_type_declaration(
         &self,
         column: &ColumnName,
-    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+    ) -> Option<&WithTypmod<TypeReference>> {
         self.output.declaration(column, &self.alias)
     }
     pub(super) fn output_type_declaration_at(
         &self,
         index: usize,
-    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+    ) -> Option<&WithTypmod<TypeReference>> {
         self.output.declaration_at(index)
     }
 
     /// Effective invocation columns, independently of the catalog return declaration.
-    pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
+    pub const fn output_columns(&self) -> &ColumnCollection {
         self.output.columns()
     }
     /// Retained invalid-definition outcomes, independently of diagnostic delivery.
-    pub fn output_problems(&self) -> &[crate::sem::TableFunctionProblem] {
+    pub fn output_problems(&self) -> &[TableFunctionProblem] {
         self.output.problems()
     }
 }
 
 impl DataSource {
-    pub(super) const fn resolved_function_name(&self) -> Option<&crate::sem::QueryName> {
+    pub(super) const fn resolved_function_name(&self) -> Option<&QueryName> {
         if let Self::CallTableFunc(source) = self {
             source.function_name()
         } else {
             None
         }
     }
-    pub(crate) fn record_function_name(
-        &mut self,
-        requested: &crate::sem::FullName,
-        resolved: &crate::sem::FullName,
-    ) {
+    pub(crate) fn record_function_name(&mut self, requested: &FullName, resolved: &FullName) {
         if let Self::CallTableFunc(source) = self {
-            source.function_name = Some(crate::sem::QueryName::new(
+            source.function_name = Some(QueryName::new(
                 &requested.to_string(),
-                crate::sem::QueryNameResolution::function(resolved),
+                QueryNameResolution::function(resolved),
             ));
         }
     }
@@ -199,21 +202,21 @@ impl TableFunctionDataSource {
     pub(super) fn typed_projection_record(
         &self,
         alias: &AliasName,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         index: usize,
-    ) -> Option<crate::sem::WildcardTypedRecord> {
-        crate::sem::WildcardTypedRecord::from_function(alias, &self.function, context, index)
+    ) -> Option<WildcardTypedRecord> {
+        WildcardTypedRecord::from_function(alias, &self.function, context, index)
     }
 
     pub(super) fn bind_projection_ordinal(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         alias: &AliasName,
         column: &ColumnName,
         index: usize,
         nullable: bool,
-    ) -> Result<SemScalarExpr, crate::sem::AnalysisError> {
-        let (value, _) = crate::sem::ColumnReferenceExpr::function_source_ref(
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let (value, _) = ColumnReferenceExpr::function_source_ref(
             context,
             alias,
             column,
@@ -227,10 +230,7 @@ impl TableFunctionDataSource {
 }
 
 impl TableFunctionDataSource {
-    pub(super) fn projection_is_table_dependent(
-        &self,
-        context: &impl crate::sem::ParseContext,
-    ) -> bool {
+    pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         self.function.table_output_depends_on_table(context)
     }
 }

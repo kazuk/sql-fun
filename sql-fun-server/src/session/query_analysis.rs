@@ -14,9 +14,10 @@ use ::sql_fun_server_api::{
 };
 use ::sql_fun_sqlast::{
     ast::{Dialect, Statement},
+    context::ParseContext,
     parse_statements,
     sem::{
-        AnalysisProblem, BaseParseContext, ParameterTypeHintWrite, ParseContext, QueryMetadata,
+        AnalysisProblem, BaseParseContext, ParameterTypeHintWrite, QueryMetadata,
         SchemaFileContext, TypeReference as SqlType,
     },
 };

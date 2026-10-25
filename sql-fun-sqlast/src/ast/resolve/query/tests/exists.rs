@@ -1,7 +1,8 @@
 //! EXISTS behavior at the query-analysis boundary using a small catalog.
 use super::super::test_helpers::resolve;
 use crate::ast::Dialect;
-use crate::sem::{ColumnName, ParseContext, PgBuiltInType, SelectStatement, SemScalarExpr};
+use crate::context::ParseContext;
+use crate::sem::{ColumnName, PgBuiltInType, SelectStatement, SemScalarExpr};
 
 #[rstest::rstest]
 #[case::null("SELECT EXISTS (SELECT NULL) AS found")]

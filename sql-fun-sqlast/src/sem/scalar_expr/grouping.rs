@@ -1,8 +1,12 @@
 //! Query-local GROUPING bindings. The shared environment remains ParseContext.
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ParseContext, QueryGrouping, ResultColumnCollection,
-    SemScalarExpr,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, QueryGrouping, QueryProblem, ResultColumnCollection,
+        SelectStatement, SemScalarExpr, traversal::SemanticVisitor,
+    },
 };
+
 use std::{cell::RefCell, rc::Rc};
 
 /// One analyzed GROUPING argument and its completed grouping-key lookup.
@@ -71,7 +75,7 @@ impl GroupingExpr {
     pub const fn is_valid(&self) -> bool {
         self.valid && self.completed
     }
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -91,7 +95,7 @@ impl GroupingExpr {
         if self.query_id == Some(query_id) {
             self.valid = false;
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::QueryProblem::invalid_grouping_placement("GROUP BY"),
+                QueryProblem::invalid_grouping_placement("GROUP BY"),
             ))?;
         }
         Ok(())
@@ -117,7 +121,7 @@ impl GroupingExpr {
             if argument.key_index.is_none() {
                 self.valid = false;
                 context.report_analysis_problem(AnalysisProblem::query(
-                    crate::sem::QueryProblem::grouping_argument_not_grouped(),
+                    QueryProblem::grouping_argument_not_grouped(),
                 ))?;
             }
         }
@@ -193,7 +197,7 @@ struct GroupingKeyValidation<'a, C> {
     query_id: usize,
     context: &'a mut C,
 }
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for GroupingKeyValidation<'_, C> {
+impl<C: ParseContext> SemanticVisitor for GroupingKeyValidation<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.validate_grouping_key_node(self.query_id, self.context)
     }
@@ -201,12 +205,12 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for GroupingKeyVali
 struct GroupingCompletion<'a, C> {
     context: &'a mut C,
 }
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for GroupingCompletion<'_, C> {
+impl<C: ParseContext> SemanticVisitor for GroupingCompletion<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.complete_grouping_node(self.context)
     }
 }
-impl crate::sem::SelectStatement {
+impl SelectStatement {
     pub(crate) fn complete_grouping(
         &mut self,
         context: &mut impl ParseContext,
@@ -349,7 +353,7 @@ fn comparison_key(expression: &SemScalarExpr) -> Result<Option<SemScalarExpr>, A
     }
 }
 struct GroupingCastNormalization;
-impl crate::sem::traversal::SemanticVisitor for GroupingCastNormalization {
+impl SemanticVisitor for GroupingCastNormalization {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.normalize_grouping_cast();
         Ok(())
@@ -358,7 +362,7 @@ impl crate::sem::traversal::SemanticVisitor for GroupingCastNormalization {
 struct ComparisonKey {
     resolved: bool,
 }
-impl crate::sem::traversal::SemanticVisitor for ComparisonKey {
+impl SemanticVisitor for ComparisonKey {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         self.resolved &= expression.grouping_references_resolved();
         expression.canonicalize_grouping_key();

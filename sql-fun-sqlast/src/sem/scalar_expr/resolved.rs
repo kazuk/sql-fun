@@ -1,9 +1,12 @@
-use crate::sem::scalar_expr::{
-    ArrayExpr, BooleanExpr, ExistsExpr, ListExpr, NullTestExpr, ScalarConstExpr, SemScalarExpr,
-    SubLinkExpr, TypeCastExpr,
-    boolean::{BooleanExprBody, NullTestType},
-};
 use crate::sem::{AnalysisError, SelectStatement, TypeReference};
+use crate::{
+    context::ParseContext,
+    sem::scalar_expr::{
+        ArrayExpr, BooleanExpr, ExistsExpr, ListExpr, NullTestExpr, ScalarConstExpr, SemScalarExpr,
+        SubLinkExpr, TypeCastExpr,
+        boolean::{BooleanExprBody, NullTestType},
+    },
+};
 
 impl SemScalarExpr {
     pub(crate) fn truth_test(value: &super::TruthTestExpr) -> Self {
@@ -89,7 +92,7 @@ impl SemScalarExpr {
         Self::TypeCast(TypeCastExpr::from_resolved(target, value))
     }
     pub(crate) fn array_subquery(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         query: &SelectStatement,
     ) -> Result<Self, AnalysisError> {
         Ok(Self::ArraySubquery(super::ArraySubqueryExpr::resolve(

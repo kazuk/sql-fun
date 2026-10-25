@@ -1,11 +1,16 @@
-use crate::ast::{Alias, Assignment, Dialect, Expr, FromItem, Name, Update};
-use crate::sem::ResolutionFailure;
-use crate::sem::UpdateDestination;
-use crate::sem::problem::UpdateProblemKind;
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause, ParseContext,
-    ResultColumnCollection, ScalarAnalysisContext, TableName, UpdateAssignmentCollection,
-    UpdateStatement, UpdateValue, WithClause,
+#[cfg(test)]
+mod tests;
+
+use crate::{
+    ast::{Alias, Assignment, CurrentOf, Dialect, Expr, FromItem, Name, Subquery, Update},
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, DataSource,
+        FromClause, FullName, PgBuiltInType, ResolutionFailure, ResultColumnCollection,
+        ScalarAnalysisContext, TableName, UpdateAssignment, UpdateAssignmentCollection,
+        UpdateCursor, UpdateDestination, UpdatePredicate, UpdateStatement, UpdateValue, WithClause,
+        parameter_resolution::ParameterResolution, problem::UpdateProblemKind,
+    },
 };
 
 impl Update {
@@ -19,11 +24,7 @@ impl Update {
                 return Ok(None);
             };
             if context.parameter_inference_needed() {
-                let constraints =
-                    crate::sem::parameter_resolution::ParameterResolution::infer_update(
-                        &mut statement,
-                        context,
-                    )?;
+                let constraints = ParameterResolution::infer_update(&mut statement, context)?;
                 context.set_parameter_constraints(&constraints);
             }
             Ok(Some(statement))
@@ -176,7 +177,7 @@ impl Update {
         table: &UpdateDestination,
     ) -> Result<(), ResolutionFailure> {
         if let Some(index) = &self.relation.indexed {
-            let name = crate::sem::FullName::with_schema(
+            let name = FullName::with_schema(
                 table
                     .name()
                     .full_name()
@@ -223,22 +224,22 @@ impl Update {
         context: &mut impl ParseContext,
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<crate::sem::UpdatePredicate>, ResolutionFailure> {
+    ) -> Result<Option<UpdatePredicate>, ResolutionFailure> {
         if let Some(expression) = &self.predicate
             && let Some(cursor) = expression.resolve_current_of(context, target)?
         {
-            return Ok(Some(crate::sem::UpdatePredicate::current_of(&cursor)));
+            return Ok(Some(UpdatePredicate::current_of(&cursor)));
         }
         let predicate = Expr::resolve_optional(&self.predicate, context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
-            && ty != crate::sem::PgBuiltInType::bool()
+            && ty != PgBuiltInType::bool()
             && !value
                 .as_const()
                 .is_some_and(|c| c.is_null() || c.as_string().is_some())
             && context
-                .get_implicit_cast(&ty, &crate::sem::PgBuiltInType::bool())
+                .get_implicit_cast(&ty, &PgBuiltInType::bool())
                 .is_none()
         {
             context.report_analysis_problem(AnalysisProblem::update(
@@ -246,9 +247,7 @@ impl Update {
                 "UPDATE WHERE requires boolean type",
             ))?;
         }
-        Ok(predicate
-            .as_ref()
-            .map(crate::sem::UpdatePredicate::expression))
+        Ok(predicate.as_ref().map(UpdatePredicate::expression))
     }
     fn resolve_returning_scope(
         &self,
@@ -347,11 +346,7 @@ impl UpdateAssignmentCollection {
                 ))?;
             }
             assignment.validate_update_value(context, column, &value)?;
-            resolved.push(crate::sem::UpdateAssignment::new(
-                column,
-                &destination,
-                &value,
-            ));
+            resolved.push(UpdateAssignment::new(column, &destination, &value));
         }
         Ok(resolved)
     }
@@ -360,7 +355,7 @@ impl Assignment {
     fn validate_update_value(
         &self,
         context: &mut impl ParseContext,
-        column: &crate::sem::ColumnDefinition,
+        column: &ColumnDefinition,
         value: &UpdateValue,
     ) -> Result<(), ResolutionFailure> {
         if value.is_default() && !self.indirection.is_empty() {
@@ -412,7 +407,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<Option<crate::sem::UpdateCursor>, ResolutionFailure> {
+    ) -> Result<Option<UpdateCursor>, ResolutionFailure> {
         match self {
             Self::CurrentOf(cursor) => cursor.resolve_update(context, target).map(Some),
             _ => Ok(None),
@@ -466,10 +461,7 @@ impl Expr {
     }
 }
 
-#[cfg(test)]
-mod tests;
-
-impl crate::ast::Subquery {
+impl Subquery {
     fn resolve_update_row(
         &self,
         context: &mut impl ParseContext,
@@ -487,19 +479,19 @@ impl crate::ast::Subquery {
     }
 }
 
-impl crate::ast::CurrentOf {
+impl CurrentOf {
     fn resolve_update(
         &self,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<crate::sem::UpdateCursor, ResolutionFailure> {
+    ) -> Result<UpdateCursor, ResolutionFailure> {
         if self.parameter != 0 {
             return Err(AnalysisError::unexpected_input_error(
                 "CURRENT OF cursor parameters require a procedural variable resolver",
             )
             .into());
         }
-        let cursor = crate::sem::UpdateCursor::new(&self.name, context.resolve_cursor(&self.name));
+        let cursor = UpdateCursor::new(&self.name, context.resolve_cursor(&self.name));
         let problem = match cursor.binding() {
             None => Some(format!(
                 "cursor {:?} does not exist in the current session scope",

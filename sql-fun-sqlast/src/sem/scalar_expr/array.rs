@@ -1,8 +1,9 @@
-use crate::sem::problem::ArrayProblem;
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParseContext, SemScalarExpr,
-    TypeReference,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, SemScalarExpr,
+        TypeReference, problem::ArrayProblem, scalar_expr::SemScalarExprNode,
+    },
 };
 
 /// An analyzed ARRAY constructor with ordered operands and its output domain.

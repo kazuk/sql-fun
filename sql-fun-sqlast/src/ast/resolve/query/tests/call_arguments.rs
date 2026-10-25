@@ -1,9 +1,10 @@
 //! Supplied call arguments survive analysis independently of function signatures.
 use super::super::test_helpers::{catalog, resolve};
 use crate::ast::{Dialect, StatementNode};
+use crate::context::ParseContext;
 use crate::sem::{
     AliasName, AnalysisError, DataSource, FuncCallExpr, FunctionParam, OverloadVariant,
-    ParseContext, PgBuiltInType, QueryNameResolution, SelectStatement, SemScalarExpr,
+    PgBuiltInType, QueryNameResolution, SelectStatement, SemScalarExpr,
 };
 
 fn projection(query: &SelectStatement) -> &SemScalarExpr {

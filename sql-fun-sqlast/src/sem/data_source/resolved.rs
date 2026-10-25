@@ -1,32 +1,35 @@
-use crate::sem::data_source::{
-    AliasSpec, CteDataSource, DataSource, JoinExprDataSource, JoinKind, SubQueryDataSource,
-    TableDataSource, UndefinedTableFuncDataSource, ViewDataSource, join_expr::JoinUsingClause,
-};
-use crate::sem::{
-    AnalysisError, AnalysisProblem, FullName, ParseContext, SelectStatement, SemScalarExpr,
-    TableName, ViewName, WithClause, type_system::ArgumentBindingCollection,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnName, CreateTrigger, DataSourceRowsFromFunc,
+        FullName, SelectStatement, SemScalarExpr, TableName, ViewName, WithClause,
+        data_source::{
+            AliasSpec, CteDataSource, DataSource, JoinExprDataSource, JoinKind, SubQueryDataSource,
+            TableDataSource, UndefinedTableFuncDataSource, ViewDataSource,
+            join_expr::JoinUsingClause,
+        },
+        problem::DeleteProblemKind,
+        type_system::ArgumentBindingCollection,
+    },
 };
 
 impl DataSource {
     pub(crate) fn canonical_relation_column(
         &self,
         context: &impl ParseContext,
-        column: &crate::sem::ColumnName,
-    ) -> Option<crate::sem::ColumnName> {
+        column: &ColumnName,
+    ) -> Option<ColumnName> {
         let target = match self {
             Self::Table(table) => table.name().full_name(),
             Self::View(view) => view.view_name().full_name(),
             _ => return None,
         };
-        crate::sem::CreateTrigger::column(context, target, column)?
+        CreateTrigger::column(context, target, column)?
             .name()
             .clone()
     }
 
-    pub(crate) fn resolved_rows(
-        functions: &[crate::sem::DataSourceRowsFromFunc],
-        alias: &AliasSpec,
-    ) -> Self {
+    pub(crate) fn resolved_rows(functions: &[DataSourceRowsFromFunc], alias: &AliasSpec) -> Self {
         Self::RowFunctions(super::DataSourceRowFunctions::new(
             &functions.to_vec().into(),
             alias,
@@ -42,7 +45,7 @@ impl DataSource {
             let cte = with.get(cte_name).expect("resolved CTE name is stored");
             if cte.is_unreadable_delete() {
                 context.report_analysis_problem(AnalysisProblem::delete(
-                    crate::sem::problem::DeleteProblemKind::unreadable_cte(cte_name),
+                    DeleteProblemKind::unreadable_cte(cte_name),
                 ))?;
             } else {
                 cte.require_readable()?;

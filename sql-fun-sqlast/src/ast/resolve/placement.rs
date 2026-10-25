@@ -1,10 +1,13 @@
 use crate::ast::{CteBody, validation::ContainsInvalidCteClause};
-use crate::sem::AnalysisError;
+use crate::{
+    context::ParseContext,
+    sem::{AnalysisError, AnalysisProblem, problem::QueryProblem},
+};
 
 impl CteBody {
     pub(in crate::ast::resolve) fn require_data_modifying_placement(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         top_level: bool,
     ) -> Result<(), AnalysisError> {
         if (matches!(
@@ -13,8 +16,8 @@ impl CteBody {
         ) && !top_level)
             || self.contains_invalid_cte_clause()
         {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::query(
-                crate::sem::problem::QueryProblem::invalid_cte_placement(),
+            context.report_analysis_problem(AnalysisProblem::query(
+                QueryProblem::invalid_cte_placement(),
             ))?;
         }
         Ok(())

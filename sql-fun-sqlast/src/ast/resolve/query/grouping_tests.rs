@@ -1,9 +1,8 @@
 //! Public semantic outcomes, using the lightweight query catalog.
 use super::test_helpers::resolve;
 use crate::ast::Dialect;
-use crate::sem::{
-    AnalysisError, GroupingExpr, ParseContext, PgBuiltInType, SelectStatement, SemScalarExpr,
-};
+use crate::context::ParseContext;
+use crate::sem::{AnalysisError, GroupingExpr, PgBuiltInType, SelectStatement, SemScalarExpr};
 
 fn groupings(query: &SelectStatement) -> Vec<GroupingExpr> {
     #[derive(Default)]

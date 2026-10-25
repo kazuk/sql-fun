@@ -1,7 +1,7 @@
 use crate::ast::Dialect;
+use crate::context::ParseContext;
 use crate::sem::{
-    BaseParseContext, ColumnName, FullName, ParseContext, PgBuiltInType, SemAst, ViewInsertSupport,
-    ViewLike,
+    BaseParseContext, ColumnName, FullName, PgBuiltInType, SemAst, ViewInsertSupport, ViewLike,
 };
 
 #[rstest::rstest]

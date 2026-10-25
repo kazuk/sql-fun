@@ -24,9 +24,12 @@ pub use self::{
     view_column_ref::ViewColumnRef,
 };
 
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ParseContext, SemScalarExpr,
-    TypeReference, scalar_expr::SemScalarExprNode,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, SemScalarExpr, TypeReference,
+        scalar_expr::SemScalarExprNode,
+    },
 };
 
 trait ColumnReference {
@@ -401,7 +404,7 @@ impl ColumnReferenceExpr {
         Self::undefined_column_resolved(context, column)
     }
 
-    pub(crate) fn undefined_column_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn undefined_column_resolved<TContext: ParseContext>(
         context: &mut TContext,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
@@ -422,7 +425,7 @@ impl ColumnReferenceExpr {
         Self::ambiguous_column_resolved(context, column)
     }
 
-    pub(crate) fn ambiguous_column_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn ambiguous_column_resolved<TContext: ParseContext>(
         context: &mut TContext,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {

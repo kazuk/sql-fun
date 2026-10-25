@@ -9,16 +9,21 @@ mod rule;
 mod trigger;
 mod update;
 
-use crate::StringSpan;
-use crate::ast::{
-    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection,
-    Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery,
-    SubqueryKind, TruthTest, TypeName,
-};
-use crate::sem::{
-    AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExpr, CaseExprAnalysisContext,
-    CoalesceExpr, ColumnName, FullName, FuncCallExpr, IndirectionExpr, OperatorName, ParseContext,
-    ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr, TypeReference,
+use crate::{
+    StringSpan,
+    ast::{
+        Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr,
+        Indirection, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, SqlValue,
+        Subquery, SubqueryKind, TruthTest, TypeName,
+    },
+    context::ParseContext,
+    sem::{
+        AliasName, AnalysisError, AnalysisProblem, ArithExpr, ArrayExpr, ArraySubscript, CaseExpr,
+        CaseExprAnalysisContext, CoalesceExpr, ColumnName, DistinctExpr, FullName, FuncCallExpr,
+        IndirectionExpr, MinMaxExpr, OperatorName, QueryNameResolution, QueryProblem,
+        ReferenceCapture, ResolvedOperator, ScalarAnalysisContext, ScalarConstExpr,
+        SelectStatement, SemScalarExpr, SqlValueExpr, TypeReference, problem::RuleProblem,
+    },
 };
 
 impl Name {
@@ -133,7 +138,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, crate::sem::AnalysisError> {
+    ) -> Result<SemScalarExpr, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, scope);
         let result = context.infer_expression_parameter_types(result);
@@ -208,7 +213,7 @@ impl Expr {
         context: &mut impl ParseContext,
     ) -> Result<SemScalarExpr, AnalysisError> {
         context.report_analysis_problem(AnalysisProblem::query(
-            crate::sem::QueryProblem::invalid_star_projection_placement(),
+            QueryProblem::invalid_star_projection_placement(),
         ))?;
         Ok(SemScalarExpr::Unexpected(
             "invalid star projection placement".to_owned(),
@@ -242,7 +247,7 @@ impl Expr {
         for item in items {
             values.push(item.resolve_array_target(context, scope, target)?);
         }
-        crate::sem::ArrayExpr::resolve(context, &values, target)
+        ArrayExpr::resolve(context, &values, target)
     }
 
     fn resolve_array_target(
@@ -422,7 +427,7 @@ impl OperatorExpr {
             let (Some(left), Some(right)) = (left, right) else {
                 return AnalysisError::raise_unexpected_input("distinctness operands");
             };
-            return Ok(SemScalarExpr::distinct(crate::sem::DistinctExpr::resolve(
+            return Ok(SemScalarExpr::distinct(DistinctExpr::resolve(
                 context, left, right, negated,
             )?));
         }
@@ -484,11 +489,14 @@ impl OperatorKind {
         name: &Name,
         left: bool,
         right: bool,
-    ) -> Result<Option<crate::sem::ResolvedOperator>, AnalysisError> {
+    ) -> Result<Option<ResolvedOperator>, AnalysisError> {
         match self {
-            Self::Ordinary | Self::Any | Self::All => Ok(Some(
-                crate::sem::ResolvedOperator::resolve(context, &name.operator_name()?, left, right),
-            )),
+            Self::Ordinary | Self::Any | Self::All => Ok(Some(ResolvedOperator::resolve(
+                context,
+                &name.operator_name()?,
+                left,
+                right,
+            ))),
             _ => Ok(None),
         }
     }
@@ -583,13 +591,13 @@ impl Cast {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let target = self.target.reference()?;
-        let mut resolution = crate::sem::QueryNameResolution::affinity(&target.to_string());
+        let mut resolution = QueryNameResolution::affinity(&target.to_string());
         let target = if context.dialect() == Dialect::postgres() {
             if let Some(canonical) = context.canonicalize_type_ref(&target) {
-                resolution = crate::sem::QueryNameResolution::type_reference(&canonical);
+                resolution = QueryNameResolution::type_reference(&canonical);
                 canonical
             } else {
-                resolution = crate::sem::QueryNameResolution::not_found();
+                resolution = QueryNameResolution::not_found();
                 context.report_analysis_problem(AnalysisProblem::parameter_constraint(
                     &format!("cast target {target} not found"),
                 ))?;
@@ -598,7 +606,7 @@ impl Cast {
         } else {
             target
         };
-        let expected = crate::sem::MinMaxExpr::base_type(context, &target);
+        let expected = MinMaxExpr::base_type(context, &target);
         let argument = if context.dialect() == Dialect::postgres()
             && resolution.is_resolved()
             && expected.is_array() == Some(true)
@@ -645,7 +653,7 @@ impl Call {
             false
         };
         let capture = if aggregate {
-            Some(crate::sem::ReferenceCapture::default())
+            Some(ReferenceCapture::default())
         } else {
             None
         };
@@ -692,11 +700,7 @@ impl CallKind {
             Self::Coalesce => call.resolve_coalesce(context, scope),
             Self::MinMax => {
                 let arguments = Expr::resolve_list(&call.arguments, context, scope)?;
-                crate::sem::MinMaxExpr::resolve(
-                    context,
-                    call.name.full_name()?.name().as_str(),
-                    &arguments,
-                )
+                MinMaxExpr::resolve(context, call.name.full_name()?.name().as_str(), &arguments)
             }
             Self::Ordinary => call.resolve_ordinary(context, scope),
         }
@@ -793,9 +797,9 @@ impl Subquery {
         if let Some(identity) = scope.rule_identity()
             && let Some(detail) = self.kind.pending_rule_semantics()
         {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                &crate::sem::problem::RuleProblem::definition(identity, detail),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::definition(
+                identity, detail,
+            )))?;
         }
         let query = self.query.resolve_in(context, Some(scope))?;
         self.kind.resolve(context, &query)
@@ -806,7 +810,7 @@ impl SubqueryKind {
     fn resolve(
         &self,
         context: &mut impl ParseContext,
-        query: &crate::sem::SelectStatement,
+        query: &SelectStatement,
     ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
             Self::Exists => Ok(SemScalarExpr::exists(query)),
@@ -896,19 +900,16 @@ impl Access {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::ArraySubscript, AnalysisError> {
+    ) -> Result<ArraySubscript, AnalysisError> {
         match self {
             Self::Index(index) => {
                 let index = index.resolve_in(context, scope)?;
-                Ok(crate::sem::ArraySubscript::index(&index))
+                Ok(ArraySubscript::index(&index))
             }
             Self::Slice(slice) => {
                 let lower = Expr::resolve_optional(&slice.lower, context, scope)?;
                 let upper = Expr::resolve_optional(&slice.upper, context, scope)?;
-                Ok(crate::sem::ArraySubscript::slice(
-                    lower.as_ref(),
-                    upper.as_ref(),
-                ))
+                Ok(ArraySubscript::slice(lower.as_ref(), upper.as_ref()))
             }
             _ => AnalysisError::raise_unexpected_input("array subscript"),
         }
@@ -946,7 +947,7 @@ impl Expr {
             .analysis_state_mut()
             .grouping_mut()
             .register_operation();
-        let capture = crate::sem::ReferenceCapture::default();
+        let capture = ReferenceCapture::default();
         let argument_scope = scope
             .with_grouping_capture(&capture)
             .with_grouping_placement("GROUPING argument");
@@ -956,7 +957,7 @@ impl Expr {
         if capture.invalid_nesting(owner, scope.grouping_scope()) {
             valid = false;
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::QueryProblem::invalid_grouping_placement(
+                QueryProblem::invalid_grouping_placement(
                     "GROUPING argument containing an aggregate or window function",
                 ),
             ))?;
@@ -965,7 +966,7 @@ impl Expr {
         if owner.is_none() || !placement.is_empty() {
             valid = false;
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::QueryProblem::invalid_grouping_placement(if placement.is_empty() {
+                QueryProblem::invalid_grouping_placement(if placement.is_empty() {
                     "expression outside SELECT"
                 } else {
                     &placement
@@ -975,7 +976,7 @@ impl Expr {
         if arguments.len() > 31 {
             valid = false;
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::QueryProblem::too_many_grouping_arguments(),
+                QueryProblem::too_many_grouping_arguments(),
             ))?;
         }
         Ok(SemScalarExpr::grouping(&arguments, owner, levels_up, valid))

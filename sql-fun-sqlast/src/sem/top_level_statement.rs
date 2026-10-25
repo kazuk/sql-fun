@@ -1,7 +1,8 @@
 use crate::{
     AstAndContextPair,
     ast::TryFromWithTokens,
-    sem::{AnalysisError, ParseContext, SemAst, create_table::DropTable},
+    context::ParseContext,
+    sem::{AlterOwner, AnalysisError, SemAst, create_table::DropTable},
     syn::{ListOpt, Opt, ParseResult},
 };
 #[cfg(feature = "sqlite")]
@@ -11,11 +12,11 @@ use ::sql_fun_core::IVec;
 
 impl SemAst {
     /// Retain an analyzed ownership change.
-    pub fn alter_owner(alteration: &crate::sem::AlterOwner) -> Self {
+    pub fn alter_owner(alteration: &AlterOwner) -> Self {
         Self::AlterOwner(alteration.clone())
     }
     /// Ownership semantics for this statement, when applicable.
-    pub const fn ownership_change(&self) -> Option<&crate::sem::AlterOwner> {
+    pub const fn ownership_change(&self) -> Option<&AlterOwner> {
         if let Self::AlterOwner(alteration) = self {
             Some(alteration)
         } else {

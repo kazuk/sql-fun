@@ -57,7 +57,17 @@ pub(crate) use self::document::{JsonTable, Merge, XmlTable};
 pub(crate) use self::ddl::{
     CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
 };
-use crate::StringSpan;
+use crate::{
+    StringSpan,
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ConflictClause, CreateEnum, CreateExtension,
+        CreateSequence, CreateTableMode, CreateView, Deferrability, Deferrable, ForeignKeyAction,
+        ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, Kind, ObjectKind,
+        ParameterConstraints, ScalarAnalysisContext, SemAst, TableName, Validity, ViewName,
+        problem::ViewProblem,
+    },
+};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct TableExtras {
@@ -120,7 +130,7 @@ pub(crate) struct Table {
     columns: Vec<Column>,
     constraints: Vec<TableConstraint>,
     temporary: bool,
-    mode: crate::sem::CreateTableMode,
+    mode: CreateTableMode,
     query: Option<Query>,
     options: Vec<SyntaxOption>,
 }
@@ -149,20 +159,13 @@ pub(crate) struct TableConstraint {
 
 #[derive(Clone, Debug)]
 pub(crate) enum ColumnConstraint {
-    Nullability(
-        bool,
-        Option<crate::sem::ConflictClause>,
-        Option<crate::sem::Validity>,
-    ),
+    Nullability(bool, Option<ConflictClause>, Option<Validity>),
     Default(Expr),
     Check(Expr),
-    PrimaryKey(
-        Option<crate::sem::ConflictClause>,
-        Option<crate::sem::Deferrable>,
-    ),
-    Unique(Option<crate::sem::ConflictClause>),
-    Identity(crate::sem::IdentityColumnMode),
-    Generated(Expr, Option<crate::sem::GeneratedColumnMode>),
+    PrimaryKey(Option<ConflictClause>, Option<Deferrable>),
+    Unique(Option<ConflictClause>),
+    Identity(IdentityColumnMode),
+    Generated(Expr, Option<GeneratedColumnMode>),
     ForeignKey(ForeignReference),
     Exclusion,
     Deferrability(bool),
@@ -175,11 +178,11 @@ pub(crate) enum ColumnConstraint {
 pub(crate) struct ForeignReference {
     table: Name,
     columns: Vec<String>,
-    match_type: Option<crate::sem::ForeignKeyMatchType>,
-    delete_action: Option<crate::sem::ForeignKeyAction>,
-    update_action: Option<crate::sem::ForeignKeyAction>,
-    deferrability: Option<crate::sem::Deferrability>,
-    validity: Option<crate::sem::Validity>,
+    match_type: Option<ForeignKeyMatchType>,
+    delete_action: Option<ForeignKeyAction>,
+    update_action: Option<ForeignKeyAction>,
+    deferrability: Option<Deferrability>,
+    validity: Option<Validity>,
     ignored_matches: Vec<String>,
 }
 
@@ -355,119 +358,106 @@ impl StatementNode {
         Self::Table(value)
     }
 
-    pub(crate) fn resolve(
-        &self,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<crate::sem::SemAst, crate::sem::AnalysisError> {
+    pub(crate) fn resolve(&self, context: &mut impl ParseContext) -> Result<SemAst, AnalysisError> {
         match self {
-            Self::Query(query) => query
-                .resolve(context)
-                .map(|query| crate::sem::SemAst::select(&query)),
+            Self::Query(query) => query.resolve(context).map(|query| SemAst::select(&query)),
             Self::Insert(insert) => insert.resolve(context).map(|value| {
-                value.as_ref().map_or_else(
-                    crate::sem::SemAst::unresolved_statement,
-                    crate::sem::SemAst::insert,
-                )
+                value
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::insert)
             }),
             Self::Update(update) => update.resolve(context).map(|value| {
-                value.as_ref().map_or_else(
-                    crate::sem::SemAst::unresolved_statement,
-                    crate::sem::SemAst::update,
-                )
+                value
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::update)
             }),
             Self::Delete(delete) => delete
                 .resolve(context)
-                .map(|delete| crate::sem::SemAst::delete(&delete)),
-            Self::Merge(merge) => merge
-                .resolve(context)
-                .map(|merge| crate::sem::SemAst::merge(&merge)),
+                .map(|delete| SemAst::delete(&delete)),
+            Self::Merge(merge) => merge.resolve(context).map(|merge| SemAst::merge(&merge)),
             Self::CreateRule(rule) => rule.resolve(context).map(|value| {
-                value.as_ref().map_or_else(
-                    crate::sem::SemAst::unresolved_statement,
-                    crate::sem::SemAst::create_rule,
-                )
+                value
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::create_rule)
             }),
             Self::DropTrigger(trigger) => trigger.resolve(context).map(|value| {
-                value.as_ref().map_or_else(
-                    crate::sem::SemAst::unresolved_statement,
-                    crate::sem::SemAst::drop_trigger,
-                )
+                value
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::drop_trigger)
             }),
             Self::CreateTrigger(trigger) => trigger.resolve(context).map(|value| {
-                value.as_ref().map_or_else(
-                    crate::sem::SemAst::unresolved_statement,
-                    crate::sem::SemAst::create_trigger,
-                )
+                value
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::create_trigger)
             }),
             Self::DropRule(rule) => rule.resolve(context).map(|value| {
-                value.as_ref().map_or_else(
-                    crate::sem::SemAst::unresolved_statement,
-                    crate::sem::SemAst::drop_rule,
-                )
+                value
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::drop_rule)
             }),
-            Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "view requires catalog application",
-            ),
-            Self::Extension(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "extension requires catalog application",
-            ),
-            Self::VariableSet(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "variable set requires catalog application",
-            ),
-            Self::EnumType(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "enum type requires catalog application",
-            ),
-            Self::Sequence(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "sequence requires catalog application",
-            ),
-            Self::DropTable(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "drop table requires catalog application",
-            ),
-            Self::AlterSequence(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "alter sequence requires catalog application",
-            ),
-            Self::Comment(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "comment requires catalog application",
-            ),
+            Self::View(_) => {
+                AnalysisError::raise_unexpected_input("view requires catalog application")
+            }
+            Self::Extension(_) => {
+                AnalysisError::raise_unexpected_input("extension requires catalog application")
+            }
+            Self::VariableSet(_) => {
+                AnalysisError::raise_unexpected_input("variable set requires catalog application")
+            }
+            Self::EnumType(_) => {
+                AnalysisError::raise_unexpected_input("enum type requires catalog application")
+            }
+            Self::Sequence(_) => {
+                AnalysisError::raise_unexpected_input("sequence requires catalog application")
+            }
+            Self::DropTable(_) => {
+                AnalysisError::raise_unexpected_input("drop table requires catalog application")
+            }
+            Self::AlterSequence(_) => {
+                AnalysisError::raise_unexpected_input("alter sequence requires catalog application")
+            }
+            Self::Comment(_) => {
+                AnalysisError::raise_unexpected_input("comment requires catalog application")
+            }
             Self::AlterOwner(alteration) => alteration
                 .resolve(context)
-                .map(|alteration| crate::sem::SemAst::alter_owner(&alteration)),
-            Self::CompositeType(composite_type) => composite_type
-                .resolve(context)
-                .map(crate::sem::SemAst::CreateCompType),
-            Self::AlterRelation(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "statement requires catalog application",
-            ),
+                .map(|alteration| SemAst::alter_owner(&alteration)),
+            Self::CompositeType(composite_type) => {
+                composite_type.resolve(context).map(SemAst::CreateCompType)
+            }
+            Self::AlterRelation(_) => {
+                AnalysisError::raise_unexpected_input("statement requires catalog application")
+            }
             Self::Function(function) => function
                 .resolve(context)
-                .map(|function| crate::sem::SemAst::create_function(&function)),
+                .map(|function| SemAst::create_function(&function)),
             Self::Index(index) => index
                 .resolve(context)
-                .map(|index| crate::sem::SemAst::from_index_resolution(&index)),
-            Self::TableAs(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "table as requires catalog application",
-            ),
-            Self::Table(_) => {
-                crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata")
+                .map(|index| SemAst::from_index_resolution(&index)),
+            Self::TableAs(_) => {
+                AnalysisError::raise_unexpected_input("table as requires catalog application")
             }
-            Self::Schema(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "schema requires catalog application",
-            ),
+            Self::Table(_) => {
+                AnalysisError::raise_unexpected_input("table requires source metadata")
+            }
+            Self::Schema(_) => {
+                AnalysisError::raise_unexpected_input("schema requires catalog application")
+            }
             Self::Domain(domain) => domain
                 .resolve(context)
-                .map(|domain| crate::sem::SemAst::create_domain(&domain)),
+                .map(|domain| SemAst::create_domain(&domain)),
         }
     }
 
     pub(crate) fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
         let mut context = context;
-        context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
+        context.set_parameter_constraints(&ParameterConstraints::default());
         match self {
             Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::DropTrigger(trigger) => trigger.resolve_and_apply(context),
@@ -501,7 +491,7 @@ impl StatementNode {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlterOwner {
-    object_kind: Option<crate::sem::ObjectKind>,
+    object_kind: Option<ObjectKind>,
     relation: Option<Name>,
     object: Option<ObjectTarget>,
     owner: Role,
@@ -552,7 +542,7 @@ pub(crate) struct Role {
 
 impl AlterOwner {
     const fn new(
-        object_kind: Option<crate::sem::ObjectKind>,
+        object_kind: Option<ObjectKind>,
         relation: Option<Name>,
         object: Option<ObjectTarget>,
         owner: Role,
@@ -578,12 +568,12 @@ impl Role {
 #[derive(Clone, Debug)]
 pub(crate) struct Comment {
     target: ObjectTarget,
-    object_kind: crate::sem::ObjectKind,
+    object_kind: ObjectKind,
     text: String,
 }
 
 impl Comment {
-    fn new(target: ObjectTarget, object_kind: crate::sem::ObjectKind, text: &str) -> Self {
+    fn new(target: ObjectTarget, object_kind: ObjectKind, text: &str) -> Self {
         Self {
             target,
             object_kind,
@@ -594,17 +584,17 @@ impl Comment {
     pub(crate) fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
-        let target = self.canonical_target().map_err(|error| {
-            crate::sem::AnalysisError::unexpected_input_error(&error.to_string())
-        })?;
+        let target = self
+            .canonical_target()
+            .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
         let comment = crate::sem::Comment::new(&target, self.object_kind, &self.text);
         let context = context.apply_comment(&comment)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::Comment(comment),
+            SemAst::Comment(comment),
             context,
         ))
     }
@@ -636,9 +626,9 @@ impl AlterSequence {
     fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
         let mut context = context;
         let mut alter_sequence = crate::sem::AlterSequence::new(&self.name.full_name()?, &[]);
@@ -648,9 +638,9 @@ impl AlterSequence {
                     if let Some(relation) = context.resolve_table_name(&requested) {
                         Some(relation)
                     } else {
-                        context.report_analysis_problem(
-                            crate::sem::AnalysisProblem::table_not_found(&requested),
-                        )?;
+                        context.report_analysis_problem(AnalysisProblem::table_not_found(
+                            &requested,
+                        ))?;
                         continue;
                     }
                 } else {
@@ -661,7 +651,7 @@ impl AlterSequence {
         }
         let context = context.apply_alter_sequence(&alter_sequence)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::AlterSequence(alter_sequence),
+            SemAst::AlterSequence(alter_sequence),
             context,
         ))
     }
@@ -688,24 +678,22 @@ impl DropTable {
     fn apply<TContext>(
         &self,
         mut context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
         let mut names = Vec::new();
         for name in &self.names {
-            let table_name = crate::sem::TableName::from(name.full_name()?);
+            let table_name = TableName::from(name.full_name()?);
             if context.get_table(&table_name).is_none() {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::table_not_found(
-                    &table_name,
-                ))?;
+                context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
             }
             names.push(table_name);
         }
         let drop_table = crate::sem::DropTable::new(&names, self.if_exists, self.cascade);
         context = context.apply_drop_table(&drop_table)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::DropTable(drop_table),
+            SemAst::DropTable(drop_table),
             context,
         ))
     }
@@ -746,19 +734,17 @@ impl Sequence {
     fn apply<TContext>(
         &self,
         mut context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
-        let mut sequence = crate::sem::CreateSequence::new(&self.name.full_name()?)
+        let mut sequence = CreateSequence::new(&self.name.full_name()?)
             .with_if_not_exists(self.if_not_exists)
             .with_temporary(self.temporary);
         for option in &self.options {
             if let Some(table) = option.owned_relation()? {
                 let Some(resolved) = context.resolve_table_name(&table) else {
-                    context.report_analysis_problem(
-                        crate::sem::AnalysisProblem::table_not_found(&table),
-                    )?;
+                    context.report_analysis_problem(AnalysisProblem::table_not_found(&table))?;
                     continue;
                 };
                 let table = resolved;
@@ -767,7 +753,7 @@ impl Sequence {
         }
         let context = context.apply_create_sequence(&sequence)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::CreateSequence(sequence),
+            SemAst::CreateSequence(sequence),
             context,
         ))
     }
@@ -787,14 +773,14 @@ impl EnumType {
     fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
-        let enum_type = crate::sem::CreateEnum::new(&self.name.full_name()?, &self.values);
+        let enum_type = CreateEnum::new(&self.name.full_name()?, &self.values);
         let context = context.apply_create_enum(&enum_type)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::CreateEnum(enum_type),
+            SemAst::CreateEnum(enum_type),
             context,
         ))
     }
@@ -833,21 +819,19 @@ impl VariableSet {
     fn resolve_and_apply<TContext>(
         &self,
         mut context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
         let [argument] = self.arguments.as_slice() else {
-            return crate::sem::AnalysisError::raise_unexpected_input(
-                "VariableSetStmt.args len!=1",
-            );
+            return AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1");
         };
-        let outcome = argument.resolve(&mut context, &crate::sem::ScalarAnalysisContext::default());
+        let outcome = argument.resolve(&mut context, &ScalarAnalysisContext::default());
         let value = outcome?;
         let variable_set = crate::sem::VariableSet::new(&self.name, &value);
         let context = context.apply_variable_set(&variable_set)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::VariableSet(variable_set),
+            SemAst::VariableSet(variable_set),
             context,
         ))
     }
@@ -872,15 +856,15 @@ impl Extension {
     fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
-        let extension = crate::sem::CreateExtension::from_name(&self.name)
-            .with_if_not_exists(self.if_not_exists);
+        let extension =
+            CreateExtension::from_name(&self.name).with_if_not_exists(self.if_not_exists);
         let context = context.apply_create_extension(&extension)?;
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::CreateExtension(extension),
+            SemAst::CreateExtension(extension),
             context,
         ))
     }
@@ -928,31 +912,31 @@ impl View {
     fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
-        TContext: crate::sem::ParseContext,
+        TContext: ParseContext,
     {
         let mut context = context;
         let requested = self.name.full_name()?;
         if requested.schema().is_none() && !self.temporary && context.get_default_schema().is_none()
         {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-                &crate::sem::problem::ViewProblem::invalid_target(&requested),
+            context.report_analysis_problem(AnalysisProblem::view(
+                &ViewProblem::invalid_target(&requested),
             ))?;
             return Ok(crate::AstAndContextPair::new(
-                crate::sem::SemAst::unresolved_statement(),
+                SemAst::unresolved_statement(),
                 context,
             ));
         }
         let name = context.creation_name(&requested, self.temporary)?;
         let kind = if self.materialized {
-            crate::sem::Kind::materialized_view()
+            Kind::materialized_view()
         } else {
-            crate::sem::Kind::view()
+            Kind::view()
         };
         if !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)? {
             return Ok(crate::AstAndContextPair::new(
-                crate::sem::SemAst::unresolved_statement(),
+                SemAst::unresolved_statement(),
                 context,
             ));
         }
@@ -961,14 +945,14 @@ impl View {
         query.rename_columns(&self.aliases);
         let lineage = self.query.view_lineage(&context, &query)?;
         let options = self.semantic_options(&mut context)?;
-        let mut view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized)
+        let mut view = CreateView::new(&name, &query, &[], &None, self.materialized)
             .with_if_not_exists(self.if_not_exists)
             .with_replace(self.replace)
             .with_temporary(self.temporary)
             .with_column_lineage(&lineage)
             .with_options(&options, self.check_option.semantic());
         let replacement_rule = if self.replace {
-            if let Some(existing) = context.get_view(&crate::sem::ViewName::from_full_name(&name))
+            if let Some(existing) = context.get_view(&ViewName::from_full_name(&name))
                 && let Some(references) = existing.rules()
             {
                 view.retain_rule_references(references);
@@ -984,7 +968,7 @@ impl View {
             context
         };
         Ok(crate::AstAndContextPair::new(
-            crate::sem::SemAst::CreateView(view),
+            SemAst::CreateView(view),
             context,
         ))
     }
@@ -1802,7 +1786,7 @@ pub(crate) struct Insert {
     source: Option<Query>,
     overriding: Option<OverridingKind>,
     conflict: Option<Conflict>,
-    or_conflict: Option<crate::sem::ConflictClause>,
+    or_conflict: Option<ConflictClause>,
     returning: Vec<Target>,
 }
 
@@ -1862,7 +1846,7 @@ pub(crate) struct Update {
     from: Vec<FromItem>,
     predicate: Option<Expr>,
     returning: Vec<Target>,
-    or_conflict: Option<crate::sem::ConflictClause>,
+    or_conflict: Option<ConflictClause>,
 }
 
 #[derive(Clone, Debug)]

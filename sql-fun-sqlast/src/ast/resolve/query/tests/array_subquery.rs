@@ -3,7 +3,8 @@ mod test_helpers;
 
 use super::super::test_helpers::resolve;
 use crate::ast::Dialect;
-use crate::sem::{ParseContext, PgBuiltInType, SelectStatement, SemScalarExpr, TypeReference};
+use crate::context::ParseContext;
+use crate::sem::{PgBuiltInType, SelectStatement, SemScalarExpr, TypeReference};
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

@@ -1,8 +1,9 @@
 //! DELETE analysis through the public catalog and statement APIs.
+use crate::context::ParseContext;
 use crate::{
     ast::Dialect,
     parse_statements,
-    sem::{BaseParseContext, ColumnName, FullName, ParseContext, PgBuiltInType, TableName},
+    sem::{BaseParseContext, ColumnName, FullName, PgBuiltInType, TableName},
 };
 
 #[test]

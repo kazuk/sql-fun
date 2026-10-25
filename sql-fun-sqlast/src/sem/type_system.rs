@@ -5,9 +5,12 @@ mod infer;
 
 use std::collections::VecDeque;
 
-use crate::sem::{
-    ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType, SemScalarExpr,
-    TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
+use crate::{
+    context::ParseContext,
+    sem::{
+        ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType, SemScalarExpr,
+        TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
+    },
 };
 
 use self::func_params::ParameterBindResult;
@@ -151,10 +154,7 @@ impl OverloadVariant {
         }
     }
 
-    pub(crate) fn table_output_depends_on_table(
-        &self,
-        context: &impl crate::sem::ParseContext,
-    ) -> bool {
+    pub(crate) fn table_output_depends_on_table(&self, context: &impl ParseContext) -> bool {
         if !self.returning_table().is_empty() {
             return false;
         }
@@ -169,7 +169,7 @@ impl OverloadVariant {
 
     pub(crate) fn table_function_output_columns(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         scalar_name: &crate::sem::ColumnName,
     ) -> crate::sem::ColumnCollection {
         let declared = self.returning_table();

@@ -1,7 +1,8 @@
 use crate::ast::{Dialect, Statement};
+use crate::context::ParseContext;
 use crate::sem::{
-    ColumnDefinition, ColumnName, FunctionParam, OverloadVariant, ParseContext, PgBuiltInType,
-    SchemaName, TypeReference, WildcardExpansion,
+    ColumnDefinition, ColumnName, FunctionParam, OverloadVariant, PgBuiltInType, SchemaName,
+    TypeReference, WildcardExpansion,
 };
 use crate::test_helpers::{TestParseContext, source_span};
 

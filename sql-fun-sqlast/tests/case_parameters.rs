@@ -1,6 +1,7 @@
 //! Parameter-dependent CASE semantics with real builtin casts and operators.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeReference};
+use ::sql_fun_sqlast::context::ParseContext;
+use ::sql_fun_sqlast::sem::{PgBuiltInType, TypeReference};
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

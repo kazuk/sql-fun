@@ -1,9 +1,14 @@
 use crate::{
     ast::TryCollectFromWithTokens,
+    context::ParseContext,
     sem::{
-        AliasSpec, AnalysisError, DataSource, MergeMatchKind, Nullable, ParseContext, WithClause,
+        AliasSpec, AnalysisError, DataSource, FullName, MergeMatchKind, Nullable, WithClause,
         create_table::ColumnName,
-        data_source::{AliasName, MergeRecordRole, WildcardProjection},
+        data_source::{
+            AliasName, ColumnCandidates, MergeRecordRole, ProjectionColumn, QualifiedSource,
+            SourceNamespace, WildcardProjection,
+        },
+        traversal::SemanticVisitor,
     },
     syn::ScanToken,
 };
@@ -80,7 +85,7 @@ impl FromClause {
         context: &impl ParseContext,
         with: &WithClause,
         column: &ColumnName,
-    ) -> Result<Option<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+    ) -> Result<Option<ProjectionColumn<'_>>, AnalysisError> {
         if !self.0.iter().any(DataSource::is_joined) {
             return Ok(None);
         }
@@ -105,8 +110,8 @@ impl FromClause {
         Ok(selected)
     }
 
-    pub(crate) fn namespace(&self) -> crate::sem::data_source::SourceNamespace<'_> {
-        let mut namespace = crate::sem::data_source::SourceNamespace::default();
+    pub(crate) fn namespace(&self) -> SourceNamespace<'_> {
+        let mut namespace = SourceNamespace::default();
         for source in &self.0 {
             namespace.append(source.namespace());
         }
@@ -117,10 +122,7 @@ impl FromClause {
         self.namespace().contains_alias(name)
     }
 
-    pub(crate) fn destination_source(
-        &self,
-        alias: &AliasName,
-    ) -> Option<crate::sem::data_source::QualifiedSource<'_>> {
+    pub(crate) fn destination_source(&self, alias: &AliasName) -> Option<QualifiedSource<'_>> {
         self.0
             .last()?
             .namespace()
@@ -142,8 +144,8 @@ impl FromClause {
     pub(crate) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
-    ) -> Result<Option<crate::sem::data_source::QualifiedSource<'a>>, ()> {
+        name: &FullName,
+    ) -> Result<Option<QualifiedSource<'a>>, ()> {
         let mut result = None;
         for source in &self.0 {
             if let Some(candidate) = source.qualified_source(context, name)? {
@@ -225,8 +227,8 @@ impl FromClause {
 
     pub(crate) fn merge_row_target(
         &self,
-        alias: &crate::sem::data_source::AliasName,
-    ) -> Option<(&crate::sem::data_source::AliasName, MergeRecordRole, bool)> {
+        alias: &AliasName,
+    ) -> Option<(&AliasName, MergeRecordRole, bool)> {
         if self.contains_alias(alias) {
             return None;
         }
@@ -235,7 +237,7 @@ impl FromClause {
             .find_map(|source| source.merge_row_target(alias))
     }
 
-    pub(crate) fn single_relation_name(&self) -> Option<crate::sem::FullName> {
+    pub(crate) fn single_relation_name(&self) -> Option<FullName> {
         match self.0.as_slice() {
             [DataSource::Table(table)] => Some(table.name().full_name().clone()),
             [DataSource::View(view)] => Some(view.view_name().full_name().clone()),
@@ -291,13 +293,13 @@ impl FromClause {
         self.find_alias_resolved(column, context, with_clause)
     }
 
-    pub(crate) fn find_alias_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn find_alias_resolved<TContext: ParseContext>(
         &self,
         column: &ColumnName,
         context: &TContext,
         with_clause: &WithClause,
     ) -> Result<::sql_fun_core::LookupResult<AliasSpec>, Vec<AliasSpec>> {
-        let mut candidates = crate::sem::data_source::ColumnCandidates::default();
+        let mut candidates = ColumnCandidates::default();
         for source in &self.0 {
             candidates.append(source.aliases_for_column_resolved(column, context, with_clause));
         }
@@ -307,7 +309,7 @@ impl FromClause {
 
 #[cfg(test)]
 mod test_find_alias_for_column {
-    use crate::sem::{AliasSpec, ColumnName, WithClause};
+    use crate::sem::{AliasName, AliasSpec, ColumnName, WithClause};
     use crate::test_helpers::TestParseContext;
     use ::sql_fun_core::LookupResult;
 
@@ -343,9 +345,7 @@ mod test_find_alias_for_column {
         let (from, context) = TestParseContext::scalar_scope_from_sql(from_sql)?;
         let with = WithClause::default();
         let column = ColumnName::from("id");
-        let (source, _) = from
-            .resolve_alias(&crate::sem::AliasName::from("a"))
-            .unwrap();
+        let (source, _) = from.resolve_alias(&AliasName::from("a")).unwrap();
         let expected = match from
             .find_alias_for_column(&column, &context, &with)
             .unwrap()
@@ -410,10 +410,10 @@ impl MergeScopeConfig {
 }
 
 impl FromClause {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         for source in &mut self.0 {
             source.walk(visitor)?;
         }

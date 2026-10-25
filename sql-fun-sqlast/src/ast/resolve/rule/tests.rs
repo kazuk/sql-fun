@@ -1,5 +1,6 @@
-use crate::sem::{
-    BaseParseContext, FullName, ParseContext, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite,
+use crate::{
+    context::ParseContext,
+    sem::{BaseParseContext, FullName, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite},
 };
 
 #[rstest::rstest]
@@ -604,6 +605,7 @@ fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
 
 mod test_helpers {
     use crate::ast::Dialect;
+    use crate::context::ParseContext;
     use crate::sem::{
         AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, CreateTable,
         CreateTableMode, FrozenBaseContext, FullName, PgBuiltInType, SchemaFileContext, SchemaName,
@@ -678,7 +680,7 @@ mod test_helpers {
     }
     pub(super) fn resolve(
         sql: &str,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
     ) -> Result<SemAst, AnalysisError> {
         crate::parse_statements(sql, Dialect::postgres())
             .next()

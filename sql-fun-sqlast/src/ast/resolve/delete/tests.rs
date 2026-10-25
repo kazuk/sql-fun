@@ -5,7 +5,8 @@ mod views;
 
 use self::test_helpers::{analyze, catalog};
 use crate::ast::Dialect;
-use crate::sem::{BaseParseContext, ColumnName, ParseContext, PgBuiltInType};
+use crate::context::ParseContext;
+use crate::sem::{BaseParseContext, ColumnName, PgBuiltInType};
 
 #[rstest::rstest]
 #[case::plain("DELETE FROM items")]

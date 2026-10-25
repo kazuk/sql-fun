@@ -1,4 +1,7 @@
-use crate::sem::{AliasSpec, ColumnName, DataSource, Nullable, ViewName, data_source::AliasName};
+use crate::{
+    context::ParseContext,
+    sem::{AliasSpec, ColumnName, DataSource, Nullable, ViewName, data_source::AliasName},
+};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewDataSource {
@@ -10,7 +13,7 @@ impl ViewDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         source: &'a DataSource,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         name: &crate::sem::FullName,
         alias: Option<&'a AliasSpec>,
     ) -> Option<super::QualifiedSource<'a>> {
@@ -44,7 +47,7 @@ impl ViewDataSource {
     }
     pub(super) fn create_column_ref(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         alias: &AliasName,
         column: &ColumnName,
         nullability: Nullable,
@@ -100,7 +103,7 @@ impl ViewDataSource {
         context: &TParseContext,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(view) = context.get_view(&self.view)
             && self.result_column(view, column).is_some()
@@ -125,7 +128,7 @@ impl ViewDataSource {
     pub(super) fn typed_projection_record(
         &self,
         alias: &AliasName,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         index: usize,
     ) -> Option<crate::sem::WildcardTypedRecord> {
         crate::sem::WildcardTypedRecord::from_view(alias, &self.view, context, index)
@@ -148,7 +151,7 @@ impl ViewDataSource {
 
     pub(super) fn bind_projection_ordinal(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         alias: &AliasName,
         column: &ColumnName,
         index: usize,
@@ -174,7 +177,7 @@ impl ViewDataSource {
 impl ViewDataSource {
     pub(super) fn projection_column_names(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
     ) -> Result<Vec<ColumnName>, crate::sem::AnalysisError> {
         let Some(view) = context.get_view(&self.view) else {
             return crate::sem::AnalysisError::raise_unexpected_none("star view");

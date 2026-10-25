@@ -1,4 +1,5 @@
-use crate::sem::{FullName, ParseContext, TriggerIdentity, TriggerInfoRead};
+use crate::context::ParseContext;
+use crate::sem::{FullName, TriggerIdentity, TriggerInfoRead};
 
 #[test]
 fn drop_masks_inherited_trigger_and_recreation_preserves_other_links() -> testresult::TestResult {
@@ -147,7 +148,7 @@ fn attached_schema_order_matches_bundled_sqlite(
 
 mod test_helpers {
     use crate::sem::{
-        BaseParseContext, FullName, ParseContext, SchemaName, TableName, TriggerIdentity, ViewName,
+        BaseParseContext, FullName, SchemaName, TableName, TriggerIdentity, ViewName,
     };
     use crate::sem::{FrozenBaseContext, SchemaFileContext};
     pub(super) const CREATE_AUDIT: &str =
@@ -200,9 +201,11 @@ mod test_helpers {
             .len()
     }
     pub(super) mod heavy {
-        use super::{CREATE_AUDIT, FrozenBaseContext, ParseContext, SchemaFileContext, apply};
+        use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
         use super::{SchemaName, layer};
+        use crate::context::ParseContext;
         use crate::sem::BaseContext;
+
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.
         pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {

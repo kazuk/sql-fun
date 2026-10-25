@@ -10,9 +10,9 @@ mod whole_rows;
 
 use super::test_helpers::{output_index, output_type, query, resolve};
 use crate::ast::Dialect;
+use crate::context::ParseContext;
 use crate::sem::{
-    ColumnReferenceExpr, ParseContext, PgBuiltInType, QueryGrouping, QueryNameResolution,
-    SemScalarExpr,
+    ColumnReferenceExpr, PgBuiltInType, QueryGrouping, QueryNameResolution, SemScalarExpr,
 };
 
 #[test]

@@ -1,6 +1,7 @@
 use super::test_helpers::catalog;
 use crate::ast::{CteDefinition, Dialect, HaveWithClause, Statement, StatementKind};
-use crate::sem::{ColumnName, ParseContext, PgBuiltInType};
+use crate::context::ParseContext;
+use crate::sem::{ColumnName, PgBuiltInType};
 
 fn statement(sql: &str) -> Statement {
     crate::parse_statements(sql, Dialect::postgres())

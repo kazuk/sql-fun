@@ -2,7 +2,8 @@ mod assignments;
 mod integration;
 
 use self::test_helpers::{catalog, resolve};
-use crate::sem::{ParseContext, PgBuiltInType};
+use crate::context::ParseContext;
+use crate::sem::PgBuiltInType;
 
 mod views;
 

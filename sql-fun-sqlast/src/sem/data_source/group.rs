@@ -1,6 +1,9 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, ColumnName, DataSource, Nullable, ParseContext, SemScalarExpr,
-    WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, ColumnName, DataSource, Nullable, SemScalarExpr, WithClause,
+        data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+    },
 };
 
 /// A SQLite parenthesized source, retaining its original column bindings.

@@ -1,4 +1,7 @@
-use crate::sem::FullName;
+use crate::{
+    context::ParseContext,
+    sem::{BaseParseContext, FullName},
+};
 
 use super::{
     TypeDefinition, concrete_type::ConcreteTypeReference, dynamic_type::DynamicTypeReference,
@@ -59,7 +62,7 @@ impl TypeReference {
 
     pub(crate) fn definition_from_catalog<'a>(
         &'a self,
-        context: &'a impl crate::sem::BaseParseContext,
+        context: &'a impl BaseParseContext,
     ) -> Option<&'a TypeDefinition> {
         if let Some(definition) = self.type_definition() {
             Some(definition)
@@ -68,9 +71,9 @@ impl TypeReference {
         }
     }
 
-    pub(crate) fn row_columns(
+    pub(crate) fn row_columns<P: ParseContext>(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &P,
     ) -> Option<crate::sem::ColumnCollection> {
         self.definition_from_catalog(context)?.row_columns(context)
     }
@@ -78,7 +81,7 @@ impl TypeReference {
     pub(crate) fn implicit_match_context(
         &self,
         target: &Self,
-        context: &impl crate::sem::BaseParseContext,
+        context: &impl BaseParseContext,
     ) -> Option<crate::sem::CastContext> {
         if self.is_dynamic() || target.is_dynamic() {
             let accepts_record = *target == Self::from_master_type_name("record")
@@ -133,11 +136,7 @@ impl TypeReference {
 
     // Structural matching is separate from catalog cast lookup: anonymous
     // definitions cannot be used as keys in the cast master.
-    pub(crate) fn matches_structure(
-        &self,
-        other: &Self,
-        context: &impl crate::sem::BaseParseContext,
-    ) -> bool {
+    pub(crate) fn matches_structure(&self, other: &Self, context: &impl BaseParseContext) -> bool {
         if self == other {
             return true;
         }

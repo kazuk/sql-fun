@@ -4,7 +4,8 @@ mod views;
 
 use self::test_helpers::{analyze, catalog};
 use crate::ast::Dialect;
-use crate::sem::{ParseContext, PgBuiltInType};
+use crate::context::ParseContext;
+use crate::sem::PgBuiltInType;
 
 #[rstest::rstest]
 #[case::literal("UPDATE items SET id=2 RETURNING *")]

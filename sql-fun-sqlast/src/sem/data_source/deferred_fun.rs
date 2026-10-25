@@ -1,4 +1,7 @@
-use crate::sem::{AliasName, AliasSpec, AnalysisError, DataSource, FuncCallExpr, Nullable};
+use crate::{
+    context::ParseContext,
+    sem::{AliasName, AliasSpec, AnalysisError, DataSource, FuncCallExpr, Nullable},
+};
 
 /// A table invocation with completed name lookup and deferred signature/columns.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -60,7 +63,7 @@ impl DataSource {
 impl DeferredTableFunction {
     pub(super) fn apply_output(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         output: &super::TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
         self.output = output.clone();
@@ -83,7 +86,7 @@ impl DeferredTableFunction {
             super::ColumnCandidates::from(vec![self.alias.clone()])
         }
     }
-    pub(super) fn bind_column<'a, C: crate::sem::ParseContext>(
+    pub(super) fn bind_column<'a, C: ParseContext>(
         &self,
         context: &'a mut C,
         alias: &AliasName,
@@ -117,7 +120,7 @@ impl DeferredTableFunction {
     }
     pub(super) fn validate_aliases(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
     ) -> Result<(), crate::sem::AnalysisError> {
         if self.output.has_declarations() {
             self.output.validate_aliases(context, &self.alias)
@@ -160,10 +163,7 @@ impl DeferredTableFunction {
         self.known_column_names().is_some()
     }
 
-    pub(super) fn projection_is_table_dependent(
-        &self,
-        context: &impl crate::sem::ParseContext,
-    ) -> bool {
+    pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         if let Some(overload) = self.call().overload().as_ref() {
             overload.table_output_depends_on_table(context)
         } else {

@@ -1,6 +1,13 @@
 //! View-write semantics using the maintained sql-fun-home catalogs.
 //! All cases run in the standard workspace flow.
 use ::sql_fun_sqlast::sem::RuleInfoRead;
+use sql_fun_core::analysis_problem::InsertProblemKind;
+use sql_fun_core::analysis_problem::UpdateProblemKind;
+use sql_fun_sqlast::context::ParseContext;
+use sql_fun_sqlast::sem::BaseParseContext;
+use sql_fun_sqlast::sem::RuleIdentity;
+use sql_fun_sqlast::sem::ViewName;
+use sql_fun_sqlast::sem::ViewWriteEvaluation;
 
 mod test_helpers {
     pub mod heavy {
@@ -10,6 +17,7 @@ mod test_helpers {
             ParsedSchemaDump, PostgresDialect,
             sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SemAst},
         };
+        use sql_fun_sqlast::context::ParseContext;
         use std::path::Path;
 
         pub struct ViewSchema {
@@ -100,7 +108,7 @@ mod test_helpers {
                 &self,
                 identity: &::sql_fun_sqlast::sem::TriggerIdentity,
             ) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::{ParseContext, TriggerInfoWrite};
+                use ::sql_fun_sqlast::sem::TriggerInfoWrite;
                 SchemaFileContext::new(
                     Path::new("mask.sql"),
                     self.context(),
@@ -115,7 +123,7 @@ mod test_helpers {
                 &self,
                 identity: &::sql_fun_sqlast::sem::RuleIdentity,
             ) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::{ParseContext, RuleInfoWrite};
+                use ::sql_fun_sqlast::sem::RuleInfoWrite;
                 SchemaFileContext::new(
                     Path::new("mask.sql"),
                     self.context(),
@@ -150,7 +158,7 @@ mod test_helpers {
                 if !context.problems().is_empty() {
                     return Err(format!("{:?}", context.problems()));
                 }
-                Ok(::sql_fun_sqlast::sem::ParseContext::freeze(context))
+                Ok(context.freeze())
             }
             pub const fn context(&self) -> &FrozenBaseContext {
                 self.parsed.base_context()
@@ -162,7 +170,6 @@ mod test_helpers {
                 self.query_problems_at(self.context(), sql)
             }
             pub fn without_search_path(&self) -> FrozenBaseContext {
-                use ::sql_fun_sqlast::sem::ParseContext;
                 let mut context = SchemaFileContext::new(
                     Path::new("empty-path.sql"),
                     self.context(),
@@ -176,7 +183,8 @@ mod test_helpers {
                 &self,
                 name: &::sql_fun_sqlast::sem::FullName,
             ) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::{BaseParseContext, ParseContext, ViewInfoWrite};
+                use sql_fun_sqlast::sem::{BaseParseContext, ViewInfoWrite};
+
                 let view = self
                     .context()
                     .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(name))
@@ -193,7 +201,8 @@ mod test_helpers {
                     .map_err(|error| error.to_string())
             }
             pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoWrite};
+                use sql_fun_sqlast::sem::ViewInfoWrite;
+
                 let SemAst::CreateView(view) =
                     self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
                 else {
@@ -247,10 +256,7 @@ mod test_helpers {
                     ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
                 ) {
                     let statement = statement.map_err(|error| error.to_string())?;
-                    ::sql_fun_sqlast::sem::ParseContext::set_statement_span(
-                        &mut context,
-                        *statement.span(),
-                    );
+                    context.set_statement_span(*statement.span());
                     context = statement
                         .analyze(context)
                         .map_err(|error| error.to_string())?
@@ -863,7 +869,6 @@ fn extracted_builtin_rules_reach_production_analysis(
 #[test]
 fn view_write_bindings_and_diagnostics_remain_structured() -> Result<(), Box<dyn std::error::Error>>
 {
-    use ::sql_fun_sqlast::sem::problem::{InsertProblemKind, UpdateProblemKind};
     let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let insert = schema.analyze("INSERT INTO item_view(key) VALUES($1) RETURNING computed")?;
     let insert = insert.as_insert().unwrap();
@@ -1110,7 +1115,6 @@ fn select_rule_replacement_refreshes_view_facts_in_the_child()
 #[test]
 fn replacing_a_view_preserves_named_rule_links_and_refreshes_its_select_rule()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity};
     let schema = heavy::ViewSchema::postgres(
         r#"
 CREATE TABLE public.items(id integer);
@@ -1122,9 +1126,7 @@ CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id F
     let name = FullName::with_schema("public", "v");
     let child =
         schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items")?;
-    let view = child
-        .get_view(&sql_fun_sqlast::sem::ViewName::from_full_name(&name))
-        .unwrap();
+    let view = child.get_view(&ViewName::from_full_name(&name)).unwrap();
     assert_eq!(view.rules().unwrap().resolve(&child).len(), 2);
     let identity = RuleIdentity::new(&name, "_RETURN");
     let rule = child.rule(&identity).unwrap();
@@ -1160,14 +1162,13 @@ CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id F
 #[test]
 fn evaluation_service_reads_definition_options_and_retained_defaults()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{BaseParseContext, ViewWriteEvaluation};
     let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v WITH (security_barrier = true) AS SELECT id FROM public.items WITH LOCAL CHECK OPTION; ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 7;",
     )?;
     let name = FullName::with_schema("public", "v");
     let definition = schema
         .context()
-        .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(&name))
+        .get_view(&ViewName::from_full_name(&name))
         .unwrap()
         .ordinary_definition()
         .unwrap();
@@ -1206,7 +1207,8 @@ fn evaluation_service_reads_definition_options_and_retained_defaults()
 #[test]
 fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity, ViewWriteEvaluation};
+    use sql_fun_sqlast::sem::BaseParseContext;
+
     let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     )?;
@@ -1214,7 +1216,7 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
     let identity = RuleIdentity::new(&name, "r");
     let child = schema.mask_rule(&identity)?;
     let references = child
-        .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(&name))
+        .get_view(&ViewName::from_full_name(&name))
         .unwrap()
         .rules()
         .unwrap();
@@ -1400,7 +1402,6 @@ fn semantic_problems_allow_subsequent_statements(
 
 #[test]
 fn rejected_default_changes_leave_the_view_unchanged() -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::ParseContext;
     let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT id FROM public.items; ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 7;",
     )?;

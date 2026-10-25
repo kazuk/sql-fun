@@ -7,8 +7,10 @@ pub use self::array_subscripts::{ArraySubscript, ArraySubscripts};
 
 use self::{array_index::ArrayIndex, array_slice::ArraySlice, member_ref::MemberRef};
 
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, SemScalarExpr, TypeReference};
+use crate::{
+    context::ParseContext,
+    sem::{AnalysisError, SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode},
+};
 
 /// Indirect expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -37,7 +39,7 @@ impl IndirectionExpr {
     }
 
     pub(crate) fn resolved_subscripts(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         base: &SemScalarExpr,
         subscripts: &[ArraySubscript],
     ) -> Result<SemScalarExpr, AnalysisError> {
@@ -58,7 +60,7 @@ impl IndirectionExpr {
             Self::MemberRef(value) => value.set_member_type(result),
         }
     }
-    pub(crate) fn resolved_index<TContext: crate::sem::ParseContext>(
+    pub(crate) fn resolved_index<TContext: ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
         index: SemScalarExpr,
@@ -68,7 +70,7 @@ impl IndirectionExpr {
         )?))
     }
 
-    pub(crate) fn resolved_slice<TContext: crate::sem::ParseContext>(
+    pub(crate) fn resolved_slice<TContext: ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
         lower: Option<SemScalarExpr>,
@@ -79,7 +81,7 @@ impl IndirectionExpr {
         )?))
     }
 
-    pub(crate) fn resolved_member<TContext: crate::sem::ParseContext>(
+    pub(crate) fn resolved_member<TContext: ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
         name: &str,

@@ -126,21 +126,14 @@ jobs:
           reporter: java-junit
 
 
-  workspace-all-features:
+  workspace-all-features-tests-build:
     needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
-
       - name: Install Rust problem matcher
         run: echo "::add-matcher::.github/problem-matchers/rust.json"
-
-      - name: Disk usage before cache restore
-        run: |
-          df -h . /usr/local/cargo /github/home
-          df -i . /usr/local/cargo /github/home
-
       - uses: actions/cache@v5
         with:
           path: |
@@ -157,70 +150,28 @@ jobs:
           restore-keys: |
             sccache-${{ runner.os }}-
 
-      - name: Build all-features test archive and regression binaries
+      - name: Build nextest archive
         env:
-          SQL_FUN_CI_ARTIFACT_DIR: /github/home/sql-fun-workspace-ci
+          SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
         run: |
           GIT_ROOT="$(git rev-parse --show-toplevel)"
-          export GIT_ROOT
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
-          sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
           .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=build
-          if [ -d target/cargo-timings ]; then
-            cp -r target/cargo-timings "$SQL_FUN_CI_ARTIFACT_DIR/"
-          fi
           sccache --show-stats
-
-      - name: Disk usage at all-features build peak
+      - name: Disk usage after test build
         if: ${{ always() }}
         run: |
-          df -h . /usr/local/cargo /github/home
-          df -i . /usr/local/cargo /github/home
-          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache /github/home/sql-fun-workspace-ci; do
-            if [ -d "$path" ]; then
-              du -sh "$path"
-            fi
-          done
-
-      - name: Drop compilation artifacts before executing tests
-        run: |
-          cargo clean
           df -h .
-          du -sh /github/home/sql-fun-workspace-ci
-
-      - name: Run archived all-features tests and SQLAST regressions
-        env:
-          SQL_FUN_CI_ARTIFACT_DIR: /github/home/sql-fun-workspace-ci
-        run: |
-          GIT_ROOT="$(git rev-parse --show-toplevel)"
-          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
-          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
-            --config-file ./ci/nextest/config.toml
-            --profile ci
-            --show-progress none"
-      - name: Restore compilation timing reports
-        if: ${{ always() }}
-        run: |
-          if [ -d /github/home/sql-fun-workspace-ci/cargo-timings ]; then
-            mkdir -p target/cargo-timings
-            cp /github/home/sql-fun-workspace-ci/cargo-timings/*.html target/cargo-timings/
-          fi
-
-      - name: Disk usage after build and test
-        if: ${{ always() }}
-        run: |
-          df -h . /usr/local/cargo /github/home
-          df -i . /usr/local/cargo /github/home
-          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
-            if [ -d "$path" ]; then
-              du -sh "$path"
-            fi
-          done
-
-      - name: Upload Cargo compilation timings
-        uses: actions/upload-artifact@v7
+          du -sh target /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-all-features-nextest
+          path: ${{ runner.temp }}/workspace-ci/nextest.tar.zst
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
           name: cargo-timings-workspace-all-features
@@ -228,6 +179,82 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+  workspace-all-features-binaries-build:
+    needs: pr-freshness
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
+      - name: Build CLI and server
+        run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
+          cargo build --locked --all-features -p sql-fun-cli --bin sql-fun -p sql-fun-server --bin sql-fun-server
+          mkdir -p "${RUNNER_TEMP}/workspace-binaries"
+          cp target/debug/sql-fun target/debug/sql-fun-server "${RUNNER_TEMP}/workspace-binaries/"
+          sccache --show-stats
+      - name: Disk usage after binaries build
+        if: ${{ always() }}
+        run: |
+          df -h .
+          du -sh target /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-all-features-binaries
+          path: ${{ runner.temp }}/workspace-binaries/
+          if-no-files-found: error
+
+  workspace-all-features:
+    needs: [workspace-all-features-tests-build, workspace-all-features-binaries-build]
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-nextest
+          path: ${{ runner.temp }}/workspace-ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-binaries
+          path: ${{ runner.temp }}/workspace-binaries
+      - name: Run archived all-features tests and SQLAST regressions
+        env:
+          SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
+          SQL_FUN_BIN: ${{ runner.temp }}/workspace-binaries/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-binaries/sql-fun-server
+        run: |
+          export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
+          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
+            --config-file ./ci/nextest/config.toml
+            --profile ci
+            --show-progress none"
+      - name: Disk usage after tests
+        if: ${{ always() }}
+        run: |
+          df -h . /github/home
+          df -i . /github/home
+          du -sh target ${{ runner.temp }}/workspace-ci ${{ runner.temp }}/workspace-binaries || true
       - name: Upload nextest JUnit report
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
@@ -236,7 +263,6 @@ jobs:
           path: target/nextest/ci/junit.xml
           retention-days: 30
           if-no-files-found: warn
-
       - name: Test Report
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
@@ -244,12 +270,6 @@ jobs:
           name: nextest tests (all features)
           path: target/nextest/ci/junit.xml
           reporter: java-junit
-
-      - name: Clean temporary test artifacts
-        if: ${{ always() }}
-        run: |
-          cargo clean
-          rm -rf /github/home/sql-fun-workspace-ci
 
   msrv:
     needs: pr-freshness

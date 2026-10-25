@@ -350,6 +350,21 @@ grammar, so PostgreSQL 18's RETURNING OLD/NEW alias syntax is unavailable.
 These limitations can terminate analysis; parsing a statement does not establish
 that its semantics are supported.
 
+## PostgreSQL truth predicates
+
+`IS TRUE`, `IS FALSE`, `IS UNKNOWN`, and their `IS NOT` forms produce a
+non-null boolean, even when the operand is NULL or a nullable column.
+`IS UNKNOWN` tests for a NULL boolean operand. These predicates require a
+boolean operand or a legal implicit conversion to boolean. A typed integer or
+text value needs an explicit boolean cast; a bare NULL or valid boolean string
+literal can be converted directly. Invalid boolean string literals are diagnosed.
+
+Truth predicates constrain parameter inputs to boolean-convertible types.
+Reusing a parameter in an incompatible expression produces a
+parameter-constraint diagnostic. As with
+other parameter analysis, admissible input types describe valid explicitly typed
+bindings; analysis does not select a wire-protocol binding.
+
 ## PostgreSQL GREATEST and LEAST
 
 `GREATEST` and `LEAST` analyze every operand and report a PostgreSQL common

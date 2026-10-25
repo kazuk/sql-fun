@@ -6,6 +6,16 @@ use crate::sem::scalar_expr::{
 use crate::sem::{AnalysisError, SelectStatement, TypeReference};
 
 impl SemScalarExpr {
+    pub(crate) fn truth_test(value: &super::TruthTestExpr) -> Self {
+        Self::TruthTest(value.clone())
+    }
+    /// SQL truth predicate, including its retained operand after inference.
+    pub const fn as_truth_test(&self) -> Option<&super::TruthTestExpr> {
+        match self {
+            Self::TruthTest(value) => Some(value),
+            _ => None,
+        }
+    }
     pub(crate) fn row(fields: &[Self]) -> Self {
         Self::Row(super::RowExpr::new(fields))
     }

@@ -246,6 +246,35 @@ impl ParameterResolution {
         }
         node
     }
+    pub(crate) fn truth_test(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        argument: &SemScalarExpr,
+        types: &InputTypeConstraint,
+    ) -> (usize, InputTypeConstraint) {
+        let input = if let Some(node) = argument.constraint_node() {
+            node
+        } else if let Some(ty) = argument.get_type() {
+            let canonical = if ty.is_dynamic() {
+                ty
+            } else {
+                context.canonicalize_type_ref(&ty).unwrap_or(ty)
+            };
+            self.graph.node(&InputTypeConstraint::exact(&canonical))
+        } else {
+            self.input(argument)
+        };
+        let output = self.graph.node(types);
+        let sources = crate::sem::TruthTestExpr::input_types(context);
+        self.graph.restrict(input, &sources);
+        self.graph.overload(
+            &[input, output],
+            &[SignatureAlternative::new(&[sources, types.clone()])],
+            "truth test",
+        );
+        (output, self.graph.domain(output).clone())
+    }
+
     pub(crate) fn unify_coalesce_types(
         &mut self,
         context: &mut impl crate::sem::ParseContext,

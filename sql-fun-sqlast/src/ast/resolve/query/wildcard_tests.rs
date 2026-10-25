@@ -1,7 +1,7 @@
 //! Semantic wildcard groups use the same small relation fixtures as name resolution.
 
 use super::test_helpers::source_namespace_statement;
-use crate::sem::ParseContext;
+use crate::context::ParseContext;
 
 #[rstest::rstest]
 #[case::zero_width("SELECT * FROM a.zero_columns", &[7], &[true], &[""])]

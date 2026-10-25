@@ -412,7 +412,7 @@ fn nominal_function_boundary_retains_argument_binding() {
 #[case::member("SELECT (r.*).x FROM (SELECT $1::integer AS n) r(x)")]
 #[case::star("SELECT (r.*).* FROM (SELECT $1::integer AS n) r(x)")]
 fn renamed_parameter_fields_retain_constraints(#[case] sql: &str) {
-    use crate::sem::ParseContext;
+    use crate::context::ParseContext;
     let (query, context) = test_helpers::alias_query(sql);
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     let constraint = context
@@ -459,9 +459,10 @@ fn scalar_source_fields_do_not_make_a_composite(#[case] sql: &str, #[case] code:
 
 mod test_helpers {
     use crate::ast::{Dialect, StatementNode};
+    use crate::context::ParseContext;
     use crate::sem::{
-        FullName, FunctionParam, OverloadVariant, ParseContext, PgBuiltInType, SelectStatement,
-        SemScalarExpr, TypeReference,
+        FullName, FunctionParam, OverloadVariant, PgBuiltInType, SelectStatement, SemScalarExpr,
+        TypeReference,
     };
     use crate::test_helpers::TestParseContext;
 

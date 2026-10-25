@@ -1,9 +1,11 @@
 use crate::{
     ast::TryFromWithTokens,
+    context::ParseContext,
     sem::{
-        AnalysisError, DeleteStatement, InsertStatement, MergeStatement, ParseContext,
-        SelectStatement, UpdateStatement,
+        AnalysisError, DeleteStatement, FullName, InsertStatement, MergeStatement,
+        ResultColumnCollection, SelectStatement, UpdateStatement,
         create_table::{ColumnDefinition, ColumnName},
+        traversal::SemanticVisitor,
     },
     syn::ScanToken,
 };
@@ -74,7 +76,7 @@ impl CteStatement {
         self.resolved_column(name, None, skip_count)
     }
 
-    pub(crate) fn result_columns(&self) -> Option<&crate::sem::ResultColumnCollection> {
+    pub(crate) fn result_columns(&self) -> Option<&ResultColumnCollection> {
         match self {
             Self::Unresolved => None,
             Self::Select(query) => Some(query.result_columns()),
@@ -150,52 +152,97 @@ impl CteStatement {
     ) -> Option<ColumnDefinition> {
         match self {
             Self::Unresolved => None,
-            Self::Select(query) => {
-                let columns = query.result_columns();
-                let result = if let Some(index) = index {
-                    columns.get_column_at(index)
-                } else {
-                    columns.get_column_with_skip_count(column, skip)
-                };
-                result.map(|column| column.create_column_definition())
-            }
-            Self::Insert(insert) => {
-                let columns = insert.result_columns();
-                let result = if let Some(index) = index {
-                    columns.get_column_at(index)
-                } else {
-                    columns.get_column_with_skip_count(column, skip)
-                };
-                result.map(|column| column.create_column_definition())
-            }
-            Self::Update(update) => {
-                let columns = update.result_columns();
-                let result = if let Some(index) = index {
-                    columns.get_column_at(index)
-                } else {
-                    columns.get_column_with_skip_count(column, skip)
-                };
-                result.map(|column| column.create_column_definition())
-            }
-            Self::Merge(merge) => {
-                let columns = merge.result_columns();
-                let result = if let Some(index) = index {
-                    columns.get_column_at(index)
-                } else {
-                    columns.get_column_with_skip_count(column, skip)
-                };
-                result.map(|column| column.create_column_definition())
-            }
-            Self::Delete(delete) => {
-                let columns = delete.result_columns();
-                let result = if let Some(index) = index {
-                    columns.get_column_at(index)
-                } else {
-                    columns.get_column_with_skip_count(column, skip)
-                };
-                result.map(|column| column.create_column_definition())
-            }
+            Self::Select(query) => SelectStatement::resolved_column(column, index, skip, query),
+            Self::Insert(insert) => InsertStatement::resolved_column(column, index, skip, insert),
+            Self::Update(update) => UpdateStatement::resolved_column(column, index, skip, update),
+            Self::Merge(merge) => MergeStatement::resolved_column(column, index, skip, merge),
+            Self::Delete(delete) => DeleteStatement::resolved_column(column, index, skip, delete),
         }
+    }
+}
+
+impl DeleteStatement {
+    fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        delete: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = delete.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
+}
+
+impl MergeStatement {
+    fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        merge: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = merge.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
+}
+
+impl UpdateStatement {
+    fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        update: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = update.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
+}
+
+impl InsertStatement {
+    fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        insert: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = insert.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
+}
+
+impl SelectStatement {
+    fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        query: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = query.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
     }
 }
 
@@ -219,7 +266,7 @@ impl WithClause {
     pub(crate) fn resolve_name(
         &self,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
+        name: &FullName,
     ) -> Option<&CteName> {
         if name.schema().is_some() || name.catalog().is_some() {
             return None;
@@ -274,10 +321,10 @@ impl WithClause {
 }
 
 impl CteStatement {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         match self {
             Self::Unresolved => {}
             Self::Select(query) => query.walk(visitor)?,
@@ -291,10 +338,10 @@ impl CteStatement {
 }
 
 impl WithClause {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         for (name, query) in &mut self.0 {
             query.walk(visitor)?;
             visitor.cte(name);

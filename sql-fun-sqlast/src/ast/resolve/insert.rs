@@ -1,14 +1,18 @@
-use crate::ast::{
-    Alias, Assignment, Conflict, ConflictAction, Dialect, Expr, Insert, Name, OverridingKind,
-    Query, QueryBody,
-};
-use crate::sem::ResolutionFailure;
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause,
-    InsertClauseSemantics, InsertClauseValues, InsertConflict, InsertDestination, InsertSource,
-    InsertStatement, InsertTarget, InsertTargetCollection, InsertValue, InsertValueCollection,
-    ParseContext, ResultColumnCollection, ScalarAnalysisContext, SelectStatement, TableName,
-    WithClause,
+use crate::{
+    ast::{
+        Alias, Assignment, Conflict, ConflictAction, Dialect, Expr, IndexExpression, Insert, Name,
+        OverridingKind, Query, QueryBody,
+    },
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnName, DataSource,
+        FromClause, InsertArbiterLookup, InsertClauseSemantics, InsertClauseValues, InsertConflict,
+        InsertConstraintLookup, InsertDestination, InsertInferenceModifiers, InsertSource,
+        InsertStatement, InsertTarget, InsertTargetCollection, InsertValue, InsertValueCollection,
+        PgBuiltInType, ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext,
+        SelectStatement, SemScalarExpr, TableName, ViewName, ViewWriteEvaluation, WithClause,
+        parameter_resolution::ParameterResolution, problem::InsertProblemKind,
+    },
 };
 
 impl Insert {
@@ -25,11 +29,7 @@ impl Insert {
                 self.columns.is_empty() && context.dialect() == Dialect::postgres();
             let expanded = if context.parameter_inference_needed() {
                 let (constraints, changed) =
-                    crate::sem::parameter_resolution::ParameterResolution::infer_insert(
-                        &mut statement,
-                        context,
-                        implicit_targets,
-                    )?;
+                    ParameterResolution::infer_insert(&mut statement, context, implicit_targets)?;
                 context.set_parameter_constraints(&constraints);
                 changed
             } else {
@@ -80,7 +80,7 @@ impl Insert {
                     .is_some_and(|support| !support.can_assign(name))
             {
                 context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::read_only_target(),
+                    InsertProblemKind::read_only_target(),
                     &format!("view column {name} does not accept assignments"),
                 ))?;
             }
@@ -95,7 +95,7 @@ impl Insert {
                 let key = support.assignment_column(name);
                 if seen.contains(&key) {
                     context.report_analysis_problem(AnalysisProblem::insert(
-                        crate::sem::problem::InsertProblemKind::duplicate_target(),
+                        InsertProblemKind::duplicate_target(),
                         "underlying column is assigned more than once",
                     ))?;
                 }
@@ -143,7 +143,7 @@ impl Insert {
         };
         if !table.is_writable() {
             context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::read_only_target(),
+                InsertProblemKind::read_only_target(),
                 "destination view does not support INSERT",
             ))?;
             return Err(ResolutionFailure::reported());
@@ -151,14 +151,14 @@ impl Insert {
         if let Some(support) = table.view_support() {
             if !self.returning.is_empty() && !support.supports_returning() {
                 context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::view_operation(),
+                    InsertProblemKind::view_operation(),
                     "destination view does not support INSERT RETURNING",
                 ))?;
                 return Err(ResolutionFailure::reported());
             }
             if self.conflict.is_some() && !support.supports_on_conflict() {
                 context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::view_operation(),
+                    InsertProblemKind::view_operation(),
                     "destination view does not support ON CONFLICT",
                 ))?;
                 return Err(ResolutionFailure::reported());
@@ -414,7 +414,7 @@ impl InsertTargetCollection {
                     let key = support.assignment_column(name);
                     if seen.contains(&key) {
                         context.report_analysis_problem(AnalysisProblem::insert(
-                            crate::sem::problem::InsertProblemKind::duplicate_target(),
+                            InsertProblemKind::duplicate_target(),
                             "underlying column is assigned more than once",
                         ))?;
                     }
@@ -435,7 +435,7 @@ impl InsertTargetCollection {
                     })
                 {
                     context.report_analysis_problem(AnalysisProblem::insert(
-                        crate::sem::problem::InsertProblemKind::duplicate_target(),
+                        InsertProblemKind::duplicate_target(),
                         &format!("column {} is assigned more than once", assignment.name),
                     ))?;
                 }
@@ -467,7 +467,7 @@ impl InsertTargetCollection {
                 && !table.can_assign(name)
             {
                 context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::read_only_target(),
+                    InsertProblemKind::read_only_target(),
                     &format!("view column {name} does not accept assignments"),
                 ))?;
             }
@@ -560,7 +560,7 @@ impl InsertTarget {
             && !defaults_only
         {
             context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::generated_target(),
+                InsertProblemKind::generated_target(),
                 "generated column accepts only DEFAULT",
             ))?;
         }
@@ -572,7 +572,7 @@ impl InsertTarget {
             && !overrides_identity
         {
             context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::identity_target(),
+                InsertProblemKind::identity_target(),
                 "GENERATED ALWAYS identity requires DEFAULT or OVERRIDING",
             ))?;
         }
@@ -596,7 +596,7 @@ impl InsertSource {
             && !query.has_width(width)
         {
             context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::arity(),
+                InsertProblemKind::arity(),
                 "INSERT query branches must match destination column count",
             ))?;
         }
@@ -622,7 +622,7 @@ fn validate_insert_width(
 ) -> Result<(), ResolutionFailure> {
     if actual != expected {
         context.report_analysis_problem(AnalysisProblem::insert(
-            crate::sem::problem::InsertProblemKind::arity(),
+            InsertProblemKind::arity(),
             message,
         ))?;
     }
@@ -706,7 +706,7 @@ impl Conflict {
             && self.inference.is_empty()
         {
             context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::conflict_chain(),
+                InsertProblemKind::conflict_chain(),
                 "only the last SQLite UPSERT clause may omit its conflict target",
             ))?;
         }
@@ -723,16 +723,16 @@ impl Conflict {
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
-            && ty != crate::sem::PgBuiltInType::bool()
+            && ty != PgBuiltInType::bool()
             && !value
                 .as_const()
                 .is_some_and(|value| value.is_null() || value.as_string().is_some())
             && context
-                .get_implicit_cast(&ty, &crate::sem::PgBuiltInType::bool())
+                .get_implicit_cast(&ty, &PgBuiltInType::bool())
                 .is_none()
         {
             context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::conflict_predicate(),
+                InsertProblemKind::conflict_predicate(),
                 "ON CONFLICT predicate must have boolean type",
             ))?;
         }
@@ -744,26 +744,23 @@ impl Conflict {
         }
         conflict.set_modifiers(modifiers);
         if let Some(constraint) = &self.constraint {
-            let lookup = crate::sem::InsertConstraintLookup::new(
-                name,
-                constraint,
-                table.constraint(constraint),
-            );
+            let lookup =
+                InsertConstraintLookup::new(name, constraint, table.constraint(constraint));
             if !lookup.is_usable() {
                 context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::conflict_constraint(),
+                    InsertProblemKind::conflict_constraint(),
                     "ON CONFLICT constraint is not a unique or primary key constraint of the destination",
                 ))?;
             }
-            conflict.set_arbiter(crate::sem::InsertArbiterLookup::named(&lookup));
+            conflict.set_arbiter(InsertArbiterLookup::named(&lookup));
         }
         if !self.inference.is_empty() {
             let arbiters = if conflict.modifiers_are_bound() {
                 match if context
-                    .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+                    .get_view(&ViewName::from_full_name(name.full_name()))
                     .is_some()
                 {
-                    crate::sem::ViewWriteEvaluation::new(context)
+                    ViewWriteEvaluation::new(context)
                         .infer_arbiters(name, &conflict)?
                         .ok_or_else(ResolutionFailure::reported)?
                 } else {
@@ -780,10 +777,10 @@ impl Conflict {
             } else {
                 Vec::new()
             };
-            conflict.set_arbiter(crate::sem::InsertArbiterLookup::inferred(&arbiters));
+            conflict.set_arbiter(InsertArbiterLookup::inferred(&arbiters));
             if arbiters.is_empty() && conflict.modifiers_are_bound() {
                 context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::conflict_target(),
+                    InsertProblemKind::conflict_target(),
                     "ON CONFLICT target has no matching unique key",
                 ))?;
             }
@@ -808,11 +805,11 @@ impl OverridingKind {
     }
 }
 
-impl crate::ast::IndexExpression {
+impl IndexExpression {
     fn resolve_insert_modifiers(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<crate::sem::InsertInferenceModifiers, ResolutionFailure> {
+    ) -> Result<InsertInferenceModifiers, ResolutionFailure> {
         let mut names = Vec::new();
         if let Some(expression) = &self.expression {
             expression.collect_insert_collations(&mut names);
@@ -833,7 +830,7 @@ impl crate::ast::IndexExpression {
             lookup.report_insert_problem(context)?;
             Some(lookup)
         };
-        Ok(crate::sem::InsertInferenceModifiers::from_lookups(
+        Ok(InsertInferenceModifiers::from_lookups(
             collations,
             operator_class,
         ))
@@ -858,7 +855,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::SemScalarExpr, ResolutionFailure> {
+    ) -> Result<SemScalarExpr, ResolutionFailure> {
         match self {
             Self::Collate(collate) => collate.argument.resolve_insert_inference(context, scope),
             Self::Parenthesized(items) => match items.as_slice() {
@@ -869,15 +866,15 @@ impl Expr {
         }
     }
 }
-impl crate::sem::CatalogNameLookup {
+impl CatalogNameLookup {
     fn report_insert_problem(
         &self,
         context: &mut impl ParseContext,
     ) -> Result<(), ResolutionFailure> {
         let kind = if self.is_missing() {
-            Some(crate::sem::problem::InsertProblemKind::conflict_name_missing())
+            Some(InsertProblemKind::conflict_name_missing())
         } else if self.ambiguous_candidates().is_some() {
-            Some(crate::sem::problem::InsertProblemKind::conflict_name_ambiguous())
+            Some(InsertProblemKind::conflict_name_ambiguous())
         } else {
             None
         };

@@ -4,7 +4,8 @@ mod test_helpers {
 }
 
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType};
+use ::sql_fun_sqlast::context::ParseContext;
+use ::sql_fun_sqlast::sem::PgBuiltInType;
 use std::collections::BTreeMap;
 
 #[test]

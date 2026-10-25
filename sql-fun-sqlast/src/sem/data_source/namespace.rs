@@ -1,7 +1,7 @@
-use crate::sem::data_source::{AliasSpec, QualifiedSource};
 use crate::sem::{
     AliasName, AnalysisError, AnalysisProblem, ColumnName, DataSource, FullName, ParseContext,
     WithClause,
+    data_source::{AliasSpec, QualifiedSource},
 };
 use ::sql_fun_core::LookupResult;
 

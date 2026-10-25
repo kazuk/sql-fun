@@ -1,7 +1,8 @@
 use crate::{
     ast::TryFromWithTokens,
+    context::ParseContext,
     sem::{
-        AliasSpec, AnalysisError, DataSource, FromClause, FullName, Nullable, ParseContext,
+        AliasSpec, AnalysisError, DataSource, FromClause, FullName, Nullable,
         ScalarAnalysisContext, SemScalarExpr, WithClause, data_source::AliasName,
     },
     syn::ScanToken,

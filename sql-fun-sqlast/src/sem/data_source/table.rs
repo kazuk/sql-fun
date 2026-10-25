@@ -1,7 +1,10 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, TableName,
-    data_source::AliasName,
-    scalar_expr::{ColumnReferenceExpr, SystemColumnRef},
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, TableName,
+        data_source::AliasName,
+        scalar_expr::{ColumnReferenceExpr, SystemColumnRef},
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -14,7 +17,7 @@ impl TableDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         source: &'a DataSource,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         name: &crate::sem::FullName,
         alias: Option<&'a AliasSpec>,
     ) -> Option<super::QualifiedSource<'a>> {
@@ -55,7 +58,7 @@ impl TableDataSource {
         context: &TParseContext,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(table) = context.get_table(&self.name)
             && (self
@@ -83,7 +86,7 @@ impl TableDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let Some(table) = context.get_table(&self.name) else {
             AnalysisError::raise_unexpected_input(&format!(
@@ -148,7 +151,7 @@ impl TableDataSource {
     pub(super) fn typed_projection_record(
         &self,
         alias: &AliasName,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         index: usize,
     ) -> Option<crate::sem::WildcardTypedRecord> {
         crate::sem::WildcardTypedRecord::from_table(alias, &self.name, context, index)
@@ -171,7 +174,7 @@ impl TableDataSource {
 
     pub(super) fn bind_projection_ordinal(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         alias: &AliasName,
         column: &ColumnName,
         index: usize,
@@ -191,7 +194,7 @@ impl TableDataSource {
 impl TableDataSource {
     pub(super) fn projection_column_names(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
     ) -> Result<Vec<ColumnName>, AnalysisError> {
         let Some(table) = context.get_table(&self.name) else {
             return AnalysisError::raise_unexpected_input("star relation missing");

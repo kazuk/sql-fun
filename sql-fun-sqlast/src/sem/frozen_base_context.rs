@@ -21,7 +21,8 @@ use std::sync::Arc;
 ///
 /// ```
 /// use std::path::Path;
-/// use ::sql_fun_sqlast::sem::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext};
+/// use ::sql_fun_sqlast::sem::{BaseParseContext, FrozenBaseContext, SchemaFileContext};
+/// use ::sql_fun_sqlast::context::ParseContext;
 ///
 /// fn next_layer(builder: SchemaFileContext, args: &::sql_fun_core::SqlFunArgs, metadata: &::sql_fun_core::SqlFunMetadata) {
 ///     let frozen = builder.freeze();
@@ -37,7 +38,8 @@ use std::sync::Arc;
 /// Frozen handles expose no parsing mutators, even when owned uniquely:
 ///
 /// ```compile_fail
-/// use ::sql_fun_sqlast::sem::{FrozenBaseContext, ParseContext};
+/// use ::sql_fun_sqlast::sem::FrozenBaseContext;
+/// use ::sql_fun_sqlast::context::ParseContext;
 ///
 /// fn mutate_frozen(mut frozen: FrozenBaseContext) {
 ///     frozen.set_search_path(&[]);

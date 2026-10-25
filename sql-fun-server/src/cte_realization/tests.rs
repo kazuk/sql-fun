@@ -7,7 +7,7 @@ use ::sql_fun_core::PlaceholderedSql;
 use ::sql_fun_sqlast::{
     ParseStatementError, PlaceholderedSqlRenderError,
     ast::{AstMutationError, Dialect},
-    sem::ParseContext,
+    context::ParseContext,
 };
 
 #[rstest::rstest]

@@ -1,29 +1,34 @@
-use crate::ast::{DropBehavior, DropRule};
-use crate::sem::ResolutionFailure;
-use crate::sem::problem::RuleProblem;
-use crate::sem::{self, AnalysisError, FullName, ParseContext, RuleIdentity, SemAst, ViewName};
+use crate::{
+    AstAndContextPair,
+    ast::{DropBehavior, DropRule},
+    context::ParseContext,
+    sem::{
+        AnalysisError, DropDependencyBehavior, FullName, ResolutionFailure, RuleIdentity, SemAst,
+        ViewName, problem::RuleProblem,
+    },
+};
 
 impl DropRule {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<sem::DropRule>, AnalysisError> {
+    ) -> Result<Option<crate::sem::DropRule>, AnalysisError> {
         let result = self.resolve_definition(context);
         ResolutionFailure::finish(result, context)
     }
     fn resolve_definition(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::DropRule, ResolutionFailure> {
+    ) -> Result<crate::sem::DropRule, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let requested_target = self.relation.full_name()?;
         let behavior = match self.behavior {
-            DropBehavior::Cascade => sem::DropDependencyBehavior::cascade(),
-            DropBehavior::Restrict => sem::DropDependencyBehavior::restrict(),
+            DropBehavior::Cascade => DropDependencyBehavior::cascade(),
+            DropBehavior::Restrict => DropDependencyBehavior::restrict(),
         };
         let Some(target) = context.resolve_relation_name(&requested_target) else {
             if self.if_exists {
-                return Ok(sem::DropRule::new(
+                return Ok(crate::sem::DropRule::new(
                     &requested,
                     &requested_target,
                     None,
@@ -44,8 +49,8 @@ impl DropRule {
         requested: &FullName,
         requested_target: &FullName,
         target: &FullName,
-        behavior: sem::DropDependencyBehavior,
-    ) -> Result<sem::DropRule, ResolutionFailure> {
+        behavior: DropDependencyBehavior,
+    ) -> Result<crate::sem::DropRule, ResolutionFailure> {
         let identity = RuleIdentity::new(target, requested.name().as_str());
         let found = context.rule(&identity).is_some();
         if identity.name().name().as_str() == "_RETURN"
@@ -61,7 +66,7 @@ impl DropRule {
         if !found && !self.if_exists {
             return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
         }
-        Ok(sem::DropRule::new(
+        Ok(crate::sem::DropRule::new(
             requested,
             requested_target,
             Some(&identity),
@@ -73,15 +78,15 @@ impl DropRule {
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,
         mut context: C,
-    ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
+    ) -> Result<AstAndContextPair<C>, AnalysisError> {
         let Some(definition) = self.resolve(&mut context)? else {
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         };
         let context = definition.apply(context)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::drop_rule(&definition),
             context,
         ))

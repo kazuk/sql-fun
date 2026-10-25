@@ -1,6 +1,9 @@
-use crate::sem::{
-    AliasName, AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, ColumnName,
-    FullName, ParseContext, QueryProblem, SemScalarExpr, TypeDefinition, TypeReference,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasName, AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, ColumnName,
+        FullName, QueryProblem, SemScalarExpr, TypeDefinition, TypeReference,
+    },
 };
 
 /// A whole-row value retains a source occurrence rather than a fabricated column.

@@ -7,23 +7,32 @@ mod test_helpers;
 mod tests;
 
 use self::clauses::ClauseBinding;
-use crate::ast::{
-    Alias, Call, CallKind, CteBody, DerivedTable, Dialect, Expr, FromGroup, FromItem, Grouping,
-    Join, JoinKind, Lock, Merge, Name, Order, Query, QueryBody, Relation, Select, SetOperation,
-    SetQuery, TableFunctions, TypedColumn, Window, With,
-};
-use crate::sem::ColumnName;
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, CteStatement, DataSource, FromClause,
-    JoinKind as SemanticJoinKind, ParseContext, ResultColumnCollection, ScalarAnalysisContext,
-    SelectStatement, SelectStatementNode, WithClause,
+
+use crate::{
+    ast::{
+        Alias, Call, CallKind, CteBody, Delete, DerivedTable, Dialect, Expr, FromGroup, FromItem,
+        Grouping, Insert, Into, Join, JoinKind, Lock, Merge, Name, Order, Query, QueryBody,
+        Relation, Select, SetOperation, SetQuery, TableFunctions, Target, TypeName, TypedColumn,
+        Update, Window, With,
+    },
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteStatement, DataSource,
+        DataSourceRowsFromFunc, FromClause, FunctionModifiers, JoinKind as SemanticJoinKind,
+        JoinUsingClause, QueryCte, QueryGrouping, QueryWindow, ResultColumnCollection,
+        ScalarAnalysisContext, SelectClauses, SelectDestination, SelectStatement,
+        SelectStatementNode, SemScalarExpr, SemanticQuery, TableFunctionOutput, WithClause,
+        problem::{
+            DeleteProblemKind, InsertProblemKind, QueryProblem, RuleProblem, UpdateProblemKind,
+        },
+    },
 };
 
 impl Query {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<SelectStatement, crate::sem::AnalysisError> {
+    ) -> Result<SelectStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None);
         let result = context.infer_query_parameter_types(result);
@@ -97,8 +106,7 @@ impl Query {
         let offset = Expr::resolve_optional(&self.offset, context, &row_scope)?;
         let locks = Lock::resolve_list(&self.locks, context, &scope)?;
         let local = self.with.local_definitions(with);
-        let mut query =
-            crate::sem::SemanticQuery::new(local, self.with.recursive, body, order, limit, offset);
+        let mut query = SemanticQuery::new(local, self.with.recursive, body, order, limit, offset);
         query.set_modifiers(self.with_ties, self.body.set_all(), locks);
         let mut query = SelectStatement::query(query);
         query.complete_grouping(context)?;
@@ -109,7 +117,7 @@ impl Query {
 #[cfg(test)]
 mod test_name_resolution_phase {
     use crate::ast::{Dialect, StatementNode};
-    use crate::sem::ParseContext;
+    use crate::context::ParseContext;
     use crate::sem::{BinaryOperatorDefinition, OperatorDefinition, OperatorName, PgBuiltInType};
     use crate::test_helpers::TestParseContext;
 
@@ -225,12 +233,10 @@ impl Select {
             && let Some(scope) = outer
             && let Some(identity) = scope.rule_identity()
         {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                &crate::sem::problem::RuleProblem::definition(
-                    identity,
-                    "SELECT INTO is not allowed in rule actions",
-                ),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::definition(
+                identity,
+                "SELECT INTO is not allowed in rule actions",
+            )))?;
         }
         Ok(())
     }
@@ -270,7 +276,7 @@ impl Select {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<crate::sem::QueryWindow>, AnalysisError> {
+    ) -> Result<Vec<QueryWindow>, AnalysisError> {
         Window::resolve_definitions(&self.windows, context, scope)
     }
 
@@ -278,7 +284,7 @@ impl Select {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<crate::sem::SemScalarExpr>, AnalysisError> {
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         Expr::resolve_optional(
             &self.predicate,
             context,
@@ -305,7 +311,7 @@ impl Select {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         results: &ResultColumnCollection,
-    ) -> Result<Option<Vec<crate::sem::SemScalarExpr>>, AnalysisError> {
+    ) -> Result<Option<Vec<SemScalarExpr>>, AnalysisError> {
         let distinct = if let Some(distinct) = &self.distinct {
             let mut resolved = Vec::new();
             for expression in distinct {
@@ -329,7 +335,7 @@ impl Select {
         scope: &mut ScalarAnalysisContext<'_>,
         results: &mut ResultColumnCollection,
         query_id: usize,
-    ) -> Result<Vec<crate::sem::QueryGrouping>, AnalysisError> {
+    ) -> Result<Vec<QueryGrouping>, AnalysisError> {
         if context.dialect() == Dialect::sqlite() {
             scope.set_output_aliases(results);
         }
@@ -348,19 +354,18 @@ impl Select {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<crate::sem::SemScalarExpr>, AnalysisError> {
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         Expr::resolve_optional(&self.having, context, scope)
     }
 
     fn resolve_clauses(
         &self,
-        distinct: Option<Vec<crate::sem::SemScalarExpr>>,
-        group: Vec<crate::sem::QueryGrouping>,
-        having: Option<crate::sem::SemScalarExpr>,
-        windows: Vec<crate::sem::QueryWindow>,
-    ) -> Result<crate::sem::SelectClauses, AnalysisError> {
-        let mut clauses =
-            crate::sem::SelectClauses::new(distinct, group, self.group_distinct, having, windows);
+        distinct: Option<Vec<SemScalarExpr>>,
+        group: Vec<QueryGrouping>,
+        having: Option<SemScalarExpr>,
+        windows: Vec<QueryWindow>,
+    ) -> Result<SelectClauses, AnalysisError> {
+        let mut clauses = SelectClauses::new(distinct, group, self.group_distinct, having, windows);
         let destination = self
             .into
             .as_ref()
@@ -373,8 +378,8 @@ impl Select {
     fn build_result(
         results: ResultColumnCollection,
         from: FromClause,
-        predicate: Option<crate::sem::SemScalarExpr>,
-        clauses: crate::sem::SelectClauses,
+        predicate: Option<SemScalarExpr>,
+        clauses: SelectClauses,
     ) -> SelectStatement {
         SelectStatement::from(SelectStatementNode::from_resolution(
             results,
@@ -386,7 +391,7 @@ impl Select {
     }
 }
 
-impl crate::ast::Target {
+impl Target {
     fn append_to_results(
         &self,
         context: &mut impl ParseContext,
@@ -439,7 +444,7 @@ impl crate::ast::Target {
         }
         if !source_found {
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::problem::QueryProblem::reference_not_found("star source"),
+                QueryProblem::reference_not_found("star source"),
             ))?;
         }
         projection.append_results(context, scope, results, self.location, None)?;
@@ -451,14 +456,11 @@ impl crate::ast::Target {
 mod wildcard_tests;
 
 impl With {
-    pub(in crate::ast) fn local_definitions(
-        &self,
-        mut visible: WithClause,
-    ) -> Vec<crate::sem::QueryCte> {
+    pub(in crate::ast) fn local_definitions(&self, mut visible: WithClause) -> Vec<QueryCte> {
         let mut local = Vec::new();
         for entry in &self.entries {
             if let Some(statement) = visible.take(&entry.name) {
-                local.push(crate::sem::QueryCte::new(
+                local.push(QueryCte::new(
                     &entry.name,
                     entry.column_names(),
                     entry.materialized,
@@ -482,10 +484,7 @@ impl With {
                 && matches!(entry.name.as_str(), "old" | "new")
             {
                 context.report_analysis_problem(AnalysisProblem::rule(
-                    &crate::sem::problem::RuleProblem::definition(
-                        identity,
-                        "CTE conflicts with rule OLD/NEW namespace",
-                    ),
+                    &RuleProblem::definition(identity, "CTE conflicts with rule OLD/NEW namespace"),
                 ))?;
             }
             entry.body.require_data_modifying_placement(
@@ -511,70 +510,115 @@ impl CteBody {
         columns: &[String],
     ) -> Result<CteStatement, AnalysisError> {
         match self {
-            Self::Query(query) => {
-                let mut query = query.resolve_in(context, Some(scope))?;
-                query.rename_columns(columns);
-                Ok(CteStatement::from_query(query))
-            }
-            Self::Insert(insert) => {
-                if context.dialect() == Dialect::sqlite() {
-                    return AnalysisError::raise_unexpected_input("SQLite INSERT CTE");
-                }
-                let Some(mut insert) = insert.resolve_in(context, Some(scope))? else {
-                    return Ok(CteStatement::unresolved());
-                };
-                if columns.len() > insert.result_columns().len() {
-                    context.report_analysis_problem(AnalysisProblem::insert(
-                        crate::sem::problem::InsertProblemKind::cte_aliases(),
-                        "INSERT CTE has more column aliases than RETURNING columns",
-                    ))?;
-                }
-                insert.rename_columns(columns);
-                Ok(CteStatement::from_insert(insert))
-            }
-            Self::Update(update) => {
-                if context.dialect() == Dialect::sqlite() {
-                    return AnalysisError::raise_unexpected_input("SQLite UPDATE CTE");
-                }
-                let Some(mut update) = update.resolve_in(context, Some(scope))? else {
-                    return Ok(CteStatement::unresolved());
-                };
-                if columns.len() > update.result_columns().len() {
-                    context.report_analysis_problem(AnalysisProblem::update(
-                        crate::sem::problem::UpdateProblemKind::cte_aliases(),
-                        "UPDATE CTE has more aliases than outputs",
-                    ))?;
-                }
-                update.rename_columns(columns);
-                Ok(CteStatement::from_update(update))
-            }
-            Self::Delete(delete) => {
-                if context.dialect() == Dialect::sqlite() {
-                    context.report_analysis_problem(AnalysisProblem::delete(
-                        crate::sem::problem::DeleteProblemKind::sqlite_cte(),
-                    ))?;
-                }
-                let mut delete = delete.resolve_in(context, Some(scope))?;
-                if columns.len() > delete.result_columns().len() {
-                    context.report_analysis_problem(AnalysisProblem::delete(
-                        crate::sem::problem::DeleteProblemKind::cte_aliases(),
-                    ))?;
-                }
-                delete.rename_columns(columns);
-                Ok(CteStatement::from_delete(&delete))
-            }
-            Self::Merge(merge) => {
-                Merge::require_version(context, 17)?;
-                let mut merge = merge.resolve_in(context, Some(scope))?;
-                if columns.len() > merge.result_columns().len() {
-                    return Err(AnalysisError::unexpected_input_error(
-                        "MERGE CTE declares more aliases than RETURNING columns",
-                    ));
-                }
-                merge.rename_columns(columns);
-                Ok(CteStatement::from_merge(merge))
-            }
+            Self::Query(query) => Query::resolve_cte_body(context, scope, columns, query),
+            Self::Insert(insert) => Insert::resolve_cte_body(context, scope, columns, insert),
+            Self::Update(update) => Update::resolve_cte_body(context, scope, columns, update),
+            Self::Delete(delete) => Delete::resolve_cte_body(context, scope, columns, delete),
+            Self::Merge(merge) => Merge::resolve_cte_body(context, scope, columns, merge),
         }
+    }
+}
+
+impl Merge {
+    fn resolve_cte_body(
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        columns: &[String],
+        merge: &Self,
+    ) -> Result<CteStatement, AnalysisError> {
+        Self::require_version(context, 17)?;
+        let mut merge = merge.resolve_in(context, Some(scope))?;
+        if columns.len() > merge.result_columns().len() {
+            return Err(AnalysisError::unexpected_input_error(
+                "MERGE CTE declares more aliases than RETURNING columns",
+            ));
+        }
+        merge.rename_columns(columns);
+        Ok(CteStatement::from_merge(merge))
+    }
+}
+
+impl Delete {
+    fn resolve_cte_body(
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        columns: &[String],
+        delete: &Self,
+    ) -> Result<CteStatement, AnalysisError> {
+        if context.dialect() == Dialect::sqlite() {
+            context.report_analysis_problem(AnalysisProblem::delete(
+                DeleteProblemKind::sqlite_cte(),
+            ))?;
+        }
+        let mut delete = delete.resolve_in(context, Some(scope))?;
+        if columns.len() > delete.result_columns().len() {
+            context.report_analysis_problem(AnalysisProblem::delete(
+                DeleteProblemKind::cte_aliases(),
+            ))?;
+        }
+        delete.rename_columns(columns);
+        Ok(CteStatement::from_delete(&delete))
+    }
+}
+
+impl Update {
+    fn resolve_cte_body(
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        columns: &[String],
+        update: &Self,
+    ) -> Result<CteStatement, AnalysisError> {
+        if context.dialect() == Dialect::sqlite() {
+            return AnalysisError::raise_unexpected_input("SQLite UPDATE CTE");
+        }
+        let Some(mut update) = update.resolve_in(context, Some(scope))? else {
+            return Ok(CteStatement::unresolved());
+        };
+        if columns.len() > update.result_columns().len() {
+            context.report_analysis_problem(AnalysisProblem::update(
+                UpdateProblemKind::cte_aliases(),
+                "UPDATE CTE has more aliases than outputs",
+            ))?;
+        }
+        update.rename_columns(columns);
+        Ok(CteStatement::from_update(update))
+    }
+}
+
+impl Insert {
+    fn resolve_cte_body(
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        columns: &[String],
+        insert: &Self,
+    ) -> Result<CteStatement, AnalysisError> {
+        if context.dialect() == Dialect::sqlite() {
+            return AnalysisError::raise_unexpected_input("SQLite INSERT CTE");
+        }
+        let Some(mut insert) = insert.resolve_in(context, Some(scope))? else {
+            return Ok(CteStatement::unresolved());
+        };
+        if columns.len() > insert.result_columns().len() {
+            context.report_analysis_problem(AnalysisProblem::insert(
+                InsertProblemKind::cte_aliases(),
+                "INSERT CTE has more column aliases than RETURNING columns",
+            ))?;
+        }
+        insert.rename_columns(columns);
+        Ok(CteStatement::from_insert(insert))
+    }
+}
+
+impl Query {
+    fn resolve_cte_body(
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        columns: &[String],
+        query: &Self,
+    ) -> Result<CteStatement, AnalysisError> {
+        let mut query = query.resolve_in(context, Some(scope))?;
+        query.rename_columns(columns);
+        Ok(CteStatement::from_query(query))
     }
 }
 
@@ -637,7 +681,7 @@ impl FromItem {
 }
 
 impl Join {
-    fn using_clause(&self) -> Option<crate::sem::JoinUsingClause> {
+    fn using_clause(&self) -> Option<JoinUsingClause> {
         if self.using.is_empty() {
             return None;
         }
@@ -645,7 +689,7 @@ impl Join {
         for column in &self.using {
             columns.push(ColumnName::from(column.as_str()));
         }
-        Some(crate::sem::JoinUsingClause::new(
+        Some(JoinUsingClause::new(
             &columns,
             &self.using_alias.as_ref().map(Alias::resolve),
         ))
@@ -664,8 +708,8 @@ impl TypedColumns<'_> {
     fn resolve_function_output(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<crate::sem::TableFunctionOutput, AnalysisError> {
-        let mut output = crate::sem::TableFunctionOutput::default();
+    ) -> Result<TableFunctionOutput, AnalysisError> {
+        let mut output = TableFunctionOutput::default();
         for column in self.0 {
             let collation = column.collation.as_ref().map(Name::full_name).transpose()?;
             output.declare(
@@ -707,7 +751,7 @@ impl TableFunctions {
                     .expression
                     .resolve_table_call(context, scope, None)?;
                 source.apply_function_output(context, output)?;
-                functions.push(crate::sem::DataSourceRowsFromFunc::invocation(&source));
+                functions.push(DataSourceRowsFromFunc::invocation(&source));
             }
             let alias = self.alias.as_ref().map(Alias::resolve).unwrap_or_else(|| {
                 AliasSpec::from_local_name(
@@ -751,7 +795,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::DataSourceRowsFromFunc, crate::sem::AnalysisError> {
+    ) -> Result<DataSourceRowsFromFunc, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_rows_call(context, scope);
         context.finish_analysis(result)
@@ -760,7 +804,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::DataSourceRowsFromFunc, AnalysisError> {
+    ) -> Result<DataSourceRowsFromFunc, AnalysisError> {
         match self {
             Self::Call(call) => {
                 call.kind.require_table_function()?;
@@ -768,13 +812,9 @@ impl Expr {
                 if call.defers_function_signature() {
                     let mut function = call.resolve_supplied_call(context, &arguments)?;
                     function.set_modifiers(call.resolve_modifiers(context, scope)?);
-                    return Ok(crate::sem::DataSourceRowsFromFunc::deferred(&function));
+                    return Ok(DataSourceRowsFromFunc::deferred(&function));
                 }
-                crate::sem::DataSourceRowsFromFunc::resolve(
-                    context,
-                    &call.name.full_name()?,
-                    &arguments,
-                )
+                DataSourceRowsFromFunc::resolve(context, &call.name.full_name()?, &arguments)
             }
             Self::SqlValue(_) => todo!("ROWS FROM expression analysis"),
             _ => AnalysisError::raise_unexpected_input("ROWS FROM expression"),
@@ -861,7 +901,7 @@ impl FromItem {
         items: &[Self],
         context: &mut impl ParseContext,
         with: &WithClause,
-    ) -> Result<FromClause, crate::sem::AnalysisError> {
+    ) -> Result<FromClause, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = Self::resolve_list_in(items, context, with, None);
         context.finish_analysis(result)
@@ -871,7 +911,7 @@ impl FromItem {
         context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
-    ) -> Result<DataSource, crate::sem::AnalysisError> {
+    ) -> Result<DataSource, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve(context, with, preceding, None);
         context.finish_analysis(result)
@@ -881,7 +921,7 @@ impl With {
     pub(crate) fn resolve_with(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<WithClause, crate::sem::AnalysisError> {
+    ) -> Result<WithClause, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve(context, None);
         context.finish_analysis(result)
@@ -1041,7 +1081,7 @@ impl Call {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::FunctionModifiers, AnalysisError> {
+    ) -> Result<FunctionModifiers, AnalysisError> {
         let columns = ResultColumnCollection::default();
         let order =
             Order::resolve_list(&self.order, context, scope, &columns, ClauseBinding::Source)?;
@@ -1067,22 +1107,22 @@ impl Call {
         } else {
             (within_order, order)
         };
-        let mut modifiers = crate::sem::FunctionModifiers::new(within_order, order, filter, over);
+        let mut modifiers = FunctionModifiers::new(within_order, order, filter, over);
         modifiers.set_flags(self.distinct, self.star, self.variadic, self.within_group);
         Ok(modifiers)
     }
 }
 
-impl crate::ast::Into {
-    fn resolve_destination(&self) -> Result<crate::sem::SelectDestination, AnalysisError> {
-        Ok(crate::sem::SelectDestination::new(
+impl Into {
+    fn resolve_destination(&self) -> Result<SelectDestination, AnalysisError> {
+        Ok(SelectDestination::new(
             &self.relation.name.full_name()?,
             &self.relation.persistence,
         ))
     }
 }
 
-impl crate::ast::TypeName {
+impl TypeName {
     fn modifier_arguments(&self) -> Result<Vec<String>, AnalysisError> {
         use crate::ast::deparse::{SqlEmit, SqlWriter};
         let mut arguments = Vec::new();

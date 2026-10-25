@@ -1,20 +1,24 @@
 //! CREATE TRIGGER resolution consumes only the common syntax tree.
-use crate::ast::{
-    CreateTrigger, Dialect, StatementNode, TriggerBody, TriggerConstraint, TriggerEvent,
-    TriggerFunction, TriggerGranularity, TriggerTiming,
-};
-use crate::sem::ResolutionFailure;
-use crate::sem::problem::TriggerProblem;
-use crate::sem::{
-    self, AliasSpec, AnalysisError, ColumnName, DataSource, FromClause, FullName, ParseContext,
-    ScalarAnalysisContext, SemAst, WithClause,
+use crate::{
+    AstAndContextPair,
+    ast::{
+        CreateTrigger, Delete, Dialect, Expr, Insert, Literal, StatementNode, TriggerBody,
+        TriggerConstraint, TriggerEvent, TriggerFunction, TriggerGranularity, TriggerTiming,
+        Update,
+    },
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, ColumnName, DataSource, FromClause, FullName, PgBuiltInType,
+        ResolutionFailure, ScalarAnalysisContext, SchemaName, SemAst, SemScalarExpr, ViewLike,
+        WithClause, problem::TriggerProblem, traversal::SemanticVisitor,
+    },
 };
 
 impl CreateTrigger {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<sem::CreateTrigger>, AnalysisError> {
+    ) -> Result<Option<crate::sem::CreateTrigger>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context).and_then(|definition| {
             if context.parameter_inference_needed() {
@@ -37,15 +41,15 @@ impl CreateTrigger {
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,
         mut context: C,
-    ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
+    ) -> Result<AstAndContextPair<C>, AnalysisError> {
         let Some(definition) = self.resolve(&mut context)? else {
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         };
         let context = definition.apply(context)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::create_trigger(&definition),
             context,
         ))
@@ -53,7 +57,7 @@ impl CreateTrigger {
     fn resolve_in(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::CreateTrigger, ResolutionFailure> {
+    ) -> Result<crate::sem::CreateTrigger, ResolutionFailure> {
         let target = self.resolve_target(context)?;
         let sqlite = context.dialect() == Dialect::sqlite();
         let timing = self.timing.unwrap_or(TriggerTiming::Before);
@@ -77,7 +81,7 @@ impl CreateTrigger {
             .transpose()?;
         let transitions = self.resolve_transitions(context, &target);
         let body = self.body.resolve(context, &scope)?;
-        let definition = sem::CreateTrigger::new(
+        let definition = crate::sem::CreateTrigger::new(
             &identity,
             &target,
             timing.semantic(),
@@ -97,7 +101,7 @@ impl CreateTrigger {
         &self,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<Vec<sem::TriggerEvent>, ResolutionFailure> {
+    ) -> Result<Vec<crate::sem::TriggerEvent>, ResolutionFailure> {
         let mut events = Vec::new();
         for event in &self.events {
             events.push(event.resolve(context, target)?);
@@ -150,7 +154,7 @@ impl CreateTrigger {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         target: &FullName,
-    ) -> Result<Option<sem::SemScalarExpr>, ResolutionFailure> {
+    ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
         let mut predicate = self
             .predicate
             .as_ref()
@@ -162,20 +166,15 @@ impl CreateTrigger {
             if self
                 .predicate
                 .as_ref()
-                .is_some_and(crate::ast::Expr::untyped_trigger_predicate)
+                .is_some_and(Expr::untyped_trigger_predicate)
             {
-                *predicate =
-                    sem::SemScalarExpr::wrap_implicit_cast(&sem::PgBuiltInType::bool(), predicate);
+                *predicate = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::bool(), predicate);
             } else {
-                sem::SemScalarExpr::implicit_cast_resolved(
-                    context,
-                    &sem::PgBuiltInType::bool(),
-                    predicate,
-                )?;
+                SemScalarExpr::implicit_cast_resolved(context, &PgBuiltInType::bool(), predicate)?;
             }
             if predicate
                 .get_type()
-                .is_none_or(|ty| ty != sem::PgBuiltInType::bool())
+                .is_none_or(|ty| ty != PgBuiltInType::bool())
             {
                 return Self::invalid(target, "WHEN must have boolean type");
             }
@@ -198,10 +197,10 @@ impl CreateTrigger {
         &self,
         _context: &impl ParseContext,
         target: &FullName,
-    ) -> Vec<sem::TriggerTransition> {
+    ) -> Vec<crate::sem::TriggerTransition> {
         let mut transitions = Vec::new();
         for transition in &self.transitions {
-            transitions.push(sem::TriggerTransition::new(
+            transitions.push(crate::sem::TriggerTransition::new(
                 &transition.name,
                 transition.new,
                 target,
@@ -212,12 +211,12 @@ impl CreateTrigger {
     fn finish_definition(
         &self,
         context: &impl ParseContext,
-        mut definition: sem::CreateTrigger,
-        events: &[sem::TriggerEvent],
-        predicate: &Option<sem::SemScalarExpr>,
-        constraint: &Option<sem::TriggerConstraint>,
-        transitions: &[sem::TriggerTransition],
-    ) -> Result<sem::CreateTrigger, ResolutionFailure> {
+        mut definition: crate::sem::CreateTrigger,
+        events: &[crate::sem::TriggerEvent],
+        predicate: &Option<SemScalarExpr>,
+        constraint: &Option<crate::sem::TriggerConstraint>,
+        transitions: &[crate::sem::TriggerTransition],
+    ) -> Result<crate::sem::CreateTrigger, ResolutionFailure> {
         definition.set_event_semantics(events, predicate, constraint, transitions);
         definition.set_creation_mode(self.replace, self.if_not_exists, self.temporary);
         definition.retain_dependencies(context)?;
@@ -232,7 +231,7 @@ impl CreateTrigger {
             let schema = trigger
                 .schema()
                 .cloned()
-                .unwrap_or_else(|| sem::SchemaName::from("main"));
+                .unwrap_or_else(|| SchemaName::from("main"));
             if name.schema().is_none() {
                 name = name.set_schema(schema);
             }
@@ -243,7 +242,7 @@ impl CreateTrigger {
         context: &impl ParseContext,
         name: &FullName,
     ) -> Result<FullName, ResolutionFailure> {
-        sem::search_path::expand_search_path_inst(context, name, |key| {
+        crate::sem::search_path::expand_search_path_inst(context, name, |key| {
             if context.dialect() == Dialect::sqlite() {
                 return context.sqlite_relation_identity(key);
             }
@@ -259,7 +258,7 @@ impl CreateTrigger {
         &self,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<sem::TriggerIdentity, ResolutionFailure> {
+    ) -> Result<crate::sem::TriggerIdentity, ResolutionFailure> {
         let supplied = self.name.full_name()?;
         if context.dialect() == Dialect::postgres() {
             if supplied.schema().is_some() || supplied.catalog().is_some() {
@@ -273,15 +272,15 @@ impl CreateTrigger {
                 &target.schema().cloned(),
                 supplied.name(),
             );
-            Ok(sem::TriggerIdentity::postgres(target, &name))
+            Ok(crate::sem::TriggerIdentity::postgres(target, &name))
         } else {
             let schema = if self.temporary {
-                sem::SchemaName::from("temp")
+                SchemaName::from("temp")
             } else {
                 supplied
                     .schema()
                     .cloned()
-                    .unwrap_or_else(|| sem::SchemaName::from("main"))
+                    .unwrap_or_else(|| SchemaName::from("main"))
             };
             if self.temporary && supplied.schema().is_some() {
                 return Self::invalid(target, "TEMP trigger name cannot be schema qualified");
@@ -293,13 +292,15 @@ impl CreateTrigger {
             {
                 return Self::invalid(target, "trigger and target must use the same SQLite schema");
             }
-            Ok(sem::TriggerIdentity::sqlite(&supplied.set_schema(schema)))
+            Ok(crate::sem::TriggerIdentity::sqlite(
+                &supplied.set_schema(schema),
+            ))
         }
     }
     fn validate_identity(
         &self,
         context: &impl ParseContext,
-        identity: &sem::TriggerIdentity,
+        identity: &crate::sem::TriggerIdentity,
     ) -> Result<(), ResolutionFailure> {
         if let Some(existing) = context.trigger(identity)
             && !self.if_not_exists
@@ -325,7 +326,7 @@ impl CreateTrigger {
         granularity: TriggerGranularity,
     ) -> Result<(), ResolutionFailure> {
         let view = context.get_view_impl(target);
-        if view.is_some_and(sem::ViewLike::is_materialized) {
+        if view.is_some_and(ViewLike::is_materialized) {
             return Self::invalid(target, "materialized views cannot own triggers");
         }
         if self.events.is_empty() {
@@ -425,19 +426,19 @@ impl CreateTrigger {
 mod tests;
 
 impl TriggerTiming {
-    const fn semantic(self) -> sem::TriggerTiming {
+    const fn semantic(self) -> crate::sem::TriggerTiming {
         match self {
-            Self::Before => sem::TriggerTiming::before(),
-            Self::After => sem::TriggerTiming::after(),
-            Self::InsteadOf => sem::TriggerTiming::instead_of(),
+            Self::Before => crate::sem::TriggerTiming::before(),
+            Self::After => crate::sem::TriggerTiming::after(),
+            Self::InsteadOf => crate::sem::TriggerTiming::instead_of(),
         }
     }
 }
 impl TriggerGranularity {
-    const fn semantic(self) -> sem::TriggerGranularity {
+    const fn semantic(self) -> crate::sem::TriggerGranularity {
         match self {
-            Self::Row => sem::TriggerGranularity::row(),
-            Self::Statement => sem::TriggerGranularity::statement(),
+            Self::Row => crate::sem::TriggerGranularity::row(),
+            Self::Statement => crate::sem::TriggerGranularity::statement(),
         }
     }
 }
@@ -458,24 +459,27 @@ impl TriggerEvent {
         &self,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<sem::TriggerEvent, ResolutionFailure> {
+    ) -> Result<crate::sem::TriggerEvent, ResolutionFailure> {
         match self {
-            Self::Insert => Ok(sem::TriggerEvent::insert()),
-            Self::Delete => Ok(sem::TriggerEvent::delete()),
-            Self::Truncate => Ok(sem::TriggerEvent::truncate()),
+            Self::Insert => Ok(crate::sem::TriggerEvent::insert()),
+            Self::Delete => Ok(crate::sem::TriggerEvent::delete()),
+            Self::Truncate => Ok(crate::sem::TriggerEvent::truncate()),
             Self::Update(columns) => {
                 let mut resolved = Vec::new();
                 for name in columns {
                     let column = ColumnName::from(name.as_str());
-                    let definition = sem::CreateTrigger::column(context, target, &column);
+                    let definition = crate::sem::CreateTrigger::column(context, target, &column);
                     if definition.is_none() && context.dialect() == Dialect::postgres() {
                         return Err(ResolutionFailure::trigger(&TriggerProblem::column(
                             target, name,
                         )));
                     }
-                    resolved.push(sem::TriggerEventColumn::new(&column, definition.as_ref()));
+                    resolved.push(crate::sem::TriggerEventColumn::new(
+                        &column,
+                        definition.as_ref(),
+                    ));
                 }
-                Ok(sem::TriggerEvent::update(&resolved))
+                Ok(crate::sem::TriggerEvent::update(&resolved))
             }
         }
     }
@@ -484,13 +488,13 @@ impl TriggerConstraint {
     fn resolve(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::TriggerConstraint, ResolutionFailure> {
+    ) -> Result<crate::sem::TriggerConstraint, ResolutionFailure> {
         let relation = self
             .relation
             .as_ref()
             .map(|relation| CreateTrigger::relation(context, &relation.name.full_name()?))
             .transpose()?;
-        Ok(sem::TriggerConstraint::new(
+        Ok(crate::sem::TriggerConstraint::new(
             &relation,
             self.deferrable,
             self.initially_deferred,
@@ -502,15 +506,17 @@ impl TriggerBody {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<sem::TriggerBody, ResolutionFailure> {
+    ) -> Result<crate::sem::TriggerBody, ResolutionFailure> {
         match self {
-            Self::Function(function) => Ok(sem::TriggerBody::function(&function.resolve(context)?)),
+            Self::Function(function) => Ok(crate::sem::TriggerBody::function(
+                &function.resolve(context)?,
+            )),
             Self::Commands(commands) => {
                 let mut resolved = Vec::new();
                 for command in commands {
                     resolved.push(command.resolve_trigger_command(context, scope)?);
                 }
-                Ok(sem::TriggerBody::commands(&resolved))
+                Ok(crate::sem::TriggerBody::commands(&resolved))
             }
         }
     }
@@ -519,7 +525,7 @@ impl TriggerFunction {
     fn resolve(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::TriggerFunction, ResolutionFailure> {
+    ) -> Result<crate::sem::TriggerFunction, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let name = context.resolve_function_name_with_search_path(&requested);
         let overloads = context
@@ -546,7 +552,7 @@ impl TriggerFunction {
         if !context.function_preserves_view_rows(&name, candidate) {
             return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         }
-        Ok(sem::TriggerFunction::new(
+        Ok(crate::sem::TriggerFunction::new(
             &name,
             &self.arguments,
             return_type,
@@ -578,11 +584,11 @@ struct WhenValidator<'a, C> {
     context: &'a C,
     invalid: bool,
 }
-impl<C: ParseContext> sem::traversal::SemanticVisitor for WhenValidator<'_, C> {
+impl<C: ParseContext> SemanticVisitor for WhenValidator<'_, C> {
     fn enter_query(&mut self) {
         self.invalid = true;
     }
-    fn expression(&mut self, expression: &mut sem::SemScalarExpr) -> Result<(), AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if !expression.preserves_view_rows(self.context) {
             self.invalid = true;
         }
@@ -590,7 +596,11 @@ impl<C: ParseContext> sem::traversal::SemanticVisitor for WhenValidator<'_, C> {
     }
 }
 
-impl crate::ast::Relation {
+trait ValidateTriggerCommand {
+    fn validate_trigger_command(&self) -> Result<(), ResolutionFailure>;
+}
+
+impl ValidateTriggerCommand for crate::ast::Relation {
     fn validate_trigger_command(&self) -> Result<(), ResolutionFailure> {
         if self.name.0.len() != 1 || self.indexed.is_some() || self.not_indexed {
             return CreateTrigger::invalid(
@@ -601,7 +611,7 @@ impl crate::ast::Relation {
         Ok(())
     }
 }
-impl crate::ast::Insert {
+impl Insert {
     fn resolve_trigger_command(
         &self,
         context: &mut impl ParseContext,
@@ -623,7 +633,7 @@ impl crate::ast::Insert {
             .map_err(Into::into)
     }
 }
-impl crate::ast::Update {
+impl Update {
     fn resolve_trigger_command(
         &self,
         context: &mut impl ParseContext,
@@ -645,7 +655,7 @@ impl crate::ast::Update {
             .map_err(Into::into)
     }
 }
-impl crate::ast::Delete {
+impl Delete {
     fn resolve_trigger_command(
         &self,
         context: &mut impl ParseContext,
@@ -664,7 +674,7 @@ impl crate::ast::Delete {
     }
 }
 
-impl crate::ast::Expr {
+impl Expr {
     const fn untyped_trigger_predicate(&self) -> bool {
         match self {
             Self::Literal(literal) => literal.untyped_trigger_predicate(),
@@ -672,7 +682,7 @@ impl crate::ast::Expr {
         }
     }
 }
-impl crate::ast::Literal {
+impl Literal {
     const fn untyped_trigger_predicate(&self) -> bool {
         matches!(self, Self::Null | Self::String(_))
     }

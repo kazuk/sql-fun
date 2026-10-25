@@ -1,5 +1,6 @@
 use super::super::test_helpers::{output_type, table_function_query};
-use crate::sem::{ColumnReferenceExpr, ParseContext, PgBuiltInType, SemScalarExpr};
+use crate::context::ParseContext;
+use crate::sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr};
 
 #[test]
 fn typed_record_parameter_is_warning_free_in_the_controlled_context() {

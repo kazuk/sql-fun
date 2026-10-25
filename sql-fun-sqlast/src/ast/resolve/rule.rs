@@ -1,17 +1,20 @@
 //! PostgreSQL rule analysis over common syntax only.
-use crate::ast::{CreateRule, Dialect, RuleEvent, StatementNode};
-use crate::sem::ResolutionFailure;
-use crate::sem::problem::RuleProblem;
-use crate::sem::{
-    self, AliasSpec, AnalysisError, DataSource, FromClause, ParseContext, RuleIdentity,
-    ScalarAnalysisContext, SemAst, WithClause,
+use crate::{
+    ast::{CreateRule, Dialect, Expr, RuleEvent, StatementNode, SubqueryKind},
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, DataSource, FromClause, PgBuiltInType, ResolutionFailure,
+        ResultColumn, ResultColumnCollection, RuleIdentity, ScalarAnalysisContext, SemAst,
+        SemScalarExpr, TableName, TypeReference, ViewLike, ViewName, WithClause,
+        problem::RuleProblem, traversal::SemanticVisitor,
+    },
 };
 
 impl CreateRule {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<sem::CreateRule>, AnalysisError> {
+    ) -> Result<Option<crate::sem::CreateRule>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self
             .resolve_definition(context)
@@ -21,8 +24,8 @@ impl CreateRule {
     }
     fn validate_resolved(
         context: &impl ParseContext,
-        definition: sem::CreateRule,
-    ) -> Result<sem::CreateRule, ResolutionFailure> {
+        definition: crate::sem::CreateRule,
+    ) -> Result<crate::sem::CreateRule, ResolutionFailure> {
         if context.parameter_inference_needed() {
             return Self::invalid(
                 definition.identity(),
@@ -56,15 +59,15 @@ impl CreateRule {
     fn resolve_definition(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::CreateRule, ResolutionFailure> {
+    ) -> Result<crate::sem::CreateRule, ResolutionFailure> {
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let requested = self.relation.name.full_name()?;
         let target = context
             .resolve_relation_name(&requested)
             .ok_or_else(|| ResolutionFailure::rule(&RuleProblem::target(&requested)))?;
         if context
-            .get_view(&crate::sem::ViewName::from_full_name(&target))
-            .is_some_and(sem::ViewLike::is_materialized)
+            .get_view(&ViewName::from_full_name(&target))
+            .is_some_and(ViewLike::is_materialized)
         {
             return Err(ResolutionFailure::rule(&RuleProblem::target(&target)));
         }
@@ -94,7 +97,7 @@ impl CreateRule {
         for action in &self.actions {
             actions.push(action.resolve_rule_action(context, &scope, &identity)?);
         }
-        let mut definition = sem::CreateRule::new(
+        let mut definition = crate::sem::CreateRule::new(
             &identity,
             event,
             self.replace,
@@ -131,7 +134,7 @@ impl CreateRule {
         }
         if self.event == RuleEvent::Select {
             if context
-                .get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+                .get_view(&ViewName::from_full_name(identity.target()))
                 .is_none()
             {
                 return Self::invalid(identity, "ON SELECT requires an ordinary view");
@@ -159,22 +162,17 @@ impl CreateRule {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         identity: &RuleIdentity,
-    ) -> Result<Option<sem::SemScalarExpr>, ResolutionFailure> {
+    ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
         let Some(syntax) = &self.predicate else {
             return Ok(None);
         };
         let mut predicate = syntax.resolve_in(context, scope)?;
         if syntax.is_rule_boolean_literal() {
-            predicate =
-                sem::SemScalarExpr::wrap_implicit_cast(&sem::PgBuiltInType::bool(), &predicate);
+            predicate = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::bool(), &predicate);
         } else {
-            sem::SemScalarExpr::implicit_cast_resolved(
-                context,
-                &sem::PgBuiltInType::bool(),
-                &mut predicate,
-            )?;
+            SemScalarExpr::implicit_cast_resolved(context, &PgBuiltInType::bool(), &mut predicate)?;
         }
-        if predicate.get_type() != Some(sem::PgBuiltInType::bool()) {
+        if predicate.get_type() != Some(PgBuiltInType::bool()) {
             return Self::invalid(identity, "WHERE must have boolean type");
         }
         let mut validator = PredicateValidator::new(context);
@@ -190,7 +188,7 @@ impl CreateRule {
     fn validate_results(
         &self,
         context: &impl ParseContext,
-        definition: &sem::CreateRule,
+        definition: &crate::sem::CreateRule,
     ) -> Result<(), ResolutionFailure> {
         let mut returning = false;
         for action in definition.actions() {
@@ -217,21 +215,21 @@ impl CreateRule {
     fn check_columns(
         context: &impl ParseContext,
         identity: &RuleIdentity,
-        columns: &sem::ResultColumnCollection,
+        columns: &ResultColumnCollection,
         names: bool,
     ) -> Result<(), ResolutionFailure> {
         let mut index = 0;
         loop {
             let expected = if let Some(table) =
-                context.get_table(&crate::sem::TableName::from(identity.target().clone()))
+                context.get_table(&TableName::from(identity.target().clone()))
             {
                 table.get_column_at(index).cloned()
             } else if let Some(view) =
-                context.get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+                context.get_view(&ViewName::from_full_name(identity.target()))
             {
                 view.result_columns()
                     .get_column_at(index)
-                    .map(sem::ResultColumn::create_column_definition)
+                    .map(ResultColumn::create_column_definition)
             } else {
                 None
             };
@@ -245,8 +243,8 @@ impl CreateRule {
             } else {
                 None
             };
-            if expected_type.is_some_and(sem::TypeReference::rule_shape_needs_modifiers)
-                || actual_type.is_some_and(sem::TypeReference::rule_shape_needs_modifiers)
+            if expected_type.is_some_and(TypeReference::rule_shape_needs_modifiers)
+                || actual_type.is_some_and(TypeReference::rule_shape_needs_modifiers)
             {
                 return Self::invalid(
                     identity,
@@ -271,12 +269,12 @@ impl CreateRule {
 }
 
 impl RuleEvent {
-    const fn semantic(self) -> sem::RuleEvent {
+    const fn semantic(self) -> crate::sem::RuleEvent {
         match self {
-            Self::Select => sem::RuleEvent::select(),
-            Self::Insert => sem::RuleEvent::insert(),
-            Self::Update => sem::RuleEvent::update(),
-            Self::Delete => sem::RuleEvent::delete(),
+            Self::Select => crate::sem::RuleEvent::select(),
+            Self::Insert => crate::sem::RuleEvent::insert(),
+            Self::Update => crate::sem::RuleEvent::update(),
+            Self::Delete => crate::sem::RuleEvent::delete(),
         }
     }
 }
@@ -368,14 +366,14 @@ impl<'a, C> PredicateValidator<'a, C> {
         }
     }
 }
-impl<C: ParseContext> sem::traversal::SemanticVisitor for PredicateValidator<'_, C> {
+impl<C: ParseContext> SemanticVisitor for PredicateValidator<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }
     fn leave_query(&mut self) {
         self.depth -= 1;
     }
-    fn expression(&mut self, expression: &mut sem::SemScalarExpr) -> Result<(), AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if self.depth == 0 && !expression.preserves_view_rows(self.context) {
             self.invalid = true;
         }
@@ -383,7 +381,7 @@ impl<C: ParseContext> sem::traversal::SemanticVisitor for PredicateValidator<'_,
     }
 }
 
-impl crate::ast::SubqueryKind {
+impl SubqueryKind {
     pub(super) const fn pending_rule_semantics(self) -> Option<&'static str> {
         match self {
             Self::Scalar | Self::Array => None,
@@ -396,7 +394,7 @@ impl crate::ast::SubqueryKind {
     }
 }
 
-impl sem::TypeReference {
+impl TypeReference {
     fn rule_shape_needs_modifiers(&self) -> bool {
         if self.is_dynamic() {
             return false;
@@ -420,7 +418,7 @@ impl sem::TypeReference {
     }
 }
 
-impl crate::ast::Expr {
+impl Expr {
     const fn is_rule_boolean_literal(&self) -> bool {
         if let Self::Literal(literal) = self {
             literal.is_rule_boolean_literal()

@@ -2,11 +2,11 @@
 use super::{AlterDefinition, AlterOperation};
 use crate::{
     ast::{AlterCommand, AlterRelation, Expr, Literal, SyntaxOption, SyntaxValue},
+    context::ParseContext,
     sem::{
         AlterColumnAttributes, AlterObjSubCommand, AlterTable, AnalysisError, AnalysisProblem,
         ColumnAttributeAction, ColumnAttributeBinding, ColumnAttributeOption, ColumnName,
-        CreateTable, ParseContext, SemAst, SourcePathWithSpan, TableName,
-        problem::AlterColumnProblem,
+        CreateTable, SemAst, SourcePathWithSpan, TableName, problem::AlterColumnProblem,
     },
 };
 
@@ -78,7 +78,8 @@ impl AlterRelation {
 
 #[cfg(test)]
 mod test_applicability {
-    use crate::sem::{BaseParseContext, ParseContext};
+    use crate::ParseContext;
+    use crate::sem::BaseParseContext;
 
     #[test]
     fn discarded_diagnostics_cannot_make_rejected_ddl_applicable() -> testresult::TestResult {

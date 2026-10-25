@@ -1,8 +1,12 @@
-use crate::ast::{Dialect, Name, Target};
-use crate::sem::problem::{DeleteProblemKind, InsertProblemKind, UpdateProblemKind};
-use crate::sem::{
-    AliasName, AliasSpec, AnalysisError, AnalysisProblem, ColumnName, FromClause,
-    InsertDestination, ParseContext, ResultColumnCollection, ScalarAnalysisContext,
+use crate::{
+    ast::{Dialect, Name, Target},
+    context::ParseContext,
+    sem::{
+        AliasName, AliasSpec, AnalysisError, AnalysisProblem, ColumnName, FromClause,
+        InsertDestination, ResultColumnCollection, ScalarAnalysisContext, WildcardExpansion,
+        WildcardProjection,
+        problem::{DeleteProblemKind, InsertProblemKind, UpdateProblemKind},
+    },
 };
 
 impl ResultColumnCollection {
@@ -31,7 +35,7 @@ impl ResultColumnCollection {
                 }
                 context
                     .analysis_state_mut()
-                    .record_wildcard(crate::sem::WildcardExpansion::new(
+                    .record_wildcard(WildcardExpansion::new(
                         target.projection_location(),
                         &results,
                         first,
@@ -186,7 +190,7 @@ impl ResultColumnCollection {
 
     fn append_projection_columns(
         &mut self,
-        projection: crate::sem::WildcardProjection<'_>,
+        projection: WildcardProjection<'_>,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         location: Option<usize>,

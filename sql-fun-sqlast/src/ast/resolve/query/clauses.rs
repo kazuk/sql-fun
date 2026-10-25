@@ -1,11 +1,15 @@
-use crate::ast::{
-    Dialect, Expr, Frame, FrameBound, FrameExclusion, FrameMode, Grouping, Literal, Lock,
-    LockStrength, LockWait, Name, Order, Window,
-};
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, ParseContext, QueryFrame,
-    QueryFrameBound, QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder,
-    QueryProblem, QueryWindow, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
+use crate::{
+    ast::{
+        Dialect, Expr, Frame, FrameBound, FrameExclusion, FrameMode, Grouping, Literal, Lock,
+        LockStrength, LockWait, Name, Order, Window,
+    },
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, QueryFrame,
+        QueryFrameBound, QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder,
+        QueryProblem, QueryWindow, ResolvedOperator, ResultColumnCollection, ScalarAnalysisContext,
+        SemScalarExpr,
+    },
 };
 
 /// SQL92 alias/ordinal references are only accepted at a clause's top level.
@@ -152,8 +156,7 @@ impl Order {
             .resolve_clause(context, scope, columns, binding)?;
         let using = if let Some(name) = &self.using {
             let operator_name = name.operator_name()?;
-            let binding =
-                crate::sem::ResolvedOperator::resolve(context, &operator_name, true, true);
+            let binding = ResolvedOperator::resolve(context, &operator_name, true, true);
             Self::checked_name(context, &name.0.join("."), binding.resolution().clone())?;
             Some(binding)
         } else {

@@ -1,5 +1,10 @@
-use crate::sem::{
-    AlterView, AnalysisError, ColumnDefinition, ColumnName, CreateTableAs, CreateView,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AlterView, AnalysisError, ColumnDefinition, ColumnName, CreateTableAs, CreateView,
+        FullName, OwnerSpecification, ResultColumnCollection, RuleIdentity, RuleReferences,
+        SelectStatement, TriggerReferences,
+    },
 };
 
 /// view like object
@@ -13,7 +18,7 @@ pub enum ViewLike {
 
 impl ViewLike {
     /// Ordinary View semantic definition; materialized views have a different definition.
-    pub fn ordinary_definition(&self) -> Option<&crate::sem::CreateView> {
+    pub fn ordinary_definition(&self) -> Option<&CreateView> {
         if let Self::View(view) = self {
             Some(view)
         } else {
@@ -21,10 +26,7 @@ impl ViewLike {
         }
     }
 
-    pub(crate) fn with_rule_query(
-        &self,
-        query: &crate::sem::SelectStatement,
-    ) -> Option<CreateView> {
+    pub(crate) fn with_rule_query(&self, query: &SelectStatement) -> Option<CreateView> {
         if let Self::View(view) = self {
             let mut view = view.as_ref().clone();
             view.replace_rule_query(query);
@@ -35,32 +37,32 @@ impl ViewLike {
     }
 
     /// Rule links of an ordinary view; materialized views cannot own user rules.
-    pub fn rules(&self) -> Option<&crate::sem::RuleReferences> {
+    pub fn rules(&self) -> Option<&RuleReferences> {
         match self {
             Self::View(view) => Some(view.rules()),
             Self::MaterializedView(_) => None,
         }
     }
-    pub(crate) fn associate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+    pub(crate) fn associate_rule(&mut self, identity: &RuleIdentity) {
         if let Self::View(view) = self {
             view.associate_rule(identity);
         }
     }
-    pub(crate) fn dissociate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+    pub(crate) fn dissociate_rule(&mut self, identity: &RuleIdentity) {
         if let Self::View(view) = self {
             view.dissociate_rule(identity);
         }
     }
 
     /// Ownership of the retained view or materialized-view definition.
-    pub fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub fn owner(&self) -> Option<&OwnerSpecification> {
         match self {
             Self::View(view) => view.owner(),
             Self::MaterializedView(view) => view.owner(),
         }
     }
     /// Replace ownership, preserving all view data.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         match self {
             Self::View(view) => view.change_owner(owner),
             Self::MaterializedView(view) => view.change_owner(owner),
@@ -68,24 +70,24 @@ impl ViewLike {
     }
 
     /// Trigger references for an ordinary view. Materialized views cannot own triggers.
-    pub fn triggers(&self) -> Option<&crate::sem::TriggerReferences> {
+    pub fn triggers(&self) -> Option<&TriggerReferences> {
         match self {
             Self::View(view) => Some(view.triggers()),
             Self::MaterializedView(_) => None,
         }
     }
-    pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
+    pub(crate) fn associate_trigger(&mut self, name: &FullName) {
         if let Self::View(view) = self {
             view.associate_trigger(name);
         }
     }
-    pub(crate) fn dissociate_trigger(&mut self, name: &crate::sem::FullName) {
+    pub(crate) fn dissociate_trigger(&mut self, name: &FullName) {
         if let Self::View(view) = self {
             view.dissociate_trigger(name);
         }
     }
 
-    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+    pub(crate) fn result_columns(&self) -> &ResultColumnCollection {
         match self {
             Self::View(view) => view.result_columns(),
             Self::MaterializedView(view) => view.result_columns(),
@@ -99,7 +101,7 @@ impl ViewLike {
     /// - `AnalysisError`
     pub fn apply_alter(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         alter_view: &AlterView,
     ) -> Result<bool, AnalysisError> {
         match self {

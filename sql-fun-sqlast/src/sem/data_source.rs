@@ -43,9 +43,9 @@ pub(crate) use self::{
     qualified::QualifiedSource,
 };
 
-use crate::sem::{
-    AnalysisError, ColumnName, ParseContext, SemScalarExpr, WithClause,
-    scalar_expr::ColumnReferenceExpr,
+use crate::{
+    context::ParseContext,
+    sem::{AnalysisError, ColumnName, SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr},
 };
 
 /// source nullability type
@@ -117,7 +117,7 @@ impl DataSource {
         nullability: bool,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         match self {
             Self::CteQuery(cteds) => {
@@ -236,7 +236,7 @@ impl DataSource {
             .into_lookup()
     }
 
-    pub(crate) fn aliases_for_column_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn aliases_for_column_resolved<TContext: ParseContext>(
         &self,
         column: &ColumnName,
         context: &TContext,
@@ -281,7 +281,7 @@ impl DataSource {
         }
     }
 
-    fn group_column_source<'a, C: crate::sem::ParseContext>(
+    fn group_column_source<'a, C: ParseContext>(
         &'a self,
         column: &ColumnName,
         context: &C,

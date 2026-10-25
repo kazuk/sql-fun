@@ -7,9 +7,12 @@ mod type_ref;
 pub use self::array::ArrayTypeDefinition;
 pub use self::{category::TypeCategory, type_ref::TypeReference};
 
-use crate::sem::{
-    ColumnCollection, ColumnName, CreateCompositeType, CreateDomain, CreateEnum, FullName,
-    LocalName, ParseContext, SchemaName, TableName,
+use crate::{
+    context::ParseContext,
+    sem::{
+        BaseParseContext, ColumnCollection, ColumnName, CreateCompositeType, CreateDomain,
+        CreateEnum, FullName, LocalName, OwnerSpecification, SchemaName, TableName,
+    },
 };
 
 /// type definitions
@@ -60,11 +63,7 @@ impl TypeDefinition {
         }
     }
 
-    pub(crate) fn matches_structure(
-        &self,
-        other: &Self,
-        context: &impl crate::sem::BaseParseContext,
-    ) -> bool {
+    pub(crate) fn matches_structure(&self, other: &Self, context: &impl BaseParseContext) -> bool {
         self.matches_structure_with(other, |left, right| left.matches_structure(right, context))
     }
 
@@ -111,7 +110,7 @@ impl TypeDefinition {
     ///
     /// Missing metadata, unresolved domains, and non-PostgreSQL contexts
     /// return `None`, distinct from the PostgreSQL codes `X` and `U`.
-    pub fn category(&self, context: &impl crate::sem::BaseParseContext) -> Option<TypeCategory> {
+    pub fn category(&self, context: &impl BaseParseContext) -> Option<TypeCategory> {
         if crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::postgres() {
             return None;
         }
@@ -142,7 +141,7 @@ impl TypeDefinition {
     }
     /// Ownership retained by a standalone type definition.
     /// Table row types obtain ownership from their referenced relation.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         match self {
             Self::Enum(definition) => definition.owner(),
             Self::CompositeType(definition) => definition.owner(),
@@ -150,7 +149,7 @@ impl TypeDefinition {
             _ => None,
         }
     }
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) -> bool {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) -> bool {
         match self {
             Self::Enum(definition) => definition.change_owner(owner),
             Self::CompositeType(definition) => definition.change_owner(owner),
@@ -292,7 +291,7 @@ impl TypeDefinition {
         self.member_type_from_catalog(context, member)
     }
 
-    pub(crate) fn member_type_from_catalog<TCatalog: crate::sem::BaseParseContext>(
+    pub(crate) fn member_type_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
         member: &str,

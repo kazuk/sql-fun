@@ -1,6 +1,12 @@
-use crate::sem::{
-    AnalysisError, ColumnDefinition, ColumnName, SemScalarExpr, TypeReference,
-    create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ColumnReferenceExpr,
+        IndirectionExpr, InsertTarget, QueryProblem, SemScalarExpr, TypeReference,
+        create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+        parameter_resolution::ParameterResolution,
+        traversal::SemanticVisitor,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -182,7 +188,7 @@ impl ResultColumnCollection {
 
     pub(crate) fn append_composite_star(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         base: SemScalarExpr,
     ) -> Result<(), AnalysisError> {
         let Some(_) = base.get_type() else {
@@ -190,15 +196,15 @@ impl ResultColumnCollection {
             return Ok(());
         };
         let Some(fields) = base.composite_columns(context) else {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::query(
-                crate::sem::QueryProblem::star_projection_requires_composite_type(),
+            context.report_analysis_problem(AnalysisProblem::query(
+                QueryProblem::star_projection_requires_composite_type(),
             ))?;
             self.push_invalid_star(base);
             return Ok(());
         };
         for name in fields.names() {
             let expression =
-                crate::sem::IndirectionExpr::resolved_member(context, base.clone(), name.as_str())?;
+                IndirectionExpr::resolved_member(context, base.clone(), name.as_str())?;
             self.push_expression(&name, expression);
         }
         Ok(())
@@ -220,7 +226,7 @@ impl ResultColumnCollection {
 
     pub(crate) fn expand_pending_stars(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         if !self.has_pending_stars() {
             return Ok(false);
@@ -247,7 +253,7 @@ impl ResultColumnCollection {
         &mut self,
         index: usize,
         query_id: usize,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if let Some(column) = self.0.get_mut(index)
             && let Some(expression) = &mut column.expression
@@ -260,10 +266,7 @@ impl ResultColumnCollection {
     pub(crate) fn grouping_expression(&self, index: usize) -> Option<&SemScalarExpr> {
         self.0.get(index)?.expression()
     }
-    pub(crate) fn default_returning_parameters(
-        &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
+    pub(crate) fn default_returning_parameters(&self, parameters: &mut ParameterResolution) {
         for column in &self.0 {
             if let Some(value) = &column.expression {
                 parameters.default_returning_parameter(value);
@@ -271,7 +274,7 @@ impl ResultColumnCollection {
         }
     }
 
-    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn assign_update_output<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
         index: usize,
@@ -339,7 +342,7 @@ impl ResultColumnCollection {
     pub(crate) fn resolve_output(
         &self,
         name: &ColumnName,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
     ) -> Result<Option<usize>, ()> {
         let mut found: Option<usize> = None;
         for (index, column) in self.0.iter().enumerate() {
@@ -362,7 +365,7 @@ impl ResultColumnCollection {
     pub(crate) fn output_reference(&self, index: usize) -> Option<SemScalarExpr> {
         let definition = self.0.get(index)?.create_column_definition();
         Some(SemScalarExpr::column_reference(
-            crate::sem::ColumnReferenceExpr::output_column(index, &definition),
+            ColumnReferenceExpr::output_column(index, &definition),
         ))
     }
     pub(crate) fn rename(&mut self, names: &[String]) {
@@ -446,16 +449,16 @@ impl ResultColumnCollection {
 }
 
 impl ResultColumnCollection {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.walk_assigned(visitor, &[])
     }
-    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk_assigned<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         let pending = self.has_pending_stars();
         for (index, column) in self.0.iter_mut().enumerate() {

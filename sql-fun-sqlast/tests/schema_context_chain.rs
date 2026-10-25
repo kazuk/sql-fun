@@ -7,9 +7,12 @@ use self::test_helpers::{
     parent_with_same_named_tables, query,
 };
 
-use ::sql_fun_sqlast::sem::{
-    BaseParseContext, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, ParseContext,
-    PgBuiltInType, SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
+use ::sql_fun_sqlast::{
+    context::ParseContext,
+    sem::{
+        BaseParseContext, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead,
+        PgBuiltInType, SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
+    },
 };
 
 #[rstest::rstest]
@@ -780,10 +783,11 @@ mod test_helpers {
     use ::clap::Parser;
     use ::sql_fun_sqlast::{
         ParsedSchemaDump, PostgresDialect, SqlFunArgs,
+        context::ParseContext,
         sem::{
             AnalysisProblem, BaseContext, BaseParseContext, ColumnName, FrozenBaseContext,
-            FullName, ParseContext, SchemaFileContext, SchemaName, TableName, TypeReference,
-            ViewInfoRead, ViewLike, problem::NameResolution,
+            FullName, SchemaFileContext, SchemaName, TableName, TypeReference, ViewInfoRead,
+            ViewLike, problem::NameResolution,
         },
     };
 

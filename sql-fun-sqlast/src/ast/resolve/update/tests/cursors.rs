@@ -1,6 +1,7 @@
 use super::test_helpers::catalog;
 use crate::ast::Dialect;
-use crate::sem::{CursorInfo, FullName, ParseContext, SemAst, TableName};
+use crate::context::ParseContext;
+use crate::sem::{CursorInfo, FullName, SemAst, TableName};
 use crate::test_helpers::TestParseContext;
 
 fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {

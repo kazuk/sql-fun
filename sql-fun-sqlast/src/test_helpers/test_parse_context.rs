@@ -3,6 +3,7 @@ mod conflict_info;
 
 use crate::{
     StringSpan,
+    context::ParseContext,
     sem::{
         AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
@@ -11,10 +12,10 @@ use crate::{
         CreateView, DiagnosticContext, DropTable, FromClause, FullName, FunctionInfoRead,
         FunctionInfoWrite, FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead,
         MutSourcePathWithSpan, OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant,
-        ParseContext, SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite,
-        SourcePathWithSpan, TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead,
-        TypeInfoWrite, TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite,
-        ViewLike, WithClause,
+        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan,
+        TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite,
+        TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        WithClause,
     },
     test_helpers::{SynBuilder, source_span},
 };
@@ -715,7 +716,10 @@ impl ParseContext for TestParseContext {
 #[cfg(test)]
 mod test_search_path {
     use super::TestParseContext;
-    use crate::sem::{ParseContext, SchemaName, SearchPathRead};
+    use crate::{
+        context::ParseContext,
+        sem::{SchemaName, SearchPathRead},
+    };
 
     #[test]
     fn replaces_search_path_and_updates_default_schema() {

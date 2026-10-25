@@ -1,9 +1,12 @@
-use crate::ast::ddl::{AlterDefinition, AlterOperation, Index, PostgresAlterCommand};
 use crate::{
-    ast::{AlterCommand, Expr, Literal, Name, SyntaxOption, SyntaxValue, TypeName},
+    ast::{
+        AlterCommand, Expr, Literal, Name, SyntaxOption, SyntaxValue, TypeName,
+        ddl::{AlterDefinition, AlterOperation, Index, PostgresAlterCommand},
+    },
+    context::ParseContext,
     sem::{
-        AnalysisError, AnalysisProblem, IndexAlteration, IndexStorageChange, IndexStorageParameter,
-        ParseContext,
+        AnalysisError, AnalysisProblem, CreateIndex, IndexAlteration, IndexStorageChange,
+        IndexStorageParameter,
     },
 };
 
@@ -135,7 +138,7 @@ impl Index {
     pub(super) fn initialize_index_storage(
         &self,
         context: &mut impl ParseContext,
-        index: &mut crate::sem::CreateIndex,
+        index: &mut CreateIndex,
     ) -> Result<bool, AnalysisError> {
         index.set_access_method(&self.access_method);
         if index.access_method() != "btree" {

@@ -2,11 +2,12 @@ use sql_fun_core::IVec;
 
 use crate::{
     ast::TryFromWithTokens,
+    context::ParseContext,
     sem::{AstAndContextPair, TypeReference},
     syn::ScanToken,
 };
 
-use super::{AnalysisError, FullName, ParseContext};
+use super::{AnalysisError, FullName};
 
 /// analyzed [`crate::syn::CreateDomainStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

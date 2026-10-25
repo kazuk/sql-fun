@@ -10,6 +10,7 @@
 #![doc = include_str!("lib.md")]
 
 pub mod ast;
+pub mod context;
 pub mod engine_specific;
 pub mod sem;
 pub mod syn;
@@ -37,7 +38,8 @@ pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
 use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 use crate::{
-    sem::{FrozenBaseContext, ParseContext, SchemaFileContext, SemAst},
+    context::ParseContext,
+    sem::{FrozenBaseContext, SchemaFileContext, SemAst},
     syn::ParseResult,
 };
 
@@ -232,7 +234,9 @@ mod test_schema_content_hash {
 
     mod test_helpers {
         pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
-            use crate::sem::{ParseContext, SchemaName};
+            use crate::context::ParseContext;
+            use crate::sem::SchemaName;
+
             let mut base = crate::test_helpers::TestParseContext::default();
             base.set_get_search_path_result(&[SchemaName::from("public")]);
             base.freeze()

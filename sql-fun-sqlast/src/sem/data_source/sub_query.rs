@@ -1,8 +1,11 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, SelectStatement,
-    WithClause,
-    data_source::AliasName,
-    scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable,
+        SelectStatement, WithClause,
+        data_source::AliasName,
+        scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -42,7 +45,7 @@ impl SubQueryDataSource {
         _with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let result_columns = self.select_statement.result_columns();
         let result_column = if let Some(index) = self.alias.derived_column_index(column) {
@@ -67,7 +70,7 @@ impl SubQueryDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let result_columns = self.select_statement.result_columns();
         let column_def = if let Some(index) = self.alias.derived_column_index(column) {
@@ -105,7 +108,7 @@ impl SubQueryDataSource {
     pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.select_statement.walk(visitor)?;
         visitor.derived(self.alias.name().as_str(), &self.alias.inference_columns());
         Ok(())

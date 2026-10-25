@@ -1,8 +1,13 @@
-use crate::sem::{
-    OverloadVariant, ParseContext,
-    type_system::{
-        ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
-        func_params::ParameterBindResult,
+use crate::{
+    context::ParseContext,
+    sem::{
+        BaseParseContext, FullName, OverloadVariant, SemScalarExpr,
+        overload_rank::OverloadRank,
+        parameter_resolution::Signature,
+        type_system::{
+            ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
+            func_params::ParameterBindResult,
+        },
     },
 };
 
@@ -24,9 +29,9 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 impl FunctionOverloadCollection {
     pub(crate) fn view_row_properties(
         &self,
-        name: &crate::sem::FullName,
+        name: &FullName,
         preserves_rows: bool,
-    ) -> Vec<((crate::sem::FullName, OverloadVariant), bool)> {
+    ) -> Vec<((FullName, OverloadVariant), bool)> {
         self.overloads
             .iter()
             .map(|overload| ((name.clone(), overload.clone()), preserves_rows))
@@ -109,7 +114,7 @@ impl FunctionOverloadCollection {
     fn infer_simple(
         bind_result: &Vec<ParameterBindResult>,
         overload: &mut OverloadVariant,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         let mut simple_infer_context = SimpleInferContext::default();
         for param in bind_result {
@@ -128,7 +133,7 @@ impl FunctionOverloadCollection {
         context: &TParseContext,
     ) -> Result<(), TypeError>
     where
-        TParseContext: crate::sem::BaseParseContext,
+        TParseContext: BaseParseContext,
     {
         let mut common_infer_context = CommonInferContext::default();
         for param in bind_result {
@@ -166,9 +171,9 @@ impl FunctionOverloadCollection {
     fn overload_rank(
         bindings: &[ParameterBindResult],
         declarations: &[ParameterBindResult],
-        context: &impl crate::sem::BaseParseContext,
-    ) -> Option<crate::sem::overload_rank::OverloadRank> {
-        let mut rank = crate::sem::overload_rank::OverloadRank::default();
+        context: &impl BaseParseContext,
+    ) -> Option<OverloadRank> {
+        let mut rank = OverloadRank::default();
         for (binding, declaration) in std::iter::zip(bindings, declarations) {
             rank = rank + binding.overload_rank(context, declaration)?;
         }
@@ -187,7 +192,7 @@ impl FunctionOverloadCollection {
         self.resolve_from_catalog(context, arg_types)
     }
 
-    pub(crate) fn resolve_from_catalog<TCatalog: crate::sem::BaseParseContext>(
+    pub(crate) fn resolve_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
         arg_types: &ArgumentBindingCollection,
@@ -241,9 +246,9 @@ mod tests;
 impl FunctionOverloadCollection {
     pub(crate) fn parameter_signatures(
         &self,
-        catalog: &impl crate::sem::BaseParseContext,
-        arguments: &[crate::sem::SemScalarExpr],
-    ) -> Vec<crate::sem::parameter_resolution::Signature> {
+        catalog: &impl BaseParseContext,
+        arguments: &[SemScalarExpr],
+    ) -> Vec<Signature> {
         let arguments = ArgumentBindingCollection::from_expr_list(arguments);
         let mut signatures = Vec::new();
         for overload in &self.overloads {
@@ -276,10 +281,10 @@ impl OverloadVariant {
         &self,
         bindings: &[ParameterBindResult],
         declarations: &[ParameterBindResult],
-    ) -> Option<crate::sem::parameter_resolution::Signature> {
+    ) -> Option<Signature> {
         let inputs = ParameterBindResult::constraint_inputs(bindings)?;
         let declared_inputs = ParameterBindResult::constraint_inputs(declarations)?;
-        crate::sem::parameter_resolution::Signature::new_function(
+        Signature::new_function(
             &inputs,
             &declared_inputs,
             &ParameterBindResult::unrestricted_inputs(bindings),

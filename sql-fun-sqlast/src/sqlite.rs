@@ -14,7 +14,8 @@ use crate::syn::sqlite::Cmd;
 
 use crate::{
     AstAndContextPair, ParseDumpFileError, ParsedSchemaDump, StringSpan,
-    sem::{AnalysisError, FrozenBaseContext, ParseContext, SchemaFileContext, SemAst},
+    context::ParseContext,
+    sem::{AnalysisError, FrozenBaseContext, SchemaFileContext, SemAst},
 };
 
 /// dialect for SQLite
@@ -296,8 +297,10 @@ mod test_schema_content_hash {
     }
 
     mod test_helpers {
+        use crate::context::ParseContext;
+
         pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
-            use crate::sem::{ParseContext, SchemaName};
+            use crate::sem::SchemaName;
             let mut base = crate::test_helpers::TestParseContext::default()
                 .with_dialect(crate::ast::Dialect::sqlite());
             base.set_get_search_path_result(&[SchemaName::from("public")]);

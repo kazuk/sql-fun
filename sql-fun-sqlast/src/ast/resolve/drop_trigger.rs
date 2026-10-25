@@ -1,13 +1,18 @@
-use crate::ast::{Dialect, DropBehavior, DropTrigger};
-use crate::sem::ResolutionFailure;
-use crate::sem::problem::TriggerProblem;
-use crate::sem::{self, AnalysisError, FullName, ParseContext, SemAst, TriggerIdentity};
+use crate::{
+    AstAndContextPair,
+    ast::{Dialect, DropBehavior, DropTrigger},
+    context::ParseContext,
+    sem::{
+        AnalysisError, DropDependencyBehavior, FullName, ResolutionFailure, SemAst,
+        TriggerIdentity, problem::TriggerProblem,
+    },
+};
 
 impl DropTrigger {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<sem::DropTrigger>, AnalysisError> {
+    ) -> Result<Option<crate::sem::DropTrigger>, AnalysisError> {
         let result = if context.dialect() == Dialect::sqlite() {
             self.resolve_sqlite(context)
         } else {
@@ -18,12 +23,12 @@ impl DropTrigger {
     fn resolve_sqlite(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::DropTrigger, ResolutionFailure> {
+    ) -> Result<crate::sem::DropTrigger, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let identity = if requested.schema().is_some() {
             let identity = TriggerIdentity::sqlite(&requested);
             if let Some(definition) = context.trigger(&identity) {
-                return Ok(sem::DropTrigger::sqlite(
+                return Ok(crate::sem::DropTrigger::sqlite(
                     &requested,
                     Some(&identity),
                     Some(definition.target()),
@@ -32,7 +37,10 @@ impl DropTrigger {
             }
             Some(identity)
         } else {
-            let mut schemas = vec![sem::SchemaName::from("temp"), sem::SchemaName::from("main")];
+            let mut schemas = vec![
+                crate::sem::SchemaName::from("temp"),
+                crate::sem::SchemaName::from("main"),
+            ];
             for schema in context.get_search_path() {
                 if !schemas
                     .iter()
@@ -44,7 +52,7 @@ impl DropTrigger {
             for schema in schemas {
                 let identity = TriggerIdentity::sqlite(&requested.clone().set_schema(schema));
                 if let Some(definition) = context.trigger(&identity) {
-                    return Ok(sem::DropTrigger::sqlite(
+                    return Ok(crate::sem::DropTrigger::sqlite(
                         &requested,
                         Some(&identity),
                         Some(definition.target()),
@@ -59,7 +67,7 @@ impl DropTrigger {
                 &requested,
             )));
         }
-        Ok(sem::DropTrigger::sqlite(
+        Ok(crate::sem::DropTrigger::sqlite(
             &requested,
             identity.as_ref(),
             None,
@@ -69,7 +77,7 @@ impl DropTrigger {
     fn resolve_postgres(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::DropTrigger, ResolutionFailure> {
+    ) -> Result<crate::sem::DropTrigger, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let requested_target = self
             .relation
@@ -82,7 +90,7 @@ impl DropTrigger {
             .semantic();
         let Some(target) = context.resolve_relation_name(&requested_target) else {
             if self.if_exists {
-                return Ok(sem::DropTrigger::new(
+                return Ok(crate::sem::DropTrigger::new(
                     &requested,
                     &requested_target,
                     None,
@@ -103,8 +111,8 @@ impl DropTrigger {
         requested: &FullName,
         requested_target: &FullName,
         target: &FullName,
-        behavior: sem::DropDependencyBehavior,
-    ) -> Result<sem::DropTrigger, ResolutionFailure> {
+        behavior: DropDependencyBehavior,
+    ) -> Result<crate::sem::DropTrigger, ResolutionFailure> {
         let name = FullName::new(
             &target.catalog().cloned(),
             &target.schema().cloned(),
@@ -117,7 +125,7 @@ impl DropTrigger {
                 &identity,
             )));
         }
-        Ok(sem::DropTrigger::new(
+        Ok(crate::sem::DropTrigger::new(
             requested,
             requested_target,
             Some(&identity),
@@ -129,15 +137,15 @@ impl DropTrigger {
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,
         mut context: C,
-    ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
+    ) -> Result<AstAndContextPair<C>, AnalysisError> {
         let Some(definition) = self.resolve(&mut context)? else {
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         };
         let context = definition.apply(context)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::drop_trigger(&definition),
             context,
         ))
@@ -147,10 +155,10 @@ impl DropTrigger {
 mod tests;
 
 impl DropBehavior {
-    const fn semantic(self) -> sem::DropDependencyBehavior {
+    const fn semantic(self) -> DropDependencyBehavior {
         match self {
-            Self::Cascade => sem::DropDependencyBehavior::cascade(),
-            Self::Restrict => sem::DropDependencyBehavior::restrict(),
+            Self::Cascade => DropDependencyBehavior::cascade(),
+            Self::Restrict => DropDependencyBehavior::restrict(),
         }
     }
 }

@@ -1,7 +1,10 @@
 use super::{AlterOwner, Name, ObjectArgument, ObjectTarget, Role};
-use crate::sem::{
-    AnalysisError, AnalysisProblem, AstAndContextPair, ObjectKind, OwnerSpecification,
-    OwnershipIdentity, OwnershipLookup, ParseContext, SemAst, TypeReference,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, AstAndContextPair, FullName, ObjectKind,
+        OwnerSpecification, OwnershipIdentity, OwnershipLookup, SchemaName, SemAst, TypeReference,
+    },
 };
 
 impl AlterOwner {
@@ -54,10 +57,10 @@ impl AlterOwner {
 
 struct RequestedIdentity {
     identity: OwnershipIdentity,
-    missing_types: Vec<crate::sem::FullName>,
+    missing_types: Vec<FullName>,
 }
 impl RequestedIdentity {
-    fn new(identity: &OwnershipIdentity, missing_types: &[crate::sem::FullName]) -> Self {
+    fn new(identity: &OwnershipIdentity, missing_types: &[FullName]) -> Self {
         Self {
             identity: identity.clone(),
             missing_types: missing_types.to_vec(),
@@ -165,12 +168,12 @@ impl OwnershipIdentity {
         OwnershipLookup::not_found(self)
     }
 
-    fn qualified_candidate_names(&self, context: &impl ParseContext) -> Vec<crate::sem::FullName> {
+    fn qualified_candidate_names(&self, context: &impl ParseContext) -> Vec<FullName> {
         if !self.kind().owner_schema_scoped() || self.name().schema().is_some() {
             return vec![self.name().clone()];
         }
         let mut names = Vec::new();
-        let catalog = crate::sem::SchemaName::from("pg_catalog");
+        let catalog = SchemaName::from("pg_catalog");
         // PostgreSQL implicitly searches pg_catalog unless it was explicitly placed.
         if !context.get_search_path().contains(&catalog) {
             names.push(self.name().replace_schema(&catalog));
@@ -245,7 +248,7 @@ impl OwnershipIdentity {
     fn resolve_visible_routines(
         &self,
         context: &impl ParseContext,
-        names: &[crate::sem::FullName],
+        names: &[FullName],
     ) -> OwnershipLookup {
         let mut visible = Vec::new();
         for name in names {

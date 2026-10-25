@@ -1,7 +1,11 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParseContext, SemScalarExpr,
-    TypeReference,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnName, InputTypeConstraint, MinMaxExpr,
+        ParameterConstraints, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution, scalar_expr::SemScalarExprNode,
+        traversal::SemanticVisitor,
+    },
 };
 
 /// COALESCE with ordered analyzed operands and its common result-type domain.
@@ -96,7 +100,7 @@ impl CoalesceExpr {
     pub(crate) fn resolve_join_key(
         context: &mut impl ParseContext,
         arguments: &[SemScalarExpr],
-        name: &crate::sem::ColumnName,
+        name: &ColumnName,
         not_null: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let sqlite_type = if context.dialect() == crate::ast::Dialect::sqlite() {
@@ -151,7 +155,7 @@ impl CoalesceExpr {
         }
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -163,7 +167,7 @@ impl CoalesceExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut ParameterResolution,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if context.dialect() == crate::ast::Dialect::sqlite() {
@@ -186,7 +190,7 @@ impl CoalesceExpr {
         Ok(())
     }
 
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         let Some(node) = self.node else {
             return;
         };

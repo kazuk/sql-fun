@@ -1,11 +1,13 @@
 use super::{CmdType, Merge, MergeMatchKind, MergeWhen, OverridingKind};
-use crate::ast::resolve::insert::InsertTargetBinding;
-use crate::ast::{Alias, Expr};
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, DataSource, FromClause, InsertClauseSemantics,
-    MergeAction, MergeDestination, MergeStatement, MergeWhenCollection, ParseContext,
-    PgBuiltInType, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr, TableName,
-    UpdateAssignmentCollection, WithClause,
+use crate::{
+    ast::{Alias, Expr, resolve::insert::InsertTargetBinding},
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, FromClause, InsertClauseSemantics,
+        MergeAction, MergeDestination, MergeStatement, MergeWhenCollection, PgBuiltInType,
+        ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr, TableName,
+        UpdateAssignmentCollection, WithClause, parameter_resolution::ParameterResolution,
+    },
 };
 
 impl Merge {
@@ -16,10 +18,7 @@ impl Merge {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|mut merge| {
             if context.parameter_inference_needed() {
-                let constraints =
-                    crate::sem::parameter_resolution::ParameterResolution::infer_merge(
-                        &mut merge, context,
-                    )?;
+                let constraints = ParameterResolution::infer_merge(&mut merge, context)?;
                 context.set_parameter_constraints(&constraints);
             }
             Ok(merge)
@@ -237,7 +236,7 @@ impl MergeWhen {
             target_scope,
             scope,
         );
-        let Some(assignments) = crate::sem::ResolutionFailure::finish(result, context)? else {
+        let Some(assignments) = ResolutionFailure::finish(result, context)? else {
             return Ok(MergeAction::unresolved());
         };
         Ok(MergeAction::update(&assignments))
@@ -268,7 +267,7 @@ impl MergeWhen {
             scope,
             Some(&self.overriding),
         );
-        let Some(clause) = crate::sem::ResolutionFailure::finish(result, context)? else {
+        let Some(clause) = ResolutionFailure::finish(result, context)? else {
             return Ok(MergeAction::unresolved());
         };
         let overriding = self.overriding.merge_override();

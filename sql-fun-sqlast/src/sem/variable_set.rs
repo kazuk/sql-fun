@@ -1,11 +1,12 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    context::ParseContext,
     sem::{AstAndContextPair, ScalarAnalysisContext, SemScalarExpr},
     syn::{ListOpt, ScanToken},
 };
 
-use super::{AnalysisError, ParseContext, SemAst};
+use super::{AnalysisError, SemAst};
 
 /// set a variable
 #[derive(Debug, Clone)]

@@ -1,5 +1,6 @@
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnName, FullName, ParseContext, QueryProblem, SemScalarExpr,
+use crate::{
+    context::ParseContext,
+    sem::{AnalysisError, AnalysisProblem, ColumnName, FullName, QueryProblem, SemScalarExpr},
 };
 
 /// A completed failed lookup retaining the logical relation qualifier and column.

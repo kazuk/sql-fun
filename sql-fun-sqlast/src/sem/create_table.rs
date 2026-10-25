@@ -12,9 +12,11 @@ use std::collections::HashMap;
 
 use crate::{
     ast::TryFromWithTokens,
+    context::ParseContext,
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
-        GetSourcePathWithSpan, ImplicitChange, ParseContext, SemAst, SourcePathWithSpan,
+        GetSourcePathWithSpan, ImplicitChange, InsertArbiter, OwnerSpecification, RuleIdentity,
+        RuleReferences, SemAst, SourcePathWithSpan, TriggerReferences,
         alter_table::AlterObjSubCommand,
     },
     syn::{ListOpt, Opt, ScanToken},
@@ -199,11 +201,11 @@ impl CreateTableMode {
 pub struct CreateTable {
     name: TableName,
     columns: ColumnCollection,
-    triggers: crate::sem::TriggerReferences,
-    rules: crate::sem::RuleReferences,
+    triggers: TriggerReferences,
+    rules: RuleReferences,
     alter_statements: Vec<AlterTable>,
     drop_statements: Vec<DropTable>,
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     cluster_on: Option<String>,
     constraints: HashMap<String, Constraint>,
     mode: CreateTableMode,
@@ -280,33 +282,33 @@ impl GetSourcePathWithSpan for CreateTable {
 
 impl CreateTable {
     /// Rule links owned by this relation; resolve against the effective context.
-    pub const fn rules(&self) -> &crate::sem::RuleReferences {
+    pub const fn rules(&self) -> &RuleReferences {
         &self.rules
     }
-    pub(crate) fn associate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+    pub(crate) fn associate_rule(&mut self, identity: &RuleIdentity) {
         self.rules.associate(identity);
     }
-    pub(crate) fn dissociate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+    pub(crate) fn dissociate_rule(&mut self, identity: &RuleIdentity) {
         self.rules.dissociate(identity);
     }
 
     /// Retained ownership; None means no ownership information was supplied.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
     /// Fully qualified trigger references associated with this relation.
-    pub const fn triggers(&self) -> &crate::sem::TriggerReferences {
+    pub const fn triggers(&self) -> &TriggerReferences {
         &self.triggers
     }
-    pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
+    pub(crate) fn associate_trigger(&mut self, name: &FullName) {
         self.triggers.associate(name);
     }
-    pub(crate) fn dissociate_trigger(&mut self, name: &crate::sem::FullName) {
+    pub(crate) fn dissociate_trigger(&mut self, name: &FullName) {
         self.triggers.dissociate(name);
     }
 
@@ -321,8 +323,8 @@ impl CreateTable {
     ) -> Self {
         Self {
             name: name.clone(),
-            triggers: crate::sem::TriggerReferences::default(),
-            rules: crate::sem::RuleReferences::default(),
+            triggers: TriggerReferences::default(),
+            rules: RuleReferences::default(),
             columns: ColumnCollection(columns),
             alter_statements: Default::default(),
             drop_statements: Default::default(),
@@ -523,14 +525,11 @@ impl CreateTable {
         &self,
         destination: &TableName,
         columns: &[ColumnName],
-    ) -> Vec<crate::sem::InsertArbiter> {
+    ) -> Vec<InsertArbiter> {
         let mut arbiters = Vec::new();
         for constraint in self.constraints.values() {
             if constraint.matches_unique_columns(columns) {
-                arbiters.push(crate::sem::InsertArbiter::table_constraint(
-                    destination,
-                    constraint,
-                ));
+                arbiters.push(InsertArbiter::table_constraint(destination, constraint));
             }
         }
         // Named inline keys also occur in the table constraint collection.
@@ -540,7 +539,7 @@ impl CreateTable {
             && let Some(column) = self.columns.get_column_def(&columns[0])
             && column.has_unique_key()
         {
-            arbiters.push(crate::sem::InsertArbiter::column_constraint(&columns[0]));
+            arbiters.push(InsertArbiter::column_constraint(&columns[0]));
         }
         arbiters
     }
@@ -700,7 +699,10 @@ mod test_analyze_create_table {
 
     use crate::{
         AstAndContextPair,
-        sem::{BaseParseContext, CreateTableMode, SchemaName, SemAst, SourcePathWithSpan},
+        sem::{
+            BaseParseContext, CreateTableMode, FullName, SchemaName, SemAst, SourcePathWithSpan,
+            TableName,
+        },
         syn::sqlite::Stmt,
         test_helpers::{
             SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
@@ -764,7 +766,7 @@ mod test_analyze_create_table {
         assert_eq!(create_table.temporary(), temporary);
 
         let lookup_name = if temporary {
-            crate::sem::TableName::from(crate::sem::FullName::with_schema("pg_temp", table_name))
+            TableName::from(FullName::with_schema("pg_temp", table_name))
         } else {
             sem_builder.table_name(table_name)
         };

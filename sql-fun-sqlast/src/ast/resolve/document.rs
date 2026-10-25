@@ -1,6 +1,8 @@
-use crate::ast::XmlTable;
-use crate::sem::ParseContext;
-use crate::sem::{AnalysisError, DataSource, ScalarAnalysisContext};
+use crate::{
+    ast::XmlTable,
+    context::ParseContext,
+    sem::{AnalysisError, DataSource, ScalarAnalysisContext},
+};
 
 impl XmlTable {
     pub(in crate::ast) fn resolve(

@@ -1,6 +1,9 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteName, DataSource, Nullable,
-    WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteName, DataSource, Nullable,
+        WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -59,7 +62,7 @@ impl CteDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let Some(cte) = with_clause.get(&self.name) else {
             AnalysisError::raise_unexpected_input(&format!(

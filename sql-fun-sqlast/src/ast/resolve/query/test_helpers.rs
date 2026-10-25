@@ -1,5 +1,6 @@
+use crate::AstAndContextPair;
 use crate::ast::{Dialect, StatementNode};
-use crate::sem::ParseContext;
+use crate::context::ParseContext;
 use crate::sem::{
     AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnName,
     FunctionParam, MutSourcePathWithSpan, OperatorDefinition, OperatorName, OverloadVariant,
@@ -155,14 +156,14 @@ pub(super) fn column_scope_query(
 }
 
 /// Analyze against explicitly supplied, small cross-schema relation fixtures.
-pub(super) fn source_namespace_statement(sql: &str) -> crate::AstAndContextPair<TestParseContext> {
+pub(super) fn source_namespace_statement(sql: &str) -> AstAndContextPair<TestParseContext> {
     source_namespace_statement_at_version(sql, "17")
 }
 
 pub(super) fn source_namespace_statement_at_version(
     sql: &str,
     version: &str,
-) -> crate::AstAndContextPair<TestParseContext> {
+) -> AstAndContextPair<TestParseContext> {
     let dialect = Dialect::postgres();
     let metadata = ::serde_json::from_value(::serde_json::json!({
         "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["a", "public"]

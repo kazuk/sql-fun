@@ -1,6 +1,13 @@
 //! Resolved View projection lineage retained independently of DML capabilities.
-use crate::ast::{Expr, FromItem, Query, QueryBody};
-use crate::sem::{AnalysisError, FullName, ParseContext, SelectStatement, ViewColumnLineage};
+use crate::{
+    ast::{Expr, FromItem, Query, QueryBody, View},
+    context::ParseContext,
+    sem::{
+        AnalysisError, ColumnDefinition, ColumnName, FromClause, FullName, ScalarAnalysisContext,
+        ScalarConstExpr, SelectStatement, SemScalarExpr, TableName, TypeReference, ViewCheckOption,
+        ViewColumnLineage, ViewName, ViewOption, WithClause,
+    },
+};
 
 impl Expr {
     // PostgreSQL removes an explicit cast to the same type without typmods.
@@ -9,14 +16,14 @@ impl Expr {
     fn view_cast_column<'a>(
         &self,
         context: &impl ParseContext,
-        columns: &'a [crate::sem::ColumnDefinition],
+        columns: &'a [ColumnDefinition],
         aliases: &[String],
-    ) -> Result<Option<&'a crate::sem::ColumnDefinition>, AnalysisError> {
+    ) -> Result<Option<&'a ColumnDefinition>, AnalysisError> {
         match self {
             Self::Column(name) => Ok(columns.iter().enumerate().find_map(|(index, column)| {
                 let visible = match aliases.get(index) {
                     Some(alias) => Some(alias.as_str()),
-                    None => column.name().as_ref().map(crate::sem::ColumnName::as_str),
+                    None => column.name().as_ref().map(ColumnName::as_str),
                 };
                 if name
                     .0
@@ -33,7 +40,7 @@ impl Expr {
                 else {
                     return Ok(None);
                 };
-                let target = crate::sem::TypeReference::concrete_type_ref(
+                let target = TypeReference::concrete_type_ref(
                     &cast.target.name.full_name()?,
                     !cast.target.array_bounds.is_empty(),
                 );
@@ -72,20 +79,18 @@ impl Query {
         &self,
         context: &impl ParseContext,
         source: &FullName,
-        projections: &mut [(crate::sem::ColumnDefinition, Option<crate::sem::ColumnName>)],
+        projections: &mut [(ColumnDefinition, Option<ColumnName>)],
     ) -> Result<(), AnalysisError> {
         let QueryBody::Select(select) = &self.body else {
             return Ok(());
         };
-        let columns = if let Some(table) =
-            context.get_table(&crate::sem::TableName::from(source.clone()))
-        {
+        let columns = if let Some(table) = context.get_table(&TableName::from(source.clone())) {
             let mut columns = Vec::new();
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
             }
             columns
-        } else if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(source)) {
+        } else if let Some(view) = context.get_view(&ViewName::from_full_name(source)) {
             if view.is_materialized() {
                 return Ok(());
             }
@@ -166,32 +171,27 @@ impl FromItem {
     }
 }
 
-impl crate::ast::View {
+impl View {
     pub(super) fn semantic_options(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Vec<crate::sem::ViewOption>, AnalysisError> {
+    ) -> Result<Vec<ViewOption>, AnalysisError> {
         let mut options = Vec::new();
         for option in &self.options {
             let value = match &option.value {
                 None => None,
-                Some(crate::ast::SyntaxValue::Expression(Expr::Column(name))) => {
-                    Some(crate::sem::SemScalarExpr::literal(
-                        &crate::sem::ScalarConstExpr::string(&name.0.join(".")),
-                    ))
-                }
+                Some(crate::ast::SyntaxValue::Expression(Expr::Column(name))) => Some(
+                    SemScalarExpr::literal(&ScalarConstExpr::string(&name.0.join("."))),
+                ),
                 Some(crate::ast::SyntaxValue::Expression(expression)) => Some(expression.resolve(
                     context,
-                    &crate::sem::ScalarAnalysisContext::new(
-                        &crate::sem::WithClause::default(),
-                        &crate::sem::FromClause::default(),
-                    ),
+                    &ScalarAnalysisContext::new(&WithClause::default(), &FromClause::default()),
                 )?),
                 Some(crate::ast::SyntaxValue::Type(_)) => {
                     return AnalysisError::raise_unexpected_input("View option type");
                 }
             };
-            options.push(crate::sem::ViewOption::new(
+            options.push(ViewOption::new(
                 option.namespace.as_deref(),
                 &option.name,
                 value.as_ref(),
@@ -201,11 +201,11 @@ impl crate::ast::View {
     }
 }
 impl crate::ast::ViewCheckOption {
-    pub(super) const fn semantic(self) -> crate::sem::ViewCheckOption {
+    pub(super) const fn semantic(self) -> ViewCheckOption {
         match self {
-            Self::None => crate::sem::ViewCheckOption::none(),
-            Self::Local => crate::sem::ViewCheckOption::local(),
-            Self::Cascaded => crate::sem::ViewCheckOption::cascaded(),
+            Self::None => ViewCheckOption::none(),
+            Self::Local => ViewCheckOption::local(),
+            Self::Cascaded => ViewCheckOption::cascaded(),
         }
     }
 }

@@ -1,7 +1,12 @@
-use crate::sem::data_source::QualifiedSource;
-use crate::sem::{
-    AliasName, AnalysisError, ColumnName, DataSource, ParseContext, ScalarAnalysisContext,
-    SemScalarExpr, WithClause,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasName, AliasSpec, AnalysisError, ColumnDefinition, ColumnName, ColumnReferenceExpr,
+        DataSource, FullName, PgBuiltInType, QualifiedColumnFailure, ResultColumnCollection,
+        ScalarAnalysisContext, SemScalarExpr, WildcardExpansion, WildcardQualifiers,
+        WildcardRowsSource, WildcardRowsSources, WildcardTypedRecord, WithClause,
+        data_source::QualifiedSource,
+    },
 };
 
 /// An expanded column keeps the selected occurrence until its expression is bound.
@@ -12,8 +17,8 @@ pub(crate) struct ProjectionColumn<'a> {
     alias: Option<AliasName>,
     binding: ProjectionBinding<'a>,
     origin: Option<ProjectionOrigin<'a>>,
-    typed_record: Option<crate::sem::WildcardTypedRecord>,
-    rows_origin: Option<(std::sync::Arc<crate::sem::WildcardRowsSource>, usize)>,
+    typed_record: Option<WildcardTypedRecord>,
+    rows_origin: Option<(std::sync::Arc<WildcardRowsSource>, usize)>,
     merge_record: Option<(super::MergeRecordRole, bool)>,
 }
 
@@ -114,11 +119,11 @@ struct MergedProjection<'a> {
 }
 
 impl<'a> MergedProjection<'a> {
-    fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
+    fn collect_rows_sources(&self, sources: &mut WildcardRowsSources) {
         self.left.collect_rows_sources(sources);
         self.right.collect_rows_sources(sources);
     }
-    fn collect_qualifiers(&self, qualifiers: &mut crate::sem::WildcardQualifiers) {
+    fn collect_qualifiers(&self, qualifiers: &mut WildcardQualifiers) {
         self.left.collect_qualifiers(qualifiers);
         self.right.collect_qualifiers(qualifiers);
     }
@@ -174,12 +179,12 @@ impl<'a> From<MergedProjection<'a>> for ProjectionBinding<'a> {
 }
 
 impl<'a> ProjectionBinding<'a> {
-    fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
+    fn collect_rows_sources(&self, sources: &mut WildcardRowsSources) {
         if let Self::Merged(merged) = self {
             merged.collect_rows_sources(sources);
         }
     }
-    fn collect_qualifiers(&self, qualifiers: &mut crate::sem::WildcardQualifiers) {
+    fn collect_qualifiers(&self, qualifiers: &mut WildcardQualifiers) {
         match self {
             Self::Source(source) => source.retain_wildcard_qualifier(qualifiers),
             Self::Merged(merged) => merged.collect_qualifiers(qualifiers),
@@ -249,11 +254,7 @@ impl<'a> ProjectionBinding<'a> {
 }
 
 impl<'a> ProjectionColumn<'a> {
-    fn retain_rows_source(
-        &mut self,
-        source: &std::sync::Arc<crate::sem::WildcardRowsSource>,
-        index: usize,
-    ) {
+    fn retain_rows_source(&mut self, source: &std::sync::Arc<WildcardRowsSource>, index: usize) {
         self.rows_origin = Some((std::sync::Arc::clone(source), index));
     }
 
@@ -290,7 +291,7 @@ impl<'a> ProjectionColumn<'a> {
         }
     }
 
-    pub(crate) fn collect_rows_sources(&self, sources: &mut crate::sem::WildcardRowsSources) {
+    pub(crate) fn collect_rows_sources(&self, sources: &mut WildcardRowsSources) {
         crate::sem::with_stack(|| {
             if let Some((source, _)) = &self.rows_origin
                 && self
@@ -303,7 +304,7 @@ impl<'a> ProjectionColumn<'a> {
             self.binding.collect_rows_sources(sources);
         });
     }
-    pub(crate) fn typed_record(&self) -> Option<crate::sem::WildcardTypedRecord> {
+    pub(crate) fn typed_record(&self) -> Option<WildcardTypedRecord> {
         if self.alias.is_none() {
             self.typed_record.clone()
         } else {
@@ -311,12 +312,12 @@ impl<'a> ProjectionColumn<'a> {
         }
     }
 
-    pub(crate) fn collect_qualifiers(&self, qualifiers: &mut crate::sem::WildcardQualifiers) {
+    pub(crate) fn collect_qualifiers(&self, qualifiers: &mut WildcardQualifiers) {
         crate::sem::with_stack(|| {
             self.binding.collect_qualifiers(qualifiers);
         });
     }
-    fn with_derived_name(mut self, alias: &crate::sem::AliasSpec, index: usize) -> Self {
+    fn with_derived_name(mut self, alias: &AliasSpec, index: usize) -> Self {
         if let Some(name) = alias.derived_column_at(index) {
             self.name = name.clone();
         }
@@ -380,7 +381,7 @@ impl<'a> ProjectionColumn<'a> {
     pub(super) fn new(
         source: &QualifiedSource<'a>,
         name: &ColumnName,
-        typed_record: &Option<crate::sem::WildcardTypedRecord>,
+        typed_record: &Option<WildcardTypedRecord>,
     ) -> Self {
         Self {
             column: name.clone(),
@@ -422,9 +423,9 @@ impl<'a> ProjectionColumn<'a> {
         qualifier: &AliasName,
     ) -> Result<Self, AnalysisError> {
         let name = ColumnName::from("*");
-        let failure = crate::sem::QualifiedColumnFailure::ambiguous(
+        let failure = QualifiedColumnFailure::ambiguous(
             context,
-            &crate::sem::FullName::from_local_name(qualifier.as_str()),
+            &FullName::from_local_name(qualifier.as_str()),
             &name,
         )?;
         Ok(Self {
@@ -567,7 +568,7 @@ impl<'a> From<Vec<ProjectionColumn<'a>>> for ProjectionColumns<'a> {
 }
 
 impl<'a> ProjectionColumns<'a> {
-    pub(super) fn with_join_alias(self, alias: &crate::sem::AliasSpec) -> Self {
+    pub(super) fn with_join_alias(self, alias: &AliasSpec) -> Self {
         let named = self.with_derived_names(alias);
         let source = if named.has_duplicate_names()
             || named
@@ -593,7 +594,7 @@ impl<'a> ProjectionColumns<'a> {
                 .collect(),
         )
     }
-    fn with_derived_names(self, alias: &crate::sem::AliasSpec) -> Self {
+    fn with_derived_names(self, alias: &AliasSpec) -> Self {
         Self(
             self.0
                 .into_iter()
@@ -623,7 +624,7 @@ impl<'a> ProjectionColumns<'a> {
         )
     }
 
-    pub(super) fn with_rows_source(mut self, source: &crate::sem::WildcardRowsSource) -> Self {
+    pub(super) fn with_rows_source(mut self, source: &WildcardRowsSource) -> Self {
         let source = std::sync::Arc::new(source.clone());
         for (index, column) in self.0.iter_mut().enumerate() {
             column.retain_rows_source(&source, index);
@@ -640,19 +641,19 @@ impl<'a> ProjectionColumns<'a> {
         self.0.extend(source.projection_names(context, with, None)?);
         Ok(())
     }
-    pub(super) fn append_ordinality(&mut self, alias: &crate::sem::AliasSpec) {
+    pub(super) fn append_ordinality(&mut self, alias: &AliasSpec) {
         let name = ColumnName::from("ordinality");
-        let definition = crate::sem::ColumnDefinition::new(
+        let definition = ColumnDefinition::new(
             &Some(name.clone()),
-            Some(&crate::sem::PgBuiltInType::int8()),
+            Some(&PgBuiltInType::int8()),
             Some(true),
             &[],
         );
-        let expression = crate::sem::ColumnReferenceExpr::function_output(alias, &definition);
+        let expression = ColumnReferenceExpr::function_output(alias, &definition);
         self.0
             .push(ProjectionColumn::expression(&name, &expression));
     }
-    pub(super) fn with_aliases(self, alias: &crate::sem::AliasSpec) -> Self {
+    pub(super) fn with_aliases(self, alias: &AliasSpec) -> Self {
         let named = self.with_derived_names(alias);
         Self(
             named
@@ -678,7 +679,7 @@ impl<'a> ProjectionColumns<'a> {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut matches = self.0.into_iter().filter(|column| column.name() == name);
         let Some(column) = matches.next() else {
-            return Ok(crate::sem::ColumnReferenceExpr::function_source_ref(
+            return Ok(ColumnReferenceExpr::function_source_ref(
                 context,
                 alias,
                 name,
@@ -690,7 +691,7 @@ impl<'a> ProjectionColumns<'a> {
             .0);
         };
         if matches.next().is_some() {
-            return crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(context, name);
+            return ColumnReferenceExpr::ambiguous_column_resolved(context, name);
         }
         column.with_nullability(nullable).bind_direct(context, with)
     }
@@ -732,7 +733,7 @@ impl<'a> WildcardProjection<'a> {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-        results: &mut crate::sem::ResultColumnCollection,
+        results: &mut ResultColumnCollection,
         location: Option<usize>,
         binding_qualifier: Option<&AliasName>,
     ) -> Result<bool, AnalysisError> {
@@ -745,13 +746,8 @@ impl<'a> WildcardProjection<'a> {
             references.push(column.projection_reference(binding_qualifier));
             column.collect_projection_sources(&mut sources);
         }
-        let mut expansion = crate::sem::WildcardExpansion::new(
-            location,
-            results,
-            first,
-            self.table_dependent,
-            &references,
-        );
+        let mut expansion =
+            WildcardExpansion::new(location, results, first, self.table_dependent, &references);
         expansion.retain_source_scope(self.source_scope_depth);
         expansion.retain_source_projections(&sources.resolve(context, scope)?);
         for column in &self.columns {

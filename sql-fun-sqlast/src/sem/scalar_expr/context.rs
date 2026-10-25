@@ -1,15 +1,23 @@
-use crate::sem::{
-    AnalysisError, ColumnName, ColumnReferenceExpr, FromClause, ParseContext, SemScalarExpr,
-    WithClause,
-    data_source::{AliasName, WildcardProjection},
-    scalar_expr::column_ref::UndefinedAliasColumnRef,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, DataSource,
+        DeleteRowVersion, FromClause, FullName, MergeMatchKind, QueryNameResolution, QueryProblem,
+        ResultColumnCollection, RuleEvent, RuleIdentity, SchemaName, SemScalarExpr, WholeRowExpr,
+        WithClause,
+        data_source::{AliasName, MergeRecordRole, QualifiedSource, WildcardProjection},
+        problem::{RuleProblem, TriggerProblem},
+        scalar_expr::column_ref::UndefinedAliasColumnRef,
+    },
 };
 
 use std::borrow::Cow;
 
+use super::grouping::ReferenceCapture;
+
 /// Expression-local scope used during scalar semantic analysis.
 ///
-/// This is separate from [`crate::sem::ParseContext`], which provides schema
+/// This is separate from [`ParseContext`], which provides schema
 /// information and collects diagnostics. Nested scalar expressions share this
 /// scope, so additional contextual bindings can be introduced here without
 /// changing every expression analyzer's arguments.
@@ -20,18 +28,18 @@ pub struct ScalarAnalysisContext<'a> {
     parent: Option<Box<Self>>,
     windows: Vec<String>,
     grouping: super::grouping::GroupingScope,
-    output_aliases: Option<crate::sem::ResultColumnCollection>,
+    output_aliases: Option<ResultColumnCollection>,
     delete_returning_target: Option<AliasName>,
     qualified_only: bool,
     rule: Option<RuleScope>,
-    trigger_namespace: Option<crate::sem::SchemaName>,
+    trigger_namespace: Option<SchemaName>,
     projection_scope_id: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
 struct RuleScope {
-    identity: crate::sem::RuleIdentity,
-    event: crate::sem::RuleEvent,
+    identity: RuleIdentity,
+    event: RuleEvent,
     forbidden: Option<&'static str>,
 }
 
@@ -44,15 +52,12 @@ impl<'a> ScalarAnalysisContext<'a> {
         self.projection_scope_id = Some(id);
     }
 
-    pub(crate) fn with_grouping_capture(
-        &self,
-        capture: &super::grouping::ReferenceCapture,
-    ) -> Self {
+    pub(crate) fn with_grouping_capture(&self, capture: &ReferenceCapture) -> Self {
         let mut scope = self.clone_scope();
         scope.add_grouping_capture(capture);
         scope
     }
-    fn add_grouping_capture(&mut self, capture: &super::grouping::ReferenceCapture) {
+    fn add_grouping_capture(&mut self, capture: &ReferenceCapture) {
         self.grouping.add_capture(capture);
         if let Some(parent) = &mut self.parent {
             parent.add_grouping_capture(capture);
@@ -71,7 +76,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         scope
     }
 
-    pub(crate) fn with_added_source(&self, source: &crate::sem::DataSource) -> Self {
+    pub(crate) fn with_added_source(&self, source: &DataSource) -> Self {
         let mut scope = self.clone_scope();
         scope.from_clause.to_mut().push(source.clone());
         scope
@@ -131,7 +136,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn relation_projection_names(
         &self,
         context: &mut impl ParseContext,
-        relation: &crate::sem::FullName,
+        relation: &FullName,
     ) -> Result<WildcardProjection<'_>, AnalysisError> {
         match self.from_clause.qualified_source(context, relation) {
             Ok(Some(source)) => source.resolved_wildcard_projection(context, &self.with_clause),
@@ -143,7 +148,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     fn parent_relation_projection_names(
         &self,
         context: &mut impl ParseContext,
-        relation: &crate::sem::FullName,
+        relation: &FullName,
     ) -> Result<WildcardProjection<'_>, AnalysisError> {
         let Some(parent) = &self.parent else {
             return Ok(WildcardProjection::unresolved());
@@ -157,8 +162,8 @@ impl<'a> ScalarAnalysisContext<'a> {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<WildcardProjection<'_>, AnalysisError> {
-        context.report_analysis_problem(crate::sem::AnalysisProblem::query(
-            crate::sem::QueryProblem::ambiguous_reference("star source"),
+        context.report_analysis_problem(AnalysisProblem::query(
+            QueryProblem::ambiguous_reference("star source"),
         ))?;
         Ok(WildcardProjection::new(&[], true, false))
     }
@@ -166,8 +171,8 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn rule(
         with: &'a WithClause,
         from: &'a FromClause,
-        identity: &crate::sem::RuleIdentity,
-        event: crate::sem::RuleEvent,
+        identity: &RuleIdentity,
+        event: RuleEvent,
         predicate: bool,
     ) -> Self {
         let mut scope = Self::new(with, from);
@@ -187,8 +192,8 @@ impl<'a> ScalarAnalysisContext<'a> {
         if let Some(identity) = self.direct_rule_identity() {
             for name in ["old", "new"] {
                 if from.contains_alias(&AliasName::from(name)) {
-                    context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                        &crate::sem::problem::RuleProblem::definition(
+                    context.report_analysis_problem(AnalysisProblem::rule(
+                        &RuleProblem::definition(
                             identity,
                             "action source conflicts with rule OLD/NEW namespace",
                         ),
@@ -218,7 +223,7 @@ impl<'a> ScalarAnalysisContext<'a> {
                 .as_ref()
                 .is_some_and(|parent| parent.in_rule_definition())
     }
-    pub(crate) fn rule_identity(&self) -> Option<&crate::sem::RuleIdentity> {
+    pub(crate) fn rule_identity(&self) -> Option<&RuleIdentity> {
         if let Some(rule) = &self.rule {
             Some(&rule.identity)
         } else if let Some(parent) = &self.parent {
@@ -227,7 +232,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             None
         }
     }
-    pub(crate) fn direct_rule_identity(&self) -> Option<&crate::sem::RuleIdentity> {
+    pub(crate) fn direct_rule_identity(&self) -> Option<&RuleIdentity> {
         self.rule
             .as_ref()
             .filter(|rule| rule.forbidden.is_none())
@@ -244,9 +249,10 @@ impl<'a> ScalarAnalysisContext<'a> {
             let detail = rule
                 .forbidden
                 .unwrap_or("OLD/NEW reference is not available for this event");
-            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                &crate::sem::problem::RuleProblem::definition(&rule.identity, detail),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::definition(
+                &rule.identity,
+                detail,
+            )))?;
         }
         Ok(())
     }
@@ -256,10 +262,10 @@ impl<'a> ScalarAnalysisContext<'a> {
         scope.qualified_only = true;
         scope
     }
-    pub(crate) fn set_trigger_namespace(&mut self, schema: Option<&crate::sem::SchemaName>) {
+    pub(crate) fn set_trigger_namespace(&mut self, schema: Option<&SchemaName>) {
         self.trigger_namespace = schema.cloned();
     }
-    fn trigger_namespace(&self) -> Option<&crate::sem::SchemaName> {
+    fn trigger_namespace(&self) -> Option<&SchemaName> {
         if let Some(schema) = &self.trigger_namespace {
             Some(schema)
         } else if let Some(parent) = &self.parent {
@@ -271,8 +277,8 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn trigger_relation_name(
         &self,
         context: &mut impl ParseContext,
-        name: &crate::sem::FullName,
-    ) -> Result<crate::sem::FullName, AnalysisError> {
+        name: &FullName,
+    ) -> Result<FullName, AnalysisError> {
         if context.dialect() != crate::ast::Dialect::sqlite() {
             return Ok(name.clone());
         }
@@ -284,12 +290,10 @@ impl<'a> ScalarAnalysisContext<'a> {
                 .schema()
                 .is_some_and(|supplied| !supplied.as_str().eq_ignore_ascii_case(schema.as_str()))
         {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::options(
-                    name,
-                    "non-TEMP SQLite triggers can reference only their own database",
-                ),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::trigger(&TriggerProblem::options(
+                name,
+                "non-TEMP SQLite triggers can reference only their own database",
+            )))?;
         }
         Ok(name.replace_schema(schema))
     }
@@ -364,17 +368,17 @@ impl<'a> ScalarAnalysisContext<'a> {
 
     pub(crate) fn for_merge_on(
         with_clause: &'a WithClause,
-        target: &crate::sem::DataSource,
-        source: &crate::sem::DataSource,
+        target: &DataSource,
+        source: &DataSource,
     ) -> Self {
         Self::with_owned_from_clause(with_clause, FromClause::for_merge_on(target, source))
     }
 
     pub(crate) fn for_merge_when(
         with_clause: &'a WithClause,
-        target: &crate::sem::DataSource,
-        source: &crate::sem::DataSource,
-        kind: crate::sem::MergeMatchKind,
+        target: &DataSource,
+        source: &DataSource,
+        kind: MergeMatchKind,
     ) -> Self {
         Self::with_owned_from_clause(
             with_clause,
@@ -385,8 +389,8 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn for_merge_returning(
         context: &impl ParseContext,
         with_clause: &'a WithClause,
-        target: &crate::sem::DataSource,
-        source: &crate::sem::DataSource,
+        target: &DataSource,
+        source: &DataSource,
         source_nullable: bool,
         old_nullable: bool,
         new_nullable: bool,
@@ -445,14 +449,14 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn delete_row_target(
         &self,
         alias: &AliasName,
-    ) -> Option<(&AliasName, crate::sem::DeleteRowVersion)> {
+    ) -> Option<(&AliasName, DeleteRowVersion)> {
         if self.from_clause.contains_alias(alias) {
             return None;
         }
-        let version = crate::sem::DeleteRowVersion::from_alias(alias.as_str())?;
+        let version = DeleteRowVersion::from_alias(alias.as_str())?;
         Some((self.delete_returning_target.as_ref()?, version))
     }
-    pub(crate) fn set_output_aliases(&mut self, columns: &crate::sem::ResultColumnCollection) {
+    pub(crate) fn set_output_aliases(&mut self, columns: &ResultColumnCollection) {
         self.output_aliases = Some(columns.clone());
     }
     pub(crate) fn has_input_column(
@@ -474,12 +478,12 @@ impl<'a> ScalarAnalysisContext<'a> {
             Ok(true)
         }
     }
-    pub(crate) fn resolve_lock(&self, name: &str) -> crate::sem::QueryNameResolution {
+    pub(crate) fn resolve_lock(&self, name: &str) -> QueryNameResolution {
         let alias = AliasName::from(name);
         match self.from_clause.namespace().resolve_name(&alias) {
-            Ok(Some(_)) => crate::sem::QueryNameResolution::source(&alias),
-            Ok(None) => crate::sem::QueryNameResolution::not_found(),
-            Err(()) => crate::sem::QueryNameResolution::ambiguous(),
+            Ok(Some(_)) => QueryNameResolution::source(&alias),
+            Ok(None) => QueryNameResolution::not_found(),
+            Err(()) => QueryNameResolution::ambiguous(),
         }
     }
     pub(crate) fn with_window_names(&self, names: Vec<String>) -> Self {
@@ -493,17 +497,14 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn resolve_window(
         &self,
         name: &str,
-        context: &impl crate::sem::ParseContext,
-    ) -> crate::sem::QueryNameResolution {
+        context: &impl ParseContext,
+    ) -> QueryNameResolution {
         if context.dialect() == crate::ast::Dialect::sqlite() {
             return self
                 .windows
                 .iter()
                 .rposition(|candidate| candidate == name)
-                .map_or_else(
-                    crate::sem::QueryNameResolution::not_found,
-                    crate::sem::QueryNameResolution::window,
-                );
+                .map_or_else(QueryNameResolution::not_found, QueryNameResolution::window);
         }
         let mut candidates = self
             .windows
@@ -511,12 +512,12 @@ impl<'a> ScalarAnalysisContext<'a> {
             .enumerate()
             .filter(|(_, candidate)| candidate.as_str() == name);
         let Some((index, _)) = candidates.next() else {
-            return crate::sem::QueryNameResolution::not_found();
+            return QueryNameResolution::not_found();
         };
         if candidates.next().is_some() {
-            crate::sem::QueryNameResolution::ambiguous()
+            QueryNameResolution::ambiguous()
         } else {
-            crate::sem::QueryNameResolution::window(index)
+            QueryNameResolution::window(index)
         }
     }
     pub(crate) fn inherited_ctes(&self) -> WithClause {
@@ -534,7 +535,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn merge_row_target(
         &self,
         alias: &AliasName,
-    ) -> Option<(&AliasName, crate::sem::data_source::MergeRecordRole, bool)> {
+    ) -> Option<(&AliasName, MergeRecordRole, bool)> {
         self.from_clause.merge_row_target(alias)
     }
 
@@ -572,7 +573,7 @@ impl ScalarAnalysisContext<'_> {
     pub(crate) fn resolve_qualified_column(
         &self,
         context: &mut impl ParseContext,
-        qualifier: &crate::sem::FullName,
+        qualifier: &FullName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
         use super::column_ref::QualifiedColumnFailure;
@@ -587,8 +588,7 @@ impl ScalarAnalysisContext<'_> {
             if catalog.as_str() != database {
                 return QualifiedColumnFailure::cross_database(context, qualifier, column);
             }
-            relation =
-                crate::sem::FullName::new(&None, &qualifier.schema().cloned(), qualifier.name());
+            relation = FullName::new(&None, &qualifier.schema().cloned(), qualifier.name());
         }
         self.resolve_qualified_in_scope(context, &relation, qualifier, column)
     }
@@ -596,8 +596,8 @@ impl ScalarAnalysisContext<'_> {
     fn resolve_qualified_in_scope(
         &self,
         context: &mut impl ParseContext,
-        relation: &crate::sem::FullName,
-        requested: &crate::sem::FullName,
+        relation: &FullName,
+        requested: &FullName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
         use super::column_ref::QualifiedColumnFailure;
@@ -641,7 +641,7 @@ impl ScalarAnalysisContext<'_> {
         Ok((value, context))
     }
 
-    pub(crate) fn resolve_column<'context, TContext: crate::sem::ParseContext>(
+    pub(crate) fn resolve_column<'context, TContext: ParseContext>(
         &self,
         context: &'context mut TContext,
         alias: Option<&AliasName>,
@@ -672,7 +672,7 @@ impl ScalarAnalysisContext<'_> {
                 Err(()) => {
                     let expression = super::column_ref::QualifiedColumnFailure::ambiguous(
                         context,
-                        &crate::sem::FullName::from_local_name(alias.as_str()),
+                        &FullName::from_local_name(alias.as_str()),
                         column,
                     )?;
                     return Ok((expression, context));
@@ -743,7 +743,7 @@ impl ScalarAnalysisContext<'_> {
     pub(crate) fn bind_source<'context, C: ParseContext>(
         &self,
         context: &'context mut C,
-        source: &crate::sem::data_source::QualifiedSource<'_>,
+        source: &QualifiedSource<'_>,
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut C), AnalysisError> {
         self.grouping.reference();
@@ -904,7 +904,7 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         self.grouping.reference();
         let Some((source, nullability)) = self.from_clause.resolve_alias(alias) else {
@@ -920,9 +920,8 @@ impl ScalarAnalysisContext<'_> {
     pub(crate) fn resolve_whole_row(
         &self,
         context: &mut impl ParseContext,
-        requested: &crate::sem::FullName,
+        requested: &FullName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        use crate::sem::{FullName, WholeRowExpr};
         let mut relation = requested.clone();
         if let Some(catalog) = requested.catalog() {
             let Some(database) = context.metadata().database_name() else {
@@ -939,11 +938,10 @@ impl ScalarAnalysisContext<'_> {
     fn resolve_whole_row_in_scope(
         &self,
         context: &mut impl ParseContext,
-        relation: &crate::sem::FullName,
-        requested: &crate::sem::FullName,
+        relation: &FullName,
+        requested: &FullName,
         levels_up: usize,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        use crate::sem::WholeRowExpr;
         let source = if relation.schema().is_some() {
             if self.qualified_only {
                 Ok(None)

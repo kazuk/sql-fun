@@ -1,7 +1,11 @@
 //! Supported inspection of the owned common AST.
 
-use crate::StringSpan;
-use crate::ast::{Cte, CteBody, Dialect, StatementNode, With};
+use crate::{
+    StringSpan,
+    ast::{Cte, CteBody, Dialect, StatementNode, With},
+    context::ParseContext,
+    sem::AnalysisError,
+};
 
 /// An owned, unresolved statement in an explicitly selected SQL dialect.
 ///
@@ -80,11 +84,11 @@ impl Statement {
     ///
     /// Returns a dialect mismatch, resolver, or diagnostic reporting error.
     /// The statement dialect must match the supplied context metadata.
-    pub fn analyze<TContext: crate::sem::ParseContext>(
+    pub fn analyze<TContext: ParseContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError> {
-        crate::sem::AnalysisError::check_dialect(self.dialect, context.dialect())?;
+    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError> {
+        AnalysisError::check_dialect(self.dialect, context.dialect())?;
         self.node.resolve_and_apply(context)
     }
 
@@ -537,11 +541,11 @@ impl CteBody {
 #[cfg(test)]
 mod test_parameter_analysis {
     use crate::ast::Dialect;
+    use crate::context::ParseContext;
     use crate::parse_statements;
     use crate::sem::{
         BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
-        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, ParseContext,
-        PgBuiltInType,
+        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType,
     };
     use crate::test_helpers::TestParseContext;
     use std::collections::BTreeMap;
@@ -935,8 +939,9 @@ mod test_parameter_analysis {
 #[cfg(test)]
 mod test_parameter_casts {
     use crate::ast::Dialect;
+    use crate::context::ParseContext;
     use crate::parse_statements;
-    use crate::sem::{ParseContext, PgBuiltInType};
+    use crate::sem::PgBuiltInType;
     use crate::test_helpers::TestParseContext;
 
     #[rstest::rstest]

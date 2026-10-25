@@ -1,10 +1,6 @@
 //! SQL input constraints are independent of parameter hints and Rust code generation.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::{
-    ast::Dialect,
-    parse_statements,
-    sem::{ParseContext, PgBuiltInType},
-};
+use ::sql_fun_sqlast::{ast::Dialect, context::ParseContext, parse_statements, sem::PgBuiltInType};
 use std::collections::BTreeMap;
 
 #[test]

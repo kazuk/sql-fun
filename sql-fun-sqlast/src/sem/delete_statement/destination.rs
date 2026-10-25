@@ -1,5 +1,10 @@
-use crate::sem::search_path::expand_relation_search_path;
-use crate::sem::{ParseContext, TableName, ViewDeleteSupport};
+use crate::{
+    context::ParseContext,
+    sem::{
+        FullName, TableName, ViewDeleteSupport, ViewLike, ViewName,
+        search_path::expand_relation_search_path,
+    },
+};
 
 /// DELETE-owned projection of the bound catalog destination.
 pub(crate) struct DeleteDestination {
@@ -17,7 +22,7 @@ impl DeleteDestination {
             .resolve_relation_name(requested.full_name())
             .map(Self::from_rule_target)
     }
-    fn from_rule_target(name: crate::sem::FullName) -> Self {
+    fn from_rule_target(name: FullName) -> Self {
         Self {
             name: TableName::from(name),
             found: true,
@@ -29,7 +34,7 @@ impl DeleteDestination {
             Self::resolve_at(context, key)
         })
     }
-    fn resolve_at(context: &impl ParseContext, key: &crate::sem::FullName) -> Option<Self> {
+    fn resolve_at(context: &impl ParseContext, key: &FullName) -> Option<Self> {
         let canonical;
         let key = if context.dialect() == crate::ast::Dialect::sqlite() {
             canonical = context.sqlite_relation_identity(key)?;
@@ -40,16 +45,12 @@ impl DeleteDestination {
         if context.get_table(&TableName::from(key.clone())).is_some() {
             return Some(Self::from_rule_target(key.clone()));
         }
-        if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(key)) {
+        if let Some(view) = context.get_view(&ViewName::from_full_name(key)) {
             return Some(Self::from_view(context, key, view));
         }
         None
     }
-    fn from_view(
-        context: &impl ParseContext,
-        key: &crate::sem::FullName,
-        view: &crate::sem::ViewLike,
-    ) -> Self {
+    fn from_view(context: &impl ParseContext, key: &FullName, view: &ViewLike) -> Self {
         let support = if view.is_materialized() {
             ViewDeleteSupport::read_only()
         } else {

@@ -1,5 +1,11 @@
 //! Internal short-circuiting of one invalid construct, distinct from engine failure.
-use crate::sem::{AnalysisError, AnalysisProblem, ParseContext};
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, AnalysisProblem,
+        problem::{RuleProblem, TriggerProblem, ViewProblem},
+    },
+};
 
 pub(crate) enum ResolutionFailure {
     Problem(Box<AnalysisProblem>),
@@ -7,13 +13,13 @@ pub(crate) enum ResolutionFailure {
     Fatal(AnalysisError),
 }
 impl ResolutionFailure {
-    pub(crate) fn rule(problem: &crate::sem::problem::RuleProblem) -> Self {
+    pub(crate) fn rule(problem: &RuleProblem) -> Self {
         Self::Problem(Box::new(AnalysisProblem::rule(problem)))
     }
-    pub(crate) fn trigger(problem: &crate::sem::problem::TriggerProblem) -> Self {
+    pub(crate) fn trigger(problem: &TriggerProblem) -> Self {
         Self::Problem(Box::new(AnalysisProblem::trigger(problem)))
     }
-    pub(crate) fn view(problem: &crate::sem::problem::ViewProblem) -> Self {
+    pub(crate) fn view(problem: &ViewProblem) -> Self {
         Self::Problem(Box::new(AnalysisProblem::view(problem)))
     }
     pub(crate) const fn reported() -> Self {

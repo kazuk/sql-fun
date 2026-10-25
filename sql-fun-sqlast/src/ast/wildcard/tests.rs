@@ -2,7 +2,7 @@ mod test_helpers;
 
 use self::test_helpers::{ResultShapeAssertions, catalog, expansions, rewritten, statement};
 use crate::ast::Dialect;
-use crate::sem::ParseContext;
+use crate::context::ParseContext;
 
 #[rstest::rstest]
 #[case::repeated("SELECT t.*, *, t.* FROM t", 3)]

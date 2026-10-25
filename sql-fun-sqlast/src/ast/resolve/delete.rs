@@ -1,9 +1,12 @@
-use crate::ast::{Alias, Delete, Dialect, Expr, FromItem};
-use crate::sem::DeleteDestination;
-use crate::sem::problem::DeleteProblemKind;
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, DataSource, DeleteStatement, FromClause,
-    ParseContext, ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
+use crate::{
+    ast::{Alias, Delete, Dialect, Expr, FromItem},
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, DeleteCursor, DeleteDestination,
+        DeletePredicate, DeleteStatement, FromClause, FullName, PgBuiltInType,
+        ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
+        parameter_resolution::ParameterResolution, problem::DeleteProblemKind,
+    },
 };
 
 impl Delete {
@@ -14,11 +17,7 @@ impl Delete {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|mut delete| {
             if context.parameter_inference_needed() {
-                let constraints =
-                    crate::sem::parameter_resolution::ParameterResolution::infer_delete(
-                        &mut delete,
-                        context,
-                    )?;
+                let constraints = ParameterResolution::infer_delete(&mut delete, context)?;
                 context.set_parameter_constraints(&constraints);
             }
             Ok(delete)
@@ -116,7 +115,7 @@ impl Delete {
         table: &DeleteDestination,
     ) -> Result<(), AnalysisError> {
         if let Some(index) = &self.relation.indexed {
-            let name = crate::sem::FullName::with_schema(
+            let name = FullName::with_schema(
                 table
                     .name()
                     .full_name()
@@ -162,30 +161,28 @@ impl Delete {
         context: &mut impl ParseContext,
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<crate::sem::DeletePredicate>, AnalysisError> {
+    ) -> Result<Option<DeletePredicate>, AnalysisError> {
         if let Some(expression) = &self.predicate
             && let Some(cursor) = expression.resolve_delete_current_of(context, target)?
         {
-            return Ok(Some(crate::sem::DeletePredicate::current_of(&cursor)));
+            return Ok(Some(DeletePredicate::current_of(&cursor)));
         }
         let predicate = Expr::resolve_optional(&self.predicate, context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
-            && ty != crate::sem::PgBuiltInType::bool()
+            && ty != PgBuiltInType::bool()
             && !value
                 .as_const()
                 .is_some_and(|c| c.is_null() || c.as_string().is_some())
             && context
-                .get_implicit_cast(&ty, &crate::sem::PgBuiltInType::bool())
+                .get_implicit_cast(&ty, &PgBuiltInType::bool())
                 .is_none()
         {
             context
                 .report_analysis_problem(AnalysisProblem::delete(DeleteProblemKind::predicate()))?;
         }
-        Ok(predicate
-            .as_ref()
-            .map(crate::sem::DeletePredicate::expression))
+        Ok(predicate.as_ref().map(DeletePredicate::expression))
     }
     fn resolve_returning_scope(
         &self,
@@ -226,7 +223,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<Option<crate::sem::DeleteCursor>, AnalysisError> {
+    ) -> Result<Option<DeleteCursor>, AnalysisError> {
         match self {
             Self::CurrentOf(cursor) => cursor.resolve_delete(context, target).map(Some),
             _ => Ok(None),
@@ -238,14 +235,14 @@ impl crate::ast::CurrentOf {
         &self,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<crate::sem::DeleteCursor, AnalysisError> {
+    ) -> Result<DeleteCursor, AnalysisError> {
         if self.parameter != 0 {
             context.report_analysis_problem(AnalysisProblem::delete(
                 DeleteProblemKind::cursor_parameter(self.parameter),
             ))?;
-            return Ok(crate::sem::DeleteCursor::parameter(self.parameter));
+            return Ok(DeleteCursor::parameter(self.parameter));
         }
-        let cursor = crate::sem::DeleteCursor::new(&self.name, context.resolve_cursor(&self.name));
+        let cursor = DeleteCursor::new(&self.name, context.resolve_cursor(&self.name));
         let problem = match cursor.binding() {
             None => Some(DeleteProblemKind::missing_cursor(&self.name)),
             Some(info) if info.updatable() == Some(false) => {

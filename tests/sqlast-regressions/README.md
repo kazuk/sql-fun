@@ -123,3 +123,12 @@ types and nullability run through both source and installed CLI checks. Rust
 retains operand structure/coercions, serialization, binding outcomes and
 admissible parameter domains; synthetic cast contexts remain unit tests because
 they model conversion policies absent from the shipped catalog.
+
+Issue #502 symmetric range predicates live in `between-symmetric.json`, selected
+with `between-symmetric.sql` on PostgreSQL 17/18. Both variants cover endpoint
+order, equal bounds, mixed comparable types, NULL positions, column lookup,
+parameters, nested expressions, and WHERE consumers. The shared source and
+installed paths check diagnostics and exact result metadata. Rust tests retain
+comparison bindings, operand lookup outcomes, serialization, and correlated
+parameter assignments; synthetic overload tests verify independent negative-form
+operators and bounds that cannot be compared with each other.

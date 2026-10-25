@@ -4,6 +4,21 @@ This page is for application developers writing queries or investigating SQL
 analysis diagnostics. It describes supported forms and current limitations;
 installation and initial configuration are covered in [Installation](installation.md).
 
+## PostgreSQL symmetric range predicates
+
+Analysis supports `BETWEEN SYMMETRIC` and `NOT BETWEEN SYMMETRIC`:
+
+```sql
+SELECT price BETWEEN SYMMETRIC $1::numeric AND $2::numeric AS within_range
+FROM products
+```
+
+Either endpoint order is accepted, and both endpoints are inclusive.
+Operands must support the corresponding PostgreSQL comparisons; compatible
+mixed types are allowed. NULL follows SQL's three-valued comparison logic.
+Analysis checks operand references and parameter constraints and describes a
+boolean result; it does not evaluate the predicate's value.
+
 ## Wildcard projection expansion
 
 PostgreSQL datasources can opt in to expanding table-dependent wildcard

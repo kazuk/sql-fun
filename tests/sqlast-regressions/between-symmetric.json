@@ -1,0 +1,1054 @@
+[
+  {
+    "name": "positive::forward",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC 1 AND 3 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::reverse",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::equal",
+    "sql": "SELECT 1 BETWEEN SYMMETRIC 1 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::outside",
+    "sql": "SELECT 4 BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::mixed",
+    "sql": "SELECT 2::int2 BETWEEN SYMMETRIC 3::int8 AND 1::numeric AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::text",
+    "sql": "SELECT 'b'::text BETWEEN SYMMETRIC 'c'::text AND 'a'::text AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::null_0_NULL",
+    "sql": "SELECT NULL BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::null_0_NULL::int",
+    "sql": "SELECT NULL::int BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::null_1_NULL",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC NULL AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::null_1_NULL::int",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC NULL::int AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::null_2_NULL",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC 3 AND NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::null_2_NULL::int",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC 3 AND NULL::int AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::column_required",
+    "sql": "SELECT required BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::column_nullable",
+    "sql": "SELECT nullable BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::column_v.required",
+    "sql": "SELECT v.required BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::cast_parameter_0",
+    "sql": "SELECT $1::int BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::cast_parameter_1",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC $1::int AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::cast_parameter_2",
+    "sql": "SELECT 2 BETWEEN SYMMETRIC 3 AND $1::int AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::deferred",
+    "sql": "SELECT $1 BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::repeated",
+    "sql": "SELECT $1 BETWEEN SYMMETRIC $1 AND $1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::nested",
+    "sql": "SELECT COALESCE($1::int,2) BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::incompatible",
+    "sql": "SELECT 1 BETWEEN SYMMETRIC true AND false AS result",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::missing",
+    "sql": "SELECT missing BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::ambiguous",
+    "sql": "SELECT required BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values a, symmetric_values b",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::where",
+    "sql": "SELECT true AS result FROM symmetric_values WHERE required BETWEEN SYMMETRIC 3 AND 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::forward",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC 1 AND 3 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::reverse",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::equal",
+    "sql": "SELECT 1 NOT BETWEEN SYMMETRIC 1 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::outside",
+    "sql": "SELECT 4 NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::mixed",
+    "sql": "SELECT 2::int2 NOT BETWEEN SYMMETRIC 3::int8 AND 1::numeric AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::text",
+    "sql": "SELECT 'b'::text NOT BETWEEN SYMMETRIC 'c'::text AND 'a'::text AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::null_0_NULL",
+    "sql": "SELECT NULL NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::null_0_NULL::int",
+    "sql": "SELECT NULL::int NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::null_1_NULL",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC NULL AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::null_1_NULL::int",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC NULL::int AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::null_2_NULL",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC 3 AND NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::null_2_NULL::int",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC 3 AND NULL::int AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::column_required",
+    "sql": "SELECT required NOT BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::column_nullable",
+    "sql": "SELECT nullable NOT BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::column_v.required",
+    "sql": "SELECT v.required NOT BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::cast_parameter_0",
+    "sql": "SELECT $1::int NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::cast_parameter_1",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC $1::int AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::cast_parameter_2",
+    "sql": "SELECT 2 NOT BETWEEN SYMMETRIC 3 AND $1::int AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::deferred",
+    "sql": "SELECT $1 NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::repeated",
+    "sql": "SELECT $1 NOT BETWEEN SYMMETRIC $1 AND $1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::nested",
+    "sql": "SELECT COALESCE($1::int,2) NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::incompatible",
+    "sql": "SELECT 1 NOT BETWEEN SYMMETRIC true AND false AS result",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::missing",
+    "sql": "SELECT missing NOT BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::ambiguous",
+    "sql": "SELECT required NOT BETWEEN SYMMETRIC 3 AND 1 AS result FROM symmetric_values a, symmetric_values b",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::where",
+    "sql": "SELECT true AS result FROM symmetric_values WHERE required NOT BETWEEN SYMMETRIC 3 AND 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::hinted",
+    "sql": "SELECT ${value:int4} BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "positive::conflicting",
+    "sql": "SELECT $1 BETWEEN SYMMETRIC 3 AND 1 AS result, $1::date AS conflict",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "conflict",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "date",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::hinted",
+    "sql": "SELECT ${value:int4} NOT BETWEEN SYMMETRIC 3 AND 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "negative::conflicting",
+    "sql": "SELECT $1 NOT BETWEEN SYMMETRIC 3 AND 1 AS result, $1::date AS conflict",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "conflict",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "date",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "later_independent_input",
+    "sql": "SELECT true AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  }
+]

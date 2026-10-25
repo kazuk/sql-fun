@@ -506,6 +506,9 @@ impl OperatorKind {
             }
             Self::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
             Self::Between | Self::NotBetween => self.resolve_between(left, right),
+            Self::BetweenSymmetric | Self::NotBetweenSymmetric => {
+                self.resolve_symmetric_between(context, left, right)
+            }
             _ => todo!("operator semantic analysis"),
         }
     }
@@ -524,6 +527,28 @@ impl OperatorKind {
         } else {
             ArithExpr::between(left, (start, end))
         })
+    }
+
+    fn resolve_symmetric_between(
+        &self,
+        context: &mut impl ParseContext,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let left = left.expect("BETWEEN SYMMETRIC argument");
+        let values = right
+            .expect("BETWEEN SYMMETRIC bounds")
+            .into_list_values()?;
+        let Ok([start, end]): Result<[SemScalarExpr; 2], _> = values.try_into() else {
+            return AnalysisError::raise_unexpected_input("BETWEEN SYMMETRIC bounds");
+        };
+        ArithExpr::symmetric_between(
+            context,
+            &left,
+            &start,
+            &end,
+            matches!(self, Self::NotBetweenSymmetric),
+        )
     }
 }
 

@@ -23,7 +23,7 @@ pub use self::{
     table_info::{TableInfoRead, TableInfoWrite},
     trigger_info::{TriggerInfoRead, TriggerInfoWrite},
     type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite},
-    type_info::{TypeInfoRead, TypeInfoWrite},
+    type_info::{RangeTypeRelationship, TypeInfoRead, TypeInfoWrite},
     view_info::{ViewInfoRead, ViewInfoWrite},
 };
 

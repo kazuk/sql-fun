@@ -117,7 +117,7 @@ impl FunctionOverloadCollection {
         }
         if simple_infer_context.is_require_infer() {
             let inferred_type = simple_infer_context.get_inference_result()?;
-            overload.apply_simple_infer_result(&inferred_type);
+            overload.apply_simple_infer_result(&inferred_type)?;
         }
         Ok(())
     }
@@ -136,7 +136,7 @@ impl FunctionOverloadCollection {
         }
         if common_infer_context.is_require_infer() {
             let inferred_type = common_infer_context.infer_from_catalog(context)?;
-            overload.apply_common_infer_result(&inferred_type);
+            overload.apply_common_infer_result(&inferred_type)?;
         }
         Ok(())
     }

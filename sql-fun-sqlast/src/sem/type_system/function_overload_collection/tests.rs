@@ -491,3 +491,109 @@ fn deferred_variadic_any_keeps_concrete_overload_correlation(
     );
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::common_array_subtype(
+    "anycompatiblerange",
+    "anycompatible",
+    "vf(NULL::array_span)",
+    "_int4"
+)]
+#[case::array_subtype("anyrange", "anyelement", "vf(NULL::array_span)", "_int4")]
+#[case::range_identity("anyrange", "anyrange", "vf(NULL::span)", "span")]
+#[case::range_element("anyrange", "anyelement", "vf(NULL::span)", "int4")]
+#[case::range_multirange("anyrange", "anymultirange", "vf(NULL::span)", "spans")]
+#[case::multirange_range("anymultirange", "anyrange", "vf(NULL::spans)", "span")]
+#[case::multirange_element("anymultirange", "anyelement", "vf(NULL::spans)", "int4")]
+#[case::multirange_identity("anymultirange", "anymultirange", "vf(NULL::spans)", "spans")]
+#[case::mixed_family(
+    "anyrange, anymultirange",
+    "anyrange",
+    "vf(NULL::span,NULL::spans)",
+    "span"
+)]
+#[case::same_subtype_other_range("anyrange", "anyrange", "vf(NULL::other)", "other")]
+#[case::common_range("anycompatiblerange", "anycompatiblerange", "vf(NULL::span)", "span")]
+#[case::common_multi(
+    "anycompatiblemultirange",
+    "anycompatiblerange",
+    "vf(NULL::spans)",
+    "span"
+)]
+#[case::common_range_multi(
+    "anycompatiblerange",
+    "anycompatiblemultirange",
+    "vf(NULL::span)",
+    "spans"
+)]
+#[case::common_element(
+    "anycompatiblerange, anycompatible",
+    "anycompatiblerange",
+    "vf(NULL::span,1)",
+    "span"
+)]
+fn range_polymorphism_retains_catalog_identity(
+    #[case] parameters: &str,
+    #[case] result: &str,
+    #[case] expression: &str,
+    #[case] expected: &str,
+) -> testresult::TestResult {
+    let analyzed =
+        test_helpers::analyze_vector(&format!("SELECT {expression}"), parameters, result)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let ty = query
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .col_type()
+        .as_ref()
+        .unwrap();
+    let expected = if expected == "int4" || expected == "_int4" {
+        TypeReference::from_master_type_name(expected)
+    } else {
+        TypeReference::from_full_name(crate::sem::FullName::with_schema("public", expected))
+    };
+    assert_eq!(ty, &expected);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::array_of_array_result("anyrange", "anyarray", "vf(NULL::array_span)")]
+#[case::nonarray_array_result("anyrange", "anynonarray", "vf(NULL::array_span)")]
+#[case::common_array_of_array_result(
+    "anycompatiblerange",
+    "anycompatiblearray",
+    "vf(NULL::array_span)"
+)]
+#[case::fake_suffix("anyrange", "anyrange", "vf(NULL::fakerange)")]
+#[case::array("anyrange", "anyrange", "vf(NULL::span[])")]
+#[case::wrong_kind("anyrange", "anyrange", "vf(NULL::spans)")]
+#[case::wrong_multi_kind("anymultirange", "anyrange", "vf(NULL::span)")]
+#[case::different_ranges("anyrange,anyrange", "anyrange", "vf(NULL::span,NULL::other)")]
+#[case::different_families("anyrange,anymultirange", "anyrange", "vf(NULL::span,NULL::others)")]
+#[case::common_different_ranges(
+    "anycompatiblerange,anycompatiblerange",
+    "anycompatiblerange",
+    "vf(NULL::span,NULL::other)"
+)]
+#[case::common_cannot_promote_subtype(
+    "anycompatiblerange,anycompatible",
+    "anycompatiblerange",
+    "vf(NULL::span,1::bigint)"
+)]
+#[case::result_cannot_choose_range("anyelement", "anyrange", "vf(1)")]
+fn range_polymorphism_rejects_invalid_relationships(
+    #[case] parameters: &str,
+    #[case] result: &str,
+    #[case] expression: &str,
+) -> testresult::TestResult {
+    let analyzed =
+        test_helpers::analyze_vector(&format!("SELECT {expression}"), parameters, result)?;
+    assert!(!analyzed.context().problems().is_empty());
+    Ok(())
+}

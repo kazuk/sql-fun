@@ -213,42 +213,43 @@ impl TypeReference {
         Self::Concrete(ConcreteTypeReference::new(full_name, is_array))
     }
 
-    /// is multi range type?
+    /// Whether this exact catalog identity is a range.
     #[must_use]
-    pub fn is_range(&self) -> bool {
-        match self {
-            Self::Concrete(c) => c.is_range(),
-            Self::Dynamic(_d) => todo!(),
+    pub fn is_range(&self, context: &impl crate::sem::BaseParseContext) -> bool {
+        context
+            .range_type_relationship(self)
+            .is_some_and(|family| family.range() == self)
+    }
+    /// Catalog subtype, only for a range identity.
+    #[must_use]
+    pub fn range_subtype(&self, context: &impl crate::sem::BaseParseContext) -> Option<Self> {
+        let family = context.range_type_relationship(self)?;
+        if family.range() == self {
+            Some(family.subtype().clone())
+        } else {
+            None
         }
     }
-
-    /// get subtype from range type
+    /// Whether this exact catalog identity is a multirange.
     #[must_use]
-    pub fn range_subtype(&self) -> Self {
-        match self {
-            Self::Concrete(c) => c.range_subtype(),
-            Self::Dynamic(_d) => todo!(),
+    pub fn is_multi_range(&self, context: &impl crate::sem::BaseParseContext) -> bool {
+        context
+            .range_type_relationship(self)
+            .is_some_and(|family| family.multirange() == self)
+    }
+    /// Catalog subtype, only for a multirange identity.
+    #[must_use]
+    pub fn multi_range_base_element(
+        &self,
+        context: &impl crate::sem::BaseParseContext,
+    ) -> Option<Self> {
+        let family = context.range_type_relationship(self)?;
+        if family.multirange() == self {
+            Some(family.subtype().clone())
+        } else {
+            None
         }
     }
-
-    /// is multi range type?
-    #[must_use]
-    pub fn is_multi_range(&self) -> bool {
-        match self {
-            Self::Concrete(c) => c.is_multi_range(),
-            Self::Dynamic(_d) => todo!(),
-        }
-    }
-
-    /// get base element type from multi range type
-    #[must_use]
-    pub fn multi_range_base_element(&self) -> Self {
-        match self {
-            Self::Concrete(c) => c.multi_range_base_element(),
-            Self::Dynamic(_d) => todo!(),
-        }
-    }
-
     /// type is simple inference arg
     #[must_use]
     pub fn is_simple_infer_arg(&self) -> bool {
@@ -357,26 +358,8 @@ impl TypeReference {
         }
     }
 
-    /// convert to range type
-    #[must_use]
-    pub fn into_range_type(&self) -> Self {
-        match self {
-            Self::Concrete(c) => c.get_range_type(),
-            Self::Dynamic(_d) => todo!(),
-        }
-    }
-
-    /// convert to multi range type
-    #[must_use]
-    pub fn into_multi_range_type(&self) -> Self {
-        match self {
-            Self::Concrete(c) => c.get_multi_range_type(),
-            Self::Dynamic(_d) => todo!(),
-        }
-    }
-
     /// apply simple inference result
-    pub fn apply_simple_infer_result(&mut self, infer_result_type: &Self) {
+    pub(crate) fn apply_simple_infer_result(&mut self, infer_result_type: &Self) {
         match self {
             Self::Concrete(c) => {
                 if infer_result_type.is_dynamic() && c.is_any_array() {
@@ -394,7 +377,7 @@ impl TypeReference {
     }
 
     /// apply common inference result
-    pub fn apply_common_infer_result(&mut self, infer_result_type: &Self) {
+    pub(crate) fn apply_common_infer_result(&mut self, infer_result_type: &Self) {
         match self {
             Self::Concrete(c) => {
                 if infer_result_type.is_dynamic() && c.is_any_compatible_array() {

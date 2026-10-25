@@ -52,8 +52,11 @@ where
     fn apply_simple_infer_result(
         &mut self,
         simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    );
-    fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference);
+    ) -> Result<(), TypeError>;
+    fn apply_common_infer_result(
+        &mut self,
+        common_infer_result: &crate::sem::type_system::CommonInferResult,
+    ) -> Result<(), crate::sem::type_system::TypeError>;
 }
 
 /// function parameter type
@@ -257,11 +260,14 @@ impl FunctionParam {
         }
     }
 
-    /// apply simple infer result
+    /// Apply a simple polymorphic substitution.
+    ///
+    /// # Errors
+    /// Returns an error if a required range family or array container is unavailable.
     pub fn apply_simple_infer_result(
         &mut self,
         simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    ) {
+    ) -> Result<(), crate::sem::type_system::TypeError> {
         match self {
             Self::In(p) => p.apply_simple_infer_result(simple_infer_result),
             Self::Out(p) => p.apply_simple_infer_result(simple_infer_result),
@@ -271,8 +277,14 @@ impl FunctionParam {
         }
     }
 
-    /// apply common infer result
-    pub fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
+    /// Apply a common polymorphic substitution.
+    ///
+    /// # Errors
+    /// Returns an error if a required range family or array container is unavailable.
+    pub fn apply_common_infer_result(
+        &mut self,
+        common_infer_result: &crate::sem::type_system::CommonInferResult,
+    ) -> Result<(), crate::sem::type_system::TypeError> {
         match self {
             Self::In(p) => p.apply_common_infer_result(common_infer_result),
             Self::Out(p) => p.apply_common_infer_result(common_infer_result),

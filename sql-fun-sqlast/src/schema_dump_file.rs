@@ -85,6 +85,12 @@ impl ParsedSchemaDump {
 }
 
 impl TypeInfoRead for ParsedSchemaDump {
+    fn range_type_relationship(
+        &self,
+        ty: &TypeReference,
+    ) -> Option<crate::sem::RangeTypeRelationship> {
+        self.base_context().range_type_relationship(ty)
+    }
     fn type_references(&self) -> Vec<TypeReference> {
         self.base_context().type_references()
     }

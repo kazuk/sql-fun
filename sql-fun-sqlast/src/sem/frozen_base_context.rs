@@ -447,6 +447,12 @@ forward_catalog_reads!(crate::sem::SchemaFileContext, catalog);
 forward_catalog_reads!(crate::ParsedSchemaDump, base_context);
 
 impl crate::sem::TypeInfoRead for FrozenBaseContext {
+    fn range_type_relationship(
+        &self,
+        ty: &TypeReference,
+    ) -> Option<crate::sem::RangeTypeRelationship> {
+        self.catalog().range_type_relationship(ty)
+    }
     fn type_references(&self) -> Vec<TypeReference> {
         self.catalog().type_references()
     }

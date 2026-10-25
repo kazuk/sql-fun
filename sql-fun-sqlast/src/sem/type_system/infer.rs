@@ -10,10 +10,11 @@ use std::collections::HashSet;
 
 use ::sql_fun_core::IVec;
 
-/// Simple-family substitution retains both element constraints and array identity.
+/// Simple-family substitution retains element, array, and range-family identities.
 pub struct SimpleInferResult {
     element: TypeReference,
     array: Option<TypeReference>,
+    family: Option<crate::sem::RangeTypeRelationship>,
 }
 
 impl SimpleInferResult {
@@ -21,10 +22,30 @@ impl SimpleInferResult {
         Self {
             element: element.clone(),
             array: array.cloned(),
+            family: None,
         }
     }
 
-    pub(crate) fn apply(&self, target: &mut TypeReference) {
+    pub(crate) fn apply(&self, target: &mut TypeReference) -> Result<(), TypeError> {
+        if self.family.is_some() && self.element.is_array() == Some(true) && !target.is_dynamic() {
+            if target.is_any_array() {
+                return TypeError::array_type_unavailable(&self.element);
+            }
+            if target.is_any_non_array() {
+                return TypeError::require_non_array(&self.element);
+            }
+        }
+        if !target.is_dynamic() && (target.is_any_range() || target.is_any_multi_range()) {
+            let Some(family) = &self.family else {
+                return TypeError::require_range_type(&self.element);
+            };
+            *target = if target.is_any_range() {
+                family.range().clone()
+            } else {
+                family.multirange().clone()
+            };
+            return Ok(());
+        }
         if !target.is_dynamic()
             && target.is_any_array()
             && let Some(array) = &self.array
@@ -33,6 +54,33 @@ impl SimpleInferResult {
         } else {
             target.apply_simple_infer_result(&self.element);
         }
+        Ok(())
+    }
+
+    pub(crate) fn apply_common(&self, target: &mut TypeReference) -> Result<(), TypeError> {
+        if self.family.is_some() && self.element.is_array() == Some(true) && !target.is_dynamic() {
+            if target.is_any_compatible_array() {
+                return TypeError::array_type_unavailable(&self.element);
+            }
+            if target.is_any_compatible_non_array() {
+                return TypeError::require_non_array(&self.element);
+            }
+        }
+        if !target.is_dynamic()
+            && (target.is_any_compatible_range() || target.is_any_compatible_multi_range())
+        {
+            let Some(family) = &self.family else {
+                return TypeError::require_range_type(&self.element);
+            };
+            *target = if target.is_any_compatible_range() {
+                family.range().clone()
+            } else {
+                family.multirange().clone()
+            };
+        } else {
+            target.apply_common_infer_result(&self.element);
+        }
+        Ok(())
     }
 }
 
@@ -41,6 +89,7 @@ pub struct SimpleInferContext {
     require_infer: bool,
     element_types: HashSet<TypeReference>,
     array_types: HashSet<TypeReference>,
+    families: HashSet<crate::sem::RangeTypeRelationship>,
 }
 
 impl SimpleInferContext {
@@ -79,22 +128,32 @@ impl SimpleInferContext {
         }
     }
 
-    fn push_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
-        if ty.is_range() {
-            self.push_element(&ty.range_subtype());
-            Ok(())
-        } else {
-            Err(TypeError::RequireRangeType(ty.clone()))
-        }
+    fn push_range_element(
+        &mut self,
+        ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        let Some(subtype) = ty.range_subtype(catalog) else {
+            return TypeError::require_range_type(ty);
+        };
+        self.families
+            .insert(catalog.range_type_relationship(ty).unwrap());
+        self.push_element(&subtype);
+        Ok(())
     }
 
-    fn push_multi_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
-        if ty.is_multi_range() {
-            self.push_element(&ty.multi_range_base_element());
-            Ok(())
-        } else {
-            Err(TypeError::RequireMultiRangeType(ty.clone()))
-        }
+    fn push_multi_range_element(
+        &mut self,
+        ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        let Some(subtype) = ty.multi_range_base_element(catalog) else {
+            return TypeError::require_multi_range_type(ty);
+        };
+        self.families
+            .insert(catalog.range_type_relationship(ty).unwrap());
+        self.push_element(&subtype);
+        Ok(())
     }
 
     /// insert type constraint
@@ -111,9 +170,9 @@ impl SimpleInferContext {
         } else if param_type.is_any_non_array() {
             self.push_non_array_element(arg_type, catalog)?;
         } else if param_type.is_any_range() {
-            self.push_range_element(arg_type)?;
+            self.push_range_element(arg_type, catalog)?;
         } else if param_type.is_any_multi_range() {
-            self.push_multi_range_element(arg_type)?;
+            self.push_multi_range_element(arg_type, catalog)?;
         }
 
         Ok(())
@@ -130,10 +189,15 @@ impl SimpleInferContext {
         if self.array_types.len() > 1 {
             return Err(TypeError::simple_infer_ambiguous(&self.array_types));
         }
-        Ok(SimpleInferResult::new(
+        if self.families.len() > 1 {
+            return Err(TypeError::simple_infer_ambiguous(&self.element_types));
+        }
+        let mut result = SimpleInferResult::new(
             self.element_types.iter().next().unwrap(),
             self.array_types.iter().next(),
-        ))
+        );
+        result.family = self.families.iter().next().cloned();
+        Ok(result)
     }
 
     pub const fn set_require_infer(&mut self) {
@@ -240,10 +304,26 @@ mod test_simple_infer_context {
     }
 }
 
+/// Common-family substitution with its catalog-constrained range identity.
+pub struct CommonInferResult(SimpleInferResult);
+
+impl CommonInferResult {
+    /// Common element type selected by the existing coercion rules.
+    #[must_use]
+    pub const fn element_type(&self) -> &TypeReference {
+        &self.0.element
+    }
+
+    pub(crate) fn apply(&self, target: &mut TypeReference) -> Result<(), TypeError> {
+        self.0.apply_common(target)
+    }
+}
+
 #[derive(Default)]
 pub struct CommonInferContext {
     require_infer: bool,
     element_types: HashSet<TypeReference>,
+    families: HashSet<crate::sem::RangeTypeRelationship>,
 }
 
 impl CommonInferContext {
@@ -277,22 +357,32 @@ impl CommonInferContext {
         }
     }
 
-    fn push_compat_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
-        if ty.is_range() {
-            self.push_compat_element(&ty.range_subtype());
-            Ok(())
-        } else {
-            Err(TypeError::RequireRangeType(ty.clone()))
-        }
+    fn push_compat_range_element(
+        &mut self,
+        ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        let Some(subtype) = ty.range_subtype(catalog) else {
+            return TypeError::require_range_type(ty);
+        };
+        self.families
+            .insert(catalog.range_type_relationship(ty).unwrap());
+        self.push_compat_element(&subtype);
+        Ok(())
     }
 
-    fn push_compat_multi_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
-        if ty.is_multi_range() {
-            self.push_compat_element(&ty.multi_range_base_element());
-            Ok(())
-        } else {
-            Err(TypeError::RequireMultiRangeType(ty.clone()))
-        }
+    fn push_compat_multi_range_element(
+        &mut self,
+        ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        let Some(subtype) = ty.multi_range_base_element(catalog) else {
+            return TypeError::require_multi_range_type(ty);
+        };
+        self.families
+            .insert(catalog.range_type_relationship(ty).unwrap());
+        self.push_compat_element(&subtype);
+        Ok(())
     }
 
     /// insert type constraint
@@ -309,9 +399,9 @@ impl CommonInferContext {
         } else if param_type.is_any_compatible_non_array() {
             self.push_compat_non_array(arg_type, catalog)?;
         } else if param_type.is_any_compatible_range() {
-            self.push_compat_range_element(arg_type)?;
+            self.push_compat_range_element(arg_type, catalog)?;
         } else if param_type.is_any_compatible_multi_range() {
-            self.push_compat_multi_range_element(arg_type)?;
+            self.push_compat_multi_range_element(arg_type, catalog)?;
         }
 
         Ok(())
@@ -333,7 +423,7 @@ impl CommonInferContext {
     pub fn get_inference_result<TParseContext>(
         &self,
         context: &TParseContext,
-    ) -> Result<TypeReference, TypeError>
+    ) -> Result<CommonInferResult, TypeError>
     where
         TParseContext: ParseContext,
     {
@@ -343,7 +433,10 @@ impl CommonInferContext {
     pub(crate) fn infer_from_catalog<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
-    ) -> Result<TypeReference, TypeError> {
+    ) -> Result<CommonInferResult, TypeError> {
+        if self.families.len() > 1 {
+            return Err(TypeError::simple_infer_ambiguous(&self.element_types));
+        }
         let mut castables: Vec<HashSet<TypeReference>> = Vec::new();
 
         // enumerate cast definitions
@@ -357,7 +450,7 @@ impl CommonInferContext {
             TypeError::common_infer_no_implicit_castable()?;
         }
         if candidates.len() == 1 {
-            return Ok(candidates.iter().next().unwrap().clone());
+            return self.result(candidates.iter().next().unwrap());
         }
 
         let mut scoreboard = Vec::new();
@@ -378,7 +471,20 @@ impl CommonInferContext {
         if results.len() != 1 {
             TypeError::common_infer_ambiguous()?;
         }
-        Ok(results[0].1.clone())
+        self.result(&results[0].1)
+    }
+
+    fn result(&self, element: &TypeReference) -> Result<CommonInferResult, TypeError> {
+        let family = self.families.iter().next().cloned();
+        if family
+            .as_ref()
+            .is_some_and(|family| family.subtype() != element)
+        {
+            return TypeError::require_range_type(element);
+        }
+        let mut result = SimpleInferResult::new(element, None);
+        result.family = family;
+        Ok(CommonInferResult(result))
     }
 
     pub const fn set_require_infer(&mut self) {
@@ -505,7 +611,7 @@ mod test_common_infer_context {
 
         let result = context.get_inference_result(&parse_context)?;
 
-        assert_eq!(result, int4);
+        assert_eq!(result.element_type(), &int4);
         Ok(())
     }
 

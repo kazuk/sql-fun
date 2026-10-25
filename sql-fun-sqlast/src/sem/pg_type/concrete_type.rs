@@ -47,15 +47,6 @@ impl ConcreteTypeReference {
         self.base.is_record()
     }
 
-    /// is range type?
-    pub fn is_range(&self) -> bool {
-        if self.is_array {
-            false
-        } else {
-            self.base.is_range()
-        }
-    }
-
     /// coverts type name with '_' as array
     pub fn from_master_type_name(name: &str) -> Self {
         if let Some(name) = name.strip_prefix('_') {
@@ -77,25 +68,6 @@ impl ConcreteTypeReference {
             base: full_name.clone(),
             is_array,
         }
-    }
-
-    /// get subtype from range type
-    pub fn range_subtype(&self) -> TypeReference {
-        TypeReference::concrete_type_ref(&self.base.range_subtype(), false)
-    }
-
-    /// is multi range type?
-    pub fn is_multi_range(&self) -> bool {
-        if self.is_array {
-            false
-        } else {
-            self.base.is_multi_range()
-        }
-    }
-
-    /// get base element type from multi range type
-    pub fn multi_range_base_element(&self) -> TypeReference {
-        TypeReference::concrete_type_ref(&self.base.multi_range_base_element(), false)
     }
 
     /// type is simple inference arg
@@ -166,16 +138,6 @@ impl ConcreteTypeReference {
         !self.is_array && self.base.is_any_compatible_multi_range()
     }
 
-    /// convert to range type
-    pub fn get_range_type(&self) -> TypeReference {
-        todo!()
-    }
-
-    /// convert to multi range type
-    pub fn get_multi_range_type(&self) -> TypeReference {
-        todo!()
-    }
-
     /// apply simple inference result
     pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
         if self.is_any_element() {
@@ -187,14 +149,6 @@ impl ConcreteTypeReference {
         } else if self.is_any_non_array() {
             self.base = infer_result_type.full_name().clone();
             self.is_array = false;
-        } else if self.is_any_range() {
-            let range_type = infer_result_type.into_range_type();
-            self.base = range_type.full_name().clone();
-            self.is_array = range_type.is_array().unwrap_or(false);
-        } else if self.is_any_multi_range() {
-            let multi_range = infer_result_type.into_multi_range_type();
-            self.base = multi_range.full_name().clone();
-            self.is_array = multi_range.is_array().unwrap_or(false);
         }
     }
 
@@ -209,14 +163,6 @@ impl ConcreteTypeReference {
         } else if self.is_any_compatible_non_array() {
             self.base = infer_result_type.full_name().clone();
             self.is_array = false;
-        } else if self.is_any_compatible_range() {
-            let range_type = infer_result_type.into_range_type();
-            self.base = range_type.full_name().clone();
-            self.is_array = range_type.is_array().unwrap_or(false);
-        } else if self.is_any_compatible_multi_range() {
-            let multi_range_type = infer_result_type.into_multi_range_type();
-            self.base = multi_range_type.full_name().clone();
-            self.is_array = multi_range_type.is_array().unwrap_or(false);
         }
     }
 }

@@ -148,6 +148,9 @@ CREATE SCHEMA "other masters";
 CREATE SCHEMA "extension masters";
 CREATE EXTENSION btree_gin SCHEMA "extension masters";
 CREATE DOMAIN "other masters"."Type 雪" AS integer;
+CREATE TYPE {quoted}."Span 雪" AS RANGE (subtype = integer, multirange_type_name = {quoted}."Spans 雪");
+CREATE TYPE {quoted}."Array span" AS RANGE (subtype = integer[], multirange_type_name = {quoted}."Array spans");
+CREATE TYPE "other masters"."Unselected span" AS RANGE (subtype = integer);
 CREATE OPERATOR FAMILY "other masters"."Family 雪" USING btree;
 CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE "other masters"."Type 雪"
  USING btree FAMILY "other masters"."Family 雪" AS
@@ -173,8 +176,20 @@ CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
     assert metadata["format_version"] == 1
     assert metadata["definition_schemas"] == sorted([schema, extension_schema])
     for filename, digest in payload(builtin).items():
-        if filename not in ("collations.json", "operator_classes.json"):
+        if filename not in ("collations.json", "operator_classes.json", "pg_type.json"):
             assert payload(selected)[filename] == digest, "additional scope changed existing catalogs"
+    selected_types = json.loads((selected / "pg_type.json").read_text())
+    custom = [t for t in selected_types if t["schema"] != "pg_catalog"]
+    assert {(t["schema"], t["name"]) for t in custom} == {(schema, "Span 雪"), (schema, "Spans 雪"), (schema, "Array span"), (schema, "Array spans")}
+    family = next(t["range_relationship"] for t in custom if t["name"] == "Span 雪")
+    def identity(schema_name, type_name):
+        return {"Concrete": {"base": {"catalog": None, "schema": schema_name, "name": type_name}, "is_array": False}}
+    assert family == {"range": identity(schema, "Span 雪"), "subtype": identity("pg_catalog", "int4"), "multirange": identity(schema, "Spans 雪")}
+    array_family = next(t["range_relationship"] for t in custom if t["name"] == "Array span")
+    array_element = identity("pg_catalog", "int4")
+    array_element["Concrete"]["is_array"] = True
+    assert array_family["subtype"] == array_element
+    assert [t for t in selected_types if t["schema"] == "pg_catalog"] == json.loads((builtin / "pg_type.json").read_text())
     assert {c["schema"] for c in collations["collations"]} == {"pg_catalog", schema}
     encoding_variants = [c["encoding"] for c in collations["collations"]
                          if c["schema"] == schema and c["name"] == "Encoding"]
@@ -213,6 +228,12 @@ def validate(binary, major, image, destination, host, bind):
     assert all(isinstance(code, str) and len(code) == 1 for code in types.values())
     assert {name: types[name] for name in ("char", "unknown", "_record", "int4range")} == {
         "char": "Z", "unknown": "X", "_record": "P", "int4range": "R"}
+    records = json.loads((output / "pg_type.json").read_text())
+    ranges = [t for t in records if "range_relationship" in t]
+    assert len(ranges) == 6
+    int4 = next(t["range_relationship"] for t in ranges if t["name"] == "int4range")
+    assert int4["subtype"]["Concrete"]["base"]["name"] == "int4"
+    assert int4["multirange"]["Concrete"]["base"]["name"] == "int4multirange"
     functions = json.loads((output / "functions.json").read_text())
     clock = next(f for f in functions if f["name"] == "clock_timestamp")
     assert clock["overloads"][0]["args"] == [], "zero-argument functions must not have a null argument"

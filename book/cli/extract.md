@@ -78,9 +78,9 @@ your normal schema workflow.
 
 ## Include additional master definitions
 
-To include collations and operator classes from additional schemas, select each
-schema explicitly. Pass its exact name as one argument, without SQL identifier
-quoting inside the value:
+To include collations, operator classes, and range type families from additional
+schemas, select each schema explicitly. Pass its exact name as one argument,
+without SQL identifier quoting inside the value:
 
 ```sh
 sql-fun extract catalog --database-url 'host=db.example.org dbname=app' \
@@ -91,12 +91,18 @@ sql-fun extract catalog --database-url 'host=db.example.org dbname=app' \
 Repeated names are deduplicated. A nonexistent or empty name is an error.
 Selection includes user-created and installed extension definitions in those
 schemas, together with their referenced type/family identities. It does not
-export application tables, install extensions, or broaden other catalog files.
+export application tables or install extensions. Selected range and multirange
+identities are added to `pg_type.json` together with their actual subtype and
+paired range/multirange relationships. Names need no particular suffix.
 Omitting this option retains builtin-only extraction. The selected scope is
 recorded in `metadata.json`.
 
-The new master files are additive to catalog format 1. Existing catalog import
-and initialization continue working, including with older format-1 generations
+Range relationships and the master files are additive to catalog format 1.
+Older type catalogs without range relationships remain readable, but cannot
+supply range polymorphic inference; extract a new catalog to use that behavior.
+
+Existing catalog import and initialization continue working, including with
+older format-1 generations
 that lack these files. Production semantic loading of these masters is separate
 work; extracting them alone does not enable conflict-target analysis.
 

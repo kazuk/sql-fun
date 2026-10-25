@@ -8,6 +8,12 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
+    fn range_type_relationship(
+        &self,
+        ty: &TypeReference,
+    ) -> Option<crate::sem::RangeTypeRelationship> {
+        self.base.range_type_relationship(ty)
+    }
     fn type_references(&self) -> Vec<TypeReference> {
         let mut types = self.base.type_references();
         types.extend(self.types.cast_source_types());
@@ -34,6 +40,12 @@ impl TypeInfoRead for SchemaCatalog {
 }
 
 impl TypeInfoRead for SchemaFileContext {
+    fn range_type_relationship(
+        &self,
+        ty: &TypeReference,
+    ) -> Option<crate::sem::RangeTypeRelationship> {
+        self.catalog.range_type_relationship(ty)
+    }
     fn type_references(&self) -> Vec<TypeReference> {
         self.catalog.type_references()
     }

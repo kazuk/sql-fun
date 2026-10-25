@@ -184,10 +184,10 @@ pub use self::{
         BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictArbiterInference,
         ConflictInfoRead, CursorInfo, DefaultSourceAccessService, DiagnosticContext,
         FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead,
-        ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext, RuleInfoRead, RuleInfoWrite,
-        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead,
-        TableInfoWrite, TriggerInfoRead, TriggerInfoWrite, TypeInfoRead, TypeInfoWrite,
-        ViewInfoRead, ViewInfoWrite,
+        ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext, RangeTypeRelationship,
+        RuleInfoRead, RuleInfoWrite, SearchPathRead, SequenceInfoRead, SequenceInfoWrite,
+        SourceAccessService, TableInfoRead, TableInfoWrite, TriggerInfoRead, TriggerInfoWrite,
+        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{
         ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,
@@ -211,7 +211,10 @@ pub use self::{
     },
     schema_file_context::SchemaFileContext,
     select_statement::{ResultColumnCollection, SelectStatement},
-    type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult},
+    type_system::{
+        CommonInferResult, FunctionOverloadCollection, FunctionParam, OverloadVariant,
+        SimpleInferResult,
+    },
     update_statement::{
         UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
         ViewUpdateInfoRead, ViewUpdateSupport, analyze_update_statement,

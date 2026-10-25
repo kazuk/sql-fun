@@ -39,7 +39,7 @@ impl BinaryCastCandidate {
         let mut candidates = Vec::new();
         for overload in overloads {
             let Some(instantiated) =
-                Self::instantiate_array_overload(context, overload, left_type, right_type)
+                Self::instantiate_simple_overload(context, overload, left_type, right_type)
             else {
                 continue;
             };
@@ -64,9 +64,9 @@ impl BinaryCastCandidate {
         candidates
     }
 
-    // A simple polymorphic array declaration shares one element type across
+    // A simple polymorphic declaration shares one element and range family across
     // both operands. Instantiate a local signature, leaving catalog data intact.
-    fn instantiate_array_overload(
+    fn instantiate_simple_overload(
         context: &impl ParseContext,
         overload: &BinaryOperatorDefinition,
         left: &TypeReference,
@@ -78,7 +78,7 @@ impl BinaryCastCandidate {
         ];
         if !inputs
             .into_iter()
-            .any(|(declared, _)| !declared.is_dynamic() && declared.is_any_array())
+            .any(|(declared, _)| !declared.is_dynamic() && declared.is_simple_infer_arg())
         {
             return Some(overload.clone());
         }
@@ -94,7 +94,7 @@ impl BinaryCastCandidate {
         let mut result = overload.get_return_type().clone();
         for ty in [&mut left, &mut right, &mut result] {
             if !ty.is_dynamic() && ty.is_simple_infer_arg() {
-                substitution.apply(ty);
+                substitution.apply(ty).ok()?;
             }
         }
         Some(BinaryOperatorDefinition::new(
@@ -224,7 +224,7 @@ mod tests {
         let declaration = BinaryOperatorDefinition::new(&placeholder, &placeholder, &element, true);
         let left = TypeReference::from_master_type_name(left);
         let right = TypeReference::from_master_type_name(right);
-        let instantiated = BinaryCastCandidate::instantiate_array_overload(
+        let instantiated = BinaryCastCandidate::instantiate_simple_overload(
             &TestParseContext::default(),
             &declaration,
             &left,

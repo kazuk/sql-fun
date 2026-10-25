@@ -32,6 +32,10 @@ fn context() -> SchemaFileContext {
         "anycompatible",
         "anycompatiblearray",
         "anycompatiblenonarray",
+        "anyrange",
+        "anymultirange",
+        "anycompatiblerange",
+        "anycompatiblemultirange",
     ] {
         let ty = TypeReference::from_master_type_name(name);
         base.setup_type(ty.clone());
@@ -71,6 +75,7 @@ fn context() -> SchemaFileContext {
         TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "control"))
             .array_type(),
     ] {
+        base.add_implicit_castable(&ty, &ty);
         base.set_get_implicit_cast_result(
             &ty,
             &ty,
@@ -87,6 +92,29 @@ fn context() -> SchemaFileContext {
         &TypeReference::from_master_type_name("float8"),
         Some(CastDefinition::new(CastContext::implicit_preferred())),
     );
+    for (range, multi, subtype) in [
+        ("span", "spans", "int4"),
+        ("other", "others", "int4"),
+        ("array_span", "array_spans", "_int4"),
+    ] {
+        let range =
+            TypeReference::from_full_name(crate::sem::FullName::with_schema("public", range));
+        let multi =
+            TypeReference::from_full_name(crate::sem::FullName::with_schema("public", multi));
+        for ty in [&range, &multi] {
+            base.setup_type(ty.clone());
+            base.add_implicit_castable(ty, ty);
+        }
+        base.add_range_family(&crate::sem::RangeTypeRelationship::new(
+            &range,
+            &TypeReference::from_master_type_name(subtype),
+            &multi,
+        ));
+    }
+    let fake =
+        TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "fakerange"));
+    base.setup_type(fake.clone());
+    base.add_implicit_castable(&fake, &fake);
     let args = base.get_args().clone();
     let metadata = base.metadata().clone();
     SchemaFileContext::new(

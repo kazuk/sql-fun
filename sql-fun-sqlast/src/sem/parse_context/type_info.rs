@@ -3,8 +3,52 @@ use crate::sem::{
     TypeReference,
 };
 
+/// Catalog-backed identity of one PostgreSQL range family.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct RangeTypeRelationship {
+    range: TypeReference,
+    subtype: TypeReference,
+    multirange: TypeReference,
+}
+
+impl RangeTypeRelationship {
+    /// Retain the catalog identities without deriving names from the subtype.
+    #[must_use]
+    pub fn new(range: &TypeReference, subtype: &TypeReference, multirange: &TypeReference) -> Self {
+        Self {
+            range: range.clone(),
+            subtype: subtype.clone(),
+            multirange: multirange.clone(),
+        }
+    }
+    /// Range type identity.
+    #[must_use]
+    pub const fn range(&self) -> &TypeReference {
+        &self.range
+    }
+    /// Range element type identity.
+    #[must_use]
+    pub const fn subtype(&self) -> &TypeReference {
+        &self.subtype
+    }
+    /// Associated multirange type identity.
+    #[must_use]
+    pub const fn multirange(&self) -> &TypeReference {
+        &self.multirange
+    }
+    pub(crate) fn contains(&self, ty: &TypeReference) -> bool {
+        ty == &self.range || ty == &self.multirange
+    }
+}
+
 /// get type definition
 pub trait TypeInfoRead {
+    /// Exact catalog relationship for a range or multirange identity.
+    /// Missing catalog facts return `None`; type spelling is never evidence.
+    fn range_type_relationship(&self, _ty: &TypeReference) -> Option<RangeTypeRelationship> {
+        None
+    }
+
     /// Enumerate catalog type identities for deferred type relationships.
     /// Definitions and unrelated catalog objects are not copied.
     fn type_references(&self) -> Vec<TypeReference>;

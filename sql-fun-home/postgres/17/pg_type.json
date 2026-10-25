@@ -325,27 +325,219 @@
   },
   {
     "category": "R",
-    "name": "int4range"
+    "name": "int4range",
+    "range_relationship": {
+      "multirange": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "int4multirange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "range": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "int4range",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "subtype": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "int4",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      }
+    }
   },
   {
     "category": "R",
-    "name": "numrange"
+    "name": "numrange",
+    "range_relationship": {
+      "multirange": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "nummultirange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "range": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "numrange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "subtype": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "numeric",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      }
+    }
   },
   {
     "category": "R",
-    "name": "tsrange"
+    "name": "tsrange",
+    "range_relationship": {
+      "multirange": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "tsmultirange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "range": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "tsrange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "subtype": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "timestamp",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      }
+    }
   },
   {
     "category": "R",
-    "name": "tstzrange"
+    "name": "tstzrange",
+    "range_relationship": {
+      "multirange": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "tstzmultirange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "range": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "tstzrange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "subtype": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "timestamptz",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      }
+    }
   },
   {
     "category": "R",
-    "name": "daterange"
+    "name": "daterange",
+    "range_relationship": {
+      "multirange": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "datemultirange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "range": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "daterange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "subtype": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "date",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      }
+    }
   },
   {
     "category": "R",
-    "name": "int8range"
+    "name": "int8range",
+    "range_relationship": {
+      "multirange": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "int8multirange",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "range": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "int8range",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      },
+      "subtype": {
+        "Concrete": {
+          "base": {
+            "catalog": null,
+            "name": "int8",
+            "schema": "pg_catalog"
+          },
+          "is_array": false
+        }
+      }
+    }
   },
   {
     "category": "U",

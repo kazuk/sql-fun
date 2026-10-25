@@ -10,6 +10,9 @@ pub enum TypeError {
     #[error("parameter binding failed , no parameter supplied for parameter {0}")]
     BindFailed(Box<FunctionParam>),
 
+    #[error("polymorphic inference failed, no array type exists for element {0}")]
+    ArrayTypeUnavailable(TypeReference),
+
     #[error("simple inference failed, require array type {0}")]
     RequireArray(TypeReference),
 
@@ -42,6 +45,21 @@ pub enum TypeError {
 }
 
 impl TypeError {
+    pub(crate) fn array_type_unavailable<T>(ty: &TypeReference) -> Result<T, Self> {
+        Err(Self::ArrayTypeUnavailable(ty.clone()))
+    }
+    pub(crate) fn require_non_array<T>(ty: &TypeReference) -> Result<T, Self> {
+        Err(Self::RequireNonArray(ty.clone()))
+    }
+
+    pub(crate) fn require_range_type<T>(ty: &TypeReference) -> Result<T, Self> {
+        Err(Self::RequireRangeType(ty.clone()))
+    }
+
+    pub(crate) fn require_multi_range_type<T>(ty: &TypeReference) -> Result<T, Self> {
+        Err(Self::RequireMultiRangeType(ty.clone()))
+    }
+
     pub(super) fn simple_infer_ambiguous(types: &std::collections::HashSet<TypeReference>) -> Self {
         Self::SimpleInferAmbiguous(types.iter().cloned().collect())
     }

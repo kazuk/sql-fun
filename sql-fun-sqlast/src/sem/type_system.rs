@@ -15,7 +15,7 @@ pub use self::{
     err::TypeError,
     func_params::FunctionParam,
     function_overload_collection::FunctionOverloadCollection,
-    infer::{CommonInferContext, SimpleInferContext, SimpleInferResult},
+    infer::{CommonInferContext, CommonInferResult, SimpleInferContext, SimpleInferResult},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -89,26 +89,40 @@ impl OverloadVariant {
         arguments
     }
 
-    /// apply simple infer result
-    pub fn apply_simple_infer_result(&mut self, infer_result_type: &SimpleInferResult) {
+    /// Apply a simple polymorphic substitution.
+    ///
+    /// # Errors
+    /// Returns an error if a required range family or array container is unavailable.
+    pub fn apply_simple_infer_result(
+        &mut self,
+        infer_result_type: &SimpleInferResult,
+    ) -> Result<(), self::TypeError> {
         if let Some(t) = self.ret_type.as_mut() {
-            infer_result_type.apply(t);
+            infer_result_type.apply(t)?;
         }
 
         for param in &mut self.params {
-            param.apply_simple_infer_result(infer_result_type);
+            param.apply_simple_infer_result(infer_result_type)?;
         }
+        Ok(())
     }
 
-    /// apply common infer result
-    pub fn apply_common_infer_result(&mut self, infer_result_type: &TypeReference) {
+    /// Apply a common polymorphic substitution.
+    ///
+    /// # Errors
+    /// Returns an error if a required range family or array container is unavailable.
+    pub fn apply_common_infer_result(
+        &mut self,
+        infer_result_type: &crate::sem::type_system::CommonInferResult,
+    ) -> Result<(), crate::sem::type_system::TypeError> {
         if let Some(t) = self.ret_type.as_mut() {
-            t.apply_common_infer_result(infer_result_type);
+            infer_result_type.apply(t)?;
         }
 
         for param in &mut self.params {
-            param.apply_common_infer_result(infer_result_type);
+            param.apply_common_infer_result(infer_result_type)?;
         }
+        Ok(())
     }
 
     /// create a variant

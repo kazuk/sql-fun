@@ -209,9 +209,9 @@ impl MinMaxExpr {
         }
         let (category, _) = Self::category(context, &base).ok()?;
         let range_family = category == 'R';
-        let family = if range_family && base.is_range() {
+        let family = if range_family && base.is_range(context) {
             Some("anyrange")
-        } else if range_family && base.is_multi_range() {
+        } else if range_family && base.is_multi_range(context) {
             Some("anymultirange")
         } else if base == TypeReference::from_master_type_name("int2vector") {
             // int2vector uses array comparison over int2 despite having a

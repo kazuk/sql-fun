@@ -170,30 +170,6 @@ impl FullName {
             && self.name.is_record()
     }
 
-    /// is range type?
-    #[must_use]
-    pub fn is_range(&self) -> bool {
-        !self.is_multi_range() && self.local_name().as_str().ends_with("range")
-    }
-
-    /// get subtype from range type
-    #[must_use]
-    pub fn range_subtype(&self) -> Self {
-        todo!()
-    }
-
-    /// is multi range type?
-    #[must_use]
-    pub fn is_multi_range(&self) -> bool {
-        self.local_name().as_str().ends_with("multirange")
-    }
-
-    /// get base element type from multi range type
-    #[must_use]
-    pub fn multi_range_base_element(&self) -> Self {
-        todo!()
-    }
-
     /// is simple infrence types
     #[must_use]
     pub fn is_simple_infer_arg(&self) -> bool {

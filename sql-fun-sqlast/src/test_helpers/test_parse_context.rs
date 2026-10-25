@@ -40,6 +40,7 @@ pub struct TestParseContext {
     search_path: Vec<SchemaName>,
     type_definitions: HashMap<FullName, TypeDefinition>,
     array_elements: HashMap<TypeReference, TypeReference>,
+    range_families: Vec<crate::sem::RangeTypeRelationship>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
     view_delete_support: HashMap<FullName, crate::sem::ViewDeleteSupport>,
@@ -70,6 +71,9 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
+    pub(crate) fn add_range_family(&mut self, family: &crate::sem::RangeTypeRelationship) {
+        self.range_families.push(family.clone());
+    }
     /// Select this fixture's analysis environment explicitly.
     pub(crate) fn with_dialect(mut self, dialect: crate::ast::Dialect) -> Self {
         let selected = if dialect == crate::ast::Dialect::sqlite() {
@@ -265,6 +269,15 @@ impl TableInfoWrite for TestParseContext {
 }
 
 impl TypeInfoRead for TestParseContext {
+    fn range_type_relationship(
+        &self,
+        ty: &TypeReference,
+    ) -> Option<crate::sem::RangeTypeRelationship> {
+        self.range_families
+            .iter()
+            .find(|family| family.contains(ty))
+            .cloned()
+    }
     fn type_references(&self) -> Vec<TypeReference> {
         self.type_definitions
             .keys()

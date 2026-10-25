@@ -29,6 +29,7 @@ pub struct BaseContext {
     context_args: SqlFunArgs,
     metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
+    ranges: Vec<crate::sem::RangeTypeRelationship>,
     binary_ordered_types: std::collections::HashSet<FullName>,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
@@ -42,13 +43,21 @@ pub struct BaseContext {
 #[derive(serde::Deserialize)]
 struct BuiltinTypeInfo {
     name: String,
+    #[serde(default = "catalog_schema")]
+    schema: String,
+    #[serde(default)]
+    range_relationship: Option<crate::sem::RangeTypeRelationship>,
     #[serde(default)]
     category: Option<crate::sem::TypeCategory>,
 }
 
+fn catalog_schema() -> String {
+    "pg_catalog".to_owned()
+}
+
 impl From<&BuiltinTypeInfo> for TypeDefinition {
     fn from(info: &BuiltinTypeInfo) -> Self {
-        let name = FullName::with_schema("pg_catalog", &info.name);
+        let name = FullName::with_schema(&info.schema, &info.name);
         Self::builtin_with_category(&name, info.category)
     }
 }
@@ -72,7 +81,7 @@ impl BaseContext {
         let paths = PostgresBuiltinPaths::try_from_args(context_args, metadata)?;
         let builtin_functions = paths.functions()?;
         let function_details = paths.function_details()?;
-        let builtin_type_data = Self::load_builtin_types(&paths)?;
+        let (builtin_type_data, ranges) = Self::load_builtin_types(&paths)?;
         let search_path = Self::setup_search_path(context_args, metadata)?;
         let functions = PgBuiltInFunctions::load_from(builtin_functions, function_details)?;
         let binary_operators = PgBuiltinOperators::load_binary(paths.binary_operators()?)?;
@@ -93,6 +102,7 @@ impl BaseContext {
             functions,
             masters,
             types: builtin_type_data,
+            ranges,
             binary_ordered_types,
             casts,
             binary_operators,
@@ -112,7 +122,13 @@ impl BaseContext {
 
     fn load_builtin_types(
         paths: &PostgresBuiltinPaths,
-    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
+    ) -> Result<
+        (
+            TrieMap<TypeDefinition>,
+            Vec<crate::sem::RangeTypeRelationship>,
+        ),
+        AnalysisError,
+    > {
         let builtin_types_path = paths.types()?;
         let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
             File::open(&builtin_types_path)?,
@@ -124,12 +140,16 @@ impl BaseContext {
             ))
         })?;
         let mut builtin_type_data = TrieMap::new();
+        let mut ranges = Vec::new();
         for builtin_type in builtin_types {
+            if let Some(relationship) = &builtin_type.range_relationship {
+                ranges.push(relationship.clone());
+            }
             let type_definition = TypeDefinition::from(&builtin_type);
             let full_name = type_definition.full_name().expect("catalog type identity");
             builtin_type_data.insert(&full_name.to_string(), type_definition);
         }
-        Ok(builtin_type_data)
+        Ok((builtin_type_data, ranges))
     }
 
     fn setup_search_path(
@@ -149,6 +169,15 @@ impl BaseContext {
 mod test_metadata;
 
 impl TypeInfoRead for BaseContext {
+    fn range_type_relationship(
+        &self,
+        ty: &TypeReference,
+    ) -> Option<crate::sem::RangeTypeRelationship> {
+        self.ranges
+            .iter()
+            .find(|family| family.contains(ty))
+            .cloned()
+    }
     fn type_references(&self) -> Vec<TypeReference> {
         self.types
             .iter()

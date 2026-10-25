@@ -141,15 +141,20 @@ impl FunctionParameterTrait for FunctionParamOut {
     fn apply_simple_infer_result(
         &mut self,
         simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    ) {
+    ) -> Result<(), crate::sem::type_system::TypeError> {
         if let Some(ty) = self.param_type.as_mut() {
-            simple_infer_result.apply(ty);
+            simple_infer_result.apply(ty)?;
         }
+        Ok(())
     }
 
-    fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
+    fn apply_common_infer_result(
+        &mut self,
+        common_infer_result: &crate::sem::type_system::CommonInferResult,
+    ) -> Result<(), crate::sem::type_system::TypeError> {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result);
+            common_infer_result.apply(ty)?;
         }
+        Ok(())
     }
 }

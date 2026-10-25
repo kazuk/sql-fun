@@ -255,6 +255,11 @@ function run_workspace() {
     cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
     local target_dir
     target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+    # nextest binaries and linked dependencies are already archived. The next
+    # phase only needs the two standalone CLI binaries, so release build
+    # intermediates before copying them to the persistent artifact directory.
+    rm -rf -- "$target_dir/debug/deps" "$target_dir/debug/incremental" \
+      "$target_dir/debug/build" "$target_dir/debug/.fingerprint"
     cp "$target_dir/debug/sql-fun" "$target_dir/debug/sql-fun-server" "$SQL_FUN_CI_ARTIFACT_DIR/"
   elif [[ "$WORKSPACE_PHASE" == "test" ]]; then
     : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"

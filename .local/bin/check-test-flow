@@ -252,23 +252,11 @@ function run_workspace() {
     mkdir -p "$SQL_FUN_CI_ARTIFACT_DIR"
     cargo nextest archive --locked --workspace --exclude sql-fun "${FEATURES[@]}" \
       --timings --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst"
-    cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
-    local target_dir
-    target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
-    # nextest binaries and linked dependencies are already archived. The next
-    # phase only needs the two standalone CLI binaries, so release build
-    # intermediates before copying them to the persistent artifact directory.
-    rm -rf -- "$target_dir/debug/deps" "$target_dir/debug/incremental" \
-      "$target_dir/debug/build" "$target_dir/debug/.fingerprint"
-    cp "$target_dir/debug/sql-fun" "$target_dir/debug/sql-fun-server" "$SQL_FUN_CI_ARTIFACT_DIR/"
+    # The CLI and server are built in a separate CI job.
   elif [[ "$WORKSPACE_PHASE" == "test" ]]; then
     : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"
-    # Integration tests embed CARGO_BIN_EXE_* paths at compile time.
-    # Restore the companion executables without restoring compilation intermediates.
-    local target_dir
-    target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
-    mkdir -p "$target_dir/debug"
-    cp "$SQL_FUN_CI_ARTIFACT_DIR/sql-fun" "$SQL_FUN_CI_ARTIFACT_DIR/sql-fun-server" "$target_dir/debug/"
+    : "${SQL_FUN_BIN:?SQL_FUN_BIN is required for archived tests}"
+    : "${SQL_FUN_TEST_SERVER_BIN:?SQL_FUN_TEST_SERVER_BIN is required for archived tests}"
     run_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst" \
       ${NEXTEST_EXTRA} --no-tests pass
     run_sqlast_regressions
@@ -292,8 +280,8 @@ function run_sqlast_regressions() {
     binary_dir="$SQL_FUN_CI_ARTIFACT_DIR"
   fi
   SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
-    SQL_FUN_BIN="${binary_dir}/sql-fun" \
-    SQL_FUN_TEST_SERVER_BIN="${binary_dir}/sql-fun-server" \
+    SQL_FUN_BIN="${SQL_FUN_BIN:-${binary_dir}/sql-fun}" \
+    SQL_FUN_TEST_SERVER_BIN="${SQL_FUN_TEST_SERVER_BIN:-${binary_dir}/sql-fun-server}" \
     SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
     "${GIT_ROOT}/tests/sqlast-regressions/run.sh"
 }

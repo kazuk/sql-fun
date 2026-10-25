@@ -447,6 +447,14 @@ mod test_index_lookup {
 }
 
 impl OperatorInfoRead for SchemaCatalog {
+    fn operator_result_is_not_null(&self, name: &OperatorName) -> Option<bool> {
+        if !name.is_valid() || self.binary_operators.get(&name.to_name_string()).is_some() {
+            None
+        } else {
+            self.base.operator_result_is_not_null(name)
+        }
+    }
+
     fn get_operator_op(
         &self,
         name: &OperatorName,

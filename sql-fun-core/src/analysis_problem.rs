@@ -4,6 +4,7 @@ mod array;
 mod call_argument;
 mod creation;
 mod delete;
+mod distinct;
 mod index;
 mod insert;
 mod message;
@@ -26,6 +27,7 @@ pub use self::creation::CreationProblem;
 pub use self::delete::{
     CursorNameProblem, CursorTargetMismatchProblem, DeleteProblem, DeleteProblemKind,
 };
+pub use self::distinct::DistinctProblem;
 pub use self::index::{IndexProblem, IndexProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::min_max::MinMaxProblem;
@@ -66,6 +68,8 @@ pub enum AnalysisProblem {
     Array(ArrayProblem),
     /// Invalid boolean input to a truth predicate.
     TruthTest(TruthTestProblem),
+    /// Invalid null-safe distinctness predicate.
+    Distinct(DistinctProblem),
     /// Invalid index alteration or a statistics warning.
     Index(IndexProblem),
     /// An ALTER COLUMN binding or attribute is invalid.
@@ -352,6 +356,12 @@ impl AnalysisProblem {
             _ => None,
         }
     }
+    /// Construct a distinctness diagnostic.
+    #[must_use]
+    pub const fn distinct(problem: DistinctProblem) -> Self {
+        Self::Distinct(problem)
+    }
+
     /// A truth-test operand typing or literal-conversion failure.
     #[must_use]
     pub const fn truth_test(problem: TruthTestProblem) -> Self {
@@ -397,6 +407,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.code(),
             Self::Array(problem) => problem.code(),
             Self::TruthTest(problem) => problem.code(),
+            Self::Distinct(problem) => problem.code(),
             Self::ParameterConstraint(_) => "parameter_constraint",
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -463,6 +474,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.render_metadata(),
             Self::Array(problem) => problem.render_metadata(),
             Self::TruthTest(problem) => problem.render_metadata(),
+            Self::Distinct(problem) => problem.render_metadata(),
             Self::ParameterConstraint(problem) => problem.render_metadata(),
             Self::NameResolution(problem) => return problem.render_metadata(),
             _ => return None,
@@ -481,6 +493,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::QueryAnalysis(problem) => problem.diagnostic_message(),
             Self::Array(problem) => problem.diagnostic_message(),
             Self::TruthTest(problem) => problem.diagnostic_message(),
+            Self::Distinct(problem) => problem.diagnostic_message(),
             Self::Index(problem) => problem.diagnostic_message(),
             Self::AlterColumn(problem) => problem.diagnostic_message(),
             Self::MinMax(problem) => problem.diagnostic_message(),

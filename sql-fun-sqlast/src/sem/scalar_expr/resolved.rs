@@ -16,6 +16,28 @@ impl SemScalarExpr {
             _ => None,
         }
     }
+
+    pub(crate) const fn distinct(value: super::DistinctExpr) -> Self {
+        Self::Distinct(value)
+    }
+    /// Null-safe distinctness predicate, preserved through parameter inference.
+    pub const fn as_distinct(&self) -> Option<&super::DistinctExpr> {
+        if let Self::Distinct(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn distinct_row_comparisons(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        other: &Self,
+    ) -> Result<Option<Vec<Self>>, AnalysisError> {
+        match (self, other) {
+            (Self::Row(left), Self::Row(right)) => left.distinct_comparisons(context, right),
+            _ => AnalysisError::raise_unexpected_input("distinctness explicit row pair"),
+        }
+    }
     pub(crate) fn row(fields: &[Self]) -> Self {
         Self::Row(super::RowExpr::new(fields))
     }

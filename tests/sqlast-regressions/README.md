@@ -132,3 +132,10 @@ installed paths check diagnostics and exact result metadata. Rust tests retain
 comparison bindings, operand lookup outcomes, serialization, and correlated
 parameter assignments; synthetic overload tests verify independent negative-form
 operators and bounds that cannot be compared with each other.
+
+Issue #499 adds the `distinctness` project-schema fixture for PostgreSQL 17/18
+through the shared source and installed paths. It covers both null-safe
+predicates, bare versus typed NULL, scalar/array/explicit-row operands,
+parameter bindings and invalid comparisons. Rust retains binding, coercion,
+serialization, correlated domains and SQLite feature contracts; see
+[the distinctness inventory](inventory-distinctness.md).

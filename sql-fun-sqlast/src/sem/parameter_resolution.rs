@@ -246,6 +246,30 @@ impl ParameterResolution {
         }
         node
     }
+    pub(crate) fn distinct_result(
+        &mut self,
+        comparisons: &[SemScalarExpr],
+        require_boolean: bool,
+        types: &InputTypeConstraint,
+    ) -> usize {
+        let output = self.graph.node(types);
+        if require_boolean {
+            let boolean = InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool());
+            for comparison in comparisons {
+                let input = self.input(comparison);
+                self.graph.overload(
+                    &[input, output],
+                    &[SignatureAlternative::new(&[
+                        boolean.clone(),
+                        boolean.clone(),
+                    ])],
+                    "distinctness",
+                );
+            }
+        }
+        output
+    }
+
     pub(crate) fn truth_test(
         &mut self,
         context: &impl crate::sem::ParseContext,

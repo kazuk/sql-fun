@@ -3,4 +3,13 @@ fail-fast = false
 slow-timeout = "20s"
 junit.path = "junit.xml"
 
+# Archive groups run independently, with persistent, non-overlapping reports.
+[profile.ci-a]
+fail-fast = false
+slow-timeout = "20s"
+junit.path = "junit.xml"
 
+[profile.ci-b]
+fail-fast = false
+slow-timeout = "20s"
+junit.path = "junit.xml"

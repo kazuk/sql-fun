@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Sourced by check-test-flow. CI-only package ownership; sql-fun itself remains
+# owned by the separate proc-macro-tests step. Own every target of each package.
+# SQL_FUN_CI_TEST_GROUP=a|b selects a build; SQL_FUN_CI_TEST_GROUPS="a b" selects
+# the paired archive execution. These are internal CI inputs, not local setup.
+WORKSPACE_TEST_GROUP_A=(
+  sql-fun-core sql-fun-cli sql-fun-client sql-fun-codegen
+  sql-fun-collector parse_dat xbuild adventure-works
+)
+WORKSPACE_TEST_GROUP_B=(sql-fun-sqlast sql-fun-server sql-fun-server-api)
+
+function workspace_test_group_packages() {
+  case "$1" in
+    a) printf '%s\n' "${WORKSPACE_TEST_GROUP_A[@]}" ;;
+    b) printf '%s\n' "${WORKSPACE_TEST_GROUP_B[@]}" ;;
+    *) echo "Unknown workspace test group: $1" >&2; return 1 ;;
+  esac
+}
+
+function validate_workspace_test_groups() {
+  local metadata=$1 expected assigned
+  expected=$(jq -r '.workspace_members as $members | .packages[] |
+    select(.id as $id | $members | index($id)) |
+    select(.name != "sql-fun") | .name' <<< "$metadata" | sort)
+  assigned=$(printf '%s\n' "${WORKSPACE_TEST_GROUP_A[@]}" "${WORKSPACE_TEST_GROUP_B[@]}" | sort)
+  if [[ "$expected" != "$assigned" ]]; then
+    echo 'Workspace test groups must own every workspace package except sql-fun exactly once.' >&2
+    diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$assigned") >&2 || true
+    return 1
+  fi
+}
+
+function build_workspace_test_group() {
+  local group=$1 package metadata package_names
+  local -a packages=() shared_features=()
+  package_names=$(workspace_test_group_packages "$group")
+  metadata=$(cargo metadata --locked --no-deps --format-version=1)
+  validate_workspace_test_groups "$metadata"
+  # The other group's selected packages previously enabled these features on
+  # shared dependencies. Preserve that activation without owning their tests.
+  if [[ "${FEATURES[*]}" == "--all-features" ]]; then
+    case "$group" in
+      a) shared_features=(--features sql-fun-server-api/bin-deps,sql-fun-server-api/openrpc-schema) ;;
+      b) shared_features=(--features sql-fun-core/beta_postgres_versions) ;;
+    esac
+  fi
+  # Select packages at Cargo build time, not via a nextest runtime filter:
+  # dependencies' test targets belong only to their own group's archive.
+  while IFS= read -r package; do
+    packages+=(-p "$package")
+  done <<< "$package_names"
+  cargo nextest archive --locked "${packages[@]}" "${FEATURES[@]}" "${shared_features[@]}" \
+    --timings --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest-${group}.tar.zst"
+}
+
+function run_workspace_test_groups() {
+  local group status=0
+  for group in a b; do
+    # Each invocation owns its extraction and metadata. Profiles keep JUnit
+    # outside the temporary extraction, under target/nextest/ci-{a,b}/.
+    if ! run_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest-${group}.tar.zst" \
+      --workspace-remap "$GIT_ROOT" --profile "ci-${group}" \
+      ${NEXTEST_EXTRA} --no-tests pass; then
+      status=1
+    fi
+  done
+  return "$status"
+}
+
+function run_grouped_workspace_verification() {
+  local tests_status=0 regressions_status=0
+  run_workspace_test_groups || tests_status=$?
+  # A conditional function call would disable errexit throughout regressions.
+  # Use a subshell with errexit instead, and collect its exit status explicitly.
+  set +e
+  (set -e; run_sqlast_regressions)
+  regressions_status=$?
+  set -e
+  (( tests_status == 0 && regressions_status == 0 ))
+}

@@ -74,6 +74,35 @@ impl RankedSignature {
         }
     }
 
+    fn unrestricted_score(&self, index: usize) -> Option<OverloadRank> {
+        if self.signature.accepts_any_type(index) {
+            Some(OverloadRank::default())
+        } else {
+            None
+        }
+    }
+
+    fn accepts_default_inputs(&self) -> bool {
+        (0..self.signature.inputs().len()).all(|index| {
+            default_types()
+                .iter()
+                .any(|ty| self.score(ty, index).is_some())
+        })
+    }
+
+    fn retain_sources(&mut self, context: &impl ParseContext, sources: &HashSet<TypeReference>) {
+        for index in 0..self.sources.len() {
+            if !self.signature.accepts_any_type(index) {
+                self.sources[index].extend(Self::ranks(
+                    context,
+                    &self.signature,
+                    index,
+                    sources.iter().cloned(),
+                ));
+            }
+        }
+    }
+
     fn alternative(
         &self,
         inputs: &[InputTypeConstraint],
@@ -85,14 +114,192 @@ impl RankedSignature {
     }
 }
 
+/// Cast ranks indexed by source; all storage queries stay with this collection.
+#[derive(Clone, Debug, Default)]
+struct ArrayCastRanks(HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>);
+
+impl ArrayCastRanks {
+    fn sources_for_target(&self, target: &TypeReference) -> HashMap<TypeReference, OverloadRank> {
+        self.0
+            .iter()
+            .filter_map(|(source, casts)| Some((source.clone(), *casts.get(target)?)))
+            .collect()
+    }
+
+    fn targets_for_source(&self, source: &TypeReference) -> HashSet<TypeReference> {
+        let mut targets = HashSet::new();
+        if source.is_array() == Some(true) {
+            targets.insert(source.clone());
+        }
+        if let Some(casts) = self.0.get(source) {
+            targets.extend(casts.keys().cloned());
+        }
+        targets
+    }
+
+    fn retain_source(&mut self, context: &impl ParseContext, source: &TypeReference) {
+        if self.0.contains_key(source) {
+            return;
+        }
+        let mut targets = context.get_implicit_castable(source);
+        if source.is_array() == Some(true) {
+            targets.insert(source.clone());
+            targets.extend(
+                context
+                    .get_implicit_castable(&source.element_type())
+                    .into_iter()
+                    .map(|ty| ty.array_type()),
+            );
+        }
+        let ranks = targets
+            .into_iter()
+            .filter(|target| target.is_array() == Some(true))
+            .filter_map(|target| {
+                Some((
+                    target.clone(),
+                    OverloadRank::argument(context, Some(source), Some(&target))?,
+                ))
+            })
+            .collect();
+        self.0.insert(source.clone(), ranks);
+    }
+}
+
+/// Ordered overload candidates and their input-domain/ranking queries.
+#[derive(Clone, Debug)]
+struct RankedSignatures(Vec<RankedSignature>);
+
+impl RankedSignatures {
+    const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn sources_for_argument(&self, index: usize) -> HashSet<TypeReference> {
+        self.0
+            .iter()
+            .flat_map(|entry| entry.sources[index].keys().cloned())
+            .collect()
+    }
+
+    fn accepts_unrestricted_argument(&self, index: usize) -> bool {
+        self.0
+            .iter()
+            .any(|entry| entry.signature.accepts_any_type(index))
+    }
+
+    fn scores_for_source(&self, source: &TypeReference, index: usize) -> Vec<Option<OverloadRank>> {
+        self.0
+            .iter()
+            .map(|entry| entry.score(source, index))
+            .collect()
+    }
+
+    fn unrestricted_scores(&self, index: usize) -> OverloadScores {
+        let scores: Vec<_> = self
+            .0
+            .iter()
+            .map(|entry| entry.unrestricted_score(index))
+            .collect();
+        OverloadScores::new(&scores)
+    }
+
+    fn input_domain(&self, index: usize) -> InputTypeConstraint {
+        if self.accepts_unrestricted_argument(index) {
+            InputTypeConstraint::any()
+        } else {
+            InputTypeConstraint::types(self.sources_for_argument(index))
+        }
+    }
+
+    fn input_domains(&self) -> Vec<InputTypeConstraint> {
+        let Some(first) = self.0.first() else {
+            return Vec::new();
+        };
+        (0..first.signature.inputs().len())
+            .map(|index| self.input_domain(index))
+            .collect()
+    }
+
+    fn accepts_default_inputs(&self) -> bool {
+        self.0.iter().any(RankedSignature::accepts_default_inputs)
+    }
+
+    fn result_types(&self) -> HashSet<TypeReference> {
+        self.0
+            .iter()
+            .map(|entry| entry.signature.result().clone())
+            .collect()
+    }
+
+    fn all_results_allowed(&self, result: &InputTypeConstraint) -> bool {
+        self.0
+            .iter()
+            .all(|entry| result.allows(entry.signature.result()))
+    }
+
+    fn permitting_result(&self, result: &InputTypeConstraint) -> Self {
+        Self(
+            self.0
+                .iter()
+                .filter(|entry| result.allows(entry.signature.result()))
+                .cloned()
+                .collect(),
+        )
+    }
+
+    fn retain_sources(&mut self, context: &impl ParseContext, sources: &HashSet<TypeReference>) {
+        for entry in &mut self.0 {
+            entry.retain_sources(context, sources);
+        }
+    }
+
+    fn has_binary_inputs(&self, target: &TypeReference) -> bool {
+        self.0
+            .iter()
+            .any(|entry| entry.signature.inputs() == [target.clone(), target.clone()])
+    }
+
+    fn push_array_comparison(
+        &mut self,
+        target: &TypeReference,
+        result: &TypeReference,
+        mut sources: HashMap<TypeReference, OverloadRank>,
+    ) {
+        sources
+            .entry(target.clone())
+            .or_insert_with(|| OverloadRank::from(crate::sem::CastContext::no_conversion()));
+        self.0.push(RankedSignature {
+            signature: Signature::new(&[target.clone(), target.clone()], result),
+            sources: vec![sources.clone(), sources],
+        });
+    }
+
+    fn retain_inputs(&mut self, inputs: &[InputTypeConstraint]) {
+        self.0.retain(|entry| entry.accepts_inputs(inputs));
+    }
+
+    fn alternative(
+        &self,
+        candidate: usize,
+        inputs: &[InputTypeConstraint],
+        excluded: &[Vec<TypeReference>],
+    ) -> SignatureAlternative {
+        self.0[candidate].alternative(inputs, excluded)
+    }
+}
+
 /// Owned ranks for finite declarations, defaults, and encountered SQL types.
 /// No catalog type universe is captured or expanded.
 #[derive(Clone, Debug)]
 struct CallFacts {
     postgres_defaults: bool,
-    concrete: Vec<RankedSignature>,
+    concrete: RankedSignatures,
     arrays: Vec<Signature>,
-    array_casts: HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>,
+    array_casts: ArrayCastRanks,
 }
 
 impl CallFacts {
@@ -130,9 +337,9 @@ impl CallFacts {
             .collect();
         let mut facts = Self {
             postgres_defaults: context.dialect() == crate::ast::Dialect::postgres(),
-            concrete,
+            concrete: RankedSignatures(concrete),
             arrays,
-            array_casts: HashMap::new(),
+            array_casts: ArrayCastRanks::default(),
         };
         // Preserve actual array casts for the finite declared/default types so
         // explicit assignment inspection can outlive the borrowed context.
@@ -150,30 +357,9 @@ impl CallFacts {
     }
 
     fn retain_array_source(&mut self, context: &impl ParseContext, source: &TypeReference) {
-        if self.arrays.is_empty() || self.array_casts.contains_key(source) {
-            return;
+        if !self.arrays.is_empty() {
+            self.array_casts.retain_source(context, source);
         }
-        let mut targets = context.get_implicit_castable(source);
-        if source.is_array() == Some(true) {
-            targets.insert(source.clone());
-            targets.extend(
-                context
-                    .get_implicit_castable(&source.element_type())
-                    .into_iter()
-                    .map(|ty| ty.array_type()),
-            );
-        }
-        let ranks = targets
-            .into_iter()
-            .filter(|target| target.is_array() == Some(true))
-            .filter_map(|target| {
-                Some((
-                    target.clone(),
-                    OverloadRank::argument(context, Some(source), Some(&target))?,
-                ))
-            })
-            .collect();
-        self.array_casts.insert(source.clone(), ranks);
     }
 
     fn retain<'a>(
@@ -189,18 +375,7 @@ impl CallFacts {
             sources.extend(context.declared_implicit_cast_sources(ty));
             self.retain_array_source(context, ty);
         }
-        for entry in &mut self.concrete {
-            for index in 0..entry.sources.len() {
-                if !entry.signature.accepts_any_type(index) {
-                    entry.sources[index].extend(RankedSignature::ranks(
-                        context,
-                        &entry.signature,
-                        index,
-                        sources.iter().cloned(),
-                    ));
-                }
-            }
-        }
+        self.concrete.retain_sources(context, &sources);
         for source in sources {
             self.retain_array_source(context, &source);
         }
@@ -208,37 +383,11 @@ impl CallFacts {
 
     fn supplies_input_context(&self) -> bool {
         self.arrays.is_empty()
-            && (self.concrete.len() == 1
-                || !self.concrete.iter().any(|entry| {
-                    (0..entry.signature.inputs().len()).all(|index| {
-                        default_types()
-                            .iter()
-                            .any(|ty| entry.score(ty, index).is_some())
-                    })
-                }))
+            && (self.concrete.len() == 1 || !self.concrete.accepts_default_inputs())
     }
 
     fn declared_inputs(&self) -> Vec<InputTypeConstraint> {
-        let Some(first) = self.concrete.first() else {
-            return Vec::new();
-        };
-        (0..first.signature.inputs().len())
-            .map(|index| {
-                if self
-                    .concrete
-                    .iter()
-                    .any(|entry| entry.signature.accepts_any_type(index))
-                {
-                    InputTypeConstraint::any()
-                } else {
-                    InputTypeConstraint::types(
-                        self.concrete
-                            .iter()
-                            .flat_map(|entry| entry.sources[index].keys().cloned()),
-                    )
-                }
-            })
-            .collect()
+        self.concrete.input_domains()
     }
 
     const fn has_declarations(&self) -> bool {
@@ -247,14 +396,11 @@ impl CallFacts {
 
     fn result_types(&self) -> InputTypeConstraint {
         InputTypeConstraint::types(
-            self.concrete
-                .iter()
-                .map(|entry| entry.signature.result().clone())
-                .chain(
-                    self.arrays
-                        .iter()
-                        .map(|signature| signature.result().clone()),
-                ),
+            self.concrete.result_types().into_iter().chain(
+                self.arrays
+                    .iter()
+                    .map(|signature| signature.result().clone()),
+            ),
         )
     }
 
@@ -264,37 +410,15 @@ impl CallFacts {
                 .arrays
                 .iter()
                 .any(|signature| result.allows(signature.result()))
-            || self
-                .concrete
-                .iter()
-                .all(|entry| result.allows(entry.signature.result()))
+            || self.concrete.all_results_allowed(result)
         {
             return None;
         }
-        let viable: Vec<_> = self
-            .concrete
-            .iter()
-            .filter(|entry| result.allows(entry.signature.result()))
-            .collect();
-        let first = viable.first()?;
-        Some(
-            (0..first.signature.inputs().len())
-                .map(|index| {
-                    if viable
-                        .iter()
-                        .any(|entry| entry.signature.accepts_any_type(index))
-                    {
-                        InputTypeConstraint::any()
-                    } else {
-                        InputTypeConstraint::types(
-                            viable
-                                .iter()
-                                .flat_map(|entry| entry.sources[index].keys().cloned()),
-                        )
-                    }
-                })
-                .collect(),
-        )
+        let viable = self.concrete.permitting_result(result);
+        if viable.is_empty() {
+            return None;
+        }
+        Some(viable.input_domains())
     }
 
     fn alternatives(
@@ -320,7 +444,7 @@ impl CallFacts {
         alternatives
     }
 
-    fn signatures(&self, inputs: &[InputTypeConstraint]) -> Vec<RankedSignature> {
+    fn signatures(&self, inputs: &[InputTypeConstraint]) -> RankedSignatures {
         let mut signatures = self.concrete.clone();
         let mut targets = HashSet::new();
         for source in inputs
@@ -328,35 +452,21 @@ impl CallFacts {
             .filter_map(InputTypeConstraint::admissible_types)
             .flatten()
         {
-            if source.is_array() == Some(true) {
-                targets.insert(source.clone());
-            }
-            if let Some(casts) = self.array_casts.get(source) {
-                targets.extend(casts.keys().cloned());
-            }
+            targets.extend(self.array_casts.targets_for_source(source));
         }
         for template in &self.arrays {
             for target in &targets {
-                if self.concrete.iter().any(|signature| {
-                    signature.signature.inputs() == [target.clone(), target.clone()]
-                }) {
+                if self.concrete.has_binary_inputs(target) {
                     continue;
                 }
-                let mut sources: HashMap<_, _> = self
-                    .array_casts
-                    .iter()
-                    .filter_map(|(source, casts)| Some((source.clone(), *casts.get(target)?)))
-                    .collect();
-                sources.entry(target.clone()).or_insert_with(|| {
-                    OverloadRank::from(crate::sem::CastContext::no_conversion())
-                });
-                signatures.push(RankedSignature {
-                    signature: Signature::new(&[target.clone(), target.clone()], template.result()),
-                    sources: vec![sources.clone(), sources],
-                });
+                signatures.push_array_comparison(
+                    target,
+                    template.result(),
+                    self.array_casts.sources_for_target(target),
+                );
             }
         }
-        signatures.retain(|signature| signature.accepts_inputs(inputs));
+        signatures.retain_inputs(inputs);
         signatures
     }
 }
@@ -460,7 +570,7 @@ impl CallConstraint {
 mod tests;
 
 fn combine(
-    signatures: &[RankedSignature],
+    signatures: &RankedSignatures,
     choices: &[Vec<SourcePartition>],
     index: usize,
     domains: &[InputTypeConstraint],
@@ -472,7 +582,7 @@ fn combine(
         let Some(candidate) = scores.unique_best() else {
             return;
         };
-        alternatives.push(signatures[candidate].alternative(domains, excluded));
+        alternatives.push(signatures.alternative(candidate, domains, excluded));
         return;
     }
     for choice in &choices[index] {
@@ -506,51 +616,32 @@ struct SourcePartition {
 impl SourcePartition {
     // Sources in one partition have identical cast scores for every overload.
     fn argument_choices(
-        signatures: &[RankedSignature],
+        signatures: &RankedSignatures,
         inputs: &[InputTypeConstraint],
     ) -> Vec<Vec<Self>> {
         let mut choices = Vec::new();
         for (index, input) in inputs.iter().enumerate() {
-            let mut sources = HashSet::new();
-            if let Some(types) = input.admissible_types() {
-                sources.extend(types.iter().cloned());
+            let sources = if let Some(types) = input.admissible_types() {
+                types.iter().cloned().collect()
             } else {
-                for signature in signatures {
-                    sources.extend(signature.sources[index].keys().cloned());
-                }
-            }
-            let has_unrestricted = signatures
-                .iter()
-                .any(|signature| signature.signature.accepts_any_type(index));
+                signatures.sources_for_argument(index)
+            };
             let excluded: Vec<_> = sources.iter().cloned().collect();
             let mut groups = BTreeMap::<Vec<Option<OverloadRank>>, Vec<TypeReference>>::new();
             for source in sources {
                 if !input.allows(&source) {
                     continue;
                 }
-                let scores = signatures
-                    .iter()
-                    .map(|signature| signature.score(&source, index))
-                    .collect();
+                let scores = signatures.scores_for_source(&source, index);
                 groups.entry(scores).or_default().push(source);
             }
             let mut partitions: Vec<_> = groups
                 .into_iter()
                 .map(|(scores, types)| Self::new(&scores, &types))
                 .collect();
-            if input.is_any() && has_unrestricted {
-                let scores: Vec<_> = signatures
-                    .iter()
-                    .map(|signature| {
-                        if signature.signature.accepts_any_type(index) {
-                            Some(OverloadRank::default())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+            if input.is_any() && signatures.accepts_unrestricted_argument(index) {
                 partitions.push(Self {
-                    scores: OverloadScores::new(&scores),
+                    scores: signatures.unrestricted_scores(index),
                     domain: InputTypeConstraint::any(),
                     excluded,
                 });

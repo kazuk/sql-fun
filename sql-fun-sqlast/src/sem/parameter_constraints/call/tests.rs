@@ -76,13 +76,10 @@ fn unrelated_catalog_growth_does_not_instantiate_array_comparisons() {
     let defaults = InputTypeConstraint::types(super::default_types());
     let instantiated = facts.signatures(&[defaults.clone(), defaults]);
     assert_eq!(instantiated.len(), 7);
-    assert!(instantiated.iter().all(|entry| {
-        entry
-            .signature
-            .inputs()
-            .iter()
-            .all(|ty| ty.is_array() != Some(true))
-    }));
+    assert_eq!(
+        instantiated.input_domains(),
+        vec![InputTypeConstraint::types(super::default_types()); 2]
+    );
 }
 
 #[rstest::rstest]

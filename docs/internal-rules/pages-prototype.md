@@ -16,9 +16,12 @@ adoption job requires `actions: read` and checkout requires `contents: read`.
 The Ubuntu runner supplies Bash, GitHub CLI, jq, tar, curl, and cmp. There are
 no new CLI runtime or contributor prerequisites.
 
-A newly added `workflow_dispatch` workflow must be registered on the default
-branch before it can be manually triggered. Once available, select the branch
-or tag containing the prototype revision to test. See GitHub's
+A new manual-only workflow on a PR branch can return HTTP 404 until GitHub has
+registered it. The normal introduction path is through the default branch;
+initial pre-merge registration for #299 used a separately approved temporary
+push trigger on a dedicated ref. That trigger is absent from the final workflow.
+Once available, select the branch or tag containing the prototype revision to
+test. See GitHub's
 [manual workflow trigger rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
 
 ## Run and verify

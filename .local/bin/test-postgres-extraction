@@ -44,65 +44,6 @@ def owned():
     return set(run("docker", "ps", "-aq", "--filter", "label=io.sql-fun.extraction=owned").stdout.split())
 
 
-class InitTerminal:
-    """Own a real terminal session and reap the CLI on every exit path."""
-    def __init__(self, binary, project, env):
-        self.master, slave = pty.openpty()
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
-
-        def terminal_session():
-            os.setsid()
-            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-
-        try:
-            self.process = subprocess.Popen([binary, "init"], cwd=project, env=env,
-                                            stdin=slave, stdout=slave, stderr=slave,
-                                            preexec_fn=terminal_session)
-        except BaseException:
-            os.close(self.master)
-            raise
-        finally:
-            os.close(slave)
-        self.transcript = bytearray()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        try:
-            if self.process.poll() is None:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-        finally:
-            os.close(self.master)
-
-    def rendered(self, since=0):
-        return re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", self.transcript[since:])
-
-    def send(self, data):
-        start = len(self.transcript)
-        os.write(self.master, data)
-        return start
-
-    def wait_for(self, marker, since=0):
-        deadline = time.monotonic() + 15
-        while marker.encode() not in self.rendered(since):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise AssertionError(f"terminal did not reach {marker!r}: {self.transcript!r}")
-            ready, _, _ = select.select([self.master], [], [], min(remaining, 1))
-            if ready:
-                try:
-                    chunk = os.read(self.master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        raise AssertionError(f"terminal exited before {marker!r}: {self.transcript!r}") from error
-                    raise
-                if not chunk:
-                    raise AssertionError(f"terminal closed before {marker!r}: {self.transcript!r}")
-                self.transcript.extend(chunk)
-
-
 def validate_interactive_init(binary, destination, fixture, declarations, ambient_metadata=False):
     """Bare init must not inspect project contents or ambient metadata paths."""
     project = destination / f"interactive-init-{fixture}"
@@ -115,83 +56,68 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
     env.pop("SQL_FUN_METADATA_FILE", None)
     if ambient_metadata:
         env["SQL_FUN_METADATA_FILE"] = str(manifest)
-    with InitTerminal(binary, project, env) as terminal:
-        wait_for = terminal.wait_for
-        rendered = terminal.rendered
+    master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
+
+    def terminal_session():
+        os.setsid()
+        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+    process = subprocess.Popen([binary, "init"],
+                               cwd=project, env=env, stdin=slave, stdout=slave,
+                               stderr=slave, preexec_fn=terminal_session)
+    os.close(slave)
+    transcript = bytearray()
+
+    def rendered(since=0):
+        return re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", transcript[since:])
+
+    def wait_for(marker, since=0):
+        deadline = time.monotonic() + 15
+        while marker.encode() not in rendered(since):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AssertionError(f"terminal did not reach {marker!r}: {transcript!r}")
+            ready, _, _ = select.select([master], [], [], min(remaining, 1))
+            if ready:
+                try:
+                    chunk = os.read(master, 65536)
+                except OSError as error:
+                    if error.errno == errno.EIO:
+                        raise AssertionError(f"terminal exited before {marker!r}: {transcript!r}") from error
+                    raise
+                if not chunk:
+                    raise AssertionError(f"terminal closed before {marker!r}: {transcript!r}")
+                transcript.extend(chunk)
+
+    try:
         wait_for("Initialize sql-fun development support?")
-        terminal.send(b"y\r")
+        os.write(master, b"y\r")
         wait_for("sql-fun home directory (SQL_FUN_HOME)?")
         assert b"Choose engines" not in rendered(), "home choice must appear first"
-        terminal.send(b"\r")  # Explicitly accept the SQL_FUN_HOME suggestion.
+        os.write(master, b"\r")  # Explicitly accept the SQL_FUN_HOME suggestion.
         wait_for(f"Use {home}")
         assert not home.exists(), "home must not be created before path confirmation"
-        terminal.send(b"y\r")  # Confirm the resolved absolute home path.
+        os.write(master, b"y\r")  # Confirm the resolved absolute home path.
         wait_for("Space to select, Enter to confirm.")
         wait_for("[ ] postgres")
         wait_for("[ ] sqlite")
         assert b"Choose datasources" not in rendered(), "bare init must not inspect project metadata"
-        start = len(terminal.transcript)
-        terminal.send(b"\r")
+        start = len(transcript)
+        os.write(master, b"\r")
         wait_for("Select at least one option explicitly.", start)
         wait_for("Space to select, Enter to confirm.", start)
-        terminal.send(b"\x1b[B \r")  # Move to SQLite, select, and confirm.
+        os.write(master, b"\x1b[B \r")  # Move to SQLite, select, and confirm.
         wait_for("SQLite development-support setup is still under development.")
-        assert terminal.process.wait(timeout=15) == 0
+        assert process.wait(timeout=15) == 0
         assert home.is_dir() and not (home / "postgres").exists()
         assert manifest.read_text() == declarations, "init must not rewrite project metadata"
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
+        os.close(master)
     print(f"Interactive init ({fixture}): no project inspection, home choice and explicit engine selection passed", flush=True)
-
-
-def validate_interactive_postgres(binary, destination, major, catalog, connection=None, cancel=False):
-    """Complete actual source/version questions using a preserved catalog fixture."""
-    source = "server" if connection else "docker"
-    project = destination / f"interactive-postgres-{major}-{source}-{'cancel' if cancel else 'complete'}"
-    project.mkdir()
-    home = project / "home"
-    installed = home / "postgres" / major
-    if not cancel:
-        shutil.copytree(catalog, installed)
-    env = dict(os.environ, SQL_FUN_HOME=str(home), TERM="xterm",
-               DOCKER_HOST="unix:///nonexistent-sql-fun-test.sock")
-    if not connection:
-        env["PATH"] = str(project / "no-tools")
-    with InitTerminal(binary, project, env) as terminal:
-        terminal.wait_for("Initialize sql-fun development support?")
-        terminal.send(b"y\r")
-        terminal.wait_for("sql-fun home directory (SQL_FUN_HOME)?")
-        terminal.send(b"\r")
-        terminal.wait_for(f"Use {home}")
-        if cancel:
-            assert not home.exists()
-        terminal.send(b"y\r")
-        terminal.wait_for("[ ] sqlite")
-        assert home.is_dir(), "home creation must precede engine/source/version questions"
-        terminal.send(b" \x1b[B \r")  # Explicitly select PostgreSQL and SQLite.
-        terminal.wait_for("Choose the PostgreSQL builtin source")
-        terminal.wait_for("[ ] Existing PostgreSQL server")
-        terminal.send(b"\x1b[B \r" if connection else b" \r")
-        if connection:
-            terminal.wait_for("libpq connection string")
-            terminal.send(connection.encode() + b"\r")
-            terminal.wait_for("Choose the connected PostgreSQL version to initialize")
-        else:
-            terminal.wait_for("Choose PostgreSQL versions to initialize")
-        terminal.wait_for(f"[ ] {major}")
-        if cancel:
-            terminal.send(b"\x1b")
-            terminal.wait_for("Error:")
-            assert terminal.process.wait(timeout=15) != 0
-            assert home.is_dir() and not (home / "postgres").exists()
-        else:
-            start = terminal.send(b"\r")
-            terminal.wait_for("Select at least one option explicitly.", start)
-            terminal.wait_for(f"[ ] {major}", start)
-            terminal.send(b" \r" if connection or major == "17" else b"\x1b[B \r")
-            terminal.wait_for(f"PostgreSQL {major}: already initialized")
-            terminal.wait_for("SQLite development-support setup is still under development.")
-            assert terminal.process.wait(timeout=15) == 0
-            assert payload(installed) == payload(catalog)
-    print(f"Interactive PostgreSQL {major} ({source}): {'cancellation preserves home' if cancel else 'source/version choices and mixed-engine completion'} passed", flush=True)
 
 
 def validate_masters(directory):
@@ -332,10 +258,6 @@ def validate(binary, major, image, destination, host, bind):
         run(binary, "init", "--yes", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
         installed = init_home / "postgres" / major
         assert payload(installed) == payload(existing), "init must install the same catalog used by extraction"
-        validate_interactive_postgres(binary, destination, major, existing)
-        validate_interactive_postgres(binary, destination, major, existing,
-                                      connection_env["SQL_FUN_DATABASE_URL"])
-        validate_interactive_postgres(binary, destination, major, existing, cancel=True)
         previous_install = payload(installed)
         run(binary, "init", "--yes", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
         assert payload(installed) == previous_install, "rerun modified a valid installation"

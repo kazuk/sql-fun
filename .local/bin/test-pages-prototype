@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+set -euo pipefail
+scripts="$(cd "$(dirname "$0")/../sbin" && pwd)"
+fixture="$(mktemp -d)"
+trap 'rm -rf "$fixture"' EXIT
+export PAGES_PROTOTYPE_FIXTURE="$fixture"
+mkdir -p "$fixture/bin" "$fixture/manual/css"
+printf '<html>CI-built manual</html>\n' > "$fixture/manual/index.html"
+printf 'body { color: black; }\n' > "$fixture/manual/css/general-test.css"
+printf '{"repository":{"full_name":"fixture/repository"},"path":".github/workflows/build-test.yml","head_sha":"1111111111111111111111111111111111111111"}\n' > "$fixture/run.json"
+printf '[{"jobs":[{"name":"doc","conclusion":"success"}]}]\n' > "$fixture/jobs.json"
+printf '[{"artifacts":[{"name":"sql-fun-user-manual","expired":false}]}]\n' > "$fixture/artifacts.json"
+cat > "$fixture/bin/gh" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$PAGES_PROTOTYPE_FIXTURE/requests"
+[[ "${API_FAILURE:-}" != true ]] || exit 1
+case "$*" in
+  'api repos/fixture/repository/actions/runs/20') cat "$PAGES_PROTOTYPE_FIXTURE/run.json" ;;
+  'api --paginate --slurp repos/fixture/repository/actions/runs/20/jobs?per_page=100') cat "$PAGES_PROTOTYPE_FIXTURE/jobs.json" ;;
+  'api --paginate --slurp repos/fixture/repository/actions/runs/20/artifacts?per_page=100') cat "$PAGES_PROTOTYPE_FIXTURE/artifacts.json" ;;
+  'run download 20 --repo fixture/repository --name sql-fun-user-manual --dir '*)
+    [[ "${DOWNLOAD_FAILURE:-}" != true ]] || exit 1
+    mkdir -p "$9"
+    cp -R "$PAGES_PROTOTYPE_FIXTURE/manual/." "$9/"
+    ;;
+  *) echo "Unexpected gh request: $*" >&2; exit 1 ;;
+esac
+MOCK
+cat > "$fixture/bin/curl" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+for argument in "$@"; do
+  if [[ "$argument" == https://example.invalid/manual/* ]]; then
+    path="${argument#https://example.invalid/manual/}"
+  fi
+done
+[[ "${MISMATCH:-}" != true ]] || { printf 'different bytes' > "${!#}"; exit 0; }
+cp "$PAGES_PROTOTYPE_FIXTURE/manual/$path" "${!#}"
+MOCK
+chmod +x "$fixture/bin/gh" "$fixture/bin/curl"
+export PATH="$fixture/bin:$PATH"
+expect_failure() {
+  if "$@" > "$fixture/stdout" 2> "$fixture/stderr"; then
+    echo "Unexpected success: $*" >&2
+    exit 1
+  fi
+}
+prepare() {
+  "$scripts/prepare-pages-prototype" fixture/repository 20 v0.2.0 "$fixture/archive"
+}
+output="$(prepare)"
+[[ "$output" == $'archive=sql-fun_v0.2.0_user-manual.tar.gz\nsource_sha=1111111111111111111111111111111111111111' ]]
+archive="$fixture/archive/sql-fun_v0.2.0_user-manual.tar.gz"
+"$scripts/extract-pages-manual" "$archive" "$fixture/extracted"
+diff -r "$fixture/manual" "$fixture/extracted"
+"$scripts/verify-pages-manual" "$fixture/extracted" https://example.invalid/manual/
+expect_failure env MISMATCH=true "$scripts/verify-pages-manual" "$fixture/extracted" https://example.invalid/manual/
+expect_failure "$scripts/extract-pages-manual" "$fixture/absent.tar.gz" "$fixture/missing"
+grep -q 'Required manual archive missing:' "$fixture/stderr"
+[[ ! -d "$fixture/missing" ]]
+
+# Invalid choices fail before touching GitHub. No run or version is inferred.
+rm "$fixture/requests"
+for tag in '' v0.2.0-snapshot1 v01.2.0 v0.2.0-rc1; do
+  expect_failure "$scripts/prepare-pages-prototype" fixture/repository 20 "$tag" "$fixture/unused"
+done
+expect_failure "$scripts/prepare-pages-prototype" fixture/repository latest v0.2.0 "$fixture/unused"
+[[ ! -f "$fixture/requests" ]]
+
+for filter in '.repository.full_name = "other/repository"' '.path = ".github/workflows/other.yml"'; do
+  cp "$fixture/run.json" "$fixture/original.json"
+  jq "$filter" "$fixture/original.json" > "$fixture/run.json"
+  expect_failure prepare
+  grep -q 'Expected a build-test.yml run' "$fixture/stderr"
+  cp "$fixture/original.json" "$fixture/run.json"
+done
+for conclusion in failure skipped null; do
+  printf '[{"jobs":[{"name":"doc","conclusion":"%s"}]}]\n' "$conclusion" > "$fixture/jobs.json"
+  expect_failure prepare
+  grep -q 'Manual producer job doc has not succeeded' "$fixture/stderr"
+done
+printf '[{"jobs":[{"name":"doc","conclusion":"success"}]}]\n' > "$fixture/jobs.json"
+for artifacts in '[{"artifacts":[]}]' '[{"artifacts":[{"name":"sql-fun-user-manual","expired":true}]}]'; do
+  printf '%s\n' "$artifacts" > "$fixture/artifacts.json"
+  rm "$fixture/requests"
+  expect_failure prepare
+  grep -q 'Required release input missing or expired: sql-fun-user-manual' "$fixture/stderr"
+  ! grep -q '^run download' "$fixture/requests"
+done
+printf '[{"artifacts":[{"name":"sql-fun-user-manual","expired":false}]}]\n' > "$fixture/artifacts.json"
+expect_failure env API_FAILURE=true "$scripts/prepare-pages-prototype" fixture/repository 20 v0.2.0 "$fixture/unused"
+expect_failure env DOWNLOAD_FAILURE=true "$scripts/prepare-pages-prototype" fixture/repository 20 v0.2.0 "$fixture/unused"
+[[ ! -d "$fixture/unused" ]]
+rm "$fixture/manual/index.html"
+expect_failure prepare
+grep -q 'has no root index.html' "$fixture/stderr"
+tar -czf "$fixture/no-index.tar.gz" -C "$fixture/manual" .
+expect_failure "$scripts/extract-pages-manual" "$fixture/no-index.tar.gz" "$fixture/no-index"
+echo 'Pages prototype contracts passed'

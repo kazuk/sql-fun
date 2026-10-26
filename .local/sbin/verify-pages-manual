@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+manual="${1:?manual directory is required}"
+url="${2:?deployed Pages URL is required}"
+temporary="$(mktemp -d)"
+trap 'rm -rf "$temporary"' EXIT
+# mdBook fingerprints its stylesheets. Compare the index and one nested asset.
+styles=("$manual"/css/*.css)
+[[ -f "${styles[0]}" ]] || { echo 'Manual has no nested CSS asset to verify' >&2; exit 1; }
+for path in index.html "${styles[0]#"$manual/"}"; do
+  curl --fail --silent --show-error --location --retry 5 --retry-delay 5 \
+    "${url%/}/$path" --output "$temporary/served"
+  cmp "$manual/$path" "$temporary/served"
+  printf 'Verified unchanged bytes: %s (%s)\n' "$path" "${url%/}/$path"
+done

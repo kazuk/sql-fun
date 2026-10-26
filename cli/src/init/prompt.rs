@@ -164,6 +164,11 @@ pub struct PromptRequest {
 }
 
 impl PromptRequest {
+    #[cfg(test)]
+    pub(super) fn title(&self) -> &str {
+        &self.title
+    }
+
     pub fn confirm(title: &str) -> Self {
         Self {
             title: title.to_owned(),

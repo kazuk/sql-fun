@@ -24,11 +24,7 @@ mod test_request {
     }
 }
 
-pub(super) fn select(title: &str, options: &[String]) -> Result<Vec<String>, InitError> {
-    select_with(title, options, PromptRequest::run)
-}
-
-fn select_with(
+pub(super) fn select_with(
     title: &str,
     options: &[String],
     mut answer: impl FnMut(&PromptRequest) -> Result<PromptResponse, InitError>,

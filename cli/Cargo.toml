@@ -66,7 +66,6 @@ sql-fun-client.workspace = true
 sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
 sql-fun-server-api.workspace = true
-statig.workspace = true
 syn.workspace = true
 tar.workspace = true
 tempfile.workspace = true

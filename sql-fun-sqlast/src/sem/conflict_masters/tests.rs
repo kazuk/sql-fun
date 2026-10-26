@@ -1,7 +1,8 @@
 use super::{ConflictMasters, lookup_collation, lookup_operator_class};
 use crate::context::BaseParseContext;
-use crate::sem::{
-    CollationIdentity, ConflictInfoRead, FullName, ParseContext, SchemaFileContext, SchemaName,
+use crate::{
+    context::ConflictInfoRead,
+    sem::{CollationIdentity, FullName, ParseContext, SchemaFileContext, SchemaName},
 };
 
 #[rstest::rstest]

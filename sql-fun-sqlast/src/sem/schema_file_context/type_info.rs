@@ -1,7 +1,10 @@
 use crate::context::BaseParseContext;
-use crate::sem::{
-    CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
-    TypeInfoRead, TypeInfoWrite, TypeReference,
+use crate::{
+    context::{TypeInfoRead, TypeInfoWrite},
+    sem::{
+        CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
+        TypeReference,
+    },
 };
 
 use crate::TrieMap;

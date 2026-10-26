@@ -1,5 +1,8 @@
 use crate::context::ParseContext;
-use crate::sem::{FullName, RuleIdentity, RuleInfoRead};
+use crate::{
+    context::RuleInfoRead,
+    sem::{FullName, RuleIdentity},
+};
 
 #[rstest::rstest]
 #[case::restrict(

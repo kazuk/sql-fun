@@ -1,5 +1,8 @@
 use crate::context::ParseContext;
-use crate::sem::{FullName, TriggerIdentity, TriggerInfoRead};
+use crate::{
+    context::TriggerInfoRead,
+    sem::{FullName, TriggerIdentity},
+};
 
 #[test]
 fn drop_masks_inherited_trigger_and_recreation_preserves_other_links() -> testresult::TestResult {

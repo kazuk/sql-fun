@@ -29,14 +29,14 @@ use self::{
 use crate::context::BaseParseContext;
 use crate::{
     StringSpan, TrieMap,
-    context::ParseContext,
+    context::{
+        IndexInfoRead, OperatorInfoRead, ParseContext, SearchPathRead, TableInfoRead, ViewInfoRead,
+    },
     sem::{
         AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
         CreateSchema, DiagnosticContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt,
-        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead,
-        OperatorName, SchemaName, SemScalarExpr, SourceAccessService, TableInfoRead, TypeReference,
-        ViewInfoRead,
-        parse_context::{IndexInfoRead, SearchPathRead},
+        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorName,
+        SchemaName, SemScalarExpr, SourceAccessService, TypeReference,
     },
 };
 
@@ -266,8 +266,8 @@ mod test_index_lookup {
     use self::test_helpers::{index, layer};
     use crate::context::BaseParseContext;
     use crate::{
-        context::ParseContext,
-        sem::{FullName, IndexInfoRead},
+        context::{IndexInfoRead, ParseContext},
+        sem::FullName,
     };
 
     #[rstest::rstest]
@@ -380,7 +380,10 @@ mod test_index_lookup {
 
     #[test]
     fn quoted_names_do_not_alias_or_shadow_other_indexes() -> testresult::TestResult {
-        use crate::sem::{FullName, IndexInfoRead, ParseContext, TableName};
+        use crate::{
+            context::IndexInfoRead,
+            sem::{FullName, ParseContext, TableName},
+        };
         let left = index("a.b", "parent_table", "c");
         let right = index("a", "other_table", "b.c");
         let parent = layer(&["a.b", "a"], std::slice::from_ref(&left))?.freeze();
@@ -498,7 +501,10 @@ impl OperatorInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_operator_layers {
-    use crate::sem::{OperatorInfoRead, OperatorName, PgBuiltInType};
+    use crate::{
+        context::OperatorInfoRead,
+        sem::{OperatorName, PgBuiltInType},
+    };
 
     #[rstest::rstest]
     #[case::binary(true, true)]
@@ -681,18 +687,18 @@ mod test_diagnostic_context {
     }
 }
 
-impl crate::sem::RuleInfoRead for SchemaCatalog {
+impl crate::context::RuleInfoRead for SchemaCatalog {
     fn local_rule(
         &self,
         identity: &crate::sem::RuleIdentity,
     ) -> Option<Option<&crate::sem::CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
     }
-    fn rule_parent(&self) -> Option<&dyn crate::sem::RuleInfoRead> {
+    fn rule_parent(&self) -> Option<&dyn crate::context::RuleInfoRead> {
         Some(&self.base)
     }
 }
-impl crate::sem::RuleInfoWrite for SchemaFileContext {
+impl crate::context::RuleInfoWrite for SchemaFileContext {
     fn store_rule(
         &mut self,
         identity: &crate::sem::RuleIdentity,
@@ -707,7 +713,7 @@ impl crate::sem::RuleInfoWrite for SchemaFileContext {
     }
 }
 
-impl crate::sem::TriggerInfoRead for SchemaCatalog {
+impl crate::context::TriggerInfoRead for SchemaCatalog {
     fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
         if let Some(entry) = self.triggers.get(identity) {
             entry.is_none()
@@ -754,7 +760,7 @@ impl BaseParseContext for SchemaCatalog {
     }
 }
 
-impl crate::sem::TriggerInfoWrite for SchemaFileContext {
+impl crate::context::TriggerInfoWrite for SchemaFileContext {
     fn register_trigger(
         mut self,
         trigger: &crate::sem::CreateTrigger,
@@ -1015,9 +1021,9 @@ mod test_extension_record {
 mod test_freeze {
     use crate::StringSpan;
     use crate::context::BaseParseContext;
-    use crate::sem::{
-        ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName, SearchPathRead,
-        TableInfoWrite,
+    use crate::{
+        context::{SearchPathRead, TableInfoWrite},
+        sem::{ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName},
     };
     use std::path::Path;
 
@@ -1157,7 +1163,10 @@ mod test_freeze {
 #[cfg(test)]
 mod test_search_path {
     use crate::context::BaseParseContext;
-    use crate::sem::{FullName, ParseContext, SchemaName, SearchPathRead};
+    use crate::{
+        context::SearchPathRead,
+        sem::{FullName, ParseContext, SchemaName},
+    };
     use std::path::Path;
 
     #[rstest::rstest]
@@ -1304,7 +1313,7 @@ mod test_search_path {
     }
 }
 
-impl crate::sem::ConflictInfoRead for SchemaCatalog {
+impl crate::context::ConflictInfoRead for SchemaCatalog {
     fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
         self.base.database_collation()
     }

@@ -1,6 +1,6 @@
-use crate::sem::{
-    AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, FullName, ParseContext,
-    SequenceInfoRead, SequenceInfoWrite,
+use crate::{
+    context::{SequenceInfoRead, SequenceInfoWrite},
+    sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, FullName, ParseContext},
 };
 
 use crate::TrieMap;

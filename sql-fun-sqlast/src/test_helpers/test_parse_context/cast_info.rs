@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::sem::{CastDefinition, CastInfoRead, TypeReference};
+use crate::{
+    context::CastInfoRead,
+    sem::{CastDefinition, TypeReference},
+};
 
 use super::TestParseContext;
 

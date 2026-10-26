@@ -2,8 +2,9 @@
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::context::ParseContext;
-use ::sql_fun_sqlast::sem::{
-    CastInfoRead, ColumnName, FullName, PgBuiltInType, TypeReference, ViewName,
+use ::sql_fun_sqlast::{
+    context::CastInfoRead,
+    sem::{ColumnName, FullName, PgBuiltInType, TypeReference, ViewName},
 };
 
 #[test]

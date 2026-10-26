@@ -628,7 +628,7 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for ViewColumnMappe
 }
 
 fn rule_is_cancelled(
-    context: &dyn crate::sem::RuleInfoRead,
+    context: &dyn crate::context::RuleInfoRead,
     identity: &crate::sem::RuleIdentity,
 ) -> bool {
     if let Some(entry) = context.local_rule(identity) {

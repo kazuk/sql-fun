@@ -1,5 +1,8 @@
 use crate::context::ParseContext;
-use crate::sem::{FullName, TriggerIdentity, TriggerInfoRead};
+use crate::{
+    context::TriggerInfoRead,
+    sem::{FullName, TriggerIdentity},
+};
 
 #[rstest::rstest]
 #[case::restrict("DROP TRIGGER audit ON item_view RESTRICT", false)]

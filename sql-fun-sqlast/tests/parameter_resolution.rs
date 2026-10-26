@@ -153,7 +153,10 @@ fn parser_adapter_retains_the_same_constraints() -> Result<(), Box<dyn std::erro
 
 #[test]
 fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{CastInfoRead, FullName, SchemaFileContext, TypeReference};
+    use ::sql_fun_sqlast::{
+        context::CastInfoRead,
+        sem::{FullName, SchemaFileContext, TypeReference},
+    };
     let definition = parse_statements(
         "create type public.mood as enum ('happy')",
         Dialect::postgres(),

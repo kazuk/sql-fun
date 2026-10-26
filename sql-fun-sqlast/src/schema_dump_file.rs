@@ -1,6 +1,9 @@
-use crate::sem::{
-    AnalysisError, AnalysisProblem, FrozenBaseContext, FullName, SemAst, TypeDefinition,
-    TypeInfoRead, TypeReference,
+use crate::{
+    context::TypeInfoRead,
+    sem::{
+        AnalysisError, AnalysisProblem, FrozenBaseContext, FullName, SemAst, TypeDefinition,
+        TypeReference,
+    },
 };
 
 /// Error for reading schema dump

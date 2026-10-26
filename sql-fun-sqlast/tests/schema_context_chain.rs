@@ -9,10 +9,9 @@ use self::test_helpers::{
 
 use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
-    context::ParseContext,
+    context::{IndexInfoRead, ParseContext, SearchPathRead, TypeInfoRead, ViewInfoRead},
     sem::{
-        ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, PgBuiltInType,
-        SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
+        ColumnName, FullName, GetSourcePathWithSpanOpt, PgBuiltInType, TableName, TypeReference,
     },
 };
 
@@ -785,10 +784,10 @@ mod test_helpers {
     use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParsedSchemaDump, PostgresDialect, SqlFunArgs,
-        context::ParseContext,
+        context::{ParseContext, ViewInfoRead},
         sem::{
             AnalysisProblem, BaseContext, ColumnName, FrozenBaseContext, FullName,
-            SchemaFileContext, SchemaName, TableName, TypeReference, ViewInfoRead, ViewLike,
+            SchemaFileContext, SchemaName, TableName, TypeReference, ViewLike,
             problem::NameResolution,
         },
     };

@@ -2,10 +2,11 @@ use crate::context::BaseParseContext;
 use crate::context::ParseContext;
 use crate::syn::Opt;
 use crate::{
+    context::{TableInfoRead, TypeInfoRead},
     sem::{
         AlterOwner, FullName, ObjectKind, OwnedObjectDefinition, OwnerSpecification,
-        OwnershipIdentity, OwnershipInfoRead, Role, RoleInfoRead, SchemaName, TableInfoRead,
-        TableName, TypeInfoRead, TypeReference,
+        OwnershipIdentity, OwnershipInfoRead, Role, RoleInfoRead, SchemaName, TableName,
+        TypeReference,
     },
     test_helpers::{
         SynBuilder,

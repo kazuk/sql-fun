@@ -4,19 +4,20 @@ mod conflict_info;
 use crate::context::BaseParseContext;
 use crate::{
     StringSpan,
-    context::ParseContext,
+    context::{
+        FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext,
+        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite,
+        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+    },
     sem::{
         AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
         CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
-        CreateView, DiagnosticContext, DropTable, FromClause, FullName, FunctionInfoRead,
-        FunctionInfoWrite, FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead,
-        MutSourcePathWithSpan, OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant,
-        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan,
-        TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite,
-        TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
-        WithClause,
+        CreateView, DiagnosticContext, DropTable, FromClause, FullName, FunctionOverloadCollection,
+        GetSourcePathWithSpanOpt, MutSourcePathWithSpan, OperatorDefinition, OperatorName,
+        OverloadVariant, SchemaName, SourcePathWithSpan, TableName, TypeDefinition, TypeReference,
+        ValidOperatorName, VariableSet, ViewLike, WithClause,
     },
     test_helpers::{SynBuilder, source_span},
 };
@@ -407,18 +408,18 @@ impl DiagnosticContext for TestParseContext {
     }
 }
 
-impl crate::sem::RuleInfoRead for TestParseContext {
+impl crate::context::RuleInfoRead for TestParseContext {
     fn local_rule(
         &self,
         identity: &crate::sem::RuleIdentity,
     ) -> Option<Option<&crate::sem::CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
     }
-    fn rule_parent(&self) -> Option<&dyn crate::sem::RuleInfoRead> {
+    fn rule_parent(&self) -> Option<&dyn crate::context::RuleInfoRead> {
         None
     }
 }
-impl crate::sem::RuleInfoWrite for TestParseContext {
+impl crate::context::RuleInfoWrite for TestParseContext {
     fn store_rule(
         &mut self,
         identity: &crate::sem::RuleIdentity,
@@ -432,7 +433,7 @@ impl crate::sem::RuleInfoWrite for TestParseContext {
     }
 }
 
-impl crate::sem::TriggerInfoRead for TestParseContext {
+impl crate::context::TriggerInfoRead for TestParseContext {
     fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
         self.triggers.get(identity).is_some_and(Option::is_none)
     }
@@ -549,7 +550,7 @@ impl FunctionInfoWrite for TestParseContext {
     }
 }
 
-impl crate::sem::TriggerInfoWrite for TestParseContext {
+impl crate::context::TriggerInfoWrite for TestParseContext {
     fn register_trigger(
         mut self,
         trigger: &crate::sem::CreateTrigger,
@@ -727,8 +728,8 @@ impl ParseContext for TestParseContext {
 mod test_search_path {
     use super::TestParseContext;
     use crate::{
-        context::ParseContext,
-        sem::{SchemaName, SearchPathRead},
+        context::{ParseContext, SearchPathRead},
+        sem::SchemaName,
     };
 
     #[test]

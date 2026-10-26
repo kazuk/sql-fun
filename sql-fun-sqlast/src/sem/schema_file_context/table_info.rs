@@ -1,6 +1,9 @@
-use crate::sem::{
-    AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, ParseContext, TableInfoRead,
-    TableInfoWrite, TableName, search_path::expand_relation_search_path,
+use crate::{
+    context::{TableInfoRead, TableInfoWrite},
+    sem::{
+        AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, ParseContext, TableName,
+        search_path::expand_relation_search_path,
+    },
 };
 
 use crate::TrieMap;
@@ -155,7 +158,10 @@ impl TableInfoWrite for SchemaFileContext {
 #[cfg(test)]
 mod test_drop_catalog_key {
     use crate::context::BaseParseContext;
-    use crate::sem::{DropTable, FullName, ParseContext, TableInfoRead, TableInfoWrite, TableName};
+    use crate::{
+        context::{TableInfoRead, TableInfoWrite},
+        sem::{DropTable, FullName, ParseContext, TableName},
+    };
 
     #[rstest::rstest]
     #[case::qualified("a.items", &["b", "a"], "a", "b")]

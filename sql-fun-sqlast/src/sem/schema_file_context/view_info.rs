@@ -1,7 +1,8 @@
 use crate::{
+    context::{ViewInfoRead, ViewInfoWrite},
     sem::{
         AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, FullName,
-        ParseContext, ViewInfoRead, ViewInfoWrite, ViewLike,
+        ParseContext, ViewLike,
     },
     syn::ObjectType,
 };

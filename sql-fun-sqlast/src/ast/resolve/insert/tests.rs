@@ -324,7 +324,7 @@ fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
             .allows(&PgBuiltInType::int8())
     );
     assert!(
-        !crate::sem::CastInfoRead::get_implicit_cast(
+        !crate::context::CastInfoRead::get_implicit_cast(
             &context,
             &PgBuiltInType::int8(),
             &PgBuiltInType::int4()

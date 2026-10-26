@@ -85,10 +85,10 @@ impl AlterCommand {
 #[cfg(test)]
 mod test_applicability {
     use crate::ParseContext;
-    use crate::sem::{FullName, TableInfoRead};
     use crate::test_helpers::ownership::{
         apply_ownership_sql, ownership_context, ownership_statement,
     };
+    use crate::{context::TableInfoRead, sem::FullName};
 
     #[test]
     fn suppressed_diagnostics_cannot_authorize_a_conflicting_rename() -> testresult::TestResult {

@@ -1,6 +1,6 @@
-use crate::sem::{
-    AnalysisError, CreateFunction, FullName, FunctionInfoRead, FunctionInfoWrite,
-    FunctionOverloadCollection, ParseContext,
+use crate::{
+    context::{FunctionInfoRead, FunctionInfoWrite},
+    sem::{AnalysisError, CreateFunction, FullName, FunctionOverloadCollection, ParseContext},
 };
 
 use crate::TrieMap;

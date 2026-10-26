@@ -1,6 +1,9 @@
 //! `PostgreSQL` vector coercion and builtin polymorphism through SQL analysis.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::sem::{CastInfoRead, TypeInfoRead, TypeReference};
+use ::sql_fun_sqlast::{
+    context::{CastInfoRead, TypeInfoRead},
+    sem::TypeReference,
+};
 
 #[rstest::rstest]
 #[case::oid_cast("'1 2'::oidvector::oid[]", "_oid")]

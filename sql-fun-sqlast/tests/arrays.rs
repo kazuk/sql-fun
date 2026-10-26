@@ -230,7 +230,7 @@ fn anonymous_record_arrays_keep_their_element_fields(
 ) -> testresult::TestResult {
     // The CLI contract records the absent public type; this checks the internal
     // dynamic array and retains the anonymous record's field definition.
-    use ::sql_fun_sqlast::sem::TypeInfoRead;
+    use ::sql_fun_sqlast::context::TypeInfoRead;
     let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed.context().problems().is_empty(),

@@ -1,7 +1,7 @@
 use crate::context::BaseParseContext;
 use crate::{
-    context::ParseContext,
-    sem::{FullName, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite},
+    context::{ParseContext, RuleInfoRead, RuleInfoWrite},
+    sem::{FullName, RuleEvent, RuleIdentity},
 };
 
 #[rstest::rstest]

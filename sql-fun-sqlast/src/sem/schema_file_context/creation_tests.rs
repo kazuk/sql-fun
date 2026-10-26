@@ -1,7 +1,7 @@
 //! Parser-to-catalog regression tests using small, explicitly seeded catalogs.
-use crate::sem::{
-    ColumnName, FullName, Kind, ObjectInfoRead, OwnershipInfoRead, ParseContext, TableInfoRead,
-    TypeInfoRead, ViewInfoRead,
+use crate::{
+    context::{TableInfoRead, TypeInfoRead, ViewInfoRead},
+    sem::{ColumnName, FullName, Kind, ObjectInfoRead, OwnershipInfoRead, ParseContext},
 };
 
 #[rstest::rstest]

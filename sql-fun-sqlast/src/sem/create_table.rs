@@ -232,8 +232,11 @@ pub struct CreateTable {
 #[cfg(test)]
 mod test_create_table_clone {
     use crate::context::BaseParseContext;
-    use crate::sem::{ColumnName, ParseContext, TableInfoWrite};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        context::TableInfoWrite,
+        sem::{ColumnName, ParseContext},
+    };
     use std::path::Path;
 
     #[test]

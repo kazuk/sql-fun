@@ -1,6 +1,6 @@
 //! View-write semantics using the maintained sql-fun-home catalogs.
 //! All cases run in the standard workspace flow.
-use ::sql_fun_sqlast::sem::RuleInfoRead;
+use ::sql_fun_sqlast::context::RuleInfoRead;
 use sql_fun_core::analysis_problem::InsertProblemKind;
 use sql_fun_core::analysis_problem::UpdateProblemKind;
 use sql_fun_sqlast::context::BaseParseContext;
@@ -108,7 +108,7 @@ mod test_helpers {
                 &self,
                 identity: &::sql_fun_sqlast::sem::TriggerIdentity,
             ) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::TriggerInfoWrite;
+                use ::sql_fun_sqlast::context::TriggerInfoWrite;
                 SchemaFileContext::new(
                     Path::new("mask.sql"),
                     self.context(),
@@ -123,7 +123,7 @@ mod test_helpers {
                 &self,
                 identity: &::sql_fun_sqlast::sem::RuleIdentity,
             ) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::RuleInfoWrite;
+                use ::sql_fun_sqlast::context::RuleInfoWrite;
                 SchemaFileContext::new(
                     Path::new("mask.sql"),
                     self.context(),
@@ -184,7 +184,7 @@ mod test_helpers {
                 name: &::sql_fun_sqlast::sem::FullName,
             ) -> Result<FrozenBaseContext, String> {
                 use ::sql_fun_sqlast::context::BaseParseContext;
-                use sql_fun_sqlast::sem::ViewInfoWrite;
+                use sql_fun_sqlast::context::ViewInfoWrite;
 
                 let view = self
                     .context()
@@ -202,7 +202,7 @@ mod test_helpers {
                     .map_err(|error| error.to_string())
             }
             pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
-                use sql_fun_sqlast::sem::ViewInfoWrite;
+                use sql_fun_sqlast::context::ViewInfoWrite;
 
                 let SemAst::CreateView(view) =
                     self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
@@ -1308,7 +1308,10 @@ fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
 #[test]
 fn evaluation_excludes_cancelled_trigger_links_and_accepts_recreation()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{TriggerIdentity, TriggerInfoRead, ViewWriteEvaluation};
+    use ::sql_fun_sqlast::{
+        context::TriggerInfoRead,
+        sem::{TriggerIdentity, ViewWriteEvaluation},
+    };
     let declaration = "CREATE TRIGGER t INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop()";
     let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; {declaration};"

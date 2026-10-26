@@ -1,6 +1,9 @@
 //! Scalar ALL through `PostgreSQL` 18's shipped operator and cast metadata.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::sem::{FullName, PgBuiltInType, ViewInfoRead};
+use ::sql_fun_sqlast::{
+    context::ViewInfoRead,
+    sem::{FullName, PgBuiltInType},
+};
 
 #[rstest::rstest]
 #[case::char_type(r#"'r'::"char" <> ALL (ARRAY['t'::"char", 'x'::"char"])"#)]

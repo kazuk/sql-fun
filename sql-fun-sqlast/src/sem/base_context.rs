@@ -11,14 +11,14 @@ use std::{fs::File, io::BufReader, path::Path};
 use crate::context::BaseParseContext;
 use crate::{
     TrieMap,
+    context::{
+        FunctionInfoRead, IndexInfoRead, OperatorInfoRead, SearchPathRead, SequenceInfoRead,
+        TableInfoRead, TypeInfoRead, ViewInfoRead,
+    },
     sem::{
-        AnalysisError, CastDefinition, CreateTable, FullName, FunctionInfoRead,
-        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorDefinition,
-        SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
-        parse_context::{
-            OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
-            ViewInfoRead,
-        },
+        AnalysisError, CastDefinition, CreateTable, FullName, FunctionOverloadCollection,
+        GetSourcePathWithSpanOpt, OperatorDefinition, SchemaName, SourcePathWithSpan,
+        TypeDefinition, TypeReference, ViewLike,
     },
 };
 use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
@@ -289,7 +289,7 @@ impl GetSourcePathWithSpanOpt for BaseContext {
     }
 }
 
-impl crate::sem::TriggerInfoRead for BaseContext {
+impl crate::context::TriggerInfoRead for BaseContext {
     fn trigger(
         &self,
         _identity: &crate::sem::TriggerIdentity,
@@ -324,7 +324,7 @@ where
     Ok(serde_json::from_reader(BufReader::new(File::open(path)?))?)
 }
 
-impl crate::sem::ConflictInfoRead for BaseContext {
+impl crate::context::ConflictInfoRead for BaseContext {
     fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
         self.masters.database()
     }
@@ -422,4 +422,4 @@ impl crate::sem::ExtensionInfoRead for BaseContext {
         false
     }
 }
-impl crate::sem::RuleInfoRead for BaseContext {}
+impl crate::context::RuleInfoRead for BaseContext {}

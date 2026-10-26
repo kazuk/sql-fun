@@ -1,7 +1,7 @@
 use crate::{
     ast::Dialect,
-    context::ParseContext,
-    sem::{FullName, TableInfoRead, TriggerIdentity, TriggerInfoRead},
+    context::{ParseContext, TableInfoRead, TriggerInfoRead},
+    sem::{FullName, TriggerIdentity},
 };
 
 #[rstest::rstest]
@@ -389,12 +389,12 @@ fn associates_trigger_names_with_views(
         FullName::with_schema("public", "item_view")
     };
     let context = test_helpers::apply(sql, test_helpers::layer(&root))?.into_context();
-    let view = crate::sem::ViewInfoRead::get_view_impl(&context, &target).unwrap();
+    let view = crate::context::ViewInfoRead::get_view_impl(&context, &target).unwrap();
     let references = view.triggers().unwrap();
     assert_eq!(references.names().len(), 1);
     assert_eq!(references.resolve(&context, &target)[0].target(), &target);
     assert!(
-        crate::sem::ViewInfoRead::get_view_impl(&root, &target)
+        crate::context::ViewInfoRead::get_view_impl(&root, &target)
             .unwrap()
             .triggers()
             .unwrap()

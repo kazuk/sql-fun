@@ -1,7 +1,10 @@
 use super::TestParseContext;
-use crate::sem::{
-    AnalysisError, CatalogNameLookup, ConflictInfoRead, FullName, InsertArbiter, InsertConflict,
-    InsertInferenceModifiers, TableName,
+use crate::{
+    context::ConflictInfoRead,
+    sem::{
+        AnalysisError, CatalogNameLookup, FullName, InsertArbiter, InsertConflict,
+        InsertInferenceModifiers, TableName,
+    },
 };
 
 impl TestParseContext {

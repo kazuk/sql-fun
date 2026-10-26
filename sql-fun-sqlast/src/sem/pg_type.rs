@@ -221,6 +221,7 @@ impl TypeDefinition {
     pub fn type_reference(&self) -> Option<&TypeReference> {
         match self {
             Self::Array(_) => None,
+            Self::Enum(definition) => Some(definition.type_ref()),
             Self::Builtin(definition) => Some(&definition.reference),
             Self::Domain(ct) => Some(ct.type_ref()),
             Self::CompositeType(ct) => ct.type_ref().as_ref(),
@@ -317,7 +318,7 @@ impl TypeDefinition {
     ) -> Option<TypeReference> {
         match self {
             Self::Array(_) => None,
-            Self::Enum(_create_enum) => todo!(),
+            Self::Enum(_) => None,
             Self::CompositeType(create_composite_type) => {
                 create_composite_type.get_member(member)?.get_type()
             }

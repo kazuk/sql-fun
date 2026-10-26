@@ -130,8 +130,10 @@ impl TypeDefinitionCollection {
     }
 
     pub(super) fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
-        self.0
-            .insert(&name.to_string(), TypeDefinition::from(create_enum));
+        self.0.insert(
+            &name.to_string(),
+            TypeDefinition::from(&create_enum.with_name(name)),
+        );
     }
 
     pub(super) fn insert_create_composite_type(

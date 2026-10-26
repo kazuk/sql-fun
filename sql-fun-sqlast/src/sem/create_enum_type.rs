@@ -1,13 +1,13 @@
 use crate::{sem::AstAndContextPair, syn::ListOpt};
 
-use super::{AnalysisError, FullName, ParseContext, SemAst};
+use super::{AnalysisError, FullName, ParseContext, SemAst, TypeReference};
 
 /// analyzed [`crate::syn::CreateEnumStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateEnum {
     #[serde(skip)]
     owner: Option<crate::sem::OwnerSpecification>,
-    name: FullName,
+    type_ref: TypeReference,
     values: Vec<EnumValueDefinition>,
 }
 
@@ -26,7 +26,7 @@ impl CreateEnum {
     pub(crate) fn new(name: &FullName, values: &[String]) -> Self {
         Self {
             owner: None,
-            name: name.clone(),
+            type_ref: TypeReference::from_full_name(name.clone()),
             values: values
                 .iter()
                 .map(|value| EnumValueDefinition {
@@ -38,8 +38,20 @@ impl CreateEnum {
 
     /// get name
     #[must_use]
-    pub const fn name(&self) -> &FullName {
-        &self.name
+    pub fn name(&self) -> &FullName {
+        self.type_ref.full_name()
+    }
+
+    /// Reference identifying this enum type.
+    #[must_use]
+    pub(crate) const fn type_ref(&self) -> &TypeReference {
+        &self.type_ref
+    }
+
+    pub(crate) fn with_name(&self, name: &FullName) -> Self {
+        let mut definition = self.clone();
+        definition.type_ref = TypeReference::from_full_name(name.clone());
+        definition
     }
 
     /// get values
@@ -79,16 +91,16 @@ pub struct EnumValueDefinition {
     name: String,
 }
 
-// Ownership changes do not change SQL type identity or the existing serialized type format.
+// Ownership is not part of SQL type identity or the serialized definition.
 impl PartialEq for CreateEnum {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.values == other.values
+        self.type_ref == other.type_ref && self.values == other.values
     }
 }
 impl Eq for CreateEnum {}
 impl std::hash::Hash for CreateEnum {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(&self.name, state);
+        std::hash::Hash::hash(&self.type_ref, state);
         std::hash::Hash::hash(&self.values, state);
     }
 }

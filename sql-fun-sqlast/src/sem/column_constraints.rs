@@ -85,6 +85,38 @@ pub enum ColumnConstraint {
     Collate(CollateColumnConstraint),
 }
 
+impl ColumnConstraint {
+    pub(crate) fn rename_expression(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Default(value) => value.rename_expression(visitor),
+            Self::Generated(value) => value.rename_expression(visitor),
+            Self::Check(value) => value.rename_expression(visitor),
+            _ => Ok(()),
+        }
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        match self {
+            Self::Nullability(value) => value.rename_relation(old, new),
+            Self::Default(value) => value.rename_relation(old, new),
+            Self::Identity(value) => value.rename_relation(old, new),
+            Self::Generated(value) => value.rename_relation(old, new),
+            Self::Check(value) => value.rename_relation(old, new),
+            Self::PrimaryKey(value) => value.rename_relation(old, new),
+            Self::Unique(value) => value.rename_relation(old, new),
+            Self::Exclusion(value) => value.rename_relation(old, new),
+            Self::ForeignKey(value) => value.rename_relation(old, new),
+            Self::AttrDeferrability(value) => value.rename_relation(old, new),
+            Self::AttrDeferred(value) => value.rename_relation(old, new),
+            Self::AttrImmediate(value) => value.rename_relation(old, new),
+            Self::Collate(value) => value.rename_relation(old, new),
+        }
+    }
+}
+
 /// kind of [`ColumnConstraint`]
 #[derive(Debug, PartialEq)]
 pub enum ColumnConstraintKind {

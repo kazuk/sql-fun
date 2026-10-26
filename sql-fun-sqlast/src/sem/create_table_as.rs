@@ -24,6 +24,15 @@ pub struct CreateTableAs {
 }
 
 impl CreateTableAs {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        self.query
+            .walk_nested_command(&mut crate::sem::traversal::RelationRenamer::new(old, new))
+    }
+
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         self.query
             .select_statement()

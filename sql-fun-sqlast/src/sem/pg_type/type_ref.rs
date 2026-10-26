@@ -20,6 +20,21 @@ pub enum TypeReference {
 }
 
 impl TypeReference {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Self::Dynamic(value) = self {
+            value.rename_relation(old, new);
+        }
+        if let Self::Concrete(value) = self
+            && value.full_name() == old.full_name()
+        {
+            *self = Self::concrete_type_ref(new.full_name(), value.is_array());
+        }
+    }
+
     /// create a reference for dynamic type
     #[must_use]
     pub fn dynamic(type_def: &TypeDefinition) -> Self {

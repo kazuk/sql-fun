@@ -89,6 +89,12 @@ pub trait IndexInfoRead {
 
 /// get function definition
 pub trait FunctionInfoRead {
+    /// Declared routine identities that can depend on schema-defined row types.
+    /// Immutable builtin-only catalogs have no such declarations.
+    fn declared_routine_names(&self) -> Vec<FullName> {
+        Vec::new()
+    }
+
     /// Whether an exactly qualified routine is an aggregate. Ordinary routines
     /// are the default; catalogs retaining aggregates must override this method.
     /// Callers must first resolve the routine through the selected catalog.

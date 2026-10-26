@@ -19,6 +19,17 @@ pub struct DefaultColumnConstraint {
 }
 
 impl DefaultColumnConstraint {
+    pub(super) fn rename_expression(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        self.expr.walk(visitor)
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// get default value expression
     pub const fn expr(&self) -> &SemScalarExpr {
         &self.expr

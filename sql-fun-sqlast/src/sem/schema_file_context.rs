@@ -10,6 +10,9 @@ mod object_info;
 mod ownership;
 mod sequence_info;
 mod table_info;
+mod table_rename;
+#[cfg(test)]
+mod table_rename_tests;
 mod type_info;
 mod view_info;
 
@@ -60,6 +63,10 @@ pub struct SchemaFileContext {
 
 #[derive(Debug)]
 pub(super) struct SchemaCatalog {
+    replaced_routines: std::collections::HashSet<FullName>,
+    renamed_relations: std::collections::HashSet<FullName>,
+    renamed_tables: std::collections::HashSet<FullName>,
+    renamed_types: std::collections::HashSet<FullName>,
     rules: std::collections::HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::sem::ownership::OwnershipCatalog,
     base: FrozenBaseContext,
@@ -119,6 +126,10 @@ impl SchemaFileContext {
         let search_path = base.get_search_path().to_vec();
         Self {
             catalog: SchemaCatalog {
+                replaced_routines: std::collections::HashSet::new(),
+                renamed_relations: std::collections::HashSet::new(),
+                renamed_tables: std::collections::HashSet::new(),
+                renamed_types: std::collections::HashSet::new(),
                 rules: std::collections::HashMap::new(),
                 ownership: Default::default(),
                 base: base.clone(),
@@ -716,6 +727,9 @@ impl crate::sem::TriggerInfoRead for SchemaCatalog {
 
 impl BaseParseContext for SchemaCatalog {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
+        if self.renamed_relations.contains(&name.sqlite_identity()) {
+            return None;
+        }
         if let Some(name) = self.tables.sqlite_name(name) {
             Some(name)
         } else if let Some(name) = self.views.sqlite_name(name) {

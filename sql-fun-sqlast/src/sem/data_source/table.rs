@@ -141,6 +141,7 @@ impl TableDataSource {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.table_binding(&mut self.name);
         visitor.relation_identity(self.name.full_name());
         visitor.relation(None, self.alias.name().as_str(), &[]);
         Ok(())

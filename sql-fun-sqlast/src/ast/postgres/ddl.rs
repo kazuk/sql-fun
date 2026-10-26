@@ -17,6 +17,31 @@ impl TryFrom<syn::ObjectType> for crate::ast::AlterRelationKind {
     }
 }
 
+impl TryFromWithTokens<&syn::RenameStmt> for crate::ast::AlterRelation {
+    type Error = AnalysisError;
+    fn try_from_with_tokens(
+        value: &syn::RenameStmt,
+        _tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        if !matches!(
+            value.get_rename_type().as_inner(),
+            Some(syn::ObjectType::ObjectTable)
+        ) {
+            return AnalysisError::raise_unexpected_input("expected table rename");
+        }
+        let relation = required(value.get_relation().as_inner(), "rename.relation")?;
+        Ok(Self {
+            only: false,
+            name: crate::ast::Name::from(&relation),
+            kind: crate::ast::AlterRelationKind::table(),
+            commands: vec![crate::ast::AlterCommand::Rename(
+                crate::ast::Name::from_parts(&[value.get_newname()]),
+            )],
+            if_exists: value.get_missing_ok(),
+        })
+    }
+}
+
 impl TryFromWithTokens<&syn::AlterTableStmt> for crate::ast::AlterRelation {
     type Error = AnalysisError;
     fn try_from_with_tokens(

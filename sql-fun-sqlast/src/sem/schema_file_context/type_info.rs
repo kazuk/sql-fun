@@ -12,6 +12,9 @@ impl TypeInfoRead for SchemaCatalog {
     fn type_references(&self) -> Vec<TypeReference> {
         let mut types = self.base.type_references();
         types.extend(self.types.cast_source_types());
+        types.retain(|ty| {
+            ty.type_definition().is_some() || !self.renamed_types.contains(ty.full_name())
+        });
         types.sort_by_cached_key(|ty| format!("{ty:?}"));
         types.dedup();
         types
@@ -22,6 +25,9 @@ impl TypeInfoRead for SchemaCatalog {
     }
 
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
+        if self.renamed_types.contains(key) {
+            return None;
+        }
         self.types.get_type_impl(key, &self.base)
     }
 
@@ -54,6 +60,7 @@ impl TypeInfoRead for SchemaFileContext {
 
 impl TypeInfoWrite for SchemaFileContext {
     fn insert_table_ref_type(&mut self, name: &TableName) {
+        self.catalog.renamed_types.remove(name.full_name());
         self.catalog.types.insert_table_ref(name);
     }
 
@@ -62,6 +69,7 @@ impl TypeInfoWrite for SchemaFileContext {
         name: &FullName,
         create_comp_type: &CreateCompositeType,
     ) {
+        self.catalog.renamed_types.remove(name);
         self.catalog
             .types
             .insert_create_composite_type(name, create_comp_type);
@@ -71,10 +79,12 @@ impl TypeInfoWrite for SchemaFileContext {
     }
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {
+        self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_domain(name, create_domain);
     }
 
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
+        self.catalog.renamed_types.remove(name);
         self.catalog.types.insert_create_enum(name, create_enum);
     }
 }

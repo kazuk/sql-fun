@@ -19,6 +19,10 @@ pub struct CollateColumnConstraint {
 }
 
 impl CollateColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     pub(crate) fn is_known_name(name: &str) -> bool {
         ["BINARY", "NOCASE", "RTRIM"].contains(&name.to_uppercase().as_str())
     }

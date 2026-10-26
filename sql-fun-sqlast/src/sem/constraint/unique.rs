@@ -16,6 +16,12 @@ pub struct UniqueConstraint {
 }
 
 impl UniqueConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        if let Some(table) = &mut self.table {
+            table.rename_reference(old, new);
+        }
+    }
+
     pub(crate) fn key_columns(&self) -> Vec<ColumnName> {
         self.keys.iter().cloned().collect()
     }

@@ -484,6 +484,16 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 tokens,
             )?));
         }
+        if let Some(rename) = value.as_rename_stmt().as_inner()
+            && matches!(
+                rename.get_rename_type().as_inner(),
+                Some(syn::ObjectType::ObjectTable)
+            )
+        {
+            return Ok(Self::alter_relation(
+                super::AlterRelation::try_from_with_tokens(&rename, tokens)?,
+            ));
+        }
         if let Some(alter_table) = value.as_alter_table_stmt().as_inner() {
             return Ok(Self::alter_relation(
                 super::AlterRelation::try_from_with_tokens(&alter_table, tokens)?,

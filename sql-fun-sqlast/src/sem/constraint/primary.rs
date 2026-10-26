@@ -19,6 +19,12 @@ pub struct PrimaryKeyConstraint {
 }
 
 impl PrimaryKeyConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        if let Some(table) = &mut self.table {
+            table.rename_reference(old, new);
+        }
+    }
+
     pub(crate) fn new(name: &str, table: &TableName, keys: &[ColumnName]) -> Self {
         Self {
             name: name.to_owned(),

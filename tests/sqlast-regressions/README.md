@@ -152,3 +152,13 @@ invariance under unrelated catalog growth. Additional cases cover late datetime
 constraints, unresolved expression results that require unsupported catalog-wide
 inference, later array/RETURNING context, and analysis recovery. Comparisons
 use the existing 55-case `distinctness` group without timing pass/fail thresholds.
+
+Table rename contracts for #527 live in `table-renames.json`, selected with
+`table-renames.sql` on PostgreSQL 17/18 through both source and installed checks.
+They verify new-name lookup, preserved view outputs, repeated renames, and reuse
+of the old name. Rust schema-chain tests retain applicability, binding identity,
+source history, failure atomicity, inherited catalog masking, row-type and
+qualified FK consumers, sequence/index links, and SQLite identity/oracle checks.
+Unqualified FK binding loss and explicit SQLite legacy-PRAGMA propagation are
+tracked independently in #810 and #811; this suite does not claim those existing
+limitations are repaired.

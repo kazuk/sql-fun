@@ -146,6 +146,10 @@ mod test_frozen_root {
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
         impl crate::sem::ObjectInfoRead for $context {
+            fn relation_names(&self) -> Vec<crate::sem::FullName> {
+                self.$catalog().relation_names()
+            }
+
             fn object_kind(&self, name: &crate::sem::FullName) -> Option<crate::sem::Kind> {
                 self.$catalog().object_kind(name)
             }
@@ -228,6 +232,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::FunctionInfoRead for $context {
+            fn declared_routine_names(&self) -> Vec<crate::sem::FullName> {
+                self.$catalog().declared_routine_names()
+            }
+
             fn is_aggregate_impl(&self, name: &crate::sem::FullName) -> bool {
                 crate::sem::FunctionInfoRead::is_aggregate_impl(self.$catalog(), name)
             }

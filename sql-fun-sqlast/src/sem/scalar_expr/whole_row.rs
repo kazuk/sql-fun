@@ -30,6 +30,21 @@ struct RowSource {
 }
 
 impl WholeRowExpr {
+    pub(super) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let RowLookup::Source(source) = &mut self.lookup {
+            if source.relation.as_ref() == Some(old.full_name()) {
+                source.relation = Some(new.full_name().clone());
+            }
+            if let Some(ty) = &mut source.type_ref {
+                ty.rename_relation(old, new);
+            }
+        }
+    }
+
     pub(crate) fn resolved(
         qualifier: &FullName,
         alias: &AliasName,

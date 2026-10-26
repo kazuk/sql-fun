@@ -228,6 +228,18 @@ pub enum TriggerBody {
     Commands(Vec<SemAst>),
 }
 impl TriggerBody {
+    fn rename_relation(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Commands(commands) = self {
+            for command in commands {
+                command.walk_nested_command(visitor)?;
+            }
+        }
+        Ok(())
+    }
+
     /// A function body reference.
     pub fn function(function: &TriggerFunction) -> Self {
         Self::Function(function.clone())
@@ -332,6 +344,45 @@ pub struct CreateTrigger {
     source: Option<crate::sem::SourcePathWithSpan>,
 }
 impl CreateTrigger {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        if self.identity.relation.as_ref() == Some(old.full_name()) {
+            self.identity.relation = Some(new.full_name().clone());
+        }
+        if &self.target == old.full_name() {
+            self.target = new.full_name().clone();
+        }
+        if let Some(constraint) = &mut self.constraint
+            && constraint.relation.as_ref() == Some(old.full_name())
+        {
+            constraint.relation = Some(new.full_name().clone());
+        }
+        for transition in &mut self.transitions {
+            if &transition.relation == old.full_name() {
+                transition.relation = new.full_name().clone();
+            }
+        }
+        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        if let Some(predicate) = &mut self.predicate {
+            predicate.walk(&mut visitor)?;
+        }
+        self.body.rename_relation(&mut visitor)?;
+        for name in &mut self.dependencies.relations {
+            if name == old.full_name() {
+                *name = new.full_name().clone();
+            }
+        }
+        for name in &mut self.dependencies.types {
+            if name == old.full_name() {
+                *name = new.full_name().clone();
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn new(
         identity: &TriggerIdentity,
         target: &FullName,

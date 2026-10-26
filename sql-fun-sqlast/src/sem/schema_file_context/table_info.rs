@@ -11,6 +11,14 @@ use super::{SchemaCatalog, SchemaFileContext};
 pub struct TableDefinitionCollection(TrieMap<CreateTable>, Vec<FullName>);
 
 impl TableDefinitionCollection {
+    pub(super) fn append_names(&self, names: &mut Vec<FullName>) {
+        for name in &self.1 {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+    }
+
     pub(super) fn sqlite_name(&self, name: &FullName) -> Option<FullName> {
         self.1
             .iter()
@@ -34,6 +42,9 @@ impl TableInfoRead for SchemaCatalog {
     fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable> {
         let identity = self.relation_identity(key);
         let key = &identity;
+        if self.renamed_tables.contains(key) {
+            return None;
+        }
         if let Some(v) = self.tables.get(key) {
             Some(v)
         } else {
@@ -58,6 +69,9 @@ impl TableInfoWrite for SchemaFileContext {
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         if !alter_table.can_apply() {
             return Ok(self);
+        }
+        if let Some(destination) = alter_table.rename_destination() {
+            return self.apply_table_rename(alter_table, destination);
         }
         let table_name = alter_table.table();
         let bound_table = alter_table.resolved_target().map(|target| {

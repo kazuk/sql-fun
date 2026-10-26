@@ -25,6 +25,16 @@ pub enum QueryNameResolution {
     Ambiguous,
 }
 impl QueryNameResolution {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Self::Type(reference) = self {
+            reference.rename_relation(old, new);
+        }
+    }
+
     pub(crate) const fn function_identity(&self) -> Option<&crate::sem::FullName> {
         if let Self::Function(name) = self {
             Some(name)

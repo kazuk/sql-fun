@@ -12,6 +12,10 @@ pub struct SystemColumnRef {
 }
 
 impl SystemColumnRef {
+    pub(super) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table.rename_reference(old, new);
+    }
+
     pub(in crate::sem) fn lookup_type(
         context: &impl ParseContext,
         column: &ColumnName,

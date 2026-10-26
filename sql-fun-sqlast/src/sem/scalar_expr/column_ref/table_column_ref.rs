@@ -43,6 +43,13 @@ impl super::ColumnReference for TableColumnRef {
 }
 
 impl TableColumnRef {
+    pub(super) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+        if let Some(column) = &mut self.column_def {
+            column.rename_relation(old, new);
+        }
+    }
+
     pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
         self.alias = alias.clone();
         self.column = column.clone();

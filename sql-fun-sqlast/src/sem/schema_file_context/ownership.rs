@@ -24,6 +24,9 @@ impl OwnershipInfoRead for SchemaCatalog {
     }
     fn routine_definitions(&self, name: &FullName) -> Vec<CreateFunction> {
         let mut definitions = self.functions.definitions(name);
+        if self.replaced_routines.contains(name) {
+            return definitions;
+        }
         for base in self.base.routine_definitions(name) {
             let identity = base.ownership_identity(name);
             if !CreateFunction::contains_identity(&definitions, name, &identity) {
@@ -37,6 +40,11 @@ impl OwnershipInfoRead for SchemaCatalog {
         kind: ObjectKind,
         name: &FullName,
     ) -> Vec<OwnedObjectDefinition> {
+        if (kind == ObjectKind::TABLE && self.renamed_tables.contains(name))
+            || (kind == ObjectKind::TYPE && self.renamed_types.contains(name))
+        {
+            return Vec::new();
+        }
         let modeled = crate::sem::ownership::model_definitions(self, kind, name);
         let mut definitions = self.ownership.definitions(kind, name);
         if !modeled.is_empty() {

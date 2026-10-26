@@ -11,6 +11,18 @@ use super::{AnalysisError, ColumnCollection, FullName, SemAst, TypeReference};
 pub struct CompositeFieldCollection(Vec<CompositeFieldDefinition>);
 
 impl CompositeFieldCollection {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        for field in &mut self.0 {
+            if let Some(ty) = &mut field.field_type {
+                ty.rename_relation(old, new);
+            }
+        }
+    }
+
     pub fn push(&mut self, item: CompositeFieldDefinition) {
         self.0.push(item);
     }
@@ -46,6 +58,14 @@ pub struct CreateCompositeType {
 }
 
 impl CreateCompositeType {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.fields.rename_relation(old, new);
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     /// Ownership is catalog state: it is omitted from the existing serialized
     /// type format and does not affect SQL type equality or hashing.

@@ -9,9 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ForeignKeyConstraint {
     name: String,
-    #[expect(dead_code)]
     source_table: Option<TableName>,
-    #[expect(dead_code)]
     target_table: TableName,
     #[expect(dead_code)]
     source_columns: Vec<ColumnName>,
@@ -20,6 +18,13 @@ pub struct ForeignKeyConstraint {
 }
 
 impl ForeignKeyConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        if let Some(table) = &mut self.source_table {
+            table.rename_reference(old, new);
+        }
+        self.target_table.rename_reference(old, new);
+    }
+
     pub(crate) fn new(
         name: &str,
         source_table: &TableName,

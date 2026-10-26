@@ -32,6 +32,19 @@ pub struct CreateView {
 }
 
 impl CreateView {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        self.query.walk(&mut visitor)?;
+        for (_, value) in &mut self.defaults {
+            value.walk(&mut visitor)?;
+        }
+        Ok(())
+    }
+
     /// View options from its defining declaration.
     pub fn options(&self) -> &[crate::sem::ViewOption] {
         &self.options

@@ -102,6 +102,20 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        match self {
+            Self::In(value) => value.rename_relation(old, new),
+            Self::Out(value) => value.rename_relation(old, new),
+            Self::InOut(value) => value.rename_relation(old, new),
+            Self::Variadic(value) => value.rename_relation(old, new),
+            Self::Table(value) => value.rename_relation(old, new),
+        }
+    }
+
     pub(crate) const fn is_variadic(&self) -> bool {
         matches!(self, Self::Variadic(_))
     }

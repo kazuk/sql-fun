@@ -176,8 +176,9 @@ owns domains, correlated alternatives, and the common propagation graph.
   checking each domain independently can accept incompatible combinations.
   Omitted positions remain unconstrained by that inspection; unknown parameter
   positions are rejected. Inspection does not supply analysis hints.
-- These domains represent admissible explicitly typed inputs, not the single
-  parameter signature inferred by an untyped PostgreSQL `PREPARE`. For example,
+- Domains retain admissible source candidates, with bounded defaults for
+  unhinted overloads as described below, rather than the single parameter
+  signature inferred by an untyped PostgreSQL `PREPARE`. For example,
   `SELECT ARRAY[$1,1]` admits both an `int4` input with an `int4[]` result and an
   `int8` input with an `int8[]` result; an untyped PostgreSQL PREPARE selects
   `int4`. Analysis does not choose a final wire-protocol binding.
@@ -196,6 +197,31 @@ owns domains, correlated alternatives, and the common propagation graph.
   references. When inspecting a previously unknown composite with `allows`,
   supply a dynamic reference containing its definition; a new concrete name
   alone cannot provide its fields. This is not a catalog snapshot API.
+
+### Default candidates and deferred overloads
+
+Overload constraints retain declarations and owned cast ranks in
+`parameter_constraints/call.rs`. Initially unrestricted calls wait for finite
+operand domains from other occurrences, casts, common-type selection, and
+structural projections. A sole concrete declaration supplies SQL type context.
+Only remaining unseeded overload inputs use the seven built-in default bind
+candidates. Candidate order never chooses a binding, and an absent default
+witness does not establish invalid SQL.
+
+Keep `anyarray` declarations deferred. Instantiate comparison signatures from
+observed array types and their conversion targets, preserving concrete overload
+precedence. Retained array conversion edges support later explicit assignment
+inspection without creating one signature per catalog type. They are processing
+facts, not another analysis environment or a new catalog representation.
+
+Unhinted overload domains expose default inference candidates, not a restriction
+on explicitly supplied client types. A solved graph retains its pre-solve SQL
+constraints for `allows`. Explicit
+assignments are checked against those constraints before default witnesses are
+supplied for remaining inputs. Resuming constraint collection restores that
+original graph so earlier default candidates cannot exclude later SQL type
+information. Keep unrestricted, empty, and finite domains distinct; preserve
+correlations and the shared diagnostic boundary.
 
 Diagnostic attribution must follow the available evidence. When independently
 established operand types violate an operation's requirements, report the

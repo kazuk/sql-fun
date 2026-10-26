@@ -559,6 +559,20 @@ expression. Use one placeholder style per input; do not mix named placeholders
 with native `$1` parameters. Explicit hints still undergo validation against
 all uses of the parameter.
 
+When overloaded operations have no SQL type information for their inputs,
+PostgreSQL bind-input inference considers seven default candidates: `bool`,
+`int4`, `int8`, `float4`, `float8`, `text`, and `numeric`. This list is not a
+preference order: several surviving candidates still leave the binding
+unresolved. Unrelated catalog types do not enlarge these default candidates.
+SQL context and explicit input hints can establish other types, including
+arrays, composite types, user-defined types, and `bytea`. All occurrences of a
+parameter contribute constraints before its binding is finalized.
+`ParameterConstraints::parameter(...).constraint()` exposes the current
+inference candidates. `ParameterConstraints::allows` checks explicitly supplied
+types against the SQL constraints, including types outside those candidates.
+For `bytea`, the protocol's text value format does not change its SQL type to
+`text`; use SQL context or an explicit `bytea` input hint.
+
 Parameters in supported ORDER BY, GROUP BY, HAVING, DISTINCT ON, LIMIT/OFFSET,
 aggregate FILTER/ordering, and window expressions participate in analysis,
 including nested queries. Parameter-dependent RANGE ordering and custom RANGE

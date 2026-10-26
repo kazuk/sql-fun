@@ -1,6 +1,6 @@
 use super::Conversation;
 use crate::init::{
-    EngineSetup, InitializationState,
+    InitializationState,
     step::{InitStep, StepCompletion, StepFuture},
     test_helpers::{common_args, state},
 };
@@ -11,7 +11,7 @@ impl InitStep for RecordStep {
     fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a> {
         Box::pin(async move {
             self.1.borrow_mut().push(self.0);
-            state.plans.push(EngineSetup::sqlite());
+            state.prepare_sqlite();
             Ok(StepCompletion::next())
         })
     }

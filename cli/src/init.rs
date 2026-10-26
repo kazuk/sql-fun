@@ -94,6 +94,55 @@ impl<'a> InitializationState<'a> {
 }
 
 impl InitializationState<'_> {
+    fn load_selection(&mut self) -> Result<(), anyhow::Error> {
+        self.selection = Some(SetupSelection::load(
+            self.common,
+            &self.args,
+            self.metadata_requested,
+        )?);
+        Ok(())
+    }
+    fn check_selection(&self) -> Result<(), anyhow::Error> {
+        self.selection
+            .as_ref()
+            .expect("selected setup")
+            .check_choices(&self.args)
+    }
+    fn choose_engines(&mut self) -> Result<(), InitError> {
+        self.selection
+            .as_mut()
+            .expect("loaded selection")
+            .choose_engines(&self.args, self.input.as_mut())
+    }
+    fn choose_datasources(&mut self) -> Result<(), anyhow::Error> {
+        self.selection
+            .as_mut()
+            .expect("loaded selection")
+            .choose_datasources(&self.args, self.input.as_mut())
+    }
+    fn choose_postgres_source(&mut self) -> Result<(), InitError> {
+        self.existing_server = PostgresSetup::choose_source(&mut self.args, self.input.as_mut())?;
+        Ok(())
+    }
+    fn choose_connection(&mut self) -> Result<(), InitError> {
+        PostgresSetup::choose_connection(&mut self.args, self.input.as_mut())
+    }
+    async fn choose_versions(&mut self) -> Result<(), anyhow::Error> {
+        self.versions =
+            Some(PostgresSetup::choose_versions(&self.args, self.input.as_mut()).await?);
+        Ok(())
+    }
+    fn prepare_sqlite(&mut self) {
+        self.plans.push(EngineSetup::sqlite());
+    }
+    #[cfg(test)]
+    fn set_input(&mut self, input: impl PromptInput + 'static) {
+        self.input = Box::new(input);
+    }
+    #[cfg(test)]
+    const fn set_metadata_requested(&mut self, requested: bool) {
+        self.metadata_requested = requested;
+    }
     fn validate_complete(&self) -> Result<(), anyhow::Error> {
         anyhow::ensure!(
             self.home.home().is_dir(),

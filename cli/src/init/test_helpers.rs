@@ -71,7 +71,7 @@ pub(super) struct Script(Rc<RefCell<VecDeque<Answer>>>);
 impl Script {
     pub(super) fn install(state: &mut InitializationState<'_>, answers: Vec<Answer>) -> Self {
         let script = Self(Rc::new(RefCell::new(answers.into())));
-        state.input = Box::new(script.clone());
+        state.set_input(script.clone());
         script
     }
     pub(super) fn assert_finished(&self) {
@@ -133,7 +133,7 @@ pub(super) fn fail_first_home_creation(
     script: &Script,
     home: &Path,
 ) {
-    state.input = Box::new(CreationRace {
+    state.set_input(CreationRace {
         script: script.clone(),
         home: home.to_path_buf(),
         failed: false,
@@ -177,7 +177,7 @@ impl MetadataProject {
     }
     pub(super) fn state(&self) -> InitializationState<'_> {
         let mut state = state(&self.common, &[]);
-        state.metadata_requested = true;
+        state.set_metadata_requested(true);
         state.home.set_home(&self.directory.path().join("home"));
         state
     }

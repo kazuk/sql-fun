@@ -40,6 +40,7 @@ pub struct TestParseContext {
     operator_op_results: HashMap<(OperatorName, bool, bool), Option<OperatorDefinition>>,
     search_path: Vec<SchemaName>,
     type_definitions: HashMap<FullName, TypeDefinition>,
+    forbid_type_enumeration: bool,
     array_elements: HashMap<TypeReference, TypeReference>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
@@ -94,6 +95,10 @@ impl TestParseContext {
 
     pub(crate) fn reject_diagnostics_after(&mut self, count: usize) {
         self.report_failure_after = Some(count);
+    }
+
+    pub(crate) fn forbid_type_enumeration(&mut self) {
+        self.forbid_type_enumeration = true;
     }
 
     pub(crate) fn has_reported_problem(&self, code: &str) -> bool {
@@ -267,6 +272,10 @@ impl TableInfoWrite for TestParseContext {
 
 impl TypeInfoRead for TestParseContext {
     fn type_references(&self) -> Vec<TypeReference> {
+        assert!(
+            !self.forbid_type_enumeration,
+            "catalog-wide type enumeration is forbidden in this scenario"
+        );
         self.type_definitions
             .keys()
             .map(|name| TypeReference::concrete_type_ref(name, false))

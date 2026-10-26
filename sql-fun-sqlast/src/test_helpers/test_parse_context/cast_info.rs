@@ -44,6 +44,14 @@ impl TestParseContext {
 
 impl CastInfoRead for TestParseContext {
     fn cast_sources(&self, target: &TypeReference, _explicit: bool) -> HashSet<TypeReference> {
+        assert!(
+            !self.forbid_type_enumeration,
+            "unbounded cast-source inference is forbidden in this scenario"
+        );
+        self.declared_implicit_cast_sources(target)
+    }
+
+    fn declared_implicit_cast_sources(&self, target: &TypeReference) -> HashSet<TypeReference> {
         let mut sources = HashSet::from([target.clone()]);
         for (source, casts) in &self.implicit_cast_results {
             if casts.get(target).is_some_and(Option::is_some) {

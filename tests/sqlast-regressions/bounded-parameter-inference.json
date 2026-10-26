@@ -726,5 +726,424 @@
         }
       ]
     }
+  },
+  {
+    "name": "DISTINCT::unsupported::($1)[1]",
+    "sql": "SELECT ($1)[1] IS DISTINCT FROM ($2)[1] AS result",
+    "expected": {
+      "diagnostics": [
+        "inference_candidate_space_unsupported",
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "DISTINCT::unsupported::($1).id",
+    "sql": "SELECT ($1).id IS DISTINCT FROM ($2).id AS result",
+    "expected": {
+      "diagnostics": [
+        "inference_candidate_space_unsupported",
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "DISTINCT::age_context::False",
+    "sql": "SELECT age($1) IS NULL AS first, $1 IS DISTINCT FROM $2 AS second",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "DISTINCT::late_array_elements::False",
+    "sql": "SELECT ($1)[1] IS DISTINCT FROM ($2)[1] AS first, $1 IS DISTINCT FROM NULL::uuid[] AS second, $2 IS DISTINCT FROM NULL::uuid[] AS third",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "third",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "DISTINCT::age_context::True",
+    "sql": "SELECT $1 IS DISTINCT FROM $2 AS first, age($1) IS NULL AS second",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "DISTINCT::late_array_elements::True",
+    "sql": "SELECT $2 IS DISTINCT FROM NULL::uuid[] AS first, $1 IS DISTINCT FROM NULL::uuid[] AS second, ($1)[1] IS DISTINCT FROM ($2)[1] AS third",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "third",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "NOT DISTINCT::unsupported::($1)[1]",
+    "sql": "SELECT ($1)[1] IS NOT DISTINCT FROM ($2)[1] AS result",
+    "expected": {
+      "diagnostics": [
+        "inference_candidate_space_unsupported",
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "NOT DISTINCT::unsupported::($1).id",
+    "sql": "SELECT ($1).id IS NOT DISTINCT FROM ($2).id AS result",
+    "expected": {
+      "diagnostics": [
+        "inference_candidate_space_unsupported",
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "NOT DISTINCT::age_context::False",
+    "sql": "SELECT age($1) IS NULL AS first, $1 IS NOT DISTINCT FROM $2 AS second",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "NOT DISTINCT::late_array_elements::False",
+    "sql": "SELECT ($1)[1] IS NOT DISTINCT FROM ($2)[1] AS first, $1 IS NOT DISTINCT FROM NULL::uuid[] AS second, $2 IS NOT DISTINCT FROM NULL::uuid[] AS third",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "third",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "NOT DISTINCT::age_context::True",
+    "sql": "SELECT $1 IS NOT DISTINCT FROM $2 AS first, age($1) IS NULL AS second",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "NOT DISTINCT::late_array_elements::True",
+    "sql": "SELECT $2 IS NOT DISTINCT FROM NULL::uuid[] AS first, $1 IS NOT DISTINCT FROM NULL::uuid[] AS second, ($1)[1] IS NOT DISTINCT FROM ($2)[1] AS third",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "third",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "recovery_after_unsupported",
+    "sql": "SELECT 1 IS NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "returning_context_before_unsupported",
+    "sql": "UPDATE inference_values SET identifier = identifier WHERE ($1)[1] IS DISTINCT FROM ($2)[1] RETURNING $1 IS DISTINCT FROM NULL::uuid[] AS first, $2 IS DISTINCT FROM NULL::uuid[] AS second",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "first",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "returning_emits_unsupported_once",
+    "sql": "DELETE FROM inference_values WHERE ($1)[1] IS DISTINCT FROM ($2)[1] RETURNING 1 IS NULL AS result",
+    "expected": {
+      "diagnostics": [
+        "inference_candidate_space_unsupported",
+        "parameter_type_unresolved",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

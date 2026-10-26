@@ -178,6 +178,17 @@ impl ParameterResolution {
         Ok(())
     }
 
+    fn complete(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        constraints: ParameterConstraints,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        // RETURNING and projection expansion use provisional solves. Only the
+        // completed statement can establish an unsupported inference boundary.
+        self.graph.report_inference_problems(context)?;
+        Ok(constraints)
+    }
+
     fn default_query_outputs(&mut self, context: &impl crate::sem::ParseContext) {
         self.graph.prepare_projections(context);
         // UPDATE/DELETE subqueries resolve unknown projected parameters before
@@ -427,13 +438,25 @@ impl ParameterResolution {
         arguments: &[SemScalarExpr],
         signatures: &[Signature],
     ) -> Result<SemScalarExpr, AnalysisError> {
+        self.call_with_diagnostic_name(catalog, name, name, arguments, signatures)
+    }
+
+    fn call_with_diagnostic_name(
+        &mut self,
+        catalog: &impl crate::sem::ParseContext,
+        name: &str,
+        diagnostic_name: &str,
+        arguments: &[SemScalarExpr],
+        signatures: &[Signature],
+    ) -> Result<SemScalarExpr, AnalysisError> {
         let result = self.operation(name, arguments, &InputTypeConstraint::any(), None);
         let mut nodes = Vec::new();
         for argument in arguments {
             nodes.push(self.input(argument));
         }
         nodes.push(result.constraint_node().expect("operation has node"));
-        self.graph.call(catalog, &nodes, signatures, name);
+        self.graph
+            .call(catalog, &nodes, signatures, diagnostic_name);
         Ok(result)
     }
 
@@ -829,14 +852,6 @@ impl Signature {
         self.unrestricted_inputs.contains(&index)
     }
 
-    pub(super) fn source_types(
-        &self,
-        catalog: &impl BaseParseContext,
-        index: usize,
-    ) -> std::collections::HashSet<TypeReference> {
-        catalog.cast_sources(&self.inputs[index], false)
-    }
-
     pub(super) fn cast_score(
         &self,
         catalog: &impl BaseParseContext,
@@ -1148,7 +1163,9 @@ impl ParameterResolution {
             };
             expand_root = expanded_arrays;
             if !expanded_arrays && !expanded_root {
-                return Ok(constraints);
+                return collector
+                    .parameters
+                    .complete(collector.context, constraints);
             }
         }
     }
@@ -1184,7 +1201,12 @@ impl ParameterResolution {
                 insert.truncate_implicit_targets();
             }
             if !expanded_arrays && !expanded {
-                return Ok((constraints, expanded_source));
+                return Ok((
+                    collector
+                        .parameters
+                        .complete(collector.context, constraints)?,
+                    expanded_source,
+                ));
             }
         }
     }
@@ -1207,7 +1229,9 @@ impl ParameterResolution {
             update.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
-                return Ok(constraints);
+                return collector
+                    .parameters
+                    .complete(collector.context, constraints);
             }
         }
     }
@@ -1230,7 +1254,9 @@ impl ParameterResolution {
             delete.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
-                return Ok(constraints);
+                return collector
+                    .parameters
+                    .complete(collector.context, constraints);
             }
         }
     }
@@ -1253,7 +1279,9 @@ impl ParameterResolution {
             merge.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
-                return Ok(constraints);
+                return collector
+                    .parameters
+                    .complete(collector.context, constraints);
             }
         }
     }
@@ -1276,7 +1304,9 @@ impl ParameterResolution {
             expression.walk(&mut finalizer)?;
             let expanded_arrays = finalizer.expanded_arrays;
             if !expanded_arrays {
-                return Ok(constraints);
+                return collector
+                    .parameters
+                    .complete(collector.context, constraints);
             }
         }
     }
@@ -1299,9 +1329,10 @@ impl ParameterResolution {
         let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
         if let Some(operator) = context.get_operator_op(name, left.is_some(), right.is_some()) {
             let signatures = operator.parameter_signatures();
-            return Ok(Some(self.call(
+            return Ok(Some(self.call_with_diagnostic_name(
                 context,
                 &format!("{name:?}"),
+                &name.to_name_string(),
                 &arguments,
                 &signatures,
             )?));

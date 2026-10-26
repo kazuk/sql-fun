@@ -56,4 +56,4 @@ parameter-bindings	project	schema-table-functions.sql	13	17,18
 truth-tests	project	truth-tests.sql	101	17,18
 between-symmetric	project	between-symmetric.sql	55	17,18
 distinctness	project	distinctness.sql	55	17,18
-bounded-parameter-inference	project	bounded-parameter-inference.sql	34	17,18
+bounded-parameter-inference	project	bounded-parameter-inference.sql	49	17,18

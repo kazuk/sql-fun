@@ -140,7 +140,7 @@ parameter bindings and invalid comparisons. Rust retains binding, coercion,
 serialization, correlated domains and SQLite feature contracts; see
 [the distinctness inventory](inventory-distinctness.md).
 
-Issue #802 adds `bounded-parameter-inference.json` with 34 project-schema
+Issue #802 adds `bounded-parameter-inference.json` with 49 project-schema
 cases per PostgreSQL 17/18 catalog. The shared source and installed paths check
 both distinctness predicates, ambiguous default candidates, explicit scalar,
 binary and custom input types, SQL-established array types, SQL-established
@@ -148,5 +148,7 @@ non-default types, and repeated parameters constrained by another occurrence in
 either order.
 Rust tests retain default membership, correlated explicit assignment inspection,
 resumption after an intermediate solve, array-only unresolved inputs, and
-invariance under unrelated catalog growth. Performance comparisons use the
-existing 55-case `distinctness` group without timing pass/fail thresholds.
+invariance under unrelated catalog growth. Additional cases cover late datetime
+constraints, unresolved expression results that require unsupported catalog-wide
+inference, later array/RETURNING context, and analysis recovery. Comparisons
+use the existing 55-case `distinctness` group without timing pass/fail thresholds.

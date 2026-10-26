@@ -23,36 +23,21 @@ impl RankedSignature {
     fn prepare(
         context: &impl ParseContext,
         signature: &Signature,
-        inputs: &[InputTypeConstraint],
-    ) -> Option<Self> {
-        let mut sources = vec![HashMap::new(); inputs.len()];
-        // Reject declarations using known operands before enumerating any
-        // unrestricted operand's cast sources.
-        for (index, input) in inputs.iter().enumerate() {
-            if signature.accepts_any_type(index) {
-                continue;
-            }
-            if let Some(types) = input.admissible_types() {
-                sources[index] = Self::ranks(context, signature, index, types.iter().cloned());
-                if sources[index].is_empty() {
-                    return None;
+        candidates: &HashSet<TypeReference>,
+    ) -> Self {
+        let sources = (0..signature.inputs().len())
+            .map(|index| {
+                if signature.accepts_any_type(index) {
+                    HashMap::new()
+                } else {
+                    Self::ranks(context, signature, index, candidates.iter().cloned())
                 }
-            }
-        }
-        for (index, input) in inputs.iter().enumerate() {
-            if input.is_any() && !signature.accepts_any_type(index) {
-                sources[index] = Self::ranks(
-                    context,
-                    signature,
-                    index,
-                    signature.source_types(context, index).into_iter(),
-                );
-            }
-        }
-        Some(Self {
+            })
+            .collect();
+        Self {
             signature: signature.clone(),
             sources,
-        })
+        }
     }
 
     fn ranks(
@@ -100,9 +85,8 @@ impl RankedSignature {
     }
 }
 
-/// Keep scalar declarations and array conversion evidence, rather than one
-/// concrete polymorphic signature per catalog type. Facts outlive ParseContext
-/// so explicit assignment inspection can instantiate a previously unseen array.
+/// Owned ranks for finite declarations, defaults, and encountered SQL types.
+/// No catalog type universe is captured or expanded.
 #[derive(Clone, Debug)]
 struct CallFacts {
     postgres_defaults: bool,
@@ -117,85 +101,144 @@ impl CallFacts {
         signatures: &[Signature],
         inputs: &[InputTypeConstraint],
     ) -> Self {
-        let concrete = signatures
+        let declarations: Vec<_> = signatures
             .iter()
             .filter(|signature| signature.is_concrete_for_arity(inputs.len()))
-            .filter_map(|signature| RankedSignature::prepare(context, signature, inputs))
             .collect();
-        let arrays_possible = Self::arrays_possible(context, inputs);
-        let arrays: Vec<_> = signatures
+        // Declared cast sources are finite inspection facts. They never
+        // enlarge the seven candidates used by default placeholder inference.
+        let targets: HashSet<_> = declarations
             .iter()
-            .filter(|signature| arrays_possible && signature.is_array_comparison())
+            .flat_map(|signature| signature.inputs().iter().cloned())
+            .collect();
+        let candidates: HashSet<_> = default_types()
+            .into_iter()
+            .chain(
+                targets
+                    .iter()
+                    .flat_map(|target| context.declared_implicit_cast_sources(target)),
+            )
+            .collect();
+        let concrete = declarations
+            .into_iter()
+            .map(|signature| RankedSignature::prepare(context, signature, &candidates))
+            .collect();
+        let arrays = signatures
+            .iter()
+            .filter(|signature| signature.is_array_comparison())
             .cloned()
             .collect();
-        let array_casts = if arrays.is_empty() {
-            HashMap::new()
-        } else {
-            Self::array_conversion_ranks(context)
-        };
-        Self {
+        let mut facts = Self {
             postgres_defaults: context.dialect() == crate::ast::Dialect::postgres(),
             concrete,
             arrays,
-            array_casts,
+            array_casts: HashMap::new(),
+        };
+        // Preserve actual array casts for the finite declared/default types so
+        // explicit assignment inspection can outlive the borrowed context.
+        for source in &candidates {
+            facts.retain_array_source(context, &source.array_type());
         }
+        facts.retain(
+            context,
+            inputs
+                .iter()
+                .filter_map(InputTypeConstraint::admissible_types)
+                .flatten(),
+        );
+        facts
     }
 
-    fn arrays_possible(context: &impl ParseContext, inputs: &[InputTypeConstraint]) -> bool {
-        inputs.iter().all(|input| {
-            input.admissible_types().is_none_or(|types| {
-                types.iter().any(|source| {
-                    source.is_array() == Some(true)
-                        || context
-                            .get_implicit_castable(source)
-                            .iter()
-                            .any(|target| target.is_array() == Some(true))
-                })
+    fn retain_array_source(&mut self, context: &impl ParseContext, source: &TypeReference) {
+        if self.arrays.is_empty() || self.array_casts.contains_key(source) {
+            return;
+        }
+        let mut targets = context.get_implicit_castable(source);
+        if source.is_array() == Some(true) {
+            targets.insert(source.clone());
+            targets.extend(
+                context
+                    .get_implicit_castable(&source.element_type())
+                    .into_iter()
+                    .map(|ty| ty.array_type()),
+            );
+        }
+        let ranks = targets
+            .into_iter()
+            .filter(|target| target.is_array() == Some(true))
+            .filter_map(|target| {
+                Some((
+                    target.clone(),
+                    OverloadRank::argument(context, Some(source), Some(&target))?,
+                ))
             })
-        })
+            .collect();
+        self.array_casts.insert(source.clone(), ranks);
     }
 
-    fn array_conversion_ranks(
+    fn retain<'a>(
+        &mut self,
         context: &impl ParseContext,
-    ) -> HashMap<TypeReference, HashMap<TypeReference, OverloadRank>> {
-        let mut ranks = HashMap::<_, HashMap<_, _>>::new();
-        // Retain conversion edges, not comparison candidates. Unrelated
-        // catalog types never become default source/target alternatives.
-        for element in context.type_references() {
-            if element.is_dynamic()
-                || element.is_simple_infer_arg()
-                || element.is_common_infer_arg()
-            {
-                continue;
-            }
-            let array = element.array_type();
-            for target in context.get_implicit_castable(&element) {
-                let target_array = target.array_type();
-                if let Some(rank) =
-                    OverloadRank::argument(context, Some(&array), Some(&target_array))
-                {
-                    ranks
-                        .entry(array.clone())
-                        .or_default()
-                        .insert(target_array, rank);
-                }
-                // Includes vectors and declared scalar-to-array casts.
-                if target.is_array() == Some(true)
-                    && let Some(rank) =
-                        OverloadRank::argument(context, Some(&element), Some(&target))
-                {
-                    ranks
-                        .entry(element.clone())
-                        .or_default()
-                        .insert(target, rank);
+        types: impl Iterator<Item = &'a TypeReference>,
+    ) {
+        let mut sources = HashSet::new();
+        for ty in types {
+            sources.insert(ty.clone());
+            // A specific SQL-established type justifies its incoming casts.
+            // Never enumerate all catalog types to find an initial seed.
+            sources.extend(context.declared_implicit_cast_sources(ty));
+            self.retain_array_source(context, ty);
+        }
+        for entry in &mut self.concrete {
+            for index in 0..entry.sources.len() {
+                if !entry.signature.accepts_any_type(index) {
+                    entry.sources[index].extend(RankedSignature::ranks(
+                        context,
+                        &entry.signature,
+                        index,
+                        sources.iter().cloned(),
+                    ));
                 }
             }
         }
-        ranks
+        for source in sources {
+            self.retain_array_source(context, &source);
+        }
     }
 
-    const fn supplies_input_context(&self) -> bool {
-        self.concrete.len() == 1 && self.arrays.is_empty()
+    fn supplies_input_context(&self) -> bool {
+        self.arrays.is_empty()
+            && (self.concrete.len() == 1
+                || !self.concrete.iter().any(|entry| {
+                    (0..entry.signature.inputs().len()).all(|index| {
+                        default_types()
+                            .iter()
+                            .any(|ty| entry.score(ty, index).is_some())
+                    })
+                }))
+    }
+
+    fn declared_inputs(&self) -> Vec<InputTypeConstraint> {
+        let Some(first) = self.concrete.first() else {
+            return Vec::new();
+        };
+        (0..first.signature.inputs().len())
+            .map(|index| {
+                if self
+                    .concrete
+                    .iter()
+                    .any(|entry| entry.signature.accepts_any_type(index))
+                {
+                    InputTypeConstraint::any()
+                } else {
+                    InputTypeConstraint::types(
+                        self.concrete
+                            .iter()
+                            .flat_map(|entry| entry.sources[index].keys().cloned()),
+                    )
+                }
+            })
+            .collect()
     }
 
     const fn has_declarations(&self) -> bool {
@@ -323,6 +366,7 @@ pub(super) struct CallConstraint {
     nodes: Vec<usize>,
     facts: Arc<CallFacts>,
     operation: String,
+    parameters: Vec<bool>,
 }
 
 impl CallConstraint {
@@ -332,12 +376,22 @@ impl CallConstraint {
         signatures: &[Signature],
         inputs: &[InputTypeConstraint],
         operation: &str,
+        parameters: &[bool],
     ) -> Self {
         Self {
+            parameters: parameters.to_vec(),
             nodes: nodes.to_vec(),
             facts: Arc::new(CallFacts::prepare(context, signatures, inputs)),
             operation: operation.to_owned(),
         }
+    }
+
+    pub(super) fn retain<'a>(
+        &mut self,
+        context: &impl ParseContext,
+        types: impl Iterator<Item = &'a TypeReference>,
+    ) {
+        Arc::make_mut(&mut self.facts).retain(context, types);
     }
 
     pub(super) fn instantiate(&self, graph: &mut ConstraintGraph, defaults: bool) -> bool {
@@ -353,6 +407,9 @@ impl CallConstraint {
         {
             inputs = contextual;
         }
+        if inputs.iter().all(InputTypeConstraint::is_any) && self.facts.supplies_input_context() {
+            inputs = self.facts.declared_inputs();
+        }
         // Wait for other occurrences, casts, projections and known operands.
         // A sole concrete declaration itself supplies SQL type context.
         let default_inference = self.facts.postgres_defaults
@@ -362,7 +419,26 @@ impl CallConstraint {
             if !defaults {
                 return false;
             }
-            inputs.fill(InputTypeConstraint::types(default_types()));
+            for (input, parameter) in inputs.iter_mut().zip(&self.parameters) {
+                if *parameter {
+                    *input = InputTypeConstraint::types(default_types());
+                }
+            }
+        }
+        if defaults
+            && inputs.iter().all(InputTypeConstraint::is_any)
+            && self
+                .facts
+                .arrays
+                .iter()
+                .any(|signature| result.allows(signature.result()))
+        {
+            graph.unsupported_inference.push(self.operation.clone());
+            graph.restrict(
+                *self.nodes.last().expect("call result"),
+                &self.facts.result_types(),
+            );
+            return true;
         }
         let alternatives = self.facts.alternatives(&inputs, &result);
         if default_inference && alternatives.is_empty() && self.facts.has_declarations() {

@@ -19,6 +19,18 @@ impl CastInfoRead for SchemaCatalog {
         }
     }
 
+    fn declared_implicit_cast_sources(&self, target: &TypeReference) -> HashSet<TypeReference> {
+        let mut sources = self.base.declared_implicit_cast_sources(target);
+        for (name, _) in self.casts.iter() {
+            let source = TypeReference::from_str(&name).expect("canonical concrete type key");
+            if self.get_implicit_cast(&source, target).is_some() {
+                sources.insert(source);
+            }
+        }
+        sources.insert(target.clone());
+        sources
+    }
+
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
         let mut sources = self.base.cast_sources(target, explicit);
         for (name, _) in self.casts.iter() {

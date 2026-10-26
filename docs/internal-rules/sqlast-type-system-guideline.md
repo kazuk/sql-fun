@@ -204,15 +204,29 @@ Overload constraints retain declarations and owned cast ranks in
 `parameter_constraints/call.rs`. Initially unrestricted calls wait for finite
 operand domains from other occurrences, casts, common-type selection, and
 structural projections. A sole concrete declaration supplies SQL type context.
-Only remaining unseeded overload inputs use the seven built-in default bind
-candidates. Candidate order never chooses a binding, and an absent default
-witness does not establish invalid SQL.
+Finite declaration requirements that cannot accept the defaults (such as
+`age`'s datetime overloads) propagate before any default alternatives.
+Only remaining unseeded parameter-placeholder inputs use the seven built-in
+default bind candidates; graph node identities preserve their semantic origin.
+Candidate order never chooses a binding, and an absent default witness does not
+establish invalid SQL.
 
 Keep `anyarray` declarations deferred. Instantiate comparison signatures from
 observed array types and their conversion targets, preserving concrete overload
-precedence. Retained array conversion edges support later explicit assignment
-inspection without creating one signature per catalog type. They are processing
-facts, not another analysis environment or a new catalog representation.
+precedence. Retain conversion ranks only for finite declaration/default types
+and types encountered in SQL; inspect casts for those specific sources or
+targets. Do not call `type_references()` or cache the catalog's type/cast
+universe as deferred-overload inference preprocessing.
+
+An unresolved non-placeholder expression must not inherit placeholder defaults.
+When its polymorphic relationship would require an unbounded type universe,
+report recoverable `inference_candidate_space_unsupported` after propagation.
+Deliver it only after statement finalization, since provisional RETURNING and
+projection solves may acquire type context in a later collection pass.
+Keep its graph nodes and unresolved domains, preserve known result metadata,
+and do not manufacture an empty domain or `parameter_constraint`: unsupported
+inference is not evidence of invalid SQL. Explicit assignments may still resolve
+those nodes through retained relationships.
 
 Unhinted overload domains expose default inference candidates, not a restriction
 on explicitly supplied client types. A solved graph retains its pre-solve SQL

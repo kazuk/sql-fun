@@ -570,6 +570,12 @@ parameter contribute constraints before its binding is finalized.
 `ParameterConstraints::parameter(...).constraint()` exposes the current
 inference candidates. `ParameterConstraints::allows` checks explicitly supplied
 types against the SQL constraints, including types outside those candidates.
+Unresolved expression results are distinct from parameter placeholders. If
+resolving them would require a catalog-wide type search, analysis reports
+`inference_candidate_space_unsupported` and leaves their types unresolved. This
+indicates a limitation of inference, not invalid SQL. Supply SQL type context or
+an input type hint to avoid that search; types established by later occurrences
+are considered before this diagnostic is emitted.
 For `bytea`, the protocol's text value format does not change its SQL type to
 `text`; use SQL context or an explicit `bytea` input hint.
 

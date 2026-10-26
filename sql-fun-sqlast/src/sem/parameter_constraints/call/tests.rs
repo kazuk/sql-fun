@@ -6,7 +6,8 @@ use std::collections::BTreeMap;
 
 #[test]
 fn defaults_are_bounded_without_restricting_explicit_assignments() {
-    let (context, signatures) = test_helpers::comparison();
+    let (mut context, signatures) = test_helpers::comparison();
+    context.forbid_type_enumeration();
     let mut graph = ConstraintGraph::default();
     let left = graph.parameter(1);
     let right = graph.parameter(2);
@@ -63,6 +64,7 @@ fn later_array_information_survives_earlier_default_inference(
 #[test]
 fn unrelated_catalog_growth_does_not_instantiate_array_comparisons() {
     let (mut context, signatures) = test_helpers::comparison();
+    context.forbid_type_enumeration();
     for index in 0..50 {
         context.setup_type(format!("public.unrelated_{index}").parse().unwrap());
     }
@@ -190,4 +192,42 @@ fn result_context_keeps_non_default_input_types_before_defaulting() {
     let constraints = ParameterConstraints::from_graph(&graph);
     assert!(constraints.allows(&BTreeMap::from([(1, date)])));
     assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+}
+
+#[test]
+fn unknown_expression_results_report_unsupported_inference_without_invalid_sql() {
+    let (mut context, signatures) = test_helpers::comparison();
+    context.forbid_type_enumeration();
+    let mut graph = ConstraintGraph::default();
+    let left = graph.node(&InputTypeConstraint::any());
+    let right = graph.node(&InputTypeConstraint::any());
+    let result = graph.node(&InputTypeConstraint::any());
+    graph.call(&context, &[left, right, result], &signatures, "comparison");
+    graph.solve().unwrap();
+    graph.report_inference_problems(&mut context).unwrap();
+    assert_eq!(context.reported_problems().len(), 1);
+    assert!(context.has_reported_problem("inference_candidate_space_unsupported"));
+    assert!(graph.domain(left).is_any());
+    assert_eq!(
+        graph.domain(result).single_type(),
+        Some(PgBuiltInType::bool())
+    );
+}
+
+#[test]
+fn sql_context_resolves_expression_results_before_the_unsupported_boundary() {
+    let (mut context, signatures) = test_helpers::comparison();
+    context.forbid_type_enumeration();
+    let mut graph = ConstraintGraph::default();
+    let left = graph.node(&InputTypeConstraint::any());
+    let right = graph.node(&InputTypeConstraint::any());
+    let result = graph.node(&InputTypeConstraint::any());
+    graph.call(&context, &[left, right, result], &signatures, "comparison");
+    let custom: TypeReference = "public.custom[]".parse().unwrap();
+    graph.restrict(left, &InputTypeConstraint::exact(&custom));
+    graph.prepare_projections(&context);
+    graph.solve().unwrap();
+    graph.report_inference_problems(&mut context).unwrap();
+    assert!(context.reported_problems().is_empty());
+    assert_eq!(graph.domain(right).single_type(), Some(custom));
 }

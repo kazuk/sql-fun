@@ -326,6 +326,7 @@ pub(crate) struct ConstraintGraph {
     common_problems: Vec<crate::sem::problem::MinMaxProblem>,
     common_facts: Option<Arc<CommonTypeFacts>>,
     calls: Vec<call::CallConstraint>,
+    unsupported_inference: Vec<String>,
     inspection: Option<Arc<Self>>,
 }
 
@@ -361,7 +362,7 @@ impl ConstraintGraph {
             };
             graph.domains[node].intersect(&InputTypeConstraint::exact(&supplied));
         }
-        graph.satisfiable()
+        graph.satisfiable() && graph.unsupported_inference.is_empty()
     }
 
     pub(crate) fn node(&mut self, domain: &InputTypeConstraint) -> usize {
@@ -420,8 +421,19 @@ impl ConstraintGraph {
             .iter()
             .map(|node| self.domain(*node).clone())
             .collect();
+        // Parameter nodes retain their semantic origin across repeated uses
+        // and derived-column aliases; expression results have distinct nodes.
+        let parameters: Vec<_> = nodes[..nodes.len() - 1]
+            .iter()
+            .map(|node| self.parameters.values().any(|parameter| parameter == node))
+            .collect();
         self.calls.push(call::CallConstraint::prepare(
-            context, nodes, signatures, &inputs, operation,
+            context,
+            nodes,
+            signatures,
+            &inputs,
+            operation,
+            &parameters,
         ));
     }
 
@@ -495,6 +507,21 @@ impl ConstraintGraph {
             }
             visited.push(ty);
         }
+        for relation in &mut self.calls {
+            relation.retain(context, visited.iter());
+        }
+    }
+
+    pub(crate) fn report_inference_problems(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for operation in &self.unsupported_inference {
+            context.report_analysis_problem(
+                crate::sem::AnalysisProblem::inference_candidate_space_unsupported(operation),
+            )?;
+        }
+        Ok(())
     }
 
     pub(crate) fn report_projection_problems(
@@ -614,6 +641,9 @@ impl ConstraintGraph {
         }
         if !self.satisfiable() {
             return Err(self.conflict());
+        }
+        if !self.unsupported_inference.is_empty() {
+            return Ok(());
         }
         // Remove globally impossible alternatives, not just locally inconsistent
         // ones. Retained alternatives stay correlated in the public result.

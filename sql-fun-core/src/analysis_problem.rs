@@ -62,6 +62,12 @@ pub trait DiagnosticMessage {
 pub enum AnalysisProblem {
     /// SQL analysis could not establish a finalized parameter type.
     ParameterTypeUnresolved(u32),
+    /// Inference would need an unsupported catalog-wide candidate search.
+    /// This reports an analysis limitation, not invalid SQL.
+    InferenceCandidateSpaceUnsupported {
+        /// SQL operation whose unresolved input requires that search.
+        operation: String,
+    },
     /// Input could not be parsed, realized, hinted, analyzed, or deparsed.
     QueryAnalysis(QueryAnalysisProblem),
     /// Invalid ARRAY constructor typing.
@@ -385,11 +391,22 @@ impl AnalysisProblem {
         Self::ParameterConstraint(ParameterConstraintProblem::new(message))
     }
 
+    /// Report an unsupported, unbounded inference search without rejecting SQL.
+    #[must_use]
+    pub fn inference_candidate_space_unsupported(operation: &str) -> Self {
+        Self::InferenceCandidateSpaceUnsupported {
+            operation: operation.to_owned(),
+        }
+    }
+
     /// Stable diagnostic classification, independent of formatted debug output.
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
             Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
+            Self::InferenceCandidateSpaceUnsupported { .. } => {
+                "inference_candidate_space_unsupported"
+            }
             Self::QueryAnalysis(problem) => problem.code(),
             Self::Index(problem) => problem.code(),
             Self::AlterColumn(problem) => problem.code(),
@@ -450,7 +467,9 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
-            Self::ParameterTypeUnresolved(_) => DiagnosticMetadata::from(self.diagnostic_message()),
+            Self::ParameterTypeUnresolved(_) | Self::InferenceCandidateSpaceUnsupported { .. } => {
+                DiagnosticMetadata::from(self.diagnostic_message())
+            }
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
             Self::Index(problem) => problem.render_metadata(),
             Self::UnreachableCoalesceArgument(..) => DiagnosticMetadata::from(
@@ -485,6 +504,9 @@ impl AnalysisProblem {
 impl DiagnosticMessage for AnalysisProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::InferenceCandidateSpaceUnsupported { operation } => format!(
+                "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"
+            ),
             Self::ParameterTypeUnresolved(index) => {
                 format!(
                     "application input binding for parameter ${index} is unresolved; supply a supported explicit input type hint; an SQL result cast may be insufficient"

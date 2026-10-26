@@ -1,0 +1,94 @@
+name: Pages manual prototype
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'build-test run ID supplying sql-fun-user-manual'
+        required: true
+        type: string
+      test_tag:
+        description: 'Archive test identity (vX.Y.Z); does not create a release'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Share the site's deployment lock with production without invoking its workflow.
+concurrency:
+  group: release-manual-pages
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      archive: ${{ steps.manual.outputs.archive }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Adopt the selected prebuilt manual and package its exact files
+        id: manual
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          TEST_TAG: ${{ inputs.test_tag }}
+        run: |
+          .local/sbin/prepare-pages-prototype "$GITHUB_REPOSITORY" "$SOURCE_RUN_ID" \
+            "$TEST_TAG" "$RUNNER_TEMP/archive" >> "$GITHUB_OUTPUT"
+      - name: Record input identity
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_SHA: ${{ steps.manual.outputs.source_sha }}
+          ARCHIVE: ${{ steps.manual.outputs.archive }}
+        run: |
+          {
+            echo "Producer: https://github.com/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID"
+            echo "Producer source SHA: $SOURCE_SHA"
+            echo 'Producer artifact: sql-fun-user-manual'
+            echo "Manual archive: $ARCHIVE"
+            echo "Prototype revision: $GITHUB_SHA; attempt: $GITHUB_RUN_ATTEMPT"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: prototype-manual-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/archive/${{ steps.manual.outputs.archive }}
+          if-no-files-found: error
+
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: prototype-manual-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/archive
+      - name: Extract the contract-compatible manual archive
+        env:
+          ARCHIVE: ${{ needs.prepare.outputs.archive }}
+        run: |
+          .local/sbin/extract-pages-manual "$RUNNER_TEMP/archive/$ARCHIVE" "$RUNNER_TEMP/manual"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          name: prototype-pages-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/manual
+      - uses: actions/deploy-pages@v4
+        id: deployment
+        with:
+          artifact_name: prototype-pages-${{ github.run_attempt }}
+      - name: Verify served manual bytes
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: .local/sbin/verify-pages-manual "$RUNNER_TEMP/manual" "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"

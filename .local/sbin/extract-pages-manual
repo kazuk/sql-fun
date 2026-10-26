@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+archive="${1:?manual archive is required}"
+output="${2:?output directory is required}"
+[[ -f "$archive" ]] || { echo "Required manual archive missing: $archive" >&2; exit 1; }
+mkdir -p "$output"
+tar -xzf "$archive" -C "$output"
+[[ -f "$output/index.html" ]] || { echo 'manual archive has no root index.html' >&2; exit 1; }

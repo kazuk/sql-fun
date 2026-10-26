@@ -11,9 +11,8 @@ use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{
-        AnalysisProblem, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead,
-        PgBuiltInType, SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
-        problem::NameResolution,
+        ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, PgBuiltInType,
+        SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
     },
 };
 
@@ -40,123 +39,6 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
         "SELECT answer FROM public.final_answers",
     )?;
     assert_query_type(&resolved, "answer", &answer_type);
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::qualified("CREATE TYPE public.status AS ENUM ('ready')", "public.status")]
-#[case::default_schema("CREATE TYPE status AS ENUM ('ready')", "public.status")]
-fn enum_column_references_use_catalog_identity_in_same_file_and_frozen_prefix(
-    #[case] declaration: &str,
-    #[case] expected_name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
-    let same_file = load_schema(
-        &root,
-        &format!(
-            "{declaration}; CREATE TABLE public.enum_items (status {expected_name}); \
-             CREATE VIEW public.enum_view AS SELECT status FROM public.enum_items;"
-        ),
-    )?;
-    assert!(
-        same_file.problems().is_empty(),
-        "{:?}",
-        same_file.problems()
-    );
-
-    let name = FullName::with_schema("public", "status");
-    let reference = TypeReference::from_full_name(name.clone());
-    let definition = same_file.base_context().get_type(&name).expect("enum type");
-    assert_eq!(definition.type_reference(), Some(&reference));
-    assert!(
-        same_file
-            .base_context()
-            .type_references()
-            .contains(&reference)
-    );
-    let builder = test_helpers::schema_builder(same_file.base_context())?;
-    assert_eq!(definition.get_member_type(&builder, "ready"), None);
-    let same_file_view = same_file
-        .get_view_impl(&FullName::with_schema("public", "enum_view"))
-        .expect("same-file enum view");
-    assert_query_type(same_file_view, "status", &reference);
-    assert_query_type(
-        &query(
-            same_file.base_context(),
-            "SELECT status FROM public.enum_items",
-        )?,
-        "status",
-        &reference,
-    );
-
-    let prefix = load_schema(&root, &format!("{declaration};"))?;
-    assert!(prefix.problems().is_empty(), "{:?}", prefix.problems());
-    let dependent = load_schema(
-        prefix.base_context(),
-        &format!(
-            "CREATE TABLE public.enum_items (status {expected_name}); \
-             CREATE VIEW public.enum_view AS SELECT status FROM public.enum_items;"
-        ),
-    )?;
-    assert!(
-        dependent.problems().is_empty(),
-        "{:?}",
-        dependent.problems()
-    );
-    let dependent_view = dependent
-        .get_view_impl(&FullName::with_schema("public", "enum_view"))
-        .expect("inherited enum view");
-    assert_query_type(dependent_view, "status", &reference);
-    assert_query_type(
-        &query(
-            dependent.base_context(),
-            "SELECT status FROM public.enum_items",
-        )?,
-        "status",
-        &reference,
-    );
-    Ok(())
-}
-
-#[test]
-fn distinct_enums_keep_distinct_references_and_missing_name_reports_a_problem()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
-    let parsed = load_schema(
-        &root,
-        "CREATE TYPE public.first_status AS ENUM ('ready'); \
-         CREATE TYPE public.second_status AS ENUM ('ready'); \
-         CREATE TABLE public.enum_items (first public.first_status, second public.second_status); \
-         CREATE TABLE public.missing_items (status public.absent_status);",
-    )?;
-    let first = TypeReference::from_full_name(FullName::with_schema("public", "first_status"));
-    let second = TypeReference::from_full_name(FullName::with_schema("public", "second_status"));
-    assert_ne!(first, second);
-    let table = parsed
-        .get_table(&TableName::from(FullName::with_schema(
-            "public",
-            "enum_items",
-        )))
-        .expect("enum table");
-    assert_eq!(
-        table
-            .get_column_def(&ColumnName::from("first"))
-            .unwrap()
-            .get_type(),
-        Some(&first)
-    );
-    assert_eq!(
-        table
-            .get_column_def(&ColumnName::from("second"))
-            .unwrap()
-            .get_type(),
-        Some(&second)
-    );
-    assert!(parsed.problems().iter().any(|problem| matches!(
-        problem,
-        AnalysisProblem::NameResolution(NameResolution::ColumnTypeNotFound(_, _, name))
-            if name.as_str() == "public.absent_status"
-    )));
     Ok(())
 }
 

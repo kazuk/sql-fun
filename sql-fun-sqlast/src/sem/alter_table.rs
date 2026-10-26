@@ -37,10 +37,31 @@ impl AlterTable {
     pub const fn can_apply(&self) -> bool {
         self.applicable
     }
-    /// Canonical target binding retained by the column-attribute analyzer.
+    /// Canonical target binding retained by semantic analysis.
     pub const fn resolved_target(&self) -> Option<&TableName> {
         self.resolved_target.as_ref()
     }
+    pub(crate) fn table_rename(
+        table: &TableName,
+        target: Option<&TableName>,
+        destination: &TableName,
+        permitted: bool,
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(table, &[AlterObjSubCommand::rename_to(destination)], source);
+        statement.resolved_target = target.cloned();
+        statement.applicable = target.is_some() && permitted;
+        statement
+    }
+
+    /// Destination identity retained for a standalone table rename.
+    pub const fn rename_destination(&self) -> Option<&TableName> {
+        let [command] = self.commands.as_slice() else {
+            return None;
+        };
+        command.rename_destination()
+    }
+
     pub(crate) fn column_attributes(
         table: &TableName,
         target: Option<&TableName>,
@@ -366,6 +387,14 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
+    const fn rename_destination(&self) -> Option<&TableName> {
+        if let Self::RenameTo(name) = self {
+            Some(name)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn column_attributes(value: &crate::sem::AlterColumnAttributes) -> Self {
         Self::ColumnAttributes(Box::new(value.clone()))
     }

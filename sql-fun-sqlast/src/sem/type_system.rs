@@ -54,6 +54,19 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(ty) = &mut self.ret_type {
+            ty.rename_relation(old, new);
+        }
+        for param in &mut self.params {
+            param.rename_relation(old, new);
+        }
+    }
+
     pub(crate) fn is_variadic(&self) -> bool {
         self.params.iter().any(FunctionParam::is_variadic)
     }

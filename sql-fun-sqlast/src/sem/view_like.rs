@@ -17,6 +17,17 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::View(value) => value.rename_relation(old, new),
+            Self::MaterializedView(value) => value.rename_relation(old, new),
+        }
+    }
+
     /// Ordinary View semantic definition; materialized views have a different definition.
     pub fn ordinary_definition(&self) -> Option<&CreateView> {
         if let Self::View(view) = self {

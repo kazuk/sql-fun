@@ -9,6 +9,16 @@ pub struct RuleIdentity {
     name: FullName,
 }
 impl RuleIdentity {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if &self.target == old.full_name() {
+            self.target = new.full_name().clone();
+        }
+    }
+
     /// Construct from a resolved target and the logical local rule name.
     pub fn new(target: &FullName, name: &str) -> Self {
         Self {
@@ -34,6 +44,16 @@ impl RuleIdentity {
 #[derive(Debug, Clone, Default)]
 pub struct RuleReferences(Vec<RuleIdentity>);
 impl RuleReferences {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        for identity in &mut self.0 {
+            identity.rename_relation(old, new);
+        }
+    }
+
     /// Exact linked definition identities, including any masked historical link.
     pub fn identities(&self) -> &[RuleIdentity] {
         &self.0
@@ -116,6 +136,16 @@ pub struct CreateRule {
     select_lineage: Option<crate::sem::ViewColumnLineage>,
 }
 impl CreateRule {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        self.identity.rename_relation(old, new);
+        self.walk(&mut crate::sem::traversal::RelationRenamer::new(old, new))?;
+        self.retain_dependencies()
+    }
+
     pub(crate) fn new(
         identity: &RuleIdentity,
         event: RuleEvent,

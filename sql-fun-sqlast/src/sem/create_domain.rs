@@ -21,6 +21,16 @@ pub struct CreateDomain {
 }
 
 impl CreateDomain {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(base) = &mut self.base_type {
+            base.rename_relation(old, new);
+        }
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     /// Ownership is catalog state: it is omitted from the existing serialized
     /// type format and does not affect SQL type equality or hashing.

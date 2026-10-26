@@ -7,6 +7,14 @@ pub struct ArrayTypeDefinition {
 }
 
 impl ArrayTypeDefinition {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.element.rename_relation(old, new);
+    }
+
     pub(crate) fn new(element: &TypeReference) -> Self {
         Self {
             element: element.clone(),

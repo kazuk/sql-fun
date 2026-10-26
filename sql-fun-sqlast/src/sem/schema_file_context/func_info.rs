@@ -8,9 +8,23 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct FunctionDefinitionCollection(TrieMap<Vec<CreateFunction>>);
+pub struct FunctionDefinitionCollection(TrieMap<Vec<CreateFunction>>, Vec<FullName>);
 
 impl FunctionDefinitionCollection {
+    fn append_names(&self, names: &mut Vec<FullName>) {
+        for name in &self.1 {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+    }
+    pub(super) fn replace(&mut self, name: &FullName, definitions: &[CreateFunction]) {
+        self.0.insert(&name.to_string(), definitions.to_vec());
+        if !self.1.contains(name) {
+            self.1.push(name.clone());
+        }
+    }
+
     pub(super) fn definitions(&self, name: &FullName) -> Vec<CreateFunction> {
         self.0.get(&name.to_string()).cloned().unwrap_or_default()
     }
@@ -21,11 +35,17 @@ impl FunctionDefinitionCollection {
             definitions.retain(|existing| existing.ownership_identity(name) != identity);
             definitions.push(definition);
         }
-        self.0.insert(&name.to_string(), definitions);
+        self.replace(name, &definitions);
     }
 }
 
 impl FunctionInfoRead for SchemaCatalog {
+    fn declared_routine_names(&self) -> Vec<FullName> {
+        let mut names = self.base.declared_routine_names();
+        self.functions.append_names(&mut names);
+        names
+    }
+
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
         if self.functions.definitions(name).is_empty() {
             self.base.is_aggregate_impl(name)

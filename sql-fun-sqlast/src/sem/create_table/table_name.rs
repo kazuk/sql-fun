@@ -22,6 +22,12 @@ impl Display for TableName {
 }
 
 impl TableName {
+    pub(crate) fn rename_reference(&mut self, old: &Self, new: &Self) {
+        if self == old {
+            *self = new.clone();
+        }
+    }
+
     /// gets name content
     #[must_use]
     pub const fn full_name(&self) -> &FullName {

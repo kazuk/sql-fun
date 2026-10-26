@@ -68,6 +68,11 @@ impl std::fmt::Display for Kind {
 /// Read the kind at an exact qualified identity, without search-path expansion.
 /// Mutation belongs exclusively to definition write/update operations.
 pub trait ObjectInfoRead {
+    /// Effective table and view catalog identities available for dependency updates.
+    fn relation_names(&self) -> Vec<FullName> {
+        Vec::new()
+    }
+
     /// Relation kind, including inherited definitions.
     fn object_kind(&self, name: &FullName) -> Option<Kind>;
 }

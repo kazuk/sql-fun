@@ -14,6 +14,14 @@ use super::{SchemaCatalog, SchemaFileContext};
 pub struct ViewInformationCollection(TrieMap<ViewLike>, Vec<FullName>);
 
 impl ViewInformationCollection {
+    pub(super) fn append_names(&self, names: &mut Vec<FullName>) {
+        for name in &self.1 {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+    }
+
     pub(super) fn sqlite_name(&self, name: &FullName) -> Option<FullName> {
         self.1
             .iter()

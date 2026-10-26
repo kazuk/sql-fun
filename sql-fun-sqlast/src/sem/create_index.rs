@@ -44,6 +44,16 @@ pub enum IndexElement {
 }
 
 impl IndexElement {
+    fn rename_relation(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Expr(expression) = self {
+            expression.walk(visitor)?;
+        }
+        Ok(())
+    }
+
     const fn is_expression(&self) -> bool {
         matches!(self, Self::Expr(_))
     }
@@ -86,6 +96,16 @@ impl IndexElementWithOrder {
 pub struct IndexElementCollection(Vec<IndexElementWithOrder>);
 
 impl IndexElementCollection {
+    fn rename_relation(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        for column in &mut self.0 {
+            column.element.rename_relation(visitor)?;
+        }
+        Ok(())
+    }
+
     pub fn from_column_names(column_names: &IVec<ColumnName>) -> Self {
         Self(
             column_names
@@ -161,6 +181,18 @@ pub struct CreateIndex {
 }
 
 impl CreateIndex {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &TableName,
+        new: &TableName,
+    ) -> Result<(), AnalysisError> {
+        self.table.rename_reference(old, new);
+        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        self.key_columns.rename_relation(&mut visitor)?;
+        self.include_columns.rename_relation(&mut visitor)?;
+        crate::sem::traversal::optional(&mut self.predicate, &mut visitor)
+    }
+
     /// Index access method retained from CREATE INDEX.
     pub fn access_method(&self) -> &str {
         &self.access_method

@@ -135,6 +135,7 @@ impl InsertStatement {
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.table_binding(&mut self.target);
         for entry in &mut self.with {
             entry.walk(visitor)?;
         }

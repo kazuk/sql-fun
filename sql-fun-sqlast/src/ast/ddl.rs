@@ -2,6 +2,7 @@
 
 mod alter_index;
 mod column_attributes;
+mod table_rename;
 
 #[path = "deparse/ddl.rs"]
 mod sql_emission;
@@ -94,6 +95,9 @@ impl super::AlterRelation {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if self.kind.supports_table_column_attributes() && self.has_table_rename() {
+            return self.resolve_table_rename(context, source);
+        }
         if self.kind.supports_table_column_attributes() && self.has_column_attributes() {
             return self.resolve_column_attributes(context, source);
         }

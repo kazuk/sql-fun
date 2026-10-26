@@ -28,6 +28,37 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    pub(crate) fn same_signatures(&self, other: &Self) -> bool {
+        self.overloads == other.overloads
+    }
+    pub(crate) fn renamed_row_properties(
+        &self,
+        context: &impl BaseParseContext,
+        name: &FullName,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Vec<((FullName, OverloadVariant), bool)> {
+        self.overloads
+            .iter()
+            .map(|signature| {
+                let preserves = context.function_preserves_view_rows(name, signature);
+                let mut renamed = signature.clone();
+                renamed.rename_relation(old, new);
+                ((name.clone(), renamed), preserves)
+            })
+            .collect()
+    }
+
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        for overload in &mut self.overloads {
+            overload.rename_relation(old, new);
+        }
+    }
+
     pub(crate) fn view_row_properties(
         &self,
         name: &FullName,

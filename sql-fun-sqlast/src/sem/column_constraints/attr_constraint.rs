@@ -15,6 +15,10 @@ pub struct AttrDeferrabilityColumnConstraint {
 }
 
 impl AttrDeferrabilityColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// create instance
     pub fn new(table_name: &TableName, column_name: &ColumnName, deferrable: bool) -> Self {
         Self {
@@ -90,6 +94,10 @@ pub struct AttrDeferredColumnConstraint {
 }
 
 impl AttrDeferredColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// create instance
     pub fn new(table_name: &TableName, column_name: &ColumnName) -> Self {
         Self {
@@ -160,6 +168,10 @@ pub struct AttrImmediateColumnConstraint {
 }
 
 impl AttrImmediateColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// create instance
     pub fn new(table_name: &TableName, column_name: &ColumnName) -> Self {
         Self {

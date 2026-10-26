@@ -30,6 +30,22 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    fn rename_expressions(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        for column in &mut self.0 {
+            column.rename_expressions(visitor)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        for column in &mut self.0 {
+            column.rename_relation(old, new);
+        }
+    }
+
     pub(crate) fn column_at(&self, index: usize) -> Option<&ColumnDefinition> {
         self.0.get(index)
     }
@@ -282,6 +298,34 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    pub(crate) fn rename_expressions(
+        &mut self,
+        old: &TableName,
+        new: &TableName,
+    ) -> Result<(), AnalysisError> {
+        self.columns
+            .rename_expressions(&mut crate::sem::traversal::RelationRenamer::new(old, new))
+    }
+
+    /// Applied ALTER statements in source order, retaining their original bindings and spans.
+    pub fn alter_statements(&self) -> &[AlterTable] {
+        &self.alter_statements
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.columns.rename_relation(old, new);
+        self.rules.rename_relation(old, new);
+        for constraint in self.constraints.values_mut() {
+            constraint.rename_relation(old, new);
+        }
+    }
+
+    fn rename_identity(&mut self, new: &TableName) {
+        let old = self.name.clone();
+        self.rename_relation(&old, new);
+        self.name = new.clone();
+    }
+
     /// Rule links owned by this relation; resolve against the effective context.
     pub const fn rules(&self) -> &RuleReferences {
         &self.rules
@@ -464,9 +508,7 @@ impl CreateTable {
                 AlterObjSubCommand::ClusterOn(index_name) => {
                     self.cluster_on = Some(index_name.clone())
                 }
-                AlterObjSubCommand::RenameTo(_) => {
-                    todo!()
-                }
+                AlterObjSubCommand::RenameTo(name) => self.rename_identity(name),
                 AlterObjSubCommand::AddColumn(_) => {
                     todo!()
                 }

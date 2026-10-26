@@ -16,6 +16,14 @@ pub struct ImplicitCastExpr {
 }
 
 impl ImplicitCastExpr {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.cast_target.rename_relation(old, new);
+    }
+
     pub(crate) fn projection_operand(&self) -> (&SemScalarExpr, &TypeReference) {
         (&self.value, &self.cast_target)
     }
@@ -49,6 +57,15 @@ pub struct TypeCastExpr {
 }
 
 impl TypeCastExpr {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.target_type.rename_relation(old, new);
+        self.resolution.rename_relation(old, new);
+    }
+
     pub(crate) fn projection_operand(&self) -> (&SemScalarExpr, &TypeReference) {
         (&self.arg, &self.target_type)
     }

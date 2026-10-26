@@ -40,6 +40,25 @@ impl ColumnAttributes {
 }
 
 impl ColumnDefinition {
+    pub(super) fn rename_expressions(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for constraint in &mut self.constraints {
+            constraint.rename_expression(visitor)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        for constraint in &mut self.constraints {
+            constraint.rename_relation(old, new);
+        }
+        if let Some(ty) = &mut self.type_ref {
+            ty.rename_relation(old, new);
+        }
+    }
+
     /// Explicit statistics target; None uses PostgreSQL's configured default.
     pub const fn statistics_target(&self) -> Option<i32> {
         self.attributes.statistics_target

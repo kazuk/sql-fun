@@ -800,3 +800,22 @@ With the `sqlite` feature, SQLite uses `database.table_or_alias.column`, where
 Identifiers are matched with SQLite's ASCII case-insensitive rules. PostgreSQL's
 four-component column form is invalid in SQLite. These column-reference rules
 do not extend support for schema- or database-qualified `*` expansion.
+
+## Table renames in schema files
+
+`ALTER TABLE … RENAME TO …` updates the analysis catalog for later statements
+in explicitly supplied schema files. The new name stays in the resolved table's
+schema; table, column, and result metadata remain available through the new name.
+Previously analyzed views and resolved dependencies follow the renamed table.
+Independent index and sequence names keep their existing names. The old table
+name becomes available for a new declaration.
+
+Analysis retains rejected renames and their diagnostics without changing the
+catalog. PostgreSQL `IF EXISTS` skips an absent table. SQLite support requires the
+`sqlite` feature and uses its case-insensitive identifier rules.
+
+Two existing analysis limitations are tracked separately: unqualified foreign-key
+references lack canonical target bindings and do not follow table renames
+([#810](https://github.com/kazuk/sql-fun/issues/810)), and explicit SQLite
+`legacy_alter_table`/`foreign_keys` PRAGMA changes are not yet modeled for rename
+propagation ([#811](https://github.com/kazuk/sql-fun/issues/811)).

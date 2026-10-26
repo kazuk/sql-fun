@@ -159,6 +159,11 @@ pub struct ForeignKeyColumnConstraint {
 }
 
 impl ForeignKeyColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+        self.primary_key_table.rename_reference(old, new);
+    }
+
     /// create instance
     #[expect(clippy::too_many_arguments)]
     pub fn new(

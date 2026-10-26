@@ -46,6 +46,24 @@ pub struct BuiltinTypeDefinition {
 }
 
 impl TypeDefinition {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        match self {
+            Self::Array(value) => value.rename_relation(old, new),
+            Self::CompositeType(value) => value.rename_relation(old, new),
+            Self::Domain(value) => value.rename_relation(old, new),
+            Self::TableRef(table, ty) => {
+                table.rename_reference(old, new);
+                ty.rename_relation(old, new);
+            }
+            Self::ImplicitComposite(columns) => columns.rename_relation(old, new),
+            Self::Enum(_) | Self::Builtin(_) => {}
+        }
+    }
+
     pub(crate) fn implicit_composite(columns: &ColumnCollection) -> Self {
         Self::ImplicitComposite(columns.clone())
     }

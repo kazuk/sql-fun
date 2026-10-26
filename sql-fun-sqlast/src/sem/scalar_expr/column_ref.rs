@@ -86,6 +86,18 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(in crate::sem) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        match self {
+            Self::TableColumn(value) => value.rename_relation(old, new),
+            Self::SystemColumn(value) => value.rename_relation(old, new),
+            _ => {}
+        }
+    }
+
     /// SQL source spelling retained by a completed projection binding.
     pub(crate) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         match self {

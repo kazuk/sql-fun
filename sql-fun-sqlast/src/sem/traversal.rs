@@ -2,6 +2,8 @@
 use crate::sem::{AnalysisError, SemScalarExpr};
 
 pub(crate) trait SemanticVisitor {
+    fn table_binding(&mut self, _name: &mut crate::sem::TableName) {}
+
     fn relation_identity(&mut self, _name: &crate::sem::FullName) {}
     fn expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
@@ -75,4 +77,27 @@ pub(crate) fn optional<V: SemanticVisitor>(
         value.walk(visitor)?;
     }
     Ok(())
+}
+
+/// Rebind exact analyzed identities while preserving SQL aliases and spelling.
+pub(crate) struct RelationRenamer<'a> {
+    old: &'a crate::sem::TableName,
+    new: &'a crate::sem::TableName,
+}
+impl<'a> RelationRenamer<'a> {
+    pub(crate) const fn new(
+        old: &'a crate::sem::TableName,
+        new: &'a crate::sem::TableName,
+    ) -> Self {
+        Self { old, new }
+    }
+}
+impl SemanticVisitor for RelationRenamer<'_> {
+    fn table_binding(&mut self, name: &mut crate::sem::TableName) {
+        name.rename_reference(self.old, self.new);
+    }
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        expression.rename_bound_relation(self.old, self.new);
+        Ok(())
+    }
 }

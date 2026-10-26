@@ -38,6 +38,14 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        match self {
+            Self::PrimaryKey(value) => value.rename_relation(old, new),
+            Self::Unique(value) => value.rename_relation(old, new),
+            Self::Foreign(value) => value.rename_relation(old, new),
+        }
+    }
+
     pub(crate) fn unique_key_columns(&self) -> Vec<crate::sem::ColumnName> {
         match self {
             Self::PrimaryKey(key) => key.keys().to_vec(),

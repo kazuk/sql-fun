@@ -133,6 +133,7 @@ impl DeleteStatement {
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.table_binding(&mut self.target);
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }

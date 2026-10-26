@@ -22,6 +22,20 @@ pub struct CreateFunction {
 }
 
 impl CreateFunction {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> bool {
+        let previous = self.clone();
+        self.overloads.rename_relation(old, new);
+        if let Some(columns) = &mut self.returning_columdef {
+            columns.rename_relation(old, new);
+        }
+        !self.overloads.same_signatures(&previous.overloads)
+            || self.returning_columdef != previous.returning_columdef
+    }
+
     pub(crate) const fn replace(&self) -> bool {
         self.replace
     }

@@ -77,6 +77,28 @@ mod implementation {
         }
     }
     impl FuncCallExpr {
+        pub(crate) fn rename_relation(
+            &mut self,
+            old: &crate::sem::TableName,
+            new: &crate::sem::TableName,
+        ) {
+            self.name_resolution.rename_relation(old, new);
+            if let Some(overload) = &mut self.overload {
+                overload.rename_relation(old, new);
+            }
+            if let Some(candidates) = &mut self.candidates {
+                for candidate in candidates {
+                    candidate.rename_relation(old, new);
+                }
+            }
+            let mut arguments = self.args.to_vec();
+            for argument in &mut arguments {
+                if let Some(definition) = &mut argument.arg_definition {
+                    definition.rename_relation(old, new);
+                }
+            }
+            self.args = arguments.into();
+        }
         pub(crate) fn canonicalize_grouping_key(&mut self) {
             if let Some(name) = self.name_resolution.function_identity() {
                 self.func_name = name.clone();

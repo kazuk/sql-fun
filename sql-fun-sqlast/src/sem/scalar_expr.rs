@@ -197,6 +197,21 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    pub(crate) fn rename_bound_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        match self {
+            Self::ColumnRef(value) => value.rename_relation(old, new),
+            Self::WholeRow(value) => value.rename_relation(old, new),
+            Self::FuncCall(value) => value.rename_relation(old, new),
+            Self::TypeCast(value) => value.rename_relation(old, new),
+            Self::ImplicitCast(value) => value.rename_relation(old, new),
+            _ => {}
+        }
+    }
+
     pub(super) fn grouping_references_resolved(&self) -> bool {
         match self {
             Self::ColumnRef(value) => value.grouping_reference_resolved(),

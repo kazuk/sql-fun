@@ -46,6 +46,16 @@ pub struct FunctionParamVariadic {
     param_type: Option<TypeReference>,
 }
 impl FunctionParamVariadic {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(ty) = &mut self.param_type {
+            ty.rename_relation(old, new);
+        }
+    }
+
     pub fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
         Self {
             name: name.cloned(),

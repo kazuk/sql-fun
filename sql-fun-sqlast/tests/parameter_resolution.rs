@@ -221,3 +221,113 @@ fn nested_queries_retain_solved_parameter_domains(
     }
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::builtin_array("integer[]", "pg_catalog.int4[]")]
+#[case::composite_array("hint_row[]", "public.hint_row[]")]
+fn real_catalog_keeps_explicit_array_input_hints(
+    #[case] hint: &str,
+    #[case] expected: &str,
+) -> testresult::TestResult {
+    use ::sql_fun_sqlast::sem::ParameterTypeHintWrite;
+    // This verifies the public hint API against actual polymorphic equality and
+    // cast metadata; the CLI's named-placeholder lexer accepts identifier hints.
+    let context = heavy::context()?;
+    let mut context = parse_statements(
+        "CREATE TYPE hint_row AS (value integer)",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()?
+    .analyze(context)?
+    .into_context();
+    context.setup_typehinting(&[Some(hint)])?;
+    let sql = format!("SELECT $1 IS DISTINCT FROM NULL::{hint}");
+    let analyzed = parse_statements(&sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    let ty = constraints
+        .parameter(1)
+        .unwrap()
+        .constraint()
+        .single_type()
+        .unwrap();
+    assert_eq!(
+        ty,
+        expected.parse::<::sql_fun_sqlast::sem::TypeReference>()?
+    );
+    assert!(constraints.allows(&BTreeMap::from([(1, ty)])));
+    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::integer("integer[]", "pg_catalog.int4[]")]
+#[case::uuid("uuid[]", "pg_catalog.uuid[]")]
+fn array_hints_resolve_expression_results_without_catalog_search(
+    #[case] hint: &str,
+    #[case] expected: &str,
+) -> testresult::TestResult {
+    use ::sql_fun_sqlast::sem::ParameterTypeHintWrite;
+    // Real equality and array-cast declarations are needed for this public API path.
+    let mut context = heavy::context()?;
+    context.setup_typehinting(&[Some(hint), Some(hint)])?;
+    let analyzed = parse_statements(
+        "SELECT ($1)[1] IS DISTINCT FROM ($2)[1] AS result",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()?
+    .analyze(context)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    for position in [1, 2] {
+        assert_eq!(
+            analyzed
+                .context()
+                .parameter_constraints()
+                .parameter(position)
+                .unwrap()
+                .constraint()
+                .single_type()
+                .unwrap(),
+            expected.parse::<::sql_fun_sqlast::sem::TypeReference>()?
+        );
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::datetime("SELECT age($1), $1 IS DISTINCT FROM $2", "pg_catalog.date")]
+#[case::string_cast("SELECT md5($1)", "pg_catalog.varchar")]
+fn explicit_assignment_inspection_keeps_declared_cast_sources(
+    #[case] sql: &str,
+    #[case] source: &str,
+) -> testresult::TestResult {
+    // Actual overload declarations and declared casts are the contract here.
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(heavy::context()?)?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .all(|problem| problem.code() != "parameter_constraint")
+    );
+    let constraints = analyzed.context().parameter_constraints().clone();
+    drop(analyzed);
+    assert!(constraints.allows(&BTreeMap::from([(1, source.parse()?)])));
+    Ok(())
+}

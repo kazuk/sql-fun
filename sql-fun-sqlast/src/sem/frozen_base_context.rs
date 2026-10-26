@@ -187,6 +187,13 @@ macro_rules! forward_catalog_reads {
             ) -> Option<crate::sem::CastDefinition> {
                 crate::sem::CastInfoRead::get_assignment_cast(self.$catalog(), source, target)
             }
+            fn declared_implicit_cast_sources(
+                &self,
+                target: &crate::sem::TypeReference,
+            ) -> std::collections::HashSet<crate::sem::TypeReference> {
+                crate::sem::CastInfoRead::declared_implicit_cast_sources(self.$catalog(), target)
+            }
+
             fn cast_sources(
                 &self,
                 target: &crate::sem::TypeReference,

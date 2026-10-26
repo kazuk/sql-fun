@@ -1,5 +1,6 @@
 //! SQL-derived parameter domains and correlated overload alternatives.
 
+mod call;
 mod common_type;
 mod structural;
 
@@ -137,7 +138,9 @@ impl ParameterConstraint {
     pub const fn position(&self) -> u32 {
         self.position
     }
-    /// Admissible input domain, independent of parameter hints and Rust mapping.
+    /// Assigned or inferred input candidates. Unhinted overloads can expose
+    /// bounded defaults; use [`ParameterConstraints::allows`] to validate an
+    /// explicit assignment against the complete correlated SQL constraints.
     pub const fn constraint(&self) -> &InputTypeConstraint {
         &self.constraint
     }
@@ -145,9 +148,10 @@ impl ParameterConstraint {
 
 /// Statement-wide input constraints, including relationships between overloads.
 ///
-/// These are admissible assignments for explicitly typed inputs, not the single
-/// parameter signature selected by PostgreSQL's untyped `PREPARE`. Analysis does
-/// not select a final wire-protocol parameter binding from this domain.
+/// Domains summarize SQL-derived input candidates, with bounded defaults for
+/// unhinted overloads. [`Self::allows`] checks explicitly supplied types against
+/// the complete SQL constraints. Analysis does not select the single parameter
+/// signature chosen by PostgreSQL's untyped `PREPARE`.
 #[derive(Clone, Debug, Default)]
 pub struct ParameterConstraints {
     parameters: Vec<ParameterConstraint>,
@@ -224,6 +228,16 @@ impl SignatureAlternative {
         Self {
             domains: domains.to_vec(),
             excluded: excluded.to_vec(),
+        }
+    }
+
+    fn permits_result(&self, result: &InputTypeConstraint) -> bool {
+        if let Some(domain) = self.domains.last()
+            && let Some(types) = domain.admissible_types()
+        {
+            types.iter().any(|ty| result.allows(ty))
+        } else {
+            true
         }
     }
 
@@ -311,9 +325,20 @@ pub(crate) struct ConstraintGraph {
     common_types: Vec<CommonTypeConstraint>,
     common_problems: Vec<crate::sem::problem::MinMaxProblem>,
     common_facts: Option<Arc<CommonTypeFacts>>,
+    calls: Vec<call::CallConstraint>,
+    unsupported_inference: Vec<String>,
+    inspection: Option<Arc<Self>>,
 }
 
 impl ConstraintGraph {
+    // A subsequent collection pass must extend SQL constraints, never defaults
+    // or alternatives eliminated by a previous inference attempt.
+    fn resume_collection(&mut self) {
+        if let Some(original) = self.inspection.take() {
+            *self = (*original).clone();
+        }
+    }
+
     fn parameter_constraints(&self) -> Vec<ParameterConstraint> {
         self.parameters
             .iter()
@@ -322,7 +347,7 @@ impl ConstraintGraph {
     }
 
     fn accepts(&self, types: &BTreeMap<u32, TypeReference>) -> bool {
-        let mut graph = self.clone();
+        let mut graph = self.inspection.as_deref().unwrap_or(self).clone();
         for (position, ty) in types {
             let Some(node) = graph.parameters.get(position).copied() else {
                 return false;
@@ -337,16 +362,18 @@ impl ConstraintGraph {
             };
             graph.domains[node].intersect(&InputTypeConstraint::exact(&supplied));
         }
-        graph.satisfiable()
+        graph.satisfiable() && graph.unsupported_inference.is_empty()
     }
 
     pub(crate) fn node(&mut self, domain: &InputTypeConstraint) -> usize {
+        self.resume_collection();
         let node = self.domains.len();
         self.domains.push(domain.clone());
         node
     }
 
     pub(crate) fn parameter(&mut self, position: u32) -> usize {
+        self.resume_collection();
         if let Some(node) = self.parameters.get(&position) {
             return *node;
         }
@@ -360,10 +387,12 @@ impl ConstraintGraph {
     }
 
     pub(crate) fn equal(&mut self, left: usize, right: usize) {
+        self.resume_collection();
         self.equalities.push((left, right));
     }
 
     pub(crate) fn restrict(&mut self, node: usize, domain: &InputTypeConstraint) {
+        self.resume_collection();
         self.requirements
             .push(format!("input node {node}: {domain:?}"));
         self.domains[node].intersect(domain);
@@ -375,8 +404,51 @@ impl ConstraintGraph {
         alternatives: &[SignatureAlternative],
         context: &str,
     ) {
+        self.resume_collection();
         self.overloads
             .push(OverloadConstraint::new(nodes, alternatives, context));
+    }
+
+    pub(crate) fn call(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        nodes: &[usize],
+        signatures: &[crate::sem::parameter_resolution::Signature],
+        operation: &str,
+    ) {
+        self.resume_collection();
+        let inputs: Vec<_> = nodes[..nodes.len() - 1]
+            .iter()
+            .map(|node| self.domain(*node).clone())
+            .collect();
+        // Parameter nodes retain their semantic origin across repeated uses
+        // and derived-column aliases; expression results have distinct nodes.
+        let parameters: Vec<_> = nodes[..nodes.len() - 1]
+            .iter()
+            .map(|node| self.parameters.values().any(|parameter| parameter == node))
+            .collect();
+        self.calls.push(call::CallConstraint::prepare(
+            context,
+            nodes,
+            signatures,
+            &inputs,
+            operation,
+            &parameters,
+        ));
+    }
+
+    fn instantiate_calls(&mut self, defaults: bool) -> bool {
+        let mut changed = false;
+        let mut deferred = Vec::new();
+        for relation in std::mem::take(&mut self.calls) {
+            if relation.instantiate(self, defaults) {
+                changed = true;
+            } else {
+                deferred.push(relation);
+            }
+        }
+        self.calls = deferred;
+        changed
     }
 
     pub(crate) fn common_type(
@@ -386,6 +458,7 @@ impl ConstraintGraph {
         comparison: bool,
         operation: &str,
     ) -> usize {
+        self.resume_collection();
         if self.common_facts.is_none() {
             self.common_facts = Some(Arc::new(CommonTypeFacts::prepare(context)));
         }
@@ -397,11 +470,13 @@ impl ConstraintGraph {
     }
 
     pub(crate) fn project(&mut self, source: usize, result: usize, projection: TypeProjection) {
+        self.resume_collection();
         self.structural
             .push(StructuralConstraint::new(source, result, projection));
     }
 
     pub(crate) fn prepare_projections(&mut self, context: &impl crate::sem::ParseContext) {
+        self.resume_collection();
         if let Some(facts) = &mut self.common_facts {
             let facts = Arc::make_mut(facts);
             for ty in self
@@ -432,6 +507,21 @@ impl ConstraintGraph {
             }
             visited.push(ty);
         }
+        for relation in &mut self.calls {
+            relation.retain(context, visited.iter());
+        }
+    }
+
+    pub(crate) fn report_inference_problems(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for operation in &self.unsupported_inference {
+            context.report_analysis_problem(
+                crate::sem::AnalysisProblem::inference_candidate_space_unsupported(operation),
+            )?;
+        }
+        Ok(())
     }
 
     pub(crate) fn report_projection_problems(
@@ -440,7 +530,7 @@ impl ConstraintGraph {
     ) -> Result<(), crate::sem::AnalysisError> {
         // Inspect each relationship before it can discard an invalid source.
         // A clone preserves the original graph for solving and conflict reporting.
-        let mut diagnostic_graph = self.clone();
+        let mut diagnostic_graph = self.inspection.as_deref().unwrap_or(self).clone();
         diagnostic_graph
             .propagate_with(|relation, domains| relation.report_problem(domains, context))?;
         for problem in diagnostic_graph.common_problems {
@@ -462,7 +552,7 @@ impl ConstraintGraph {
             if self.domains.iter().any(InputTypeConstraint::is_empty) {
                 return Ok(false);
             }
-            let mut changed = false;
+            let mut changed = self.instantiate_calls(false);
             if let Some(facts) = self.common_facts.clone() {
                 let mut deferred = Vec::new();
                 for relation in std::mem::take(&mut self.common_types) {
@@ -505,6 +595,12 @@ impl ConstraintGraph {
         if !self.propagate() {
             return false;
         }
+        if !self.calls.is_empty() {
+            self.instantiate_calls(true);
+            if !self.propagate() {
+                return false;
+            }
+        }
         let branch = self
             .overloads
             .iter()
@@ -526,6 +622,18 @@ impl ConstraintGraph {
     }
 
     pub(crate) fn solve(&mut self) -> Result<(), ParameterConstraintProblem> {
+        self.resume_collection();
+        let original = if self.calls.is_empty() {
+            None
+        } else {
+            Some(Arc::new(self.clone()))
+        };
+        let result = self.solve_domains();
+        self.inspection = original;
+        result
+    }
+
+    fn solve_domains(&mut self) -> Result<(), ParameterConstraintProblem> {
         if self.parameters.contains_key(&0) {
             return Err(ParameterConstraintProblem::new(
                 "parameter positions start at one",
@@ -533,6 +641,9 @@ impl ConstraintGraph {
         }
         if !self.satisfiable() {
             return Err(self.conflict());
+        }
+        if !self.unsupported_inference.is_empty() {
+            return Ok(());
         }
         // Remove globally impossible alternatives, not just locally inconsistent
         // ones. Retained alternatives stay correlated in the public result.

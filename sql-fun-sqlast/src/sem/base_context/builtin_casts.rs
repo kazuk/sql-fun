@@ -82,6 +82,11 @@ impl CastInfoRead for super::BaseContext {
         None
     }
 
+    fn declared_implicit_cast_sources(&self, target: &TypeReference) -> HashSet<TypeReference> {
+        // The implicit branch reads declared builtin casts, never the type catalog.
+        self.cast_sources(target, false)
+    }
+
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
         let mut sources = HashSet::from([target.clone()]);
         for (name, _) in self.casts.iter() {

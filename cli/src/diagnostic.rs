@@ -198,6 +198,12 @@ mod test_implemented_family_rendering {
         "duplicate window definition: named_window",
         false
     )]
+    #[case::inference_candidate_space(
+        AnalysisProblem::inference_candidate_space_unsupported("comparison"),
+        "inference_candidate_space_unsupported",
+        "catalog-wide candidate search",
+        false
+    )]
     #[case::parameter_constraint(
         AnalysisProblem::parameter_constraint("$1 has conflicting requirements"),
         "parameter_constraint",

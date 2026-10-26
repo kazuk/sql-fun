@@ -485,6 +485,28 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Inference would need an unsupported catalog-wide candidate search.\nThis reports an analysis limitation, not invalid SQL.",
+                  "type": "object",
+                  "properties": {
+                    "InferenceCandidateSpaceUnsupported": {
+                      "type": "object",
+                      "properties": {
+                        "operation": {
+                          "description": "SQL operation whose unresolved input requires that search.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "operation"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InferenceCandidateSpaceUnsupported"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Input could not be parsed, realized, hinted, analyzed, or deparsed.",
                   "type": "object",
                   "properties": {
@@ -4160,6 +4182,28 @@
                   },
                   "required": [
                     "ParameterTypeUnresolved"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Inference would need an unsupported catalog-wide candidate search.\nThis reports an analysis limitation, not invalid SQL.",
+                  "type": "object",
+                  "properties": {
+                    "InferenceCandidateSpaceUnsupported": {
+                      "type": "object",
+                      "properties": {
+                        "operation": {
+                          "description": "SQL operation whose unresolved input requires that search.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "operation"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "InferenceCandidateSpaceUnsupported"
                   ],
                   "additionalProperties": false
                 },

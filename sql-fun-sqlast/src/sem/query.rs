@@ -849,13 +849,7 @@ impl ResolvedOperator {
         context: &impl crate::sem::ParseContext,
         name: &OperatorName,
     ) -> Self {
-        let mut binding = Self::resolve(context, name, true, true);
-        if context.parameter_inference_needed()
-            && let Some(operator) = context.get_operator_op(name, true, true)
-        {
-            binding.signatures = operator.comparison_signatures(context);
-        }
-        binding
+        Self::resolve(context, name, true, true)
     }
     /// Name lookup outcome; overload/type selection is a subsequent operation.
     pub const fn resolution(&self) -> &QueryNameResolution {

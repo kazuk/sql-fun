@@ -176,8 +176,9 @@ owns domains, correlated alternatives, and the common propagation graph.
   checking each domain independently can accept incompatible combinations.
   Omitted positions remain unconstrained by that inspection; unknown parameter
   positions are rejected. Inspection does not supply analysis hints.
-- These domains represent admissible explicitly typed inputs, not the single
-  parameter signature inferred by an untyped PostgreSQL `PREPARE`. For example,
+- Domains retain admissible source candidates, with bounded defaults for
+  unhinted overloads as described below, rather than the single parameter
+  signature inferred by an untyped PostgreSQL `PREPARE`. For example,
   `SELECT ARRAY[$1,1]` admits both an `int4` input with an `int4[]` result and an
   `int8` input with an `int8[]` result; an untyped PostgreSQL PREPARE selects
   `int4`. Analysis does not choose a final wire-protocol binding.
@@ -196,6 +197,45 @@ owns domains, correlated alternatives, and the common propagation graph.
   references. When inspecting a previously unknown composite with `allows`,
   supply a dynamic reference containing its definition; a new concrete name
   alone cannot provide its fields. This is not a catalog snapshot API.
+
+### Default candidates and deferred overloads
+
+Overload constraints retain declarations and owned cast ranks in
+`parameter_constraints/call.rs`. Initially unrestricted calls wait for finite
+operand domains from other occurrences, casts, common-type selection, and
+structural projections. A sole concrete declaration supplies SQL type context.
+Finite declaration requirements that cannot accept the defaults (such as
+`age`'s datetime overloads) propagate before any default alternatives.
+Only remaining unseeded parameter-placeholder inputs use the seven built-in
+default bind candidates; graph node identities preserve their semantic origin.
+Candidate order never chooses a binding, and an absent default witness does not
+establish invalid SQL.
+
+Keep `anyarray` declarations deferred. Instantiate comparison signatures from
+observed array types and their conversion targets, preserving concrete overload
+precedence. Retain conversion ranks only for finite declaration/default types
+and types encountered in SQL; inspect casts for those specific sources or
+targets. Do not call `type_references()` or cache the catalog's type/cast
+universe as deferred-overload inference preprocessing.
+
+An unresolved non-placeholder expression must not inherit placeholder defaults.
+When its polymorphic relationship would require an unbounded type universe,
+report recoverable `inference_candidate_space_unsupported` after propagation.
+Deliver it only after statement finalization, since provisional RETURNING and
+projection solves may acquire type context in a later collection pass.
+Keep its graph nodes and unresolved domains, preserve known result metadata,
+and do not manufacture an empty domain or `parameter_constraint`: unsupported
+inference is not evidence of invalid SQL. Explicit assignments may still resolve
+those nodes through retained relationships.
+
+Unhinted overload domains expose default inference candidates, not a restriction
+on explicitly supplied client types. A solved graph retains its pre-solve SQL
+constraints for `allows`. Explicit
+assignments are checked against those constraints before default witnesses are
+supplied for remaining inputs. Resuming constraint collection restores that
+original graph so earlier default candidates cannot exclude later SQL type
+information. Keep unrestricted, empty, and finite domains distinct; preserve
+correlations and the shared diagnostic boundary.
 
 Diagnostic attribution must follow the available evidence. When independently
 established operand types violate an operation's requirements, report the

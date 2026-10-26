@@ -10,6 +10,12 @@ pub trait CastInfoRead {
     /// casts are included. This does not compose transitive cast paths.
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference>;
 
+    /// Identity and explicitly declared implicit-cast sources for a known target.
+    /// Unlike `cast_sources`, this must not enumerate catalog types to discover
+    /// potential nominal/domain sources. Encountered SQL types are checked
+    /// separately with `get_implicit_cast`.
+    fn declared_implicit_cast_sources(&self, target: &TypeReference) -> HashSet<TypeReference>;
+
     /// Resolve a direct assignment conversion, distinct from explicit coercion.
     fn get_assignment_cast(
         &self,

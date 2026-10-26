@@ -7,10 +7,17 @@ use crate::sem::{
 
 impl RoleInfoRead for SchemaCatalog {
     fn role_by_name(&self, name: &str) -> Option<&Role> {
+        if let Some(role) = self.registered_role_by_name(name) {
+            Some(role)
+        } else {
+            self.configured_roles.role(name)
+        }
+    }
+    fn registered_role_by_name(&self, name: &str) -> Option<&Role> {
         if let Some(role) = self.ownership.role(name) {
             Some(role)
         } else {
-            self.base.role_by_name(name)
+            self.base.registered_role_by_name(name)
         }
     }
 }

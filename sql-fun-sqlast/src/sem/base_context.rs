@@ -27,6 +27,7 @@ use serde::de::DeserializeOwned;
 /// Builtin schema information initialized from the selected metadata.
 #[derive(Debug)]
 pub struct BaseContext {
+    configured_roles: crate::sem::ownership::ConfiguredRoles,
     context_args: SqlFunArgs,
     metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
@@ -89,6 +90,7 @@ impl BaseContext {
 
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
         Ok(Self {
+            configured_roles: metadata.into(),
             context_args: context_args.clone(),
             metadata: metadata.clone(),
             functions,
@@ -385,7 +387,15 @@ impl crate::sem::ViewMergeInfoRead for BaseContext {
     }
 }
 
-impl crate::sem::RoleInfoRead for BaseContext {}
+impl crate::sem::RoleInfoRead for BaseContext {
+    fn registered_role_by_name(&self, _name: &str) -> Option<&crate::sem::Role> {
+        None
+    }
+
+    fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
+        self.configured_roles.role(name)
+    }
+}
 impl crate::sem::OwnershipInfoRead for BaseContext {
     fn routine_definitions(&self, name: &FullName) -> Vec<crate::sem::CreateFunction> {
         self.get_function_impl(name)

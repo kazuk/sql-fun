@@ -159,6 +159,7 @@ connector = 'orders-connector'
             self.home(),
             &"17".parse().unwrap(),
             &["public".to_owned()],
+            None,
         )
         .unwrap()
     }
@@ -178,7 +179,7 @@ connector = 'orders-connector'
         self.home().join("postgres/17/schema.sql")
     }
     pub(super) fn builtin_key(&self) -> super::SchemaContextKey {
-        super::SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()])
+        super::SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None)
             .layer(
                 &Self::hash(&self.builtin_sql()),
                 &self.builtin_sql().canonicalize().unwrap(),
@@ -205,8 +206,9 @@ impl SchemaProject {
         let home = self.home().to_path_buf();
         let version = "17".parse().unwrap();
         let search_path = vec!["public".to_owned()];
-        let key = super::SchemaContextKey::root(&version, &search_path);
-        let root = SchemaCacheService::load_root(&home, &version, &search_path, &key).unwrap();
+        let key = super::SchemaContextKey::root(&version, &search_path, None);
+        let root =
+            SchemaCacheService::load_root(&home, &version, &search_path, None, &key).unwrap();
         let (resume, resumed) = ::tokio::sync::oneshot::channel();
         let (ready, started) = ::tokio::sync::oneshot::channel();
         let task_api = std::sync::Arc::clone(api);
@@ -290,5 +292,49 @@ impl SchemaProject {
             &args,
             &metadata,
         )
+    }
+}
+
+impl SchemaProject {
+    pub(super) fn configure_roles(&self, datasource: &str, declaration: &str) {
+        let path = self.home().join("Cargo.toml");
+        let source = std::fs::read_to_string(&path).unwrap();
+        let header = format!("[package.metadata.database.{datasource}]\n");
+        let start = source.find(&header).unwrap() + header.len();
+        // Role arrays contain '[' too; find the next table header by its line prefix.
+        let end = source[start..]
+            .find("\n[")
+            .map_or(source.len(), |offset| start + offset + 1);
+        let body = source[start..end]
+            .lines()
+            .filter(|line| !line.starts_with("roles ="))
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(
+            path,
+            format!(
+                "{}{}\n{}\n{}",
+                &source[..start],
+                body,
+                declaration,
+                &source[end..]
+            ),
+        )
+        .unwrap();
+    }
+
+    pub(super) fn apply_sql(
+        context: ::sql_fun_sqlast::sem::SchemaFileContext,
+        sql: &str,
+    ) -> ::sql_fun_sqlast::AstAndContextPair<::sql_fun_sqlast::sem::SchemaFileContext> {
+        use ::sql_fun_sqlast::sem::{MutSourcePathWithSpan, SemAst, SourcePathWithSpan};
+        let mut context = context;
+        context.set_source_path_with_span(&SourcePathWithSpan::new(
+            Path::new("roles.sql"),
+            &::sql_fun_sqlast::StringSpan::new(0, sql.len()),
+        ));
+        let syntax = ::sql_fun_sqlast::PostgresDialect::parse(sql).unwrap();
+        let tokens = ::sql_fun_sqlast::PostgresDialect::scan(sql).unwrap();
+        SemAst::semantic_analysis(context, syntax, &tokens).unwrap()
     }
 }

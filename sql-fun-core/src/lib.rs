@@ -94,8 +94,8 @@ pub use self::{
     highlighter::TerminalColor,
     lookup_result::LookupResult,
     metadata::{
-        InitializationDatasources, MetadataError, PostgresEngineVersion, SqlFunMetadata,
-        SqlFunMetadataCollection,
+        InitializationDatasources, MetadataError, PostgresEngineVersion, RoleInventory,
+        SqlFunMetadata, SqlFunMetadataCollection,
     },
     postgres_version::{PostgresVersion, PostgresVersionInventory},
     rewrite_options::RewriteOptions,

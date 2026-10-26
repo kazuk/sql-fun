@@ -319,6 +319,38 @@ impl DatabaseEngine {
     }
 }
 
+/// Validated exact catalog role names, ordered independently of input order.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RoleInventory(std::collections::BTreeSet<String>);
+
+impl<'de> serde::Deserialize<'de> for RoleInventory {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let names = <Vec<String> as serde::Deserialize>::deserialize(deserializer)?;
+        let mut result = std::collections::BTreeSet::new();
+        for name in names {
+            if name.is_empty() || name.contains('\0') {
+                return Err(serde::de::Error::custom(
+                    "roles require nonempty names without NUL",
+                ));
+            }
+            if !result.insert(name.clone()) {
+                return Err(serde::de::Error::custom(format!(
+                    "duplicate role name: {name}"
+                )));
+            }
+        }
+        Ok(Self(result))
+    }
+}
+
+impl RoleInventory {
+    /// Convert exact names into the consumer's role definitions.
+    #[must_use]
+    pub fn definitions<T: for<'a> From<&'a str>>(&self) -> Vec<T> {
+        self.0.iter().map(|name| T::from(name.as_str())).collect()
+    }
+}
+
 /// `sql-fun` metadata structures
 ///
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -353,6 +385,9 @@ pub struct SqlFunMetadata {
         deserialize_with = "SqlFunMetadata::deserialize_database_name"
     )]
     database_name: Option<String>,
+
+    /// Explicit exact-name role inventory for offline ownership analysis.
+    roles: Option<RoleInventory>,
 
     /// Schema search path
     search_path: Option<Vec<String>>,
@@ -421,6 +456,12 @@ impl SqlFunMetadata {
             ));
         }
         Ok(name)
+    }
+
+    /// Explicit role inventory; omission differs from an explicitly empty list.
+    #[must_use]
+    pub const fn roles(&self) -> Option<&RoleInventory> {
+        self.roles.as_ref()
     }
 
     /// Code generation options configured for this datasource.
@@ -641,5 +682,58 @@ mod test_codegen_metadata {
         ] {
             assert!(metadata_with_codegen_options(input).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod test_role_metadata {
+    use crate::test_helpers::{initialization_choices_project, metadata_with_codegen_options};
+
+    #[rstest::rstest]
+    #[case::omitted("", None)]
+    #[case::empty("roles = []", Some(vec![]))]
+    #[case::exact_names(r#"roles = ['Owner', 'owner', 'a.b', '所有者', 'a"b', ' spaced ']"#,
+        Some(vec![" spaced ", "Owner", "a\"b", "a.b", "owner", "所有者"]))]
+    fn preserves_explicit_inventory(#[case] input: &str, #[case] expected: Option<Vec<&str>>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        let names = selected
+            .roles()
+            .map(super::RoleInventory::definitions::<String>);
+        assert_eq!(
+            names,
+            expected.map(|names| names.into_iter().map(String::from).collect())
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::scalar("roles = 'owner'")]
+    #[case::table("roles = { owner = true }")]
+    #[case::number("roles = [42]")]
+    #[case::empty_name("roles = ['']")]
+    #[case::nul(r#"roles = ["bad\u0000name"]"#)]
+    #[case::duplicate("roles = ['owner', 'owner']")]
+    fn rejects_invalid_inventory_in_both_loaders(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
+        let project = initialization_choices_project(&format!(
+            "[package.metadata.database.app]\nengine = 'PostgreSQL'\ndialect = 'postgres'\n{input}"
+        ));
+        let declarations =
+            super::InitializationDatasources::load_from(&project.path().join("Cargo.toml"))
+                .unwrap();
+        assert!(declarations.selected_metadata("app").is_err());
+    }
+
+    #[test]
+    fn selected_loader_does_not_decode_unselected_role_inventory() {
+        let project = initialization_choices_project(
+            "[package.metadata.database.app]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nroles = ['owner']\n[package.metadata.database.other]\nroles = 42",
+        );
+        let declarations =
+            super::InitializationDatasources::load_from(&project.path().join("Cargo.toml"))
+                .unwrap();
+        let selected = declarations.selected_metadata("app").unwrap();
+        assert_eq!(selected.roles().unwrap().definitions::<String>(), ["owner"]);
+        assert!(declarations.selected_metadata("other").is_err());
     }
 }

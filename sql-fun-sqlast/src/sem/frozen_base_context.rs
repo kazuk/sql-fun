@@ -161,6 +161,9 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::RoleInfoRead for $context {
+            fn registered_role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
+                crate::sem::RoleInfoRead::registered_role_by_name(self.$catalog(), name)
+            }
             fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
                 crate::sem::RoleInfoRead::role_by_name(self.$catalog(), name)
             }

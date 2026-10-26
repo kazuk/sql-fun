@@ -97,6 +97,10 @@ version = "$version"
 search_path = ["public"]
 connector = "tokio-postgres"
 METADATA
+    # Optional fixture-owned datasource fields are shared by source/installed checks.
+    if [[ -f "$suite/$fixture.metadata.toml" ]]; then
+      cat "$suite/$fixture.metadata.toml" >>"$metadata"
+    fi
     args=(--term-color never --metadata-file "$metadata" --datasource regression)
     if [[ "$schema" != - ]]; then args+=(--schema-file "$suite/$schema"); fi
     echo "== $fixture PostgreSQL $version ($level), expected $count cases; catalog $SQL_FUN_HOME/postgres/$version"

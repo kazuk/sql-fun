@@ -69,6 +69,7 @@ pub(super) struct SchemaCatalog {
     renamed_types: std::collections::HashSet<FullName>,
     rules: std::collections::HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::sem::ownership::OwnershipCatalog,
+    configured_roles: crate::sem::ownership::ConfiguredRoles,
     base: FrozenBaseContext,
     triggers:
         std::collections::HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
@@ -132,6 +133,7 @@ impl SchemaFileContext {
                 renamed_types: std::collections::HashSet::new(),
                 rules: std::collections::HashMap::new(),
                 ownership: Default::default(),
+                configured_roles: metadata.into(),
                 base: base.clone(),
                 triggers: std::collections::HashMap::new(),
                 args: args.clone(),

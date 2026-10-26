@@ -18,12 +18,20 @@ use std::{
 pub struct SchemaContextKey(String);
 
 impl SchemaContextKey {
-    fn root(version: &PostgresEngineVersion, search_path: &[String]) -> Self {
+    fn root(
+        version: &PostgresEngineVersion,
+        search_path: &[String],
+        roles: Option<&::sql_fun_core::RoleInventory>,
+    ) -> Self {
         let mut hasher = Hasher::new();
         hasher.append_str(&SqlDialect::PostgreSQL.to_string());
         hasher.append_str(&version.to_string());
         hasher
             .append_str(&::serde_json::to_string(search_path).expect("string array serialization"));
+        if let Some(roles) = roles {
+            hasher
+                .append_str(&::serde_json::to_string(roles).expect("role inventory serialization"));
+        }
         Self(hasher.finish())
     }
 
@@ -145,6 +153,7 @@ impl SchemaLoadError {
 pub struct SchemaSelection {
     version: PostgresEngineVersion,
     search_path: Vec<String>,
+    roles: Option<::sql_fun_core::RoleInventory>,
     extensions: Vec<PathBuf>,
     dump: Option<PathBuf>,
     expected_hash: Option<String>,
@@ -225,6 +234,7 @@ impl SchemaSelection {
             search_path: args
                 .postgres_search_path(metadata)
                 .map_err(|e| SchemaLoadError::source(&e))?,
+            roles: metadata.roles().cloned(),
             extensions: extensions.to_vec(),
             dump: dump.map(Path::to_path_buf),
             expected_hash: expected_hash.map(str::to_owned),
@@ -335,23 +345,13 @@ impl SchemaCacheService {
         &self,
         selection: &SchemaSelection,
     ) -> Result<InitializedSchema, SchemaLoadError> {
-        let (args, metadata) =
-            Self::schema_environment(&self.home, &selection.version, &selection.search_path)?;
-        let root_key = SchemaContextKey::root(&selection.version, &selection.search_path);
-        let home = self.home.clone();
-        let version = selection.version.clone();
-        let search_path = selection.search_path.clone();
-        let key = root_key.clone();
-        let mut layer = self
-            .roots
-            .load(&root_key, move || async move {
-                ::tokio::task::spawn_blocking(move || {
-                    Self::load_root(&home, &version, &search_path, &key)
-                })
-                .await
-                .expect("builtin loader panicked")
-            })
-            .await?;
+        let (args, metadata) = Self::schema_environment(
+            &self.home,
+            &selection.version,
+            &selection.search_path,
+            selection.roles.as_ref(),
+        )?;
+        let mut layer = self.selected_root(selection).await?;
         if !selection.level.includes_default() {
             return Self::prefix(layer);
         }
@@ -398,6 +398,31 @@ impl SchemaCacheService {
         })
     }
 
+    async fn selected_root(
+        &self,
+        selection: &SchemaSelection,
+    ) -> Result<LoadedLayer, SchemaLoadError> {
+        let root_key = SchemaContextKey::root(
+            &selection.version,
+            &selection.search_path,
+            selection.roles.as_ref(),
+        );
+        let home = self.home.clone();
+        let version = selection.version.clone();
+        let search_path = selection.search_path.clone();
+        let roles = selection.roles.clone();
+        let key = root_key.clone();
+        self.roots
+            .load(&root_key, move || async move {
+                ::tokio::task::spawn_blocking(move || {
+                    Self::load_root(&home, &version, &search_path, roles.as_ref(), &key)
+                })
+                .await
+                .expect("builtin loader panicked")
+            })
+            .await
+    }
+
     fn prefix(layer: LoadedLayer) -> Result<InitializedSchema, SchemaLoadError> {
         let analysis = Arc::clone(Self::successful(&layer.outcome)?);
         Ok(InitializedSchema {
@@ -418,11 +443,12 @@ impl SchemaCacheService {
         home: &Path,
         version: &PostgresEngineVersion,
         search_path: &[String],
+        roles: Option<&::sql_fun_core::RoleInventory>,
     ) -> Result<(SqlFunArgs, SqlFunMetadata), SchemaLoadError> {
-        // Only schema-relevant inputs enter the shared root. No datasource config
-        // or ambient environment is retained by the shared builtin catalog.
+        // Only schema-relevant inputs enter the shared root, including role identities
+        // used by schema DDL. No other datasource config or ambient values are retained.
         let metadata: SqlFunMetadata = ::serde_json::from_value(::serde_json::json!({
-            "engine": "PostgreSQL", "dialect": "postgres", "version": version.to_string(), "search_path": search_path,
+            "engine": "PostgreSQL", "dialect": "postgres", "version": version.to_string(), "search_path": search_path, "roles": roles,
         })).map_err(|e| SchemaLoadError::source(&e))?;
         let args = SqlFunArgs::builder(&HashMap::new())
             .map_err(|e| SchemaLoadError::source(&e))?
@@ -439,9 +465,10 @@ impl SchemaCacheService {
         home: &Path,
         version: &PostgresEngineVersion,
         search_path: &[String],
+        roles: Option<&::sql_fun_core::RoleInventory>,
         key: &SchemaContextKey,
     ) -> Result<LoadedLayer, SchemaLoadError> {
-        let (args, metadata) = Self::schema_environment(home, version, search_path)?;
+        let (args, metadata) = Self::schema_environment(home, version, search_path, roles)?;
         let base = BaseContext::new(&args, &metadata).map_err(|e| SchemaLoadError::source(&e))?;
         Ok(LoadedLayer {
             key: key.clone(),

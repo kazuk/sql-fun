@@ -162,3 +162,11 @@ qualified FK consumers, sequence/index links, and SQLite identity/oracle checks.
 Unqualified FK binding loss and explicit SQLite legacy-PRAGMA propagation are
 tracked independently in #810 and #811; this suite does not claim those existing
 limitations are repaired.
+
+Issue #613 adds project role inventory fixtures on PostgreSQL 17/18. The optional
+`<fixture>.metadata.toml` file appends datasource fields to that fixture's explicitly
+selected regression metadata. `project-roles` supplies exact role names;
+`project-roles-empty` explicitly supplies an empty list, while
+`project-roles-omitted` has no role configuration. All three run through the
+shared source and installed checks. Rust tests retain owner bindings, catalog
+application, current-configuration isolation, and cache identity assertions.

@@ -1,4 +1,4 @@
-use crate::sem::{ColumnDefinition, ColumnName, FullName};
+use crate::sem::{ColumnDefinition, ColumnName};
 
 /// INSTEAD OF row-trigger events available on a MERGE view target.
 #[derive(
@@ -100,17 +100,6 @@ impl ViewMergeSupport {
             .iter()
             .find(|column| column.name().as_ref() == Some(name))
     }
-}
-
-/// Catalog service for MERGE view targets. The name is already bound and
-/// qualified; this is not a second search-path lookup.
-pub trait ViewMergeInfoRead {
-    /// Return explicit MERGE eligibility and action-column metadata.
-    ///
-    /// Implementations must account for view updatability, rules and
-    /// action-specific INSTEAD OF triggers. Missing metadata must remain
-    /// explicitly unimplemented rather than being interpreted as success.
-    fn view_merge_support(&self, view: &FullName) -> ViewMergeSupport;
 }
 
 #[cfg(test)]

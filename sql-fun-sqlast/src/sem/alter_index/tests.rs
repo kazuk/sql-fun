@@ -450,11 +450,8 @@ mod test_helpers {
     use crate::{
         AstAndContextPair,
         ast::{StatementNode, TryFromWithTokens},
-        context::IndexInfoRead,
-        sem::{
-            AnalysisError, CreateIndex, FrozenBaseContext, FullName, MutSourcePathWithSpan,
-            SchemaFileContext,
-        },
+        context::{IndexInfoRead, MutSourcePathWithSpan},
+        sem::{AnalysisError, CreateIndex, FrozenBaseContext, FullName, SchemaFileContext},
     };
     pub(super) fn deduplicate(index: &CreateIndex) -> Option<bool> {
         match index.storage_parameter("deduplicate_items") {

@@ -5,9 +5,10 @@ use crate::SqliteToken;
 
 use crate::{
     ast::TryFromWithTokens,
+    context::GetSourcePathWithSpan,
     sem::{
-        AstAndContextPair, ColumnDefinition, ColumnName, Constraint, GetSourcePathWithSpan,
-        SemScalarExpr, SourcePathWithSpan, ViewName,
+        AstAndContextPair, ColumnDefinition, ColumnName, Constraint, SemScalarExpr,
+        SourcePathWithSpan, ViewName,
     },
     syn::{AlterTableType, ScanToken},
 };

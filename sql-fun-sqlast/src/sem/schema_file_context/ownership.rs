@@ -1,9 +1,12 @@
 use super::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead},
+    context::{
+        OwnershipInfoRead, RoleInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
+        ViewInfoRead,
+    },
     sem::{
         AlterOwner, AnalysisError, CreateFunction, CreateSchema, FullName, ObjectKind,
-        OwnedObjectDefinition, OwnershipInfoRead, Role, RoleInfoRead,
+        OwnedObjectDefinition, Role,
     },
 };
 

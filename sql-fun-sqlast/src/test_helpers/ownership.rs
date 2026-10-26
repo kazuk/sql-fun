@@ -1,11 +1,8 @@
 //! Explicit catalog fixtures for ownership semantics.
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
-    context::ParseContext,
-    sem::{
-        AnalysisError, AstAndContextPair, MutSourcePathWithSpan, Role, SchemaFileContext,
-        SchemaName,
-    },
+    context::{MutSourcePathWithSpan, ParseContext},
+    sem::{AnalysisError, AstAndContextPair, Role, SchemaFileContext, SchemaName},
     test_helpers::{SynBuilder, TestParseContext, schema_layer, source_span},
 };
 

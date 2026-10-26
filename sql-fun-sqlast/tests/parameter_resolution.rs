@@ -232,7 +232,7 @@ fn real_catalog_keeps_explicit_array_input_hints(
     #[case] hint: &str,
     #[case] expected: &str,
 ) -> testresult::TestResult {
-    use ::sql_fun_sqlast::sem::ParameterTypeHintWrite;
+    use ::sql_fun_sqlast::context::ParameterTypeHintWrite;
     // This verifies the public hint API against actual polymorphic equality and
     // cast metadata; the CLI's named-placeholder lexer accepts identifier hints.
     let context = heavy::context()?;
@@ -278,7 +278,7 @@ fn array_hints_resolve_expression_results_without_catalog_search(
     #[case] hint: &str,
     #[case] expected: &str,
 ) -> testresult::TestResult {
-    use ::sql_fun_sqlast::sem::ParameterTypeHintWrite;
+    use ::sql_fun_sqlast::context::ParameterTypeHintWrite;
     // Real equality and array-cast declarations are needed for this public API path.
     let mut context = heavy::context()?;
     context.setup_typehinting(&[Some(hint), Some(hint)])?;

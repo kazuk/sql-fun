@@ -2,7 +2,7 @@ mod destination;
 mod view_support;
 
 pub(crate) use self::destination::MergeDestination;
-pub use self::view_support::{ViewMergeInfoRead, ViewMergeSupport, ViewMergeTriggers};
+pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
 use crate::sem::traversal::SemanticVisitor;
 use crate::sem::{

@@ -9,10 +9,11 @@ use self::test_helpers::{
 
 use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
-    context::{IndexInfoRead, ParseContext, SearchPathRead, TypeInfoRead, ViewInfoRead},
-    sem::{
-        ColumnName, FullName, GetSourcePathWithSpanOpt, PgBuiltInType, TableName, TypeReference,
+    context::{
+        GetSourcePathWithSpanOpt, IndexInfoRead, ParseContext, SearchPathRead, TypeInfoRead,
+        ViewInfoRead,
     },
+    sem::{ColumnName, FullName, PgBuiltInType, TableName, TypeReference},
 };
 
 #[rstest::rstest]

@@ -162,11 +162,11 @@ fn infers_parameters_across_ordered_actions_and_returning() {
 
 mod test_helpers {
     use crate::ast::Dialect;
-    use crate::sem::{
-        AnalysisError, ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType,
-        SchemaName, SemAst,
-    };
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{AnalysisError, ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+    };
     pub(super) fn catalog(version: u32) -> TestParseContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":version.to_string(), "search_path":["public"]})).unwrap();
         let mut context = TestParseContext::default().with_metadata(&metadata);

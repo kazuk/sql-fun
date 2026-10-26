@@ -6,8 +6,8 @@ use crate::context::ViewInfoRead;
 
 use crate::test_helpers::ownership::apply_ownership_sql;
 use crate::{
-    context::{TableInfoRead, TypeInfoRead},
-    sem::{GetSourcePathWithSpan, ObjectInfoRead, ParseContext},
+    context::{GetSourcePathWithSpan, ObjectInfoRead, TableInfoRead, TypeInfoRead},
+    sem::ParseContext,
 };
 
 #[rstest::rstest]
@@ -433,7 +433,7 @@ fn trigger_and_rule_identities_follow_the_owning_table() -> testresult::TestResu
 
 #[test]
 fn ownership_follows_the_table_without_resurrecting_the_old_identity() -> testresult::TestResult {
-    use crate::sem::{ObjectKind, OwnershipInfoRead};
+    use crate::{context::OwnershipInfoRead, sem::ObjectKind};
     let context = apply_ownership_sql(
         test_helpers::table_layer(false)?,
         "ALTER TABLE before_name OWNER TO CURRENT_USER",

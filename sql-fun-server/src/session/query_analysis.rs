@@ -15,12 +15,9 @@ use ::sql_fun_server_api::{
 use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     ast::{Dialect, Statement},
-    context::ParseContext,
+    context::{ParameterTypeHintWrite, ParseContext},
     parse_statements,
-    sem::{
-        AnalysisProblem, ParameterTypeHintWrite, QueryMetadata, SchemaFileContext,
-        TypeReference as SqlType,
-    },
+    sem::{AnalysisProblem, QueryMetadata, SchemaFileContext, TypeReference as SqlType},
 };
 use std::path::{Path, PathBuf};
 

@@ -81,7 +81,7 @@ impl FunctionInfoRead for SchemaCatalog {
     }
 
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
-        let definitions = crate::sem::OwnershipInfoRead::routine_definitions(self, name);
+        let definitions = crate::context::OwnershipInfoRead::routine_definitions(self, name);
         if definitions.is_empty() {
             return None;
         }
@@ -120,7 +120,7 @@ impl FunctionInfoWrite for SchemaFileContext {
         name: &FullName,
         create_function: &CreateFunction,
     ) -> Result<Self, AnalysisError> {
-        let existing = crate::sem::OwnershipInfoRead::routine_definitions(&self, name);
+        let existing = crate::context::OwnershipInfoRead::routine_definitions(&self, name);
         let mut candidates = Vec::new();
         for mut candidate in create_function.split_definitions() {
             if let Some(previous) = candidate.previous_definition(&existing, &candidates) {

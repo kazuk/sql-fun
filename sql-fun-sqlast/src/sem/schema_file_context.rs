@@ -30,13 +30,14 @@ use crate::context::BaseParseContext;
 use crate::{
     StringSpan, TrieMap,
     context::{
-        IndexInfoRead, OperatorInfoRead, ParseContext, SearchPathRead, TableInfoRead, ViewInfoRead,
+        DiagnosticContext, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
+        OperatorInfoRead, ParseContext, SearchPathRead, SourceAccessService, TableInfoRead,
+        ViewInfoRead,
     },
     sem::{
         AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
-        CreateSchema, DiagnosticContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt,
-        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorName,
-        SchemaName, SemScalarExpr, SourceAccessService, TypeReference,
+        CreateSchema, FrozenBaseContext, FullName, ImplicitChange, ObjectKind, OperatorDefinition,
+        OperatorName, SchemaName, SemScalarExpr, TypeReference,
     },
 };
 
@@ -55,10 +56,10 @@ pub struct SchemaFileContext {
     diagnostic_source: Option<String>,
     presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
     problems: Vec<AnalysisProblem>,
-    cursors: crate::sem::CursorBindings,
+    cursors: crate::context::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
-    parameter_type_hints: crate::sem::ParameterTypeHints,
+    parameter_type_hints: crate::context::ParameterTypeHints,
 }
 
 #[derive(Debug)]
@@ -163,7 +164,7 @@ impl SchemaFileContext {
             diagnostic_source: None,
             presentations: Vec::new(),
             problems: Vec::new(),
-            cursors: crate::sem::CursorBindings::default(),
+            cursors: crate::context::CursorBindings::default(),
             analysis_state: crate::sem::AnalysisState::default(),
             parameter_constraints: crate::sem::ParameterConstraints::default(),
             parameter_type_hints: Default::default(),
@@ -633,14 +634,17 @@ impl DiagnosticContext for SchemaFileContext {
 #[cfg(test)]
 mod test_diagnostic_context {
     use crate::StringSpan;
-    use crate::sem::{AnalysisProblem, DiagnosticContext, FullName, ParseContext};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        context::DiagnosticContext,
+        sem::{AnalysisProblem, FullName, ParseContext},
+    };
     use std::path::Path;
 
     #[derive(Debug)]
     struct UnavailableSource;
 
-    impl crate::sem::SourceAccessService for UnavailableSource {
+    impl crate::context::SourceAccessService for UnavailableSource {
         fn get_source_span(
             &self,
             _args: &::sql_fun_core::SqlFunArgs,
@@ -815,15 +819,15 @@ impl crate::context::TriggerInfoWrite for SchemaFileContext {
     }
 }
 
-impl crate::sem::ParameterTypeHintRead for SchemaFileContext {
+impl crate::context::ParameterTypeHintRead for SchemaFileContext {
     fn get_parameter_typehint(&self, index: usize) -> Option<TypeReference> {
         self.parameter_type_hints.lookup(index)
     }
 }
 
-impl crate::sem::ParameterTypeHintWrite for SchemaFileContext {
+impl crate::context::ParameterTypeHintWrite for SchemaFileContext {
     fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
-        self.parameter_type_hints = crate::sem::ParameterTypeHints::resolve(hints, self)?;
+        self.parameter_type_hints = crate::context::ParameterTypeHints::resolve(hints, self)?;
         Ok(())
     }
 }
@@ -912,7 +916,7 @@ impl ParseContext for SchemaFileContext {
         create_extension: &CreateExtension,
     ) -> Result<Self, AnalysisError> {
         let name = create_extension.name();
-        if crate::sem::ExtensionInfoRead::extension_exists(&self, name) {
+        if crate::context::ExtensionInfoRead::extension_exists(&self, name) {
             if !create_extension.if_not_exists() {
                 self.report_problem(AnalysisProblem::creation(
                     crate::sem::problem::CreationProblem::named(
@@ -943,7 +947,7 @@ impl ParseContext for SchemaFileContext {
 
     fn apply_create_schema(mut self, create_schema: &CreateSchema) -> Result<Self, AnalysisError> {
         let name = create_schema.name();
-        if crate::sem::OwnershipInfoRead::schema_definition(&self, name).is_some() {
+        if crate::context::OwnershipInfoRead::schema_definition(&self, name).is_some() {
             if !create_schema.if_not_exists() {
                 self.report_problem(AnalysisProblem::creation(
                     crate::sem::problem::CreationProblem::named(
@@ -1022,8 +1026,8 @@ mod test_freeze {
     use crate::StringSpan;
     use crate::context::BaseParseContext;
     use crate::{
-        context::{SearchPathRead, TableInfoWrite},
-        sem::{ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName},
+        context::{GetSourcePathWithSpanOpt, SearchPathRead, TableInfoWrite},
+        sem::{ColumnName, ParseContext, SchemaName},
     };
     use std::path::Path;
 
@@ -1088,12 +1092,15 @@ mod test_freeze {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint, CreateTable,
-            CreateTableMode, FrozenBaseContext, FullName, ParseContext, PgBuiltInType,
-            PrimaryKeyConstraint, SchemaFileContext, SchemaName, SourceAccessService, TableName,
-        };
         use crate::test_helpers::{TestParseContext, source_span};
+        use crate::{
+            context::SourceAccessService,
+            sem::{
+                AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint,
+                CreateTable, CreateTableMode, FrozenBaseContext, FullName, ParseContext,
+                PgBuiltInType, PrimaryKeyConstraint, SchemaFileContext, SchemaName, TableName,
+            },
+        };
         use std::rc::{Rc, Weak};
 
         pub(super) fn empty_base() -> FrozenBaseContext {
@@ -1351,17 +1358,17 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
         table: &crate::sem::TableName,
         conflict: &crate::sem::InsertConflict,
     ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-        crate::sem::parse_context::conflict_info::infer_from_catalog(self, table, conflict)
+        crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
     }
 }
 
-impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
+impl crate::context::ViewInsertInfoRead for SchemaCatalog {
     fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
         self.base.view_insert_support(view)
     }
 }
 
-impl crate::sem::ViewUpdateInfoRead for SchemaCatalog {
+impl crate::context::ViewUpdateInfoRead for SchemaCatalog {
     fn view_update_support(
         &self,
         view: &crate::sem::FullName,
@@ -1370,13 +1377,13 @@ impl crate::sem::ViewUpdateInfoRead for SchemaCatalog {
     }
 }
 
-impl crate::sem::ViewDeleteInfoRead for SchemaCatalog {
+impl crate::context::ViewDeleteInfoRead for SchemaCatalog {
     fn view_delete_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
-impl crate::sem::ViewMergeInfoRead for SchemaCatalog {
+impl crate::context::ViewMergeInfoRead for SchemaCatalog {
     fn view_merge_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }

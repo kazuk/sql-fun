@@ -1,5 +1,3 @@
-use crate::sem::FullName;
-
 /// Completed catalog decision about deleting from an ordinary view.
 /// DELETE eligibility is independent of INSERT and UPDATE eligibility.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -32,12 +30,4 @@ impl ViewDeleteSupport {
     pub const fn supports_returning(&self) -> bool {
         self.returning
     }
-}
-
-/// DELETE capability service for an already bound, qualified ordinary view.
-pub trait ViewDeleteInfoRead {
-    /// Return a completed decision without executing trigger or rule bodies.
-    /// Catalogs without the required metadata must leave this explicitly
-    /// unimplemented, rather than inventing success or a read-only decision.
-    fn view_delete_support(&self, view: &FullName) -> ViewDeleteSupport;
 }

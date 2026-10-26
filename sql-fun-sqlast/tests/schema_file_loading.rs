@@ -18,9 +18,10 @@ mod test_helpers {
     use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParseDumpFileError, ParsedSchemaDump, PostgresDialect,
+        context::GetSourcePathWithSpanOpt,
         sem::{
-            AnalysisProblem, BaseContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt,
-            TableName, problem::NameResolution,
+            AnalysisProblem, BaseContext, FrozenBaseContext, FullName, TableName,
+            problem::NameResolution,
         },
     };
     use ::tempfile::NamedTempFile;

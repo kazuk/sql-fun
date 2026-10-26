@@ -82,11 +82,14 @@ fn comment_targets_preserve_quoted_names_and_function_signatures() -> testresult
 mod test_helpers {
     use crate::ast::{Dialect, StatementNode, TryFromWithTokens};
     use crate::context::BaseParseContext;
-    use crate::sem::{
-        AnalysisError, ColumnName, FullName, MutSourcePathWithSpan, ParseContext, PgBuiltInType,
-        SchemaFileContext, SchemaName,
-    };
     use crate::test_helpers::{SynBuilder, TestParseContext};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{
+            AnalysisError, ColumnName, FullName, ParseContext, PgBuiltInType, SchemaFileContext,
+            SchemaName,
+        },
+    };
 
     pub(super) fn context() -> SchemaFileContext {
         let mut base = TestParseContext::default();

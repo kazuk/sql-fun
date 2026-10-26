@@ -844,7 +844,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn schema_loading_skips_parameter_inference() {
-        use crate::sem::{MutSourcePathWithSpan, SchemaName};
+        use crate::{context::MutSourcePathWithSpan, sem::SchemaName};
         let before = crate::sem::parameter_resolution::inference_runs();
         let mut context = crate::test_helpers::schema_layer(
             std::path::Path::new("schema.sql"),

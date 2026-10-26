@@ -1,25 +1,12 @@
-pub(crate) mod conflict_info;
-mod cursors;
-pub(crate) mod type_hint;
-
+use crate::{
+    StringSpan,
+    sem::{AnalysisError, SourcePathWithSpan},
+};
+use ::sql_fun_core::SqlFunArgs;
 use std::{
     io::{Read, Seek},
     path::Path,
 };
-
-pub use self::{
-    conflict_info::{CatalogNameLookup, ConflictArbiterInference},
-    cursors::CursorInfo,
-    type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite},
-};
-
-pub(crate) use self::cursors::CursorBindings;
-
-use crate::{
-    StringSpan,
-    sem::{AnalysisError, AnalysisProblem},
-};
-use sql_fun_core::SqlFunArgs;
 
 /// provide access to source SQL file
 pub trait SourceAccessService: std::fmt::Debug {
@@ -61,10 +48,40 @@ pub struct DefaultSourceAccessService {}
 
 impl SourceAccessService for DefaultSourceAccessService {}
 
-/// Mutable diagnostic sink for semantic analysis.
-pub trait DiagnosticContext {
-    /// Report a recoverable analysis problem.
-    ///
-    /// Returns an error if the diagnostic cannot be accepted or rendered.
-    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError>;
+/// can get source path with span
+pub trait GetSourcePathWithSpan {
+    /// get source path with span
+    fn get_source_path_with_span(&self) -> &SourcePathWithSpan;
+
+    /// get source path
+    fn get_source_path(&self) -> &Path {
+        self.get_source_path_with_span().source_path()
+    }
+
+    /// get source span
+    fn get_span(&self) -> &StringSpan {
+        self.get_source_path_with_span().span()
+    }
+}
+
+/// support mutate source path with span
+pub trait MutSourcePathWithSpan {
+    /// set source path with span
+    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan);
+}
+
+/// cant get optional source path with span
+pub trait GetSourcePathWithSpanOpt {
+    /// get source path with span
+    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan>;
+
+    /// get source path
+    fn get_source_path(&self) -> Option<&Path> {
+        self.get_source_path_with_span().map(|v| v.source_path())
+    }
+
+    /// get source span
+    fn get_span(&self) -> Option<&StringSpan> {
+        self.get_source_path_with_span().map(|v| v.span())
+    }
 }

@@ -2,14 +2,13 @@
 use super::{SchemaCatalog, SchemaFileContext};
 use crate::{
     context::{
-        FunctionInfoRead, IndexInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
-        ViewInfoRead,
+        FunctionInfoRead, IndexInfoRead, ObjectInfoRead, OwnershipInfoRead, SequenceInfoRead,
+        TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
     sem::{
         AlterTable, AnalysisError, CreateFunction, CreateIndex, CreateRule, CreateSequence,
-        CreateTable, CreateTrigger, FullName, ObjectInfoRead, OverloadVariant, OwnershipInfoRead,
-        ParseContext, RuleIdentity, RuleReferences, TableName, TriggerIdentity, TriggerReferences,
-        TypeDefinition, ViewLike,
+        CreateTable, CreateTrigger, FullName, OverloadVariant, ParseContext, RuleIdentity,
+        RuleReferences, TableName, TriggerIdentity, TriggerReferences, TypeDefinition, ViewLike,
     },
 };
 

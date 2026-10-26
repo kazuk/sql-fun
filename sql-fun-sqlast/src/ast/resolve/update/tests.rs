@@ -129,10 +129,11 @@ fn sqlite_invalid_returning(#[case] sql: &str) {
 
 mod test_helpers {
     use crate::ast::Dialect;
-    use crate::sem::{
-        ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType, SchemaName, SemAst,
-    };
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+    };
 
     #[cfg(feature = "sqlite")]
     pub(super) fn sqlite_accepts(sql: &str) {

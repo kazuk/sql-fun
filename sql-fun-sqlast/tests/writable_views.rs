@@ -996,10 +996,10 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
     let older = schema.incomplete_catalog()?;
     let view = FullName::with_schema("public", "incomplete");
     assert!(
-        ::sql_fun_sqlast::sem::ViewInsertInfoRead::view_insert_support(&older, &view).is_none()
+        ::sql_fun_sqlast::context::ViewInsertInfoRead::view_insert_support(&older, &view).is_none()
     );
     assert!(
-        ::sql_fun_sqlast::sem::ViewUpdateInfoRead::view_update_support(&older, &view).is_none()
+        ::sql_fun_sqlast::context::ViewUpdateInfoRead::view_update_support(&older, &view).is_none()
     );
     for nested in ["incomplete", "incomplete_nested"] {
         let nested = FullName::with_schema("public", nested);

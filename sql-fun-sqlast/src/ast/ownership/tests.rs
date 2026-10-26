@@ -2,11 +2,10 @@ use crate::context::BaseParseContext;
 use crate::context::ParseContext;
 use crate::syn::Opt;
 use crate::{
-    context::{TableInfoRead, TypeInfoRead},
+    context::{OwnershipInfoRead, RoleInfoRead, TableInfoRead, TypeInfoRead},
     sem::{
         AlterOwner, FullName, ObjectKind, OwnedObjectDefinition, OwnerSpecification,
-        OwnershipIdentity, OwnershipInfoRead, Role, RoleInfoRead, SchemaName, TableName,
-        TypeReference,
+        OwnershipIdentity, Role, SchemaName, TableName, TypeReference,
     },
     test_helpers::{
         SynBuilder,
@@ -517,7 +516,7 @@ fn dependent_sequence_owners_follow_table_changes_across_layers() -> testresult:
         .into_context();
     let base = context.freeze();
     let mut context = schema_layer(std::path::Path::new("next.sql"), &base);
-    crate::sem::MutSourcePathWithSpan::set_source_path_with_span(
+    crate::context::MutSourcePathWithSpan::set_source_path_with_span(
         &mut context,
         &crate::test_helpers::source_span(),
     );

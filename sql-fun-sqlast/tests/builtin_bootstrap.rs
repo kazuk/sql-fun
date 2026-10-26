@@ -84,7 +84,7 @@ fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn s
         &args,
         selected,
     );
-    ::sql_fun_sqlast::sem::MutSourcePathWithSpan::set_source_path_with_span(
+    ::sql_fun_sqlast::context::MutSourcePathWithSpan::set_source_path_with_span(
         &mut query_context,
         &::sql_fun_sqlast::sem::SourcePathWithSpan::new(
             "system-column.sql",

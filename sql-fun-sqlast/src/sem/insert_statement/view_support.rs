@@ -87,11 +87,3 @@ impl ViewInsertSupport {
         self.column_definition(column).is_some()
     }
 }
-
-/// Catalog service for view destinations. The name is already bound and
-/// qualified; this is not a second search-path lookup.
-pub trait ViewInsertInfoRead {
-    /// Retrieve explicitly registered support by exact identity, without deriving
-    /// capabilities or interpreting absence. The analyzer owns those decisions.
-    fn view_insert_support(&self, view: &FullName) -> Option<&ViewInsertSupport>;
-}

@@ -5,19 +5,20 @@ use crate::context::BaseParseContext;
 use crate::{
     StringSpan,
     context::{
-        FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext,
-        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite,
-        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        DiagnosticContext, FunctionInfoRead, FunctionInfoWrite, GetSourcePathWithSpanOpt,
+        IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead, ParseContext, SearchPathRead,
+        SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite, TypeInfoRead,
+        TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     sem::{
         AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
         CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
-        CreateView, DiagnosticContext, DropTable, FromClause, FullName, FunctionOverloadCollection,
-        GetSourcePathWithSpanOpt, MutSourcePathWithSpan, OperatorDefinition, OperatorName,
-        OverloadVariant, SchemaName, SourcePathWithSpan, TableName, TypeDefinition, TypeReference,
-        ValidOperatorName, VariableSet, ViewLike, WithClause,
+        CreateView, DropTable, FromClause, FullName, FunctionOverloadCollection,
+        OperatorDefinition, OperatorName, OverloadVariant, SchemaName, SourcePathWithSpan,
+        TableName, TypeDefinition, TypeReference, ValidOperatorName, VariableSet, ViewLike,
+        WithClause,
     },
     test_helpers::{SynBuilder, source_span},
 };
@@ -58,10 +59,10 @@ pub struct TestParseContext {
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
-    cursors: crate::sem::CursorBindings,
+    cursors: crate::context::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
-    parameter_type_hints: crate::sem::ParameterTypeHints,
+    parameter_type_hints: crate::context::ParameterTypeHints,
     report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
     table_ref_types: Vec<TableName>,
@@ -600,15 +601,15 @@ impl crate::context::TriggerInfoWrite for TestParseContext {
     }
 }
 
-impl crate::sem::ParameterTypeHintRead for TestParseContext {
+impl crate::context::ParameterTypeHintRead for TestParseContext {
     fn get_parameter_typehint(&self, index: usize) -> Option<TypeReference> {
         self.parameter_type_hints.lookup(index)
     }
 }
 
-impl crate::sem::ParameterTypeHintWrite for TestParseContext {
+impl crate::context::ParameterTypeHintWrite for TestParseContext {
     fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
-        self.parameter_type_hints = crate::sem::ParameterTypeHints::resolve(hints, self)?;
+        self.parameter_type_hints = crate::context::ParameterTypeHints::resolve(hints, self)?;
         Ok(())
     }
 }
@@ -685,7 +686,7 @@ impl ParseContext for TestParseContext {
 
     fn set_source_file(
         &mut self,
-        _source_access_service: Box<dyn crate::sem::SourceAccessService>,
+        _source_access_service: Box<dyn crate::context::SourceAccessService>,
     ) {
         todo!()
     }
@@ -812,13 +813,13 @@ impl TestParseContext {
             .insert(name.clone(), support.clone());
     }
 }
-impl crate::sem::ViewInsertInfoRead for TestParseContext {
+impl crate::context::ViewInsertInfoRead for TestParseContext {
     fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
         self.view_insert_support.get(view)
     }
 }
 
-impl crate::sem::ViewUpdateInfoRead for TestParseContext {
+impl crate::context::ViewUpdateInfoRead for TestParseContext {
     fn view_update_support(&self, view: &FullName) -> Option<&crate::sem::ViewUpdateSupport> {
         self.view_update_support.get(view)
     }
@@ -835,7 +836,7 @@ impl TestParseContext {
     }
 }
 
-impl crate::sem::ViewDeleteInfoRead for TestParseContext {
+impl crate::context::ViewDeleteInfoRead for TestParseContext {
     fn view_delete_support(&self, view: &FullName) -> crate::sem::ViewDeleteSupport {
         self.view_delete_support
             .get(view)
@@ -844,7 +845,7 @@ impl crate::sem::ViewDeleteInfoRead for TestParseContext {
     }
 }
 
-impl crate::sem::ViewMergeInfoRead for TestParseContext {
+impl crate::context::ViewMergeInfoRead for TestParseContext {
     fn view_merge_support(&self, view: &FullName) -> crate::sem::ViewMergeSupport {
         self.view_merge_support
             .get(view)
@@ -873,12 +874,12 @@ impl TestParseContext {
     }
 }
 
-impl crate::sem::RoleInfoRead for TestParseContext {
+impl crate::context::RoleInfoRead for TestParseContext {
     fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
         self.ownership.role(name)
     }
 }
-impl crate::sem::OwnershipInfoRead for TestParseContext {
+impl crate::context::OwnershipInfoRead for TestParseContext {
     fn ownership_definitions(
         &self,
         kind: crate::sem::ObjectKind,
@@ -899,7 +900,7 @@ impl crate::sem::OwnershipInfoRead for TestParseContext {
     }
 }
 
-impl crate::sem::ObjectInfoRead for TestParseContext {
+impl crate::context::ObjectInfoRead for TestParseContext {
     fn object_kind(&self, name: &crate::sem::FullName) -> Option<crate::sem::Kind> {
         if self.get_table_impl(name).is_some() {
             Some(crate::sem::Kind::table())
@@ -914,7 +915,7 @@ impl crate::sem::ObjectInfoRead for TestParseContext {
         }
     }
 }
-impl crate::sem::ExtensionInfoRead for TestParseContext {
+impl crate::context::ExtensionInfoRead for TestParseContext {
     fn extension_exists(&self, _: &str) -> bool {
         false
     }

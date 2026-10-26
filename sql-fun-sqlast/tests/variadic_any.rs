@@ -45,11 +45,9 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
+            context::MutSourcePathWithSpan,
             parse_statements,
-            sem::{
-                BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext,
-                SourcePathWithSpan,
-            },
+            sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
         };
         use std::{collections::BTreeMap, path::PathBuf};
 

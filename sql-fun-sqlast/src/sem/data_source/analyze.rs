@@ -34,7 +34,8 @@ impl DataSource {
 #[cfg(test)]
 mod test_analyze_range_subselect {
     use crate::{
-        sem::{MutSourcePathWithSpan, SourcePathWithSpan},
+        context::MutSourcePathWithSpan,
+        sem::SourcePathWithSpan,
         syn::{Node, NodeList, WithClauseOpt},
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };

@@ -1,6 +1,9 @@
 use super::{SchemaCatalog, SchemaFileContext};
 use crate::context::BaseParseContext;
-use crate::sem::{ExtensionInfoRead, FullName, Kind, ObjectInfoRead};
+use crate::{
+    context::{ExtensionInfoRead, ObjectInfoRead},
+    sem::{FullName, Kind},
+};
 
 impl ObjectInfoRead for SchemaCatalog {
     fn relation_names(&self) -> Vec<FullName> {

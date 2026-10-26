@@ -87,8 +87,11 @@ fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
 }
 
 mod test_helpers {
-    use crate::sem::{MutSourcePathWithSpan, PgBuiltInType, SchemaName};
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{PgBuiltInType, SchemaName},
+    };
 
     pub(super) fn context() -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());

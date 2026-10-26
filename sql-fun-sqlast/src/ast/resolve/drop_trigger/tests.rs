@@ -179,7 +179,7 @@ mod test_helpers {
         mut context: SchemaFileContext,
         sql: &str,
     ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
-        crate::sem::MutSourcePathWithSpan::set_source_path_with_span(
+        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
             &crate::test_helpers::source_span(),
         );

@@ -127,9 +127,9 @@ mod test_helpers {
     use std::path::Path;
 
     use crate::context::BaseParseContext;
-    use crate::sem::{
-        BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext,
-        SourcePathWithSpan,
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
     };
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 

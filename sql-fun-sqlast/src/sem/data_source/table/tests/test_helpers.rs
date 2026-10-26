@@ -1,10 +1,10 @@
 use crate::ast::Dialect;
 use crate::context::BaseParseContext;
-use crate::sem::{
-    MutSourcePathWithSpan, ParseContext, SchemaFileContext, SchemaName, SelectStatement,
-    TypeReference,
-};
 use crate::test_helpers::{TestParseContext, source_span};
+use crate::{
+    context::MutSourcePathWithSpan,
+    sem::{ParseContext, SchemaFileContext, SchemaName, SelectStatement, TypeReference},
+};
 
 /// Uses only six explicit builtin types and small local DDL, without a shipped catalog.
 pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFileContext) {

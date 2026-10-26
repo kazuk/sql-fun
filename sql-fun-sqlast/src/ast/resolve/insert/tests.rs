@@ -782,10 +782,11 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
 
 mod test_helpers {
     use crate::ast::Dialect;
-    use crate::sem::{
-        ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType, SchemaName, SemAst,
-    };
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+    };
 
     pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(dialect);

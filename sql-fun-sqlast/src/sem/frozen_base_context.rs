@@ -89,8 +89,8 @@ impl From<BaseContext> for FrozenBaseContext {
 mod test_frozen_root {
     use crate::context::BaseParseContext;
     use crate::{
-        context::SearchPathRead,
-        sem::{FrozenBaseContext, FullName, GetSourcePathWithSpanOpt},
+        context::{GetSourcePathWithSpanOpt, SearchPathRead},
+        sem::{FrozenBaseContext, FullName},
     };
 
     #[test]
@@ -148,7 +148,7 @@ mod test_frozen_root {
 
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
-        impl crate::sem::ObjectInfoRead for $context {
+        impl crate::context::ObjectInfoRead for $context {
             fn relation_names(&self) -> Vec<crate::sem::FullName> {
                 self.$catalog().relation_names()
             }
@@ -157,23 +157,23 @@ macro_rules! forward_catalog_reads {
                 self.$catalog().object_kind(name)
             }
         }
-        impl crate::sem::ExtensionInfoRead for $context {
+        impl crate::context::ExtensionInfoRead for $context {
             fn extension_exists(&self, name: &str) -> bool {
                 self.$catalog().extension_exists(name)
             }
         }
 
-        impl crate::sem::RoleInfoRead for $context {
+        impl crate::context::RoleInfoRead for $context {
             fn registered_role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
-                crate::sem::RoleInfoRead::registered_role_by_name(self.$catalog(), name)
+                crate::context::RoleInfoRead::registered_role_by_name(self.$catalog(), name)
             }
             fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
-                crate::sem::RoleInfoRead::role_by_name(self.$catalog(), name)
+                crate::context::RoleInfoRead::role_by_name(self.$catalog(), name)
             }
         }
-        impl crate::sem::OwnershipInfoRead for $context {
+        impl crate::context::OwnershipInfoRead for $context {
             fn schema_definition(&self, name: &str) -> Option<&crate::sem::CreateSchema> {
-                crate::sem::OwnershipInfoRead::schema_definition(self.$catalog(), name)
+                crate::context::OwnershipInfoRead::schema_definition(self.$catalog(), name)
             }
 
             fn ownership_definitions(
@@ -181,13 +181,17 @@ macro_rules! forward_catalog_reads {
                 kind: crate::sem::ObjectKind,
                 name: &crate::sem::FullName,
             ) -> Vec<crate::sem::OwnedObjectDefinition> {
-                crate::sem::OwnershipInfoRead::ownership_definitions(self.$catalog(), kind, name)
+                crate::context::OwnershipInfoRead::ownership_definitions(
+                    self.$catalog(),
+                    kind,
+                    name,
+                )
             }
             fn routine_definitions(
                 &self,
                 name: &crate::sem::FullName,
             ) -> Vec<crate::sem::CreateFunction> {
-                crate::sem::OwnershipInfoRead::routine_definitions(self.$catalog(), name)
+                crate::context::OwnershipInfoRead::routine_definitions(self.$catalog(), name)
             }
         }
         impl crate::context::CastInfoRead for $context {
@@ -381,38 +385,38 @@ macro_rules! forward_catalog_reads {
             }
         }
 
-        impl crate::sem::ViewInsertInfoRead for $context {
+        impl crate::context::ViewInsertInfoRead for $context {
             fn view_insert_support(
                 &self,
                 name: &crate::sem::FullName,
             ) -> Option<&crate::sem::ViewInsertSupport> {
-                crate::sem::ViewInsertInfoRead::view_insert_support(self.$catalog(), name)
+                crate::context::ViewInsertInfoRead::view_insert_support(self.$catalog(), name)
             }
         }
 
-        impl crate::sem::ViewDeleteInfoRead for $context {
+        impl crate::context::ViewDeleteInfoRead for $context {
             fn view_delete_support(
                 &self,
                 name: &crate::sem::FullName,
             ) -> crate::sem::ViewDeleteSupport {
-                crate::sem::ViewDeleteInfoRead::view_delete_support(self.$catalog(), name)
+                crate::context::ViewDeleteInfoRead::view_delete_support(self.$catalog(), name)
             }
         }
-        impl crate::sem::ViewUpdateInfoRead for $context {
+        impl crate::context::ViewUpdateInfoRead for $context {
             fn view_update_support(
                 &self,
                 name: &crate::sem::FullName,
             ) -> Option<&crate::sem::ViewUpdateSupport> {
-                crate::sem::ViewUpdateInfoRead::view_update_support(self.$catalog(), name)
+                crate::context::ViewUpdateInfoRead::view_update_support(self.$catalog(), name)
             }
         }
 
-        impl crate::sem::ViewMergeInfoRead for $context {
+        impl crate::context::ViewMergeInfoRead for $context {
             fn view_merge_support(
                 &self,
                 name: &crate::sem::FullName,
             ) -> crate::sem::ViewMergeSupport {
-                crate::sem::ViewMergeInfoRead::view_merge_support(self.$catalog(), name)
+                crate::context::ViewMergeInfoRead::view_merge_support(self.$catalog(), name)
             }
         }
 
@@ -432,9 +436,9 @@ macro_rules! forward_catalog_reads {
             }
         }
 
-        impl crate::sem::GetSourcePathWithSpanOpt for $context {
+        impl crate::context::GetSourcePathWithSpanOpt for $context {
             fn get_source_path_with_span(&self) -> Option<&crate::sem::SourcePathWithSpan> {
-                crate::sem::GetSourcePathWithSpanOpt::get_source_path_with_span(self.$catalog())
+                crate::context::GetSourcePathWithSpanOpt::get_source_path_with_span(self.$catalog())
             }
         }
 

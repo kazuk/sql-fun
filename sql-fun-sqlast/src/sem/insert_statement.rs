@@ -7,7 +7,7 @@ pub use self::arbiter::{
     ViewSourceArbiter,
 };
 pub(crate) use self::destination::InsertDestination;
-pub use self::view_support::{ViewInsertInfoRead, ViewInsertSupport};
+pub use self::view_support::ViewInsertSupport;
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitor;

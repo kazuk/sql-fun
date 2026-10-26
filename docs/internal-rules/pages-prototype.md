@@ -34,7 +34,7 @@ Dispatch **Pages manual prototype** (`pages-prototype.yml`) with those inputs
 and the prototype ref to test. The workflow downloads only the selected run's
 artifact and packages its existing files as
 `sql-fun_vX.Y.Z_user-manual.tar.gz`, with `index.html` at archive root, following
-#328's archive contract. Its preparation job summary records the producer run,
+the archive contract in #328. Its preparation job summary records the producer run,
 source SHA, artifact name, archive name, and prototype revision/attempt. The
 archive remains available as `prototype-manual-<attempt>` in that run's artifacts.
 

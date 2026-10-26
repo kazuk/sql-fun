@@ -1,5 +1,6 @@
 //! SQL-to-semantics and catalog-chain regressions; no external server is required.
-use crate::sem::{BaseParseContext, ColumnName, ParseContext};
+use crate::context::BaseParseContext;
+use crate::sem::{ColumnName, ParseContext};
 use crate::syn::{ListOpt, Opt};
 
 #[rstest::rstest]
@@ -515,9 +516,10 @@ mod test_helpers {
         context
     }
 
+    use crate::context::BaseParseContext;
     use crate::sem::{
-        AnalysisError, AstAndContextPair, BaseParseContext, ColumnDefinition, ColumnName,
-        FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext, TableName,
+        AnalysisError, AstAndContextPair, ColumnDefinition, ColumnName, FrozenBaseContext,
+        MutSourcePathWithSpan, ParseContext, SchemaFileContext, TableName,
     };
     pub(super) fn table_name() -> TableName {
         TableName::from(crate::sem::FullName::with_schema("public", "t"))

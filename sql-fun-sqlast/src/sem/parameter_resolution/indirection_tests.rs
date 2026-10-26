@@ -370,7 +370,8 @@ fn nested_deferred_members_report_structured_errors(
 
 #[test]
 fn owned_named_composites_preserve_nominal_identity() -> Result<(), Box<dyn std::error::Error>> {
-    use crate::sem::{BaseParseContext, FullName, TypeReference};
+    use crate::context::BaseParseContext;
+    use crate::sem::{FullName, TypeReference};
     // Schema cast metadata distinguishes named composites with identical fields.
     let context = test_helpers::schema(
         "create type public.first_value as (n integer); create type public.second_value as (n integer);",

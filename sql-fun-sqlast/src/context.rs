@@ -1,19 +1,22 @@
 //! context
 
+mod base_parse_context;
+
+pub use self::base_parse_context::BaseParseContext;
+
 use sql_fun_core::{IVec, analysis_problem::AnalysisProblem};
 
 use crate::{
     StringSpan,
     sem::{
-        AliasSpec, AlterIndex, AlterOwner, AnalysisError, BaseParseContext, Comment,
-        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
-        CreateIndex, CreateSchema, CreateTable, CursorInfo, DataSource, DiagnosticContext,
-        FrozenBaseContext, FullName, FunctionInfoWrite, GetSourcePathWithSpan, Kind,
-        MutSourcePathWithSpan, OwnedObjectDefinition, ParameterTypeHintRead,
-        ParameterTypeHintWrite, Role, RuleInfoWrite, SchemaName, SemScalarExpr, SequenceInfoWrite,
-        SourceAccessService, TableInfoWrite, TableName, TriggerInfoWrite, TypeInfoWrite,
-        VariableSet, ViewInfoWrite, problem::CreationProblem,
-        type_system::ArgumentBindingCollection,
+        AliasSpec, AlterIndex, AlterOwner, AnalysisError, Comment, CreateCompositeType,
+        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
+        CreateTable, CursorInfo, DataSource, DiagnosticContext, FrozenBaseContext, FullName,
+        FunctionInfoWrite, GetSourcePathWithSpan, Kind, MutSourcePathWithSpan,
+        OwnedObjectDefinition, ParameterTypeHintRead, ParameterTypeHintWrite, Role, RuleInfoWrite,
+        SchemaName, SemScalarExpr, SequenceInfoWrite, SourceAccessService, TableInfoWrite,
+        TableName, TriggerInfoWrite, TypeInfoWrite, VariableSet, ViewInfoWrite,
+        problem::CreationProblem, type_system::ArgumentBindingCollection,
     },
 };
 

@@ -140,10 +140,8 @@ impl TableInfoWrite for SchemaFileContext {
 
 #[cfg(test)]
 mod test_drop_catalog_key {
-    use crate::sem::{
-        BaseParseContext, DropTable, FullName, ParseContext, TableInfoRead, TableInfoWrite,
-        TableName,
-    };
+    use crate::context::BaseParseContext;
+    use crate::sem::{DropTable, FullName, ParseContext, TableInfoRead, TableInfoWrite, TableName};
 
     #[rstest::rstest]
     #[case::qualified("a.items", &["b", "a"], "a", "b")]

@@ -241,8 +241,8 @@ mod test_schema_content_hash {
                 file.path(),
                 analysis_base,
                 &mut hash,
-                crate::sem::BaseParseContext::get_args(&environment),
-                crate::sem::BaseParseContext::metadata(&environment),
+                crate::context::BaseParseContext::get_args(&environment),
+                crate::context::BaseParseContext::metadata(&environment),
             )
         };
         assert_eq!(result.is_ok(), succeeds, "{result:?}");
@@ -266,8 +266,8 @@ mod test_schema_content_hash {
                 SqliteDialect::parse_schema_snapshot(
                     &snapshot,
                     analysis_base,
-                    crate::sem::BaseParseContext::get_args(&environment),
-                    crate::sem::BaseParseContext::metadata(&environment),
+                    crate::context::BaseParseContext::get_args(&environment),
+                    crate::context::BaseParseContext::metadata(&environment),
                 )
             }
             .is_ok()
@@ -287,8 +287,8 @@ mod test_schema_content_hash {
                 &directory.path().join("missing.sql"),
                 analysis_base,
                 &mut hash,
-                crate::sem::BaseParseContext::get_args(&environment),
-                crate::sem::BaseParseContext::metadata(&environment),
+                crate::context::BaseParseContext::get_args(&environment),
+                crate::context::BaseParseContext::metadata(&environment),
             )
         }
         .unwrap_err();

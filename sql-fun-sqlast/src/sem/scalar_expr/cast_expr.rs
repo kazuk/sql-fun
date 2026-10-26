@@ -142,7 +142,7 @@ impl TypeCastExpr {
         }
         let target = if context.dialect() == crate::ast::Dialect::postgres() {
             if let Some(target) =
-                crate::sem::BaseParseContext::canonicalize_type_ref(context, &self.target_type)
+                crate::context::BaseParseContext::canonicalize_type_ref(context, &self.target_type)
             {
                 parameters.require(context, &self.arg, &target, true);
                 target

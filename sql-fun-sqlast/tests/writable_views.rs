@@ -3,8 +3,8 @@
 use ::sql_fun_sqlast::sem::RuleInfoRead;
 use sql_fun_core::analysis_problem::InsertProblemKind;
 use sql_fun_core::analysis_problem::UpdateProblemKind;
+use sql_fun_sqlast::context::BaseParseContext;
 use sql_fun_sqlast::context::ParseContext;
-use sql_fun_sqlast::sem::BaseParseContext;
 use sql_fun_sqlast::sem::RuleIdentity;
 use sql_fun_sqlast::sem::ViewName;
 use sql_fun_sqlast::sem::ViewWriteEvaluation;
@@ -183,7 +183,8 @@ mod test_helpers {
                 &self,
                 name: &::sql_fun_sqlast::sem::FullName,
             ) -> Result<FrozenBaseContext, String> {
-                use sql_fun_sqlast::sem::{BaseParseContext, ViewInfoWrite};
+                use ::sql_fun_sqlast::context::BaseParseContext;
+                use sql_fun_sqlast::sem::ViewInfoWrite;
 
                 let view = self
                     .context()
@@ -1207,7 +1208,7 @@ fn evaluation_service_reads_definition_options_and_retained_defaults()
 #[test]
 fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
 -> Result<(), Box<dyn std::error::Error>> {
-    use sql_fun_sqlast::sem::BaseParseContext;
+    use sql_fun_sqlast::context::BaseParseContext;
 
     let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",

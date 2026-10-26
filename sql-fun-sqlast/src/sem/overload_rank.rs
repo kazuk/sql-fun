@@ -1,4 +1,5 @@
-use crate::sem::{BaseParseContext, CastContext, TypeReference};
+use crate::context::BaseParseContext;
+use crate::sem::{CastContext, TypeReference};
 
 /// Compare exact-match counts before considering preferred conversions.
 /// This uses existing cast preferences; category/unknown resolution is separate.

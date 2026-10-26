@@ -3,9 +3,10 @@
 use std::path::PathBuf;
 
 use ::clap::Parser;
+use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     PostgresDialect, SqlFunArgs,
-    sem::{BaseContext, BaseParseContext, FrozenBaseContext, FullName, TableName},
+    sem::{BaseContext, FrozenBaseContext, FullName, TableName},
 };
 
 #[rstest::rstest]

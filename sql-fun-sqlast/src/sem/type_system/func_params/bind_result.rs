@@ -78,7 +78,7 @@ impl ParameterBindResult {
 
     pub(crate) fn overload_rank(
         &self,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
         declaration: &Self,
     ) -> Option<crate::sem::overload_rank::OverloadRank> {
         use crate::sem::overload_rank::OverloadRank;
@@ -136,7 +136,7 @@ impl ParameterBindResult {
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         match self {
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
@@ -153,7 +153,7 @@ impl ParameterBindResult {
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         match self {
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
@@ -174,7 +174,7 @@ impl ParameterBindResult {
         self.test_catalog_castability(context)
     }
 
-    pub(crate) fn test_catalog_castability<TCatalog: crate::sem::BaseParseContext>(
+    pub(crate) fn test_catalog_castability<TCatalog: crate::context::BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<i32, TypeError> {

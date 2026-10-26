@@ -1,4 +1,5 @@
-use crate::sem::{BaseContext, BaseParseContext, FullName, TypeDefinition, TypeReference};
+use crate::context::BaseParseContext;
+use crate::sem::{BaseContext, FullName, TypeDefinition, TypeReference};
 use std::sync::Arc;
 
 /// An owned, immutable schema context that can be shared across threads.
@@ -21,7 +22,8 @@ use std::sync::Arc;
 ///
 /// ```
 /// use std::path::Path;
-/// use ::sql_fun_sqlast::sem::{BaseParseContext, FrozenBaseContext, SchemaFileContext};
+/// use ::sql_fun_sqlast::context::BaseParseContext;
+/// use ::sql_fun_sqlast::sem::{FrozenBaseContext, SchemaFileContext};
 /// use ::sql_fun_sqlast::context::ParseContext;
 ///
 /// fn next_layer(builder: SchemaFileContext, args: &::sql_fun_core::SqlFunArgs, metadata: &::sql_fun_core::SqlFunMetadata) {
@@ -85,9 +87,8 @@ impl From<BaseContext> for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_frozen_root {
-    use crate::sem::{
-        BaseParseContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt, SearchPathRead,
-    };
+    use crate::context::BaseParseContext;
+    use crate::sem::{FrozenBaseContext, FullName, GetSourcePathWithSpanOpt, SearchPathRead};
 
     #[test]
     fn clone_retains_selected_metadata_and_builtin_reads() -> testresult::TestResult {
@@ -435,21 +436,21 @@ macro_rules! forward_catalog_reads {
             }
         }
 
-        impl crate::sem::BaseParseContext for $context {
+        impl crate::context::BaseParseContext for $context {
             fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
                 self.$catalog().sqlite_relation_identity(name)
             }
 
             fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
-                crate::sem::BaseParseContext::metadata(self.$catalog())
+                crate::context::BaseParseContext::metadata(self.$catalog())
             }
 
             fn get_args(&self) -> &::sql_fun_core::SqlFunArgs {
-                crate::sem::BaseParseContext::get_args(self.$catalog())
+                crate::context::BaseParseContext::get_args(self.$catalog())
             }
 
             fn get_source_file_path(&self) -> Option<&std::path::Path> {
-                crate::sem::BaseParseContext::get_source_file_path(self.$catalog())
+                crate::context::BaseParseContext::get_source_file_path(self.$catalog())
             }
         }
     };
@@ -479,7 +480,8 @@ impl crate::sem::TypeInfoRead for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_type_lookup_cost {
-    use crate::sem::{BaseParseContext, FullName, ParseContext};
+    use crate::context::BaseParseContext;
+    use crate::sem::{FullName, ParseContext};
     use std::{path::Path, sync::atomic::Ordering};
 
     #[rstest::rstest]

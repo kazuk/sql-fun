@@ -3,9 +3,10 @@ mod test_helpers;
 use self::test_helpers::{analyze, context, layer};
 #[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
+use crate::context::BaseParseContext;
 use crate::sem::{
-    BaseParseContext, ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext, PgBuiltInType,
-    SchemaName, TypeReference,
+    ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext, PgBuiltInType, SchemaName,
+    TypeReference,
 };
 
 #[rstest::rstest]

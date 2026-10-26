@@ -1,6 +1,5 @@
-use crate::sem::{
-    BaseParseContext, FullName, ParseContext, SchemaName, TypeDefinition, TypeReference,
-};
+use crate::context::{BaseParseContext, ParseContext};
+use crate::sem::{FullName, SchemaName, TypeDefinition, TypeReference};
 use crate::test_helpers::TestParseContext;
 
 #[rstest::rstest]

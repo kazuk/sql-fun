@@ -1,6 +1,7 @@
+use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     PostgresDialect,
-    sem::{BaseContext, BaseParseContext, FullName, TableName},
+    sem::{BaseContext, FullName, TableName},
 };
 
 use std::path::Path;

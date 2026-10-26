@@ -147,10 +147,9 @@ fn attached_schema_order_matches_bundled_sqlite(
 }
 
 mod test_helpers {
-    use crate::sem::{
-        BaseParseContext, FullName, SchemaName, TableName, TriggerIdentity, ViewName,
-    };
+    use crate::context::BaseParseContext;
     use crate::sem::{FrozenBaseContext, SchemaFileContext};
+    use crate::sem::{FullName, SchemaName, TableName, TriggerIdentity, ViewName};
     pub(super) const CREATE_AUDIT: &str =
         "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view BEGIN SELECT 1; END";
     pub(super) fn identity() -> TriggerIdentity {

@@ -337,7 +337,10 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn preserves_view_rows(&self, context: &impl crate::sem::BaseParseContext) -> bool {
+    pub(crate) fn preserves_view_rows(
+        &self,
+        context: &impl crate::context::BaseParseContext,
+    ) -> bool {
         if let Self::FuncCall(call) = self {
             if call.signature_is_deferred() || call.modifiers().over().is_some() {
                 return false;

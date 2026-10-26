@@ -1,6 +1,7 @@
+use crate::context::BaseParseContext;
 use crate::{
     context::ParseContext,
-    sem::{BaseParseContext, FullName, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite},
+    sem::{FullName, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite},
 };
 
 #[rstest::rstest]
@@ -605,11 +606,12 @@ fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
 
 mod test_helpers {
     use crate::ast::Dialect;
+    use crate::context::BaseParseContext;
     use crate::context::ParseContext;
     use crate::sem::{
-        AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, CreateTable,
-        CreateTableMode, FrozenBaseContext, FullName, PgBuiltInType, SchemaFileContext, SchemaName,
-        SemAst, TableName,
+        AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode,
+        FrozenBaseContext, FullName, PgBuiltInType, SchemaFileContext, SchemaName, SemAst,
+        TableName,
     };
     use crate::test_helpers::TestParseContext;
 

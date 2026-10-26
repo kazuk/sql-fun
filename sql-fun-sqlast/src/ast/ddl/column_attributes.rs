@@ -79,7 +79,7 @@ impl AlterRelation {
 #[cfg(test)]
 mod test_applicability {
     use crate::ParseContext;
-    use crate::sem::BaseParseContext;
+    use crate::context::BaseParseContext;
 
     #[test]
     fn discarded_diagnostics_cannot_make_rejected_ddl_applicable() -> testresult::TestResult {

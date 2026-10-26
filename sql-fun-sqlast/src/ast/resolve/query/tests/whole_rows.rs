@@ -529,7 +529,7 @@ mod test_helpers {
         );
     }
     fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, crate::sem::SchemaFileContext) {
-        use crate::sem::BaseParseContext;
+        use crate::context::BaseParseContext;
         let mut base = super::super::super::test_helpers::catalog();
         let nominal =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);

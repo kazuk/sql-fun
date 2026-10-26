@@ -457,9 +457,10 @@ mod test_build_op_all {
     }
 
     mod test_helpers {
+        use crate::context::BaseParseContext;
         use crate::sem::{
-            BaseParseContext, CreateDomain, ParseContext, PgBuiltInType, SchemaFileContext,
-            SchemaName, TypeDefinition, TypeReference,
+            CreateDomain, ParseContext, PgBuiltInType, SchemaFileContext, SchemaName,
+            TypeDefinition, TypeReference,
         };
         use crate::test_helpers::TestParseContext;
 

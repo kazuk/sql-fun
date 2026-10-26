@@ -1,8 +1,7 @@
 use crate::ast::Dialect;
+use crate::context::BaseParseContext;
 use crate::context::ParseContext;
-use crate::sem::{
-    BaseParseContext, ColumnName, FullName, PgBuiltInType, SemAst, ViewInsertSupport, ViewLike,
-};
+use crate::sem::{ColumnName, FullName, PgBuiltInType, SemAst, ViewInsertSupport, ViewLike};
 
 #[rstest::rstest]
 #[case::values("INSERT INTO writable_items(id) VALUES (1) RETURNING *", 2)]

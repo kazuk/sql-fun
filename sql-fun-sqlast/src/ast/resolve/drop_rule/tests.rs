@@ -144,8 +144,9 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
 }
 
 mod test_helpers {
-    use crate::sem::{BaseParseContext, FullName, RuleIdentity, TableName, ViewName};
+    use crate::context::BaseParseContext;
     use crate::sem::{FrozenBaseContext, SchemaFileContext};
+    use crate::sem::{FullName, RuleIdentity, TableName, ViewName};
     pub(super) const CREATE_AUDIT: &str =
         "CREATE RULE audit AS ON INSERT TO item_view DO INSTEAD NOTHING";
     pub(super) fn identity() -> RuleIdentity {

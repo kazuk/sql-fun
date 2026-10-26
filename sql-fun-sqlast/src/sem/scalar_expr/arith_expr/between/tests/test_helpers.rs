@@ -1,9 +1,10 @@
+use crate::context::BaseParseContext;
 use crate::{
     ast::Dialect,
     sem::{
-        BaseParseContext, BinaryOperatorDefinition, MutSourcePathWithSpan, OperatorDefinition,
-        OperatorName, ParseContext, PgBuiltInType, SchemaFileContext, SchemaName,
-        SourcePathWithSpan, TypeCategory, TypeDefinition,
+        BinaryOperatorDefinition, MutSourcePathWithSpan, OperatorDefinition, OperatorName,
+        ParseContext, PgBuiltInType, SchemaFileContext, SchemaName, SourcePathWithSpan,
+        TypeCategory, TypeDefinition,
     },
     test_helpers::TestParseContext,
 };

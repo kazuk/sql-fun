@@ -7,11 +7,12 @@ mod type_ref;
 pub use self::array::ArrayTypeDefinition;
 pub use self::{category::TypeCategory, type_ref::TypeReference};
 
+use crate::context::BaseParseContext;
 use crate::{
     context::ParseContext,
     sem::{
-        BaseParseContext, ColumnCollection, ColumnName, CreateCompositeType, CreateDomain,
-        CreateEnum, FullName, LocalName, OwnerSpecification, SchemaName, TableName,
+        ColumnCollection, ColumnName, CreateCompositeType, CreateDomain, CreateEnum, FullName,
+        LocalName, OwnerSpecification, SchemaName, TableName,
     },
 };
 

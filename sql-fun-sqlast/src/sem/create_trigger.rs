@@ -1,7 +1,8 @@
+use crate::context::BaseParseContext;
 use crate::sem::traversal::SemanticVisitor;
 use crate::sem::{
-    AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, FullName, ParseContext, SemAst,
-    SemScalarExpr, TypeReference,
+    AnalysisError, ColumnDefinition, ColumnName, FullName, ParseContext, SemAst, SemScalarExpr,
+    TypeReference,
 };
 
 /// Exact trigger lookup identity, including PostgreSQL's owning relation namespace.

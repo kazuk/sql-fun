@@ -23,15 +23,16 @@ use self::{
     view_info::ViewInformationCollection,
 };
 
+use crate::context::BaseParseContext;
 use crate::{
     StringSpan, TrieMap,
     context::ParseContext,
     sem::{
-        AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
-        CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, FullName,
-        GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan, ObjectKind,
-        OperatorDefinition, OperatorInfoRead, OperatorName, SchemaName, SemScalarExpr,
-        SourceAccessService, TableInfoRead, TypeReference, ViewInfoRead,
+        AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
+        CreateSchema, DiagnosticContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt,
+        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead,
+        OperatorName, SchemaName, SemScalarExpr, SourceAccessService, TableInfoRead, TypeReference,
+        ViewInfoRead,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
@@ -250,9 +251,10 @@ impl IndexInfoRead for SchemaCatalog {
 #[cfg(test)]
 mod test_index_lookup {
     use self::test_helpers::{index, layer};
+    use crate::context::BaseParseContext;
     use crate::{
         context::ParseContext,
-        sem::{BaseParseContext, FullName, IndexInfoRead},
+        sem::{FullName, IndexInfoRead},
     };
 
     #[rstest::rstest]
@@ -996,9 +998,10 @@ mod test_extension_record {
 #[cfg(test)]
 mod test_freeze {
     use crate::StringSpan;
+    use crate::context::BaseParseContext;
     use crate::sem::{
-        BaseParseContext, ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName,
-        SearchPathRead, TableInfoWrite,
+        ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName, SearchPathRead,
+        TableInfoWrite,
     };
     use std::path::Path;
 
@@ -1137,7 +1140,8 @@ mod test_freeze {
 
 #[cfg(test)]
 mod test_search_path {
-    use crate::sem::{BaseParseContext, FullName, ParseContext, SchemaName, SearchPathRead};
+    use crate::context::BaseParseContext;
+    use crate::sem::{FullName, ParseContext, SchemaName, SearchPathRead};
     use std::path::Path;
 
     #[rstest::rstest]

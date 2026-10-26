@@ -224,7 +224,7 @@ impl FunctionParam {
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
         bind: &ParameterBindResult,
     ) -> Result<(), TypeError> {
         match self {
@@ -245,7 +245,7 @@ impl FunctionParam {
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
         bind: &ParameterBindResult,
     ) -> Result<(), TypeError> {
         match self {
@@ -310,7 +310,7 @@ impl FunctionParam {
         self.castability_one_from_catalog(context, source_type)
     }
 
-    pub(crate) fn castability_one_from_catalog<TCatalog: crate::sem::BaseParseContext>(
+    pub(crate) fn castability_one_from_catalog<TCatalog: crate::context::BaseParseContext>(
         &self,
         context: &TCatalog,
         source_type: &Option<TypeReference>,
@@ -349,7 +349,7 @@ impl FunctionParam {
         self.castability_variadic_from_catalog(context, source_types)
     }
 
-    pub(crate) fn castability_variadic_from_catalog<TCatalog: crate::sem::BaseParseContext>(
+    pub(crate) fn castability_variadic_from_catalog<TCatalog: crate::context::BaseParseContext>(
         &self,
         context: &TCatalog,
         source_types: &IVec<Option<TypeReference>>,

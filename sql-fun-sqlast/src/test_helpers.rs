@@ -199,7 +199,7 @@ pub(crate) fn schema_layer(
     path: &std::path::Path,
     base: &crate::sem::FrozenBaseContext,
 ) -> crate::sem::SchemaFileContext {
-    use crate::sem::BaseParseContext;
+    use crate::context::BaseParseContext;
     let environment = TestParseContext::default();
     crate::sem::SchemaFileContext::new(path, base, environment.get_args(), environment.metadata())
 }

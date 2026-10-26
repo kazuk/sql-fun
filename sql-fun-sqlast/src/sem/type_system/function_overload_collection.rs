@@ -1,7 +1,8 @@
+use crate::context::BaseParseContext;
 use crate::{
     context::ParseContext,
     sem::{
-        BaseParseContext, FullName, OverloadVariant, SemScalarExpr,
+        FullName, OverloadVariant, SemScalarExpr,
         overload_rank::OverloadRank,
         parameter_resolution::Signature,
         type_system::{

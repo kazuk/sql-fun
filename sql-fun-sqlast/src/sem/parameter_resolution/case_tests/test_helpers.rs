@@ -1,6 +1,7 @@
+use crate::context::BaseParseContext;
 use crate::{
     ast::Dialect,
-    sem::{BaseParseContext, ParseContext, PgBuiltInType, SchemaFileContext, SchemaName},
+    sem::{ParseContext, PgBuiltInType, SchemaFileContext, SchemaName},
     test_helpers::TestParseContext,
 };
 

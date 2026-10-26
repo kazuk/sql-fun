@@ -1,8 +1,9 @@
 //! Existing type consumers retain catalog identity and extracted cast preference.
 use self::test_helpers::heavy;
+use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::sem::{
-    BaseParseContext, CastInfoRead, ColumnName, FullName, PgBuiltInType, TypeReference, ViewName,
+    CastInfoRead, ColumnName, FullName, PgBuiltInType, TypeReference, ViewName,
 };
 
 #[test]

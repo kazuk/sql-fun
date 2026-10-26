@@ -81,9 +81,10 @@ fn comment_targets_preserve_quoted_names_and_function_signatures() -> testresult
 
 mod test_helpers {
     use crate::ast::{Dialect, StatementNode, TryFromWithTokens};
+    use crate::context::BaseParseContext;
     use crate::sem::{
-        AnalysisError, BaseParseContext, ColumnName, FullName, MutSourcePathWithSpan, ParseContext,
-        PgBuiltInType, SchemaFileContext, SchemaName,
+        AnalysisError, ColumnName, FullName, MutSourcePathWithSpan, ParseContext, PgBuiltInType,
+        SchemaFileContext, SchemaName,
     };
     use crate::test_helpers::{SynBuilder, TestParseContext};
 

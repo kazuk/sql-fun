@@ -1,6 +1,5 @@
-use crate::sem::{
-    AnalysisError, BaseParseContext, FullName, InsertArbiter, InsertConflict, TableName,
-};
+use crate::context::BaseParseContext;
+use crate::sem::{AnalysisError, FullName, InsertArbiter, InsertConflict, TableName};
 
 /// A completed catalog name lookup, retaining the requested spelling separately
 /// from catalog identities (schema-qualified in PostgreSQL). Missing and

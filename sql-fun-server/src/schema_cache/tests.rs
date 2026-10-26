@@ -123,7 +123,8 @@ async fn snapshot_hash_and_analysis_stay_paired_after_file_changes() {
         project.home(),
         &"17".parse().unwrap(),
         &["public".to_owned()],
-        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]),
+        None,
+        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None),
     )
     .unwrap();
     let path = project
@@ -241,14 +242,14 @@ async fn canonical_aliases_share_identity_and_order_changes_identity() {
 #[test]
 fn fixed_identity_vectors_and_search_path_order() {
     let version = "17".parse().unwrap();
-    let root = SchemaContextKey::root(&version, &["public".to_owned()]);
+    let root = SchemaContextKey::root(&version, &["public".to_owned()], None);
     assert_eq!(
         root.as_str(),
         "cd82693b72f7ae267a4d9221cfd31b3bd061271ae5b489c8a0cf3066e90fd418"
     );
     assert_ne!(
-        SchemaContextKey::root(&version, &["a".to_owned(), "b".to_owned()]),
-        SchemaContextKey::root(&version, &["b".to_owned(), "a".to_owned()])
+        SchemaContextKey::root(&version, &["a".to_owned(), "b".to_owned()], None),
+        SchemaContextKey::root(&version, &["b".to_owned(), "a".to_owned()], None)
     );
 }
 
@@ -331,7 +332,8 @@ async fn removed_file_does_not_change_an_already_read_snapshot() {
         project.home(),
         &"17".parse().unwrap(),
         &["public".to_owned()],
-        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]),
+        None,
+        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None),
     )
     .unwrap();
     let path = project
@@ -396,7 +398,7 @@ async fn builtin_sql_edits_replace_file_layer_and_preserve_root() {
     let dump = project.schema("dump.sql", "-- application");
     let request = project.selection("products", &[], &dump, &SchemaProject::hash(&dump));
     let first = service.initialize(&request).await.unwrap();
-    let root_key = SchemaContextKey::root(&request.version, &request.search_path);
+    let root_key = SchemaContextKey::root(&request.version, &request.search_path, None);
     let root = service.roots.lookup(&root_key).unwrap();
     assert!(root.hash.is_none());
     assert!(
@@ -431,7 +433,8 @@ async fn changed_observation_does_not_join_older_pending_extension() {
         project.home(),
         &"17".parse().unwrap(),
         &["public".to_owned()],
-        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]),
+        None,
+        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None),
     )
     .unwrap();
     let path = project
@@ -602,5 +605,237 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
     let known = service.known_paths.lock().unwrap();
     for (index, path) in [builtin, extension, dump].iter().enumerate() {
         assert_eq!(known.contains_key(path), index < depth);
+    }
+}
+
+#[rstest::rstest]
+#[case::folded("OWNER", "owner")]
+#[case::quoted(r#""Mixed Owner""#, "Mixed Owner")]
+#[case::escaped_quote(r#""a""b""#, "a\"b")]
+#[case::unicode(r#""所有者""#, "所有者")]
+#[case::dot(r#""a.b""#, "a.b")]
+fn configured_roles_bind_and_apply_through_direct_context(
+    #[case] spelling: &str,
+    #[case] expected: &str,
+) {
+    use ::sql_fun_sqlast::context::ParseContext;
+    use ::sql_fun_sqlast::sem::{ObjectKind, OwnershipInfoRead, Role, RoleInfoRead};
+    let project = SchemaProject::new();
+    project.configure_roles(
+        "products",
+        r#"roles = ['owner', 'Mixed Owner', 'a"b', '所有者', 'a.b']"#,
+    );
+    let context = project.analysis_context("products");
+    assert_eq!(
+        context.role_by_name(expected).map(Role::name),
+        Some(expected)
+    );
+    let created = SchemaProject::apply_sql(context, "CREATE SCHEMA app").into_context();
+    let changed =
+        SchemaProject::apply_sql(created, &format!("ALTER SCHEMA app OWNER TO {spelling}"));
+    let change = changed.ast().ownership_change().unwrap();
+    assert_eq!(
+        change.owner().resolved_role().map(Role::name),
+        Some(expected)
+    );
+    assert!(changed.context().problems().is_empty());
+    let frozen = changed.into_context().freeze();
+    let next = project.analysis_context_over(&frozen, "products");
+    let definitions =
+        next.ownership_definitions(ObjectKind::from(37), &FullName::from_local_name("app"));
+    assert_eq!(
+        definitions[0]
+            .owner()
+            .unwrap()
+            .resolved_role()
+            .map(Role::name),
+        Some(expected)
+    );
+}
+
+#[rstest::rstest]
+#[case::omitted("")]
+#[case::empty("roles = []")]
+#[case::different("roles = ['other']")]
+fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: &str) {
+    use ::sql_fun_sqlast::context::ParseContext;
+    use ::sql_fun_sqlast::sem::{OwnershipInfoRead, RoleInfoRead};
+    let project = SchemaProject::new();
+    project.configure_roles("products", "roles = ['owner']");
+    project.configure_roles("orders", declaration);
+    let original = project.analysis_context("products");
+    assert!(original.role_by_name("owner").is_some());
+    let base = SchemaProject::apply_sql(original, "CREATE SCHEMA app")
+        .into_context()
+        .freeze();
+    let selected = project.analysis_context_over(&base, "orders");
+    assert!(selected.role_by_name("owner").is_none());
+    let failed = SchemaProject::apply_sql(selected, "ALTER SCHEMA app OWNER TO owner");
+    assert!(
+        failed
+            .ast()
+            .ownership_change()
+            .unwrap()
+            .owner()
+            .resolved_role()
+            .is_none()
+    );
+    assert_eq!(
+        failed.context().problems()[0].code(),
+        "ownership_role_not_found"
+    );
+    assert!(
+        failed
+            .context()
+            .schema_definition("app")
+            .unwrap()
+            .owner()
+            .is_none()
+    );
+    let later = SchemaProject::apply_sql(failed.into_context(), "CREATE SCHEMA later");
+    assert!(later.context().schema_definition("later").is_some());
+}
+
+#[tokio::test]
+async fn role_inventory_partitions_cached_bindings_and_diagnostics() {
+    use ::sql_fun_sqlast::sem::{OwnershipInfoRead, Role, RoleInfoRead};
+    let project = SchemaProject::new();
+    let service = project.service();
+    project.configure_roles("products", "roles = ['owner', 'other']");
+    let dump = project.schema(
+        "roles.sql",
+        "CREATE SCHEMA app; ALTER SCHEMA app OWNER TO owner;",
+    );
+    let hash = SchemaProject::hash(&dump);
+    let configured = service
+        .initialize(&project.selection("products", &[], &dump, &hash))
+        .await
+        .unwrap();
+    assert_eq!(
+        configured
+            .base_context()
+            .schema_definition("app")
+            .unwrap()
+            .owner()
+            .unwrap()
+            .resolved_role()
+            .map(Role::name),
+        Some("owner")
+    );
+    assert!(
+        configured
+            .analysis()
+            .diagnostics()
+            .last()
+            .unwrap()
+            .problems()
+            .is_empty()
+    );
+    project.configure_roles("orders", "roles = ['other', 'owner']");
+    let reordered = service
+        .initialize(&project.selection("orders", &[], &dump, &hash))
+        .await
+        .unwrap();
+    assert_eq!(configured.key(), reordered.key());
+    assert!(std::ptr::eq(configured.analysis(), reordered.analysis()));
+    project.configure_roles("orders", "roles = ['other']");
+    let missing = service
+        .initialize(&project.selection("orders", &[], &dump, &hash))
+        .await
+        .unwrap();
+    assert_ne!(configured.key(), missing.key());
+    assert!(missing.base_context().role_by_name("owner").is_none());
+    assert!(
+        missing
+            .base_context()
+            .schema_definition("app")
+            .unwrap()
+            .owner()
+            .is_none()
+    );
+    assert_eq!(
+        missing.analysis().diagnostics().last().unwrap().problems()[0].code(),
+        "ownership_role_not_found"
+    );
+    let query_context = project.analysis_context_over(configured.base_context(), "products");
+    let later = SchemaProject::apply_sql(query_context, "ALTER SCHEMA app OWNER TO other");
+    assert_eq!(
+        later
+            .ast()
+            .ownership_change()
+            .unwrap()
+            .owner()
+            .resolved_role()
+            .map(Role::name),
+        Some("other")
+    );
+    project.configure_roles("orders", "");
+    let omitted = service
+        .initialize(&project.selection("orders", &[], &dump, &hash))
+        .await
+        .unwrap();
+    project.configure_roles("orders", "roles = []");
+    let empty = service
+        .initialize(&project.selection("orders", &[], &dump, &hash))
+        .await
+        .unwrap();
+    assert_ne!(omitted.key(), empty.key());
+    assert!(omitted.base_context().metadata().roles().is_none());
+    assert!(empty.base_context().metadata().roles().is_some());
+}
+
+#[test]
+fn explicitly_registered_roles_survive_current_inventory_changes() {
+    use ::sql_fun_sqlast::context::ParseContext;
+    use ::sql_fun_sqlast::sem::{Role, RoleInfoRead};
+    let project = SchemaProject::new();
+    project.configure_roles("products", "roles = ['configured']");
+    project.configure_roles("orders", "roles = []");
+    let mut original = project.analysis_context("products");
+    original.insert_role(&Role::from("registered"));
+    let frozen = original.freeze();
+    let next = project.analysis_context_over(&frozen, "orders");
+    assert!(next.role_by_name("configured").is_none());
+    assert_eq!(
+        next.role_by_name("registered").map(Role::name),
+        Some("registered")
+    );
+}
+
+#[rstest::rstest]
+#[case::builtin(::sql_fun_core::SchemaLevel::builtin())]
+#[case::default_sql(::sql_fun_core::SchemaLevel::default_sql())]
+#[tokio::test]
+async fn configured_roles_reach_builtin_and_default_prefixes(
+    #[case] level: ::sql_fun_core::SchemaLevel,
+) {
+    use ::sql_fun_sqlast::sem::{OwnershipInfoRead, Role, RoleInfoRead};
+    let project = SchemaProject::new();
+    project.configure_roles("products", "roles = ['owner']");
+    project.schema(
+        "postgres/17/schema.sql",
+        "CREATE SCHEMA default_target; ALTER SCHEMA default_target OWNER TO owner;",
+    );
+    let (args, metadata) = project.analysis_inputs("products");
+    let selection =
+        SchemaSelection::for_level("products", &args, &metadata, &[], None, None, level).unwrap();
+    let schema = project.service().initialize(&selection).await.unwrap();
+    assert_eq!(
+        schema.base_context().role_by_name("owner").map(Role::name),
+        Some("owner")
+    );
+    if level.includes_default() {
+        assert_eq!(
+            schema
+                .base_context()
+                .schema_definition("default_target")
+                .unwrap()
+                .owner()
+                .unwrap()
+                .resolved_role()
+                .map(Role::name),
+            Some("owner")
+        );
+        assert!(schema.analysis().diagnostics()[0].problems().is_empty());
     }
 }

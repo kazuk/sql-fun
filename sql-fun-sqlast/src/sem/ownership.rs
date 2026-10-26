@@ -16,6 +16,26 @@ impl Role {
     }
 }
 
+/// Roles derived from the current analysis metadata, independent of frozen configuration.
+#[derive(Debug, Default)]
+pub(crate) struct ConfiguredRoles(std::collections::HashMap<String, Role>);
+impl From<&::sql_fun_core::SqlFunMetadata> for ConfiguredRoles {
+    fn from(metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
+        let mut roles = Self::default();
+        if let Some(inventory) = metadata.roles() {
+            for role in inventory.definitions::<Role>() {
+                roles.0.insert(role.name().to_owned(), role);
+            }
+        }
+        roles
+    }
+}
+impl ConfiguredRoles {
+    pub(crate) fn role(&self, name: &str) -> Option<&Role> {
+        self.0.get(name)
+    }
+}
+
 /// Explicit owner syntax and, for named roles, its completed lookup result.
 /// Session keywords remain symbolic; no connection or ambient identity is inferred.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -227,6 +247,15 @@ impl OwnedObjectDefinition {
 
 /// Exact-name role lookup supplied by the explicitly selected analysis environment.
 pub trait RoleInfoRead {
+    /// Explicitly registered semantic roles, independent of project configuration.
+    /// Layered contexts use this to preserve registrations without inheriting a
+    /// frozen catalog's historical configured inventory. Providers that include
+    /// project-configured roles in `role_by_name` must override this method to
+    /// exclude those entries; the default preserves existing semantic providers.
+    fn registered_role_by_name(&self, name: &str) -> Option<&Role> {
+        self.role_by_name(name)
+    }
+
     /// Missing roles remain missing; implementations must not fabricate a role.
     fn role_by_name(&self, _name: &str) -> Option<&Role> {
         None

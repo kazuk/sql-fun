@@ -1,0 +1,12 @@
+[
+  {
+    "name": "empty-inventory",
+    "sql": "ALTER SCHEMA role_target OWNER TO owner",
+    "expected": {
+      "diagnostics": [
+        "ownership_role_not_found"
+      ],
+      "columns": []
+    }
+  }
+]

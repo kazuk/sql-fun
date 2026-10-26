@@ -58,3 +58,6 @@ between-symmetric	project	between-symmetric.sql	55	17,18
 distinctness	project	distinctness.sql	55	17,18
 bounded-parameter-inference	project	bounded-parameter-inference.sql	49	17,18
 table-renames	project	table-renames.sql	4	17,18
+project-roles	project	project-roles.sql	11	17,18
+project-roles-empty	project	project-roles.sql	1	17,18
+project-roles-omitted	project	project-roles.sql	1	17,18

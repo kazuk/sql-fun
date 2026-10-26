@@ -819,3 +819,24 @@ references lack canonical target bindings and do not follow table renames
 ([#810](https://github.com/kazuk/sql-fun/issues/810)), and explicit SQLite
 `legacy_alter_table`/`foreign_keys` PRAGMA changes are not yet modeled for rename
 propagation ([#811](https://github.com/kazuk/sql-fun/issues/811)).
+
+## Project role inventory
+
+ALTER OWNER analysis resolves named owners against the selected datasource's
+explicit [`roles` metadata](installation.md#configure-known-postgresql-roles).
+For example, `roles = ["app_owner"]` allows `ALTER SCHEMA app OWNER TO app_owner`
+when schema `app` exists. The analyzer retains the resolved role and updates the
+schema ownership used by later analysis. Other supported ownership targets use
+the same role lookup.
+
+SQL unquoted names fold to lowercase; quoted names preserve their exact case and
+escaped quotes. Configured strings are exact catalog names, not SQL expressions.
+An unavailable name produces `ownership_role_not_found`; the rejected ownership
+change leaves the catalog unchanged, and later statements can still be analyzed.
+Omitted configuration and an explicit empty list both leave named roles
+unavailable. SQL `CURRENT_ROLE`, `CURRENT_USER`, and `SESSION_USER` remain symbolic
+session-dependent owners; no concrete session role is inferred. Quoted names such
+as `"CURRENT_USER"` instead request a named role from the inventory.
+
+This is offline semantic analysis of known role identities. It does not check
+whether a connected user could transfer ownership or grant database permissions.

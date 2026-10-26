@@ -145,6 +145,38 @@ cargo add tokio --futures full
 cargo add tokio-postgres futures-util
 ```
 
+## Configure known PostgreSQL roles
+
+For offline ownership analysis, list known role names in the selected datasource
+of your project's `Cargo.toml` (or the metadata file you explicitly select):
+
+```toml
+[package.metadata.database.app]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "18"
+roles = ["app_owner", "Reporting Owner"]
+```
+
+Each string is an exact catalog name, without SQL identifier quoting. For example,
+`"app_owner"` matches SQL `app_owner`, `APP_OWNER`, and `"app_owner"`;
+`"Reporting Owner"` matches SQL `"Reporting Owner"`. TOML quoting delimits strings;
+it does not add SQL quotes. Names retain case, spaces, Unicode, dots, and literal
+quote characters. A role name containing a double quote, such as `a"b`, can be
+written as the TOML literal string `'a"b'` and referenced in SQL as `"a""b"`.
+
+Role names are global, independent of schemas and search paths. Configure names
+needed by your selected datasource; sql-fun does not discover roles from a server,
+schema names, or your operating-system identity. Empty names, NUL characters,
+duplicate exact names, and values other than arrays of strings are rejected.
+
+Omitting `roles` leaves the inventory unspecified and preserves existing analysis
+behavior. `roles = []` explicitly supplies no roles. Both report unavailable named
+owners when an ALTER OWNER statement needs a role that was not supplied.
+Configuration supplies role identities for analysis; it does not create roles,
+connect to PostgreSQL, or validate membership and permissions. See
+[ownership analysis](sql-analysis.md#project-role-inventory).
+
 ## Initialize PostgreSQL builtin metadata
 
 PostgreSQL analysis requires builtin metadata matching your target PostgreSQL

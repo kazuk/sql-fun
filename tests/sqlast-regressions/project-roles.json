@@ -1,0 +1,94 @@
+[
+  {
+    "name": "folded",
+    "sql": "ALTER SCHEMA role_target OWNER TO OWNER",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "quoted",
+    "sql": "ALTER SCHEMA role_target OWNER TO \"Mixed Owner\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "escaped-quote",
+    "sql": "ALTER SCHEMA role_target OWNER TO \"a\"\"b\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "unicode",
+    "sql": "ALTER SCHEMA role_target OWNER TO \"所有者\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "dot",
+    "sql": "ALTER SCHEMA role_target OWNER TO \"a.b\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "quoted-keyword",
+    "sql": "ALTER SCHEMA role_target OWNER TO \"CURRENT_USER\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "symbolic-session",
+    "sql": "ALTER SCHEMA role_target OWNER TO SESSION_USER",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing",
+    "sql": "ALTER SCHEMA role_target OWNER TO absent_owner",
+    "expected": {
+      "diagnostics": [
+        "ownership_role_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "case-mismatch",
+    "sql": "ALTER SCHEMA role_target OWNER TO \"Owner\"",
+    "expected": {
+      "diagnostics": [
+        "ownership_role_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "current_role",
+    "sql": "ALTER SCHEMA role_target OWNER TO CURRENT_ROLE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "current_user",
+    "sql": "ALTER SCHEMA role_target OWNER TO CURRENT_USER",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

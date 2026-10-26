@@ -1,9 +1,10 @@
+use crate::context::BaseParseContext;
 use crate::{
     ast::Dialect,
     sem::{
-        BaseParseContext, CastContext, CastDefinition, MutSourcePathWithSpan, ParseContext,
-        PgBuiltInType, SchemaFileContext, SchemaName, SourcePathWithSpan, TypeCategory,
-        TypeDefinition, TypeReference,
+        CastContext, CastDefinition, MutSourcePathWithSpan, ParseContext, PgBuiltInType,
+        SchemaFileContext, SchemaName, SourcePathWithSpan, TypeCategory, TypeDefinition,
+        TypeReference,
     },
     test_helpers::TestParseContext,
 };

@@ -54,7 +54,7 @@ impl SimpleInferContext {
     fn push_array(
         &mut self,
         array_ty: &TypeReference,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         if let Some(element) = catalog.get_array_item_type(array_ty) {
             self.array_types.insert(array_ty.clone());
@@ -69,7 +69,7 @@ impl SimpleInferContext {
     fn push_non_array_element(
         &mut self,
         ty: &TypeReference,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
@@ -102,7 +102,7 @@ impl SimpleInferContext {
         &mut self,
         param_type: &TypeReference,
         arg_type: &TypeReference,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         if param_type.is_any_element() {
             self.push_element(arg_type);
@@ -148,7 +148,7 @@ impl SimpleInferContext {
         &mut self,
         param: &TParam,
         bind: &ParameterBindResult,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError>
     where
         TParam: FunctionParameterTrait + Sized,
@@ -254,7 +254,7 @@ impl CommonInferContext {
     pub fn push_compat_array(
         &mut self,
         array_ty: &TypeReference,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         if let Some(element) = catalog.get_array_item_type(array_ty) {
             self.element_types.insert(element);
@@ -267,7 +267,7 @@ impl CommonInferContext {
     pub fn push_compat_non_array(
         &mut self,
         ty: &TypeReference,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
@@ -300,7 +300,7 @@ impl CommonInferContext {
         &mut self,
         param_type: &TypeReference,
         arg_type: &TypeReference,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError> {
         if param_type.is_any_compatible() {
             self.push_compat_element(arg_type);
@@ -340,7 +340,7 @@ impl CommonInferContext {
         self.infer_from_catalog(context)
     }
 
-    pub(crate) fn infer_from_catalog<TCatalog: crate::sem::BaseParseContext>(
+    pub(crate) fn infer_from_catalog<TCatalog: crate::context::BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<TypeReference, TypeError> {
@@ -393,7 +393,7 @@ impl CommonInferContext {
         &mut self,
         param: &TParam,
         bind: &ParameterBindResult,
-        catalog: &impl crate::sem::BaseParseContext,
+        catalog: &impl crate::context::BaseParseContext,
     ) -> Result<(), TypeError>
     where
         TParam: FunctionParameterTrait + Sized,

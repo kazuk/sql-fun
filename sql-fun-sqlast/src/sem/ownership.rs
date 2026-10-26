@@ -354,7 +354,7 @@ impl OwnershipCatalog {
     }
 }
 
-pub(crate) fn model_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+pub(crate) fn model_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -372,7 +372,7 @@ pub(crate) fn model_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     }
 }
 
-fn table_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+fn table_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -383,7 +383,7 @@ fn table_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn sequence_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+fn sequence_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -394,7 +394,7 @@ fn sequence_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn view_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+fn view_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -408,7 +408,7 @@ fn view_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn schema_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+fn schema_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -419,7 +419,7 @@ fn schema_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn type_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+fn type_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -447,7 +447,7 @@ fn type_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     ownership_snapshot(actual_kind, name, owner)
 }
 
-fn routine_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+fn routine_definitions<C: crate::context::BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,

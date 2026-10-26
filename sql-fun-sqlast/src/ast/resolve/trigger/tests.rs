@@ -632,10 +632,11 @@ fn postgres_cte_lookup_preserves_quoted_case(
 
 mod test_helpers {
     use crate::ast::Dialect;
+    use crate::context::BaseParseContext;
     use crate::sem::{
-        AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, CreateTable,
-        CreateTableMode, FrozenBaseContext, FullName, FunctionOverloadCollection, OverloadVariant,
-        PgBuiltInType, SchemaFileContext, SchemaName, TableName, TypeReference,
+        AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode,
+        FrozenBaseContext, FullName, FunctionOverloadCollection, OverloadVariant, PgBuiltInType,
+        SchemaFileContext, SchemaName, TableName, TypeReference,
     };
     use crate::test_helpers::TestParseContext;
 

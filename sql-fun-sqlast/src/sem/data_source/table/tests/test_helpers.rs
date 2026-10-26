@@ -1,7 +1,8 @@
 use crate::ast::Dialect;
+use crate::context::BaseParseContext;
 use crate::sem::{
-    BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext, SchemaName,
-    SelectStatement, TypeReference,
+    MutSourcePathWithSpan, ParseContext, SchemaFileContext, SchemaName, SelectStatement,
+    TypeReference,
 };
 use crate::test_helpers::{TestParseContext, source_span};
 

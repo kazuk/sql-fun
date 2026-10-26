@@ -5,10 +5,11 @@ mod case_tests;
 #[cfg(test)]
 mod indirection_tests;
 use crate::ast::Dialect;
+use crate::context::BaseParseContext;
 use crate::sem::overload_rank::OverloadRank;
 use crate::sem::{
-    AnalysisError, BaseParseContext, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
-    ParameterConstraints, SemScalarExpr, SignatureAlternative, TypeReference,
+    AnalysisError, ConstrainedExpr, ConstraintGraph, InputTypeConstraint, ParameterConstraints,
+    SemScalarExpr, SignatureAlternative, TypeReference,
 };
 use std::collections::BTreeMap;
 

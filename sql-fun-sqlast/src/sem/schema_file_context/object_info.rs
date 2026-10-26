@@ -1,5 +1,6 @@
 use super::{SchemaCatalog, SchemaFileContext};
-use crate::sem::{BaseParseContext, ExtensionInfoRead, FullName, Kind, ObjectInfoRead};
+use crate::context::BaseParseContext;
+use crate::sem::{ExtensionInfoRead, FullName, Kind, ObjectInfoRead};
 
 impl ObjectInfoRead for SchemaCatalog {
     fn object_kind(&self, name: &FullName) -> Option<Kind> {

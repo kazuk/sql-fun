@@ -314,7 +314,8 @@ fn keeps_schema_qualified_and_array_field_types() {
 
 #[test]
 fn keeps_selected_overload_separate_from_output_definitions() {
-    use crate::sem::{AliasName, BaseParseContext, ColumnName, DataSource, FullName};
+    use crate::context::BaseParseContext;
+    use crate::sem::{AliasName, ColumnName, DataSource, FullName};
     let (query, context) =
         table_function_query("SELECT r.a FROM overloaded_record(1) AS r(a text)", false);
     assert_eq!(
@@ -436,7 +437,8 @@ fn qualified_star_expands_only_its_selected_source(#[case] sql: &str) {
 
 #[test]
 fn table_row_returns_do_not_inherit_storage_constraints() {
-    use crate::sem::{BaseParseContext, ColumnName, FullName, TableName};
+    use crate::context::BaseParseContext;
+    use crate::sem::{ColumnName, FullName, TableName};
     let (query, context) = table_function_query("SELECT r.a FROM row_fun() r", false);
     assert_eq!(
         context.reported_problem_count(),

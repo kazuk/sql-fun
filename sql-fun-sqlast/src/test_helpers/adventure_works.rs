@@ -1,4 +1,5 @@
-use crate::sem::{BaseContext, BaseParseContext, FrozenBaseContext};
+use crate::context::BaseParseContext;
+use crate::sem::{BaseContext, FrozenBaseContext};
 use crate::{PostgresDialect, SqlFunArgs};
 
 use std::path::PathBuf;

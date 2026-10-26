@@ -1,7 +1,7 @@
 use super::{ConflictMasters, lookup_collation, lookup_operator_class};
+use crate::context::BaseParseContext;
 use crate::sem::{
-    BaseParseContext, CollationIdentity, ConflictInfoRead, FullName, ParseContext,
-    SchemaFileContext, SchemaName,
+    CollationIdentity, ConflictInfoRead, FullName, ParseContext, SchemaFileContext, SchemaName,
 };
 
 #[rstest::rstest]
@@ -398,7 +398,7 @@ mod test_helpers {
         let metadata = TestParseContext::default().with_dialect(dialect);
         Ok(crate::sem::BaseContext::new(
             &args,
-            crate::sem::BaseParseContext::metadata(&metadata),
+            crate::context::BaseParseContext::metadata(&metadata),
         )?)
     }
 

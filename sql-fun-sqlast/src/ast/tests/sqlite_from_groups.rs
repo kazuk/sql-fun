@@ -1,4 +1,5 @@
-use crate::sem::{BaseParseContext, ColumnName, PgBuiltInType};
+use crate::context::BaseParseContext;
+use crate::sem::{ColumnName, PgBuiltInType};
 
 #[rstest::rstest]
 #[case("select q.ax as n from (a) as q", false, true)]
@@ -94,9 +95,10 @@ fn parenthesized_sources_report_duplicate_group_aliases() -> testresult::TestRes
 }
 
 mod test_helpers {
+    use crate::context::BaseParseContext;
     use crate::sem::{
-        AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, MutSourcePathWithSpan,
-        PgBuiltInType, SchemaName, SelectStatement, SemAst,
+        AnalysisError, ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType,
+        SchemaName, SelectStatement, SemAst,
     };
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
 

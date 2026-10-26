@@ -1,5 +1,6 @@
+use crate::context::BaseParseContext;
 use crate::context::ParseContext;
-use crate::sem::{BaseParseContext, SchemaFileContext};
+use crate::sem::SchemaFileContext;
 
 /// Explicit small composite fixtures; no builtin catalog or live database.
 pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileContext> {

@@ -7,11 +7,12 @@ use self::test_helpers::{
     parent_with_same_named_tables, query,
 };
 
+use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{
-        BaseParseContext, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead,
-        PgBuiltInType, SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
+        ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, PgBuiltInType,
+        SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
     },
 };
 
@@ -781,13 +782,14 @@ mod test_helpers {
     use std::path::Path;
 
     use ::clap::Parser;
+    use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParsedSchemaDump, PostgresDialect, SqlFunArgs,
         context::ParseContext,
         sem::{
-            AnalysisProblem, BaseContext, BaseParseContext, ColumnName, FrozenBaseContext,
-            FullName, SchemaFileContext, SchemaName, TableName, TypeReference, ViewInfoRead,
-            ViewLike, problem::NameResolution,
+            AnalysisProblem, BaseContext, ColumnName, FrozenBaseContext, FullName,
+            SchemaFileContext, SchemaName, TableName, TypeReference, ViewInfoRead, ViewLike,
+            problem::NameResolution,
         },
     };
 

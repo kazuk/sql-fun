@@ -1,5 +1,6 @@
+use crate::context::BaseParseContext;
 use crate::sem::traversal::SemanticVisitor;
-use crate::sem::{AnalysisError, BaseParseContext, FullName, ParseContext, SemAst, SemScalarExpr};
+use crate::sem::{AnalysisError, FullName, ParseContext, SemAst, SemScalarExpr};
 
 /// PostgreSQL rule identity: a rule name in one resolved relation's namespace.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

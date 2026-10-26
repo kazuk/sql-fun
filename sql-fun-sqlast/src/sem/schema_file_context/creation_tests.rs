@@ -442,7 +442,7 @@ mod test_helpers {
     use crate::sem::ParseContext;
     use crate::sem::{AnalysisError, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext};
     pub(super) fn child(parent: FrozenBaseContext) -> SchemaFileContext {
-        use crate::sem::BaseParseContext;
+        use crate::context::BaseParseContext;
         let mut context = SchemaFileContext::new(
             std::path::Path::new("creation.sql"),
             &parent,
@@ -711,7 +711,8 @@ fn temporary_relations_and_row_types_follow_search_path(
     #[case] selected: &str,
     #[values(false, true)] inherited: bool,
 ) -> testresult::TestResult {
-    use crate::sem::{BaseParseContext, SchemaName, TableName};
+    use crate::context::BaseParseContext;
+    use crate::sem::{SchemaName, TableName};
     let mut context = test_helpers::postgres(
         "CREATE TABLE public.t(permanent integer); CREATE TEMP TABLE t(temporary integer)",
     )?;
@@ -747,7 +748,8 @@ fn temporary_relations_and_row_types_follow_search_path(
 
 #[test]
 fn temporary_view_shadows_permanent_table_without_affecting_routines() -> testresult::TestResult {
-    use crate::sem::{BaseParseContext, SchemaName, TableName};
+    use crate::context::BaseParseContext;
+    use crate::sem::{SchemaName, TableName};
     let context = test_helpers::postgres(
         "CREATE TABLE public.t(permanent integer); CREATE TEMP VIEW t AS SELECT 1 AS temporary; CREATE FUNCTION public.f() RETURNS integer LANGUAGE SQL AS 'SELECT 1'; CREATE FUNCTION pg_temp.f() RETURNS bigint LANGUAGE SQL AS 'SELECT 1'",
     )?;
@@ -888,7 +890,8 @@ fn materialized_view_applies_the_output_column_name_list() -> testresult::TestRe
 
 #[test]
 fn postgres18_named_not_null_occupies_the_constraint_namespace() -> testresult::TestResult {
-    use crate::sem::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext, SchemaName};
+    use crate::context::BaseParseContext;
+    use crate::sem::{MutSourcePathWithSpan, SchemaFileContext, SchemaName};
     let mut metadata = ::sql_fun_core::SqlFunMetadataCollection::load_from(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/selected-postgres.toml"

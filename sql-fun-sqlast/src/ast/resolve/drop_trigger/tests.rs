@@ -147,8 +147,9 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
 }
 
 mod test_helpers {
-    use crate::sem::{BaseParseContext, FullName, TableName, TriggerIdentity, ViewName};
+    use crate::context::BaseParseContext;
     use crate::sem::{FrozenBaseContext, SchemaFileContext};
+    use crate::sem::{FullName, TableName, TriggerIdentity, ViewName};
     pub(super) const CREATE_AUDIT: &str = "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()";
     pub(super) fn identity() -> TriggerIdentity {
         TriggerIdentity::postgres(

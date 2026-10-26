@@ -1,5 +1,6 @@
 use super::BuiltinTypeInfo;
-use crate::sem::{BaseParseContext, FullName, TypeDefinition};
+use crate::context::BaseParseContext;
+use crate::sem::{FullName, TypeDefinition};
 use crate::test_helpers::TestParseContext;
 
 #[rstest::rstest]

@@ -445,12 +445,13 @@ fn statistics_preserve_a_non_btree_access_method() -> testresult::TestResult {
 }
 
 mod test_helpers {
+    use crate::context::BaseParseContext;
     use crate::{
         AstAndContextPair,
         ast::{StatementNode, TryFromWithTokens},
         sem::{
-            AnalysisError, BaseParseContext, CreateIndex, FrozenBaseContext, FullName,
-            IndexInfoRead, MutSourcePathWithSpan, SchemaFileContext,
+            AnalysisError, CreateIndex, FrozenBaseContext, FullName, IndexInfoRead,
+            MutSourcePathWithSpan, SchemaFileContext,
         },
     };
     pub(super) fn deduplicate(index: &CreateIndex) -> Option<bool> {

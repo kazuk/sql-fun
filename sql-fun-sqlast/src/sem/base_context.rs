@@ -8,10 +8,11 @@ pub use self::{
 
 use std::{fs::File, io::BufReader, path::Path};
 
+use crate::context::BaseParseContext;
 use crate::{
     TrieMap,
     sem::{
-        AnalysisError, BaseParseContext, CastDefinition, CreateTable, FullName, FunctionInfoRead,
+        AnalysisError, CastDefinition, CreateTable, FullName, FunctionInfoRead,
         FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorDefinition,
         SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
         parse_context::{

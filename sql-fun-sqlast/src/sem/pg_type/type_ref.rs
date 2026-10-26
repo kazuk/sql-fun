@@ -1,7 +1,5 @@
-use crate::{
-    context::ParseContext,
-    sem::{BaseParseContext, FullName},
-};
+use crate::context::BaseParseContext;
+use crate::{context::ParseContext, sem::FullName};
 
 use super::{
     TypeDefinition, concrete_type::ConcreteTypeReference, dynamic_type::DynamicTypeReference,

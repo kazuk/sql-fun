@@ -1,11 +1,12 @@
 mod cast_info;
 mod conflict_info;
 
+use crate::context::BaseParseContext;
 use crate::{
     StringSpan,
     context::ParseContext,
     sem::{
-        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext,
+        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
         CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,

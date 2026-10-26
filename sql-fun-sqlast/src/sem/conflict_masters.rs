@@ -1,4 +1,5 @@
-use crate::sem::{AnalysisError, BaseParseContext, CatalogNameLookup, FullName};
+use crate::context::BaseParseContext;
+use crate::sem::{AnalysisError, CatalogNameLookup, FullName};
 use std::{collections::HashSet, fs::File, io::BufReader, path::Path};
 
 /// Qualified collation identity, including encoding eligibility.

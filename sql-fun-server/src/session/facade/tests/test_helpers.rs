@@ -4,7 +4,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use ::sql_fun_sqlast::sem::{BaseParseContext, ColumnDefinition, CreateTable, FullName, TableName};
+use ::sql_fun_sqlast::context::BaseParseContext;
+use ::sql_fun_sqlast::sem::{ColumnDefinition, CreateTable, FullName, TableName};
 
 /// Real schema borrow with a destructor that observes schema data on teardown.
 /// Uses the small synthetic `SchemaProject` fixture, not the full builtin catalog.

@@ -1,7 +1,6 @@
 use crate::ast::Dialect;
-use crate::sem::{
-    BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext, SchemaName, TypeReference,
-};
+use crate::context::BaseParseContext;
+use crate::sem::{FrozenBaseContext, ParseContext, SchemaFileContext, SchemaName, TypeReference};
 use crate::test_helpers::TestParseContext;
 
 /// A small explicit catalog for parameter typing; no builtin catalog loading.

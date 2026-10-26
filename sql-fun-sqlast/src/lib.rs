@@ -202,8 +202,8 @@ mod test_schema_content_hash {
                 file.path(),
                 analysis_base,
                 &mut hash,
-                crate::sem::BaseParseContext::get_args(&environment),
-                crate::sem::BaseParseContext::metadata(&environment),
+                crate::context::BaseParseContext::get_args(&environment),
+                crate::context::BaseParseContext::metadata(&environment),
             )
         };
         assert_eq!(result.is_ok(), succeeds, "{result:?}");
@@ -223,8 +223,8 @@ mod test_schema_content_hash {
                 &directory.path().join("missing.sql"),
                 analysis_base,
                 &mut hash,
-                crate::sem::BaseParseContext::get_args(&environment),
-                crate::sem::BaseParseContext::metadata(&environment),
+                crate::context::BaseParseContext::get_args(&environment),
+                crate::context::BaseParseContext::metadata(&environment),
             )
         }
         .unwrap_err();
@@ -478,7 +478,7 @@ mod tests {
         crate::test_helpers::small_stack_regression(2 * 1024 * 1024, || {
             let dump = crate::test_helpers::adventure_works_schema(&context_args)
                 .expect("full AdventureWorks schema on a small stack");
-            let view = crate::sem::BaseParseContext::get_view(
+            let view = crate::context::BaseParseContext::get_view(
                 &dump,
                 &crate::sem::ViewName::from_full_name(&crate::sem::FullName::with_schema(
                     "humanresources",

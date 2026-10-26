@@ -15,11 +15,12 @@ mod test_helpers {
 
     use ::clap::Parser;
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
+    use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParseDumpFileError, ParsedSchemaDump, PostgresDialect,
         sem::{
-            AnalysisProblem, BaseContext, BaseParseContext, FrozenBaseContext, FullName,
-            GetSourcePathWithSpanOpt, TableName, problem::NameResolution,
+            AnalysisProblem, BaseContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt,
+            TableName, problem::NameResolution,
         },
     };
     use ::tempfile::NamedTempFile;

@@ -215,7 +215,8 @@ pub struct CreateTable {
 
 #[cfg(test)]
 mod test_create_table_clone {
-    use crate::sem::{BaseParseContext, ColumnName, ParseContext, TableInfoWrite};
+    use crate::context::BaseParseContext;
+    use crate::sem::{ColumnName, ParseContext, TableInfoWrite};
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
@@ -697,12 +698,10 @@ mod test_analyze_create_table {
     use assert_matches::assert_matches;
     use testresult::TestResult;
 
+    use crate::context::BaseParseContext;
     use crate::{
         AstAndContextPair,
-        sem::{
-            BaseParseContext, CreateTableMode, FullName, SchemaName, SemAst, SourcePathWithSpan,
-            TableName,
-        },
+        sem::{CreateTableMode, FullName, SchemaName, SemAst, SourcePathWithSpan, TableName},
         syn::sqlite::Stmt,
         test_helpers::{
             SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,

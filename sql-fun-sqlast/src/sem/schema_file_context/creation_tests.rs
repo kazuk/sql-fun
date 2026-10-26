@@ -5,6 +5,84 @@ use crate::sem::{
 };
 
 #[rstest::rstest]
+#[case::qualified("CREATE TYPE public.status AS ENUM ('ready')")]
+#[case::default_schema("CREATE TYPE status AS ENUM ('ready')")]
+fn enum_references_retain_catalog_identity(
+    #[case] declaration: &str,
+    #[values(false, true)] inherited: bool,
+) -> testresult::TestResult {
+    use crate::context::BaseParseContext;
+    use crate::sem::TypeReference;
+
+    let mut context = test_helpers::postgres(declaration)?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    if inherited {
+        context = test_helpers::child(context.freeze());
+    }
+    let context = test_helpers::apply(
+        context,
+        "CREATE TABLE public.enum_items (status public.status); \
+         CREATE VIEW public.enum_view AS SELECT status FROM public.enum_items;",
+    )?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let name = FullName::with_schema("public", "status");
+    let reference = TypeReference::from_full_name(name.clone());
+    let definition = context.get_type(&name).expect("enum type");
+    assert_eq!(definition.type_reference(), Some(&reference));
+    assert!(context.type_references().contains(&reference));
+    assert_eq!(definition.get_member_type(&context, "ready"), None);
+    let view = context
+        .get_view_impl(&FullName::with_schema("public", "enum_view"))
+        .expect("enum view");
+    assert_eq!(
+        view.get_column_def(&ColumnName::from("status"))
+            .expect("selected enum column")
+            .get_type(),
+        Some(&reference)
+    );
+    Ok(())
+}
+
+#[test]
+fn distinct_enums_keep_distinct_references_and_missing_name_reports_a_problem()
+-> testresult::TestResult {
+    use crate::sem::{AnalysisProblem, TypeReference, problem::NameResolution};
+
+    let context = test_helpers::postgres(
+        "CREATE TYPE public.first_status AS ENUM ('ready'); \
+         CREATE TYPE public.second_status AS ENUM ('ready'); \
+         CREATE TABLE public.enum_items (first public.first_status, second public.second_status); \
+         CREATE TABLE public.missing_items (status public.absent_status);",
+    )?;
+    let first = TypeReference::from_full_name(FullName::with_schema("public", "first_status"));
+    let second = TypeReference::from_full_name(FullName::with_schema("public", "second_status"));
+    assert_ne!(first, second);
+    let table = context
+        .get_table_impl(&FullName::with_schema("public", "enum_items"))
+        .expect("enum table");
+    assert_eq!(
+        table
+            .get_column_def(&ColumnName::from("first"))
+            .unwrap()
+            .get_type(),
+        Some(&first)
+    );
+    assert_eq!(
+        table
+            .get_column_def(&ColumnName::from("second"))
+            .unwrap()
+            .get_type(),
+        Some(&second)
+    );
+    assert!(matches!(
+        context.problems(),
+        [AnalysisProblem::NameResolution(NameResolution::ColumnTypeNotFound(_, _, name))]
+            if name.as_str() == "public.absent_status"
+    ));
+    Ok(())
+}
+
+#[rstest::rstest]
 #[case::table_table(
     "CREATE TABLE public.t(id integer)",
     "CREATE TABLE public.t(other integer)",

@@ -19,6 +19,7 @@ coalesce_semantic	builtin	-	3	17,18
 array-subqueries	builtin	-	28	17,18
 bootstrap-array-expressions	builtin	-	2	18
 schema-composites	project	schema-composites.sql	6	17,18
+schema-enums	project	schema-enums.sql	3	17,18
 schema-delete	project	schema-delete.sql	18	17,18
 schema-domains-builtin	default	-	10	17,18
 schema-domains-default-tie	project	schema-domains-default-tie.sql	1	17,18

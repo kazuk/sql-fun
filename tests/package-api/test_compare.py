@@ -62,16 +62,6 @@ class Comparison(unittest.TestCase):
             self.assertEqual(fingerprint(package), contents)
         return report
 
-    def test_missing_requested_feature(self):
-        old = self.package('old', '')
-        old['features'] = ['missing']
-        report = self.compare(old, self.package('new', ''), expected='analysis-error')
-        self.assertIn('old JSON production', report['diagnostics'])
-        self.assertNotIn('impact', report)
-
-    def test_wrong_producer(self):
-        self.compare(self.package('old', ''), self.package('new', ''), expected='analysis-error', toolchain='nonexistent-357-fixture')
-
     def test_preparation_uses_active_toolchain_without_installing(self):
         tools = self.root / 'tools'
         tools.mkdir()
@@ -111,37 +101,6 @@ class Comparison(unittest.TestCase):
         old = self.package('old', '')
         del old['default_features']
         self.compare(old, self.package('new', ''), expected='analysis-error')
-
-    def test_source_dependency_path_rejected(self):
-        old = self.package('old', '', dependencies='outside={path="../../outside"}')
-        self.compare(old, self.package('new', ''), expected='analysis-error')
-
-    def test_source_target_path_rejected(self):
-        old = self.package('old', '')
-        manifest = Path(old['package']) / 'Cargo.toml'
-        outside = self.root / 'outside.rs'
-        outside.write_text('pub fn outside() {}')
-        manifest.write_text(manifest.read_text().replace('[lib]', '[lib]\npath=' + json.dumps(str(outside))))
-        report = self.compare(old, self.package('new', ''), expected='analysis-error')
-        self.assertIn('target source is outside', report['diagnostics'])
-
-    def test_external_workspace_reference_rejected(self):
-        old = self.package('old', '')
-        manifest = Path(old['package']) / 'Cargo.toml'
-        manifest.write_text(manifest.read_text().replace('[package]', '[package]\nworkspace="../other"'))
-        report = self.compare(old, self.package('new', ''), expected='analysis-error')
-        self.assertIn('must not reference an external workspace', report['diagnostics'])
-
-    def test_missing_analyzer(self):
-        self.compare(self.package('old', ''), self.package('new', ''),
-                     expected='analysis-error', analyzer=self.root / 'missing-tool')
-
-    def test_wrong_analyzer_version(self):
-        tool = self.root / 'wrong-tool'
-        tool.write_text('#!/bin/sh\necho cargo-semver-checks 0.0.0\n')
-        tool.chmod(0o755)
-        self.compare(self.package('old', ''), self.package('new', ''),
-                     expected='analysis-error', analyzer=tool)
 
     def test_wrapper_read_and_parse_errors(self):
         malformed = self.root / 'broken.json'

@@ -22,7 +22,8 @@ maintenance cost and its runtime cannot easily be reduced, delete and discard
 it, including unused test-only helpers and fixtures. Do not move that cost to
 another CI step, keep an ignored/manual copy, or undertake elaborate refactoring
 solely to retain the assertion. Record removed coverage and the cost/value
-rationale in the pull request.
+rationale in the pull request. Leave enough runtime margin for the maintained CI
+environment; a case barely under one second locally can still fail there.
 
 For issue #828, no additional automated tests, assertions, permanent fixtures,
 or CI checks are authorized: CI is billed and no budget is allocated for their

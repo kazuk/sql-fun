@@ -149,7 +149,10 @@ cleared by an empty structural diff.
 
 The existing `workspace` check runs `xbuild`'s integration test through Cargo or
 nextest, including its CI archive group. `tests/package-api/test_compare.py`
-retains inexpensive validation and report-boundary checks. The comparator runtime
+retains inexpensive explicit-input, preparation, wrapper-error, JSON and report
+checks. The #828 cost review also discarded the repeated Cargo metadata,
+producer, source-boundary and analyzer-version rejection cases after CI timed
+out the reduced aggregate near one second. The comparator runtime
 requires Python 3.11+ (`tomllib`), Bash, rustup and Cargo. Maintained tests use
 `uv run --no-project --no-config --python 3.12` through existing contributor/CI
 setup. Runtime nextest paths support archive relocation.

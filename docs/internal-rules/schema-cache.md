@@ -111,12 +111,15 @@ Historical entries remain in memory only for the service lifetime.
 The server executable installs a default-diagnostic-preserving panic hook
 before its Tokio runtime is created. Any panic aborts that server process,
 including async/blocking task panics. Importing the library does not install
-the hook. No panic recovery or cache repair is attempted. Subprocess tests
-verify abort and backtrace output without killing the main runner.
+the hook. No panic recovery or cache repair is attempted. The #828 cost
+review discarded the process abort/backtrace test because symbolizing a real
+backtrace exceeded the one-second per-case budget.
 
 Unit tests run in the maintained workspace/nextest flow, with small synthetic
 catalog fixtures. Full initialization RPC tests must be added when #428 wires
 session registration to this service. `notify` 8.2 supports Rust 1.77 and its
 Linux backend uses native inotify through existing Rust/libc dependencies;
 there is no additional executable or native development package prerequisite
-for the repository's Linux CI image.
+for the repository's Linux CI image. The #828 cost review also discarded the
+OS notification delivery test: native event scheduling exceeded the one-second
+case budget. Deterministic invalidation and inode-replacement checks remain.

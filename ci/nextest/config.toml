@@ -9,6 +9,7 @@ junit.path = "junit.xml"
 # Archive groups run independently, with persistent, non-overlapping reports.
 [profile.ci-a]
 fail-fast = false
+test-threads = 1
 junit.path = "junit.xml"
 
 [profile.ci-b]

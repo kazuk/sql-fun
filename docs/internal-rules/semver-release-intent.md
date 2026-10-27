@@ -1,9 +1,8 @@
 # SemVer release intent and Cargo feature lifecycle
 
-Status: **policy awaiting final review** for #355. The #356 capability findings
-are incorporated below; the handling of unsupported classifications still
-requires final maintainer review of the proposed conservative combination
-before this becomes the implementation contract.
+Status: **final, approved policy** for #355, incorporating the reviewed #356
+capability findings. This is the repository's release-intent classification
+contract for implementation in #357–#361.
 
 ## Authority and scope
 
@@ -117,13 +116,13 @@ Observed capabilities and boundaries:
   analysis as well. Exit `0` alone does not establish complete classification
   or prove every intended surface was checked.
 
-## Proposed conservative comparison rule
+## Conservative comparison rule
 
 The additional [capability investigation](semver-analyzer-probe.md) verifies
 **cargo-public-api 0.52.0** against the same format-61 rustdoc JSON pairs used by
 cargo-semver-checks 0.51.0, including function-like, derive and attribute macros.
-This provides the following concrete proposal for final policy review; it does
-not approve comparator or CI implementation:
+Apply the following repository policy. Comparator and CI implementation remain
+separate work:
 
 1. After successful analysis of all intended coverage, no structural difference
    starts at Patch. Added-only public API starts at Minor. Any removed/changed
@@ -139,7 +138,7 @@ not approve comparator or CI implementation:
 3. Compare released Cargo feature inventories separately: removed released
    features require Major even with no API diff. New opt-in feature coverage
    must not suppress any released selected coverage. New APIs in that coverage
-   require at least Minor under this proposal.
+   require at least Minor under this policy.
 4. Validate the complete old/new coverage, tool versions, compiler/target and
    JSON producer/schema provenance explicitly. A missing, unreadable,
    incompatible or failed artifact/tool is validation failure, not a SemVer
@@ -175,9 +174,9 @@ work and does not establish that those missing lints ship in version 0.51.0.
 
 Direct SemVer JSON input also ignores manifest lint overrides: even passing the
 candidate manifest did not enable the opt-in struct-addition finding. Do not
-assume opt-in configuration is active in a JSON-only adapter. The proposed
-public-api diff supplies structural addition coverage independently; the JSON
-SemVer default findings can still raise its conservative level.
+assume opt-in configuration is active in a JSON-only adapter. The public-api
+diff supplies structural addition coverage independently; the JSON SemVer
+default findings can still raise its conservative level.
 
 Both tools accepted the exact same format-61 artifacts in the measured cases.
 Format-55 inputs failed. Mutating only the format marker to 999 was accepted by
@@ -187,15 +186,15 @@ when they change; reuse of arbitrary archived JSON is not established here.
 The production JSON generation strategy and tool provisioning remain later
 implementation decisions, with no new contributor procedure authorized.
 
-**Awaiting final maintainer review:** approve the conservative over-classification
-tradeoff, complete released-coverage requirement and complementary behavioral
-review boundary above. The requested combination is established for the
-reproducible cases, not all possible Rust behavior. No comparator, CI wiring,
-baseline migration or fallback is implemented or authorized by this document.
+The conservative over-classification tradeoff, complete released-coverage
+requirement and complementary behavioral review boundary above are approved
+repository policy. The measured combination establishes the documented cases,
+not complete compatibility coverage of all Rust behavior. This specification
+does not implement a comparator, CI wiring, baseline migration or fallback.
 
 ## Acceptance examples
 
-The following cases are requirements for the final comparison contract, not
+The following cases are requirements of the comparison contract, not
 claims about current tooling:
 
 | Case | Expected policy outcome |
@@ -207,13 +206,12 @@ claims about current tooling:
 | 5. Adopt the new coverage into a stable active baseline, then break it in a subsequent candidate | Treat the now-released coverage as a normal compatibility contract. |
 | 6. Add versus remove feature coverage | Addition is not treated as removal; removal of released coverage must not be treated as harmless addition. |
 | 7. New side enables an opt-in feature absent from the baseline | Compare the common historical surface for compatibility and classify the candidate-only surface as new coverage, without requiring a nonexistent baseline feature. |
-| 8. Analyzer cannot classify a change required by this policy | Proposed combination: classify an observed unclassifiable API diff as Major; tool/analysis failure fails validation; out-of-model concerns remain inconclusive pending complementary review. No unsupported omission proves a pass. |
+| 8. Analyzer cannot classify a change required by this policy | Classify an observed unclassifiable API diff as Major; tool/analysis failure fails validation; out-of-model concerns remain inconclusive pending complementary review. No unsupported omission proves a pass. |
 
-## Finalization boundary
+## Specification and implementation boundary
 
-Issue #355 is specification-only. The #356 report supplies the tested version
-and observed gaps, including the requested conservative combination. Final
-approval still requires review of its tradeoffs and coverage boundary;
-incorporating measurements alone does not complete #355 or #356. Package
-materialization, baseline storage/adoption, caching, CI wiring, and
-implementation belong to issues #357–#361 and are not defined here.
+This approved policy and the reviewed #356 capability findings fulfill #355's
+specification requirements. The capability report remains investigation
+evidence. Package materialization, baseline storage/adoption, caching, CI wiring
+and comparator implementation belong to #357–#361; their implementation is not
+completed by this documentation change.

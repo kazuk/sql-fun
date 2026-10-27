@@ -4,8 +4,9 @@
 
 These measured results inform the release-intent policy in
 [semver-release-intent.md](semver-release-intent.md) and the analyzer adapter in
-later implementation issues. They are investigation evidence, not approval of a
-supplementary classifier or a claim of complete SemVer coverage. The
+later implementation issues. They are the reviewed investigation evidence
+incorporated into the final, approved policy for #355; they do not establish
+complete SemVer coverage or completed comparator/CI implementation. The
 reproducible fixture definitions below are maintained with this report; repeat
 them when changing the authoritative analyzer version or input path.
 
@@ -337,12 +338,12 @@ change. Default diff exits **0 even for differences**. With `--deny`, it exits
 The four denial-status digits are in **all/added/changed/removed** order. All
 successful plain diff invocations below returned 0.
 
-The classification column applies the proposed conservative rule to the measured
-diff and SemVer results; it is a policy proposal awaiting final review, not
+The classification column applies the approved conservative policy to the
+measured diff and SemVer results. These are policy-required outcomes, not
 implemented comparator behavior. `Patch*` means no structural finding, subject
 to the coverage and behavioral limits below. SemVer codes are patch/minor/major.
 
-| Case | Old Rust source | New Rust source | Diff | Deny statuses | SemVer JSON codes | Proposed required level |
+| Case | Old Rust source | New Rust source | Diff | Deny statuses | SemVer JSON codes | Policy-required level |
 | --- | --- | --- | --- | --- | --- | --- |
 | unchanged | A | A | – | 0000 | 0/0/0 | Patch* |
 | function-add | A | `pub fn api() {} pub fn added() {}` | A | 1100 | 0/0/0 | Minor |
@@ -401,7 +402,7 @@ Struct additions include their visible auto/blanket impls.
   declaration (`-> semver_probe::Api` versus `-> Self`), despite SemVer checks
   passing all levels. This Self transition is excluded by the project's
   enforced lint, as verified below. Renaming generic `T` to `U` also reports
-  changed and conservatively requires Major under the proposal; that is not
+  changed and conservatively requires Major under the policy; that is not
   evidence of an actual Cargo-incompatible change.
 - Renaming a value parameter alone produces no diff under the tested flags.
 - Making a function `const` reports changed and therefore Major conservatively,
@@ -446,7 +447,7 @@ patch and minor emit `partial_ord_struct_fields_reordered`, with
 The patch summary is exactly `228 pass, 0 fail, 1 warn, 31 skip` and
 `produced 1 major and 0 minor level warnings`.
 
-The proposed maximum-of-findings rule therefore includes warning-level
+The maximum-of-findings rule therefore includes warning-level
 findings and yields **Major**, not Patch. A production adapter that only retries
 release levels and inspects exit codes cannot implement that rule correctly.
 Direct JSON input cannot promote these warnings through manifest overrides;
@@ -461,7 +462,7 @@ Use the sources and feature declarations below, with selections applied during
 `extra=[]`, `old=[]` and `new=[]` are entries in `[features]`; `–` means absent
 or no selected feature. `A` retains its definition above.
 
-| Case | Old source / declarations / selection | New source / declarations / selection | Diff | SemVer JSON codes | Proposed outcome |
+| Case | Old source / declarations / selection | New source / declarations / selection | Diff | SemVer JSON codes | Policy outcome |
 | --- | --- | --- | --- | --- | --- |
 | feature-on | `#[cfg(feature="extra")] pub fn api() {}` / `extra=[]` / extra | `` / `extra=[]` / extra | R | 100/100/0 | Major |
 | feature-off | `#[cfg(feature="extra")] pub fn api() {}` / `extra=[]` / – | `` / `extra=[]` / – | – | 0/0/0 | No finding in unselected coverage; selected released coverage still required |
@@ -538,11 +539,11 @@ Two additional generation-failure cases were checked without invoking a
 comparator; two Clippy runs establish the repository relevance of the Self
 control. The original 78 comparisons remain recorded above.
 
-## Proposed classification contract awaiting final review
+## Approved classification contract
 
-The review request authorizes investigating this combination, not implementing
-it. Within explicitly validated structural coverage, use the following proposed
-repository gate rule:
+The following approved repository policy applies within explicitly validated
+structural coverage. This investigation records its evidence; comparator and
+CI implementation remain separate work:
 
 1. No structural difference starts at Patch; additive-only API diff starts at
    Minor; any removed/changed item or successfully observed but unclassifiable
@@ -553,7 +554,7 @@ repository gate rule:
    required trait methods. No finding can lower a conservative diff result.
 3. Compare released Cargo feature inventories separately. Removal requires
    Major; a new opt-in feature introduces new coverage and does not hide old
-   coverage. Ordinary added APIs still require Minor under this proposal.
+   coverage. Ordinary added APIs still require Minor under this policy.
 4. Compare every previously released selected API surface plus new coverage;
    retain explicit old/new selections and reject missing intended coverage.
 5. Validate tool/JSON/compiler provenance and successful completion before any
@@ -562,19 +563,20 @@ repository gate rule:
    outside structural proof and require complementary review/tests.
 
 No successful output in this matrix had a fourth, unclassifiable diff category.
-The Major rule for an observed but unclassifiable API difference is a proposed
+The Major rule for an observed but unclassifiable API difference is an approved
 policy boundary, not a measured extra public-api category. The parser-failure
 controls specifically exercise validation failure instead.
 
 This is conservative about **observed differences**, including known harmless
 representation changes; it is not a completeness theorem for all Rust or macro
 behavior. It deliberately trades false Major requirements for a simple,
-reviewable boundary without semantic normalization heuristics. Whether that
-tradeoff and the complementary review boundary are acceptable remains a
-maintainer decision. In particular, an empty structural diff must not silently
-clear a known out-of-model compatibility concern.
+reviewable boundary without semantic normalization heuristics. That tradeoff
+and the complementary review boundary are approved repository policy. An empty
+structural diff must not silently clear a known out-of-model compatibility
+concern.
 
-The reproducible matrices establish the requested combination for the tested
-cases. They do not authorize a second comparator implementation, CI integration,
-new contributor commands, a baseline migration, or completion of #355/#356. The
-policy revision remains awaiting final review.
+The reproducible matrices establish the approved combination for the tested
+cases and supply the reviewed #356 findings incorporated into #355's final
+specification. They remain investigation evidence: comparator implementation,
+CI integration, contributor procedures and baseline migration are separate work
+and are not implemented by this documentation change.

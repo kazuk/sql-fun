@@ -75,7 +75,9 @@ and validation of local dependency resolution.
 Analyzer versions are pinned independently of compiler versions:
 
 - `public-api` library 0.52.0, with rustdoc-types 0.57.3 in `Cargo.lock`;
-- `cargo-semver-checks` executable 0.51.0.
+- `cargo-semver-checks` executable **0.51.0-sqlfun.1**, built from upstream
+  0.51.0 with the [#826 trait-presence query correction](semver-shadowed-trait.md).
+  Stock 0.51.0 is rejected; its identical-input false positive is reproducible.
 
 The #356 producer (Rust/Cargo 1.99.1, JSON schema 61) records a successful
 probe, not a mandatory contributor toolchain. Use the explicitly requested
@@ -155,17 +157,22 @@ without introducing a manual Python setup step. uv is already in contributor
 setup for graphify and in the development/CI image. Tests use runtime nextest
 paths to support archive relocation.
 
-`.local/sbin/prepare-package-api-tests` uses the active contributor toolchain,
-including an explicit rustup override, without installing or pinning a compiler.
-It prepares the pinned analyzer: it reuses a matching executable or performs a
-task-local Cargo install under `target/package-api-tools`. This is
-internal preparation behind the existing contributor test entry point, not a
-new contributor command. Package analysis itself never installs tools or uses
-network access. First-time test tool provisioning may require network access;
-fixtures use tiny offline dependency graphs and isolated build directories.
-Maintained regression tests cover compiler version drift with compatible JSON,
-unsupported schemas through the real analyzer reader, selected-toolchain Cargo
-resolution despite a conflicting PATH, and preparation without compiler installs.
+`.local/sbin/prepare-package-api-tests` records the active contributor toolchain,
+including an explicit rustup override, and verifies the corrected analyzer
+provided by the documented development/CI builder image. It never installs or
+patches tools. A missing or stock executable fails with the required identity.
+`ci/github-actions/Dockerfile` owns the checksum-pinned source download, query
+correction, locked build and semantic smoke tests. Image publication and adoption
+follow `ci/README.md`; the comparator must not be adopted before that image.
+
+The complete approved-baseline regression extracts its frozen copy of the
+approved seed from #824 with a SHA-256 check and prepares historical registry
+dependencies before running nine offline comparisons. It does not read or adopt
+an ambient active baseline. The test uses the same `workspace`/nextest path as
+the minimized shadowing and genuine replacement controls. Maintained tests also
+cover compiler version drift with compatible JSON, unsupported schemas through
+the real analyzer reader, selected-toolchain Cargo resolution despite a
+conflicting PATH, and preparation without compiler installs.
 
 No release gate, workflow job, baseline archive, performance cache or new
 contributor procedure is introduced here.

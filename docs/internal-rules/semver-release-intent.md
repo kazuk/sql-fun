@@ -108,7 +108,10 @@ their expected outcome.
 The [#356 capability report and reproducible fixtures](semver-analyzer-probe.md)
 measure **cargo-semver-checks 0.51.0**, the version already pinned in the CI
 image.
-Use that version for authoritative comparisons until a replacement is probed.
+The comparator uses the narrowly corrected **0.51.0-sqlfun.1** build described in
+[the #826 investigation](semver-shadowed-trait.md), retaining the same lint
+inventory, required levels and fail-closed contracts. Stock 0.51.0 has a proven
+identical-input `trait_changed_kind` false positive.
 Cargo's compatibility guidance remains the policy authority.
 
 Observed capabilities and boundaries:

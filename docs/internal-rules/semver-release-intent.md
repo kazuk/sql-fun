@@ -2,8 +2,8 @@
 
 Status: **policy awaiting final review** for #355. The #356 capability findings
 are incorporated below; the handling of unsupported classifications still
-requires a maintainer decision before this becomes the final implementation
-contract.
+requires final maintainer review of the proposed conservative combination
+before this becomes the implementation contract.
 
 ## Authority and scope
 
@@ -117,18 +117,75 @@ Observed capabilities and boundaries:
   analysis as well. Exit `0` alone does not establish complete classification
   or prove every intended surface was checked.
 
-Unsupported classifications remain **unresolved/inconclusive**, never a proven
-pass. This applies even when a detected lower bound fits the declared intent.
-The findings do not authorize silently weakening the maximum-required-level
-contract to a detected-breaking-change-only gate.
+## Proposed conservative comparison rule
 
-**Pending maintainer decision:** approve a concrete supplementary classification
-or evidence protocol for unsupported cases, or explicitly revise the gate's
-contract. No such mechanism is selected or implemented by this document. The
-existing inconclusive outcome is deterministic, but does not complete the policy
-requirement to settle how the release gate can establish all required levels.
-Implementation issues #357–#361 must wait for that scope decision and final
-policy approval.
+The additional [capability investigation](semver-analyzer-probe.md) verifies
+**cargo-public-api 0.52.0** against the same format-61 rustdoc JSON pairs used by
+cargo-semver-checks 0.51.0, including function-like, derive and attribute macros.
+This provides the following concrete proposal for final policy review; it does
+not approve comparator or CI implementation:
+
+1. After successful analysis of all intended coverage, no structural difference
+   starts at Patch. Added-only public API starts at Minor. Any removed/changed
+   item, or successfully observed API difference that cannot be classified,
+   starts at Major.
+2. Take the maximum of that conservative level and applicable SemVer findings.
+   Added required trait methods and exhaustive enum variants demonstrate why
+   additive-only diff cannot independently establish Minor.
+3. Compare released Cargo feature inventories separately: removed released
+   features require Major even with no API diff. New opt-in feature coverage
+   must not suppress any released selected coverage. New APIs in that coverage
+   require at least Minor under this proposal.
+4. Validate the complete old/new coverage, tool versions, compiler/target and
+   JSON producer/schema provenance explicitly. A missing, unreadable,
+   incompatible or failed artifact/tool is validation failure, not a SemVer
+   verdict. Do not classify failures as Major or treat them as passes.
+5. Review/test behavior outside structural JSON, including macro expansion and
+   accepted macro input. An empty diff does not prove those contracts unchanged;
+   a known unresolved concern remains inconclusive until evaluated.
+
+This rule intentionally assigns Major to the measured harmless concrete-type
+versus `Self` return spelling and generic-parameter renames. It is a
+conservative repository gate requirement, not a claim that Cargo defines those
+changes as breaking. No semantic normalization or exceptions are selected by
+this proposal. Public parameter renames are omitted by the tested public-api
+flags; moving private implementation modules while preserving a re-export
+produces no diff.
+
+The tested public-api diff distinguishes added/changed/removed public items and
+includes auto/blanket/derived impls. Do not adopt simplification flags that hide
+those surfaces without separately establishing their coverage. Its ordinary
+CLI exits 0 for differences; `--deny` exits 1 for denied differences, but read
+and parse failures also exit 1. Successful completion must be established before
+interpreting categories; a raw exit-1 result is not a SemVer classification.
+
+### Opt-in and JSON tooling boundaries
+
+The shipped SemVer inventory contains 31 allow-by-default Minor lints, including
+struct/enum/union additions, constants, statics and inherent methods. Enabling
+them with `deny` detects the tested additions, but standalone functions, type
+aliases, new traits and macros remain uncovered. Upstream #949 includes proposed
+work and does not establish that those missing lints ship in version 0.51.0.
+
+Direct SemVer JSON input also ignores manifest lint overrides: even passing the
+candidate manifest did not enable the opt-in struct-addition finding. Do not
+assume opt-in configuration is active in a JSON-only adapter. The proposed
+public-api diff supplies structural addition coverage independently; the JSON
+SemVer default findings can still raise its conservative level.
+
+Both tools accepted the exact same format-61 artifacts in the measured cases.
+Format-55 inputs failed. Mutating only the format marker to 999 was accepted by
+public-api but rejected by SemVer, so provenance and schema checks cannot rely
+on public-api alone. Persist the producer details with artifacts and re-probe
+when they change; reuse of arbitrary archived JSON is not established here.
+The production JSON generation strategy and tool provisioning remain later
+implementation decisions, with no new contributor procedure authorized.
+
+**Awaiting final maintainer review:** approve the conservative over-classification
+tradeoff, complete released-coverage requirement and complementary behavioral
+review boundary above. The requested combination is established for the
+reproducible cases, not all possible Rust behavior. No comparator, CI wiring,
+baseline migration or fallback is implemented or authorized by this document.
 
 ## Acceptance examples
 
@@ -144,13 +201,13 @@ claims about current tooling:
 | 5. Adopt the new coverage into a stable active baseline, then break it in a subsequent candidate | Treat the now-released coverage as a normal compatibility contract. |
 | 6. Add versus remove feature coverage | Addition is not treated as removal; removal of released coverage must not be treated as harmless addition. |
 | 7. New side enables an opt-in feature absent from the baseline | Compare the common historical surface for compatibility and classify the candidate-only surface as new coverage, without requiring a nonexistent baseline feature. |
-| 8. Analyzer cannot classify a change required by this policy | Report an explicitly unresolved/inconclusive classification until the final policy defines and validates a supplementary mechanism; never claim a proven pass from the analyzer's omission. |
+| 8. Analyzer cannot classify a change required by this policy | Proposed combination: classify an observed unclassifiable API diff as Major; tool/analysis failure fails validation; out-of-model concerns remain inconclusive pending complementary review. No unsupported omission proves a pass. |
 
 ## Finalization boundary
 
 Issue #355 is specification-only. The #356 report supplies the tested version
-and observed gaps. Final approval still requires an explicit decision on
-unsupported classifications and review of that revision; incorporating
-measurements alone does not complete #355 or #356. Package materialization,
-baseline storage/adoption, caching, CI wiring, and implementation belong to
-issues #357–#361 and are not defined here.
+and observed gaps, including the requested conservative combination. Final
+approval still requires review of its tradeoffs and coverage boundary;
+incorporating measurements alone does not complete #355 or #356. Package
+materialization, baseline storage/adoption, caching, CI wiring, and
+implementation belong to issues #357–#361 and are not defined here.

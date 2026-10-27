@@ -169,3 +169,9 @@ resolution despite a conflicting PATH, and preparation without compiler installs
 
 No release gate, workflow job, baseline archive, performance cache or new
 contributor procedure is introduced here.
+
+The [feature-coverage coordinator](semver-feature-coverage.md) consumes this
+interface under the repository's additive-feature rule. Its maintained tests
+share the existing `workspace` integration path. Historical registry dependency
+preparation may download locked dependencies before the real-seed fixture runs;
+production comparison remains offline.

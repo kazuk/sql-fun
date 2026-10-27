@@ -182,7 +182,7 @@ def analyze(artifacts, coverage, wrapper, semver, scratch, env):
     except (AnalysisError, ValueError, OSError) as error:
         raise AnalysisError(
             f'Cannot analyze generated rustdoc JSON schema {coverage["old"]["schema"]} with '
-            'cargo-semver-checks 0.51.0 and public-api 0.52.0. '
+            'cargo-semver-checks 0.51.0-sqlfun.1 and public-api 0.52.0. '
             'Check the analyzer diagnostics below. If this schema/input is unsupported, '
             'update and re-probe the pinned analyzers for the selected compiler.\n'
             f'{error}') from error
@@ -243,8 +243,8 @@ def compare(request, wrapper, semver, scratch):
     producer.update(rustc=rustc_details.strip(), host=host)
     for command in ("cargo", "rustdoc"):
         producer[command] = run([env[command.upper()], "--version"], scratch, env).stdout.strip()
-    require(run([str(semver), "--version"], scratch, env).stdout.strip() == "cargo-semver-checks 0.51.0",
-            "expected cargo-semver-checks 0.51.0")
+    require(run([str(semver), "--version"], scratch, env).stdout.strip() == "cargo-semver-checks 0.51.0-sqlfun.1",
+            "expected cargo-semver-checks 0.51.0-sqlfun.1")
     artifacts, coverage = {}, {}
     for side in ("old", "new"):
         try:
@@ -272,7 +272,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--request", required=True, help="absolute path to explicit comparison JSON")
     parser.add_argument("--diff-wrapper", required=True, help="absolute path to built xbuild")
-    parser.add_argument("--semver-checks", required=True, help="absolute path to cargo-semver-checks 0.51.0")
+    parser.add_argument("--semver-checks", required=True, help="absolute path to cargo-semver-checks 0.51.0-sqlfun.1")
     args = parser.parse_args()
     try:
         request = json.loads(explicit_path(args.request).read_text())

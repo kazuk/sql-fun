@@ -75,7 +75,9 @@ and validation of local dependency resolution.
 Analyzer versions are pinned independently of compiler versions:
 
 - `public-api` library 0.52.0, with rustdoc-types 0.57.3 in `Cargo.lock`;
-- `cargo-semver-checks` executable 0.51.0.
+- `cargo-semver-checks` executable **0.51.0-sqlfun.1**, built from upstream
+  0.51.0 with the [#826 trait-presence query correction](semver-shadowed-trait.md).
+  Stock 0.51.0 is rejected; its identical-input false positive is reproducible.
 
 The #356 producer (Rust/Cargo 1.99.1, JSON schema 61) records a successful
 probe, not a mandatory contributor toolchain. Use the explicitly requested
@@ -157,15 +159,28 @@ paths to support archive relocation.
 
 `.local/sbin/prepare-package-api-tests` uses the active contributor toolchain,
 including an explicit rustup override, without installing or pinning a compiler.
-It prepares the pinned analyzer: it reuses a matching executable or performs a
-task-local Cargo install under `target/package-api-tools`. This is
-internal preparation behind the existing contributor test entry point, not a
-new contributor command. Package analysis itself never installs tools or uses
-network access. First-time test tool provisioning may require network access;
-fixtures use tiny offline dependency graphs and isolated build directories.
-Maintained regression tests cover compiler version drift with compatible JSON,
-unsupported schemas through the real analyzer reader, selected-toolchain Cargo
-resolution despite a conflicting PATH, and preparation without compiler installs.
+It reuses a matching corrected executable or invokes the internal
+`package-api/prepare_analyzer.py` helper. That helper downloads the checksum-pinned
+upstream source archive, corrects only `trait_changed_kind`, assigns the distinct
+`0.51.0-sqlfun.1` identity, and builds using the upstream dependency lockfile.
+The upstream lockfile remains unchanged; only the CLI advertises the corrected
+build identity. Installation is serialized across test processes. Sources are
+prepared outside the workspace; build/install outputs stay under this worktree's
+`target/package-api-tools/0.51.0-sqlfun.1`. The stock analyzer in the CI image
+is not replaced or silently accepted. No CI image change is required.
+
+This remains internal preparation behind the existing contributor test entry
+point, not a new contributor command. Preparation may require network access;
+package comparison itself never installs tools or uses network access. The
+complete approved-baseline regression extracts its frozen copy of the approved
+seed from #824 with a SHA-256 check and prepares historical registry dependencies
+before
+running nine offline comparisons. It does not read or adopt an ambient active
+baseline. The test is maintained through the same `workspace`/nextest path as
+the minimized shadowing and genuine replacement controls. Maintained tests also
+cover compiler version drift with compatible JSON, unsupported schemas through
+the real analyzer reader, selected-toolchain Cargo resolution despite a
+conflicting PATH, and preparation without compiler installs.
 
 No release gate, workflow job, baseline archive, performance cache or new
 contributor procedure is introduced here.

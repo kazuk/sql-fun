@@ -7,15 +7,11 @@ root=$(git rev-parse --show-toplevel)
 producer=$(rustup show active-toolchain)
 producer=${producer%% *}
 if command -v cargo-semver-checks >/dev/null &&
-  [[ "$(cargo-semver-checks --version)" == 'cargo-semver-checks 0.51.0' ]]; then
+  [[ "$(cargo-semver-checks --version)" == 'cargo-semver-checks 0.51.0-sqlfun.1' ]]; then
   analyzer=$(command -v cargo-semver-checks)
 else
-  # Keep prepared executables local to this task's build tree, never replacing
-  # a contributor's installed version. Cargo's cache can serve subsequent runs.
-  prepared="$root/target/package-api-tools"
-  if [[ ! -x "$prepared/bin/cargo-semver-checks" ]]; then
-    cargo install --locked --version 0.51.0 --root "$prepared" cargo-semver-checks >&2
-  fi
-  analyzer="$prepared/bin/cargo-semver-checks"
+  # Build the corrected query behind the existing preparation boundary. The
+  # stock CI-image executable has the #826 false positive and is not reused.
+  analyzer=$(RUSTUP_TOOLCHAIN="$producer" python3 "$root/.local/sbin/package-api/prepare_analyzer.py")
 fi
 jq -n --arg toolchain "$producer" --arg semver_checks "$analyzer" '{toolchain: $toolchain, semver_checks: $semver_checks}'

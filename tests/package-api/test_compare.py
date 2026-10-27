@@ -70,6 +70,58 @@ class Comparison(unittest.TestCase):
         self.assertEqual(report['impact'], 'patch')
         self.assertTrue(report['limits'])
 
+    def test_unchanged_shadowed_trait_and_struct(self):
+        # Keeping the private tuple type in a public signature makes rustdoc
+        # retain it, as in the approved historical SQLAST package (#826).
+        for definition in ('pub struct Api;', 'pub struct Api(Option<u8>);'):
+            with self.subTest(definition=definition):
+                source = ('mod traits { pub trait Api {} } '
+                          'mod generated { mod inner { ' + definition + ' } '
+                          'pub use self::inner::Api; pub fn keep(_: Api) {} } '
+                          'pub mod api { pub use crate::traits::Api; pub use crate::generated::*; }')
+                old = self.package('old-' + str(len(definition)), source)
+                new = self.package('new-' + str(len(definition)), source)
+                report = self.compare(old, new)
+                self.assertEqual(report['impact'], 'patch')
+                self.assertEqual(report['semver']['major'], 0)
+                self.assertEqual(report['diff']['added'], [])
+                self.assertEqual(report['diff']['removed'], [])
+                self.assertEqual(report['diff']['changed'], [])
+
+    def test_trait_replaced_by_another_kind(self):
+        for kind, replacement in dict(struct='pub struct Api;', enum='pub enum Api {}',
+                                      union='pub union Api { pub value: u8 }').items():
+            with self.subTest(replacement=replacement):
+                old = self.package('old-' + kind, 'pub trait Api {}')
+                new = self.package('new-' + kind, replacement)
+                report = self.compare(old, new)
+                self.assertEqual(report['impact'], 'major')
+                self.assertIn('failure trait_changed_kind:', report['semver']['diagnostics'])
+
+    def test_trait_replacement_is_path_specific(self):
+        shared = 'mod traits { pub trait Api {} } pub use traits::Api as Other; '
+        report = self.compare(self.package('old', shared + 'pub use traits::Api;'),
+                              self.package('new', shared + 'pub struct Api;'))
+        self.assertEqual(report['impact'], 'major')
+        self.assertIn('failure trait_changed_kind:', report['semver']['diagnostics'])
+
+    def test_complete_approved_baseline_self_comparison(self):
+        import baseline_helpers
+        compared, excluded = [], []
+        for name, selection in baseline_helpers.released_selections(
+                ROOT, self.root, self.tools['toolchain'], self.tools['target']):
+            with self.subTest(package=name):
+                print(f'Approved baseline: {name}', file=sys.stderr, flush=True)
+                if selection is None:
+                    excluded.append(name)
+                    continue
+                report = self.compare(selection, selection)
+                self.assertEqual(report['impact'], 'patch', report)
+                compared.append(name)
+        self.assertEqual(len(compared), 9)
+        self.assertIn('sql-fun-sqlast', compared)
+        self.assertEqual(excluded, ['adventure-works'])
+
     def test_addition(self):
         report = self.compare(self.package('old', ''), self.package('new', 'pub fn added() {}'))
         self.assertEqual(report['impact'], 'minor')
@@ -298,7 +350,7 @@ class Comparison(unittest.TestCase):
                           'test "$*" = "show active-toolchain" || exit 99\n'
                           'echo "next-stable-fixture (environment override)"\n')
         analyzer = tools / 'cargo-semver-checks'
-        analyzer.write_text('#!/bin/sh\necho cargo-semver-checks 0.51.0\n')
+        analyzer.write_text('#!/bin/sh\necho cargo-semver-checks 0.51.0-sqlfun.1\n')
         rustup.chmod(0o755)
         analyzer.chmod(0o755)
         env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'])

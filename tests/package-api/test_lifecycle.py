@@ -10,7 +10,7 @@ import unittest
 from unittest import mock
 
 sys.dont_write_bytecode = True
-from lifecycle_helpers import ROOT, RealBaseline, state_for, write_package
+from lifecycle_helpers import ROOT, RealBaseline, SelectionChange, state_for, write_package
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
 from compare import AnalysisError
 from lifecycle import read_state, schedule, execute, resolve_dependencies
@@ -70,7 +70,8 @@ class Scheduling(unittest.TestCase):
         (self.new / 'probe/Cargo.toml').write_text('[package]\nname="probe"\nversion="1.0.0"\n')
         self.after['configurations']['postgres']['probe'] = []
         calls, removed, _, _ = schedule(*self.inputs())
-        self.assertFalse(calls)
+        self.assertEqual([c['kind'] for c in calls], ['current-validation'])
+        self.assertEqual(calls[0]['new']['features'], [])
         self.assertIn('released-manifest-features-removed', [r['reason'] for r in removed])
 
     def test_new_crate_then_adoption_then_removal(self):
@@ -80,8 +81,9 @@ class Scheduling(unittest.TestCase):
         old, old_packages, new, new_packages = self.inputs()
         calls, removed, added, _ = schedule(old, old_packages, new, new_packages)
         self.assertFalse(removed)
-        self.assertEqual([c['package'] for c in calls], ['probe', 'new-crate'])
+        self.assertEqual([c['package'] for c in calls], ['probe'])
         self.assertEqual(added[0]['package'], 'new-crate')
+        self.assertEqual(added[0]['reason'], 'new-package')
         calls, removed, added, _ = schedule(new, new_packages, new, new_packages)
         self.assertFalse(added)
         self.assertTrue(all(c['kind'] == 'released' for c in calls))
@@ -101,12 +103,14 @@ class Scheduling(unittest.TestCase):
                     self.inputs()
 
     def test_binary_packages_are_explicitly_excluded(self):
-        write_package(self.new, name='tool', source='fn main() {}', binary=True)
-        self.after['packages']['tool'] = 'tool'
-        self.after['configurations']['postgres']['tool'] = []
+        for root, state in ((self.old, self.before), (self.new, self.after)):
+            write_package(root, name='tool', source='fn main() {}', binary=True)
+            state['packages']['tool'] = 'tool'
+            state['configurations']['postgres']['tool'] = []
         _, _, added, excluded = schedule(*self.inputs())
-        self.assertEqual(added[0]['package'], 'tool')
+        self.assertFalse(added)
         self.assertEqual(excluded[0]['reason'], 'binary-only')
+        self.assertEqual(len(excluded), 1)
 
     def test_new_library_on_existing_binary_package_has_no_old_api_contract(self):
         (self.old / 'probe/src/lib.rs').unlink()
@@ -167,7 +171,7 @@ class RealLifecycle(unittest.TestCase):
         cls.tools = json.loads(prepared.stdout)
         RealBaseline.prepare_registry(cls.tools['toolchain'])
 
-    def check(self, fixture):
+    def check(self, fixture, expected='detected'):
         fixture.write()
         completed = subprocess.run([sys.executable, str(ROOT / '.local/sbin/compare-feature-coverage'),
             '--baseline', str(fixture.baseline), '--candidate', str(fixture.descriptor),
@@ -175,10 +179,27 @@ class RealLifecycle(unittest.TestCase):
             '--semver-checks', self.tools['semver_checks'], '--toolchain', self.tools['toolchain']],
             text=True, capture_output=True)
         report = json.loads(completed.stdout)
-        self.assertEqual(completed.returncode, 0, report)
-        self.assertEqual(report['status'], 'detected', report)
-        print(f'lifecycle: {report["impact"]}, {len(report["comparisons"])} comparisons', flush=True)
+        self.assertEqual(completed.returncode, 0 if expected == 'detected' else 1, report)
+        self.assertEqual(report['status'], expected, report)
+        if expected == 'detected':
+            print(f'lifecycle: {report["impact"]}, {len(report["comparisons"])} comparisons', flush=True)
+        else:
+            self.assertNotIn('impact', report)
+            self.assertNotIn('next_coverage', report)
         return report
+
+    def test_replacement_and_shrink_validate_current_selection(self):
+        for replacement, retain in ((True, True), (True, False), (False, True), (False, False)):
+            with self.subTest(replacement=replacement, retain_released=retain):
+                with tempfile.TemporaryDirectory(prefix='selected-coverage-') as directory:
+                    fixture = SelectionChange(Path(directory), replacement, retain)
+                    report = self.check(fixture)
+                    self.assertEqual(report['impact'], 'major')
+                    self.assertTrue(report['removed_coverage'])
+                    self.assertTrue(any(c['kind'] == 'current-validation' for c in report['comparisons']))
+                    fixture.invalidate_current_selection()
+                    report = self.check(fixture, expected='analysis-error')
+                    self.assertIn('invalid selected configuration', report['diagnostics'])
 
     def test_optional_local_crate_is_supplied_only_when_resolved(self):
         with tempfile.TemporaryDirectory(prefix='optional-local-crate-') as directory:
@@ -201,6 +222,13 @@ class RealLifecycle(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='real-seed-lifecycle-') as directory:
             fixture = RealBaseline(Path(directory))
             self.assertEqual(fixture.state['source_revision'], 'bd53b083b028dc8423f6c4e5b232cbd3c851c8c1')
+            name = write_package(fixture.candidate, name='new-crate')
+            fixture.current['packages'][name] = name
+            fixture.current['configurations']['postgres'][name] = []
+            report = self.check(fixture)
+            self.assertEqual(report['impact'], 'patch')
+            self.assertFalse(any(c['package'] == name for c in report['comparisons']))
+            self.assertEqual(report['next_coverage']['packages'][name], name)
             fixture.add_feature()
             report = self.check(fixture)  # AC 1, 7: additive unreleased coverage.
             self.assertEqual(report['impact'], 'minor')
@@ -208,16 +236,13 @@ class RealLifecycle(unittest.TestCase):
             fixture.break_released_api()
             self.assertEqual(self.check(fixture)['impact'], 'major')  # AC 2.
             fixture.add_feature()  # Restore original API and keep the new feature.
-            fixture.current['configurations']['new-product'] = {fixture.name: ['unreleased']}
+            fixture.current['configurations']['new-product'] = {fixture.name: ['unreleased'], name: []}
             self.assertEqual(self.check(fixture)['impact'], 'minor')  # AC 3.
             fixture.break_released_api()
-            name = write_package(fixture.candidate, name='new-crate')
-            fixture.current['packages'][name] = name
-            for mapping in fixture.current['configurations'].values():
-                mapping[name] = []
             report = self.check(fixture)  # AC 4, also a new crate cannot hide the break.
             self.assertEqual(report['impact'], 'major')
             self.assertTrue(any(c['package'] == name for c in report['new_coverage']))
+            self.assertFalse(any(c['package'] == name for c in report['comparisons']))
             fixture.add_feature()
             fixture.adopt()
             fixture.break_added_api()

@@ -73,35 +73,51 @@ features, also compare the historical selection against the expanded current
 selection. Identical package/selection pairs execute once. A released selection
 is not discarded when another product is added.
 
-Current-only products and packages have no invented published predecessor.
-A new product name that selects an actual released selection reuses its
-historical comparison and is marked `released_selection`; naming alone does not
-impose Minor impact. For genuinely new selections/packages, self-comparison
-validates the actual selected current surface and reports new coverage with
-conservative Minor impact, without establishing a historical contract for it.
-Historical comparisons still run and can raise the overall result to Major.
-The additive-feature rule makes special cross-product API attribution
-unnecessary. There is no all-products comparison matrix or analyzer for features
-that hide existing APIs.
+Candidate-only, never-released packages have no SemVer contract. Record them
+with `reason: "new-package"` in `new_coverage` and retain them in
+`next_coverage`, but do not schedule a self-comparison or require a bump solely
+for their introduction. Unchanged released packages plus a new crate therefore
+remain Patch. Build validation of new crates belongs to ordinary builds/tests; a
+new crate can still be compiled as a dependency when checking a released crate.
+After stable baseline adoption, compare its APIs as released coverage normally.
+
+For a current-only product containing a released package, a new name selecting
+an actual released selection reuses its historical comparison and is marked
+`released_selection`; naming alone does not impose Minor impact. For genuinely
+new selections of released packages, self-comparison validates the current
+surface and reports new coverage with conservative Minor impact. It does not
+establish a published predecessor for the selection. Historical comparisons
+still run and can raise the overall result to Major. The additive-feature rule
+makes special cross-product API attribution unnecessary. There is no
+all-products comparison matrix or analyzer for features that hide existing APIs.
+
+Every current library/proc-macro selection of an already released crate must be
+validated, even when it shrinks or replaces historical features. If
+historical/expanded calls already cover that selection, reuse them. Otherwise
+run a `current-validation` call on the actual selected surface. Keep coverage
+removal evidence, but never use Major removal evidence as a substitute for
+successful analysis: a compile failure still produces `analysis-error` without
+an impact or `next_coverage`.
 
 Removed released manifest features, dropped product/mapping coverage, removed
 packages and removed library targets contribute explicit Major evidence. Also
 retain lost resolved feature coverage from #357's old/new coverage evidence,
 even when no public API item changes. Package inputs reproduce the released
 defaults/forwarding; a second historical feature-resolution representation is
-not needed. Detect
-known missing features before attempting impossible historical builds. A policy
-requesting an unknown current feature is an input error. Binary-only packages
-remain explicit in policy but their reports exclude Rust API analysis; this is
-not a CLI compatibility guarantee.
+not needed. Detect known missing features before attempting impossible
+historical builds. A policy requesting an unknown current feature is an input
+error. Binary-only packages remain explicit in policy but their reports exclude
+Rust API analysis; this is not a CLI compatibility guarantee.
 
 Success is exit 0 with JSON `status: "detected"`. `impact` is the maximum of
-comparison results, new surface coverage (Minor) and coverage removals (Major).
+comparison results, new coverage of released packages (Minor) and coverage
+removals (Major). Never-released package introduction contributes no bump.
 `comparisons` retains package/product/kind and #357's complete evidence;
 `new_coverage`, `removed_coverage`, `excluded`, `limits` and `next_coverage`
 explain the result. Success does not mean the release intent permits it: #359
-owns that decision. Failure is exit 1 with `status: "analysis-error"`, diagnostics
-and limits, without an impact. Invalid command syntax uses argparse exit 2.
+owns that decision. Failure is exit 1 with `status: "analysis-error"`,
+diagnostics and limits, without an impact. Invalid command syntax uses argparse
+exit 2.
 
 `next_coverage` records the candidate state using its relative package paths.
 Its consumer must retain the corresponding package contents with it. Merely
@@ -151,28 +167,34 @@ re-exports the `ListOpt` trait alongside a glob that also contains a shadowed
 `ListOpt` struct. This is evidence of an existing analyzer limitation, not a
 lifecycle change or a failed build. The coordinator preserves that Major finding
 under #355's policy; it does not suppress it, alter the approved seed or exclude
-released SQLAST coverage. Resolving the false finding requires a separate
-maintainer scope decision before relying on an enforcing release gate.
+released SQLAST coverage. The independent false finding is tracked in
+[#826](https://github.com/kazuk/sql-fun/issues/826) for a separate PR before the
+enforcing #361 gate.
 
 ## Package-set lifecycle and maintained verification
 
 Compare the two source package sets independently. A candidate-only crate does
-not require an old mapping/package or a manual baseline rewrite. Continue
-released-crate comparisons in the same run. After explicit stable adoption,
-new packages become historical obligations. A missing released package is
-reported as removal even when no current workspace member can be enumerated.
-A rename is removal plus addition; no rename inference is performed.
+not require an old mapping/package, a self-comparison, a Minor bump or a manual
+baseline rewrite. Continue released-crate comparisons in the same run. After
+explicit stable adoption, new packages become historical obligations. A missing
+released package is reported as removal even when no current workspace member
+can be enumerated. A rename is removal plus addition; no rename inference is
+performed.
 
 `xbuild/tests/package_api.rs` runs the lifecycle Python contracts through the
 existing `workspace` check and nextest archive group. Scheduling tests verify
-policy errors, package addition/adoption/removal and comparator failures. The
+policy errors, package addition/adoption/removal and comparator failures. Real
+package fixtures verify replacement/shrink selections with retained or removed
+historical features, including selected compilation failures. The real-seed
+sequence verifies neutral crate introduction, continued released-crate checks,
+and compatibility checks on the new crate only after baseline adoption. The
 real-seed lifecycle fixture extracts the checked-in active baseline and scopes
 API mutations to its actual `sql-fun-core` package, retaining its approved
 source revision and package contents. It tests all seven acceptance cases via
 the production scripts, including a copied fixture baseline representing stable
 adoption. It never advances the checked-in baseline. Other historical packages
-remain in the full archive; this focused compiler test is not a certification
-of every historical crate's buildability or compatibility with today's source.
+remain in the full archive; this focused compiler test is not a certification of
+every historical crate's buildability or compatibility with today's source.
 
 The real-source fixture incurs repeated isolated Cargo/rustdoc builds. Its
 preparation downloads locked historical registry dependencies into Cargo's cache

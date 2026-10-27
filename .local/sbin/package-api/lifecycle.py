@@ -121,8 +121,11 @@ def schedule(old, old_packages, new, new_packages):
         if removed:
             removals.append(dict(package=name, reason='released-manifest-features-removed', features=sorted(removed)))
     seen = set()
+    current_selections = set()
 
     def compare_pair(name, product, before, after, kind):
+        new_side = selection(name, after, new_packages)
+        current_selections.add(json.dumps(new_side, sort_keys=True))
         if not has_api(new_packages[name]):
             if name in old_packages and has_api(old_packages[name]):
                 removals.append(dict(package=name, reason='released-api-target-removed'))
@@ -132,7 +135,6 @@ def schedule(old, old_packages, new, new_packages):
             additions.append(dict(package=name, configuration=product, reason='new-api-target'))
             before = None
         old_side = selection(name, before, old_packages) if before is not None else selection(name, after, new_packages)
-        new_side = selection(name, after, new_packages)
         key = json.dumps([old_side, new_side], sort_keys=True)
         if key not in seen:
             seen.add(key)
@@ -154,15 +156,22 @@ def schedule(old, old_packages, new, new_packages):
                 compare_pair(name, product, before, current[name], 'expanded')
     for product, mapping in new['configurations'].items():
         for name, features in mapping.items():
-            if name not in old_packages or product not in old['configurations']:
-                released_selection = name in old_packages and any(
+            if name not in old_packages:
+                # No released crate means no SemVer contract to compare or bump.
+                additions.append(dict(package=name, configuration=product, reason='new-package'))
+                continue
+            if product not in old['configurations']:
+                released_selection = any(
                     set(previous[name]) == set(features) for previous in old['configurations'].values())
                 additions.append(dict(package=name, configuration=product, reason='new-coverage',
                                       released_selection=released_selection))
-                # An alias of an actual released selection reuses historical replay;
-                # a new product name alone is not a public API addition.
-                if not released_selection:
-                    compare_pair(name, product, None, features, 'new-coverage')
+            current = selection(name, features, new_packages)
+            if json.dumps(current, sort_keys=True) not in current_selections:
+                # Removal evidence must not hide an invalid replacement/shrink.
+                # This validates an existing released crate's current selection;
+                # it does not invent a historical contract for that selection.
+                kind = 'new-coverage' if product not in old['configurations'] else 'current-validation'
+                compare_pair(name, product, None, features, kind)
     return calls, removals, additions, binaries
 
 
@@ -172,7 +181,8 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
     require(old['target'] == new['target'], 'baseline/candidate targets differ')
     calls, removed, added, binaries = schedule(old, old_packages, new, new_packages)
     reports = []
-    new_surface = any(not addition.get('released_selection', False) for addition in added)
+    new_surface = any(addition['reason'] != 'new-package' and
+                      not addition.get('released_selection', False) for addition in added)
     impact = 'major' if removed else ('minor' if new_surface else 'patch')
     for index, call in enumerate(calls):
         request = dict(old=resolve_dependencies(call['old'], new['target'], toolchain),

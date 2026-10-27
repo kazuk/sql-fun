@@ -101,3 +101,31 @@ class RealBaseline:
 
     def break_added_api(self):
         self.lib.write_text(self.lib.read_text().replace('pub fn lifecycle_added() {}', 'pub fn lifecycle_added(_: u8) {}'))
+
+
+class SelectionChange:
+    """Small published-package fixture for validating replacement/shrink states."""
+    def __init__(self, root, replacement, retain_released):
+        released = root / 'released'
+        write_package(released, features='released=[]\n')
+        self.baseline = archive_state(released, state_for({'probe': 'probe'},
+            {'postgres': {'probe': ['released']}}), root / 'active.tar.gz')
+        candidate = root / 'candidate'
+        features = ('released=[]\n' if retain_released else '') + 'replacement=[]\n'
+        write_package(candidate, features=features)
+        self.package = candidate / 'probe'
+        self.current = state_for({'probe': 'probe'},
+            {'postgres': {'probe': ['replacement'] if replacement else []}})
+        self.descriptor = candidate / 'coverage.json'
+        self.policy = root / 'policy.toml'
+        self.replacement = replacement
+
+    def write(self):
+        self.descriptor.write_text(json.dumps(self.current))
+        features = self.current['configurations']['postgres']['probe']
+        self.policy.write_text(f'[feature-set.postgres]\nprobe={json.dumps(features)}\n')
+
+    def invalidate_current_selection(self):
+        condition = 'feature="replacement"' if self.replacement else 'not(feature="released")'
+        with (self.package / 'src/lib.rs').open('a') as source:
+            source.write(f'\n#[cfg({condition})]\ncompile_error!("invalid selected configuration");\n')

@@ -2,6 +2,15 @@
 
 #[test]
 fn package_api_contracts() {
+    run_contracts("test_compare.py");
+}
+
+#[test]
+fn feature_coverage_contracts() {
+    run_contracts("test_lifecycle.py");
+}
+
+fn run_contracts(script: &str) {
     // nextest remaps these runtime paths when running a CI build archive.
     let manifest_dir =
         std::env::var_os("CARGO_MANIFEST_DIR").expect("Cargo/nextest package directory");
@@ -14,7 +23,7 @@ fn package_api_contracts() {
     // test interpreter without adding a manual Python installation step.
     let status = std::process::Command::new("uv")
         .args(["run", "--no-project", "--no-config", "--python", "3.12"])
-        .arg(root.join("tests/package-api/test_compare.py"))
+        .arg(root.join("tests/package-api").join(script))
         .env("PACKAGE_API_DIFF_WRAPPER", wrapper)
         .current_dir(root)
         .status()

@@ -64,6 +64,26 @@ concerns:
   baseline, subsequent comparisons must check that coverage as an existing
   contract.
 
+### Repository operational rule: additive Cargo features
+
+Enabling an additional Cargo feature MUST NOT remove or change an existing
+public API. Supported feature combinations must be additive. Default features
+and dependency forwarding must not be used to circumvent this rule by hiding or
+changing existing APIs when coverage grows. Feature authors and reviewers are
+responsible for following this rule.
+
+The lifecycle comparison assumes compliance with this repository-owned rule.
+It does not analyze prohibited non-additive configurations, attribute individual
+APIs across products, or enumerate arbitrary feature combinations. Document a
+repository restriction instead of accommodating a prohibited edge case in the
+comparison machinery. This does not narrow valid external specification support
+or change the comparator's analysis-error contract.
+
+Removing released feature coverage remains incompatible evidence; it is not
+configuration growth. Product names may grow their mappings without renaming.
+See the [implemented lifecycle contract](semver-feature-coverage.md) for the
+released-state representation, package-set evolution and initial seed.
+
 ### Comparing old and new feature selections
 
 Compare the published baseline API with the candidate API while keeping

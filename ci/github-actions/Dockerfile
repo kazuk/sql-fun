@@ -15,7 +15,7 @@ RUN apt-get update \
     ca-certificates curl wget git openssh-client \
     unzip zip xz-utils sudo \
     build-essential pkg-config \
-    libssl-dev clang \
+    libssl-dev clang python3 \
     postgresql-client libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -42,7 +42,82 @@ RUN test "$(dpkg --print-architecture)" = amd64 \
     && rm -rf /tmp/binstall
 
 RUN cargo binstall --locked --force --root /opt/tools \
-    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb cargo-semver-checks@0.51.0
+    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb
+
+# #826: a same-path struct does not replace a trait that is still public API.
+# Keep the upstream lockfile and package version; identify the corrected CLI.
+RUN <<'SH'
+set -eu
+mkdir -p /tmp/semver-source
+curl -fsSL https://static.crates.io/crates/cargo-semver-checks/cargo-semver-checks-0.51.0.crate \
+    -o /tmp/semver-source/source.crate
+printf '%s  %s\n' \
+    484e65e62077aed1a119d04ab414038d20b9013302b7353487ff69a461842bf8 \
+    /tmp/semver-source/source.crate | sha256sum --check --strict -
+tar -xzf /tmp/semver-source/source.crate -C /tmp/semver-source
+cd /tmp/semver-source/cargo-semver-checks-0.51.0
+python3 - <<'PYTHON'
+from pathlib import Path
+
+def replace_once(path, before, after):
+    source = path.read_text()
+    if source.count(before) != 1:
+        raise ValueError(f"unexpected pinned analyzer source: {path}")
+    path.write_text(source.replace(before, after))
+
+query = Path("src/lints/trait_changed_kind.ron")
+# Reuse trait_missing's zero-count predicate at the baseline import path.
+replace_once(query, '            current {\n', '''            current {
+                item @fold @transform(op: "count") @filter(op: "=", value: ["$zero"]) {
+                    ... on Trait {
+                        visibility_limit @filter(op: "=", value: ["$public"])
+                        importable_path {
+                            path @filter(op: "=", value: ["%path"])
+                            public_api @filter(op: "=", value: ["$true"])
+                        }
+                    }
+                }
+''')
+replace_once(query, '        "public": "public",', '        "public": "public",\n        "zero": 0,')
+replace_once(Path("src/main.rs"), '#[command(version, propagate_version = true)]',
+             '#[command(version = "0.51.0-sqlfun.1", propagate_version = true)]')
+PYTHON
+cargo install --path . --locked --root /opt/tools
+analyzer=/opt/tools/bin/cargo-semver-checks
+test "$("$analyzer" --version)" = 'cargo-semver-checks 0.51.0-sqlfun.1'
+
+# Exercise the compiled query, then verify a real replacement still fails.
+mkdir -p /tmp/semver-probe/src
+cd /tmp/semver-probe
+cat > Cargo.toml <<'TOML'
+[package]
+name = "semver-image-probe"
+version = "1.0.0"
+edition = "2021"
+TOML
+cat > src/lib.rs <<'RUST'
+mod traits { pub trait Api {} }
+mod generated {
+    mod inner { pub struct Api(Option<u8>); }
+    pub use self::inner::Api;
+    pub fn keep(_: Api) {}
+}
+pub mod api { pub use crate::traits::Api; pub use crate::generated::*; }
+RUST
+RUSTC_BOOTSTRAP=1 cargo rustdoc --offline --lib -- -Z unstable-options --output-format json
+cp target/doc/semver_image_probe.json old.json
+"$analyzer" check-release --baseline-rustdoc old.json --current-rustdoc old.json --release-type patch
+printf '%s\n' 'pub mod api { pub struct Api; }' > src/lib.rs
+RUSTC_BOOTSTRAP=1 cargo rustdoc --offline --lib -- -Z unstable-options --output-format json
+status=0
+"$analyzer" check-release --baseline-rustdoc old.json \
+    --current-rustdoc target/doc/semver_image_probe.json --release-type patch \
+    --color never > result.log 2>&1 || status=$?
+cat result.log
+test "$status" -eq 100
+grep -q -- 'failure trait_changed_kind:' result.log
+rm -rf /tmp/semver-source /tmp/semver-probe
+SH
 
 ARG TYPOS_TAG
 ARG TYPOS_SHA256
@@ -151,7 +226,7 @@ RUN curl -LsSf https://github.com/rvben/rumdl/releases/download/v0.2.76/rumdl-v0
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
 
 RUN cargo deb --version \
-    && cargo semver-checks --version
+    && test "$(cargo semver-checks --version)" = 'cargo-semver-checks 0.51.0-sqlfun.1'
 
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
 

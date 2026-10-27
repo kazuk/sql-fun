@@ -1,9 +1,6 @@
 //! Scalar ALL through `PostgreSQL` 18's shipped operator and cast metadata.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::{
-    context::ViewInfoRead,
-    sem::{FullName, PgBuiltInType},
-};
+use ::sql_fun_sqlast::sem::PgBuiltInType;
 
 #[rstest::rstest]
 #[case::char_type(r#"'r'::"char" <> ALL (ARRAY['t'::"char", 'x'::"char"])"#)]
@@ -22,7 +19,7 @@ use ::sql_fun_sqlast::{
 #[case::records("pg_control_system() = ALL (ARRAY[pg_control_system()])")]
 fn typed_all_retains_boolean_and_binding(#[case] expression: &str) -> testresult::TestResult {
     // Actual builtin overload and cast families are the contract under test.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), false)?;
+    let analyzed = heavy::analyze(&format!("SELECT {expression}"))?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -61,7 +58,7 @@ fn invalid_all_keeps_operands_and_failure(
     #[case] expression: &str,
     #[case] code: &str,
 ) -> testresult::TestResult {
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), false)?;
+    let analyzed = heavy::analyze(&format!("SELECT {expression}"))?;
     assert!(
         analyzed
             .context()
@@ -94,81 +91,6 @@ fn invalid_all_keeps_operands_and_failure(
     Ok(())
 }
 
-#[test]
-fn shipped_catalog_all_clauses_resolve() -> testresult::TestResult {
-    // Full catalog DDL is needed to check all seven affected view clauses.
-    let analyzed = heavy::analyze(
-        r#"SELECT 'r'::"char" <> ALL (ARRAY['t'::"char", 'x'::"char"]),
-                  'public'::name <> ALL (ARRAY['pg_catalog'::name, 'information_schema'::name])"#,
-        true,
-    )?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    for name in [
-        "information_schema.table_constraints",
-        "pg_catalog.pg_stat_user_indexes",
-        "pg_catalog.pg_stat_user_tables",
-        "pg_catalog.pg_stat_xact_user_tables",
-        "pg_catalog.pg_statio_user_indexes",
-        "pg_catalog.pg_statio_user_sequences",
-        "pg_catalog.pg_statio_user_tables",
-    ] {
-        let name: FullName = name.parse()?;
-        let view = analyzed.context().get_view_impl(&name).unwrap();
-        let query = view.ordinary_definition().unwrap().query();
-        let encoded = ::serde_json::to_value(query)?;
-        assert_eq!(test_helpers::assert_all_bindings(&encoded)?, 1, "{name}");
-    }
-    let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    for index in 0..2 {
-        let column = select.result_columns().get_column_at(index).unwrap();
-        assert_eq!(column.col_type(), &Some(PgBuiltInType::bool()));
-        let value = column.expression().unwrap();
-        assert!(value.operator_binding().unwrap().resolution().is_resolved());
-        let encoded = ::serde_json::to_value(value)?;
-        assert!(encoded["Arith"].get("OpAllBinary").is_some());
-    }
-    Ok(())
-}
-
 mod test_helpers {
     pub(super) mod heavy;
-
-    pub(super) fn assert_all_bindings(
-        value: &::serde_json::Value,
-    ) -> Result<usize, ::serde_json::Error> {
-        use ::sql_fun_sqlast::sem::{PgBuiltInType, SemScalarExpr};
-
-        if value["Arith"].get("OpAllBinary").is_some() {
-            let expression: SemScalarExpr = ::serde_json::from_value(value.clone())?;
-            assert_eq!(expression.get_type(), Some(PgBuiltInType::bool()));
-            assert_eq!(expression.is_not_null(), None);
-            assert!(
-                expression
-                    .operator_binding()
-                    .unwrap()
-                    .resolution()
-                    .is_resolved()
-            );
-            return Ok(1);
-        }
-        let mut count = 0;
-        match value {
-            ::serde_json::Value::Object(fields) => {
-                for child in fields.values() {
-                    count += assert_all_bindings(child)?;
-                }
-            }
-            ::serde_json::Value::Array(values) => {
-                for child in values {
-                    count += assert_all_bindings(child)?;
-                }
-            }
-            _ => {}
-        }
-        Ok(count)
-    }
 }

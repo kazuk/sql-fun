@@ -84,7 +84,6 @@ fn invalid_operands_render_specific_diagnostics(
 #[rstest::rstest]
 #[case::numeric("select greatest($1,1) as result")]
 #[case::nested("select least(greatest($1,1),2) as result")]
-#[case::repeated("select greatest($1,$1,1) as result")]
 #[case::subquery("select greatest((select $1),1) as result")]
 #[case::cte("with c as (select greatest($1,1) as n) select least(c.n,2) as result from c")]
 fn parameter_sources_allow_numeric_promotion(

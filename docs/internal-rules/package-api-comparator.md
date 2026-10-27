@@ -148,14 +148,18 @@ cleared by an empty structural diff.
 ## Maintained checks and preparation
 
 The existing `workspace` check runs `xbuild`'s integration test through Cargo or
-nextest, including its CI archive group. The test invokes
-`tests/package-api/test_compare.py` against the actual built wrapper. Tests
-exercise real package builds and both analyzers. The internal comparator runtime
+nextest, including its CI archive group. `tests/package-api/test_compare.py`
+retains inexpensive validation and report-boundary checks. The comparator runtime
 requires Python 3.11+ (`tomllib`), Bash, rustup and Cargo. Maintained tests use
-`uv run --no-project --no-config --python 3.12` to prepare their interpreter
-without introducing a manual Python setup step. uv is already in contributor
-setup for graphify and in the development/CI image. Tests use runtime nextest
-paths to support archive relocation.
+`uv run --no-project --no-config --python 3.12` through existing contributor/CI
+setup. Runtime nextest paths support archive relocation.
+
+The #828 [test cost review](workspace-test-cost.md) discarded the repeated real
+Cargo/rustdoc/analyzer comparisons and complete historical-baseline replay.
+These assertions are not retained as ignored or manual tests. Compiler/analyzer
+integration, feature/proc-macro API comparisons, producer/schema mutation, and
+complete-baseline Patch verdicts are no longer recurring test coverage. The
+comparison implementation and its runtime analysis guarantees are unchanged.
 
 `.local/sbin/prepare-package-api-tests` records the active contributor toolchain,
 including an explicit rustup override, and verifies the corrected analyzer
@@ -165,20 +169,7 @@ patches tools. A missing or stock executable fails with the required identity.
 correction, locked build and semantic smoke tests. Image publication and adoption
 follow `ci/README.md`; the comparator must not be adopted before that image.
 
-The complete approved-baseline regression extracts its frozen copy of the
-approved seed from #824 with a SHA-256 check and prepares historical registry
-dependencies before running nine offline comparisons. It does not read or adopt
-an ambient active baseline. The test uses the same `workspace`/nextest path as
-the minimized shadowing and genuine replacement controls. Maintained tests also
-cover compiler version drift with compatible JSON, unsupported schemas through
-the real analyzer reader, selected-toolchain Cargo resolution despite a
-conflicting PATH, and preparation without compiler installs.
-
-No release gate, workflow job, baseline archive, performance cache or new
-contributor procedure is introduced here.
-
 The [feature-coverage coordinator](semver-feature-coverage.md) consumes this
 interface under the repository's additive-feature rule. Its maintained tests
-share the existing `workspace` integration path. Historical registry dependency
-preparation may download locked dependencies before the real-seed fixture runs;
-production comparison remains offline.
+share the existing `workspace` integration path. Production comparison remains
+offline; the discarded historical replay no longer provisions dependencies.

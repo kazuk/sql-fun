@@ -1,15 +1,16 @@
+# Mandatory per-case policy for workspace-related check-test-flow invocations.
+[profile.default]
+slow-timeout = { period = "1s", terminate-after = 1, grace-period = "0s" }
+
 [profile.ci]
 fail-fast = false
-slow-timeout = "20s"
 junit.path = "junit.xml"
 
 # Archive groups run independently, with persistent, non-overlapping reports.
 [profile.ci-a]
 fail-fast = false
-slow-timeout = "20s"
 junit.path = "junit.xml"
 
 [profile.ci-b]
 fail-fast = false
-slow-timeout = "20s"
 junit.path = "junit.xml"

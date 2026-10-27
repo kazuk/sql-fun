@@ -42,12 +42,12 @@ integration groups above.
 | File/group | Builtin-dependent assertion | Disposition |
 | --- | --- | --- |
 | [`parameter_resolution.rs`](../../sql-fun-sqlast/tests/parameter_resolution.rs) | Numeric source constraints from real operators/casts; parser adapter parity; enum I/O casts and nested parameter domains. | Retain: assertions inspect domain `allows`/correlation, parser-adapter equivalence, enum explicit-cast APIs, and serialized nested constraints. The CLI contract cannot inspect those internal domains or bindings. |
-| [`domain_casts.rs`](../../sql-fun-sqlast/tests/domain_casts.rs) | Explicit and I/O cast availability, domain identity, array/domain coercions, and parameter input domains. | Retain internal target lookup, cast argument/resolution structure, and domain input/output constraints. Custom-schema cases remain Rust coverage under the accepted builtin-only scope. |
-| [`scalar_any.rs`](../../sql-fun-sqlast/tests/scalar_any.rs), [`scalar_all.rs`](../../sql-fun-sqlast/tests/scalar_all.rs) | Actual equality overloads and cast families, invalid operator cases, and shipped catalog clauses. | Retain operator/operand binding assertions, serialized semantic-tree checks, and scans of shipped catalog view bindings. |
-| [`variadic_any.rs`](../../sql-fun-sqlast/tests/variadic_any.rs) | Imported `pg_catalog.format` overload binding through the shipped declaration and builtin views. | Retain selected-overload, SQL argument position, argument binding, and serialized binding assertions. |
+| [`domain_casts.rs`](../../sql-fun-sqlast/tests/domain_casts.rs) | Explicit and I/O cast availability, domain identity, array/domain coercions, and parameter input domains. | Retain internal target lookup, cast argument/resolution structure, and domain input/output constraints. Custom-schema cases remain Rust coverage under the accepted builtin-only scope. #828 discarded the additional full-catalog domain replay for execution cost. |
+| [`scalar_any.rs`](../../sql-fun-sqlast/tests/scalar_any.rs), [`scalar_all.rs`](../../sql-fun-sqlast/tests/scalar_all.rs) | Actual equality overloads and cast families, and invalid operator cases. | Retain operator/operand binding assertions and serialized semantic-tree checks. #828 discarded repeated full-catalog view scans for execution cost. |
+| `variadic_any.rs` | Imported `pg_catalog.format` overload binding through the shipped declaration and builtin views. | Discarded in #828: the full-catalog setup cost did not justify these additional binding assertions. |
 | [`vectors.rs`](../../sql-fun-sqlast/tests/vectors.rs) | Vector array/cast behavior, polymorphic function signatures, operator bindings, and conversion contexts. | The four `invalid_vector_inputs` cases have been migrated by the coordinator to `vectors.json` (PostgreSQL 18). Other vector groups remain in Rust because they inspect catalog conversion context, semantic bindings, or structure beyond the CLI result contract. |
-| [`whole_row_catalog.rs`](../../sql-fun-sqlast/tests/whole_row_catalog.rs) | The real `_pg_truetypid` overload and shipped catalog view path with whole-row arguments. | Retain function-overload, typed whole-row argument, and relation-binding assertions. |
-| [`schema_context_chain.rs`](../../sql-fun-sqlast/tests/schema_context_chain.rs) — `inherited_catalog_objects_and_merged_overloads_drive_query_analysis` | Real inherited catalog objects and merged builtin overloads determine expression types. | Retain: asserts inherited context layers, visible objects, and merged overloads through the internal layer API. |
+| `whole_row_catalog.rs` | The real `_pg_truetypid` overload and shipped catalog view path with whole-row arguments. | Discarded in #828: the full-catalog setup cost did not justify these additional internal assertions. |
+| [`schema_context_chain.rs`](../../sql-fun-sqlast/tests/schema_context_chain.rs) — `inherited_catalog_objects_and_merged_overloads_drive_query_analysis` | Small real DDL layers and imported builtin signatures determine expression types. | Retain: asserts inherited context layers, visible fixture objects, and merged overloads through the internal layer API. #828 removed full builtin SQL loading and the standalone pg_class presence assertion. |
 | [`schema_context_chain.rs`](../../sql-fun-sqlast/tests/schema_context_chain.rs) — `sql_casts_preserve_array_identity` | SQL cast identity and array subscripting. | Migrated by the coordinator to `casts.json`: five cast inputs plus four indexed subscripting inputs, verified against PostgreSQL 17 and 18; the superseded Rust group was removed. |
 
 ## CASE and COALESCE semantic-only cases
@@ -79,6 +79,12 @@ Keep its constraint assertion in Rust; do not count it as superseded by the
 fixture. The CLI behavior was observed at `--schema-level builtin` on both
 PostgreSQL 17 and 18.
 
+The #828 cost review discarded the repeated numeric CASE/COALESCE variants,
+the two-result CASE and two-input COALESCE aggregates, and the multi-comparison
+simple CASE variant. Their combinatorial inference cost exceeded the per-case
+budget; the remaining assignment and binding assertions are retained without
+replacement tests for the discarded scenarios.
+
 ## Additional semantic-only retained groups
 
 These source groups use builtin-named types and synthetic lookup data. Their
@@ -96,7 +102,7 @@ they are not unresolved migration candidates.
 
 | File/group | Why it stays outside this migration |
 | --- | --- |
-| [`builtin_bootstrap.rs`](../../sql-fun-sqlast/tests/builtin_bootstrap.rs), [`extracted_artifacts.rs`](../../sql-fun-sqlast/tests/extracted_artifacts.rs), and [`schema_file_loading.rs`](../../sql-fun-sqlast/tests/schema_file_loading.rs) | Their contracts are catalog bootstrap, extracted-artifact compatibility, SQL syntax/version loading, source provenance, and atomic per-file loading. Keep loader regressions at the loader boundary; a consumer fixture would not localize those failures. |
+| [`extracted_artifacts.rs`](../../sql-fun-sqlast/tests/extracted_artifacts.rs), and [`schema_file_loading.rs`](../../sql-fun-sqlast/tests/schema_file_loading.rs) | Their retained contracts are extracted metadata compatibility, SQL syntax/version loading, source provenance, and atomic per-file loading. Whole-schema bootstrap and copied-generation replay tests were discarded in #828 for execution cost. |
 | [`schema_context_chain.rs`](../../sql-fun-sqlast/tests/schema_context_chain.rs) — all groups other than the inherited builtin-overload and migrated cast groups above | They assert ordered immutable schema prefixes, missing-relation/domain diagnostics, descendant isolation, and view application. A loaded builtin root is setup for the schema-layer contract. |
 | [`qualified_columns.rs`](../../sql-fun-sqlast/tests/qualified_columns.rs) | Its real-catalog helper is shared setup; assertions concern qualified relation identity, aliases, visibility, and column lineage. The tests do not select builtin overloads or rely on a builtin cast family. |
 | [`base_context/builtin_casts.rs`](../../sql-fun-sqlast/src/sem/base_context/builtin_casts.rs), `builtin_fun.rs`, `builtin_ope.rs`, `test_metadata.rs`, and `test_type_categories.rs` | These are direct tests of metadata parsing, builtin catalog construction, and type-category data. Retain them as producer/loader tests; public semantic fixtures cover consumers. |

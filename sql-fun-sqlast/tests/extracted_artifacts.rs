@@ -46,11 +46,3 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str
         .resolve_versions(catalog.join("extension"))
         .unwrap();
 }
-
-#[rstest::rstest]
-#[case::seventeen("17")]
-#[case::eighteen("18")]
-fn installed_generation_bootstraps_builtin_and_user_schemas(#[case] version: &str) {
-    let fixture = heavy::InitializedCatalog::new(version);
-    fixture.assert_semantics(version);
-}

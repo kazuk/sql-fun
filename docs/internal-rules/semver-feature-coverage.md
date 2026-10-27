@@ -174,7 +174,7 @@ enforcing #361 gate.
 The corrected image-provided analyzer `0.51.0-sqlfun.1` makes all nine
 comparisons Patch without changing lifecycle policy or suppressing findings.
 The [#826 investigation](semver-shadowed-trait.md) records the cause,
-image-owned correction and maintained complete-baseline regression.
+image-owned correction and historical complete-baseline validation evidence.
 
 ## Package-set lifecycle and maintained verification
 
@@ -195,10 +195,12 @@ without compiling historical sources. Replacement/shrink cases check that the
 current selection is scheduled and its analysis failure propagates even when
 removal already supplies Major evidence.
 
-The existing package comparator contracts own real compiler/analyzer validation.
-The lifecycle suite does not repeat isolated Cargo/rustdoc builds or fetch
-historical dependencies. Real-source lifecycle acceptance checks performed during
-implementation remain validation evidence, rather than recurring CI tests.
+The #828 [test cost review](workspace-test-cost.md) discarded the costly real
+compiler/analyzer comparison suite and duplicate historical-baseline fixture;
+that coverage is not moved to a manual test path. The lifecycle suite remains
+within the per-case limit and does not repeat isolated Cargo/rustdoc builds or
+fetch historical dependencies. Real-source lifecycle acceptance checks performed
+during implementation remain validation evidence, rather than recurring CI tests.
 Normal contributor commands and prerequisites remain unchanged.
 
 Issue #360 owns ongoing candidate generation/validation, stable adoption/advancement

@@ -9,7 +9,7 @@ this migration merged. The source is
 [`array_subquery.rs`](../../sql-fun-sqlast/src/ast/resolve/query/tests/array_subquery.rs).
 The fixture [array-subqueries.json](array-subqueries.json) stores 28 named case
 objects and runs against PostgreSQL 17 and 18. The two isolated expressions from
-[`builtin_bootstrap.rs`](../../sql-fun-sqlast/tests/builtin_bootstrap.rs) are in
+`builtin_bootstrap.rs` (discarded in #828 for execution cost) are in
 [bootstrap-array-expressions.json](bootstrap-array-expressions.json), selected
 only for PostgreSQL 18 to match the original version-specific checks.
 
@@ -24,7 +24,7 @@ only for PostgreSQL 18 to match the original version-specific checks.
 | `anonymous_record_identity_is_retained_in_array_type` | CLI checks the absent public type and non-null array output. Rust retains the owned anonymous element definition; the API does not serialize this dynamic type as a named `record[]`. |
 | `correlated_binding_and_serialized_query_survive_analysis` | CLI checks typed result columns without diagnostics. Rust retains the correlated child binding, child type and serialization round trip. |
 | `enclosing_expressions_consume_array_result`: `subscript`, `cast` | Type, name and nullability move to the CLI; these result-only Rust cases are removed. |
-| `builtin_bootstrap`: isolated ARRAY and CASE expressions | Exact SQL and `name[]` output move to the PostgreSQL 18 CLI fixture. The bootstrap test retains whole-catalog diagnostics and its `pg_policies.roles` check. |
+| `builtin_bootstrap`: isolated ARRAY and CASE expressions | Exact SQL and `name[]` output move to the PostgreSQL 18 CLI fixture. The separate bootstrap test, including whole-catalog diagnostics and its `pg_policies.roles` check, was discarded in #828 for execution cost. |
 
 The typed-parameter cases and unconstrained source also expect the CLI's
 `parameter_type_unresolved` diagnostic. The product boundary must select a wire

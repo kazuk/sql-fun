@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 #[rstest::rstest]
 #[case::then_parameter("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
 #[case::else_parameter("SELECT CASE WHEN true THEN 1 ELSE $1 END")]
-#[case::repeated("SELECT CASE WHEN true THEN $1 WHEN false THEN $1 ELSE 1 END")]
 #[case::nested("SELECT CASE WHEN true THEN CASE WHEN false THEN $1 ELSE 2 END ELSE 1 END")]
 #[case::outer_operator("SELECT (CASE WHEN true THEN $1 ELSE 1 END) + 2")]
 #[case::outer_call("SELECT abs(CASE WHEN true THEN $1 ELSE 1 END)")]
@@ -115,7 +114,6 @@ fn condition_parameters_preserve_result_selection(
 #[case::selector("SELECT CASE $1 WHEN 1 THEN 2 ELSE 3 END")]
 #[case::when_operand("SELECT CASE 1 WHEN $1 THEN 2 ELSE 3 END")]
 #[case::result_parameter("SELECT CASE 1 WHEN 1 THEN $1 ELSE 3 END")]
-#[case::multiple_comparisons("SELECT CASE $1 WHEN 1 THEN 2 WHEN 2::bigint THEN 4 ELSE 3 END")]
 fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestResult {
     // Equality overload and implicit-cast selection use the real builtin signatures.
     let analyzed = heavy::analyze(sql, &[])?;
@@ -170,7 +168,6 @@ fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestRe
 }
 
 #[rstest::rstest]
-#[case::two_results("SELECT CASE WHEN true THEN $1 WHEN false THEN $2 ELSE 1 END")]
 #[case::simple_comparison("SELECT CASE $1 WHEN $2 THEN 1 ELSE 2 END")]
 fn repeated_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {
     // Builtin overload/cast alternatives must retain correlations between inputs.

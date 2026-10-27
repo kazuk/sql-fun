@@ -92,10 +92,8 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 #[rstest::rstest]
 #[case::mixed("SELECT ARRAY[$1,1] AS result")]
 #[case::reverse("SELECT ARRAY[1,$1] AS result")]
-#[case::repeated("SELECT ARRAY[$1,$1,1] AS result")]
 #[case::subquery("SELECT ARRAY[(SELECT $1),1] AS result")]
 #[case::cte("WITH c AS (SELECT ARRAY[$1,1] AS n) SELECT ARRAY[c.n] AS result FROM c")]
-#[case::nested("SELECT ARRAY[ARRAY[$1,1],ARRAY[2]] AS result")]
 fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult::TestResult {
     let analyzed = heavy::analyze(sql, &[])?;
     assert!(

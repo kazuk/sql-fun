@@ -37,7 +37,6 @@ turso_parser = { version = "=0.8.1", optional = true }
 
 [dev-dependencies]
 assert_matches.workspace = true
-backtrace-on-stack-overflow.workspace = true
 clap = { workspace = true }
 ctor = { workspace = true }
 rstest = { workspace = true }

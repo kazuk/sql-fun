@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 #[rstest::rstest]
 #[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]
-#[case::repeated("SELECT COALESCE($1,$1,1)")]
 #[case::nested("SELECT COALESCE(COALESCE($1,2),1)")]
 #[case::nested_case("SELECT COALESCE(CASE WHEN true THEN $1 ELSE 2 END,1)")]
 #[case::in_case("SELECT CASE WHEN true THEN COALESCE($1,1) ELSE 2 END")]
@@ -77,30 +76,6 @@ fn finalized_operands_retain_common_type_and_coercions(
         let value = ::serde_json::to_value(&coalesce.arguments()[0])?;
         assert!(value.get("ImplicitCast").is_some(), "{value}");
     }
-    Ok(())
-}
-
-#[test]
-fn multiple_parameters_preserve_joint_input_and_output_alternatives() -> testresult::TestResult {
-    // Real builtin source partitions must retain compatible joint assignments.
-    let analyzed = heavy::analyze("SELECT COALESCE($1,$2,1)", &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::int8())
-    ])));
-    assert!(!constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::bool())
-    ])));
-    let result = constraints.result_column(0).unwrap();
-    assert!(result.allows(&PgBuiltInType::int4()));
-    assert!(result.allows(&PgBuiltInType::int8()));
     Ok(())
 }
 

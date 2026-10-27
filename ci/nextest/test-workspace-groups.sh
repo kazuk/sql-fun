@@ -47,8 +47,8 @@ done
 
 # Both archives and regressions must run, in order, for every failure location.
 GIT_ROOT=$PWD
-NEXTEST_EXTRA='--config-file ci/nextest/config.toml'
-function run_nextest() {
+NEXTEST_EXTRA=''
+function run_workspace_nextest() {
   local group
   case "$*" in
     *nextest-a.tar.zst*) group=a ;;

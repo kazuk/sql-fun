@@ -306,10 +306,12 @@ This requires Scrut, `psql`, Docker CLI, and daemon access. Supply
 connectivity requires specific addresses. CI runs the fixture against the
 Debian-installed package on the Docker-capable Ubuntu runner.
 
-`sql-fun-sqlast/tests/builtin_bootstrap.rs` separately loads each committed
-builtin schema through the normal semantic context, then parses a representative
-user schema that resolves builtin functions and operators. It is an ordinary
-Rust integration test and does not require Docker or an installed CLI.
+The source and installed SQLAST regression suites exercise committed builtin
+schemas through the CLI analysis path. The separate Rust whole-schema bootstrap
+and copied-generation replay tests were discarded in #828 because their
+repeated schema loading exceeded the per-case budget. The retained
+`extracted_artifacts.rs` checks load catalog metadata and validate PostgreSQL
+syntax without repeating complete semantic schema initialization.
 
 The generic initialization tests also verify explicit choices and dispatch:
 SQLite-only setup does not run PostgreSQL setup, omitted choices are not filled

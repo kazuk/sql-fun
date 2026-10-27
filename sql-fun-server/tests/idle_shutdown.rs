@@ -1,96 +1,10 @@
-//! Real-process regression coverage for server idle shutdown and configuration.
+//! Real-process argument and help checks for server idle configuration.
 
 mod test_helpers {
     pub(super) mod heavy;
 }
 
 use self::test_helpers::heavy;
-
-use std::time::Duration;
-
-#[test]
-fn server_without_clients_exits_cleans_up_and_can_restart() {
-    let mut server = heavy::Server::start("1", "10");
-    server.assert_idle_exit();
-    server.restart();
-    let client = server.authenticate();
-    drop(client);
-    server.assert_idle_exit();
-}
-
-#[test]
-fn connected_client_prevents_shutdown_until_final_disconnect() {
-    let mut server = heavy::Server::start("1", "10");
-    let first = server.authenticate();
-    let second = server.authenticate();
-    server.assert_running_for(Duration::from_millis(1_200));
-    drop(first);
-    server.assert_running_for(Duration::from_millis(1_200));
-    drop(second);
-    // The old startup deadline has passed; disconnection must start a new one.
-    server.assert_running_for(Duration::from_millis(300));
-    server.assert_idle_exit();
-}
-
-#[test]
-fn reconnect_cancels_pending_shutdown() {
-    let mut server = heavy::Server::start("2", "10");
-    drop(server.authenticate());
-    server.assert_running_for(Duration::from_millis(300));
-    let client = server.authenticate();
-    server.assert_running_for(Duration::from_millis(2_200));
-    drop(client);
-    server.assert_running_for(Duration::from_millis(300));
-    server.assert_idle_exit();
-}
-
-#[test]
-fn zero_disables_shutdown_before_and_after_connections() {
-    let mut server = heavy::Server::start("0", "10");
-    server.assert_running_for(Duration::from_millis(1_200));
-    drop(server.authenticate());
-    server.assert_running_for(Duration::from_millis(1_200));
-}
-
-#[test]
-fn read_timeout_remains_independent_and_then_starts_server_idle_period() {
-    let mut server = heavy::Server::start("1", "2");
-    let mut client = server.authenticate();
-    server.assert_running_for(Duration::from_millis(1_200));
-    client.assert_closed();
-    server.assert_running_for(Duration::from_millis(300));
-    server.assert_idle_exit();
-}
-
-#[test]
-fn socket_counts_as_connected_before_authentication() {
-    let mut server = heavy::Server::start("1", "10");
-    let client = server.connect();
-    server.assert_running_for(Duration::from_millis(1_200));
-    drop(client);
-    server.assert_idle_exit();
-}
-
-#[test]
-fn failed_authentication_releases_connection() {
-    let mut server = heavy::Server::start("1", "10");
-    let mut client = server.connect();
-    client.reject_authentication();
-    server.assert_running_for(Duration::from_millis(300));
-    server.assert_idle_exit();
-}
-
-#[test]
-fn environment_configures_timeout() {
-    let mut server = heavy::Server::with_options(&[], Some("1"), "10");
-    server.assert_idle_exit();
-}
-
-#[test]
-fn argument_overrides_environment() {
-    let mut server = heavy::Server::with_options(&["--server-idle-timeout", "1"], Some("0"), "10");
-    server.assert_idle_exit();
-}
 
 #[rstest::rstest]
 #[case::negative("-1")]

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Sourced by check-test-flow. Keep the per-case policy on workspace-related
+# routes, including affected packages and relocated archives. The separate
+# proc-macro-tests step continues to use run_nextest directly.
+function run_workspace_nextest() {
+  run_nextest --config-file "$GIT_ROOT/ci/nextest/config.toml" "$@"
+}

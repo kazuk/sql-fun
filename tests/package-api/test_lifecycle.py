@@ -1,7 +1,6 @@
-"""Maintained lifecycle contracts, including the approved real initial baseline."""
+"""Lightweight orchestration contracts; compiler behavior belongs to test_compare."""
 import copy
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -10,10 +9,10 @@ import unittest
 from unittest import mock
 
 sys.dont_write_bytecode = True
-from lifecycle_helpers import ROOT, RealBaseline, SelectionChange, state_for, write_package
+from lifecycle_helpers import ROOT, state_for, write_package
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
 from compare import AnalysisError
-from lifecycle import read_state, schedule, execute, resolve_dependencies
+from lifecycle import read_state, schedule, execute
 
 
 class Scheduling(unittest.TestCase):
@@ -140,6 +139,70 @@ class Scheduling(unittest.TestCase):
         self.assertFalse(added)
         self.assertEqual({c['package'] for c in calls} | {e['package'] for e in excluded}, set(packages))
 
+    def execute_with_reports(self, reports):
+        self.inputs()
+        policy = self.root / 'policy.toml'
+        policy.write_text(''.join(
+            f'[feature-set.{product}]\n' + ''.join(
+                f'{name}={json.dumps(features)}\n' for name, features in mapping.items())
+            for product, mapping in self.after['configurations'].items()))
+        completed = [subprocess.CompletedProcess([], 0 if report['status'] == 'detected' else 1,
+                                                json.dumps(report)) for report in reports]
+        with mock.patch('lifecycle.subprocess.run', side_effect=completed) as comparator:
+            result = execute(self.old / 'coverage.json', self.new / 'coverage.json', policy,
+                             Path('/comparator'), Path('/wrapper'), Path('/semver'), 'stable', self.root)
+        self.assertEqual(comparator.call_count, len(reports))
+        return result
+
+    @staticmethod
+    def api_report(impact='patch'):
+        return dict(status='detected', impact=impact, coverage={
+            'old': {'resolved_features': ['released']},
+            'new': {'resolved_features': ['released']}})
+
+    def test_replacement_and_shrink_propagate_current_selection_failure(self):
+        for replacement, retain in ((True, True), (True, False), (False, True), (False, False)):
+            with self.subTest(replacement=replacement, retain_released=retain):
+                features = ('released=[]\n' if retain else '') + 'replacement=[]\n'
+                (self.new / 'probe/Cargo.toml').write_text(
+                    '[package]\nname="probe"\nversion="1.0.0"\n[features]\n' + features)
+                selected = ['replacement'] if replacement else []
+                self.after['configurations']['postgres']['probe'] = selected
+                calls, _, _, _ = schedule(*self.inputs())
+                self.assertEqual(calls[-1]['kind'], 'current-validation')
+                self.assertEqual(calls[-1]['new']['features'], selected)
+                valid = [self.api_report() for _ in calls]
+                result = self.execute_with_reports(valid)
+                self.assertEqual(result['impact'], 'major')
+                self.assertTrue(result['removed_coverage'])
+                failed = valid[:-1] + [dict(status='analysis-error', diagnostics='build failed')]
+                with self.assertRaisesRegex(AnalysisError, 'build failed'):
+                    self.execute_with_reports(failed)
+
+    def test_feature_growth_aggregates_comparator_impact(self):
+        self.after['configurations']['postgres']['probe'].append('added')
+        for impact in ('patch', 'minor', 'major'):
+            with self.subTest(comparator_impact=impact):
+                result = self.execute_with_reports([self.api_report(impact), self.api_report('minor')])
+                self.assertEqual(result['impact'], 'major' if impact == 'major' else 'minor')
+                self.assertEqual(result['next_coverage'], self.after)
+
+    def test_new_crate_is_neutral_until_adopted(self):
+        write_package(self.new, name='new-crate')
+        self.after['packages']['new-crate'] = 'new-crate'
+        self.after['configurations']['postgres']['new-crate'] = []
+        result = self.execute_with_reports([self.api_report()])
+        self.assertEqual(result['impact'], 'patch')
+        self.assertEqual([c['package'] for c in result['comparisons']], ['probe'])
+        self.assertIn('new-crate', result['next_coverage']['packages'])
+        # Once adopted, the new crate is a released comparison obligation.
+        write_package(self.old, name='new-crate')
+        self.before = copy.deepcopy(result['next_coverage'])
+        result = self.execute_with_reports([self.api_report(), self.api_report('major')])
+        self.assertEqual(result['impact'], 'major')
+        self.assertTrue(any(c['package'] == 'new-crate' and c['result']['impact'] == 'major'
+                            for c in result['comparisons']))
+
     def test_lost_released_coverage_remains_major_without_api_diff(self):
         self.inputs()
         policy = self.root / 'policy.toml'
@@ -161,104 +224,6 @@ class Scheduling(unittest.TestCase):
         with mock.patch('lifecycle.subprocess.run', return_value=failed), self.assertRaisesRegex(AnalysisError, 'build failed'):
             execute(self.old / 'coverage.json', self.new / 'coverage.json', policy,
                     Path('/comparator'), Path('/wrapper'), Path('/semver'), 'stable', self.root)
-
-
-class RealLifecycle(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        prepared = subprocess.run([str(ROOT / '.local/sbin/prepare-package-api-tests')],
-                                  text=True, capture_output=True, check=True)
-        cls.tools = json.loads(prepared.stdout)
-        RealBaseline.prepare_registry(cls.tools['toolchain'])
-
-    def check(self, fixture, expected='detected'):
-        fixture.write()
-        completed = subprocess.run([sys.executable, str(ROOT / '.local/sbin/compare-feature-coverage'),
-            '--baseline', str(fixture.baseline), '--candidate', str(fixture.descriptor),
-            '--policy', str(fixture.policy), '--diff-wrapper', os.environ['PACKAGE_API_DIFF_WRAPPER'],
-            '--semver-checks', self.tools['semver_checks'], '--toolchain', self.tools['toolchain']],
-            text=True, capture_output=True)
-        report = json.loads(completed.stdout)
-        self.assertEqual(completed.returncode, 0 if expected == 'detected' else 1, report)
-        self.assertEqual(report['status'], expected, report)
-        if expected == 'detected':
-            print(f'lifecycle: {report["impact"]}, {len(report["comparisons"])} comparisons', flush=True)
-        else:
-            self.assertNotIn('impact', report)
-            self.assertNotIn('next_coverage', report)
-        return report
-
-    def test_replacement_and_shrink_validate_current_selection(self):
-        for replacement, retain in ((True, True), (True, False), (False, True), (False, False)):
-            with self.subTest(replacement=replacement, retain_released=retain):
-                with tempfile.TemporaryDirectory(prefix='selected-coverage-') as directory:
-                    fixture = SelectionChange(Path(directory), replacement, retain)
-                    report = self.check(fixture)
-                    self.assertEqual(report['impact'], 'major')
-                    self.assertTrue(report['removed_coverage'])
-                    self.assertTrue(any(c['kind'] == 'current-validation' for c in report['comparisons']))
-                    fixture.invalidate_current_selection()
-                    report = self.check(fixture, expected='analysis-error')
-                    self.assertIn('invalid selected configuration', report['diagnostics'])
-
-    def test_optional_local_crate_is_supplied_only_when_resolved(self):
-        with tempfile.TemporaryDirectory(prefix='optional-local-crate-') as directory:
-            root = Path(directory)
-            write_package(root, name='probe')
-            write_package(root, name='local-dependency')
-            with (root / 'probe/Cargo.toml').open('a') as manifest:
-                manifest.write('\n[dependencies]\nlocal-dependency={version="1.0",optional=true}\n')
-            side = dict(package=str(root / 'probe'), dependencies=[str(root / 'local-dependency')],
-                        default_features=True, features=[])
-            selected = resolve_dependencies(side, 'x86_64-unknown-linux-gnu', self.tools['toolchain'])
-            self.assertFalse(selected['dependencies'])
-            side['features'] = ['local-dependency']
-            selected = resolve_dependencies(side, 'x86_64-unknown-linux-gnu', self.tools['toolchain'])
-            self.assertEqual(selected['dependencies'], side['dependencies'])
-
-    def test_seven_acceptance_cases_from_real_seed(self):
-        # One lifecycle sequence intentionally shares its expensive real-source
-        # fixture; the adopted state is the output of the preceding stage.
-        with tempfile.TemporaryDirectory(prefix='real-seed-lifecycle-') as directory:
-            fixture = RealBaseline(Path(directory))
-            self.assertEqual(fixture.state['source_revision'], 'bd53b083b028dc8423f6c4e5b232cbd3c851c8c1')
-            name = write_package(fixture.candidate, name='new-crate')
-            fixture.current['packages'][name] = name
-            fixture.current['configurations']['postgres'][name] = []
-            report = self.check(fixture)
-            self.assertEqual(report['impact'], 'patch')
-            self.assertFalse(any(c['package'] == name for c in report['comparisons']))
-            self.assertEqual(report['next_coverage']['packages'][name], name)
-            fixture.add_feature()
-            report = self.check(fixture)  # AC 1, 7: additive unreleased coverage.
-            self.assertEqual(report['impact'], 'minor')
-            self.assertFalse(report['removed_coverage'])
-            fixture.break_released_api()
-            self.assertEqual(self.check(fixture)['impact'], 'major')  # AC 2.
-            fixture.add_feature()  # Restore original API and keep the new feature.
-            fixture.current['configurations']['new-product'] = {fixture.name: ['unreleased'], name: []}
-            self.assertEqual(self.check(fixture)['impact'], 'minor')  # AC 3.
-            fixture.break_released_api()
-            report = self.check(fixture)  # AC 4, also a new crate cannot hide the break.
-            self.assertEqual(report['impact'], 'major')
-            self.assertTrue(any(c['package'] == name for c in report['new_coverage']))
-            self.assertFalse(any(c['package'] == name for c in report['comparisons']))
-            fixture.add_feature()
-            fixture.adopt()
-            fixture.break_added_api()
-            self.assertEqual(self.check(fixture)['impact'], 'major')  # AC 5.
-            (fixture.candidate / 'new-crate/src/lib.rs').write_text('pub fn released(_: u8) {}')
-            report = self.check(fixture)
-            self.assertTrue(any(c['package'] == 'new-crate' and c['result']['impact'] == 'major'
-                                for c in report['comparisons']))
-            fixture.manifest.write_text(fixture.original_manifest)
-            fixture.lib.write_text(fixture.original_api)
-            (fixture.candidate / 'new-crate/src/lib.rs').write_text('pub fn released() {}')
-            for mapping in fixture.current['configurations'].values():
-                mapping[fixture.name] = []
-            report = self.check(fixture)  # AC 6, 7: released coverage removal.
-            self.assertEqual(report['impact'], 'major')
-            self.assertTrue(report['removed_coverage'])
 
 
 if __name__ == '__main__':

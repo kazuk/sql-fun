@@ -181,26 +181,20 @@ released package is reported as removal even when no current workspace member
 can be enumerated. A rename is removal plus addition; no rename inference is
 performed.
 
-`xbuild/tests/package_api.rs` runs the lifecycle Python contracts through the
-existing `workspace` check and nextest archive group. Scheduling tests verify
-policy errors, package addition/adoption/removal and comparator failures. Real
-package fixtures verify replacement/shrink selections with retained or removed
-historical features, including selected compilation failures. The real-seed
-sequence verifies neutral crate introduction, continued released-crate checks,
-and compatibility checks on the new crate only after baseline adoption. The
-real-seed lifecycle fixture extracts the checked-in active baseline and scopes
-API mutations to its actual `sql-fun-core` package, retaining its approved
-source revision and package contents. It tests all seven acceptance cases via
-the production scripts, including a copied fixture baseline representing stable
-adoption. It never advances the checked-in baseline. Other historical packages
-remain in the full archive; this focused compiler test is not a certification of
-every historical crate's buildability or compatibility with today's source.
+`xbuild/tests/package_api.rs` runs lightweight lifecycle Python contracts through
+the existing `workspace` check and nextest archive group. They verify scheduling,
+policy errors, package addition/adoption/removal, impact aggregation and error
+propagation using small source packages and supplied comparator reports. They
+also extract the checked-in seed and validate its complete replay mappings
+without compiling historical sources. Replacement/shrink cases check that the
+current selection is scheduled and its analysis failure propagates even when
+removal already supplies Major evidence.
 
-The real-source fixture incurs repeated isolated Cargo/rustdoc builds. Its
-preparation downloads locked historical registry dependencies into Cargo's cache
-when necessary; analysis itself is offline. Small scheduling fixtures supplement
-the real baseline rather than substituting for it. Normal contributor commands
-and prerequisites remain unchanged.
+The existing package comparator contracts own real compiler/analyzer validation.
+The lifecycle suite does not repeat isolated Cargo/rustdoc builds or fetch
+historical dependencies. Real-source lifecycle acceptance checks performed during
+implementation remain validation evidence, rather than recurring CI tests.
+Normal contributor commands and prerequisites remain unchanged.
 
 Issue #360 owns ongoing candidate generation/validation, stable adoption/advancement
 and snapshot non-advancement. #361 owns release CI wiring. This implementation

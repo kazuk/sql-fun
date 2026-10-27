@@ -212,6 +212,7 @@ mod tests {
         assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
     }
 
+    // Removed native_notification_invalidates_in_place_change; restore from df446be6c1d950353fbd7f79916f79c68bfd396d.
     #[test]
     fn inode_replacement_invalidates_without_notification() {
         let directory = ::tempfile::tempdir().unwrap();

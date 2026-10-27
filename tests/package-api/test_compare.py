@@ -19,6 +19,9 @@ def fingerprint(directory):
             for p in directory.rglob('*') if p.is_file()}
 
 
+# Removed compiler and historical replay methods; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+# Removed seven CI-over-budget methods; restore from df446be6c1d950353fbd7f79916f79c68bfd396d.
+
 class Comparison(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

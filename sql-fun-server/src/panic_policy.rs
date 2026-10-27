@@ -9,3 +9,5 @@ pub fn install_server_panic_hook() {
         std::process::abort();
     }));
 }
+
+// Removed the subprocess panic/backtrace test; restore from df446be6c1d950353fbd7f79916f79c68bfd396d.

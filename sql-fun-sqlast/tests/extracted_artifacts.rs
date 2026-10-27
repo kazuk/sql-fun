@@ -1,4 +1,6 @@
 //! Loader compatibility for the officially extracted `PostgreSQL` artifacts.
+// Removed installed-generation bootstrap cases here and builtin_bootstrap.rs; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+
 mod extracted_artifacts_helpers {
     pub(crate) mod heavy;
 }

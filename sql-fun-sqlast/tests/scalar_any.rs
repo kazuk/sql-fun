@@ -86,6 +86,9 @@ fn invalid_any_keeps_operands_and_failure(
     Ok(())
 }
 
+// Removed shipped_catalog_any_and_ordinary_array_equality_resolve here and
+// the standalone variadic_any.rs format test; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+
 mod test_helpers {
     pub(super) mod heavy;
 }

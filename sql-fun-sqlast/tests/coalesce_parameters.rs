@@ -4,6 +4,7 @@ use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::sem::{PgBuiltInType, TypeReference};
 use std::collections::BTreeMap;
 
+// Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]
@@ -97,6 +98,7 @@ fn outer_cast_constrains_coalesce_output() -> testresult::TestResult {
     Ok(())
 }
 
+// Removed multiple_parameters_preserve_joint_input_and_output_alternatives; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::same_domain("COALESCE($1::amount,NULL::amount)", "public.amount")]
 #[case::domain_base("COALESCE($1::amount,1)", "pg_catalog.int4")]

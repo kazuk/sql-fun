@@ -458,4 +458,6 @@ mod tests {
         eprintln!("{ct:?}");
         Ok(())
     }
+
+    // Removed the AdventureWorks schema test; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 }

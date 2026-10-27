@@ -8,6 +8,7 @@ use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::sem::PgBuiltInType;
 use std::collections::BTreeMap;
 
+// Removed the extra comparison variants from this aggregate; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[test]
 fn catalog_comparison_bindings_and_constraints() -> testresult::TestResult {
     // Real cross-type operator signatures determine the admissible sources.

@@ -81,6 +81,7 @@ fn invalid_operands_render_specific_diagnostics(
     Ok(())
 }
 
+// Removed the repeated parameter-source variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::numeric("select greatest($1,1) as result")]
 #[case::nested("select least(greatest($1,1),2) as result")]

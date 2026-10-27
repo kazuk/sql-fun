@@ -89,6 +89,7 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
     Ok(())
 }
 
+// Removed repeated and nested numeric-source cases in 81568731f391becc60f90cbeac057ddd96c0baa6, and the CTE case in 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
 #[case::mixed("SELECT ARRAY[$1,1] AS result")]
 #[case::reverse("SELECT ARRAY[1,$1] AS result")]
@@ -119,6 +120,7 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
     Ok(())
 }
 
+// Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
 #[case::greatest("GREATEST($1,NULL)")]
 #[case::least("LEAST($1,NULL)")]

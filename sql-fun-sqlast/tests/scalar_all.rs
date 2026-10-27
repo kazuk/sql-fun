@@ -91,6 +91,8 @@ fn invalid_all_keeps_operands_and_failure(
     Ok(())
 }
 
+// Removed shipped_catalog_all_clauses_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+
 mod test_helpers {
     pub(super) mod heavy;
 }

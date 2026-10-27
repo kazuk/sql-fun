@@ -101,6 +101,7 @@ fn preserves_existing_declaration_attributes() {
     assert_eq!(existing.materialized(), Some(true));
 }
 
+// Removed accepts_postgres_modifying_body; restore from 6a785e971f0a16745f7cf8dd4b7c408d9984951b.
 #[rstest::rstest]
 #[case::base("select 1; select 2", &[])]
 #[case::cte("select 1", &[("chosen", "select 1; select 2")])]

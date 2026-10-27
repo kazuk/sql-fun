@@ -96,6 +96,8 @@ fn dependent_file_reports_named_missing_domain_base_before_its_provider()
     Ok(())
 }
 
+// Removed standalone whole_row_catalog.rs and the pg_class assertion here;
+// restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[test]
 fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
 -> Result<(), Box<dyn std::error::Error>> {

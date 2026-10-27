@@ -139,6 +139,8 @@ fn parameter_cast_preserves_admissible_inputs_and_domain_output(
     Ok(())
 }
 
+// Removed shipped_postgres18_catalog_domain_casts_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_core::SqlFunArgs;

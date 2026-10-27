@@ -6,6 +6,7 @@ mod test_helpers {
 
 use self::test_helpers::heavy;
 
+// Removed the nine real-time idle shutdown cases; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::negative("-1")]
 #[case::malformed("never")]

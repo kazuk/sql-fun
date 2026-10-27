@@ -31,7 +31,7 @@ for catalog in left_unary_op right_unary_op casts; do
   printf '{}\n' >"$SQL_FUN_API_FIXTURE/home/postgres/17/$catalog.json"
 done
 printf '%s\n' '{"intentionally_unused":[]}' >"$SQL_FUN_API_FIXTURE/home/postgres/17/binary_op.json"
-printf '%s\n' '[{"name":"int4"}]' >"$SQL_FUN_API_FIXTURE/home/postgres/17/pg_type.json"
+printf '%s\n' '[{"schema":"pg_catalog","name":"int4","collatable":false}]' >"$SQL_FUN_API_FIXTURE/home/postgres/17/pg_type.json"
 printf '%s\n' '-- synthetic builtin' >"$SQL_FUN_API_FIXTURE/home/postgres/17/schema.sql"
 for catalog in collations operator_classes; do
   cp "$api_fixture_source/$catalog.json" "$SQL_FUN_API_FIXTURE/home/postgres/17/$catalog.json"

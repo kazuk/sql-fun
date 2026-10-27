@@ -8,7 +8,7 @@ pub(super) fn query_project() -> SchemaProject {
     let builtin = project.home().join("postgres/17");
     std::fs::write(
         builtin.join("pg_type.json"),
-        r#"[{"name":"int4"},{"name":"bool"},{"name":"text"}]"#,
+        r#"[{"schema":"pg_catalog","name":"int4","collatable":false},{"schema":"pg_catalog","name":"bool","collatable":false},{"schema":"pg_catalog","name":"text","collatable":true}]"#,
     )
     .unwrap();
     std::fs::write(

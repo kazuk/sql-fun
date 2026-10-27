@@ -58,7 +58,7 @@ mod test_function_param_analyze {
             &Some(SchemaName::from("pg_catalog")),
             &LocalName::from("int4"),
         );
-        let int4_type = TypeDefinition::builtin(&int4_name);
+        let int4_type = TypeDefinition::builtin(&int4_name, None);
         test_context.set_get_type_impl_result(&int4_name, &int4_type);
         let builder = SynBuilder::new();
         let arg_type = builder.type_name(&["int4"]);
@@ -127,7 +127,7 @@ mod test_function_param_analyze_as_column_definition {
             &Some(SchemaName::from("pg_catalog")),
             &LocalName::from("int4"),
         );
-        let int4_type = TypeDefinition::builtin(&int4_name);
+        let int4_type = TypeDefinition::builtin(&int4_name, None);
         test_context.set_get_type_impl_result(&int4_name, &int4_type);
         let builder = SynBuilder::new();
         let arg_type = builder.type_name(&["int4"]);

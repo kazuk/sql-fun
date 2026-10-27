@@ -2,6 +2,8 @@ mod aggregate_info;
 mod builtin_casts;
 mod builtin_fun;
 mod builtin_ope;
+#[cfg(test)]
+mod test_helpers;
 pub use self::{
     builtin_casts::PgBuiltinCasts, builtin_fun::PgBuiltInFunctions, builtin_ope::PgBuiltinOperators,
 };
@@ -43,20 +45,132 @@ pub struct BaseContext {
 
 #[derive(serde::Deserialize)]
 struct BuiltinTypeInfo {
+    schema: String,
     name: String,
     #[serde(default)]
     category: Option<crate::sem::TypeCategory>,
+    #[serde(deserialize_with = "crate::sem::pg_type::deserialize_collatable")]
+    collatable: Option<bool>,
+}
+
+#[cfg(test)]
+mod builtin_type_info_tests {
+    use super::BuiltinTypeInfo;
+
+    #[rstest::rstest]
+    #[case::missing_schema(r#"{"name":"text","collatable":true}"#)]
+    #[case::null_schema(r#"{"schema":null,"name":"text","collatable":true}"#)]
+    #[case::missing_fact(r#"{"schema":"pg_catalog","name":"text"}"#)]
+    #[case::invalid_fact(r#"{"schema":"pg_catalog","name":"text","collatable":"true"}"#)]
+    fn invalid_required_fields_fail(#[case] json: &str) {
+        assert!(serde_json::from_str::<BuiltinTypeInfo>(json).is_err());
+    }
 }
 
 impl From<&BuiltinTypeInfo> for TypeDefinition {
     fn from(info: &BuiltinTypeInfo) -> Self {
-        let name = FullName::with_schema("pg_catalog", &info.name);
-        Self::builtin_with_category(&name, info.category)
+        let name = FullName::with_schema(&info.schema, &info.name);
+        Self::builtin_with_category(&name, info.category, info.collatable)
     }
 }
 
 #[cfg(test)]
-mod test_type_categories;
+mod builtin_type_conversion_tests {
+    use super::BuiltinTypeInfo;
+    use crate::{
+        context::BaseParseContext,
+        sem::{FullName, TypeDefinition, TypeReference},
+        test_helpers::TestParseContext,
+    };
+
+    #[rstest::rstest]
+    #[case::yes("true", Some(true))]
+    #[case::no("false", Some(false))]
+    #[case::undefined("null", None)]
+    fn retains_required_nullable_fact_and_qualified_identity(
+        #[case] value: &str,
+        #[case] expected: Option<bool>,
+    ) {
+        let json = format!(
+            r#"{{"schema":"Odd.Schema","name":"_Type 雪","category":null,"collatable":{value}}}"#
+        );
+        let record: BuiltinTypeInfo = serde_json::from_str(&json).unwrap();
+        let definition = TypeDefinition::from(&record);
+        let reference = TypeReference::dynamic(&definition);
+        let context = TestParseContext::default();
+        assert_eq!(reference.collation_capability(&context), expected);
+        assert_eq!(
+            definition.full_name(),
+            Some(&FullName::with_schema("Odd.Schema", "_Type 雪"))
+        );
+    }
+    #[rstest::rstest]
+    #[case::seventeen("17")]
+    #[case::eighteen("18")]
+    fn committed_catalogs_survive_loading_and_lookup(#[case] version: &str) {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sql-fun-home/postgres")
+            .join(version)
+            .join("pg_type.json");
+        let catalog = std::fs::read_to_string(path).unwrap();
+        let records: Vec<BuiltinTypeInfo> = serde_json::from_str(&catalog).unwrap();
+        assert!(!records.is_empty());
+        let mut context = TestParseContext::default();
+        for record in records {
+            assert!(
+                record.category.is_some(),
+                "defined builtin: {}",
+                record.name
+            );
+            let definition = TypeDefinition::from(&record);
+            let name = FullName::with_schema(&record.schema, &record.name);
+            context.set_get_type_impl_result(&name, &definition);
+            for lookup in [name, FullName::from_local_name(&record.name)] {
+                let loaded = context.get_type(&lookup).expect("type lookup");
+                assert_eq!(loaded.category(&context), record.category);
+                assert_eq!(
+                    TypeReference::dynamic(loaded).collation_capability(&context),
+                    record.collatable,
+                );
+                let json = serde_json::to_string(loaded).unwrap();
+                let restored: TypeDefinition = serde_json::from_str(&json).unwrap();
+                assert_eq!(restored, *loaded);
+                assert_eq!(restored.category(&context), record.category);
+            }
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::shell(
+        r#"{"schema":"pg_catalog","collatable":null,"name":"custom","category":null}"#,
+        None
+    )]
+    #[case::custom(
+        r#"{"schema":"pg_catalog","collatable":null,"name":"custom","category":"!"}"#,
+        Some('!')
+    )]
+    #[case::unknown(
+        r#"{"schema":"pg_catalog","collatable":null,"name":"unknown","category":"X"}"#,
+        Some('X')
+    )]
+    fn preserves_available_and_missing_information(
+        #[case] json: &str,
+        #[case] expected: Option<char>,
+    ) {
+        let record: BuiltinTypeInfo = serde_json::from_str(json).unwrap();
+        let definition = TypeDefinition::from(&record);
+        let context = TestParseContext::default();
+        assert_eq!(
+            definition
+                .category(&context)
+                .map(crate::sem::TypeCategory::code),
+            expected
+        );
+        let json = serde_json::to_string(&definition).unwrap();
+        let restored: TypeDefinition = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.category(&context), definition.category(&context));
+    }
+}
 
 impl BaseContext {
     /// Initialize builtin schema information with the caller's selected metadata.
@@ -116,9 +230,14 @@ impl BaseContext {
     fn load_builtin_types(
         paths: &PostgresBuiltinPaths,
     ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
-        let builtin_types_path = paths.types()?;
+        Self::read_builtin_types(&paths.types()?)
+    }
+
+    fn read_builtin_types(
+        builtin_types_path: &Path,
+    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
         let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
-            File::open(&builtin_types_path)?,
+            File::open(builtin_types_path)?,
         ))
         .map_err(|error| {
             AnalysisError::unexpected_input_error(&format!(
@@ -128,13 +247,71 @@ impl BaseContext {
         })?;
         let mut builtin_type_data = TrieMap::new();
         for builtin_type in builtin_types {
+            if builtin_type.schema.is_empty()
+                || builtin_type.name.is_empty()
+                || builtin_type.schema.contains('\0')
+                || builtin_type.name.contains('\0')
+            {
+                return Err(AnalysisError::unexpected_input_error(&format!(
+                    "invalid type identity in {}",
+                    builtin_types_path.display()
+                )));
+            }
             let type_definition = TypeDefinition::from(&builtin_type);
             let full_name = type_definition.full_name().expect("catalog type identity");
+            if builtin_type_data.get(&full_name.to_string()).is_some() {
+                return Err(AnalysisError::unexpected_input_error(&format!(
+                    "duplicate type {full_name} in {}",
+                    builtin_types_path.display()
+                )));
+            }
             builtin_type_data.insert(&full_name.to_string(), type_definition);
         }
         Ok(builtin_type_data)
     }
+}
 
+#[cfg(test)]
+mod read_builtin_types_tests {
+    use super::{BaseContext, test_helpers};
+    use crate::{
+        sem::{FullName, TypeReference},
+        test_helpers::TestParseContext,
+    };
+
+    #[rstest::rstest]
+    #[case::empty_schema(r#"[{"schema":"","name":"text","collatable":true}]"#)]
+    #[case::empty_name(r#"[{"schema":"public","name":"","collatable":true}]"#)]
+    #[case::nul_name(r#"[{"schema":"public","name":"a\u0000b","collatable":true}]"#)]
+    #[case::duplicate(r#"[{"schema":"public","name":"custom","collatable":true},{"schema":"public","name":"custom","collatable":false}]"#)]
+    fn invalid_catalog_reports_its_path(#[case] json: &str) {
+        let fixture = test_helpers::TypeCatalog::new(json);
+        let error = BaseContext::read_builtin_types(fixture.path()).unwrap_err();
+        assert!(error.to_string().contains(fixture.path().to_str().unwrap()));
+    }
+
+    #[test]
+    fn same_local_names_retain_separate_qualified_facts() {
+        let fixture = test_helpers::TypeCatalog::new(
+            r#"[
+            {"schema":"one","name":"custom","collatable":true},
+            {"schema":"two","name":"custom","collatable":false}
+        ]"#,
+        );
+        let types = BaseContext::read_builtin_types(fixture.path()).unwrap();
+        let context = TestParseContext::default();
+        for (schema, expected) in [("one", true), ("two", false)] {
+            let name = FullName::with_schema(schema, "custom");
+            let loaded = types.get(&name.to_string()).unwrap();
+            assert_eq!(
+                TypeReference::dynamic(loaded).collation_capability(&context),
+                Some(expected)
+            );
+        }
+    }
+}
+
+impl BaseContext {
     fn setup_search_path(
         context_args: &SqlFunArgs,
         metadata: &SqlFunMetadata,

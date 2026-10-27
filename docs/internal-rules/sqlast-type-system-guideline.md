@@ -77,6 +77,18 @@ the supported element, array, and non-array placeholders (`anyelement`,
 `anyarray`, `anynonarray`, and their `anycompatible` counterparts). This does not
 make all polymorphic methods callable on a dynamic receiver.
 
+## Type collation facts
+
+`TypeReference::collation_capability` returns the retained PostgreSQL capability
+through `ParseContext`. Existing nominal definitions retain `collatable:
+Option<bool>`; domains and ordinary arrays follow their existing base/element
+references, including owned dynamic definitions. Nominal vectors use their own
+fact. Undefined facts, unresolved references, cycles and other dialects return
+`None`. The query performs no supplementary discovery and emits no diagnostics;
+SQL consumers own applicability and diagnostic policy. See the
+[extraction contract](postgres-extraction.md#type-collation-capability) for
+required JSON-key presence and explicit null semantics.
+
 ## Known types, unknowns, and casts
 
 Expression typing and nullability are separate results: `get_type()` returns

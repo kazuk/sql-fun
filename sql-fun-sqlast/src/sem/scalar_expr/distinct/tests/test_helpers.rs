@@ -29,6 +29,7 @@ pub(super) fn context_for(dialect: Dialect) -> SchemaFileContext {
             &TypeDefinition::builtin_with_category(
                 ty.full_name(),
                 Some(TypeCategory::try_from(category).unwrap()),
+                None,
             ),
         );
     }

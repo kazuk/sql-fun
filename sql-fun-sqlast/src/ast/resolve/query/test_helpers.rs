@@ -179,6 +179,7 @@ pub(super) fn source_namespace_statement_at_version(
             &crate::sem::TypeDefinition::builtin_with_category(
                 ty.full_name(),
                 Some(crate::sem::TypeCategory::try_from('N').unwrap()),
+                None,
             ),
         );
     }

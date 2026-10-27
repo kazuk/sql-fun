@@ -61,7 +61,11 @@ impl SchemaProject {
         std::fs::write(builtin.join("operator_classes.json"), r#"[{"schema":"pg_catalog","name":"int4_ops","access_method":"btree",
                 "family":{"schema":"pg_catalog","name":"integer_ops","access_method":"btree"},
                 "input_type":{"schema":"pg_catalog","name":"int4"},"default":true,"key_type":null}]"#).unwrap();
-        std::fs::write(builtin.join("pg_type.json"), r#"[{"name":"int4"}]"#).unwrap();
+        std::fs::write(
+            builtin.join("pg_type.json"),
+            r#"[{"schema":"pg_catalog","name":"int4","collatable":false}]"#,
+        )
+        .unwrap();
         std::fs::write(builtin.join("schema.sql"), "-- synthetic builtin\n").unwrap();
         std::fs::write(
             directory.path().join("Cargo.toml"),

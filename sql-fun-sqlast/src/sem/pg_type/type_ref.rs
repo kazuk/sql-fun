@@ -1,5 +1,6 @@
 use crate::context::BaseParseContext;
 use crate::{context::ParseContext, sem::FullName};
+use std::collections::HashSet;
 
 use super::{
     TypeDefinition, concrete_type::ConcreteTypeReference, dynamic_type::DynamicTypeReference,
@@ -17,6 +18,140 @@ pub enum TypeReference {
     Concrete(ConcreteTypeReference),
     /// dynamic type
     Dynamic(DynamicTypeReference),
+}
+
+impl TypeReference {
+    /// PostgreSQL collation capability, following existing domain/array references.
+    ///
+    /// `None` means an undefined fact or unresolved reference (also returned for
+    /// other dialects). This query does not validate SQL, report diagnostics or
+    /// discover supplemental metadata. Nominal vectors use their own fact.
+    pub fn collation_capability(&self, context: &impl ParseContext) -> Option<bool> {
+        if context.dialect() != crate::ast::Dialect::postgres() {
+            return None;
+        }
+        self.collation_capability_in(context, &mut HashSet::new())
+    }
+
+    pub(super) fn collation_capability_in(
+        &self,
+        context: &impl ParseContext,
+        visited: &mut HashSet<FullName>,
+    ) -> Option<bool> {
+        match self {
+            Self::Concrete(reference) => {
+                if reference.is_array() {
+                    return reference
+                        .element_type()
+                        .collation_capability_in(context, visited);
+                }
+                if !visited.insert(reference.full_name().clone()) {
+                    return None;
+                }
+                self.definition_from_catalog(context)?
+                    .collation_capability_in(context, visited)
+            }
+            Self::Dynamic(reference) => reference
+                .type_definition()
+                .collation_capability_in(context, visited),
+        }
+    }
+}
+
+#[cfg(test)]
+mod collation_capability_tests {
+    use crate::{
+        sem::{CreateDomain, FullName, TypeDefinition, TypeReference},
+        test_helpers::TestParseContext,
+    };
+
+    #[rstest::rstest]
+    fn retained_fact_is_used_without_name_or_element_inference(
+        #[values(Some(true), Some(false), None)] fact: Option<bool>,
+        #[values(false, true)] dynamic: bool,
+        #[values(false, true)] array: bool,
+    ) {
+        let mut context = TestParseContext::default();
+        // A qualified, vector-like name must not determine the answer.
+        let name = FullName::with_schema("extension schema", "_custom_vector");
+        let definition = TypeDefinition::builtin(&name, fact);
+        context.set_get_type_impl_result(&name, &definition);
+        let reference = if dynamic {
+            TypeReference::dynamic(&definition)
+        } else {
+            TypeReference::concrete_type_ref(&name, false)
+        };
+        let reference = if array {
+            reference.array_type()
+        } else {
+            reference
+        };
+        assert_eq!(reference.collation_capability(&context), fact);
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+
+    #[rstest::rstest]
+    fn follows_nested_domains_and_arrays(
+        #[values(Some(true), Some(false), None)] fact: Option<bool>,
+        #[values(false, true)] array_base: bool,
+        #[values(false, true)] array_domain: bool,
+        #[values(false, true)] dynamic: bool,
+    ) {
+        let mut context = TestParseContext::default();
+        let base_name = FullName::with_schema("extension", "base");
+        let base = TypeReference::concrete_type_ref(&base_name, array_base);
+        context.set_get_type_impl_result(&base_name, &TypeDefinition::builtin(&base_name, fact));
+        let first =
+            TypeReference::concrete_type_ref(&FullName::with_schema("public", "first"), false);
+        let second =
+            TypeReference::concrete_type_ref(&FullName::with_schema("public", "second"), false);
+        let first_definition = TypeDefinition::from(&CreateDomain::new(&first, &Some(base)));
+        context.set_get_type_impl_result(first.full_name(), &first_definition);
+        let second_definition = TypeDefinition::from(&CreateDomain::new(&second, &Some(first)));
+        context.set_get_type_impl_result(second.full_name(), &second_definition);
+        let reference = if dynamic {
+            TypeReference::dynamic(&second_definition)
+        } else {
+            second
+        };
+        let reference = if array_domain {
+            reference.array_type()
+        } else {
+            reference
+        };
+        assert_eq!(reference.collation_capability(&context), fact);
+    }
+
+    #[rstest::rstest]
+    #[case::missing_base(None)]
+    #[case::missing_definition(Some("missing"))]
+    #[case::cycle(Some("cycle"))]
+    fn unresolved_and_cyclic_domains_have_no_fact(#[case] base: Option<&str>) {
+        let mut context = TestParseContext::default();
+        let reference =
+            TypeReference::concrete_type_ref(&FullName::with_schema("public", "cycle"), false);
+        let base = base.map(|name| {
+            TypeReference::concrete_type_ref(&FullName::with_schema("public", name), false)
+        });
+        let domain = TypeDefinition::from(&CreateDomain::new(&reference, &base));
+        context.set_get_type_impl_result(reference.full_name(), &domain);
+        assert_eq!(reference.collation_capability(&context), None);
+        assert_eq!(
+            TypeReference::dynamic(&domain).collation_capability(&context),
+            None
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn other_dialects_do_not_expose_postgres_facts() {
+        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let reference = TypeReference::dynamic(&TypeDefinition::builtin(
+            &FullName::with_schema("pg_catalog", "text"),
+            Some(true),
+        ));
+        assert_eq!(reference.collation_capability(&context), None);
+    }
 }
 
 impl TypeReference {

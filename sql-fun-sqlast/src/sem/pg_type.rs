@@ -1,6 +1,5 @@
 mod array;
 mod category;
-mod collation;
 mod concrete_type;
 mod dynamic_type;
 mod type_ref;
@@ -16,6 +15,7 @@ use crate::{
         LocalName, OwnerSpecification, SchemaName, TableName,
     },
 };
+use std::collections::HashSet;
 
 /// type definitions
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -57,6 +57,24 @@ where
 }
 
 impl TypeDefinition {
+    fn collation_capability_in(
+        &self,
+        context: &impl ParseContext,
+        visited: &mut HashSet<FullName>,
+    ) -> Option<bool> {
+        match self {
+            Self::Builtin(definition) => definition.collatable,
+            Self::Array(array) => array.element().collation_capability_in(context, visited),
+            Self::Domain(domain) => domain
+                .base_type()?
+                .collation_capability_in(context, visited),
+            Self::Enum(_)
+            | Self::CompositeType(_)
+            | Self::TableRef(_, _)
+            | Self::ImplicitComposite(_) => Some(false),
+        }
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

@@ -183,7 +183,8 @@ function addition proposal must not be mistaken for an available lint.
 
 Inspection of the [v0.51.0 shipped lint
 definitions](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0/src/lints)
-found **260 lints: 229 deny-by-default and 31 allow-by-default**. The CLI's
+found **260 lints: 215 deny-by-default, 14 warn-by-default and 31
+allow-by-default**. The CLI's
 `cargo semver-checks --list` lists the 229 default lints; it is insufficient for
 this inventory. The complete allow-by-default inventory is:
 
@@ -357,7 +358,7 @@ to the coverage and behavioral limits below. SemVer codes are patch/minor/major.
 | reexport-add | `mod private { pub struct Api; }` | `mod private { pub struct Api; } pub use private::Api;` | A | 1100 | 0/0/0 | Minor |
 | reexport-move | `mod a { pub struct Api; } pub use a::Api;` | `mod b { pub struct Api; } pub use b::Api;` | – | 0000 | 0/0/0 | Patch* |
 | reexport-alias | `pub struct Api;` | `pub struct Api; pub use Api as Alias;` | A | 1100 | 0/0/0 | Minor |
-| self-spelling | `pub struct Api; impl Api { pub fn make() -> Api { Api } }` | `pub struct Api; impl Api { pub fn make() -> Self { Self } }` | C | 1010 | 0/0/0 | Major |
+| self-spelling | `pub struct Api; impl Api { pub fn make() -> Api { Api } }` | `pub struct Api; impl Api { pub fn make() -> Self { Self } }` | C | 1010 | 0/0/0 | Outside project inputs; raw rule Major |
 | param-rename | `pub fn api(first: u8) {}` | `pub fn api(second: u8) {}` | – | 0000 | 0/0/0 | Patch* |
 | generic-rename | `pub fn api<T>(x: T) {}` | `pub fn api<U>(x: U) {}` | C | 1010 | 0/0/0 | Major |
 | body-change | `pub fn api() -> u8 { 1 }` | `pub fn api() -> u8 { 2 }` | – | 0000 | 0/0/0 | Patch* |
@@ -378,6 +379,7 @@ to the coverage and behavioral limits below. SemVer codes are patch/minor/major.
 | field-change | `pub struct Api { pub field: u8 }` | `pub struct Api { pub field: u16 }` | C | 1010 | 0/0/0 | Major |
 | declarative-add | Empty | `#[macro_export] macro_rules! api { () => {} }` | A | 1100 | 0/0/0 | Minor |
 | macro-input | `P` plus `#[proc_macro_derive(Api)] pub fn api(_: proc_macro::TokenStream) -> proc_macro::TokenStream { proc_macro::TokenStream::new() }` | `P` plus `#[proc_macro_derive(Api, attributes(helper))] pub fn api(_: proc_macro::TokenStream) -> proc_macro::TokenStream { proc_macro::TokenStream::new() }` | – | 0000 | 0/0/0 | Patch* |
+| warning-order | `#[derive(PartialEq, PartialOrd)] pub struct Api { pub a: u8, pub b: u8 }` | `#[derive(PartialEq, PartialOrd)] pub struct Api { pub b: u8, pub a: u8 }` | – | 0000 | 0/0/0, Major warning for patch/minor | Major from warning |
 
 For example, the function-add diff is exactly
 `+pub fn semver_probe::added()`. Function-like, derive and attribute additions
@@ -397,9 +399,10 @@ Struct additions include their visible auto/blanket impls.
   produces no diff: the public import path is preserved.
 - Returning `Self` instead of the identical concrete `Api` produces a changed
   declaration (`-> semver_probe::Api` versus `-> Self`), despite SemVer checks
-  passing all levels. Renaming generic `T` to `U` likewise reports changed. The
-  proposed rule assigns **Major** to both. These are intentional conservative
-  over-classifications, not evidence of an actual Cargo-incompatible change.
+  passing all levels. This Self transition is excluded by the project's
+  enforced lint, as verified below. Renaming generic `T` to `U` also reports
+  changed and conservatively requires Major under the proposal; that is not
+  evidence of an actual Cargo-incompatible change.
 - Renaming a value parameter alone produces no diff under the tested flags.
 - Making a function `const` reports changed and therefore Major conservatively,
   although the shipped opt-in `function_now_const` lint calls this Minor.
@@ -412,6 +415,44 @@ Struct additions include their visible auto/blanket impls.
   attribute addition, produce no diff. They cannot be proven compatible by
   either structural comparator. Retain behavior/compiler tests and explicit
   review of changes outside the representation.
+
+### Repository relevance of the Self spelling control
+
+The workspace sets `clippy::use_self` to Warn in `Cargo.toml`, and the standard
+lint step passes `-D warnings`. Confirming the **self-spelling** sources with:
+
+```bash
+cargo clippy --manifest-path old/Cargo.toml --lib -- \
+  -W clippy::use_self -D warnings
+cargo clippy --manifest-path new/Cargo.toml --lib -- \
+  -W clippy::use_self -D warnings
+```
+
+returned **101** for the concrete `Api` spelling (two `use_self` errors) and
+**0** for `Self`. The project already enforces `Self` wherever applicable.
+Consequently the concrete side is not a permitted project input: this spelling
+transition does not arise in repository comparisons and is not a project
+classification case or an unresolved policy question. The fixture only records
+the raw tool's behavior outside the project's input constraints; it creates no
+requirement for normalization, lint changes or a policy exception. Generic
+parameter spelling is a separate representation control.
+
+### Warning-level findings are classification inputs
+
+The shipped defaults are 215 Deny, 14 Warn and 31 Allow. The **warning-order**
+fixture has no public-api difference, and SemVer returns 0/0/0. Nevertheless,
+patch and minor emit `partial_ord_struct_fields_reordered`, with
+`required_update: Major` and a warning that a new major version is suggested.
+The patch summary is exactly `228 pass, 0 fail, 1 warn, 31 skip` and
+`produced 1 major and 0 minor level warnings`.
+
+The proposed maximum-of-findings rule therefore includes warning-level
+findings and yields **Major**, not Patch. A production adapter that only retries
+release levels and inspects exit codes cannot implement that rule correctly.
+Direct JSON input cannot promote these warnings through manifest overrides;
+it must preserve and interpret their required levels, or fail validation when
+it cannot establish them. This is an observed requirement for later adapter
+work, not an implementation in this PR.
 
 ### Cargo feature and coverage controls
 
@@ -490,11 +531,12 @@ structured library result is required before interpreting its categories. Tool
 failure, unknown exit status, incompatible format, or failed JSON generation is
 **validation failure**, never a successful pass or a Major SemVer verdict.
 
-The follow-up records 397 comparator invocations: 42 source opt-in checks,
-344 comparisons across 43 successfully generated JSON pairs (five public-api
+The follow-up records 405 comparator invocations: 42 source opt-in checks,
+352 comparisons across 44 successfully generated JSON pairs (five public-api
 modes and three SemVer levels each), and 11 input/configuration controls.
 Two additional generation-failure cases were checked without invoking a
-comparator. The original 78 comparisons remain recorded above.
+comparator; two Clippy runs establish the repository relevance of the Self
+control. The original 78 comparisons remain recorded above.
 
 ## Proposed classification contract awaiting final review
 
@@ -506,7 +548,8 @@ repository gate rule:
    Minor; any removed/changed item or successfully observed but unclassifiable
    API difference starts at Major.
 2. Take the maximum of that result and the required level of applicable
-   cargo-semver-checks findings. This is essential for added enum variants and
+   cargo-semver-checks findings, including warning-level findings. This is
+   essential for added enum variants and
    required trait methods. No finding can lower a conservative diff result.
 3. Compare released Cargo feature inventories separately. Removal requires
    Major; a new opt-in feature introduces new coverage and does not hide old

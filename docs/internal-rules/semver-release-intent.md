@@ -129,9 +129,13 @@ not approve comparator or CI implementation:
    starts at Patch. Added-only public API starts at Minor. Any removed/changed
    item, or successfully observed API difference that cannot be classified,
    starts at Major.
-2. Take the maximum of that conservative level and applicable SemVer findings.
+2. Take the maximum of that conservative level and applicable SemVer findings,
+   including warning-level findings.
    Added required trait methods and exhaustive enum variants demonstrate why
-   additive-only diff cannot independently establish Minor.
+   additive-only diff cannot independently establish Minor. A reordered
+   `PartialOrd` struct produces no public-api diff and exits 0, but its Major
+   warning raises the combined result to Major. Exit codes alone are
+   insufficient; an adapter unable to preserve finding levels fails validation.
 3. Compare released Cargo feature inventories separately: removed released
    features require Major even with no API diff. New opt-in feature coverage
    must not suppress any released selected coverage. New APIs in that coverage
@@ -144,13 +148,15 @@ not approve comparator or CI implementation:
    accepted macro input. An empty diff does not prove those contracts unchanged;
    a known unresolved concern remains inconclusive until evaluated.
 
-This rule intentionally assigns Major to the measured harmless concrete-type
-versus `Self` return spelling and generic-parameter renames. It is a
-conservative repository gate requirement, not a claim that Cargo defines those
-changes as breaking. No semantic normalization or exceptions are selected by
-this proposal. Public parameter renames are omitted by the tested public-api
-flags; moving private implementation modules while preserving a re-export
-produces no diff.
+This rule conservatively assigns Major to the measured harmless generic
+parameter rename. That is a repository gate requirement, not a claim that Cargo
+defines the change as breaking. The concrete-type versus `Self` control is
+outside project inputs: the workspace's enforced `use_self` lint already
+requires `Self` on both sides wherever applicable, so that spelling transition
+does not arise in repository comparisons. It is not an unresolved policy case
+and does not require normalization or an exception. Public value-parameter
+renames are omitted by the tested public-api flags; moving private implementation
+modules while preserving a re-export produces no diff.
 
 The tested public-api diff distinguishes added/changed/removed public items and
 includes auto/blanket/derived impls. Do not adopt simplification flags that hide

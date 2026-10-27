@@ -52,8 +52,9 @@ relax that check.
 
 Supply the complete local packaged dependency closure on each side, including
 transitive and proc-macro dependencies. No workspace discovery or source/version
-materialization occurs. Source path dependencies, workspace inheritance and
-symlinks are rejected. Each supplied dependency name must be unique and resolve
+materialization occurs. Source path dependencies, external workspace references,
+workspace inheritance, target sources outside the package, and symlinks are
+rejected. Each supplied dependency name must be unique and resolve
 to the supplied package/version through operation-local crates.io patches.
 Other registry dependencies must already be available to Cargo offline. The
 comparator does not fetch missing dependencies or substitute adjacent sources.

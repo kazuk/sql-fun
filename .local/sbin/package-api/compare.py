@@ -84,6 +84,7 @@ def prepare_side(paths, root):
         require("package" in manifest, f"missing package identity: {source}")
         package = manifest["package"]
         require(isinstance(package, dict), "package manifest table is invalid")
+        require("workspace" not in package, "package must not reference an external workspace")
         require(isinstance(package.get("name"), str) and isinstance(package.get("version"), str),
                 "use self-contained packaged manifests, without workspace inheritance")
         require(not manifest.get("workspace") and not manifest.get("patch") and not manifest.get("replace"),
@@ -132,6 +133,11 @@ def generate(side, paths, root, target, host, env):
     allowed_manifests = {str(path / "Cargo.toml") for _, path in packages}
     require(all(p["source"] is not None or p["manifest_path"] in allowed_manifests
                 for p in metadata["packages"]), "unexpected local source dependency")
+    for local in metadata["packages"]:
+        if local["manifest_path"] in allowed_manifests:
+            directory_path = Path(local["manifest_path"]).parent
+            require(all(Path(t["src_path"]).resolve().is_relative_to(directory_path)
+                        for t in local["targets"]), "package target source is outside supplied contents")
     node = next(n for n in metadata["resolve"]["nodes"] if n["id"] == selected["id"])
     build = root / "build"
     run(["cargo", "rustdoc", *common, "--lib", "--target", target,

@@ -1,6 +1,6 @@
 use super::BuiltinTypeInfo;
 use crate::context::BaseParseContext;
-use crate::sem::{FullName, TypeDefinition};
+use crate::sem::{FullName, TypeDefinition, TypeReference};
 use crate::test_helpers::TestParseContext;
 
 #[rstest::rstest]
@@ -22,11 +22,15 @@ fn committed_catalogs_survive_loading_and_lookup(#[case] version: &str) {
             record.name
         );
         let definition = TypeDefinition::from(&record);
-        let name = FullName::with_schema("pg_catalog", &record.name);
+        let name = FullName::with_schema(&record.schema, &record.name);
         context.set_get_type_impl_result(&name, &definition);
         for lookup in [name, FullName::from_local_name(&record.name)] {
             let loaded = context.get_type(&lookup).expect("type lookup");
             assert_eq!(loaded.category(&context), record.category);
+            assert_eq!(
+                TypeReference::dynamic(loaded).collation_capability(&context),
+                record.collatable,
+            );
             let json = serde_json::to_string(loaded).unwrap();
             let restored: TypeDefinition = serde_json::from_str(&json).unwrap();
             assert_eq!(restored, *loaded);
@@ -36,10 +40,18 @@ fn committed_catalogs_survive_loading_and_lookup(#[case] version: &str) {
 }
 
 #[rstest::rstest]
-#[case::legacy(r#"{"name":"custom"}"#, None)]
-#[case::shell(r#"{"name":"custom","category":null}"#, None)]
-#[case::custom(r#"{"name":"custom","category":"!"}"#, Some('!'))]
-#[case::unknown(r#"{"name":"unknown","category":"X"}"#, Some('X'))]
+#[case::shell(
+    r#"{"schema":"pg_catalog","collatable":null,"name":"custom","category":null}"#,
+    None
+)]
+#[case::custom(
+    r#"{"schema":"pg_catalog","collatable":null,"name":"custom","category":"!"}"#,
+    Some('!')
+)]
+#[case::unknown(
+    r#"{"schema":"pg_catalog","collatable":null,"name":"unknown","category":"X"}"#,
+    Some('X')
+)]
 fn preserves_available_and_missing_information(#[case] json: &str, #[case] expected: Option<char>) {
     let record: BuiltinTypeInfo = serde_json::from_str(json).unwrap();
     let definition = TypeDefinition::from(&record);
@@ -56,9 +68,9 @@ fn preserves_available_and_missing_information(#[case] json: &str, #[case] expec
 }
 
 #[test]
-fn legacy_definition_shape_remains_readable() {
+fn definition_preserves_flattened_reference_shape() {
     let name = FullName::with_schema("pg_catalog", "custom");
-    let definition = TypeDefinition::builtin(&name);
+    let definition = TypeDefinition::builtin(&name, None);
     let json = serde_json::to_value(&definition).unwrap();
     assert!(json["Builtin"]["Concrete"].is_object());
     assert!(json["Builtin"].get("category").is_none());
@@ -81,6 +93,7 @@ fn category_follows_selected_definition_and_search_path() {
             &TypeDefinition::builtin_with_category(
                 &name,
                 Some(TypeCategory::try_from(code).unwrap()),
+                None,
             ),
         );
     }
@@ -99,7 +112,7 @@ fn category_follows_selected_definition_and_search_path() {
 fn postgres_metadata_does_not_classify_sqlite_types() {
     let name = FullName::with_schema("pg_catalog", "int4");
     let category = crate::sem::TypeCategory::try_from('N').unwrap();
-    let definition = TypeDefinition::builtin_with_category(&name, Some(category));
+    let definition = TypeDefinition::builtin_with_category(&name, Some(category), None);
     let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
     assert_eq!(definition.category(&context), None);
 }

@@ -20,8 +20,9 @@ covers released PostgreSQL 17 and 18. Bootstrap object OIDs are below PostgreSQL
 `FirstNormalObjectId` (16384); this boundary separates bootstrap catalogs from
 objects installed later, even inside `pg_catalog`. System schema rendering covers
 `pg_catalog` and `information_schema`; function metadata retains the loader's
-SQL-callable scope, excluding internal/trigger signatures. Application schema and
-installed extension catalogs are separate inputs.
+SQL-callable scope, excluding internal/trigger signatures. Application schema
+SQL and extension scripts remain separate inputs. The type master additionally
+includes persistent installed base types as described below.
 
 SQL identifiers are tagged as identifiers and rendered only through `ident`.
 Server-rendered expressions, types, argument declarations, and definitions are
@@ -62,11 +63,22 @@ for scalar, aggregate and set-returning functions on both supported versions.
 
 ## Type categories
 
-`pg_type.json` records `name` and `category`. For defined types, `category` is
+`pg_type.json` records required `schema`, `name` and `collatable` fields, along
+with `category`. Qualified identity is the exact `(schema, name)` pair. For
+defined types, `category` is
 exactly `pg_type.typcategory`, a single printable ASCII code, including uncommon
 builtin and user-defined codes. Shell types emit null because PostgreSQL does
-not guarantee their classification. The builtin extraction scope is unchanged;
-this does not select application or extension schemas.
+not guarantee their classification. The existing bootstrap eligibility is
+unchanged, including eligible undefined shells. In addition, normal extraction
+unconditionally includes persistent installed base types (`typtype = 'b'`),
+including extension/user types and normal-OID definitions in `pg_catalog`.
+Exclude `pg_toast` and temporary/toast-temporary namespaces; identify generated
+ordinary array rows by another type's `typarray` relationship and omit them from
+this additional selection. Do not infer arrays from names or generic `typelem`.
+Nominal vectors and custom element-bearing base types retain their identities.
+The union emits each identity once: existing bootstrap OID order first, then
+additional types ordered by exact namespace/name using `C` ordering. This does
+not select application schema SQL, extension files or further catalog payloads.
 
 The semantic type definition retains category independently of type names,
 preferred status, and casts. `TypeDefinition::category` uses the supplied
@@ -77,8 +89,10 @@ analysis time (including `A` for a declared array base). Missing base metadata
 remains unavailable. Synthetic anonymous composites describe row structure and
 have `C`; an unclassified nominal definition remains unavailable.
 
-Older name-only records and serialized definitions remain readable with category
-unavailable. Missing/null is distinct from `X` (the PostgreSQL unknown type) and
+The category field remains optional on semantic definitions; this does not
+provide compatibility with older catalog generations lacking required `schema`
+or `collatable` keys. Missing/null category is distinct from `X` (the PostgreSQL
+unknown type) and
 `U` (user-defined). Malformed supplied codes fail loading with the catalog path.
 New metadata is serialized without changing the existing nominal-reference shape;
 category is an additive optional field. Domain classification is retained through
@@ -89,6 +103,38 @@ Automated category load/read round-trips use these existing committed catalogs;
 no separate oracle snapshots are maintained. PostgreSQL 15–18 behavior can be
 checked with small development-oracle queries without extending the CLI's
 supported version matrix or making ordinary Rust tests depend on live servers.
+
+## Type collation capability
+
+Each `pg_type.json` record includes `collatable`: a boolean from
+`pg_type.typcollation <> 0` for defined types, or explicit null when
+`typisdefined` is false. Do not exclude eligible shells or interpret their
+unspecified properties as false. The key is mandatory even for null values;
+missing keys and malformed values fail loading with the catalog path. `schema`
+is also mandatory, without a `pg_catalog` default. Duplicate qualified type
+identities and empty/NUL-containing identifiers fail loading. Regenerate the
+bundled PostgreSQL 17/18 masters for the current format; no legacy reader exists.
+
+The existing `BuiltinTypeInfo` / `BuiltinTypeDefinition` path retains
+`collatable: Option<bool>` directly, preserving the existing flattened reference
+shape. Serialized definitions keep the field, including explicit null. There is
+no discriminator, separate registry, provenance flag or supplementary provider.
+No raw OID or default-collation identity is needed for this capability fact.
+
+`TypeReference::collation_capability` uses `ParseContext` and the existing type
+references. Nominal definitions return their own retained fact; domains recurse
+through their resolved base and ordinary arrays through their element. This
+includes nested domains, domain/array combinations and owned dynamic definitions.
+Vectors read their own fact rather than an arbitrary element's fact. Enum,
+composite, table-row and anonymous-composite definitions are non-collatable.
+Undefined facts, unresolved references, cyclic domain chains and non-PostgreSQL
+contexts return `None`. The query reports no diagnostics and performs no
+additional discovery. SQL consumers own any interpretation, declaration
+validation, diagnostics and DDL application decisions.
+
+This scope is unconditional in ordinary `extract catalog` and does not depend
+on `--definition-schema`, add another option, or add initialization prompts.
+That existing option continues to select only collation/operator-class masters.
 
 ## Additive master definitions
 

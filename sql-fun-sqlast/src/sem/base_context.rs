@@ -43,20 +43,25 @@ pub struct BaseContext {
 
 #[derive(serde::Deserialize)]
 struct BuiltinTypeInfo {
+    schema: String,
     name: String,
     #[serde(default)]
     category: Option<crate::sem::TypeCategory>,
+    #[serde(deserialize_with = "crate::sem::pg_type::deserialize_collatable")]
+    collatable: Option<bool>,
 }
 
 impl From<&BuiltinTypeInfo> for TypeDefinition {
     fn from(info: &BuiltinTypeInfo) -> Self {
-        let name = FullName::with_schema("pg_catalog", &info.name);
-        Self::builtin_with_category(&name, info.category)
+        let name = FullName::with_schema(&info.schema, &info.name);
+        Self::builtin_with_category(&name, info.category, info.collatable)
     }
 }
 
 #[cfg(test)]
 mod test_type_categories;
+#[cfg(test)]
+mod test_type_collatability;
 
 impl BaseContext {
     /// Initialize builtin schema information with the caller's selected metadata.
@@ -116,9 +121,14 @@ impl BaseContext {
     fn load_builtin_types(
         paths: &PostgresBuiltinPaths,
     ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
-        let builtin_types_path = paths.types()?;
+        Self::read_builtin_types(&paths.types()?)
+    }
+
+    fn read_builtin_types(
+        builtin_types_path: &Path,
+    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
         let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
-            File::open(&builtin_types_path)?,
+            File::open(builtin_types_path)?,
         ))
         .map_err(|error| {
             AnalysisError::unexpected_input_error(&format!(
@@ -128,8 +138,24 @@ impl BaseContext {
         })?;
         let mut builtin_type_data = TrieMap::new();
         for builtin_type in builtin_types {
+            if builtin_type.schema.is_empty()
+                || builtin_type.name.is_empty()
+                || builtin_type.schema.contains('\0')
+                || builtin_type.name.contains('\0')
+            {
+                return Err(AnalysisError::unexpected_input_error(&format!(
+                    "invalid type identity in {}",
+                    builtin_types_path.display()
+                )));
+            }
             let type_definition = TypeDefinition::from(&builtin_type);
             let full_name = type_definition.full_name().expect("catalog type identity");
+            if builtin_type_data.get(&full_name.to_string()).is_some() {
+                return Err(AnalysisError::unexpected_input_error(&format!(
+                    "duplicate type {full_name} in {}",
+                    builtin_types_path.display()
+                )));
+            }
             builtin_type_data.insert(&full_name.to_string(), type_definition);
         }
         Ok(builtin_type_data)

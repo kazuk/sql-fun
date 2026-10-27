@@ -94,7 +94,7 @@ impl SchemaFixture {
                 .directory
                 .path()
                 .join("home/postgres/17/pg_type.json"),
-            r#"[{"name":"int4"},{"name":"text"},{"name":"bool"}]"#,
+            r#"[{"schema":"pg_catalog","name":"int4","collatable":false},{"schema":"pg_catalog","name":"text","collatable":true},{"schema":"pg_catalog","name":"bool","collatable":false}]"#,
         )?;
         Ok(fixture)
     }

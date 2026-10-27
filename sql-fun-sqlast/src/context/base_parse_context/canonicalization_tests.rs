@@ -20,7 +20,7 @@ fn canonicalization_retains_the_matched_key(
     let mut context = TestParseContext::default();
     let schemas: Vec<_> = path.iter().map(|name| SchemaName::from(name)).collect();
     context.set_search_path(&schemas);
-    let declaration = TypeDefinition::builtin(&FullName::from_local_name("item"));
+    let declaration = TypeDefinition::builtin(&FullName::from_local_name("item"), None);
     for schema in ["a", "b", "a.b", "pg_catalog"] {
         context.set_get_type_impl_result(&FullName::with_schema(schema, "item"), &declaration);
     }

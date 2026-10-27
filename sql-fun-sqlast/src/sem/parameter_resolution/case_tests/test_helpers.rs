@@ -37,6 +37,7 @@ fn context_for(dialect: Dialect) -> SchemaFileContext {
             &crate::sem::TypeDefinition::builtin_with_category(
                 ty.full_name(),
                 Some(crate::sem::TypeCategory::try_from(category).unwrap()),
+                None,
             ),
         );
     }

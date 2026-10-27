@@ -25,6 +25,7 @@ pub(super) fn context(cast: Option<CastContext>) -> SchemaFileContext {
             &TypeDefinition::builtin_with_category(
                 ty.full_name(),
                 Some(TypeCategory::try_from(category).unwrap()),
+                None,
             ),
         );
     }

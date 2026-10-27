@@ -1303,7 +1303,7 @@ mod test_search_path {
             context.set_search_path(&search_path(schemas));
             for schema in ["pg_catalog", "public", "app"] {
                 let name = FullName::with_schema(schema, "item");
-                context.set_get_type_impl_result(&name, &TypeDefinition::builtin(&name));
+                context.set_get_type_impl_result(&name, &TypeDefinition::builtin(&name, None));
                 let overload = OverloadVariant::new(
                     &Some(TypeReference::from_full_name(name.clone())),
                     &Vec::new(),

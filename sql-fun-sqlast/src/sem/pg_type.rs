@@ -1,5 +1,6 @@
 mod array;
 mod category;
+mod collation;
 mod concrete_type;
 mod dynamic_type;
 mod type_ref;
@@ -35,7 +36,7 @@ pub enum TypeDefinition {
     ImplicitComposite(ColumnCollection),
 }
 
-/// Catalog-loaded nominal type and its optional PostgreSQL classification.
+/// Catalog-loaded nominal type and its optional PostgreSQL facts.
 /// The flattened reference retains the existing serialized reference shape.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BuiltinTypeDefinition {
@@ -43,6 +44,16 @@ pub struct BuiltinTypeDefinition {
     reference: TypeReference,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     category: Option<TypeCategory>,
+    #[serde(deserialize_with = "deserialize_collatable")]
+    collatable: Option<bool>,
+}
+
+// deserialize_with makes presence mandatory while accepting explicit JSON null.
+pub(super) fn deserialize_collatable<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(deserializer)
 }
 
 impl TypeDefinition {
@@ -117,11 +128,16 @@ impl TypeDefinition {
         self.structural_columns().is_some()
     }
 
-    /// Construct a catalog type without inferring classification from its name.
-    pub fn builtin_with_category(full_name: &FullName, category: Option<TypeCategory>) -> Self {
+    /// Construct a catalog type with explicit category and collation facts.
+    pub fn builtin_with_category(
+        full_name: &FullName,
+        category: Option<TypeCategory>,
+        collatable: Option<bool>,
+    ) -> Self {
         Self::Builtin(BuiltinTypeDefinition {
             reference: TypeReference::concrete_type_ref(full_name, false),
             category,
+            collatable,
         })
     }
 
@@ -244,10 +260,10 @@ impl TypeDefinition {
         }
     }
 
-    /// get builtin type by name
+    /// Construct a nominal type with an explicit collation fact and no category.
     #[must_use]
-    pub fn builtin(full_name: &FullName) -> Self {
-        Self::builtin_with_category(full_name, None)
+    pub fn builtin(full_name: &FullName, collatable: Option<bool>) -> Self {
+        Self::builtin_with_category(full_name, None, collatable)
     }
 
     /// check type compatibility
@@ -351,7 +367,7 @@ mod array_definition_tests {
         let right = TypeDefinition::array(&TypeReference::from_master_type_name(element));
         assert_eq!(left.compatible_with(&right), compatible);
         assert_eq!(right.compatible_with(&left), compatible);
-        let scalar = TypeDefinition::builtin(PgBuiltInType::int4().full_name());
+        let scalar = TypeDefinition::builtin(PgBuiltInType::int4().full_name(), None);
         assert!(!left.compatible_with(&scalar));
         assert!(!scalar.compatible_with(&left));
     }

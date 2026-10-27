@@ -19,6 +19,8 @@ import subprocess
 import time
 import tarfile
 
+TYPE_QUERY = (Path(__file__).resolve().parents[2] / "cli/src/extract/sql/builtin_types.sql").read_text()
+
 IMAGES = {
     "17": "postgres@sha256:29e0bb09c8e7e7fc265ea9f4367de9622e55bae6b0b97e7cce740c2d63c2ebc0",
     "18": "postgres@sha256:5773fe724c49c42a7a9ca70202e11e1dff21fb7235b335a73f39297d200b73a2",
@@ -137,7 +139,67 @@ def validate_masters(directory):
     return collations, classes
 
 
+def base_type_sql(schema, name, collatable):
+    def ident(value):
+        return '"' + value.replace('"', '""') + '"'
+    ty = f"{ident(schema)}.{ident(name)}"
+    input_fn = f"{ident(schema)}.{ident(name + '_in')}"
+    output_fn = f"{ident(schema)}.{ident(name + '_out')}"
+    return f'''CREATE TYPE {ty};
+CREATE FUNCTION {input_fn}(cstring) RETURNS {ty} AS 'textin' LANGUAGE internal IMMUTABLE STRICT;
+CREATE FUNCTION {output_fn}({ty}) RETURNS cstring AS 'textout' LANGUAGE internal IMMUTABLE STRICT;
+CREATE TYPE {ty} (INPUT={input_fn}, OUTPUT={output_fn}, INTERNALLENGTH=variable,
+ STORAGE=extended, COLLATABLE={str(collatable).lower()});
+'''
+
+
+def validate_type_facts(directory):
+    rows = json.loads((directory / "pg_type.json").read_text())
+    facts = {(row["schema"], row["name"]): row["collatable"] for row in rows}
+    assert len(facts) == len(rows), "duplicate qualified type identity"
+    assert all(row["collatable"] is None or type(row["collatable"]) is bool for row in rows)
+    assert {name: facts[("pg_catalog", name)] for name in ("text", "name", "int4", "int2vector")} == {
+        "text": True, "name": True, "int4": False, "int2vector": False}
+    return rows, facts
+
+
+def validate_shell_selection(identifier):
+    # Substitute only the source relation to exercise the real producer query
+    # without changing PostgreSQL system catalogs or depending on bootstrap shells.
+    source = '''source_types(oid, typnamespace, typtype, typname, typisdefined,
+        typcategory, typcollation, typarray) AS (
+      VALUES (42::oid, 'pg_catalog'::regnamespace::oid, 'p', 'shell', false, NULL::text, 0::oid, 0::oid),
+             (43::oid, 'pg_catalog'::regnamespace::oid, 'p', '__excluded', false, NULL::text, 0::oid, 0::oid),
+             (44::oid, 'pg_catalog'::regnamespace::oid, 'b', 'defined', true, 'S', 100::oid, 45::oid),
+             (45::oid, 'pg_catalog'::regnamespace::oid, 'b', '_defined', true, 'A', 100::oid, 0::oid)
+    ), bootstrap'''
+    query = TYPE_QUERY.replace("pg_catalog.pg_type", "source_types").replace("WITH bootstrap", "WITH " + source)
+    result = run("docker", "exec", "-i", identifier, "psql", "-X", "-qAt", "-U", "postgres",
+                 "-v", "ON_ERROR_STOP=1", data=query.encode())
+    rows = json.loads(result.stdout)
+    assert rows == [
+        {"schema": "pg_catalog", "name": "shell", "category": None, "collatable": None},
+        {"schema": "pg_catalog", "name": "defined", "category": "S", "collatable": True},
+    ], "shell-null facts or existing eligibility changed"
+
+
+def validate_installed_type_facts(builtin, baseline, schema, other, extension_schema):
+    rows, facts = validate_type_facts(builtin)
+    assert facts[(schema, "Base 雪")] is True
+    assert facts[(other, "Base 雪")] is False
+    assert facts[("pg_catalog", "Normal OID Type")] is True
+    assert facts[(extension_schema, "citext")] is True
+    assert facts[(extension_schema, "hstore")] is False
+    assert (schema, "_Base 雪") not in facts, "ordinary arrays must retain their existing representation"
+    baseline_identities = {(row["schema"], row["name"]) for row in
+                           json.loads((baseline / "pg_type.json").read_text())}
+    additional = [(row["schema"], row["name"]) for row in rows if (row["schema"], row["name"]) not in
+                  baseline_identities]
+    assert additional == sorted(additional), "installed types must have deterministic qualified ordering"
+
+
 def validate_selected_masters(binary, major, destination, environment, bundle_file, identifier):
+    validate_shell_selection(identifier)
     # Include quotes, backslashes, SQL punctuation and Unicode in exact CLI inputs.
     schema = "Odd'\\\"; -- 雪"
     other = "other masters"
@@ -147,6 +209,8 @@ def validate_selected_masters(binary, major, destination, environment, bundle_fi
 CREATE SCHEMA "other masters";
 CREATE SCHEMA "extension masters";
 CREATE EXTENSION btree_gin SCHEMA "extension masters";
+CREATE EXTENSION citext SCHEMA "extension masters";
+CREATE EXTENSION hstore SCHEMA "extension masters";
 CREATE DOMAIN "other masters"."Type 雪" AS integer;
 CREATE OPERATOR FAMILY "other masters"."Family 雪" USING btree;
 CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE "other masters"."Type 雪"
@@ -160,11 +224,18 @@ CREATE COLLATION "other masters"."Name 雪" FROM pg_catalog."C";
 CREATE COLLATION {quoted}."Encoding" (provider=libc, locale='C');
 CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
 '''
+    sql += base_type_sql(schema, "Base 雪", True)
+    sql += base_type_sql(other, "Base 雪", False)
+    sql += base_type_sql("pg_catalog", "Normal OID Type", True)
     run("docker", "exec", "-i", identifier, "psql", "-X", "-U", "postgres",
         "-v", "ON_ERROR_STOP=1", data=sql.encode())
     builtin = destination / f"{major}-masters-builtin"
     run(binary, "extract", "catalog", "--output", str(builtin), env=environment)
-    assert payload(builtin) == payload(destination / f"{major}-restricted")
+    baseline = payload(destination / f"{major}-restricted")
+    for filename, digest in baseline.items():
+        if filename != "pg_type.json":
+            assert payload(builtin)[filename] == digest, "type scope changed another catalog"
+    validate_installed_type_facts(builtin, destination / f"{major}-restricted", schema, other, extension_schema)
     selected = destination / f"{major}-selected-masters"
     options = ["--definition-schema", schema, "--definition-schema", extension_schema]
     run(binary, "extract", "catalog", *options, "--output", str(selected), env=environment)
@@ -209,6 +280,7 @@ def validate(binary, major, image, destination, host, bind):
     output = destination / major
     run(binary, "extract", "catalog", "--docker-image", image,
         "--docker-host-address", host, "--docker-bind-address", bind, "--output", str(output))
+    validate_type_facts(output)
     types = {row["name"]: row["category"] for row in json.loads((output / "pg_type.json").read_text())}
     assert all(isinstance(code, str) and len(code) == 1 for code in types.values())
     assert {name: types[name] for name in ("char", "unknown", "_record", "int4range")} == {

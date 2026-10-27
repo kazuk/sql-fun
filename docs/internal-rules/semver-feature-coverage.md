@@ -171,6 +171,11 @@ released SQLAST coverage. The independent false finding is tracked in
 [#826](https://github.com/kazuk/sql-fun/issues/826) for a separate PR before the
 enforcing #361 gate.
 
+The corrected image-provided analyzer `0.51.0-sqlfun.1` makes all nine
+comparisons Patch without changing lifecycle policy or suppressing findings.
+The [#826 investigation](semver-shadowed-trait.md) records the cause,
+image-owned correction and maintained complete-baseline regression.
+
 ## Package-set lifecycle and maintained verification
 
 Compare the two source package sets independently. A candidate-only crate does

@@ -8,11 +8,13 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
 from compare import AnalysisError, parse_semver, validate_json
+import compare as comparator
 
 
 def fingerprint(directory):
@@ -26,6 +28,9 @@ class Comparison(unittest.TestCase):
         prepared = subprocess.run([str(ROOT / '.local/sbin/prepare-package-api-tests')],
                                   text=True, capture_output=True, check=True)
         cls.tools = json.loads(prepared.stdout)
+        details = subprocess.run(['rustup', 'run', cls.tools['toolchain'], 'rustc', '--version', '--verbose'],
+                                 text=True, capture_output=True, check=True).stdout
+        cls.tools['target'] = next(line.removeprefix('host: ') for line in details.splitlines() if line.startswith('host: '))
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='package-api-fixture-')
@@ -43,7 +48,7 @@ class Comparison(unittest.TestCase):
         return dict(package=str(path), dependencies=[], features=[], default_features=False)
 
     def compare(self, old, new, expected='detected', analyzer=None, **overrides):
-        request = dict(old=old, new=new, target='x86_64-unknown-linux-gnu', toolchain=self.tools['toolchain'])
+        request = dict(old=old, new=new, target=self.tools['target'], toolchain=self.tools['toolchain'])
         request.update(overrides)
         path = self.root / 'request.json'
         path.write_text(json.dumps(request))
@@ -225,6 +230,83 @@ class Comparison(unittest.TestCase):
     def test_wrong_producer(self):
         self.compare(self.package('old', ''), self.package('new', ''), expected='analysis-error', toolchain='nonexistent-357-fixture')
 
+    def request_for(self, old, new):
+        return dict(old=old, new=new, target=self.tools['target'], toolchain=self.tools['toolchain'])
+
+    def test_updated_compiler_versions_with_compatible_json(self):
+        request = self.request_for(self.package('old', ''), self.package('new', 'pub fn added() {}'))
+        scratch = self.root / 'analysis'
+        scratch.mkdir()
+        # Simulate a routine compiler update retaining a compatible schema.
+        # JSON generation and both analyzers still execute their real binaries.
+        real_run = comparator.run
+
+        def updated_version(command, *args, **kwargs):
+            result = real_run(command, *args, **kwargs)
+            if command[1:] in (['--version'], ['--version', '--verbose']):
+                name = Path(command[0]).name
+                if name in ('rustc', 'cargo', 'rustdoc'):
+                    lines = result.stdout.splitlines()
+                    lines[0] = f'{name} 99.0.0 (updated-compiler-fixture 2099-01-01)'
+                    result.stdout = '\n'.join(lines) + '\n'
+            return result
+
+        # An ambient standalone Cargo must not override the selected toolchain.
+        tools = self.root / 'ambient-tools'
+        tools.mkdir()
+        cargo = tools / 'cargo'
+        cargo.write_text('#!/bin/sh\necho wrong-ambient-cargo >&2\nexit 90\n')
+        cargo.chmod(0o755)
+        with mock.patch('compare.run', side_effect=updated_version), mock.patch.dict(
+                os.environ, {'PATH': str(tools) + os.pathsep + os.environ['PATH']}):
+            report = comparator.compare(request, Path(os.environ['PACKAGE_API_DIFF_WRAPPER']),
+                                        Path(self.tools['semver_checks']), scratch)
+        self.assertEqual(report['impact'], 'minor')
+        for name in ('rustc', 'cargo', 'rustdoc'):
+            self.assertIn('99.0.0', report['producer'][name])
+        self.assertEqual(report['coverage']['old']['schema'], report['coverage']['new']['schema'])
+
+    def test_unsupported_generated_schema_is_not_a_verdict(self):
+        request = self.request_for(self.package('old', ''), self.package('new', ''))
+        scratch = self.root / 'analysis'
+        scratch.mkdir()
+        real_generate = comparator.generate
+
+        def unsupported_schema(*args):
+            artifact, coverage = real_generate(*args)
+            document = json.loads(artifact.read_text())
+            document['format_version'] = 999
+            artifact.write_text(json.dumps(document))
+            coverage['schema'] = 999
+            return artifact, coverage
+
+        with mock.patch('compare.generate', side_effect=unsupported_schema):
+            with self.assertRaises(AnalysisError) as failure:
+                comparator.compare(request, Path(os.environ['PACKAGE_API_DIFF_WRAPPER']),
+                                   Path(self.tools['semver_checks']), scratch)
+        message = str(failure.exception)
+        self.assertIn('schema 999', message)
+        self.assertIn('update and re-probe the pinned analyzers', message)
+        self.assertIn('Actual producer:', message)
+
+    def test_preparation_uses_active_toolchain_without_installing(self):
+        tools = self.root / 'tools'
+        tools.mkdir()
+        log = self.root / 'rustup-calls'
+        rustup = tools / 'rustup'
+        rustup.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> ' + str(log) + '\n'
+                          'test "$*" = "show active-toolchain" || exit 99\n'
+                          'echo "next-stable-fixture (environment override)"\n')
+        analyzer = tools / 'cargo-semver-checks'
+        analyzer.write_text('#!/bin/sh\necho cargo-semver-checks 0.51.0\n')
+        rustup.chmod(0o755)
+        analyzer.chmod(0o755)
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'])
+        prepared = subprocess.run([str(ROOT / '.local/sbin/prepare-package-api-tests')],
+                                  cwd=ROOT, env=env, text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(prepared.stdout)['toolchain'], 'next-stable-fixture')
+        self.assertEqual(log.read_text().splitlines(), ['show active-toolchain'])
+
     def test_missing_explicit_default_policy(self):
         old = self.package('old', '')
         del old['default_features']
@@ -273,10 +355,10 @@ class Comparison(unittest.TestCase):
 
 
 class JsonBoundary(unittest.TestCase):
-    def test_schema_marker_alone_cannot_establish_compatibility(self):
+    def test_schema_version_must_be_an_integer(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'wrong-schema.json'
-            path.write_text('{"format_version":999}')
+            path.write_text('{"format_version":"61"}')
             with self.assertRaisesRegex(AnalysisError, 'schema'):
                 validate_json(path, 'probe', '1.0.0', 'x86_64-unknown-linux-gnu')
 

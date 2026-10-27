@@ -2,13 +2,10 @@
 # Internal test preparation, not an additional contributor command/prerequisite.
 set -euo pipefail
 root=$(git rev-parse --show-toplevel)
-# Reuse an installed measured compiler; otherwise provision the exact release.
-if [[ "$(rustc +stable --version)" == 'rustc 1.99.1 (58cf8f9c3 2026-10-13)' ]]; then
-  producer=stable
-else
-  rustup toolchain install 1.99.1 --profile minimal >&2
-  producer=1.99.1
-fi
+# Use the toolchain running the contributor's checks, including an explicit
+# rustup override. A probe's compiler version is not a project prerequisite.
+producer=$(rustup show active-toolchain)
+producer=${producer%% *}
 if command -v cargo-semver-checks >/dev/null &&
   [[ "$(cargo-semver-checks --version)" == 'cargo-semver-checks 0.51.0' ]]; then
   analyzer=$(command -v cargo-semver-checks)

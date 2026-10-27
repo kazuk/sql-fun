@@ -46,9 +46,9 @@ The request is explicit, including empty lists and both default-feature policies
 
 Package directories contain already extracted Cargo source-package contents,
 including normalized, self-contained `Cargo.toml` files. The example's
-`stable` names an explicitly supplied installed toolchain; its compiler identity
-must match the supported producer below. A floating toolchain name does not
-relax that check.
+`stable` names an explicitly supplied installed toolchain. The comparator uses
+that toolchain’s Cargo, rustc and rustdoc together, even if ambient executable
+paths or Cargo-home settings name a different compiler.
 
 Supply the complete local packaged dependency closure on each side, including
 transitive and proc-macro dependencies. No workspace discovery or source/version
@@ -72,23 +72,32 @@ and validation of local dependency resolution.
 
 ## Producer and analyzer contract
 
-The initial supported tuple matches #356:
+Analyzer versions are pinned independently of compiler versions:
 
-- rustc/rustdoc `1.99.1 (58cf8f9c3 2026-10-13)`;
-- Cargo `1.99.1 (5f94df478 2026-08-27)`;
-- rustdoc JSON schema 61, produced with scoped `RUSTC_BOOTSTRAP=1`;
 - `public-api` library 0.52.0, with rustdoc-types 0.57.3 in `Cargo.lock`;
 - `cargo-semver-checks` executable 0.51.0.
 
-Both analyzers consume the same freshly generated JSON files. Validate compiler,
-package/version identity, schema, target selection and complete successful
-production before comparison. The explicit `--target` controls library builds;
-Cargo documents proc-macro targets for the host, placing their JSON in the
-host output directory. The script selects that path from the target kind,
-without replacing a macro target with a library target. Unavailable target
-support fails generation. Arbitrary archived JSON is not an input contract.
-Re-probe and review this tuple when changing it; do not silently switch tools,
-compilers, schema versions or baseline sources.
+The #356 producer (Rust/Cargo 1.99.1, JSON schema 61) records a successful
+probe, not a mandatory contributor toolchain. Use the explicitly requested
+installed toolchain, with scoped `RUSTC_BOOTSTRAP=1` for JSON production. Record
+its actual rustc verbose identity, Cargo/rustdoc versions, host and requested
+target in the report. Each side records the actual generated schema version.
+There is no compiler-version equality gate or automatic compiler substitution.
+
+Both pinned analyzers must successfully consume the same freshly generated JSON
+files. Validate package/version identity, private-item coverage, target selection
+and complete successful production before comparison. A positive schema marker
+alone does not establish compatibility: the SemVer reader checks supported
+formats, and both analyzers must parse and complete their respective analyses.
+Unsupported input returns an analysis error with the actual schema, producer and
+underlying diagnostics. Update and re-probe the pinned analyzers when necessary;
+do not install an older compiler to hide incompatibility.
+
+The explicit `--target` controls library builds; Cargo documents proc-macro
+targets for the host, placing their JSON in the host output directory. The
+script selects that path from the target kind, without replacing a macro target
+with a library target. Unavailable target support fails generation. Arbitrary
+archived JSON is not an input contract.
 
 The Rust wrapper retains auto, blanket and derived impls and omits value
 parameter names, matching the probe. It emits the library's added/removed lists
@@ -146,13 +155,17 @@ without introducing a manual Python setup step. uv is already in contributor
 setup for graphify and in the development/CI image. Tests use runtime nextest
 paths to support archive relocation.
 
-`.local/sbin/prepare-package-api-tests` prepares missing pinned analyzer/compiler
-versions for these tests. It reuses an installed matching tool, otherwise uses
-rustup or a task-local Cargo install under `target/package-api-tools`. This is
+`.local/sbin/prepare-package-api-tests` uses the active contributor toolchain,
+including an explicit rustup override, without installing or pinning a compiler.
+It prepares the pinned analyzer: it reuses a matching executable or performs a
+task-local Cargo install under `target/package-api-tools`. This is
 internal preparation behind the existing contributor test entry point, not a
 new contributor command. Package analysis itself never installs tools or uses
 network access. First-time test tool provisioning may require network access;
 fixtures use tiny offline dependency graphs and isolated build directories.
+Maintained regression tests cover compiler version drift with compatible JSON,
+unsupported schemas through the real analyzer reader, selected-toolchain Cargo
+resolution despite a conflicting PATH, and preparation without compiler installs.
 
 No release gate, workflow job, baseline archive, performance cache or new
 contributor procedure is introduced here.

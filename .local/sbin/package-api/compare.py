@@ -9,9 +9,6 @@ import subprocess
 import tempfile
 import tomllib
 
-RUSTC = "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
-CARGO = "cargo 1.99.1 (5f94df478 2026-08-27)"
-RUSTDOC = "rustdoc 1.99.1 (58cf8f9c3 2026-10-13)"
 LIMITS = [
     "Structural analysis does not prove compatibility of runtime behavior, macro expansion or accepted macro input.",
     "An empty diff does not resolve a known behavioral compatibility concern; complementary review/tests are required.",
@@ -64,7 +61,7 @@ def tool_environment(toolchain, scratch):
                CARGO_ENCODED_RUSTFLAGS="", CARGO_ENCODED_RUSTDOCFLAGS="",
                CARGO_BUILD_RUSTC_WRAPPER="", CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER="")
     # Explicit executable selection also takes precedence over Cargo home settings.
-    for name in ("rustc", "rustdoc"):
+    for name in ("cargo", "rustc", "rustdoc"):
         path = run(["rustup", "which", "--toolchain", toolchain, name], scratch, env).stdout.strip()
         env[name.upper()] = path
     return env
@@ -120,7 +117,7 @@ def generate(side, paths, root, target, host, env):
         common += ["--no-default-features"]
     if side["features"]:
         common += ["--features", ",".join(side["features"])]
-    metadata = json.loads(run(["cargo", "metadata", "--format-version", "1", "--filter-platform", target, *common], root, env).stdout)
+    metadata = json.loads(run([env["CARGO"], "metadata", "--format-version", "1", "--filter-platform", target, *common], root, env).stdout)
     selected = next(p for p in metadata["packages"] if Path(p["manifest_path"]).parent == directory)
     require(set(side["features"]) <= selected["features"].keys(), "requested package feature is missing")
     libraries = [t for t in selected["targets"] if "lib" in t["kind"] or "proc-macro" in t["kind"]]
@@ -140,29 +137,56 @@ def generate(side, paths, root, target, host, env):
                         for t in local["targets"]), "package target source is outside supplied contents")
     node = next(n for n in metadata["resolve"]["nodes"] if n["id"] == selected["id"])
     build = root / "build"
-    run(["cargo", "rustdoc", *common, "--lib", "--target", target,
+    run([env["CARGO"], "rustdoc", *common, "--lib", "--target", target,
          "--target-dir", str(build), "--", "-Z", "unstable-options", "--output-format", "json"], root, env)
     # Cargo builds/document proc-macro targets for the host, even with --target.
     output = build if "proc-macro" in libraries[0]["kind"] else build / target
     artifact = output / "doc" / (libraries[0]["name"].replace("-", "_") + ".json")
     documented_target = host if "proc-macro" in libraries[0]["kind"] else target
-    validate_json(artifact, libraries[0]["name"], package["version"], documented_target)
+    schema = validate_json(artifact, libraries[0]["name"], package["version"], documented_target)
     return artifact, {"name": package["name"], "version": package["version"],
                       "target_kind": libraries[0]["kind"], "features": side["features"],
                       "default_features": side["default_features"], "resolved_features": node["features"],
-                      "feature_inventory": sorted(selected["features"]), "schema": 61,
+                      "feature_inventory": sorted(selected["features"]), "schema": schema,
                       "documented_target": documented_target}
 
 
 def validate_json(artifact, name, version, target):
     document = json.loads(artifact.read_text())
     require(isinstance(document, dict), "rustdoc JSON must be an object")
-    require(document.get("format_version") == 61, "unsupported rustdoc schema (expected 61)")
+    schema = document.get("format_version")
+    require(type(schema) is int and schema > 0, "missing or invalid rustdoc schema version")
     crate = document["index"][str(document["root"])]["name"]
     require(crate == name.replace("-", "_") and document.get("crate_version") == version,
             "unexpected JSON crate identity/version")
     require(document.get("includes_private") is False, "unexpected private-item JSON coverage")
     require(document["target"]["triple"] == target, "unexpected JSON compilation target")
+    # The pinned analyzers validate schema support and payload compatibility.
+    # public-api alone can accept a forged marker; SemVer's reader must also pass.
+    return schema
+
+
+def analyze(artifacts, coverage, wrapper, semver, scratch, env):
+    require(coverage["old"]["schema"] == coverage["new"]["schema"],
+            "old/new JSON schemas differ despite using the same selected toolchain")
+    try:
+        result = run([str(semver), "check-release", "--baseline-rustdoc", str(artifacts["old"]),
+                      "--current-rustdoc", str(artifacts["new"]), "--release-type", "patch", "--color", "never"],
+                     scratch, env, allowed=(0, 100))
+        findings = parse_semver(result.stdout + "\n" + result.stderr, result.returncode)
+        diff = json.loads(run([str(wrapper), "public-api-diff", "--old", str(artifacts["old"]),
+                               "--new", str(artifacts["new"])], scratch, env).stdout)
+        require(set(diff) == {"public_api_version", "added", "removed", "changed"} and
+                diff["public_api_version"] == "0.52.0" and
+                all(isinstance(diff[k], list) for k in ("added", "removed", "changed")), "invalid diff wrapper output")
+    except (AnalysisError, ValueError, OSError) as error:
+        raise AnalysisError(
+            f'Cannot analyze generated rustdoc JSON schema {coverage["old"]["schema"]} with '
+            'cargo-semver-checks 0.51.0 and public-api 0.52.0. '
+            'Check the analyzer diagnostics below. If this schema/input is unsupported, '
+            'update and re-probe the pinned analyzers for the selected compiler.\n'
+            f'{error}') from error
+    return diff, findings
 
 
 def parse_semver(output, status):
@@ -211,12 +235,16 @@ def compare(request, wrapper, semver, scratch):
     require(isinstance(request["toolchain"], str) and request["toolchain"], "explicit toolchain required")
     paths = {side: validate_side(request[side]) for side in ("old", "new")}
     env = tool_environment(request["toolchain"], scratch)
-    for command, expected in (("rustc", RUSTC), ("cargo", CARGO), ("rustdoc", RUSTDOC)):
-        require(run([command, "--version"], scratch, env).stdout.strip() == expected,
-                f"unsupported {command} producer; expected {expected}")
+    producer = {"toolchain": request["toolchain"], "target": request["target"]}
+    rustc_details = run([env["RUSTC"], "--version", "--verbose"], scratch, env).stdout
+    host_match = re.search(r"^host: (\S+)$", rustc_details, re.M)
+    require(host_match is not None, "selected rustc did not report its host in --version --verbose")
+    host = host_match[1]
+    producer.update(rustc=rustc_details.strip(), host=host)
+    for command in ("cargo", "rustdoc"):
+        producer[command] = run([env[command.upper()], "--version"], scratch, env).stdout.strip()
     require(run([str(semver), "--version"], scratch, env).stdout.strip() == "cargo-semver-checks 0.51.0",
             "expected cargo-semver-checks 0.51.0")
-    host = run(["rustc", "--print", "host-tuple"], scratch, env).stdout.strip()
     artifacts, coverage = {}, {}
     for side in ("old", "new"):
         try:
@@ -224,15 +252,10 @@ def compare(request, wrapper, semver, scratch):
         except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration) as error:
             raise AnalysisError(f"{side} JSON production: {error}") from error
     require(coverage["old"]["name"] == coverage["new"]["name"], "old/new package names differ")
-    diff = json.loads(run([str(wrapper), "public-api-diff", "--old", str(artifacts["old"]),
-                           "--new", str(artifacts["new"])], scratch, env).stdout)
-    require(set(diff) == {"public_api_version", "added", "removed", "changed"} and
-            diff["public_api_version"] == "0.52.0" and
-            all(isinstance(diff[k], list) for k in ("added", "removed", "changed")), "invalid diff wrapper output")
-    result = run([str(semver), "check-release", "--baseline-rustdoc", str(artifacts["old"]),
-                  "--current-rustdoc", str(artifacts["new"]), "--release-type", "patch", "--color", "never"],
-                 scratch, env, allowed=(0, 100))
-    findings = parse_semver(result.stdout + "\n" + result.stderr, result.returncode)
+    try:
+        diff, findings = analyze(artifacts, coverage, wrapper, semver, scratch, env)
+    except AnalysisError as error:
+        raise AnalysisError(f'{error}\nActual producer: {json.dumps(producer)}') from error
     removed = sorted(set(coverage["old"]["feature_inventory"]) - set(coverage["new"]["feature_inventory"]))
     impact = "patch"
     if diff["added"] or findings["minor"]:
@@ -241,7 +264,7 @@ def compare(request, wrapper, semver, scratch):
         impact = "major"
     return {"status": "detected", "impact": impact, "diff": diff, "removed_features": removed,
             "semver": findings, "coverage": coverage,
-            "producer": {"rustc": RUSTC, "cargo": CARGO, "rustdoc": RUSTDOC, "target": request["target"], "host": host},
+            "producer": producer,
             "limits": LIMITS}
 
 

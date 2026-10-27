@@ -104,6 +104,10 @@ jobs:
           test "$(docker run --rm "${LOCAL_IMAGE_TAG}" scrut --version)" = "scrut 0.4.3"
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo --version
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo deny --version
+          docker run --rm "${LOCAL_IMAGE_TAG}" cargo deb --version
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -e HOME=/home/builder -e CARGO_HOME=/home/builder/.cargo \
+            "${LOCAL_IMAGE_TAG}" cargo deb --version
           docker run --rm "${LOCAL_IMAGE_TAG}" mdbook --help >/dev/null
 
       - name: publish
@@ -188,6 +192,11 @@ jobs:
           ## Documentation
 
           - [ ] README/book/user_manual updated (if needed): review the cherry-picked documentation; no additional end-user change is required for digest adoption.
+
+          ## Stats
+
+          - [ ] \`update-stats\` (if applicable): inherited from the reviewed image change; no new measurement for digest adoption.
+          - [ ] Coverage impact reviewed in \`stats/coverage.txt\` (if applicable): review the cherry-picked statistics.
 
           ## Risk and Rollout
 

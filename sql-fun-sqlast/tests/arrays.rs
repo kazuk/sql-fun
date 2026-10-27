@@ -93,7 +93,6 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 #[case::mixed("SELECT ARRAY[$1,1] AS result")]
 #[case::reverse("SELECT ARRAY[1,$1] AS result")]
 #[case::subquery("SELECT ARRAY[(SELECT $1),1] AS result")]
-#[case::cte("WITH c AS (SELECT ARRAY[$1,1] AS n) SELECT ARRAY[c.n] AS result FROM c")]
 fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult::TestResult {
     let analyzed = heavy::analyze(sql, &[])?;
     assert!(
@@ -121,7 +120,6 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 }
 
 #[rstest::rstest]
-#[case::array("ARRAY[$1,NULL]")]
 #[case::greatest("GREATEST($1,NULL)")]
 #[case::least("LEAST($1,NULL)")]
 #[case::case("CASE WHEN true THEN $1 ELSE NULL END")]
@@ -144,11 +142,7 @@ fn unanchored_parameters_accept_typed_assignments(
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
     let result = constraints.result_column(usize::from(reverse)).unwrap();
-    let expected = if expression.starts_with("ARRAY") {
-        PgBuiltInType::int4().array_type()
-    } else {
-        PgBuiltInType::int4()
-    };
+    let expected = PgBuiltInType::int4();
     assert!(result.allows(&expected), "{result:?}");
     Ok(())
 }

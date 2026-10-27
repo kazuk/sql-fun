@@ -359,6 +359,23 @@ class Comparison(unittest.TestCase):
         self.assertEqual(json.loads(prepared.stdout)['toolchain'], 'next-stable-fixture')
         self.assertEqual(log.read_text().splitlines(), ['show active-toolchain'])
 
+    def test_preparation_rejects_stock_analyzer_without_building(self):
+        tools = self.root / 'stock-tools'
+        tools.mkdir()
+        analyzer = tools / 'cargo-semver-checks'
+        analyzer.write_text('#!/bin/sh\necho cargo-semver-checks 0.51.0\n')
+        analyzer.chmod(0o755)
+        cargo = tools / 'cargo'
+        cargo.write_text('#!/bin/sh\necho unexpected-install >&2\nexit 99\n')
+        cargo.chmod(0o755)
+        result = subprocess.run([str(ROOT / '.local/sbin/prepare-package-api-tests')],
+                                cwd=ROOT, env=dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH']),
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('builder must provide cargo-semver-checks 0.51.0-sqlfun.1', result.stderr)
+        self.assertNotIn('unexpected-install', result.stderr)
+        self.assertFalse(result.stdout)
+
     def test_missing_explicit_default_policy(self):
         old = self.package('old', '')
         del old['default_features']

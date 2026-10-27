@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
-# Internal test preparation, not an additional contributor command/prerequisite.
+# Use the tools supplied by the documented development/CI builder image.
 set -euo pipefail
-root=$(git rev-parse --show-toplevel)
-# Use the toolchain running the contributor's checks, including an explicit
-# rustup override. A probe's compiler version is not a project prerequisite.
 producer=$(rustup show active-toolchain)
 producer=${producer%% *}
-if command -v cargo-semver-checks >/dev/null &&
-  [[ "$(cargo-semver-checks --version)" == 'cargo-semver-checks 0.51.0-sqlfun.1' ]]; then
-  analyzer=$(command -v cargo-semver-checks)
-else
-  # Build the corrected query behind the existing preparation boundary. The
-  # stock CI-image executable has the #826 false positive and is not reused.
-  analyzer=$(RUSTUP_TOOLCHAIN="$producer" python3 "$root/.local/sbin/package-api/prepare_analyzer.py")
+if ! command -v cargo-semver-checks >/dev/null ||
+  [[ "$(cargo-semver-checks --version)" != 'cargo-semver-checks 0.51.0-sqlfun.1' ]]; then
+  echo 'The builder must provide cargo-semver-checks 0.51.0-sqlfun.1; use the CI image containing the #826 correction.' >&2
+  exit 1
 fi
+analyzer=$(command -v cargo-semver-checks)
 jq -n --arg toolchain "$producer" --arg semver_checks "$analyzer" '{toolchain: $toolchain, semver_checks: $semver_checks}'

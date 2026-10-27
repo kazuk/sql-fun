@@ -7,8 +7,8 @@ coordinator in PR #824, and release-intent enforcement in #359/#361. It does
 not change release policy or baseline selection. The repair is a corrected
 upstream lint query, not a second classifier or a post-processing exception.
 
-The comparator requires **cargo-semver-checks 0.51.0-sqlfun.1**. The internal
-preparation helper builds this executable from the upstream 0.51.0 source
+The comparator requires **cargo-semver-checks 0.51.0-sqlfun.1**. `ci/github-actions/Dockerfile`
+builds this executable from the upstream 0.51.0 source
 archive, verified against SHA-256
 `484e65e62077aed1a119d04ab414038d20b9013302b7353487ff69a461842bf8`.
 The archive records upstream revision
@@ -16,7 +16,9 @@ The archive records upstream revision
 version and dependency lockfile. Only the CLI version output receives a
 distinct identity.
 Upstream lint documentation links continue to reference the real 0.51.0 tag.
-No compiler substitution, lint disabling or CI image adoption is involved.
+The corrected image is published and adopted through `ci/README.md`.
+Test preparation verifies the installed executable and never patches or builds
+tools. No compiler substitution or lint disabling is involved.
 Future upstream upgrades must re-probe the correction and the existing
 analyzer contracts before replacing this build.
 

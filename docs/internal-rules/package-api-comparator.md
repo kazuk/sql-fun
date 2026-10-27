@@ -157,26 +157,18 @@ without introducing a manual Python setup step. uv is already in contributor
 setup for graphify and in the development/CI image. Tests use runtime nextest
 paths to support archive relocation.
 
-`.local/sbin/prepare-package-api-tests` uses the active contributor toolchain,
-including an explicit rustup override, without installing or pinning a compiler.
-It reuses a matching corrected executable or invokes the internal
-`package-api/prepare_analyzer.py` helper. That helper downloads the checksum-pinned
-upstream source archive, corrects only `trait_changed_kind`, assigns the distinct
-`0.51.0-sqlfun.1` identity, and builds using the upstream dependency lockfile.
-The upstream lockfile remains unchanged; only the CLI advertises the corrected
-build identity. Installation is serialized across test processes. Sources are
-prepared outside the workspace; build/install outputs stay under this worktree's
-`target/package-api-tools/0.51.0-sqlfun.1`. The stock analyzer in the CI image
-is not replaced or silently accepted. No CI image change is required.
+`.local/sbin/prepare-package-api-tests` records the active contributor toolchain,
+including an explicit rustup override, and verifies the corrected analyzer
+provided by the documented development/CI builder image. It never installs or
+patches tools. A missing or stock executable fails with the required identity.
+`ci/github-actions/Dockerfile` owns the checksum-pinned source download, query
+correction, locked build and semantic smoke tests. Image publication and adoption
+follow `ci/README.md`; the comparator must not be adopted before that image.
 
-This remains internal preparation behind the existing contributor test entry
-point, not a new contributor command. Preparation may require network access;
-package comparison itself never installs tools or uses network access. The
-complete approved-baseline regression extracts its frozen copy of the approved
-seed from #824 with a SHA-256 check and prepares historical registry dependencies
-before
-running nine offline comparisons. It does not read or adopt an ambient active
-baseline. The test is maintained through the same `workspace`/nextest path as
+The complete approved-baseline regression extracts its frozen copy of the
+approved seed from #824 with a SHA-256 check and prepares historical registry
+dependencies before running nine offline comparisons. It does not read or adopt
+an ambient active baseline. The test uses the same `workspace`/nextest path as
 the minimized shadowing and genuine replacement controls. Maintained tests also
 cover compiler version drift with compatible JSON, unsupported schemas through
 the real analyzer reader, selected-toolchain Cargo resolution despite a

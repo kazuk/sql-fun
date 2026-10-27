@@ -48,12 +48,132 @@ pub struct BuiltinTypeDefinition {
     collatable: Option<bool>,
 }
 
+#[cfg(test)]
+mod builtin_type_definition_tests {
+    use super::TypeDefinition;
+    use crate::sem::{FullName, TypeReference};
+
+    #[rstest::rstest]
+    fn nullable_fact_survives_serialization(
+        #[values(Some(true), Some(false), None)] expected: Option<bool>,
+    ) {
+        let definition =
+            TypeDefinition::builtin(&FullName::with_schema("public", "custom"), expected);
+        let context = crate::test_helpers::TestParseContext::default();
+        let serialized = serde_json::to_value(&definition).unwrap();
+        assert!(serialized["Builtin"].get("collatable").is_some());
+        assert_eq!(
+            serialized["Builtin"]["collatable"],
+            serde_json::to_value(expected).unwrap()
+        );
+        let restored: TypeDefinition = serde_json::from_value(serialized).unwrap();
+        assert_eq!(restored, definition);
+        assert_eq!(
+            TypeReference::dynamic(&restored).collation_capability(&context),
+            expected
+        );
+    }
+
+    #[test]
+    fn semantic_definitions_also_require_the_fact_key() {
+        let definition = TypeDefinition::builtin(&FullName::with_schema("public", "custom"), None);
+        let mut serialized = serde_json::to_value(definition).unwrap();
+        serialized["Builtin"]
+            .as_object_mut()
+            .unwrap()
+            .remove("collatable");
+        assert!(serde_json::from_value::<TypeDefinition>(serialized).is_err());
+    }
+
+    #[test]
+    fn definition_preserves_flattened_reference_shape() {
+        let name = FullName::with_schema("pg_catalog", "custom");
+        let definition = TypeDefinition::builtin(&name, None);
+        let json = serde_json::to_value(&definition).unwrap();
+        assert!(json["Builtin"]["Concrete"].is_object());
+        assert!(json["Builtin"].get("category").is_none());
+        assert_eq!(
+            serde_json::from_value::<TypeDefinition>(json).unwrap(),
+            definition
+        );
+    }
+}
+
 // deserialize_with makes presence mandatory while accepting explicit JSON null.
 pub(super) fn deserialize_collatable<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     serde::Deserialize::deserialize(deserializer)
+}
+
+impl TypeDefinition {
+    /// PostgreSQL classification from catalog metadata or verified DDL semantics.
+    ///
+    /// Missing metadata, unresolved domains, and non-PostgreSQL contexts
+    /// return `None`, distinct from the PostgreSQL codes `X` and `U`.
+    pub fn category(&self, context: &impl BaseParseContext) -> Option<TypeCategory> {
+        if crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::postgres() {
+            return None;
+        }
+        self.intrinsic_category()
+    }
+
+    pub(crate) fn intrinsic_category(&self) -> Option<TypeCategory> {
+        match self {
+            Self::Array(_) => TypeCategory::try_from('A').ok(),
+            Self::Builtin(definition) => definition.category,
+            Self::Enum(_) => TypeCategory::try_from('E').ok(),
+            Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
+                TypeCategory::try_from('C').ok()
+            }
+            Self::Domain(definition) => definition.category(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod category_tests {
+    use super::TypeDefinition;
+    use crate::{context::BaseParseContext, sem::FullName, test_helpers::TestParseContext};
+
+    #[test]
+    fn category_follows_selected_definition_and_search_path() {
+        use crate::sem::{SchemaName, TypeCategory};
+
+        let mut context = TestParseContext::default();
+        context
+            .set_get_search_path_result(&[SchemaName::from("second"), SchemaName::from("first")]);
+        for (schema, code) in [("first", 'q'), ("second", '!')] {
+            let name = FullName::with_schema(schema, "custom");
+            context.set_get_type_impl_result(
+                &name,
+                &TypeDefinition::builtin_with_category(
+                    &name,
+                    Some(TypeCategory::try_from(code).unwrap()),
+                    None,
+                ),
+            );
+        }
+        let selected = context
+            .get_type(&FullName::from_local_name("custom"))
+            .unwrap();
+        assert_eq!(selected.category(&context).unwrap().code(), '!');
+        let qualified = context
+            .get_type(&FullName::with_schema("first", "custom"))
+            .unwrap();
+        assert_eq!(qualified.category(&context).unwrap().code(), 'q');
+    }
+
+    #[test]
+    #[cfg(feature = "sqlite")]
+    fn postgres_metadata_does_not_classify_sqlite_types() {
+        let name = FullName::with_schema("pg_catalog", "int4");
+        let category = crate::sem::TypeCategory::try_from('N').unwrap();
+        let definition = TypeDefinition::builtin_with_category(&name, Some(category), None);
+        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        assert_eq!(definition.category(&context), None);
+    }
 }
 
 impl TypeDefinition {
@@ -74,7 +194,39 @@ impl TypeDefinition {
             | Self::ImplicitComposite(_) => Some(false),
         }
     }
+}
 
+#[cfg(test)]
+mod definition_collation_tests {
+    use crate::{
+        sem::{
+            ColumnCollection, CompositeFieldCollection, CreateCompositeType, CreateEnum, FullName,
+            TableName, TypeDefinition, TypeReference,
+        },
+        test_helpers::TestParseContext,
+    };
+
+    #[test]
+    fn structural_rows_are_not_collatable() {
+        let context = TestParseContext::default();
+        let composite = CreateCompositeType::from_fields(&CompositeFieldCollection::default());
+        let reference = TypeReference::dynamic(&TypeDefinition::from(&composite));
+        assert_eq!(reference.collation_capability(&context), Some(false));
+        let row = TypeReference::dynamic(&TypeDefinition::implicit_composite(
+            &ColumnCollection::default(),
+        ));
+        assert_eq!(row.collation_capability(&context), Some(false));
+        let enumeration =
+            CreateEnum::new(&FullName::with_schema("public", "enum"), &["a".to_owned()]);
+        let enumeration = TypeReference::dynamic(&TypeDefinition::from(&enumeration));
+        assert_eq!(enumeration.collation_capability(&context), Some(false));
+        let table = TableName::from(FullName::with_schema("public", "table"));
+        let row = TypeReference::dynamic(&TypeDefinition::table_ref(&table));
+        assert_eq!(row.collation_capability(&context), Some(false));
+    }
+}
+
+impl TypeDefinition {
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,
@@ -157,29 +309,6 @@ impl TypeDefinition {
             category,
             collatable,
         })
-    }
-
-    /// PostgreSQL classification from catalog metadata or verified DDL semantics.
-    ///
-    /// Missing metadata, unresolved domains, and non-PostgreSQL contexts
-    /// return `None`, distinct from the PostgreSQL codes `X` and `U`.
-    pub fn category(&self, context: &impl BaseParseContext) -> Option<TypeCategory> {
-        if crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::postgres() {
-            return None;
-        }
-        self.intrinsic_category()
-    }
-
-    pub(crate) fn intrinsic_category(&self) -> Option<TypeCategory> {
-        match self {
-            Self::Array(_) => TypeCategory::try_from('A').ok(),
-            Self::Builtin(definition) => definition.category,
-            Self::Enum(_) => TypeCategory::try_from('E').ok(),
-            Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
-                TypeCategory::try_from('C').ok()
-            }
-            Self::Domain(definition) => definition.category(),
-        }
     }
 
     pub(crate) const fn is_builtin(&self) -> bool {

@@ -61,10 +61,7 @@ impl TypeReference {
 #[cfg(test)]
 mod collation_capability_tests {
     use crate::{
-        sem::{
-            ColumnCollection, CompositeFieldCollection, CreateCompositeType, CreateDomain,
-            CreateEnum, FullName, TableName, TypeDefinition, TypeReference,
-        },
+        sem::{CreateDomain, FullName, TypeDefinition, TypeReference},
         test_helpers::TestParseContext,
     };
 
@@ -143,25 +140,6 @@ mod collation_capability_tests {
             TypeReference::dynamic(&domain).collation_capability(&context),
             None
         );
-    }
-
-    #[test]
-    fn structural_rows_are_not_collatable() {
-        let context = TestParseContext::default();
-        let composite = CreateCompositeType::from_fields(&CompositeFieldCollection::default());
-        let reference = TypeReference::dynamic(&TypeDefinition::from(&composite));
-        assert_eq!(reference.collation_capability(&context), Some(false));
-        let row = TypeReference::dynamic(&TypeDefinition::implicit_composite(
-            &ColumnCollection::default(),
-        ));
-        assert_eq!(row.collation_capability(&context), Some(false));
-        let enumeration =
-            CreateEnum::new(&FullName::with_schema("public", "enum"), &["a".to_owned()]);
-        let enumeration = TypeReference::dynamic(&TypeDefinition::from(&enumeration));
-        assert_eq!(enumeration.collation_capability(&context), Some(false));
-        let table = TableName::from(FullName::with_schema("public", "table"));
-        let row = TypeReference::dynamic(&TypeDefinition::table_ref(&table));
-        assert_eq!(row.collation_capability(&context), Some(false));
     }
 
     #[test]

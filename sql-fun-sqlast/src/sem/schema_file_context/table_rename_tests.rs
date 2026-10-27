@@ -2,12 +2,13 @@
 mod test_helpers;
 
 #[cfg(feature = "sqlite")]
-use crate::sem::ViewInfoRead;
+use crate::context::ViewInfoRead;
 
-use crate::sem::{
-    GetSourcePathWithSpan, ObjectInfoRead, ParseContext, TableInfoRead, TypeInfoRead,
-};
 use crate::test_helpers::ownership::apply_ownership_sql;
+use crate::{
+    context::{GetSourcePathWithSpan, ObjectInfoRead, TableInfoRead, TypeInfoRead},
+    sem::ParseContext,
+};
 
 #[rstest::rstest]
 #[case::unqualified("ALTER TABLE before_name RENAME TO after_name")]
@@ -173,7 +174,10 @@ fn destination_stays_in_the_bound_schema_and_preserves_quoted_names() -> testres
 
 #[test]
 fn indexes_sequences_and_view_sources_follow_the_renamed_table() -> testresult::TestResult {
-    use crate::sem::{IndexInfoRead, SequenceInfoRead, TableName, ViewInfoRead};
+    use crate::{
+        context::{IndexInfoRead, SequenceInfoRead, ViewInfoRead},
+        sem::TableName,
+    };
     let context = apply_ownership_sql(
         test_helpers::context(),
         "CREATE TABLE before_name(id integer CONSTRAINT before_name_pkey PRIMARY KEY)",
@@ -314,7 +318,7 @@ fn old_name_can_be_reused_without_resurrecting_the_table(
 
 #[test]
 fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresult::TestResult {
-    use crate::sem::{ColumnName, FunctionInfoRead};
+    use crate::{context::FunctionInfoRead, sem::ColumnName};
     let context = apply_ownership_sql(
         test_helpers::context(),
         "CREATE TABLE before_name(id integer CONSTRAINT before_key PRIMARY KEY)",
@@ -375,7 +379,10 @@ fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresul
 
 #[test]
 fn trigger_and_rule_identities_follow_the_owning_table() -> testresult::TestResult {
-    use crate::sem::{RuleIdentity, RuleInfoRead, TriggerIdentity, TriggerInfoRead};
+    use crate::{
+        context::{RuleInfoRead, TriggerInfoRead},
+        sem::{RuleIdentity, TriggerIdentity},
+    };
     let context = test_helpers::table_layer(false)?;
     let context = apply_ownership_sql(context, "CREATE FUNCTION audit_function() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'")?.into_context();
     let context = apply_ownership_sql(context, "CREATE TRIGGER audit AFTER INSERT ON before_name FOR EACH ROW EXECUTE FUNCTION audit_function()")?.into_context();
@@ -426,7 +433,7 @@ fn trigger_and_rule_identities_follow_the_owning_table() -> testresult::TestResu
 
 #[test]
 fn ownership_follows_the_table_without_resurrecting_the_old_identity() -> testresult::TestResult {
-    use crate::sem::{ObjectKind, OwnershipInfoRead};
+    use crate::{context::OwnershipInfoRead, sem::ObjectKind};
     let context = apply_ownership_sql(
         test_helpers::table_layer(false)?,
         "ALTER TABLE before_name OWNER TO CURRENT_USER",

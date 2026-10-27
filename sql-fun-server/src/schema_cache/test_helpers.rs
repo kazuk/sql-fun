@@ -327,7 +327,10 @@ impl SchemaProject {
         context: ::sql_fun_sqlast::sem::SchemaFileContext,
         sql: &str,
     ) -> ::sql_fun_sqlast::AstAndContextPair<::sql_fun_sqlast::sem::SchemaFileContext> {
-        use ::sql_fun_sqlast::sem::{MutSourcePathWithSpan, SemAst, SourcePathWithSpan};
+        use ::sql_fun_sqlast::{
+            context::MutSourcePathWithSpan,
+            sem::{SemAst, SourcePathWithSpan},
+        };
         let mut context = context;
         context.set_source_path_with_span(&SourcePathWithSpan::new(
             Path::new("roles.sql"),

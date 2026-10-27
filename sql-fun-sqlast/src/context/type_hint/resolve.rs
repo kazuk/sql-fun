@@ -1,6 +1,7 @@
 //! Construct named type references directly, without a statement or expression AST.
 use crate::ast::Dialect;
-use crate::sem::{AnalysisError, ParseContext, TypeReference, parse_client_type};
+use crate::context::ParseContext;
+use crate::sem::{AnalysisError, TypeReference, parse_client_type};
 
 pub(super) fn resolve_parameter_hint(
     slot: usize,

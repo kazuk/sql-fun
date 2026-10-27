@@ -5,10 +5,8 @@ use std::{
 
 use crate::{
     TrieMap,
-    sem::{
-        AnalysisError, CastContext, CastDefinition, CastInfoRead, FullName, TypeInfoRead,
-        TypeReference,
-    },
+    context::{CastInfoRead, TypeInfoRead},
+    sem::{AnalysisError, CastContext, CastDefinition, FullName, TypeReference},
 };
 
 pub struct PgBuiltinCasts {}
@@ -273,8 +271,9 @@ mod test_builtin_cast_identity {
     use ::clap::Parser;
     use ::sql_fun_core::SqlFunArgs;
 
-    use crate::sem::{
-        BaseContext, CastInfoRead, FrozenBaseContext, FullName, SchemaFileContext, TypeReference,
+    use crate::{
+        context::CastInfoRead,
+        sem::{BaseContext, FrozenBaseContext, FullName, SchemaFileContext, TypeReference},
     };
 
     #[test]

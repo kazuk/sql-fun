@@ -7,7 +7,7 @@ pub use self::cursor::DeleteCursor;
 pub(crate) use self::cursor::DeletePredicate;
 pub(crate) use self::destination::DeleteDestination;
 pub use self::row::{DeleteRowColumn, DeleteRowVersion};
-pub use self::view_support::{ViewDeleteInfoRead, ViewDeleteSupport};
+pub use self::view_support::ViewDeleteSupport;
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitor;

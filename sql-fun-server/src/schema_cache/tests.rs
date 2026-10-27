@@ -619,7 +619,10 @@ fn configured_roles_bind_and_apply_through_direct_context(
     #[case] expected: &str,
 ) {
     use ::sql_fun_sqlast::context::ParseContext;
-    use ::sql_fun_sqlast::sem::{ObjectKind, OwnershipInfoRead, Role, RoleInfoRead};
+    use ::sql_fun_sqlast::{
+        context::{OwnershipInfoRead, RoleInfoRead},
+        sem::{ObjectKind, Role},
+    };
     let project = SchemaProject::new();
     project.configure_roles(
         "products",
@@ -659,7 +662,7 @@ fn configured_roles_bind_and_apply_through_direct_context(
 #[case::different("roles = ['other']")]
 fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: &str) {
     use ::sql_fun_sqlast::context::ParseContext;
-    use ::sql_fun_sqlast::sem::{OwnershipInfoRead, RoleInfoRead};
+    use ::sql_fun_sqlast::context::{OwnershipInfoRead, RoleInfoRead};
     let project = SchemaProject::new();
     project.configure_roles("products", "roles = ['owner']");
     project.configure_roles("orders", declaration);
@@ -698,7 +701,10 @@ fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: 
 
 #[tokio::test]
 async fn role_inventory_partitions_cached_bindings_and_diagnostics() {
-    use ::sql_fun_sqlast::sem::{OwnershipInfoRead, Role, RoleInfoRead};
+    use ::sql_fun_sqlast::{
+        context::{OwnershipInfoRead, RoleInfoRead},
+        sem::Role,
+    };
     let project = SchemaProject::new();
     let service = project.service();
     project.configure_roles("products", "roles = ['owner', 'other']");
@@ -787,7 +793,7 @@ async fn role_inventory_partitions_cached_bindings_and_diagnostics() {
 #[test]
 fn explicitly_registered_roles_survive_current_inventory_changes() {
     use ::sql_fun_sqlast::context::ParseContext;
-    use ::sql_fun_sqlast::sem::{Role, RoleInfoRead};
+    use ::sql_fun_sqlast::{context::RoleInfoRead, sem::Role};
     let project = SchemaProject::new();
     project.configure_roles("products", "roles = ['configured']");
     project.configure_roles("orders", "roles = []");
@@ -809,7 +815,10 @@ fn explicitly_registered_roles_survive_current_inventory_changes() {
 async fn configured_roles_reach_builtin_and_default_prefixes(
     #[case] level: ::sql_fun_core::SchemaLevel,
 ) {
-    use ::sql_fun_sqlast::sem::{OwnershipInfoRead, Role, RoleInfoRead};
+    use ::sql_fun_sqlast::{
+        context::{OwnershipInfoRead, RoleInfoRead},
+        sem::Role,
+    };
     let project = SchemaProject::new();
     project.configure_roles("products", "roles = ['owner']");
     project.schema(

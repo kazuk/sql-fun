@@ -281,7 +281,8 @@ impl SelectStatementNode {
 #[cfg(test)]
 mod test_scalar_scope {
     use crate::{
-        sem::{ColumnName, MutSourcePathWithSpan, PgBuiltInType, SourcePathWithSpan},
+        context::MutSourcePathWithSpan,
+        sem::{ColumnName, PgBuiltInType, SourcePathWithSpan},
         syn::Opt,
         test_helpers::{SynBuilder, TestParseContext, source_span},
     };

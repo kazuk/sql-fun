@@ -1,8 +1,13 @@
 use super::{SchemaCatalog, SchemaFileContext};
-use crate::sem::{
-    AlterOwner, AnalysisError, CreateFunction, CreateSchema, FullName, ObjectKind,
-    OwnedObjectDefinition, OwnershipInfoRead, Role, RoleInfoRead, SequenceInfoRead, TableInfoRead,
-    TypeInfoRead, ViewInfoRead,
+use crate::{
+    context::{
+        OwnershipInfoRead, RoleInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
+        ViewInfoRead,
+    },
+    sem::{
+        AlterOwner, AnalysisError, CreateFunction, CreateSchema, FullName, ObjectKind,
+        OwnedObjectDefinition, Role,
+    },
 };
 
 impl RoleInfoRead for SchemaCatalog {

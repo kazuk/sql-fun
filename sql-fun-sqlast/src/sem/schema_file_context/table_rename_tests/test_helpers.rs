@@ -1,9 +1,9 @@
 use crate::context::BaseParseContext;
-use crate::sem::{
-    AnalysisError, FrozenBaseContext, FullName, MutSourcePathWithSpan, ParseContext,
-    SchemaFileContext,
-};
 use crate::test_helpers::{ownership::apply_ownership_sql, source_span};
+use crate::{
+    context::MutSourcePathWithSpan,
+    sem::{AnalysisError, FrozenBaseContext, FullName, ParseContext, SchemaFileContext},
+};
 
 pub(super) fn context() -> SchemaFileContext {
     let metadata = ::serde_json::from_value(::serde_json::json!({

@@ -557,7 +557,7 @@ mod test_helpers {
             &args,
             &metadata,
         );
-        crate::sem::MutSourcePathWithSpan::set_source_path_with_span(
+        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
             &crate::sem::SourcePathWithSpan::new(
                 "whole_rows.sql",

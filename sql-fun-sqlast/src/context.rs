@@ -1,8 +1,51 @@
-//! context
+//! Shared catalog interfaces and services for SQL analysis.
 
 mod base_parse_context;
+mod cast_info;
+mod conflict_info;
+mod cursor_bindings;
+mod diagnostic;
+mod function_info;
+mod index_info;
+mod object_info;
+mod operator_info;
+mod ownership_info;
+mod rule_info;
+mod search_path;
+mod sequence_info;
+mod source;
+mod table_info;
+mod trigger_info;
+mod type_hint;
+mod type_info;
+mod view_info;
 
 pub use self::base_parse_context::BaseParseContext;
+pub use self::cast_info::CastInfoRead;
+pub use self::conflict_info::ConflictInfoRead;
+pub(crate) use self::cursor_bindings::CursorBindings;
+pub use self::diagnostic::DiagnosticContext;
+pub use self::function_info::{FunctionInfoRead, FunctionInfoWrite};
+pub use self::index_info::IndexInfoRead;
+pub use self::object_info::{ExtensionInfoRead, ObjectInfoRead};
+pub use self::operator_info::OperatorInfoRead;
+pub use self::ownership_info::{OwnershipInfoRead, RoleInfoRead};
+pub use self::rule_info::{RuleInfoRead, RuleInfoWrite};
+pub use self::search_path::SearchPathRead;
+pub use self::sequence_info::{SequenceInfoRead, SequenceInfoWrite};
+pub use self::source::{
+    DefaultSourceAccessService, GetSourcePathWithSpan, GetSourcePathWithSpanOpt,
+    MutSourcePathWithSpan, SourceAccessService,
+};
+pub use self::table_info::{TableInfoRead, TableInfoWrite};
+pub use self::trigger_info::{TriggerInfoRead, TriggerInfoWrite};
+pub(crate) use self::type_hint::ParameterTypeHints;
+pub use self::type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite};
+pub use self::type_info::{TypeInfoRead, TypeInfoWrite};
+pub use self::view_info::{
+    ViewDeleteInfoRead, ViewInfoRead, ViewInfoWrite, ViewInsertInfoRead, ViewMergeInfoRead,
+    ViewUpdateInfoRead,
+};
 
 use sql_fun_core::{IVec, analysis_problem::AnalysisProblem};
 
@@ -11,11 +54,8 @@ use crate::{
     sem::{
         AliasSpec, AlterIndex, AlterOwner, AnalysisError, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, DataSource, DiagnosticContext, FrozenBaseContext, FullName,
-        FunctionInfoWrite, GetSourcePathWithSpan, Kind, MutSourcePathWithSpan,
-        OwnedObjectDefinition, ParameterTypeHintRead, ParameterTypeHintWrite, Role, RuleInfoWrite,
-        SchemaName, SemScalarExpr, SequenceInfoWrite, SourceAccessService, TableInfoWrite,
-        TableName, TriggerInfoWrite, TypeInfoWrite, VariableSet, ViewInfoWrite,
+        CreateTable, CursorInfo, DataSource, FrozenBaseContext, FullName, Kind,
+        OwnedObjectDefinition, Role, SchemaName, SemScalarExpr, TableName, VariableSet,
         problem::CreationProblem, type_system::ArgumentBindingCollection,
     },
 };
@@ -276,7 +316,7 @@ where
     /// Freezing consumes the builder; it cannot be reused afterwards:
     ///
     /// ```compile_fail
-    /// use ::sql_fun_sqlast::sem::{ParseContext, SchemaFileContext};
+    /// use ::sql_fun_sqlast::{context::ParseContext, sem::SchemaFileContext};
     ///
     /// fn reuse_builder(mut builder: SchemaFileContext) {
     ///     let _frozen = builder.freeze();

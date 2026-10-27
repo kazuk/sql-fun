@@ -29,14 +29,15 @@ use self::{
 use crate::context::BaseParseContext;
 use crate::{
     StringSpan, TrieMap,
-    context::ParseContext,
+    context::{
+        DiagnosticContext, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
+        OperatorInfoRead, ParseContext, SearchPathRead, SourceAccessService, TableInfoRead,
+        ViewInfoRead,
+    },
     sem::{
         AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
-        CreateSchema, DiagnosticContext, FrozenBaseContext, FullName, GetSourcePathWithSpanOpt,
-        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead,
-        OperatorName, SchemaName, SemScalarExpr, SourceAccessService, TableInfoRead, TypeReference,
-        ViewInfoRead,
-        parse_context::{IndexInfoRead, SearchPathRead},
+        CreateSchema, FrozenBaseContext, FullName, ImplicitChange, ObjectKind, OperatorDefinition,
+        OperatorName, SchemaName, SemScalarExpr, TypeReference,
     },
 };
 
@@ -55,10 +56,10 @@ pub struct SchemaFileContext {
     diagnostic_source: Option<String>,
     presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
     problems: Vec<AnalysisProblem>,
-    cursors: crate::sem::CursorBindings,
+    cursors: crate::context::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
-    parameter_type_hints: crate::sem::ParameterTypeHints,
+    parameter_type_hints: crate::context::ParameterTypeHints,
 }
 
 #[derive(Debug)]
@@ -163,7 +164,7 @@ impl SchemaFileContext {
             diagnostic_source: None,
             presentations: Vec::new(),
             problems: Vec::new(),
-            cursors: crate::sem::CursorBindings::default(),
+            cursors: crate::context::CursorBindings::default(),
             analysis_state: crate::sem::AnalysisState::default(),
             parameter_constraints: crate::sem::ParameterConstraints::default(),
             parameter_type_hints: Default::default(),
@@ -266,8 +267,8 @@ mod test_index_lookup {
     use self::test_helpers::{index, layer};
     use crate::context::BaseParseContext;
     use crate::{
-        context::ParseContext,
-        sem::{FullName, IndexInfoRead},
+        context::{IndexInfoRead, ParseContext},
+        sem::FullName,
     };
 
     #[rstest::rstest]
@@ -380,7 +381,10 @@ mod test_index_lookup {
 
     #[test]
     fn quoted_names_do_not_alias_or_shadow_other_indexes() -> testresult::TestResult {
-        use crate::sem::{FullName, IndexInfoRead, ParseContext, TableName};
+        use crate::{
+            context::IndexInfoRead,
+            sem::{FullName, ParseContext, TableName},
+        };
         let left = index("a.b", "parent_table", "c");
         let right = index("a", "other_table", "b.c");
         let parent = layer(&["a.b", "a"], std::slice::from_ref(&left))?.freeze();
@@ -498,7 +502,10 @@ impl OperatorInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_operator_layers {
-    use crate::sem::{OperatorInfoRead, OperatorName, PgBuiltInType};
+    use crate::{
+        context::OperatorInfoRead,
+        sem::{OperatorName, PgBuiltInType},
+    };
 
     #[rstest::rstest]
     #[case::binary(true, true)]
@@ -627,14 +634,17 @@ impl DiagnosticContext for SchemaFileContext {
 #[cfg(test)]
 mod test_diagnostic_context {
     use crate::StringSpan;
-    use crate::sem::{AnalysisProblem, DiagnosticContext, FullName, ParseContext};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        context::DiagnosticContext,
+        sem::{AnalysisProblem, FullName, ParseContext},
+    };
     use std::path::Path;
 
     #[derive(Debug)]
     struct UnavailableSource;
 
-    impl crate::sem::SourceAccessService for UnavailableSource {
+    impl crate::context::SourceAccessService for UnavailableSource {
         fn get_source_span(
             &self,
             _args: &::sql_fun_core::SqlFunArgs,
@@ -681,18 +691,18 @@ mod test_diagnostic_context {
     }
 }
 
-impl crate::sem::RuleInfoRead for SchemaCatalog {
+impl crate::context::RuleInfoRead for SchemaCatalog {
     fn local_rule(
         &self,
         identity: &crate::sem::RuleIdentity,
     ) -> Option<Option<&crate::sem::CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
     }
-    fn rule_parent(&self) -> Option<&dyn crate::sem::RuleInfoRead> {
+    fn rule_parent(&self) -> Option<&dyn crate::context::RuleInfoRead> {
         Some(&self.base)
     }
 }
-impl crate::sem::RuleInfoWrite for SchemaFileContext {
+impl crate::context::RuleInfoWrite for SchemaFileContext {
     fn store_rule(
         &mut self,
         identity: &crate::sem::RuleIdentity,
@@ -707,7 +717,7 @@ impl crate::sem::RuleInfoWrite for SchemaFileContext {
     }
 }
 
-impl crate::sem::TriggerInfoRead for SchemaCatalog {
+impl crate::context::TriggerInfoRead for SchemaCatalog {
     fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
         if let Some(entry) = self.triggers.get(identity) {
             entry.is_none()
@@ -754,7 +764,7 @@ impl BaseParseContext for SchemaCatalog {
     }
 }
 
-impl crate::sem::TriggerInfoWrite for SchemaFileContext {
+impl crate::context::TriggerInfoWrite for SchemaFileContext {
     fn register_trigger(
         mut self,
         trigger: &crate::sem::CreateTrigger,
@@ -809,15 +819,15 @@ impl crate::sem::TriggerInfoWrite for SchemaFileContext {
     }
 }
 
-impl crate::sem::ParameterTypeHintRead for SchemaFileContext {
+impl crate::context::ParameterTypeHintRead for SchemaFileContext {
     fn get_parameter_typehint(&self, index: usize) -> Option<TypeReference> {
         self.parameter_type_hints.lookup(index)
     }
 }
 
-impl crate::sem::ParameterTypeHintWrite for SchemaFileContext {
+impl crate::context::ParameterTypeHintWrite for SchemaFileContext {
     fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
-        self.parameter_type_hints = crate::sem::ParameterTypeHints::resolve(hints, self)?;
+        self.parameter_type_hints = crate::context::ParameterTypeHints::resolve(hints, self)?;
         Ok(())
     }
 }
@@ -906,7 +916,7 @@ impl ParseContext for SchemaFileContext {
         create_extension: &CreateExtension,
     ) -> Result<Self, AnalysisError> {
         let name = create_extension.name();
-        if crate::sem::ExtensionInfoRead::extension_exists(&self, name) {
+        if crate::context::ExtensionInfoRead::extension_exists(&self, name) {
             if !create_extension.if_not_exists() {
                 self.report_problem(AnalysisProblem::creation(
                     crate::sem::problem::CreationProblem::named(
@@ -937,7 +947,7 @@ impl ParseContext for SchemaFileContext {
 
     fn apply_create_schema(mut self, create_schema: &CreateSchema) -> Result<Self, AnalysisError> {
         let name = create_schema.name();
-        if crate::sem::OwnershipInfoRead::schema_definition(&self, name).is_some() {
+        if crate::context::OwnershipInfoRead::schema_definition(&self, name).is_some() {
             if !create_schema.if_not_exists() {
                 self.report_problem(AnalysisProblem::creation(
                     crate::sem::problem::CreationProblem::named(
@@ -1015,9 +1025,9 @@ mod test_extension_record {
 mod test_freeze {
     use crate::StringSpan;
     use crate::context::BaseParseContext;
-    use crate::sem::{
-        ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName, SearchPathRead,
-        TableInfoWrite,
+    use crate::{
+        context::{GetSourcePathWithSpanOpt, SearchPathRead, TableInfoWrite},
+        sem::{ColumnName, ParseContext, SchemaName},
     };
     use std::path::Path;
 
@@ -1082,12 +1092,15 @@ mod test_freeze {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint, CreateTable,
-            CreateTableMode, FrozenBaseContext, FullName, ParseContext, PgBuiltInType,
-            PrimaryKeyConstraint, SchemaFileContext, SchemaName, SourceAccessService, TableName,
-        };
         use crate::test_helpers::{TestParseContext, source_span};
+        use crate::{
+            context::SourceAccessService,
+            sem::{
+                AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint,
+                CreateTable, CreateTableMode, FrozenBaseContext, FullName, ParseContext,
+                PgBuiltInType, PrimaryKeyConstraint, SchemaFileContext, SchemaName, TableName,
+            },
+        };
         use std::rc::{Rc, Weak};
 
         pub(super) fn empty_base() -> FrozenBaseContext {
@@ -1157,7 +1170,10 @@ mod test_freeze {
 #[cfg(test)]
 mod test_search_path {
     use crate::context::BaseParseContext;
-    use crate::sem::{FullName, ParseContext, SchemaName, SearchPathRead};
+    use crate::{
+        context::SearchPathRead,
+        sem::{FullName, ParseContext, SchemaName},
+    };
     use std::path::Path;
 
     #[rstest::rstest]
@@ -1304,7 +1320,7 @@ mod test_search_path {
     }
 }
 
-impl crate::sem::ConflictInfoRead for SchemaCatalog {
+impl crate::context::ConflictInfoRead for SchemaCatalog {
     fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
         self.base.database_collation()
     }
@@ -1342,17 +1358,17 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
         table: &crate::sem::TableName,
         conflict: &crate::sem::InsertConflict,
     ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-        crate::sem::parse_context::conflict_info::infer_from_catalog(self, table, conflict)
+        crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
     }
 }
 
-impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
+impl crate::context::ViewInsertInfoRead for SchemaCatalog {
     fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
         self.base.view_insert_support(view)
     }
 }
 
-impl crate::sem::ViewUpdateInfoRead for SchemaCatalog {
+impl crate::context::ViewUpdateInfoRead for SchemaCatalog {
     fn view_update_support(
         &self,
         view: &crate::sem::FullName,
@@ -1361,13 +1377,13 @@ impl crate::sem::ViewUpdateInfoRead for SchemaCatalog {
     }
 }
 
-impl crate::sem::ViewDeleteInfoRead for SchemaCatalog {
+impl crate::context::ViewDeleteInfoRead for SchemaCatalog {
     fn view_delete_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
-impl crate::sem::ViewMergeInfoRead for SchemaCatalog {
+impl crate::context::ViewMergeInfoRead for SchemaCatalog {
     fn view_merge_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }

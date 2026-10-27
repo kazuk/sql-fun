@@ -357,11 +357,11 @@ fn sqlite_public_adapter_analyzes_delete() {
 
 mod test_helpers {
     use crate::ast::Dialect;
-    use crate::sem::{
-        AnalysisError, ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType,
-        SchemaName, SemAst,
-    };
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{AnalysisError, ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+    };
 
     pub(super) fn catalog_with_text_integer_cast() -> TestParseContext {
         let mut context = catalog(Dialect::postgres());

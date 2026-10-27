@@ -324,7 +324,7 @@ fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
             .allows(&PgBuiltInType::int8())
     );
     assert!(
-        !crate::sem::CastInfoRead::get_implicit_cast(
+        !crate::context::CastInfoRead::get_implicit_cast(
             &context,
             &PgBuiltInType::int8(),
             &PgBuiltInType::int4()
@@ -782,10 +782,11 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
 
 mod test_helpers {
     use crate::ast::Dialect;
-    use crate::sem::{
-        ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType, SchemaName, SemAst,
-    };
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+    };
 
     pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(dialect);

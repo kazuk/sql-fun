@@ -1,7 +1,7 @@
 use crate::context::BaseParseContext;
 use crate::{
-    context::ParseContext,
-    sem::{FullName, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite},
+    context::{ParseContext, RuleInfoRead, RuleInfoWrite},
+    sem::{FullName, RuleEvent, RuleIdentity},
 };
 
 #[rstest::rstest]
@@ -624,7 +624,7 @@ mod test_helpers {
     pub(super) fn catalog() -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
-        crate::sem::MutSourcePathWithSpan::set_source_path_with_span(
+        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
             &crate::test_helpers::source_span(),
         );

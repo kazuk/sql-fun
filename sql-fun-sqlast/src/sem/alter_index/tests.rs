@@ -1,6 +1,7 @@
 //! Enduring parser-to-semantics and schema-chain coverage without database dependencies.
-use crate::sem::{
-    FullName, IndexInfoRead, Kind, ParseContext, SchemaName, TableName, problem::IndexProblemKind,
+use crate::{
+    context::IndexInfoRead,
+    sem::{FullName, Kind, ParseContext, SchemaName, TableName, problem::IndexProblemKind},
 };
 
 #[rstest::rstest]
@@ -449,10 +450,8 @@ mod test_helpers {
     use crate::{
         AstAndContextPair,
         ast::{StatementNode, TryFromWithTokens},
-        sem::{
-            AnalysisError, CreateIndex, FrozenBaseContext, FullName, IndexInfoRead,
-            MutSourcePathWithSpan, SchemaFileContext,
-        },
+        context::{IndexInfoRead, MutSourcePathWithSpan},
+        sem::{AnalysisError, CreateIndex, FrozenBaseContext, FullName, SchemaFileContext},
     };
     pub(super) fn deduplicate(index: &CreateIndex) -> Option<bool> {
         match index.storage_parameter("deduplicate_items") {

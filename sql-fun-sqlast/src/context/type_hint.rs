@@ -1,8 +1,7 @@
 mod resolve;
-#[cfg(test)]
-mod tests;
 
-use crate::sem::{AnalysisError, ParseContext, TypeReference};
+use crate::context::ParseContext;
+use crate::sem::{AnalysisError, TypeReference};
 
 /// Read the explicit SQL input types installed for this query.
 pub trait ParameterTypeHintRead {
@@ -56,3 +55,6 @@ impl ParameterTypeHints {
         Ok(Self(resolved))
     }
 }
+
+#[cfg(test)]
+mod tests;

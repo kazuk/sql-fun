@@ -1,5 +1,8 @@
 use crate::context::ParseContext;
-use crate::sem::{FullName, TriggerIdentity, TriggerInfoRead};
+use crate::{
+    context::TriggerInfoRead,
+    sem::{FullName, TriggerIdentity},
+};
 
 #[rstest::rstest]
 #[case::restrict("DROP TRIGGER audit ON item_view RESTRICT", false)]
@@ -176,7 +179,7 @@ mod test_helpers {
         mut context: SchemaFileContext,
         sql: &str,
     ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
-        crate::sem::MutSourcePathWithSpan::set_source_path_with_span(
+        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
             &crate::test_helpers::source_span(),
         );

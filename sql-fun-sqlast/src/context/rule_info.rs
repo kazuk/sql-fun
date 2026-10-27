@@ -1,7 +1,7 @@
 use crate::context::BaseParseContext;
-use crate::sem::{
-    AnalysisError, CreateRule, FullName, RuleIdentity, TableInfoWrite, TableName, ViewLike,
-    ViewName,
+use crate::{
+    context::TableInfoWrite,
+    sem::{AnalysisError, CreateRule, FullName, RuleIdentity, TableName, ViewLike, ViewName},
 };
 
 /// Read named rules through context layers without falling through tombstones.
@@ -48,7 +48,7 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
         identity: &RuleIdentity,
     ) -> Result<Self, AnalysisError>
     where
-        Self: crate::sem::ParseContext,
+        Self: crate::context::ParseContext,
     {
         self.update_rule_link(target, identity, true)
     }
@@ -59,7 +59,7 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
         identity: &RuleIdentity,
     ) -> Result<Self, AnalysisError>
     where
-        Self: crate::sem::ParseContext,
+        Self: crate::context::ParseContext,
     {
         self.update_rule_link(target, identity, false)
     }
@@ -71,7 +71,7 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
         associate: bool,
     ) -> Result<Self, AnalysisError>
     where
-        Self: crate::sem::ParseContext,
+        Self: crate::context::ParseContext,
     {
         if let Some(mut table) = self.get_table(&TableName::from(target.clone())).cloned() {
             if associate {

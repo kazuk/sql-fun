@@ -1,12 +1,15 @@
 use crate::AstAndContextPair;
 use crate::ast::{Dialect, StatementNode};
 use crate::context::ParseContext;
-use crate::sem::{
-    AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnName,
-    FunctionParam, MutSourcePathWithSpan, OperatorDefinition, OperatorName, OverloadVariant,
-    PgBuiltInType, SchemaName, SelectStatement, TypeReference,
-};
 use crate::test_helpers::{TestParseContext, source_span};
+use crate::{
+    context::MutSourcePathWithSpan,
+    sem::{
+        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnName,
+        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType,
+        SchemaName, SelectStatement, TypeReference,
+    },
+};
 
 pub(super) fn catalog() -> TestParseContext {
     let mut context = TestParseContext::default();

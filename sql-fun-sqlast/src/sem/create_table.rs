@@ -12,12 +12,11 @@ use std::collections::HashMap;
 
 use crate::{
     ast::TryFromWithTokens,
-    context::ParseContext,
+    context::{GetSourcePathWithSpan, ParseContext},
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
-        GetSourcePathWithSpan, ImplicitChange, InsertArbiter, OwnerSpecification, RuleIdentity,
-        RuleReferences, SemAst, SourcePathWithSpan, TriggerReferences,
-        alter_table::AlterObjSubCommand,
+        ImplicitChange, InsertArbiter, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
+        SourcePathWithSpan, TriggerReferences, alter_table::AlterObjSubCommand,
     },
     syn::{ListOpt, Opt, ScanToken},
 };
@@ -232,8 +231,11 @@ pub struct CreateTable {
 #[cfg(test)]
 mod test_create_table_clone {
     use crate::context::BaseParseContext;
-    use crate::sem::{ColumnName, ParseContext, TableInfoWrite};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        context::TableInfoWrite,
+        sem::{ColumnName, ParseContext},
+    };
     use std::path::Path;
 
     #[test]

@@ -488,9 +488,12 @@ mod test_helpers {
     // pg_query 6 uses PostgreSQL 17 grammar. Seed the supported semantic catalog
     // mode directly so PostgreSQL 18 virtual-column restrictions are exercised.
     pub(super) fn virtual_column_context() -> crate::sem::SchemaFileContext {
-        use crate::sem::{
-            ColumnConstraint, CreateTable, CreateTableMode, GeneratedColumnConstraint,
-            GeneratedColumnMode, PgBuiltInType, ScalarConstExpr, SemScalarExpr, TableInfoWrite,
+        use crate::{
+            context::TableInfoWrite,
+            sem::{
+                ColumnConstraint, CreateTable, CreateTableMode, GeneratedColumnConstraint,
+                GeneratedColumnMode, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+            },
         };
         let mut context = context("18");
         let column = ColumnName::from("g");
@@ -517,9 +520,12 @@ mod test_helpers {
     }
 
     use crate::context::BaseParseContext;
-    use crate::sem::{
-        AnalysisError, AstAndContextPair, ColumnDefinition, ColumnName, FrozenBaseContext,
-        MutSourcePathWithSpan, ParseContext, SchemaFileContext, TableName,
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{
+            AnalysisError, AstAndContextPair, ColumnDefinition, ColumnName, FrozenBaseContext,
+            ParseContext, SchemaFileContext, TableName,
+        },
     };
     pub(super) fn table_name() -> TableName {
         TableName::from(crate::sem::FullName::with_schema("public", "t"))

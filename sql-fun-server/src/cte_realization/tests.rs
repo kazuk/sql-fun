@@ -414,7 +414,10 @@ fn rejects_conflicting_explicit_hints(
 
 #[test]
 fn realized_bindings_accept_query_scoped_sql_type_hints() {
-    use ::sql_fun_sqlast::sem::{FullName, ParameterTypeHintWrite, PgBuiltInType, TypeReference};
+    use ::sql_fun_sqlast::{
+        context::ParameterTypeHintWrite,
+        sem::{FullName, PgBuiltInType, TypeReference},
+    };
 
     let project = crate::schema_cache::test_helpers::SchemaProject::new();
     let realized = realize_cte_catalog(

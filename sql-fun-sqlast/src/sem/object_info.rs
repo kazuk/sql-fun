@@ -1,5 +1,4 @@
 //! Shared relation-name collision domain. Definitions remain in their own catalogs.
-use crate::sem::FullName;
 
 /// Kind occupying a shared relation name; unrelated namespaces are excluded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,20 +63,4 @@ impl std::fmt::Display for Kind {
             Self::CompositeType => "composite type",
         })
     }
-}
-/// Read the kind at an exact qualified identity, without search-path expansion.
-/// Mutation belongs exclusively to definition write/update operations.
-pub trait ObjectInfoRead {
-    /// Effective table and view catalog identities available for dependency updates.
-    fn relation_names(&self) -> Vec<FullName> {
-        Vec::new()
-    }
-
-    /// Relation kind, including inherited definitions.
-    fn object_kind(&self, name: &FullName) -> Option<Kind>;
-}
-/// Read extension existence in its separate database-wide namespace.
-pub trait ExtensionInfoRead {
-    /// Whether the current or inherited catalog contains this extension name.
-    fn extension_exists(&self, name: &str) -> bool;
 }

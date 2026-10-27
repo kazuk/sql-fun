@@ -119,11 +119,3 @@ impl ViewUpdateSupport {
         self.column_definition(column).is_some()
     }
 }
-
-/// Catalog service for view destinations. The name is already bound and
-/// qualified; this is not a second search-path lookup.
-pub trait ViewUpdateInfoRead {
-    /// Retrieve explicitly registered support by exact identity, without deriving
-    /// capabilities or interpreting absence. The analyzer owns those decisions.
-    fn view_update_support(&self, view: &FullName) -> Option<&ViewUpdateSupport>;
-}

@@ -96,11 +96,14 @@ fn parenthesized_sources_report_duplicate_group_aliases() -> testresult::TestRes
 
 mod test_helpers {
     use crate::context::BaseParseContext;
-    use crate::sem::{
-        AnalysisError, ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType,
-        SchemaName, SelectStatement, SemAst,
-    };
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{
+            AnalysisError, ColumnDefinition, ColumnName, PgBuiltInType, SchemaName,
+            SelectStatement, SemAst,
+        },
+    };
 
     fn selected_context() -> TestParseContext {
         let mut metadata = ::sql_fun_core::SqlFunMetadataCollection::load_from(concat!(

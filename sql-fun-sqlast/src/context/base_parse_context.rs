@@ -2,12 +2,19 @@ use std::path::Path;
 
 use ::sql_fun_core::SqlFunArgs;
 
-use crate::sem::{
-    CastInfoRead, ConflictInfoRead, CreateIndex, CreateSequence, CreateTable, FullName,
-    FunctionInfoRead, FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead,
-    OperatorInfoRead, RuleInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TableName,
-    TriggerInfoRead, TypeDefinition, TypeInfoRead, TypeReference, ViewInfoRead, ViewLike, ViewName,
-    search_path::{expand_relation_search_path, expand_search_path_inst, expand_type_search_path},
+use crate::{
+    context::{
+        CastInfoRead, ConflictInfoRead, FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead,
+        OperatorInfoRead, RuleInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead,
+        TriggerInfoRead, TypeInfoRead, ViewInfoRead,
+    },
+    sem::{
+        CreateIndex, CreateSequence, CreateTable, FullName, FunctionOverloadCollection, TableName,
+        TypeDefinition, TypeReference, ViewLike, ViewName,
+        search_path::{
+            expand_relation_search_path, expand_search_path_inst, expand_type_search_path,
+        },
+    },
 };
 
 /// schema information database
@@ -17,13 +24,13 @@ use crate::sem::{
 /// [`crate::context::ParseContext`] presents mutate functions.
 ///
 pub trait BaseParseContext:
-    crate::sem::RoleInfoRead
-    + crate::sem::OwnershipInfoRead
+    crate::context::RoleInfoRead
+    + crate::context::OwnershipInfoRead
     + CastInfoRead
     + ConflictInfoRead
     + FunctionInfoRead
-    + crate::sem::ExtensionInfoRead
-    + crate::sem::ObjectInfoRead
+    + crate::context::ExtensionInfoRead
+    + crate::context::ObjectInfoRead
     + IndexInfoRead
     + OperatorInfoRead
     + RuleInfoRead
@@ -31,10 +38,10 @@ pub trait BaseParseContext:
     + SequenceInfoRead
     + TypeInfoRead
     + TableInfoRead
-    + crate::sem::ViewInsertInfoRead
-    + crate::sem::ViewUpdateInfoRead
-    + crate::sem::ViewDeleteInfoRead
-    + crate::sem::ViewMergeInfoRead
+    + crate::context::ViewInsertInfoRead
+    + crate::context::ViewUpdateInfoRead
+    + crate::context::ViewDeleteInfoRead
+    + crate::context::ViewMergeInfoRead
     + ViewInfoRead
     + SearchPathRead
     + GetSourcePathWithSpanOpt

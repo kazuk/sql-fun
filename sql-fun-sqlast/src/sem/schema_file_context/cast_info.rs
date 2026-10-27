@@ -1,6 +1,9 @@
 use std::{collections::HashSet, str::FromStr};
 
-use crate::sem::{CastContext, CastDefinition, CastInfoRead, TypeInfoRead, TypeReference};
+use crate::{
+    context::{CastInfoRead, TypeInfoRead},
+    sem::{CastContext, CastDefinition, TypeReference},
+};
 
 use super::SchemaCatalog;
 
@@ -209,7 +212,10 @@ impl SchemaCatalog {
 
 #[cfg(test)]
 mod test_domain_casts {
-    use crate::sem::{CastInfoRead, ParseContext, PgBuiltInType};
+    use crate::{
+        context::CastInfoRead,
+        sem::{ParseContext, PgBuiltInType},
+    };
 
     #[rstest::rstest]
     fn domains_use_explicit_base_conversion_without_implicit_credit(
@@ -278,9 +284,12 @@ mod test_domain_casts {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            CastContext, CastDefinition, CreateDomain, FullName, ParseContext, PgBuiltInType,
-            SchemaFileContext, TypeInfoWrite, TypeReference,
+        use crate::{
+            context::TypeInfoWrite,
+            sem::{
+                CastContext, CastDefinition, CreateDomain, FullName, ParseContext, PgBuiltInType,
+                SchemaFileContext, TypeReference,
+            },
         };
 
         pub(super) fn reference(name: &str) -> TypeReference {
@@ -320,7 +329,10 @@ mod test_domain_casts {
 
 #[cfg(test)]
 mod test_cast_layers {
-    use crate::sem::{CastContext, CastInfoRead, ParseContext};
+    use crate::{
+        context::CastInfoRead,
+        sem::{CastContext, ParseContext},
+    };
     use std::collections::HashSet;
 
     #[rstest::rstest]

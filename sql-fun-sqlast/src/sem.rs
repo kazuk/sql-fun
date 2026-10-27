@@ -10,6 +10,7 @@ mod base_context;
 mod cast;
 mod column_constraints;
 mod comment;
+pub(crate) mod conflict_info;
 mod conflict_masters;
 mod constraint;
 mod create_comp_type;
@@ -26,6 +27,7 @@ mod create_table_as;
 mod create_trigger;
 mod create_view;
 mod cte;
+mod cursor_info;
 mod data_source;
 mod def_elem;
 mod delete_statement;
@@ -44,7 +46,6 @@ mod overload_rank;
 pub(crate) mod ownership;
 mod parameter_constraints;
 pub(crate) mod parameter_resolution;
-mod parse_context;
 mod pg_type;
 pub mod problem;
 mod query;
@@ -84,12 +85,12 @@ pub(crate) use self::wildcard_expansion::{
     WildcardRowsSource, WildcardRowsSources, WildcardSourceProjection, WildcardTypedRecord,
 };
 
+#[cfg(test)]
+pub(crate) use self::conflict_info::infer_from_catalog;
+pub use self::cursor_info::CursorInfo;
 pub(crate) use self::insert_statement::{
     InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
 };
-#[cfg(test)]
-pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
-pub(crate) use self::parse_context::type_hint::ParameterTypeHints;
 pub(crate) use self::resolution::ResolutionFailure;
 pub(crate) use self::update_statement::UpdateAssignmentCollection;
 
@@ -98,7 +99,7 @@ pub(crate) use self::merge_statement::MergeDestination;
 pub(crate) use self::merge_statement::MergeWhenCollection;
 pub use self::merge_statement::{
     MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
-    ViewMergeInfoRead, ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
+    ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
 };
 
 pub(crate) use self::conflict_masters::ConflictMasters;
@@ -133,6 +134,7 @@ pub use self::{
         UniqueColumnConstraint, Validity,
     },
     comment::{Comment, ObjectKind},
+    conflict_info::{CatalogNameLookup, ConflictArbiterInference},
     conflict_masters::{
         CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
         OperatorClassDefinition, OperatorFamilyIdentity,
@@ -161,8 +163,8 @@ pub use self::{
     },
     def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
     delete_statement::{
-        DeleteCursor, DeleteRowColumn, DeleteRowVersion, DeleteStatement, ViewDeleteInfoRead,
-        ViewDeleteSupport, analyze_delete_statement,
+        DeleteCursor, DeleteRowColumn, DeleteRowVersion, DeleteStatement, ViewDeleteSupport,
+        analyze_delete_statement,
     },
     error::AnalysisError,
     from_clause::FromClause,
@@ -170,28 +172,16 @@ pub use self::{
     insert_statement::{
         InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
         InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
-        InsertTarget, InsertValue, ViewInsertInfoRead, ViewInsertSupport, ViewSourceArbiter,
-        analyze_insert_statement,
+        InsertTarget, InsertValue, ViewInsertSupport, ViewSourceArbiter, analyze_insert_statement,
     },
     names::{
         CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName,
         parse_client_type,
     },
-    object_info::{ExtensionInfoRead, Kind, ObjectInfoRead},
+    object_info::Kind,
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
-    ownership::{
-        OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, OwnershipInfoRead, Role,
-        RoleInfoRead,
-    },
+    ownership::{OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, Role},
     parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
-    parse_context::{
-        CastInfoRead, CatalogNameLookup, ConflictArbiterInference, ConflictInfoRead, CursorInfo,
-        DefaultSourceAccessService, DiagnosticContext, FunctionInfoRead, FunctionInfoWrite,
-        IndexInfoRead, OperatorInfoRead, ParameterTypeHintRead, ParameterTypeHintWrite,
-        RuleInfoRead, RuleInfoWrite, SearchPathRead, SequenceInfoRead, SequenceInfoWrite,
-        SourceAccessService, TableInfoRead, TableInfoWrite, TriggerInfoRead, TriggerInfoWrite,
-        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
-    },
     pg_type::{
         ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,
         TypeReference,
@@ -217,7 +207,7 @@ pub use self::{
     type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult},
     update_statement::{
         UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
-        ViewUpdateInfoRead, ViewUpdateSupport, analyze_update_statement,
+        ViewUpdateSupport, analyze_update_statement,
     },
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
@@ -233,7 +223,6 @@ pub(crate) use self::{
     data_source::{AliasName, JoinUsingClause},
     delete_statement::{DeleteDestination, DeletePredicate},
     parameter_constraints::{ConstraintGraph, SignatureAlternative},
-    parse_context::CursorBindings,
     scalar_expr::{CaseExprAnalysisContext, WholeRowFields, grouping::ReferenceCapture},
     select_statement::{ResultColumn, SelectStatementNode},
     update_statement::{UpdateDestination, UpdatePredicate},
@@ -279,44 +268,6 @@ impl SourcePathWithSpan {
     /// get a source span
     pub const fn span(&self) -> &StringSpan {
         &self.span
-    }
-}
-
-/// can get source path with span
-pub trait GetSourcePathWithSpan {
-    /// get source path with span
-    fn get_source_path_with_span(&self) -> &SourcePathWithSpan;
-
-    /// get source path
-    fn get_source_path(&self) -> &Path {
-        self.get_source_path_with_span().source_path()
-    }
-
-    /// get source span
-    fn get_span(&self) -> &StringSpan {
-        self.get_source_path_with_span().span()
-    }
-}
-
-/// support mutate source path with span
-pub trait MutSourcePathWithSpan {
-    /// set source path with span
-    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan);
-}
-
-/// cant get optional source path with span
-pub trait GetSourcePathWithSpanOpt {
-    /// get source path with span
-    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan>;
-
-    /// get source path
-    fn get_source_path(&self) -> Option<&Path> {
-        self.get_source_path_with_span().map(|v| v.source_path())
-    }
-
-    /// get source span
-    fn get_span(&self) -> Option<&StringSpan> {
-        self.get_source_path_with_span().map(|v| v.span())
     }
 }
 

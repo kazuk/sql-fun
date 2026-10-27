@@ -11,14 +11,14 @@ use std::{fs::File, io::BufReader, path::Path};
 use crate::context::BaseParseContext;
 use crate::{
     TrieMap,
+    context::{
+        FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead,
+        SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
+    },
     sem::{
-        AnalysisError, CastDefinition, CreateTable, FullName, FunctionInfoRead,
-        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorDefinition,
-        SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
-        parse_context::{
-            OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
-            ViewInfoRead,
-        },
+        AnalysisError, CastDefinition, CreateTable, FullName, FunctionOverloadCollection,
+        OperatorDefinition, SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference,
+        ViewLike,
     },
 };
 use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
@@ -289,7 +289,7 @@ impl GetSourcePathWithSpanOpt for BaseContext {
     }
 }
 
-impl crate::sem::TriggerInfoRead for BaseContext {
+impl crate::context::TriggerInfoRead for BaseContext {
     fn trigger(
         &self,
         _identity: &crate::sem::TriggerIdentity,
@@ -324,7 +324,7 @@ where
     Ok(serde_json::from_reader(BufReader::new(File::open(path)?))?)
 }
 
-impl crate::sem::ConflictInfoRead for BaseContext {
+impl crate::context::ConflictInfoRead for BaseContext {
     fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
         self.masters.database()
     }
@@ -356,17 +356,17 @@ impl crate::sem::ConflictInfoRead for BaseContext {
         table: &crate::sem::TableName,
         conflict: &crate::sem::InsertConflict,
     ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-        crate::sem::parse_context::conflict_info::infer_from_catalog(self, table, conflict)
+        crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
     }
 }
 
-impl crate::sem::ViewInsertInfoRead for BaseContext {
+impl crate::context::ViewInsertInfoRead for BaseContext {
     fn view_insert_support(&self, _view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
         None
     }
 }
 
-impl crate::sem::ViewUpdateInfoRead for BaseContext {
+impl crate::context::ViewUpdateInfoRead for BaseContext {
     fn view_update_support(
         &self,
         _view: &crate::sem::FullName,
@@ -375,19 +375,19 @@ impl crate::sem::ViewUpdateInfoRead for BaseContext {
     }
 }
 
-impl crate::sem::ViewDeleteInfoRead for BaseContext {
+impl crate::context::ViewDeleteInfoRead for BaseContext {
     fn view_delete_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
-impl crate::sem::ViewMergeInfoRead for BaseContext {
+impl crate::context::ViewMergeInfoRead for BaseContext {
     fn view_merge_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }
 }
 
-impl crate::sem::RoleInfoRead for BaseContext {
+impl crate::context::RoleInfoRead for BaseContext {
     fn registered_role_by_name(&self, _name: &str) -> Option<&crate::sem::Role> {
         None
     }
@@ -396,7 +396,7 @@ impl crate::sem::RoleInfoRead for BaseContext {
         self.configured_roles.role(name)
     }
 }
-impl crate::sem::OwnershipInfoRead for BaseContext {
+impl crate::context::OwnershipInfoRead for BaseContext {
     fn routine_definitions(&self, name: &FullName) -> Vec<crate::sem::CreateFunction> {
         self.get_function_impl(name)
             .map_or_else(Vec::new, |overloads| {
@@ -412,14 +412,14 @@ impl crate::sem::OwnershipInfoRead for BaseContext {
     }
 }
 
-impl crate::sem::ObjectInfoRead for BaseContext {
+impl crate::context::ObjectInfoRead for BaseContext {
     fn object_kind(&self, _: &FullName) -> Option<crate::sem::Kind> {
         None
     }
 }
-impl crate::sem::ExtensionInfoRead for BaseContext {
+impl crate::context::ExtensionInfoRead for BaseContext {
     fn extension_exists(&self, _: &str) -> bool {
         false
     }
 }
-impl crate::sem::RuleInfoRead for BaseContext {}
+impl crate::context::RuleInfoRead for BaseContext {}

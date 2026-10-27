@@ -152,7 +152,7 @@ fn sqlite_table_retains_named_constraints_order_and_options() -> testresult::Tes
 fn public_sqlite_table_dispatch_preserves_column_semantics(
     source_span: crate::sem::SourcePathWithSpan,
 ) -> testresult::TestResult {
-    use crate::sem::{MutSourcePathWithSpan, SemAst};
+    use crate::{context::MutSourcePathWithSpan, sem::SemAst};
     let parsed = crate::test_helpers::SqliteSynBuilder
         .parse_as_stmt("create table items (label text not null default 'one')");
     let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
@@ -383,8 +383,11 @@ fn context_free_dml_expression_syntax(#[case] sql: &str) -> testresult::TestResu
 mod sqlite {
     use crate::ast::Expr;
     use crate::ast::tests::test_helpers::{AnalysisFixture, postgres, sqlite};
-    use crate::sem::{ColumnName, MutSourcePathWithSpan, PgBuiltInType, SemAst};
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{ColumnName, PgBuiltInType, SemAst},
+    };
 
     use ::sql_fun_core::IVec;
 

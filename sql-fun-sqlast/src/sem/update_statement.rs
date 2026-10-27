@@ -5,7 +5,7 @@ mod view_support;
 pub use self::cursor::UpdateCursor;
 pub(crate) use self::cursor::UpdatePredicate;
 pub(crate) use self::destination::UpdateDestination;
-pub use self::view_support::{ViewUpdateInfoRead, ViewUpdateSupport};
+pub use self::view_support::ViewUpdateSupport;
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitor;

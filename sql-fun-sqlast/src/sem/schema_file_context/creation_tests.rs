@@ -1,7 +1,7 @@
 //! Parser-to-catalog regression tests using small, explicitly seeded catalogs.
-use crate::sem::{
-    ColumnName, FullName, Kind, ObjectInfoRead, OwnershipInfoRead, ParseContext, TableInfoRead,
-    TypeInfoRead, ViewInfoRead,
+use crate::{
+    context::{ObjectInfoRead, OwnershipInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead},
+    sem::{ColumnName, FullName, Kind, ParseContext},
 };
 
 #[rstest::rstest]
@@ -469,7 +469,10 @@ fn record_only_drop_retains_the_name() -> testresult::TestResult {
 #[cfg(feature = "sqlite")]
 mod sqlite {
     use super::test_helpers;
-    use crate::sem::{FullName, Kind, ObjectInfoRead, ParseContext};
+    use crate::{
+        context::ObjectInfoRead,
+        sem::{FullName, Kind, ParseContext},
+    };
 
     #[rstest::rstest]
     #[case::duplicate("CREATE TABLE t(id)", "CREATE TABLE T(other)", false)]
@@ -518,7 +521,10 @@ mod sqlite {
 mod test_helpers {
     #[cfg(feature = "sqlite")]
     use crate::sem::ParseContext;
-    use crate::sem::{AnalysisError, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{AnalysisError, FrozenBaseContext, SchemaFileContext},
+    };
     pub(super) fn child(parent: FrozenBaseContext) -> SchemaFileContext {
         use crate::context::BaseParseContext;
         let mut context = SchemaFileContext::new(
@@ -969,7 +975,10 @@ fn materialized_view_applies_the_output_column_name_list() -> testresult::TestRe
 #[test]
 fn postgres18_named_not_null_occupies_the_constraint_namespace() -> testresult::TestResult {
     use crate::context::BaseParseContext;
-    use crate::sem::{MutSourcePathWithSpan, SchemaFileContext, SchemaName};
+    use crate::{
+        context::MutSourcePathWithSpan,
+        sem::{SchemaFileContext, SchemaName},
+    };
     let mut metadata = ::sql_fun_core::SqlFunMetadataCollection::load_from(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/tests/fixtures/selected-postgres.toml"

@@ -1,0 +1,30 @@
+---
+type: Third Party License Notice
+sources:
+  - url: {{ SOURCE_URL }}
+    revision: {{ SOURCE_REVISION | default(value="unknown") }}
+resource_path: {{ RESOURCE_PATH }}
+content_sha256: {{ CONTENT_SHA256 }}
+detected_license: {{ DETECTED_LICENSE }}
+automated_verification:
+  status: pending
+  license: unknown
+---
+
+# {{ RESOURCE_PATH }} license notice
+
+## Automated verification
+
+Automated verification collects the source metadata, content hash, detected
+license data, and any license information supplied to this record. It does not
+constitute legal review or approval by the repository owner or maintainers.
+Set `automated_verification.status` to `completed` only after the workflow has
+verified the recorded information against the source and license material.
+
+## Notice Text
+
+```text
+<!-- BEGIN THIRD PARTY NOTICE -->
+Replace this placeholder with the required notice text.
+<!-- END THIRD PARTY NOTICE -->
+```

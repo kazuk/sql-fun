@@ -3,6 +3,8 @@ type: Concept Type Definition
 defined_type: Concept Type Definition
 ---
 
+# Concept Type Definition
+
 ## Type Description
 
 `Concept Type Definition` defines a concept type.
@@ -16,9 +18,11 @@ defined_type: Concept Type Definition
   - `command`: REQUIRED Text, command line used to invoke the tool.
   - `link`: OPTIONAL Text, link to detailed documentation for the tool.
 
-When a concept imports or derives content from outside the repository, the `sources` frontmatter field is REQUIRED.
+When a concept imports or derives content from outside the repository, the
+`sources` frontmatter field is REQUIRED.
 
-See: [5. Provenance, trust, and lifecycle](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#5-provenance-trust-and-lifecycle)
+See:
+[5. Provenance, trust, and lifecycle](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#5-provenance-trust-and-lifecycle)
 
 ## Markdown Content
 
@@ -30,7 +34,8 @@ See: [5. Provenance, trust, and lifecycle](https://github.com/GoogleCloudPlatfor
 - `Naming` heading: OPTIONAL, describes file naming rules.
 - `Examples` heading: OPTIONAL, provides examples of type usage.
 - `Lifecycle` heading: OPTIONAL, describes the concept lifecycle.
-- `Agent Skills` heading: OPTIONAL, describes agent skills for this　concept type.
+- `Agent Skills` heading: OPTIONAL, describes agent skills for this concept
+  type.
 
 ## Examples
 
@@ -38,8 +43,10 @@ See: [5. Provenance, trust, and lifecycle](https://github.com/GoogleCloudPlatfor
 
 ## Placement
 
-- Valid and active `Concept Type Definition` concepts MUST be placed under `/.local/okf_types/`.
-- A `Concept Type Definition` placed outside `/.local/okf_types/` is inactive and MUST NOT be used as an active type definition.
+- Valid and active `Concept Type Definition` concepts MUST be placed under
+  `/.local/okf_types/`.
+- A `Concept Type Definition` placed outside `/.local/okf_types/` is inactive
+  and MUST NOT be used as an active type definition.
 
 ## Naming
 

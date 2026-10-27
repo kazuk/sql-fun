@@ -20,8 +20,13 @@
   ],
   "+": [
     {
-      "input": "int8",
-      "result": "int8",
+      "input": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "input": "float8",
+      "result": "float8",
       "strict": true
     },
     {
@@ -35,13 +40,8 @@
       "strict": true
     },
     {
-      "input": "float4",
-      "result": "float4",
-      "strict": true
-    },
-    {
-      "input": "float8",
-      "result": "float8",
+      "input": "int8",
+      "result": "int8",
       "strict": true
     },
     {
@@ -52,13 +52,13 @@
   ],
   "-": [
     {
-      "input": "int8",
-      "result": "int8",
+      "input": "float4",
+      "result": "float4",
       "strict": true
     },
     {
-      "input": "int4",
-      "result": "int4",
+      "input": "float8",
+      "result": "float8",
       "strict": true
     },
     {
@@ -67,13 +67,13 @@
       "strict": true
     },
     {
-      "input": "float4",
-      "result": "float4",
+      "input": "int4",
+      "result": "int4",
       "strict": true
     },
     {
-      "input": "float8",
-      "result": "float8",
+      "input": "int8",
+      "result": "int8",
       "strict": true
     },
     {
@@ -89,34 +89,29 @@
   ],
   "?-": [
     {
-      "input": "lseg",
+      "input": "line",
       "result": "bool",
       "strict": true
     },
     {
-      "input": "line",
+      "input": "lseg",
       "result": "bool",
       "strict": true
     }
   ],
   "?|": [
     {
-      "input": "lseg",
+      "input": "line",
       "result": "bool",
       "strict": true
     },
     {
-      "input": "line",
+      "input": "lseg",
       "result": "bool",
       "strict": true
     }
   ],
   "@": [
-    {
-      "input": "int8",
-      "result": "int8",
-      "strict": true
-    },
     {
       "input": "float4",
       "result": "float4",
@@ -138,6 +133,11 @@
       "strict": true
     },
     {
+      "input": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
       "input": "numeric",
       "result": "numeric",
       "strict": true
@@ -145,12 +145,12 @@
   ],
   "@-@": [
     {
-      "input": "path",
+      "input": "lseg",
       "result": "float8",
       "strict": true
     },
     {
-      "input": "lseg",
+      "input": "path",
       "result": "float8",
       "strict": true
     }
@@ -162,17 +162,17 @@
       "strict": true
     },
     {
+      "input": "circle",
+      "result": "point",
+      "strict": true
+    },
+    {
       "input": "lseg",
       "result": "point",
       "strict": true
     },
     {
       "input": "polygon",
-      "result": "point",
-      "strict": true
-    },
-    {
-      "input": "circle",
       "result": "point",
       "strict": true
     }
@@ -193,23 +193,13 @@
   ],
   "~": [
     {
-      "input": "macaddr",
-      "result": "macaddr",
-      "strict": true
-    },
-    {
-      "input": "macaddr8",
-      "result": "macaddr8",
+      "input": "bit",
+      "result": "bit",
       "strict": true
     },
     {
       "input": "inet",
       "result": "inet",
-      "strict": true
-    },
-    {
-      "input": "bit",
-      "result": "bit",
       "strict": true
     },
     {
@@ -225,6 +215,16 @@
     {
       "input": "int8",
       "result": "int8",
+      "strict": true
+    },
+    {
+      "input": "macaddr",
+      "result": "macaddr",
+      "strict": true
+    },
+    {
+      "input": "macaddr8",
+      "result": "macaddr8",
       "strict": true
     }
   ]

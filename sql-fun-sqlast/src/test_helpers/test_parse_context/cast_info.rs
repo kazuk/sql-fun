@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::sem::{CastDefinition, CastInfoRead, TypeReference};
+use crate::{
+    context::CastInfoRead,
+    sem::{CastDefinition, TypeReference},
+};
 
 use super::TestParseContext;
 
@@ -43,12 +46,34 @@ impl TestParseContext {
 }
 
 impl CastInfoRead for TestParseContext {
+    fn cast_sources(&self, target: &TypeReference, _explicit: bool) -> HashSet<TypeReference> {
+        assert!(
+            !self.forbid_type_enumeration,
+            "unbounded cast-source inference is forbidden in this scenario"
+        );
+        self.declared_implicit_cast_sources(target)
+    }
+
+    fn declared_implicit_cast_sources(&self, target: &TypeReference) -> HashSet<TypeReference> {
+        let mut sources = HashSet::from([target.clone()]);
+        for (source, casts) in &self.implicit_cast_results {
+            if casts.get(target).is_some_and(Option::is_some) {
+                sources.insert(source.clone());
+            }
+        }
+        sources
+    }
+
     fn get_explicit_cast(
         &self,
-        _source_type: &TypeReference,
-        _target_type: &TypeReference,
+        source_type: &TypeReference,
+        target_type: &TypeReference,
     ) -> Option<CastDefinition> {
-        todo!()
+        self.implicit_cast_results
+            .get(source_type)?
+            .get(target_type)
+            .cloned()
+            .flatten()
     }
 
     fn get_implicit_cast(

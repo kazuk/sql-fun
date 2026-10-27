@@ -1,0 +1,118 @@
+# Test SQL contracts
+
+`sql-fun test` checks diagnostic-code sets and statically analyzed result columns.
+It supports both SQLAST regressions and application query-interface tests without
+executing queries or connecting to a live database. It uses the same input syntax,
+explicit datasource selection, schema levels, and server prerequisites as
+[`sql-fun analyze`](analyze.md), and never creates or validates Rust query lockfiles.
+
+```sh
+sql-fun --metadata-file Cargo.toml --datasource app \
+  test 'cases.toml#$.tests.queries' \
+  --expect 'cases.toml#$.tests.expected' --junit-xml target/sql-fun-test/junit.xml
+```
+
+For example, with a schema defining `events(id int4 NOT NULL)`:
+
+```toml
+[tests]
+queries = [
+  "SELECT id FROM events",
+  "INSERT INTO events (id) VALUES (1)",
+]
+
+[[tests.expected]]
+diagnostics = []
+[[tests.expected.columns]]
+name = "id"
+type = { schema_name = "pg_catalog", local_name = "int4", is_array = false }
+nullability = "not_null"
+
+[[tests.expected]]
+diagnostics = []
+# Omitted columns asserts zero result columns.
+```
+
+## Unresolved input bindings
+
+`parameter_type_unresolved` is an error from analysis when the application's
+input binding cannot be finalized. It does not declare the SQL intrinsically
+invalid. Known output columns are still checked even when an input type is
+unresolved. For example, this contract expects the error and the known `text`
+result from a result cast:
+
+```toml
+[tests]
+queries = ["SELECT $1::text AS value"]
+
+[[tests.expected]]
+diagnostics = ["parameter_type_unresolved"]
+[[tests.expected.columns]]
+name = "value"
+type = { schema_name = "pg_catalog", local_name = "text", is_array = false }
+nullability = "unknown"
+```
+
+This test passes with status 0 when the diagnostic and column contract match;
+it does not assert a finalized executable application binding. An unexpected
+diagnostic or result-column difference still fails. The same input makes
+`analyze` exit with status 1. To explicitly select the input type, use
+`SELECT ${src:text}::text AS value`, whose expected diagnostic set is empty.
+See [parameter bindings](analyze.md#parameter-bindings).
+
+## Expectations
+
+`--expect` reads a JSON, TOML, or YAML file, optionally followed by `#JSONPath`.
+Without a selector, its structured document root is the expectation value.
+A selector must match exactly one node. One SQL string takes one expectation
+object; a SQL array takes an array of expectations with the same length, matched
+by zero-based index. A one-element SQL array still requires an expectation array.
+All input structures and counts are validated before analysis begins.
+
+Every expectation object requires `diagnostics`, an array of actual API diagnostic
+codes. Codes are compared as sets: order and duplicates are ignored, but both
+missing and unexpected codes fail. All severities participate. An empty set
+requires no diagnostics of any severity. SQL semantic errors can be expected;
+API, transport, and internal analysis failures cannot be expected as codes.
+
+`columns` is always checked. Omitting it means zero columns, exactly like
+`columns = []`; omission never skips validation. Nonempty columns are compared
+in ordinal order, checking the name, optional SQL type, and nullability.
+
+- A present `type` requires `schema_name`, `local_name`, and explicit `is_array`.
+  Use exact API names, including case, rather than SQL aliases.
+- Omitting `type` (or setting it to null in JSON/YAML) asserts that the API type
+  is absent/unresolved. It is not a wildcard.
+- Each column requires `nullability`: `not_null`, `nullable`, or `unknown`.
+- Unknown fields and malformed expectations are input errors.
+
+A diagnostic-code array is also accepted as shorthand for an expectation with
+those diagnostics and zero columns. It still checks result shape.
+
+One selected SQL string must produce exactly one statement analysis result.
+Zero or multiple statement results fail the assertion. The command never combines
+statement diagnostic sets or result columns to match one expectation.
+
+The result reflects static analysis, including its unresolved types and
+nullability. It does not verify database contents or execute query effects.
+
+## Reports and exit status
+
+Console output identifies each input by source/selector and array index, shows
+assertion differences or execution errors, and prints a final case count.
+Independent cases continue after assertion failures and attributable API errors.
+
+`--junit-xml <PATH>` writes one testcase per selected SQL input, creates parent
+directories, and produces a complete report even when cases fail. Matching cases
+pass; diagnostic, column, and statement-result-count mismatches are `failure`
+elements. Attributable setup/API/transport/internal failures are `error` elements.
+Invalid input before cases can be enumerated is a command-level error and does not
+create invented testcases. Testcase identities depend on the supplied source,
+selector, and array index. XML 1.0-disallowed characters in report text are replaced
+with the Unicode replacement character. The report supports JUnit consumers such
+as the repository's existing GitHub Actions test reporter. No report file is
+accessed when the option is absent.
+
+Exit status is 0 only when every case passes, 1 for assertion or execution errors
+(including report-write failure), and 2 for invalid CLI usage. Producing a JUnit
+report does not turn a failing run into success.

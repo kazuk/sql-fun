@@ -43,6 +43,19 @@ impl super::ColumnReference for CteColumnRef {
 }
 
 impl CteColumnRef {
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
+        self.alias = alias.clone();
+        self.column_name = column.clone();
+        self
+    }
+
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
+    pub(super) const fn binding_alias(&self) -> &AliasName {
+        &self.alias
+    }
+
     /// create instance
     #[must_use]
     pub fn new(
@@ -59,5 +72,11 @@ impl CteColumnRef {
             column_def: column_def.cloned(),
             source_nullable,
         }
+    }
+}
+
+impl CteColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column_name))
     }
 }

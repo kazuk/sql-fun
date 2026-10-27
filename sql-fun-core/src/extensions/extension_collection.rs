@@ -157,3 +157,40 @@ impl PostgresExtensionsCollection {
         }
     }
 }
+
+#[cfg(test)]
+mod test_uuid_ossp_resolution {
+    use super::PostgresExtensionsCollection;
+    use crate::extensions::test_helpers::ExtensionFixture;
+
+    #[test]
+    fn resolves_versions_from_controls_with_non_utf8_comments_and_values()
+    -> ::testresult::TestResult {
+        let fixture = ExtensionFixture::with_control_bytes(
+            "uuid-ossp",
+            &["1.1", "1.0--1.1"],
+            b"# \xff\ncomment='\xfe'\ndefault_version='1.1'",
+        )?;
+        let mut extensions: PostgresExtensionsCollection = "uuid-ossp".parse().unwrap();
+        extensions.resolve_versions(fixture.path())?;
+        assert_eq!(extensions.to_string(), "uuid-ossp@1.1");
+        assert_eq!(
+            extensions.sql_files(fixture.path())?[0],
+            fixture.script("uuid-ossp", "1.1")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn resolves_uuid_ossp_with_its_update_script_present() -> ::testresult::TestResult {
+        let fixture = ExtensionFixture::uuid_ossp()?;
+        let mut extensions: PostgresExtensionsCollection = "uuid-ossp".parse().unwrap();
+        extensions.resolve_versions(fixture.path())?;
+        assert_eq!(extensions.to_string(), "uuid-ossp@1.1");
+        let files = extensions.sql_files(fixture.path())?;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0], fixture.script("uuid-ossp", "1.1"));
+        assert!(fixture.script("uuid-ossp", "1.0--1.1").is_file());
+        Ok(())
+    }
+}

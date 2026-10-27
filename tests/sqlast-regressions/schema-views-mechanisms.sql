@@ -1,0 +1,18 @@
+CREATE TABLE public.items (id integer PRIMARY KEY);
+CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END';
+CREATE VIEW public.v_insert_trigger AS SELECT DISTINCT id FROM public.items;
+CREATE TRIGGER ti INSTEAD OF INSERT ON public.v_insert_trigger FOR EACH ROW EXECUTE FUNCTION public.noop();
+CREATE VIEW public.v_update_trigger AS SELECT DISTINCT id FROM public.items;
+CREATE TRIGGER tu INSTEAD OF UPDATE ON public.v_update_trigger FOR EACH ROW EXECUTE FUNCTION public.noop();
+CREATE VIEW public.v_both_triggers AS SELECT DISTINCT id FROM public.items;
+CREATE TRIGGER tib INSTEAD OF INSERT OR UPDATE ON public.v_both_triggers FOR EACH ROW EXECUTE FUNCTION public.noop();
+CREATE VIEW public.v_insert_rule AS SELECT DISTINCT id FROM public.items;
+CREATE RULE ri AS ON INSERT TO public.v_insert_rule DO INSTEAD NOTHING;
+CREATE VIEW public.v_update_rule AS SELECT DISTINCT id FROM public.items;
+CREATE RULE ru AS ON UPDATE TO public.v_update_rule DO INSTEAD NOTHING;
+CREATE VIEW public.v_rule_returning AS SELECT DISTINCT id FROM public.items;
+CREATE RULE rr AS ON INSERT TO public.v_rule_returning DO INSTEAD INSERT INTO public.items VALUES(NEW.id) RETURNING id;
+CREATE VIEW public.v_conditional_rule AS SELECT DISTINCT id FROM public.items;
+CREATE RULE rc AS ON INSERT TO public.v_conditional_rule WHERE NEW.id > 0 DO INSTEAD NOTHING;
+CREATE VIEW public.v_additional_rule AS SELECT DISTINCT id FROM public.items;
+CREATE RULE ra AS ON INSERT TO public.v_additional_rule DO ALSO INSERT INTO public.items VALUES(NEW.id);

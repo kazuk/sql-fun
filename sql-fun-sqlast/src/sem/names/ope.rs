@@ -1,11 +1,10 @@
-use std::fmt::Display;
-
+use crate::sem::names::SchemaName;
 use crate::{
     sem::{AnalysisError, ParseContext, error::ProblemLikeError},
     syn::{ListOpt, NodeListOpt},
 };
 
-use super::SchemaName;
+use std::fmt::Display;
 
 /// operator name with schema(optional)
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -17,14 +16,42 @@ pub struct ValidOperatorName {
 impl Display for ValidOperatorName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema_name) = &self.schema_name {
-            write!(f, "{schema_name}",)?;
+            write!(
+                f,
+                "{}.",
+                crate::identifier::CanonicalIdentifier::from(schema_name.as_str())
+            )?;
         }
         write!(f, "{}", self.op_name)?;
         Ok(())
     }
 }
 
+#[cfg(test)]
+mod display_tests {
+    use crate::sem::names::ope::ValidOperatorName;
+
+    #[rstest::rstest]
+    #[case(None, "+")]
+    #[case(Some("pg_catalog"), "pg_catalog.+")]
+    #[case(Some("a.b"), r#""a.b".+"#)]
+    #[case(Some("a\"b"), r#""a""b".+"#)]
+    fn preserves_qualification(#[case] schema: Option<&str>, #[case] expected: &str) {
+        assert_eq!(
+            ValidOperatorName::from_parts(schema, "+").to_string(),
+            expected
+        );
+    }
+}
+
 impl ValidOperatorName {
+    pub(super) fn from_parts(schema: Option<&str>, name: &str) -> Self {
+        Self {
+            schema_name: schema.map(SchemaName::from),
+            op_name: name.to_owned(),
+        }
+    }
+
     /// create from [`crate::syn::NodeListOpt`]
     pub fn try_from(value: NodeListOpt) -> Result<Option<Self>, ProblemLikeError> {
         let Some(items) = value.map_values(|v| v.as_string().get_sval()) else {
@@ -65,6 +92,10 @@ pub enum OperatorName {
 }
 
 impl OperatorName {
+    pub(crate) fn from_parts(schema: Option<&str>, name: &str) -> Self {
+        Self::Valid(ValidOperatorName::from_parts(schema, name))
+    }
+
     /// accept operator name or report problem
     pub fn try_from_report<TParseContext: ParseContext>(
         value: NodeListOpt,
@@ -98,7 +129,7 @@ impl OperatorName {
 
     /// create instance for test
     #[cfg(test)]
-    pub fn new(name: &str) -> OperatorName {
+    pub fn new(name: &str) -> Self {
         Self::Valid(ValidOperatorName::new(name))
     }
 }

@@ -19,6 +19,13 @@ pub struct CollateColumnConstraint {
 }
 
 impl CollateColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
+    pub(crate) fn is_known_name(name: &str) -> bool {
+        ["BINARY", "NOCASE", "RTRIM"].contains(&name.to_uppercase().as_str())
+    }
     /// create instance
     pub fn new(table_name: &TableName, column_name: &ColumnName, collation_name: &str) -> Self {
         Self {
@@ -50,8 +57,6 @@ impl ColumnConstraintTrait for CollateColumnConstraint {
 
 #[cfg(feature = "sqlite")]
 impl CollateColumnConstraint {
-    const COLLATION_NAMES: [&'static str; 3] = ["BINARY", "NOCASE", "RTRIM"];
-
     /// analyze [`crate::syn::sqlite::CollateColumnConstraint`]
     pub fn analyze_constraint_sqlite<TParseContext>(
         mut context: TParseContext,
@@ -64,8 +69,10 @@ impl CollateColumnConstraint {
         TParseContext: ParseContext,
     {
         let collation_name = syn.collation_name().value();
-        if !Self::COLLATION_NAMES.contains(&collation_name.to_uppercase().as_str()) {
-            context.report_problem(AnalysisProblem::collation_name_not_found(collation_name))?;
+        if !Self::is_known_name(collation_name) {
+            context.report_analysis_problem(AnalysisProblem::collation_name_not_found(
+                collation_name,
+            ))?;
         }
         Ok((
             ColumnConstraint::collate(Self::new(table_name, column_name, collation_name)),

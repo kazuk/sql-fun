@@ -1,4 +1,4 @@
-use crate::syn::sqlite::{Expr, Indexed, Limit, QualifiedName, ResultColumn, SortedColumn, With};
+use crate::syn::sqlite::{Expr, Indexed, QualifiedName, ResultColumn, With};
 
 /// delete statement
 #[derive(derive_getters::Getters, Debug)]
@@ -8,8 +8,6 @@ pub struct DeleteStatement {
     indexed: Option<Indexed>,
     where_clause: Option<Box<Expr>>,
     returning: Vec<ResultColumn>,
-    order_by: Vec<SortedColumn>,
-    limit: Option<Limit>,
 }
 
 impl DeleteStatement {
@@ -20,8 +18,6 @@ impl DeleteStatement {
         indexed: Option<Indexed>,
         where_clause: Option<Box<Expr>>,
         returning: Vec<ResultColumn>,
-        order_by: Vec<SortedColumn>,
-        limit: Option<Limit>,
     ) -> Self {
         Self {
             with,
@@ -29,8 +25,6 @@ impl DeleteStatement {
             indexed,
             where_clause,
             returning,
-            order_by,
-            limit,
         }
     }
 }

@@ -1,11 +1,12 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnConstraint, ColumnName, FullName, ParseContext,
-        SemScalarExpr, TableName, TypeReference,
+        AnalysisError, ColumnConstraint, ColumnName, ParseContext, SemScalarExpr, TableName,
+        TypeReference,
     },
-    syn::{ListOpt, Opt, ScanToken},
+    syn::ScanToken,
 };
 
 #[cfg(feature = "sqlite")]
@@ -21,6 +22,114 @@ pub struct ColumnDefinition {
     #[deprecated = "query from constraints"]
     default: Option<Box<SemScalarExpr>>,
     constraints: Vec<ColumnConstraint>,
+    #[serde(default, skip_serializing_if = "ColumnAttributes::is_empty")]
+    attributes: ColumnAttributes,
+}
+
+/// Persistent PostgreSQL per-column planning attributes.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+struct ColumnAttributes {
+    statistics_target: Option<i32>,
+    n_distinct: Option<String>,
+    n_distinct_inherited: Option<String>,
+}
+impl ColumnAttributes {
+    fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+impl ColumnDefinition {
+    pub(super) fn rename_expressions(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for constraint in &mut self.constraints {
+            constraint.rename_expression(visitor)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        for constraint in &mut self.constraints {
+            constraint.rename_relation(old, new);
+        }
+        if let Some(ty) = &mut self.type_ref {
+            ty.rename_relation(old, new);
+        }
+    }
+
+    /// Explicit statistics target; None uses PostgreSQL's configured default.
+    pub const fn statistics_target(&self) -> Option<i32> {
+        self.attributes.statistics_target
+    }
+    /// Explicit n_distinct estimate retained from ALTER COLUMN SET.
+    pub fn distinct_estimate(&self) -> Option<f64> {
+        if let Some(value) = &self.attributes.n_distinct {
+            value.trim().parse().ok()
+        } else {
+            None
+        }
+    }
+    /// Explicit n_distinct_inherited estimate retained from ALTER COLUMN SET.
+    pub fn inherited_distinct_estimate(&self) -> Option<f64> {
+        if let Some(value) = &self.attributes.n_distinct_inherited {
+            value.trim().parse().ok()
+        } else {
+            None
+        }
+    }
+    pub(crate) const fn apply_statistics_target(&mut self, value: Option<i32>) {
+        self.attributes.statistics_target = value;
+    }
+    pub(crate) fn apply_distinct_option(&mut self, name: &str, value: Option<&str>) {
+        match name {
+            "n_distinct" => self.attributes.n_distinct = value.map(str::to_owned),
+            "n_distinct_inherited" => {
+                self.attributes.n_distinct_inherited = value.map(str::to_owned)
+            }
+            _ => unreachable!("only validated column options are applied"),
+        }
+    }
+    pub(crate) fn drop_generation_expression(&mut self) {
+        self.constraints
+            .retain(|constraint| constraint.as_generated().is_none());
+    }
+    pub(crate) fn apply_attribute_nullability(&mut self, table: &TableName, value: bool) {
+        self.constraints
+            .retain(|constraint| constraint.as_nullability().is_none());
+        if let Some(column) = &self.name {
+            self.constraints.push(ColumnConstraint::nullability(
+                crate::sem::ColumnNullabilityConstraint::new(table, column, value, None, None),
+            ));
+        }
+        // Keep the existing query metadata accessor in sync with the constraint.
+        self.set_not_null(Some(value));
+    }
+    pub(crate) fn has_identity(&self) -> bool {
+        self.constraints
+            .iter()
+            .any(|constraint| constraint.as_identity().is_some())
+    }
+    pub(crate) fn has_inline_primary_key(&self) -> bool {
+        self.constraints
+            .iter()
+            .any(|constraint| constraint.as_primary_key().is_some())
+    }
+    pub(crate) fn has_stored_generation(&self) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint
+                .as_generated()
+                .is_some_and(crate::sem::GeneratedColumnConstraint::is_stored)
+        })
+    }
+    pub(crate) fn has_virtual_generation(&self) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint
+                .as_generated()
+                .is_some_and(crate::sem::GeneratedColumnConstraint::is_virtual)
+        })
+    }
 }
 
 impl Clone for ColumnDefinition {
@@ -33,11 +142,30 @@ impl Clone for ColumnDefinition {
             #[expect(deprecated)]
             default: self.default.clone(),
             constraints: self.constraints.clone(),
+            attributes: self.attributes.clone(),
         }
     }
 }
 
 impl ColumnDefinition {
+    pub(crate) fn replace_view_default(
+        &mut self,
+        view: &crate::sem::FullName,
+        value: &SemScalarExpr,
+    ) {
+        self.constraints
+            .retain(|constraint| constraint.as_default().is_none());
+        if let Some(name) = &self.name {
+            self.constraints.push(ColumnConstraint::default(
+                crate::sem::DefaultColumnConstraint::new(
+                    &TableName::from(view.clone()),
+                    name,
+                    value.clone(),
+                ),
+            ));
+        }
+    }
+
     /// create instance
     #[must_use]
     pub fn new(
@@ -54,6 +182,7 @@ impl ColumnDefinition {
             #[expect(deprecated)]
             default: Default::default(),
             constraints: constraints.to_vec(),
+            attributes: ColumnAttributes::default(),
         }
     }
 
@@ -94,6 +223,22 @@ impl ColumnDefinition {
         self.is_not_null = not_null;
     }
 
+    pub(super) fn apply_primary_key_nullability(&mut self) {
+        if self
+            .constraints
+            .iter()
+            .any(|constraint| constraint.as_primary_key().is_some())
+        {
+            self.set_not_null(Some(true));
+        }
+    }
+
+    pub(super) fn has_unique_key(&self) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint.as_primary_key().is_some() || constraint.as_unique().is_some()
+        })
+    }
+
     /// get column constraints
     #[must_use]
     pub const fn constraints(&self) -> &[ColumnConstraint] {
@@ -107,7 +252,7 @@ impl ColumnDefinition {
 
     /// analyze [`crate::syn::ColumnDef`]
     pub fn analyze_column_def<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         column_def: &crate::syn::ColumnDef,
         tokens: &IVec<ScanToken>,
@@ -115,125 +260,22 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        let colname = column_def.get_colname();
-        let colname = ColumnName::new(&colname);
-        let Some(type_name) = column_def.get_type_name().as_inner() else {
-            AnalysisError::raise_unexpected_none("column_def.get_type_name")?
-        };
-        let is_not_null = column_def.get_is_not_null();
-
-        let key = FullName::try_from(type_name)?;
-        let type_ref = if let Some(sem_type) = context.get_type(&key).cloned() {
-            if let Some(type_ref) = sem_type.type_reference().cloned() {
-                Some(type_ref)
-            } else {
-                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
-                None
-            }
-        } else {
-            context.report_problem(AnalysisProblem::column_type_not_found(
-                table_name, &colname, &key,
-            ))?;
-            None
-        };
-
-        let constraints = if let Some(constraint_list) =
-            column_def.get_constraints().map(|v| v.as_constraint())
-        {
-            let mut constraints = Vec::new();
-            for constraint in constraint_list {
-                let (c, new_context) = ColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    &colname,
-                    &constraint,
-                    tokens,
-                )?;
-                context = new_context;
-
-                if let Some(fk) = c.as_foreign_key()
-                    && let Some(col_type) = &type_ref
-                    && let Some(pk_col_type) = fk.primary_key_column_type()
-                    && col_type != pk_col_type
-                {
-                    context.report_problem(AnalysisProblem::foreign_key_column_type_mismatch(
-                        table_name,
-                        &colname,
-                        col_type,
-                        fk.primary_key_table(),
-                        fk.primary_key_column(),
-                        pk_col_type,
-                    ))?;
-                }
-
-                constraints.push(c)
-            }
-            constraints
-        } else {
-            Vec::default()
-        };
-        let column = Self::new(
-            &Some(colname),
-            type_ref.as_ref(),
-            Some(is_not_null),
-            &constraints,
-        );
-        Ok((column, context))
+        crate::ast::Column::try_from_with_tokens(column_def, tokens)?
+            .resolve_and_report(context, table_name)
     }
 
     /// analyze [`crate::syn::sqlite::ColumnDefinition`]
     #[cfg(feature = "sqlite")]
     pub fn analyze_column_definition<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         syn: &crate::syn::sqlite::ColumnDefinition,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let colname = ColumnName::from(syn.column_name());
-
-        let col_type = if let Some(ct) = syn.column_type() {
-            let type_name = FullName::from_local_name(ct.name());
-            if let Some(_type_def) = context.get_type(&type_name) {
-                Some(TypeReference::from_full_name(type_name))
-            } else {
-                context.report_problem(AnalysisProblem::column_type_not_found(
-                    table_name, &colname, &type_name,
-                ))?;
-                None
-            }
-        } else {
-            None
-        };
-
-        let mut result = Self::new(&Some(colname.clone()), col_type.as_ref(), None, &[]);
-
-        for constraint in syn.constraints() {
-            let (constraint, new_context) = ColumnConstraint::analyze_sqlite_column_constraint(
-                context,
-                table_name,
-                &colname,
-                constraint.constraint(),
-                tokens,
-            )?;
-            context = new_context;
-
-            match &constraint {
-                ColumnConstraint::Nullability(nullable_constraint) => {
-                    result.set_not_null(Some(nullable_constraint.is_not_null()));
-                }
-                ColumnConstraint::Default(default_constraint) => {
-                    result.set_default(default_constraint.expr());
-                }
-                _ => {}
-            }
-
-            result.push_constraint(constraint);
-        }
-
-        Ok((result, context))
+        crate::ast::Column::try_from(syn)?.resolve_and_report(context, table_name)
     }
 }
 
@@ -247,7 +289,7 @@ mod test_sqlite_column_definition {
         SqliteToken,
         sem::{FullName, SchemaName, SemScalarExpr, TableName, TypeReference},
         sqlite::SqliteDialect,
-        syn::sqlite::{CreateTableBody, Stmt},
+        syn::sqlite::CreateTableBody,
         test_helpers::TestParseContext,
     };
 
@@ -261,10 +303,7 @@ mod test_sqlite_column_definition {
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
         let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = match cmd {
-            turso_parser::ast::Cmd::Stmt(stmt) => Stmt::from(stmt),
-            _ => panic!("expected sqlite statement command"),
-        };
+        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
         let Some(create_table) = stmt.into_create_table() else {
             panic!("expected create table statement")
         };
@@ -272,8 +311,8 @@ mod test_sqlite_column_definition {
     }
 
     fn setup_context() -> TestParseContext {
-        let mut context = TestParseContext::default();
-        context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "integer"),
             false,
@@ -301,10 +340,7 @@ mod test_sqlite_column_definition {
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
         let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = match cmd {
-            turso_parser::ast::Cmd::Stmt(stmt) => Stmt::from(stmt),
-            _ => panic!("expected sqlite statement command"),
-        };
+        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
         let Some(create_table) = stmt.into_create_table() else {
             panic!("expected create table statement")
         };

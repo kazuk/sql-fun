@@ -1,16 +1,12 @@
-use sql_fun_core::IVec;
-
 #[cfg(feature = "sqlite")]
 use crate::SqliteToken;
-use crate::{
-    sem::{
-        AnalysisError, AnalysisProblem, FullName, ParseContext, ScalarAnalysisContext,
-        SemScalarExpr, TypeReference,
-    },
-    syn::{Opt, ScanToken},
-};
+use crate::sem::scalar_expr::SemScalarExprNode;
+#[cfg(feature = "sqlite")]
+use crate::sem::{AnalysisError, ParseContext, ScalarAnalysisContext};
+use crate::sem::{SemScalarExpr, TypeReference};
 
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
+#[cfg(feature = "sqlite")]
+use ::sql_fun_core::IVec;
 
 /// implicit cast expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -20,6 +16,18 @@ pub struct ImplicitCastExpr {
 }
 
 impl ImplicitCastExpr {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.cast_target.rename_relation(old, new);
+    }
+
+    pub(crate) fn projection_operand(&self) -> (&SemScalarExpr, &TypeReference) {
+        (&self.value, &self.cast_target)
+    }
+
     /// create a implicit cast expression
     #[must_use]
     pub fn new(value: &SemScalarExpr, cast_target: &TypeReference) -> Self {
@@ -44,14 +52,50 @@ impl SemScalarExprNode for ImplicitCastExpr {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TypeCastExpr {
     target_type: TypeReference,
+    resolution: crate::sem::QueryNameResolution,
     arg: Box<SemScalarExpr>,
 }
 
 impl TypeCastExpr {
-    fn new(target_type: TypeReference, arg: SemScalarExpr) -> Self {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.target_type.rename_relation(old, new);
+        self.resolution.rename_relation(old, new);
+    }
+
+    pub(crate) fn projection_operand(&self) -> (&SemScalarExpr, &TypeReference) {
+        (&self.arg, &self.target_type)
+    }
+
+    pub(super) fn array_projection_name(&self) -> Option<&'static str> {
+        self.arg.array_projection_name()
+    }
+
+    pub(super) fn grouping_key_operand(&self) -> Option<&SemScalarExpr> {
+        if self.resolution.is_resolved() && self.arg.get_type().as_ref() == Some(&self.target_type)
+        {
+            Some(&self.arg)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn set_resolution(&mut self, resolution: crate::sem::QueryNameResolution) {
+        self.resolution = resolution;
+    }
+    /// Completed target-name resolution (or SQLite affinity interpretation).
+    pub const fn resolution(&self) -> &crate::sem::QueryNameResolution {
+        &self.resolution
+    }
+
+    pub(super) fn from_resolved(target_type: &TypeReference, arg: &SemScalarExpr) -> Self {
         Self {
-            target_type,
-            arg: Box::new(arg),
+            target_type: target_type.clone(),
+            resolution: crate::sem::QueryNameResolution::type_reference(target_type),
+            arg: Box::new(arg.clone()),
         }
     }
 }
@@ -66,45 +110,6 @@ impl SemScalarExprNode for TypeCastExpr {
     }
 }
 
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::TypeCast> for TypeCastExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::TypeCast,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(arg) = syn.get_arg().as_inner() else {
-            AnalysisError::raise_unexpected_none("typecast.arg")?
-        };
-        let Some(target_type) = syn.get_type_name().as_inner() else {
-            AnalysisError::raise_unexpected_none("typecast.type_name")?
-        };
-        let target_type = TypeReference::from_full_name(FullName::try_from(target_type)?);
-
-        let (arg, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
-        context = new_context;
-
-        if let Some(from_type) = arg.get_type() {
-            let cast = context.get_explicit_cast(&from_type, &target_type);
-            if cast.is_none() {
-                context.report_problem(AnalysisProblem::explicit_cast_not_defined(
-                    &from_type,
-                    &target_type,
-                ))?;
-            }
-        }
-
-        Ok((
-            SemScalarExpr::TypeCast(Self::new(target_type, arg)),
-            context,
-        ))
-    }
-}
-
 #[cfg(feature = "sqlite")]
 impl TypeCastExpr {
     /// analyze [`crate::syn::sqlite::ExprCast`]
@@ -112,28 +117,63 @@ impl TypeCastExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         syn: &crate::syn::sqlite::ExprCast,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let Some(ty) = syn.type_name() else {
-            AnalysisError::raise_unexpected_none("ExprCast.type_name")?;
-            AnalysisError::never();
-        };
-        let target_type_name = FullName::from_local_name(ty.name());
-        if context.get_type(&target_type_name).is_none() {
-            context.report_problem(AnalysisProblem::type_not_found(&target_type_name))?;
-        };
+        let syntax = crate::ast::Expr::try_from(syn)?;
+        let result = syntax.resolve(&mut context, scalar_context);
+        Ok((result?, context))
+    }
+}
 
-        let (expr, new_context) =
-            SemScalarExpr::analyze_sqlite_scalar_expr(context, scalar_context, syn.expr(), tokens)?;
-        context = new_context;
+impl TypeCastExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg.walk(visitor)?;
+        Ok(())
+    }
+}
 
-        let target_type = TypeReference::from_full_name(target_type_name);
-        Ok((
-            SemScalarExpr::TypeCast(Self::new(target_type, expr)),
-            context,
-        ))
+impl ImplicitCastExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.value.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl TypeCastExpr {
+    pub(crate) fn collect_constraints(
+        &mut self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        if self.arg.constraint_node().is_none() {
+            return Ok(None);
+        }
+        let target = if context.dialect() == crate::ast::Dialect::postgres() {
+            if let Some(target) =
+                crate::context::BaseParseContext::canonicalize_type_ref(context, &self.target_type)
+            {
+                parameters.require(context, &self.arg, &target, true);
+                target
+            } else {
+                self.target_type.clone()
+            }
+        } else {
+            self.target_type.clone()
+        };
+        Ok(Some(parameters.operation(
+            "CAST",
+            std::slice::from_ref(&self.arg),
+            &crate::sem::InputTypeConstraint::exact(&target),
+            None,
+        )))
     }
 }

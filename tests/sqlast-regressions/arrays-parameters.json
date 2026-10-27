@@ -1,0 +1,90 @@
+[
+  {
+    "name": "parameters_retain_uncertainty_or_use_explicit_target::only",
+    "sql": "SELECT ARRAY[$1] AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameters_retain_uncertainty_or_use_explicit_target::null",
+    "sql": "SELECT ARRAY[$1,NULL] AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameters_retain_uncertainty_or_use_explicit_target::explicit",
+    "sql": "SELECT ARRAY[$1]::int[] AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "public_array_parameter_domains_do_not_select_an_untyped_prepare_signature::untyped",
+    "sql": "SELECT ARRAY[$1,1] AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "public_array_parameter_domains_do_not_select_an_untyped_prepare_signature::narrowed",
+    "sql": "SELECT ARRAY[$1::integer,1] AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

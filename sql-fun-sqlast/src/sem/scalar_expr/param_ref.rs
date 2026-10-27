@@ -1,36 +1,50 @@
-use sql_fun_core::IVec;
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{InputTypeConstraint, TypeReference};
 
-use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, TypeReference},
-    syn::ScanToken,
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExpr, SemScalarExprNode};
-
-/// parameter reference expression
+/// A numbered SQL input with its assigned or inferred SQL type domain.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ParamRef {}
+pub struct ParamRef {
+    position: u32,
+    constraint: InputTypeConstraint,
+    #[serde(skip)]
+    node: usize,
+}
 
-impl SemScalarExprNode for ParamRef {
-    fn get_type(&self) -> Option<TypeReference> {
-        todo!()
+impl ParamRef {
+    pub(crate) fn new(position: u32, node: usize, constraint: &InputTypeConstraint) -> Self {
+        Self {
+            position,
+            node,
+            constraint: constraint.clone(),
+        }
     }
-
-    fn is_not_null(&self) -> Option<bool> {
-        todo!()
+    /// Original one-based parameter identity.
+    pub const fn position(&self) -> u32 {
+        self.position
+    }
+    /// Assigned or SQL-derived input types; `any` is a successful inference result.
+    pub const fn constraint(&self) -> &InputTypeConstraint {
+        &self.constraint
+    }
+    pub(crate) const fn node(&self) -> usize {
+        self.node
     }
 }
 
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::ParamRef> for ParamRef
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        _context: TParseContext,
-        _scalar_context: &ScalarAnalysisContext<'_>,
-        _syn: crate::syn::ParamRef,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
+impl SemScalarExprNode for ParamRef {
+    fn get_type(&self) -> Option<TypeReference> {
+        self.constraint.single_type()
+    }
+    fn is_not_null(&self) -> Option<bool> {
+        None
+    }
+}
+
+impl ParamRef {
+    pub(super) const fn canonicalize_grouping_key(&mut self) {
+        self.node = 0;
+    }
+    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        self.constraint = constraints.node_domain(self.node).clone();
     }
 }

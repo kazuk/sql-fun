@@ -51,6 +51,23 @@ impl TryFrom<JoinTypeOpt> for JoinKind {
 }
 
 impl JoinKind {
+    pub(super) const fn uses_right_join_column(&self) -> bool {
+        matches!(self, Self::Right)
+    }
+
+    pub(crate) const fn inner() -> Self {
+        Self::Inner
+    }
+    pub(crate) const fn left() -> Self {
+        Self::Left
+    }
+    pub(crate) const fn right() -> Self {
+        Self::Right
+    }
+    pub(crate) const fn full() -> Self {
+        Self::Full
+    }
+
     /// get left nullability
     #[must_use]
     pub const fn left_nullable(&self, in_nullable: Nullable) -> Nullable {
@@ -81,5 +98,11 @@ impl JoinKind {
             Self::UniqueInner => in_nullable,
             Self::UniqueOuter => true,
         }
+    }
+}
+
+impl JoinKind {
+    pub(super) const fn is_full(&self) -> bool {
+        matches!(self, Self::Full)
     }
 }

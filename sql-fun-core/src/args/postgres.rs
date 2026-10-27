@@ -154,6 +154,18 @@ impl PostgresArgs {
         }
     }
 
+    pub(super) fn version_override(
+        &self,
+    ) -> Result<Option<PostgresEngineVersion>, SqlFunArgsError> {
+        let Some(text) = &self.postgres_version else {
+            return Ok(None);
+        };
+        match PostgresEngineVersion::from_str(text) {
+            Ok(version) => Ok(Some(version)),
+            Err(_) => SqlFunArgsError::invalid_engine_version(text),
+        }
+    }
+
     /// get `PostgreSQL` version
     pub fn postgres_version(
         &self,
@@ -188,6 +200,34 @@ impl PostgresArgs {
 
     pub const fn postgres_extensions_dir(&self) -> Option<&PathBuf> {
         self.postgres_extensions_dir.as_ref()
+    }
+
+    /// Preserve overrides until each query explicitly selects its datasource.
+    pub(super) fn get_explicit_envs(&self, envs: &mut HashMap<String, String>) {
+        if let Some(search_path) = &self.postgres_search_path {
+            envs.insert(
+                Self::SQL_FUN_PG_SEARCH_PATH.to_string(),
+                search_path.join(","),
+            );
+        }
+        if let Some(version) = &self.postgres_version {
+            envs.insert(Self::SQL_FUN_POSTGRES_VERSION.to_string(), version.clone());
+        }
+        if let Some(extensions) = &self.postgres_extensions {
+            envs.insert(Self::SQL_FUN_EXTENSIONS.to_string(), extensions.to_string());
+        }
+        if let Some(path) = &self.builtin_schema_dir {
+            envs.insert(
+                Self::SQL_FUN_BUILTIN_SCHEMA.to_string(),
+                path.to_string_lossy().to_string(),
+            );
+        }
+        if let Some(path) = &self.postgres_extensions_dir {
+            envs.insert(
+                Self::SQL_FUN_EXTENSIONS_DIR.to_string(),
+                path.to_string_lossy().to_string(),
+            );
+        }
     }
 
     pub fn get_envs(

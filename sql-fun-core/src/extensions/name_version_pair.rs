@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::extensions::control_file;
 use crate::{ExtensionConfigError, ExtensionVersion};
 
 /// Postgres extensin name version pair.
@@ -40,7 +41,7 @@ mod test_extension_name_version_pair_display {
             version: Some(ExtensionVersion::new("1.0")),
         };
         let display_result = item.to_string();
-        assert_eq!("ext@1.0", display_result)
+        assert_eq!("ext@1.0", display_result);
     }
 }
 
@@ -126,10 +127,11 @@ impl ExtensionNameVersionPair {
         base_path: P,
     ) -> Result<PathBuf, ExtensionConfigError> {
         if let Some(version) = &self.version {
+            ExtensionVersion::installation(&version.to_string())?;
             let path = base_path
                 .as_ref()
                 .join(PathBuf::from(format!("{}--{version}.sql", self.name)));
-            if path.exists() {
+            if path.is_file() {
                 Ok(path)
             } else {
                 ExtensionConfigError::extension_sql_not_exist(&self.name, version, path)
@@ -148,8 +150,27 @@ impl ExtensionNameVersionPair {
         &mut self,
         base_path: P,
     ) -> Result<PathBuf, ExtensionConfigError> {
+        let base_path = base_path.as_ref();
+        let control_path = base_path.join(format!("{}.control", self.name));
+        match std::fs::read(&control_path) {
+            Ok(contents) => {
+                if let Some(version) = control_file::default_version(&contents, &control_path)? {
+                    let version = ExtensionVersion::installation(&version)?;
+                    let path = base_path.join(format!("{}--{version}.sql", self.name));
+                    if !path.is_file() {
+                        return ExtensionConfigError::extension_sql_not_exist(
+                            &self.name, &version, &path,
+                        );
+                    }
+                    self.version = Some(version);
+                    return Ok(path);
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
         let name_prefix = format!("{}--", self.name);
-        let dir = base_path.as_ref().read_dir()?;
+        let dir = base_path.read_dir()?;
         let mut version_candidates = Vec::new();
         for entry in dir {
             let entry = entry?;
@@ -157,37 +178,151 @@ impl ExtensionNameVersionPair {
                 continue;
             }
             let name_path = PathBuf::from(entry.file_name());
-            let Some(ext) = name_path.extension().and_then(|v| v.to_str()) else {
+            let Some(ext) = name_path.extension() else {
                 continue;
             };
-            let Some(stem) = name_path.file_stem().and_then(|v| v.to_str()) else {
+            let Some(ext) = ext.to_str() else {
+                continue;
+            };
+            let Some(stem) = name_path.file_stem() else {
+                continue;
+            };
+            let Some(stem) = stem.to_str() else {
                 continue;
             };
             if !ext.eq_ignore_ascii_case("sql") || !stem.starts_with(&name_prefix) {
                 continue;
             }
             let version = &stem[name_prefix.len()..];
-            if !version.is_empty() {
-                version_candidates.push(version.to_string());
+            if !version.is_empty()
+                && !version.contains("--")
+                && ExtensionVersion::installation(version).is_ok()
+            {
+                version_candidates.push((version.to_string(), entry.path()));
             }
         }
 
+        version_candidates.sort_by(|left, right| left.0.cmp(&right.0));
         if version_candidates.len() == 1 {
-            let version = &version_candidates[0];
+            let (version, path) = &version_candidates[0];
             self.version = Some(ExtensionVersion::new(version));
-            let path = base_path
-                .as_ref()
-                .join(PathBuf::from(format!("{}--{version}.sql", self.name)));
-            Ok(path)
+            Ok(path.clone())
         } else if version_candidates.is_empty() {
             ExtensionConfigError::extension_not_found(&self.name, base_path)
         } else {
             ExtensionConfigError::multiple_extension_version(
                 &self.name,
                 base_path,
-                &version_candidates,
+                &version_candidates
+                    .into_iter()
+                    .map(|(version, _)| version)
+                    .collect::<Vec<_>>(),
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod test_installation_resolution {
+    use super::ExtensionNameVersionPair;
+    use crate::ExtensionVersion;
+    use crate::extensions::test_helpers::ExtensionFixture;
+
+    #[test]
+    fn prefers_default_and_explicit_version() -> ::testresult::TestResult {
+        let fixture =
+            ExtensionFixture::new("ext", &["1", "2", "1--2"], Some("default_version='2'"))?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+        assert_eq!(
+            pair.resolve_version(fixture.path())?,
+            fixture.script("ext", "2")
+        );
+        assert_eq!(pair.to_string(), "ext@2");
+        let mut explicit =
+            ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("1")))?;
+        assert_eq!(
+            explicit.resolve_version(fixture.path())?,
+            fixture.script("ext", "1")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn fallback_uses_only_installation_scripts() -> ::testresult::TestResult {
+        for control in [None, Some("comment='no default'")] {
+            let fixture = ExtensionFixture::new("ext", &["release-2", "1--2", ""], control)?;
+            let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+            assert_eq!(
+                pair.resolve_version(fixture.path())?,
+                fixture.script("ext", "release-2")
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn errors_do_not_infer_a_version() -> ::testresult::TestResult {
+        for (versions, control) in [
+            (&["1--2"][..], None),
+            (&["1", "2"][..], None),
+            (&["1"][..], Some("default_version='2'")),
+            (&["1"][..], Some("default_version=''")),
+            (&["1"][..], Some("default_version='../1'")),
+            (&["1--2"][..], Some("default_version='1--2'")),
+            (&["1"][..], Some("default_version='unfinished")),
+        ] {
+            let fixture = ExtensionFixture::new("ext", versions, control)?;
+            let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+            assert!(pair.resolve_version(fixture.path()).is_err());
+            assert_eq!(pair.to_string(), "ext");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ignores_script_directories_and_other_extensions() -> ::testresult::TestResult {
+        let fixture = ExtensionFixture::new("other-ext", &["1"], None)?;
+        fixture.script_directory("ext", "1")?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+        assert!(pair.resolve_version(fixture.path()).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_selection_ignores_malformed_control_but_rejects_updates() -> ::testresult::TestResult
+    {
+        let fixture = ExtensionFixture::new("ext", &["1", "1--2"], Some("invalid"))?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("1")))?;
+        assert_eq!(
+            pair.resolve_version(fixture.path())?,
+            fixture.script("ext", "1")
+        );
+        let mut update =
+            ExtensionNameVersionPair::try_new("ext", &Some(ExtensionVersion::new("1--2")))?;
+        assert!(update.resolve_version(fixture.path()).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn ambiguity_diagnostics_sort_installation_versions() -> ::testresult::TestResult {
+        let fixture = ExtensionFixture::new("ext", &["z", "a", "a--z"], None)?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+        let error = pair.resolve_version(fixture.path()).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Extension ext has multiple versions [\"a\", \"z\"], please specify one of version"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn propagates_control_read_errors() -> ::testresult::TestResult {
+        let fixture = ExtensionFixture::new("ext", &["1"], None)?;
+        fixture.unreadable_control("ext")?;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &None)?;
+        assert!(pair.resolve_version(fixture.path()).is_err());
+        assert_eq!(pair.to_string(), "ext");
+        Ok(())
     }
 }
 

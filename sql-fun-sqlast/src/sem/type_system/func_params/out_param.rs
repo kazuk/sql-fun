@@ -46,6 +46,16 @@ pub struct FunctionParamOut {
 }
 
 impl FunctionParamOut {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(ty) = &mut self.param_type {
+            ty.rename_relation(old, new);
+        }
+    }
+
     pub fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
         Self {
             name: name.cloned(),
@@ -111,11 +121,15 @@ impl FunctionParameterTrait for FunctionParamOut {
             AnalysisError::raise_unexpected_none("function_parameter.arg_type")?
         };
         let param_type = FullName::try_from(param_type)?;
-        let param_type = context.get_type(&param_type);
+        let param_type = if let Some(definition) = context.get_type(&param_type) {
+            definition.type_reference().cloned()
+        } else {
+            None
+        };
         Ok((
             FunctionParam::from(&Self {
                 name: Some(param_name),
-                param_type: param_type.and_then(|v| v.type_reference()).cloned(),
+                param_type,
             }),
             context,
         ))
@@ -134,9 +148,12 @@ impl FunctionParameterTrait for FunctionParamOut {
         false
     }
 
-    fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
+    fn apply_simple_infer_result(
+        &mut self,
+        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
+    ) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result);
+            simple_infer_result.apply(ty);
         }
     }
 

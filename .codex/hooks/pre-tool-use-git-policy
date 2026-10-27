@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+
+hook_input=$(cat)
+command=$(jq -r '.tool_input.command // empty' <<<"$hook_input")
+
+if [[ -z "$command" ]]; then
+    exit 0
+fi
+
+normalized_command=${command//\"/}
+normalized_command=${normalized_command//\'/}
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+source "${script_dir}/../../.local/lib/agent-git.sh"
+real_git=$(agent_real_git "${script_dir}/../../.local/agent-bin")
+
+git_paths=("$real_git")
+for candidate in /bin/git /usr/bin/git; do
+    if [[ -x "$candidate" && "$(realpath "$candidate")" == "$real_git" ]]; then
+        git_paths+=("$candidate")
+    fi
+done
+
+for git_path in "${git_paths[@]}"; do
+    if [[ "$normalized_command" =~ (^|[[:space:];\|&])${git_path}([[:space:];\|&]|$) ]]; then
+        jq -n --arg reason "Direct invocation of ${git_path} is disabled in the Codex agent environment. Use the repository Git wrapper or the agent-worktree skill/helper." \
+            '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
+        exit 0
+    fi
+done

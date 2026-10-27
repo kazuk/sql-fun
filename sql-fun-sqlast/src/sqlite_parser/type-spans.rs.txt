@@ -1,0 +1,44 @@
+/// Exact source boundaries for a type, including numeric modifiers and trivia.
+///
+/// Entries follow normalized AST traversal: cast arguments before their type,
+/// and LIMIT count before OFFSET, including the comma spelling of LIMIT.
+#[derive(Clone, Debug)]
+pub struct TypeSpan {
+    name: String,
+    start: usize,
+    end: usize,
+}
+
+impl TypeSpan {
+    fn new(name: &str, start: usize, end: usize) -> Self {
+        Self {
+            name: name.to_owned(),
+            start,
+            end,
+        }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+    pub(crate) const fn start(&self) -> usize {
+        self.start
+    }
+    pub(crate) const fn end(&self) -> usize {
+        self.end
+    }
+}
+
+impl<'a> Parser<'a> {
+    /// Parse with optional exact type locations, preserving the upstream AST.
+    pub fn with_type_spans(input: &'a [u8]) -> Self {
+        let mut parser = Self::new(input);
+        parser.retain_type_spans = true;
+        parser
+    }
+
+    /// Take captured locations since the previous call.
+    pub fn take_type_spans(&mut self) -> Vec<TypeSpan> {
+        std::mem::take(&mut self.type_spans)
+    }
+}

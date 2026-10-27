@@ -58,6 +58,33 @@ impl CastDefinition {
 }
 
 impl CastContext {
+    /// Construct a context for an exact type match.
+    pub(crate) const fn no_conversion() -> Self {
+        Self::NoConversion
+    }
+
+    /// Construct an implicit conversion context.
+    pub(crate) const fn implicit() -> Self {
+        Self::Implicit
+    }
+
+    /// Construct a preferred implicit context for semantic test fixtures.
+    #[cfg(test)]
+    pub(crate) const fn implicit_preferred() -> Self {
+        Self::ImplicitPrefeerd
+    }
+
+    /// Construct an explicit cast context.
+    pub(crate) const fn explicit() -> Self {
+        Self::Explicit
+    }
+
+    /// Construct an assignment context for semantic test fixtures.
+    #[cfg(test)]
+    pub(crate) const fn assignment() -> Self {
+        Self::Assignment
+    }
+
     /// cast is defined, always use explicit
     #[must_use]
     pub const fn use_in_explicit(&self) -> bool {

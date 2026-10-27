@@ -1,44 +1,98 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-ALLOW_DIRTY_OPT=""
+function usage() {
+  cat <<'USAGE'
+usage: publish-crates --manifest=PATH
 
-while (( "$#" )); do
-  case "$1" in
-    --allow-dirty)
-      ALLOW_DIRTY_OPT="--allow-dirty"
-      shift
-      ;;
-    -*|--*=) # unsupported flags
-      echo "Error: Unsupported flag $1" >&2
-      exit 1
-      ;;
+Publish the crate/version pairs in PATH. Each line must be a tab-separated
+package name and version read from materialized workspace Cargo metadata. Existing
+crates.io versions are skipped so a partial publication can be resumed.
+USAGE
+}
+
+manifest=""
+for arg in "$@"; do
+  case "$arg" in
+    --manifest=*) manifest="${arg#--manifest=}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unsupported argument: $arg" >&2; usage >&2; exit 1 ;;
   esac
 done
 
-# depends  (no internal dependencies)
-cargo publish -p sql-fun-core ${ALLOW_DIRTY_OPT}
-sleep 60
+[[ -n "$manifest" && -f "$manifest" ]] || { echo "a readable --manifest is required" >&2; exit 1; }
 
-# depends  sql-fun-core
-cargo publish -p sql-fun-sqlast ${ALLOW_DIRTY_OPT}
-sleep 60
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
 
-# depends  (no internal dependencies)
-cargo publish -p sql-fun-server-api ${ALLOW_DIRTY_OPT}
-sleep 60
+declare -A expected_versions=()
+while IFS=$'\t' read -r package version; do
+  [[ -n "$package" && -n "$version" ]] || { echo "invalid manifest entry" >&2; exit 1; }
+  [[ -z "${expected_versions[$package]+x}" ]] || { echo "duplicate package in manifest: $package" >&2; exit 1; }
+  expected_versions["$package"]="$version"
+done < "$manifest"
 
-# depends  sql-fun-server-api, sql-fun-sqlast, sql-fun-core
-cargo publish -p sql-fun-server ${ALLOW_DIRTY_OPT}
-sleep 60
+(( ${#expected_versions[@]} > 0 )) || { echo "manifest is empty" >&2; exit 1; }
 
-# depends  sql-fun-server-api, sql-fun-core
-cargo publish -p sql-fun-client ${ALLOW_DIRTY_OPT}
-sleep 60
+metadata="$(cargo metadata --no-deps --format-version=1)"
+for package in "${!expected_versions[@]}"; do
+  actual_version="$(jq -er --arg package "$package" '.packages[] | select(.name == $package and .source == null and .publish != []) | .version' <<<"$metadata")" \
+    || { echo "manifest package is not publishable: $package" >&2; exit 1; }
+  [[ "$actual_version" == "${expected_versions[$package]}" ]] \
+    || { echo "manifest version does not match Cargo.toml for $package" >&2; exit 1; }
+done
 
-# depends  sql-fun-client, sql-fun-core
-cargo publish -p sql-fun-cli ${ALLOW_DIRTY_OPT}
-sleep 60
+declare -A remaining=()
+declare -A dependencies=()
+for package in "${!expected_versions[@]}"; do
+  remaining["$package"]=1
+  dependencies["$package"]="$(jq -r --arg package "$package" '
+    .packages[] | select(.name == $package) | .dependencies[]
+    | select(.path != null) | .name
+  ' <<<"$metadata")"
+done
 
-# depends  sql-fun-client
-cargo publish -p sql-fun ${ALLOW_DIRTY_OPT}
+while (( ${#remaining[@]} > 0 )); do
+  selected=""
+  while IFS= read -r candidate; do
+    ready=1
+    while IFS= read -r dependency; do
+      [[ -z "$dependency" || -z "${remaining[$dependency]+x}" ]] || { ready=0; break; }
+    done <<<"${dependencies[$candidate]}"
+    if (( ready )); then
+      selected="$candidate"
+      break
+    fi
+  done < <(printf '%s\n' "${!remaining[@]}" | sort)
+
+  [[ -n "$selected" ]] || { echo "cycle detected in publishable workspace dependencies" >&2; exit 1; }
+  version="${expected_versions[$selected]}"
+  version_status="$(curl --silent --show-error --user-agent 'sql-fun-release-publication/1' --output /dev/null --write-out '%{http_code}' \
+    "https://crates.io/api/v1/crates/$selected/$version")"
+  case "$version_status" in
+    200) echo "skipping existing crates.io version: $selected $version" ;;
+    404)
+      crate_status="$(curl --silent --show-error --user-agent 'sql-fun-release-publication/1' --output /dev/null --write-out '%{http_code}' \
+        "https://crates.io/api/v1/crates/$selected")"
+      publish_token="${CARGO_REGISTRY_TOKEN:-}"
+      case "$crate_status" in
+        200) ;;
+        404)
+          if [[ -z "${CRATES_IO_BOOTSTRAP_TOKEN:-}" ]]; then
+            echo "unpublished crate requires a bootstrap token: $selected" >&2
+            echo "set CRATES_IO_BOOTSTRAP_TOKEN for this one-time publish" >&2
+            exit 1
+          fi
+          publish_token="$CRATES_IO_BOOTSTRAP_TOKEN"
+          echo "bootstrapping unpublished crate: $selected"
+          ;;
+        *) echo "crates.io crate lookup failed for $selected: HTTP $crate_status" >&2; exit 1 ;;
+      esac
+      echo "publishing $selected $version"
+      CARGO_REGISTRY_TOKEN="$publish_token" cargo publish --package "$selected" --allow-dirty -vv
+      ;;
+    *) echo "crates.io lookup failed for $selected $version: HTTP $version_status" >&2; exit 1 ;;
+  esac
+
+  unset 'remaining[$selected]'
+done

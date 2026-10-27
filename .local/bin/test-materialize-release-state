@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+helper="$repo_root/.local/sbin/materialize-release-state"
+test_root="$(mktemp -d)"
+trap 'rm -rf "$test_root"' EXIT
+workspace="$test_root/workspace"
+mkdir -p "$workspace/.local/bin" "$test_root/release-inputs"
+cp "$repo_root/.local/bin/"{bump-version,materialize-release-versions,release-crate-manifest} "$workspace/.local/bin/"
+cat > "$workspace/Cargo.toml" <<'TOML'
+[workspace]
+resolver = "2"
+members = ["core", "api", "worker", "tool"]
+[workspace.dependencies]
+core = { path = "core", version = "0.4.2" }
+api = { path = "api", version = "1.2.3" }
+[workspace.metadata.next-release]
+core = "major"
+api = "minor"
+worker = "patch"
+TOML
+create_package() {
+  local name="$1" version="$2"
+  mkdir -p "$workspace/$name/src"
+  cat > "$workspace/$name/Cargo.toml" <<TOML
+[package]
+name = "$name"
+version = "$version"
+edition = "2021"
+TOML
+  : > "$workspace/$name/src/lib.rs"
+}
+create_package core 0.4.2
+create_package api 1.2.3
+create_package worker 0.6.2
+create_package tool 2.3.4
+cat >> "$workspace/worker/Cargo.toml" <<'TOML'
+[dependencies]
+core.workspace = true
+TOML
+cat >> "$workspace/tool/Cargo.toml" <<'TOML'
+publish = false
+[dependencies]
+api.workspace = true
+TOML
+printf 'adopted producer bytes' > "$test_root/release-inputs/binary"
+printf 'unrelated untracked content' > "$workspace/unrelated"
+cd "$workspace"
+git init --quiet
+cargo generate-lockfile
+git add Cargo.toml Cargo.lock core api worker tool .local/bin
+git -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m 'test: release workspace'
+
+expect_failure_without_mutation() {
+  if "$helper" "$@" > "$test_root/stdout" 2> "$test_root/stderr"; then
+    echo "Unexpected success: $*" >&2
+    exit 1
+  fi
+  git diff --exit-code
+  git diff --cached --exit-code
+}
+expect_failure_without_mutation stable snapshot "$test_root/invalid"
+expect_failure_without_mutation snapshot '' "$test_root/invalid"
+expect_failure_without_mutation unknown '' "$test_root/invalid"
+expect_failure_without_mutation stable '' "$workspace/state"
+ln -s "$workspace" "$test_root/worktree-link"
+expect_failure_without_mutation stable '' "$test_root/worktree-link/state"
+mkdir "$test_root/existing"
+expect_failure_without_mutation stable '' "$test_root/existing"
+
+# All package intent is checked before any version is changed.
+sed -i '/worker = "patch"/d' Cargo.toml
+original="$(git diff)"
+if "$helper" stable '' "$test_root/missing-intent"; then exit 1; fi
+# Preexisting edits are rejected, so commit invalid intent to exercise the
+# materializer's own validation from a clean tracked checkout.
+[[ "$(git diff)" == "$original" ]]
+git add Cargo.toml
+git -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m 'test: missing intent'
+expect_failure_without_mutation stable '' "$test_root/missing-intent-clean"
+git reset --hard HEAD~1 --quiet
+
+for tag in v9.8.7 v9.8.7-snapshot v9.8.7-snapshot2; do
+  identity="$("$repo_root/.local/bin/parse-release-version" "$tag")"
+  classification="$(cut -f4 <<<"$identity")"
+  snapshot="$(cut -f3 <<<"$identity")"
+  suffix="${snapshot:+-$snapshot}"
+  state="$test_root/$tag"
+  "$helper" "$classification" "$snapshot" "$state"
+  printf 'api\t1.3.0%s\ncore\t0.5.0%s\nworker\t0.6.3%s\n' "$suffix" "$suffix" "$suffix" > "$test_root/expected.tsv"
+  cmp "$test_root/expected.tsv" "$state/crates.tsv"
+  # Downstream readers use materialized values without applying another bump.
+  .local/bin/release-crate-manifest > "$test_root/consumer.tsv"
+  cmp "$state/crates.tsv" "$test_root/consumer.tsv"
+  metadata="$(cargo metadata --locked --no-deps --format-version=1)"
+  [[ "$(jq -r '.packages[] | select(.name == "tool") | .version' <<<"$metadata")" == 2.3.4 ]]
+  [[ "$(taplo get --file-path Cargo.toml workspace.dependencies.core.version)" == "0.5.0$suffix" ]]
+  [[ "$(taplo get --file-path Cargo.toml workspace.dependencies.api.version)" == "1.3.0$suffix" ]]
+  git diff --name-only > "$test_root/actual-paths"
+  cmp "$state/changed-paths.txt" "$test_root/actual-paths"
+  for path in Cargo.toml Cargo.lock core/Cargo.toml api/Cargo.toml worker/Cargo.toml; do
+    grep -Fxq "$path" "$state/changed-paths.txt"
+  done
+  [[ "$(wc -l < "$state/changed-paths.txt")" == 5 ]]
+  git diff --cached --exit-code
+  [[ "$(cat unrelated)" == 'unrelated untracked content' ]]
+  [[ "$(cat "$test_root/release-inputs/binary")" == 'adopted producer bytes' ]]
+  git reset --hard HEAD --quiet
+done
+
+# Mutation failure must propagate, leaving no successful changed-path handoff.
+cat > .local/bin/materialize-release-versions <<'MOCK'
+#!/usr/bin/env bash
+printf '\n# partial mutation\n' >> core/Cargo.toml
+exit 1
+MOCK
+git add .local/bin/materialize-release-versions
+git -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m 'test: failing materializer'
+if "$helper" stable '' "$test_root/partial"; then exit 1; fi
+[[ ! -e "$test_root/partial/changed-paths.txt" ]]
+git reset --hard HEAD~1 --quiet
+
+# Even a successful materializer cannot hand unrelated source edits to #330.
+cat > .local/bin/materialize-release-versions <<'MOCK'
+#!/usr/bin/env bash
+printf '// unrelated mutation\n' >> core/src/lib.rs
+MOCK
+git add .local/bin/materialize-release-versions
+git -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m 'test: unexpected materializer edit'
+if "$helper" stable '' "$test_root/unexpected" > "$test_root/stdout" 2> "$test_root/stderr"; then exit 1; fi
+grep -Fq 'Unexpected materialization change: core/src/lib.rs' "$test_root/stderr"
+echo 'Release materialization state contracts passed'

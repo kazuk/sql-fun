@@ -29,12 +29,15 @@ pub use self::{
     unique_constraint::UniqueColumnConstraint,
 };
 
-use sql_fun_core::IVec;
+#[cfg(any(test, feature = "sqlite"))]
+use ::sql_fun_core::IVec;
 
-use crate::{
-    sem::{AnalysisError, ColumnName, ParseContext, TableName},
-    syn::{ConstrType, Opt, ScanToken},
-};
+#[cfg(test)]
+use crate::{ast::TryFromWithTokens, syn::ScanToken};
+
+#[cfg(any(test, feature = "sqlite"))]
+use crate::sem::ParseContext;
+use crate::sem::{AnalysisError, ColumnName, TableName};
 
 /// common behavior for column constraints
 pub trait ColumnConstraintTrait {
@@ -80,6 +83,38 @@ pub enum ColumnConstraint {
     AttrImmediate(AttrImmediateColumnConstraint),
     /// collate column constraint
     Collate(CollateColumnConstraint),
+}
+
+impl ColumnConstraint {
+    pub(crate) fn rename_expression(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Default(value) => value.rename_expression(visitor),
+            Self::Generated(value) => value.rename_expression(visitor),
+            Self::Check(value) => value.rename_expression(visitor),
+            _ => Ok(()),
+        }
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        match self {
+            Self::Nullability(value) => value.rename_relation(old, new),
+            Self::Default(value) => value.rename_relation(old, new),
+            Self::Identity(value) => value.rename_relation(old, new),
+            Self::Generated(value) => value.rename_relation(old, new),
+            Self::Check(value) => value.rename_relation(old, new),
+            Self::PrimaryKey(value) => value.rename_relation(old, new),
+            Self::Unique(value) => value.rename_relation(old, new),
+            Self::Exclusion(value) => value.rename_relation(old, new),
+            Self::ForeignKey(value) => value.rename_relation(old, new),
+            Self::AttrDeferrability(value) => value.rename_relation(old, new),
+            Self::AttrDeferred(value) => value.rename_relation(old, new),
+            Self::AttrImmediate(value) => value.rename_relation(old, new),
+            Self::Collate(value) => value.rename_relation(old, new),
+        }
+    }
 }
 
 /// kind of [`ColumnConstraint`]
@@ -499,9 +534,10 @@ mod test_column_constraint_trait_for_column_constraint {
     }
 }
 
+#[cfg(test)]
 impl ColumnConstraint {
     pub(crate) fn analyze_constraint<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
         syn: &crate::syn::Constraint,
@@ -510,142 +546,11 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        let Some(con_type) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-
-        let constraint = match con_type {
-            ConstrType::ConstrNull | ConstrType::ConstrNotnull => {
-                let (null_constraint, new_context) =
-                    ColumnNullabilityConstraint::analyze_constraint(
-                        context,
-                        table_name,
-                        column_name,
-                        syn,
-                    )?;
-                context = new_context;
-                Self::nullability(null_constraint)
-            }
-            ConstrType::ConstrDefault => {
-                let (c, new_context) = DefaultColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                    tokens,
-                )?;
-                context = new_context;
-                Self::default(c)
-            }
-            ConstrType::ConstrIdentity => {
-                let (c, new_context) = IdentityColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::identity(c)
-            }
-            ConstrType::ConstrGenerated => {
-                let (c, new_context) = GeneratedColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                    tokens,
-                )?;
-                context = new_context;
-                Self::generated(c)
-            }
-            ConstrType::ConstrCheck => {
-                let (c, new_context) = CheckColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                    tokens,
-                )?;
-                context = new_context;
-                Self::check(c)
-            }
-            ConstrType::ConstrPrimary => {
-                let (pk_constraint, new_context) = PrimaryKeyColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::primary_key(pk_constraint)
-            }
-            ConstrType::ConstrUnique => {
-                let (uniq_constraint, new_context) = UniqueColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::unique(uniq_constraint)
-            }
-            ConstrType::ConstrExclusion => {
-                let (c, new_context) = ExclusionColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::exclusion(c)
-            }
-            ConstrType::ConstrForeign => {
-                let (c, new_context) = ForeignKeyColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::foreign_key(c)
-            }
-            ConstrType::ConstrAttrDeferrable | ConstrType::ConstrAttrNotDeferrable => {
-                let (c, new_context) = AttrDeferrabilityColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::attr_deferrability(c)
-            }
-            ConstrType::ConstrAttrDeferred => {
-                let (c, new_context) = AttrDeferredColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::attr_deferred(c)
-            }
-            ConstrType::ConstrAttrImmediate => {
-                let (c, new_context) = AttrImmediateColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    column_name,
-                    syn,
-                )?;
-                context = new_context;
-                Self::attr_immediate(c)
-            }
-            ConstrType::OptionNone | ConstrType::Undefined => {
-                AnalysisError::raise_unexpected_input("constraint.contype")?;
-                AnalysisError::never()
-            }
-        };
-        Ok((constraint, context))
+        crate::ast::ColumnConstraint::try_from_with_tokens(syn, tokens)?.resolve_and_report(
+            context,
+            table_name,
+            column_name,
+        )
     }
 }
 
@@ -757,90 +662,23 @@ mod column_constraint_analyze_constraint_tests {
 }
 
 impl ColumnConstraint {
-    /// analyze [`crate::syn::sqllite::ColumnConstraint`]
+    /// analyze [`crate::syn::sqlite::ColumnConstraint`]
     #[cfg(feature = "sqlite")]
     pub fn analyze_sqlite_column_constraint<TParseContext>(
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
         syn: &crate::syn::sqlite::ColumnConstraint,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        use crate::syn::sqlite::ColumnConstraint;
-
-        match syn {
-            ColumnConstraint::PrimaryKey(primary_key_column_constraint) => {
-                PrimaryKeyColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    primary_key_column_constraint,
-                )
-            }
-            ColumnConstraint::NotNull(not_null_column_constraint) => {
-                ColumnNullabilityConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    not_null_column_constraint,
-                )
-            }
-            ColumnConstraint::Unique(unique_column_constraint) => {
-                UniqueColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    unique_column_constraint,
-                )
-            }
-            ColumnConstraint::Check(check_column_constraint) => {
-                CheckColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    check_column_constraint,
-                    tokens,
-                )
-            }
-            ColumnConstraint::Default(default_column_constraint) => {
-                DefaultColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    default_column_constraint,
-                    tokens,
-                )
-            }
-            ColumnConstraint::Collate(collate_column_constraint) => {
-                CollateColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    collate_column_constraint,
-                    tokens,
-                )
-            }
-            ColumnConstraint::ForeignKey(foreign_key_column_constraint) => {
-                ForeignKeyColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    foreign_key_column_constraint,
-                )
-            }
-            ColumnConstraint::Generated(_generated_column_constraint) => {
-                GeneratedColumnConstraint::analyze_constraint_sqlite(
-                    context,
-                    table_name,
-                    column_name,
-                    _generated_column_constraint,
-                    tokens,
-                )
-            }
-        }
+        crate::ast::ColumnConstraint::try_from(syn)?.resolve_and_report(
+            context,
+            table_name,
+            column_name,
+        )
     }
 }
 
@@ -902,6 +740,9 @@ pub struct Deferrable {
 }
 
 impl Deferrable {
+    pub(crate) const fn is_initially_deferred(&self) -> bool {
+        self.init_deferred
+    }
     /// create instance
     pub const fn new(init_deferred: bool) -> Self {
         Self { init_deferred }

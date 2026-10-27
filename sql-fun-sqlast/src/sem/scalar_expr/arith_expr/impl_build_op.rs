@@ -1,38 +1,47 @@
+use crate::sem::scalar_expr::arith_expr::ArithExpr;
 use crate::sem::{
-    AnalysisError, OperatorName, ParseContext, SemScalarExpr,
-    scalar_expr::arith_expr::UndefinedOperatorCallSite,
+    AnalysisError, OperatorName, SemScalarExpr, scalar_expr::arith_expr::UndefinedOperatorCallSite,
 };
 
-use super::ArithExpr;
-
 impl ArithExpr {
-    pub(super) fn build_op<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn build_op<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator_def) = context.get_operator_op(name, lexpr.is_some(), rexpr.is_some())
         {
+            if lexpr
+                .as_ref()
+                .is_some_and(|value| value.get_type().is_none())
+                || rexpr
+                    .as_ref()
+                    .is_some_and(|value| value.get_type().is_none())
+            {
+                return Ok((Self::deferred_operator(name, lexpr, rexpr), context));
+            }
             let operator_def = operator_def.clone();
             match (lexpr, rexpr) {
-                (Some(l), Some(r)) => Self::build_binary_op(context, name, l, r, operator_def),
+                (Some(l), Some(r)) => {
+                    Self::build_binary_op_resolved(context, name, l, r, operator_def)
+                }
                 (None, None) => AnalysisError::raise_unexpected_input("lexpr, rexpr both None")?,
                 (Some(a), None) => {
-                    let resolved = Self::resolve_overload_unary(&mut context, operator_def, a)?;
+                    let resolved = Self::resolve_overload_unary(context, operator_def, a)?;
                     resolved.into_left_unary_call_site_expr(context, name)
                 }
                 (None, Some(a)) => {
-                    let resolved = Self::resolve_overload_unary(&mut context, operator_def, a)?;
+                    let resolved = Self::resolve_overload_unary(context, operator_def, a)?;
                     resolved.into_right_unary_call_site_expr(context, name)
                 }
             }
         } else {
             tracing::trace!("operator not found in context");
-            UndefinedOperatorCallSite::undefined_operator(context, name, lexpr, rexpr)
+            UndefinedOperatorCallSite::undefined_operator_resolved(context, name, lexpr, rexpr)
         }
     }
 }
@@ -48,7 +57,8 @@ mod test_arith_expr_build_op {
         },
         test_helpers::{TestParseContext, test_context},
     };
-    use testresult::TestResult;
+
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     #[case("+", Some(10), Some(10))]
@@ -95,7 +105,7 @@ mod test_arith_expr_build_op {
         let left = left.map(|v| SemScalarExpr::new_const(ScalarConstExpr::new_integer(v)));
         let right = right.map(|v| SemScalarExpr::new_const(ScalarConstExpr::new_integer(v)));
 
-        ArithExpr::build_op(test_context, &name, left, right)?;
+        ArithExpr::build_op(&mut test_context, &name, left, right)?;
         Ok(())
     }
 }

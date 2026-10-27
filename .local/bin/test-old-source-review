@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Offline contracts for the repository-local maintenance skill.
+set -euo pipefail
+root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+fixture="$(mktemp -d)"
+trap 'rm -rf -- "$fixture"' EXIT
+export REVIEW_FIXTURE="$fixture"
+mkdir -p "$fixture/repo/.codex/skills" "$fixture/repo/.github/ISSUE_TEMPLATE" "$fixture/repo/.local/bin" "$fixture/bin"
+cp -R "$root/.codex/skills/old-source-review" "$fixture/repo/.codex/skills/"
+cp "$root/.github/ISSUE_TEMPLATE/maintenance.md" "$fixture/repo/.github/ISSUE_TEMPLATE/"
+git -C "$fixture/repo" init -q
+git -C "$fixture/repo" config user.name Fixture
+git -C "$fixture/repo" config user.email fixture@example.invalid
+# Fixture commits must work even when signing is enabled and no signer exists.
+git -C "$fixture/repo" config commit.gpgSign true
+git -C "$fixture/repo" config gpg.program false
+printf 'pub fn stable_definition() {}\n' > "$fixture/repo/old source.rs"
+printf 'pub fn other() {}\n' > "$fixture/repo/other.rs"
+cat > "$fixture/repo/.local/bin/old-source" <<'POLICY'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$PWD" == "$REVIEW_FIXTURE/repo" ]]
+[[ "${POLICY_FAILURE:-false}" != true ]] || exit 1
+[[ "${EMPTY_POLICY:-false}" != true ]] || exit 0
+printf '2000-01-01 %s\n2001-01-01 other.rs\n' "${CANDIDATE:-old source.rs}"
+POLICY
+chmod +x "$fixture/repo/.local/bin/old-source"
+git -C "$fixture/repo" add .
+git -C "$fixture/repo" commit --no-gpg-sign -qm 'test: fixture'
+sha="$(git -C "$fixture/repo" rev-parse HEAD)"
+collect="$fixture/repo/.codex/skills/old-source-review/scripts/collect-evidence.sh"
+create="$fixture/repo/.codex/skills/old-source-review/scripts/create-maintenance-issue.sh"
+expect_failure() {
+  if "$@" > "$fixture/stdout" 2> "$fixture/stderr"; then
+    printf 'Unexpected success: %s\n' "$*" >&2
+    exit 1
+  fi
+}
+cd "$fixture"
+"$collect" --oldest | jq -e --arg sha "$sha" '.target == "old source.rs" and .evidence_commit == $sha' >/dev/null
+"$collect" --suggest-candidate | jq -e '.suggested_target == "old source.rs"' >/dev/null
+expect_failure "$collect"
+expect_failure "$collect" --oldest --target other.rs
+expect_failure "$collect" --oldest --suggest-candidate
+expect_failure "$collect" --suggest-candidate --definition stable_definition
+expect_failure env CANDIDATE=other.txt "$collect" --oldest
+expect_failure "$collect" --target other.rs --evidence-commit 0000000000000000000000000000000000000000
+expect_failure "$collect" --oldest --evidence-commit "$sha"
+expect_failure "$collect" --evidence-commit HEAD --target other.rs
+expect_failure env POLICY_FAILURE=true "$collect" --oldest
+expect_failure env EMPTY_POLICY=true "$collect" --oldest
+expect_failure env CANDIDATE=missing.rs "$collect" --oldest
+printf 'pub fn dirty_definition() {}\n' > "$fixture/repo/old source.rs"
+"$collect" --oldest --definition stable_definition | jq -e '.literal_definition_occurrences[0].literal_occurrences | length == 1' >/dev/null
+"$collect" --target 'old source.rs' --definition dirty_definition | jq -e '.literal_definition_occurrences[0].literal_occurrences | length == 0' >/dev/null
+git -C "$fixture/repo" add 'old source.rs'
+git -C "$fixture/repo" commit --no-gpg-sign -qm 'test: change head'
+"$collect" --target 'old source.rs' --evidence-commit "$sha" --definition stable_definition | jq -e --arg sha "$sha" '.evidence_commit == $sha and (.literal_definition_occurrences[0].literal_occurrences | length == 1)' >/dev/null
+cat > "$fixture/bin/gh" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$1 $2" == 'repo view' ]]; then
+  [[ "$3" == https://github.com/fixture/repository ]]
+  [[ "${RESOLVE_FAILURE:-false}" != true ]] || exit 1
+  printf 'Fixture/Repository\n'
+elif [[ "$1 $2" == 'issue create' ]]; then
+  printf 'create\n' >> "$REVIEW_FIXTURE/requests"
+  [[ "$3 $4" == '--repo Fixture/Repository' ]]
+  [[ "$9 ${10}" == '--label not-ready' ]]
+  grep -q '^# Required follow-up for Keep' "$8"
+  [[ "${CREATE_FAILURE:-false}" != true ]] || exit 1
+  printf 'https://github.com/Fixture/Repository/issues/1\n'
+else
+  exit 1
+fi
+MOCK
+chmod +x "$fixture/bin/gh"
+export PATH="$fixture/bin:$PATH" GH_REPO=unrelated/repository
+"$create" --required-headings > "$fixture/body"
+args=(--repository-context --title '[Maintenance] old source.rs: Keep' --body-file "$fixture/body")
+expect_failure "$create" "${args[@]}"
+[[ ! -e "$fixture/requests" ]]
+for remote in \
+  https://github.com/fixture/repository.git \
+  git@github.com:fixture/repository.git \
+  ssh://git@github.com/fixture/repository.git \
+  https://github.com/fixture/repository/ \
+  https://github.com/fixture/repository.git/ \
+  ssh://git@github.com/fixture/repository/; do
+  git -C "$fixture/repo" remote remove origin 2>/dev/null || true
+  git -C "$fixture/repo" remote add origin "$remote"
+  "$create" "${args[@]}" >/dev/null
+done
+[[ "$(wc -l < "$fixture/requests")" -eq 6 ]]
+expect_failure "$create" "${args[@]}" --repo other/repository
+expect_failure env RESOLVE_FAILURE=true "$create" "${args[@]}"
+printf 'invalid body\n' > "$fixture/bad-body"
+expect_failure "$create" --repository-context --title test --body-file "$fixture/bad-body"
+git -C "$fixture/repo" remote set-url origin https://example.invalid/fixture/repository
+expect_failure "$create" "${args[@]}"
+[[ "$(wc -l < "$fixture/requests")" -eq 6 ]]
+# Never echo credentials, including when rejecting credential-bearing origins.
+for remote in \
+  https://x-access-token:fixture-secret@github.com/fixture/repository.git \
+  https://x-access-token:fixture-secret@example.invalid/fixture/repository.git; do
+  git -C "$fixture/repo" remote set-url origin "$remote"
+  expect_failure "$create" "${args[@]}"
+  if grep -Fq 'fixture-secret' "$fixture/stdout" "$fixture/stderr"; then
+    printf 'Credential leaked in origin diagnostic\n' >&2
+    exit 1
+  fi
+  grep -Fq 'unsupported repository origin' "$fixture/stderr"
+done
+[[ "$(wc -l < "$fixture/requests")" -eq 6 ]]
+git -C "$fixture/repo" remote set-url origin https://github.com/fixture/repository.git
+expect_failure env CREATE_FAILURE=true "$create" "${args[@]}"
+[[ "$(wc -l < "$fixture/requests")" -eq 7 ]]
+# Use the controlled helper with an explicit fixture root, even when GIT_ROOT
+# points to the developer checkout and the agent Git wrapper is active.
+linked="$(GIT_ROOT="$fixture/repo" "$root/.local/bin/agent-worktree-add" linked HEAD)"
+[[ "$linked" == "$fixture/repo/.worktrees/linked" ]]
+"$linked/.codex/skills/old-source-review/scripts/create-maintenance-issue.sh" "${args[@]}" >/dev/null
+[[ "$(wc -l < "$fixture/requests")" -eq 8 ]]
+printf 'Old-source-review contracts passed\n'

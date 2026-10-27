@@ -1,0 +1,7 @@
+{{#each this}}
+CREATE TABLE {{ident schema}}.{{ident table}} (
+{{#each columns}}
+    {{ident column}} {{sql data_type}}{{#if not_null}} NOT NULL{{/if}}{{#if default_expr}} DEFAULT ({{sql default_expr}}){{/if}}{{#unless @last}},{{/unless}}
+{{/each}}
+);
+{{/each}}

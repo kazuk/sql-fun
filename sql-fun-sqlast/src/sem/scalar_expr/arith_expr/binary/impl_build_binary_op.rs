@@ -12,16 +12,28 @@ impl super::ArithExpr {
     where
         TParseContext: ParseContext,
     {
-        let resolved_bin_op =
-            Self::resolve_overload_binary(&mut context, operator_def, lexpr, rexpr)?;
+        let (value, _) =
+            Self::build_binary_op_resolved(&mut context, name, lexpr, rexpr, operator_def)?;
+        Ok((value, context))
+    }
+
+    pub(crate) fn build_binary_op_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+        operator_def: OperatorDefinition,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::ParseContext,
+    {
+        let resolved_bin_op = Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
         resolved_bin_op.into_call_site_expr(context, name)
     }
 }
 
 #[cfg(test)]
 mod test_arith_expr_build_binary_op {
-    use testresult::TestResult;
-
     use crate::{
         sem::{
             BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
@@ -31,6 +43,8 @@ mod test_arith_expr_build_binary_op {
         },
         test_helpers::{TestParseContext, test_context},
     };
+
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     fn test_arith_expr_build_binary_op(mut test_context: TestParseContext) -> TestResult {

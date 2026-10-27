@@ -1,4 +1,6 @@
 disallowed-methods = [
+    { path = "core::option::Option::and_then", reason = "Use explicit if let, let chains, or match for readability." },
+    { path = "core::option::Option::or_else", reason = "Use explicit if let, let chains, or match for readability." },
     { path = "bool::then", reason = "Use explicit if/else for readability." },
     { path = "bool::then_some", reason = "Use explicit if/else for readability." },
 ]

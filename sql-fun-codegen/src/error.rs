@@ -41,9 +41,9 @@ pub enum SqlFunCodegenError {
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
 
-    /// represents [`serde_yaml_ng::Error`]
+    /// represents [`serde_saphyr::Error`]
     #[error(transparent)]
-    Yaml(#[from] serde_yaml_ng::Error),
+    Yaml(#[from] serde_saphyr::Error),
 
     /// represents [`std::io::Error`]
     #[error(transparent)]

@@ -1,4 +1,5 @@
 mod impl_conversion_traits;
+mod parse;
 
 use std::fmt::Display;
 
@@ -6,8 +7,20 @@ use std::fmt::Display;
 use crate::sem::AnalysisError;
 use crate::sem::{CatalogName, LocalName, SchemaName};
 
-/// full name parts.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
+/// A logical SQL name with one, two, or three components.
+///
+/// A catalog requires a schema. Components contain logical identifier values,
+/// without SQL delimiters; constructors do not perform SQL case folding.
+/// `Display` is an injective canonical spelling used by name-search tries. It
+/// quotes punctuation, case-sensitive spellings and PostgreSQL keywords where
+/// necessary. It is not dialect validation: empty identifiers, for example,
+/// are representable here but are not legal PostgreSQL SQL.
+///
+/// `FromStr` reads this component spelling (including doubled double quotes),
+/// preserving case, without interpreting SQL type aliases or folding case.
+/// Use the dialect's SQL parser when reading SQL, and [`Self::to_sql`] when
+/// emitting a name for a selected dialect.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize)]
 pub struct FullName {
     catalog: Option<CatalogName>,
     schema: Option<SchemaName>,
@@ -28,13 +41,52 @@ impl TryFrom<&crate::syn::sqlite::QualifiedName> for FullName {
 }
 
 impl FullName {
-    /// create instance
+    pub(crate) fn sqlite_identity(&self) -> Self {
+        Self::new(
+            &self
+                .catalog()
+                .map(|name| CatalogName::from(name.as_str().to_ascii_lowercase().as_str())),
+            &self
+                .schema()
+                .map(|name| SchemaName::from(name.as_str().to_ascii_lowercase().as_str())),
+            &LocalName::from(self.name().as_str().to_ascii_lowercase().as_str()),
+        )
+    }
+
+    pub(crate) fn sqlite_eq(&self, other: &Self) -> bool {
+        const fn equal(left: Option<&str>, right: Option<&str>) -> bool {
+            match (left, right) {
+                (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+                (None, None) => true,
+                _ => false,
+            }
+        }
+        equal(
+            self.catalog().map(CatalogName::as_str),
+            other.catalog().map(CatalogName::as_str),
+        ) && equal(
+            self.schema().map(SchemaName::as_str),
+            other.schema().map(SchemaName::as_str),
+        ) && self
+            .name()
+            .as_str()
+            .eq_ignore_ascii_case(other.name().as_str())
+    }
+
+    /// Construct from logical components.
+    ///
+    /// # Panics
+    /// Panics if a catalog is supplied without a schema.
     #[must_use]
     pub fn new(
         catalog: &Option<CatalogName>,
         schema: &Option<SchemaName>,
         name: &LocalName,
     ) -> Self {
+        assert!(
+            catalog.is_none() || schema.is_some(),
+            "a catalog requires a schema"
+        );
         Self {
             catalog: catalog.clone(),
             schema: schema.clone(),
@@ -66,13 +118,26 @@ impl FullName {
         &self.name
     }
 
-    /// create with catalog
-    pub fn with_catalog(catalog: &str, schema: Option<&str>, name: &str) -> Self {
-        Self {
-            catalog: Some(CatalogName::from(catalog)),
-            schema: schema.map(SchemaName::from),
-            name: LocalName::from(name),
-        }
+    /// Construct a three-component name. A catalog always requires a schema.
+    #[must_use]
+    pub fn with_catalog(catalog: &str, schema: &str, name: &str) -> Self {
+        Self::new(
+            &Some(CatalogName::from(catalog)),
+            &Some(SchemaName::from(schema)),
+            &LocalName::from(name),
+        )
+    }
+
+    /// Render a checked SQL name for an explicitly selected dialect.
+    ///
+    /// All components are quoted. PostgreSQL rejects empty identifiers; both
+    /// dialects reject NUL. SQLite rejects three-component relation names.
+    /// This does not verify that a catalog exists or is accessible.
+    ///
+    /// # Errors
+    /// Returns an error if the name cannot be emitted for the selected dialect.
+    pub fn to_sql(&self, dialect: crate::ast::Dialect) -> Result<String, crate::ast::DeparseError> {
+        crate::ast::render_full_name(self, dialect)
     }
 
     /// create with schema
@@ -96,16 +161,6 @@ impl FullName {
     #[must_use]
     pub fn replace_schema(&self, schema: &SchemaName) -> Self {
         self.clone().set_schema(schema.clone())
-    }
-
-    /// supply `catalog_name`
-    #[must_use]
-    pub fn catalog_default(&self, catalog_name: &str) -> Self {
-        if self.catalog().is_none() && self.schema().is_none() {
-            Self::with_catalog(catalog_name, None, self.name().as_str())
-        } else {
-            self.clone()
-        }
     }
 
     /// create `FullName` from only local part
@@ -238,16 +293,78 @@ impl FullName {
     }
 }
 
+// Quoted components escape every quote and protect every separator. Unquoted
+// components contain neither. With catalog-only states excluded, the component
+// count uniquely identifies the qualification shape, so this spelling is injective.
 impl Display for FullName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(catalog) = &self.catalog {
-            write!(f, "{catalog}.")?;
+            write!(
+                f,
+                "{}.",
+                crate::identifier::CanonicalIdentifier::from(catalog.as_str())
+            )?;
         }
 
         if let Some(schema) = &self.schema {
-            write!(f, "{schema}.")?;
+            write!(
+                f,
+                "{}.",
+                crate::identifier::CanonicalIdentifier::from(schema.as_str())
+            )?;
         }
 
-        write!(f, "{}", self.name)
+        write!(
+            f,
+            "{}",
+            crate::identifier::CanonicalIdentifier::from(self.name.as_str())
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests;
+
+impl<'de> serde::Deserialize<'de> for FullName {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename = "FullName")]
+        struct Components {
+            catalog: Option<CatalogName>,
+            schema: Option<SchemaName>,
+            name: LocalName,
+        }
+        let parts = <Components as serde::Deserialize>::deserialize(deserializer)?;
+        if parts.catalog.is_some() && parts.schema.is_none() {
+            return Err(serde::de::Error::custom("a catalog requires a schema"));
+        }
+        Ok(Self::new(&parts.catalog, &parts.schema, &parts.name))
+    }
+}
+
+#[cfg(test)]
+mod deserialize_tests {
+    use super::FullName;
+
+    #[test]
+    fn rejects_catalog_without_schema() {
+        let input = r#"{"catalog":"db","schema":null,"name":"items"}"#;
+        let error = serde_json::from_str::<FullName>(input).unwrap_err();
+        assert!(error.to_string().contains("a catalog requires a schema"));
+    }
+
+    #[rstest::rstest]
+    #[case::local(FullName::from_local_name("a.b"))]
+    #[case::schema(FullName::with_schema("", "Mixed"))]
+    #[case::catalog(FullName::with_catalog("my.db", "a.b", "c.d"))]
+    fn preserves_serialized_shape_and_valid_identity(
+        #[case] name: FullName,
+    ) -> testresult::TestResult {
+        let encoded = serde_json::to_value(&name)?;
+        assert_eq!(encoded["catalog"], serde_json::to_value(name.catalog())?);
+        assert_eq!(encoded["schema"], serde_json::to_value(name.schema())?);
+        assert_eq!(encoded["name"], name.name().as_str());
+        assert_eq!(serde_json::from_value::<FullName>(encoded)?, name);
+        Ok(())
     }
 }

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+test_root="$(mktemp -d)"
+trap 'rm -rf "$test_root"' EXIT
+fixture="$test_root/workspace"
+
+mkdir -p "$fixture/.local/bin"
+cp "$repo_root/Cargo.toml" "$fixture/Cargo.toml"
+cp "$repo_root/.local/bin/bump-version" "$repo_root/.local/bin/materialize-release-versions" "$fixture/.local/bin/"
+
+while IFS= read -r manifest; do
+  relative="${manifest#"$repo_root"/}"
+  directory="$(dirname "$relative")"
+  mkdir -p "$fixture/$directory/src"
+  cp "$manifest" "$fixture/$relative"
+  : > "$fixture/$directory/src/lib.rs"
+done < <(find "$repo_root" -name Cargo.toml -not -path '*/target/*' -not -path '*/postgres/*' | sort)
+
+git -C "$fixture" init --quiet
+git -C "$fixture" add .
+git -C "$fixture" -c user.name=test -c user.email=test@example.invalid commit --quiet -m fixture
+
+function expect_failure_without_mutation() {
+  if (cd "$fixture" && "$@" >/dev/null 2>&1); then
+    echo "expected command to fail: $*" >&2
+    exit 1
+  fi
+  git -C "$fixture" diff --exit-code
+}
+
+expect_failure_without_mutation .local/bin/materialize-release-versions --release --snapshot=trial
+expect_failure_without_mutation .local/bin/materialize-release-versions --snapshot='invalid name'
+
+sed -i '/^sql-fun-codegen = "patch"$/d' "$fixture/Cargo.toml"
+git -C "$fixture" add Cargo.toml
+git -C "$fixture" -c user.name=test -c user.email=test@example.invalid commit --quiet -m missing-metadata
+expect_failure_without_mutation .local/bin/materialize-release-versions --release
+
+git -C "$fixture" reset --hard HEAD~1 --quiet
+(cd "$fixture" && .local/bin/materialize-release-versions --release --output="$test_root/release.tsv")
+grep -Fqx "sql-fun-core$(printf '\t')0.1.2" "$test_root/release.tsv"
+grep -Fqx "sql-fun-codegen$(printf '\t')0.1.1" "$test_root/release.tsv"
+
+git -C "$fixture" reset --hard HEAD --quiet
+(cd "$fixture" && .local/bin/materialize-release-versions --snapshot=snapshot1 --output="$test_root/snapshot.tsv")
+grep -Fqx "sql-fun-core$(printf '\t')0.1.2-snapshot1" "$test_root/snapshot.tsv"
+grep -Fqx "sql-fun-codegen$(printf '\t')0.1.1-snapshot1" "$test_root/snapshot.tsv"

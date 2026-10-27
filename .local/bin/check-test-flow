@@ -11,39 +11,55 @@ Options:
   --workspace-only
   --changed-only
   --nextest-extra="..."
+  --workspace-phase=build|test   Split workspace compilation and execution.
   --fmt-check           Check formatting without rewriting files.
   --step=<name>          Run only the selected step. Can be repeated.
   --list-steps           Print available step names.
   -h, --help
 
-Steps:
+Default steps:
   affected
   workspace
   proc-macro-tests
   fmt
   lint
+  package-metadata
   server-api-spec
   deny
   dependency-updates
+  markdown-lint
   doc
   typos
+  version-materialization
   graphify
+  skill-lint
+
+Optional steps (explicit --step required):
+  packaging
+  cli-contract
+  cli-e2e
 USAGE
 }
 
-ALL_STEPS=(
+DEFAULT_STEPS=(
   affected
   workspace
   proc-macro-tests
   fmt
   lint
+  package-metadata
   server-api-spec
   deny
   dependency-updates
+  markdown-lint
   doc
   typos
+  version-materialization
   graphify
+  skill-lint
 )
+
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract cli-e2e)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
@@ -51,7 +67,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify)
+    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e)
       printf '%s\n' "$1"
       ;;
     format)
@@ -76,6 +92,7 @@ SINCE=""
 WORKSPACE_ONLY=0
 CHANGED_ONLY=0
 NEXTEST_EXTRA=""
+WORKSPACE_PHASE=""
 FMT_CHECK=0
 SELECTED_STEPS=()
 
@@ -86,6 +103,7 @@ for a in "$@"; do
     --workspace-only) WORKSPACE_ONLY=1 ;;
     --changed-only)   CHANGED_ONLY=1 ;;
     --nextest-extra=*) NEXTEST_EXTRA="${a#*=}" ;;
+    --workspace-phase=build|--workspace-phase=test) WORKSPACE_PHASE="${a#*=}" ;;
     --fmt-check) FMT_CHECK=1 ;;
     --step=*) SELECTED_STEPS+=("$(normalize_step "${a#*=}")") ;;
     --list-steps) list_steps; exit 0 ;;
@@ -97,13 +115,20 @@ done
 cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
 
+echo '== Copy payload module from sql-fun-server-api to sql-fun-client'
+rm sql-fun-client/src/payloads.rs
+rm -rf sql-fun-client/src/payloads
+cp sql-fun-server-api/src/payloads.rs sql-fun-client/src/payloads.rs
+cp -r sql-fun-server-api/src/payloads sql-fun-client/src/payloads
+
+
 declare -A STEP_SELECTED=()
 if (( ${#SELECTED_STEPS[@]} > 0 )); then
   for step in "${SELECTED_STEPS[@]}"; do
     STEP_SELECTED["$step"]=1
   done
 else
-  for step in "${ALL_STEPS[@]}"; do
+  for step in "${DEFAULT_STEPS[@]}"; do
     STEP_SELECTED["$step"]=1
   done
 fi
@@ -132,6 +157,7 @@ function collect_changed() {
 
 function run_check()   { echo ">> cargo check $*";   cargo check   "$@"; }
 function run_nextest() { echo ">> cargo nextest run $*"; cargo nextest run "$@"; }
+function run_clippy() { echo ">> cargo clippy $*"; cargo clippy "$@"; }
 
 function run_affected() {
   if (( WORKSPACE_ONLY == 1 )); then
@@ -172,6 +198,8 @@ function run_affected() {
     for pkg in "${!AFFECTED[@]}"; do
       run_check   -p "$pkg" "${FEATURES[@]}"
       run_nextest -p "$pkg" "${FEATURES[@]}" ${NEXTEST_EXTRA}  --no-tests pass
+      run_clippy  -p "$pkg" "${FEATURES[@]}" --no-deps --all-targets \
+        -- -D warnings --allow unfulfilled_lint_expectations
     done
   else
     echo "== No affected crates detected."
@@ -181,11 +209,109 @@ function run_affected() {
   fi
 }
 
+function run_sqlast_feature_boundaries() {
+  echo "== sqlast SQLite workaround feature boundaries"
+  # Separate Cargo invocations avoid workspace feature unification hiding opt-out.
+  run_check -p sql-fun-sqlast --all-targets --no-default-features
+  run_check -p sql-fun-sqlast --all-targets --no-default-features --features sqlite
+  run_check -p sql-fun-sqlast --all-targets --no-default-features --features turso_parser
+  run_check -p sql-fun-sqlast --all-targets --features workaround_turso_9791
+}
+
+function run_cli_dependency_boundaries() {
+  echo "== CLI SQLAST dependency boundary (including test/build dependencies)"
+  local tree mode
+  local -a features=()
+  for mode in default sqlite; do
+    features=()
+    if [[ "$mode" == sqlite ]]; then
+      features=(--features sqlite)
+    fi
+    tree="$(cargo tree --locked -p sql-fun-cli --edges normal,build,dev "${features[@]}")"
+    case "$tree" in
+      *sql-fun-sqlast*)
+        echo "CLI $mode dependency graph includes sql-fun-sqlast" >&2
+        return 1
+        ;;
+    esac
+    # Keep package selections separate from workspace feature unification.
+    run_check -p sql-fun-cli --all-targets "${features[@]}"
+  done
+}
+
+function run_workspace_build_checks() {
+  if [[ "$WORKSPACE_PHASE" == "build" && -n "${SQL_FUN_CI_TEST_GROUP:-}" ]]; then
+    case "$SQL_FUN_CI_TEST_GROUP" in
+      a)
+        run_cli_dependency_boundaries
+        run_check --workspace "${FEATURES[@]}"
+        ;;
+      b) run_sqlast_feature_boundaries ;;
+      *) echo "Unknown workspace test group: $SQL_FUN_CI_TEST_GROUP" >&2; return 1 ;;
+    esac
+  else
+    run_sqlast_feature_boundaries
+    run_cli_dependency_boundaries
+    run_check --workspace "${FEATURES[@]}"
+  fi
+}
+
 function run_workspace() {
   require_command cargo-nextest
+  require_command jq
   echo "== Workspace verification"
-  run_check   --workspace "${FEATURES[@]}"
-  run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+  bash "$GIT_ROOT/ci/nextest/test-workspace-groups.sh"
+  if [[ "$WORKSPACE_PHASE" != "test" ]]; then
+    run_workspace_build_checks
+  fi
+  if [[ "$WORKSPACE_PHASE" == "build" ]]; then
+    : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"
+    mkdir -p "$SQL_FUN_CI_ARTIFACT_DIR"
+    if [[ -n "${SQL_FUN_CI_TEST_GROUP:-}" ]]; then
+      source "$GIT_ROOT/.local/sbin/workspace-test-groups"
+      workspace_test_group_packages "$SQL_FUN_CI_TEST_GROUP" >/dev/null
+      build_workspace_test_group "$SQL_FUN_CI_TEST_GROUP"
+    else
+      cargo nextest archive --locked --workspace --exclude sql-fun "${FEATURES[@]}" \
+        --timings --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst"
+    fi
+    # The CLI and server are built in a separate CI job.
+  elif [[ "$WORKSPACE_PHASE" == "test" ]]; then
+    : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"
+    : "${SQL_FUN_BIN:?SQL_FUN_BIN is required for archived tests}"
+    : "${SQL_FUN_TEST_SERVER_BIN:?SQL_FUN_TEST_SERVER_BIN is required for archived tests}"
+    if [[ "${SQL_FUN_CI_TEST_GROUPS:-}" == "a b" ]]; then
+      source "$GIT_ROOT/.local/sbin/workspace-test-groups"
+      run_grouped_workspace_verification
+    else
+      run_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst" \
+        ${NEXTEST_EXTRA} --no-tests pass
+      run_sqlast_regressions
+    fi
+  else
+    run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+    run_sqlast_regressions
+  fi
+}
+
+# Shared offline SQL contracts are part of workspace verification in local and CI runs.
+function run_sqlast_regressions() {
+  require_command jq
+  # Match nextest package/target selection to reuse its unified dependency artifacts.
+  if [[ "$WORKSPACE_PHASE" != "test" ]]; then
+    cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
+  fi
+  local target_dir
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  local binary_dir="${target_dir}/debug"
+  if [[ "$WORKSPACE_PHASE" == "test" ]]; then
+    binary_dir="$SQL_FUN_CI_ARTIFACT_DIR"
+  fi
+  SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
+    SQL_FUN_BIN="${SQL_FUN_BIN:-${binary_dir}/sql-fun}" \
+    SQL_FUN_TEST_SERVER_BIN="${SQL_FUN_TEST_SERVER_BIN:-${binary_dir}/sql-fun-server}" \
+    SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
+    "${GIT_ROOT}/tests/sqlast-regressions/run.sh"
 }
 
 function run_proc_macro_tests() {
@@ -208,7 +334,8 @@ function run_fmt() {
 
 function run_lint() {
   echo "== Linting"
-  cargo clippy --no-deps --workspace --all-targets "${FEATURES[@]}"
+  cargo clippy --no-deps --workspace --all-targets "${FEATURES[@]}" \
+    -- -D warnings --allow unfulfilled_lint_expectations
   RUST_LOG=error taplo lint
 }
 
@@ -231,8 +358,13 @@ function run_dependency_updates() {
 }
 
 function run_doc() {
+  require_command mdbook
   echo "== Document build"
   cargo doc --workspace --no-deps
+  mdbook build
+  echo "== Documentation tests (default and all features)"
+  cargo test --doc -p sql-fun-sqlast -p sql-fun-client
+  cargo test --doc -p sql-fun-sqlast -p sql-fun-client --all-features
 }
 
 function run_typos() {
@@ -240,10 +372,99 @@ function run_typos() {
   typos --config .local/config/typos.toml
 }
 
+function run_version_materialization() {
+  echo "== Verify release version materialization"
+  "${GIT_ROOT}/.local/bin/test-materialize-release-versions"
+  "${GIT_ROOT}/.local/bin/test-release-publication"
+  "${GIT_ROOT}/.local/bin/test-release-preparation"
+  "${GIT_ROOT}/.local/bin/test-pages-prototype"
+  "${GIT_ROOT}/.local/bin/test-materialize-release-state"
+}
+
+function run_packaging() {
+  echo "== Build and validate Linux distributions"
+  "${GIT_ROOT}/.local/bin/package-linux" x86_64-unknown-linux-gnu
+}
+
+function run_package_metadata() {
+  require_command cargo
+  require_command jq
+  local crates name version manifest_path directory
+  local -a patches=()
+  crates="$("${GIT_ROOT}/.local/bin/release-crate-manifest" --with-paths)"
+
+  # Cargo resolves registry dependencies even with --no-verify. Point workspace
+  # dependencies at their local sources while their versions are unpublished.
+  while IFS=$'\t' read -r name version manifest_path; do
+    directory="$(dirname "$manifest_path")"
+    patches+=(--config "patch.crates-io.\"$name\".path=$(jq -Rn --arg path "$directory" '$path')")
+  done <<< "$crates"
+
+  while IFS=$'\t' read -r name version manifest_path; do
+    echo ">> cargo package --package $name --allow-dirty --no-verify"
+    if ! cargo package --package "$name" --allow-dirty --no-verify --quiet "${patches[@]}"; then
+      echo "error: package construction failed for $name" >&2
+      return 1
+    fi
+  done <<< "$crates"
+}
+
+function run_cli_contract() {
+  require_command jq
+  require_command scrut
+  echo "== CLI contracts"
+  cargo build --locked -p sql-fun-cli --bin sql-fun
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  BASH_ENV="${GIT_ROOT}/cli/contracts/setup.sh" \
+    SQL_FUN_BIN="${target_dir}/debug/sql-fun" \
+    scrut test "${GIT_ROOT}/cli/contracts"
+}
+
+function run_cli_e2e() {
+  require_command jq
+  require_command scrut
+  echo "== Scrut CLI E2E tests"
+  cargo build --locked -p sql-fun-cli --bin sql-fun "${FEATURES[@]}"
+  cargo build --locked -p sql-fun-server --bin sql-fun-server "${FEATURES[@]}"
+  local target_dir
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  SQL_FUN_BIN="${target_dir}/debug/sql-fun" \
+    SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server" \
+    "${GIT_ROOT}/cli/tests/scrut/run.sh" cli/tests/scrut
+}
+
 function run_graphify() {
   require_command graphify
   echo "== Update graph index"
   graphify update .
+}
+
+function run_skill_validator() {
+  require_command skill-validator
+  echo "== Linting skills"
+  # Repository skills may include a maintainer-facing README.md when SKILL.md
+  # links to it, such as the third-party vendoring workflow.
+  skill-validator check --strict --allow-flat-layouts --emit-annotations .codex/skills --output compact
+}
+
+function run_rumdl() {
+  require_command rumdl
+  echo "== Linting Markdown"
+
+  # Gitlinks identify submodules even when they have not been initialized.
+  local entry
+  local -a excludes=()
+  while IFS= read -r -d '' entry; do
+    [[ "$entry" == "160000 "* ]] || continue
+    excludes+=("${entry#*$'\t'}/**")
+  done < <(git ls-files --stage -z)
+
+  local -a options=()
+  if (( ${#excludes[@]} > 0 )); then
+    local IFS=,
+    options=(--exclude "${excludes[*]}")
+  fi
+  rumdl check "${options[@]}" .
 }
 
 for step in "${ALL_STEPS[@]}"; do
@@ -254,12 +475,19 @@ for step in "${ALL_STEPS[@]}"; do
       proc-macro-tests) run_proc_macro_tests ;;
       fmt) run_fmt ;;
       lint) run_lint ;;
+      package-metadata) run_package_metadata ;;
       server-api-spec) run_server_api_spec ;;
       deny) run_deny ;;
       dependency-updates) run_dependency_updates ;;
       doc) run_doc ;;
       typos) run_typos ;;
+      version-materialization) run_version_materialization ;;
       graphify) run_graphify ;;
+      skill-lint) run_skill_validator ;;
+      markdown-lint) run_rumdl ;;
+      packaging) run_packaging ;;
+      cli-contract) run_cli_contract ;;
+      cli-e2e) run_cli_e2e ;;
     esac
   fi
 done

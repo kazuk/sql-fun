@@ -1,0 +1,65 @@
+[
+  {
+    "name": "enum_column_keeps_qualified_identity",
+    "sql": "SELECT status FROM public.enum_items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "status",
+          "type": {
+            "schema_name": "public",
+            "local_name": "status",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "same_label_enums_keep_distinct_result_types",
+    "sql": "SELECT status, other FROM public.enum_items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "status",
+          "type": {
+            "schema_name": "public",
+            "local_name": "status",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "other",
+          "type": {
+            "schema_name": "public",
+            "local_name": "other_status",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "enum_function_result_keeps_identity",
+    "sql": "SELECT public.enum_identity(status) FROM public.enum_items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "enum_identity",
+          "type": {
+            "schema_name": "public",
+            "local_name": "status",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

@@ -2,26 +2,57 @@ name: build and test
 
 on:
   pull_request:
+    branches-ignore:
+      - ci-image
     types:
       - opened
       - synchronize
       - reopened
   merge_group:
 
+concurrency:
+  group: build-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: never
   USER: runner
 
 jobs:
+  pr-freshness:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+
+      - name: Reject PR heads missing current base
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags origin "+refs/heads/${PR_BASE_REF}:refs/remotes/origin/${PR_BASE_REF}"
+          git fetch --no-tags origin "$PR_HEAD_SHA"
+          if ! git merge-base --is-ancestor "refs/remotes/origin/${PR_BASE_REF}" "$PR_HEAD_SHA"; then
+            echo "::error::PR head does not contain the current base (${PR_BASE_REF}); rebase onto the PR base before CI."
+            exit 1
+          fi
+
   workspace:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: &ci-builder-container
-      image: ghcr.io/kazuk/ci-builder@sha256:ea6ec7eb1de813cc738996ba2ebc42d6b9a02ad9e8d0c81e2141e097887410fa
+      image: ghcr.io/kazuk/ci-builder@sha256:911d5ec28d1a1981022eb07d510c90c73df720e214e2e164b83cec6aa7bb5636
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - name: Disk usage before cache restore
         run: |
@@ -49,6 +80,8 @@ jobs:
           GIT_ROOT="$(git rev-parse --show-toplevel)"
           export GIT_ROOT
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          export SQL_FUN_BIN="${GIT_ROOT}/target/debug/sql-fun"
+          export SQL_FUN_TEST_SERVER_BIN="${GIT_ROOT}/target/debug/sql-fun-server"
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
@@ -69,6 +102,23 @@ jobs:
             fi
           done
 
+      - name: Upload SQLAST regression evidence
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-source
+          path: target/sqlast-regressions/
+          if-no-files-found: warn
+
+      - name: Upload nextest JUnit report
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nextest-junit-workspace
+          path: target/nextest/ci/junit.xml
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Test Report
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
@@ -78,136 +128,301 @@ jobs:
           reporter: java-junit
 
 
-  workspace-all-features:
+  workspace-all-features-tests-build:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [a, b]
     steps:
       - uses: actions/checkout@v5
-
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
       - name: Disk usage before cache restore
         run: |
           df -h . /usr/local/cargo /github/home
           df -i . /usr/local/cargo /github/home
-
       - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
             /usr/local/cargo/git
-          key: cargo-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-workspace-all-features-tests-${{ matrix.group }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
 
       - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
-          key: sccache-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          key: sccache-${{ runner.os }}-workspace-all-features-tests-${{ matrix.group }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sccache-${{ runner.os }}-
 
-      - name: Build and test with all features
+      - name: Build nextest archive
+        env:
+          SQL_FUN_CI_TEST_GROUP: ${{ matrix.group }}
+          SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
         run: |
           GIT_ROOT="$(git rev-parse --show-toplevel)"
-          export GIT_ROOT
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
-          sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --all-features --step=workspace --nextest-extra="
-            --config-file ./ci/nextest/config.toml
-            --profile ci
-            --show-progress none"
+          sccache --start-server
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=build
           sccache --show-stats
-
-      - name: Disk usage after build and test
+      - name: Disk usage after test build
         if: ${{ always() }}
         run: |
           df -h . /usr/local/cargo /github/home
           df -i . /usr/local/cargo /github/home
-          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
-            if [ -d "$path" ]; then
-              du -sh "$path"
-            fi
-          done
+          du -sh target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-all-features-nextest-${{ matrix.group }}
+          path: ${{ runner.temp }}/workspace-ci/nextest-${{ matrix.group }}.tar.zst
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: cargo-timings-workspace-all-features-${{ matrix.group }}
+          path: target/cargo-timings/*.html
+          retention-days: 30
+          if-no-files-found: warn
 
-      - name: Test Report
+  workspace-all-features-cli-build:
+    needs: pr-freshness
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-workspace-all-features-cli-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-workspace-all-features-cli-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+      - name: Build cli binary
+        run: |
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
+          cargo build --locked --all-features -p sql-fun-cli --bin sql-fun
+          mkdir -p "${RUNNER_TEMP}/workspace-cli"
+          cp "target/debug/sql-fun" "${RUNNER_TEMP}/workspace-cli/"
+          sccache --show-stats
+      - name: Disk usage after cli build
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          du -sh target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-all-features-cli
+          path: ${{ runner.temp }}/workspace-cli/
+          if-no-files-found: error
+
+  workspace-all-features-server-build:
+    needs: pr-freshness
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-workspace-all-features-server-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-workspace-all-features-server-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+      - name: Build server binary
+        run: |
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
+          cargo build --locked --all-features -p sql-fun-server --bin sql-fun-server
+          mkdir -p "${RUNNER_TEMP}/workspace-server"
+          cp "target/debug/sql-fun-server" "${RUNNER_TEMP}/workspace-server/"
+          sccache --show-stats
+      - name: Disk usage after server build
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          du -sh target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-all-features-server
+          path: ${{ runner.temp }}/workspace-server/
+          if-no-files-found: error
+
+  workspace-all-features:
+    needs: [workspace-all-features-tests-build, workspace-all-features-cli-build, workspace-all-features-server-build]
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-nextest-a
+          path: ${{ runner.temp }}/workspace-ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-nextest-b
+          path: ${{ runner.temp }}/workspace-ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-cli
+          path: ${{ runner.temp }}/workspace-cli
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-server
+          path: ${{ runner.temp }}/workspace-server
+      - name: Run archived all-features tests and SQLAST regressions
+        env:
+          SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
+          SQL_FUN_CI_TEST_GROUPS: a b
+          SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
+        run: |
+          export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
+          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
+            --config-file ./ci/nextest/config.toml
+            --show-progress none"
+      - name: Disk usage after tests
+        if: ${{ always() }}
+        run: |
+          df -h . /github/home
+          df -i . /github/home
+          du -sh target ${{ runner.temp }}/workspace-ci ${{ runner.temp }}/workspace-cli ${{ runner.temp }}/workspace-server || true
+      - name: Upload SQLAST regression evidence
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-source-all-features
+          path: target/sqlast-regressions/
+          if-no-files-found: warn
+      - name: Upload nextest JUnit report (a)
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nextest-junit-workspace-all-features-a
+          path: target/nextest/ci-a/junit.xml
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Test Report (a)
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
         with:
-          name: nextest tests (all features)
-          path: target/nextest/ci/junit.xml
+          name: nextest tests (all features, group a)
+          path: target/nextest/ci-a/junit.xml
           reporter: java-junit
 
-  proc-macro-tests:
+      - name: Upload nextest JUnit report (b)
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nextest-junit-workspace-all-features-b
+          path: target/nextest/ci-b/junit.xml
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Test Report (b)
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: nextest tests (all features, group b)
+          path: target/nextest/ci-b/junit.xml
+          reporter: java-junit
+
+  msrv:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
 
+      - name: Read declared Rust version
+        id: msrv
+        run: |
+          RUST_VERSION="$(cargo metadata --no-deps --format-version=1 --locked \
+            | jq -er '.packages[] | select(.name == "sql-fun") | .rust_version')"
+          echo "rust_version=${RUST_VERSION}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
             /usr/local/cargo/git
-          key: cargo-${{ runner.os }}-proc-macro-tests-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            cargo-${{ runner.os }}-
+            cargo-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-
 
       - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
-          key: sccache-${{ runner.os }}-proc-macro-tests-${{ hashFiles('**/Cargo.lock') }}
+          key: sccache-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            sccache-${{ runner.os }}-
+            sccache-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-
 
-      - name: Proc-macro compilation tests
+      - name: Check workspace with declared MSRV
         run: |
-          GIT_ROOT="$(git rev-parse --show-toplevel)"
-          export GIT_ROOT
-          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
-          sccache --start-server
+          RUST_VERSION="${{ steps.msrv.outputs.rust_version }}"
+          rustup toolchain install "$RUST_VERSION" --profile minimal
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=proc-macro-tests --all-features --nextest-extra="
-            --config-file ./ci/nextest/config.toml
-            --profile ci
-            --test-threads=1
-            --show-progress none"
+          sccache --start-server
+          cargo +"$RUST_VERSION" check --workspace --all-features --locked
           sccache --show-stats
 
-      - name: Disk usage after proc-macro compilation tests
-        if: ${{ always() }}
-        run: |
-          df -h . /usr/local/cargo /github/home
-          df -i . /usr/local/cargo /github/home
-          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
-            if [ -d "$path" ]; then
-              du -sh "$path"
-            fi
-          done
-
-      - name: Test Report
-        uses: dorny/test-reporter@v3
-        if: ${{ !cancelled() }}
-        with:
-          name: proc-macro compilation tests
-          path: target/nextest/ci/junit.xml
-          reporter: java-junit
 
   fmt:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - name: Check formatting
         run: .local/bin/check-test-flow --step=fmt --fmt-check
 
   lint:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -233,14 +448,33 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=lint
+          .local/bin/check-test-flow --all-features --step=lint
           sccache --show-stats
 
+      - name: Check crate package metadata
+        run: .local/bin/check-test-flow --step=package-metadata
+
+      - name: Check typos
+        run: .local/bin/check-test-flow --step=typos
+
+      - name: Verify release version and publication contracts
+        run: .local/bin/check-test-flow --step=version-materialization
+
+      - name: Validate skills
+        run: .local/bin/check-test-flow --step=skill-lint
+
+      - name: Lint Markdown
+        run: .local/bin/check-test-flow --step=markdown-lint
+
   server-api-spec:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -270,19 +504,27 @@ jobs:
           sccache --show-stats
 
   deny:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - name: Check dependencies
         run: .local/bin/check-test-flow --step=deny
 
   dependency-updates:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -297,10 +539,14 @@ jobs:
         run: .local/bin/check-test-flow --step=dependency-updates
 
   doc:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -326,28 +572,189 @@ jobs:
           .local/bin/check-test-flow --step=doc
           sccache --show-stats
 
-  typos:
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-user-manual
+          path: user_manual/
+          if-no-files-found: error
+
+  packaging:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
+    env:
+      CARGO_TARGET_DIR: target
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check typos
-        run: .local/bin/check-test-flow --step=typos
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
+      - name: Build and validate Linux distributions
+        run: .local/bin/check-test-flow --step=packaging
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: target/distributions/x86_64-unknown-linux-gnu/*
+          if-no-files-found: error
+
+  install-validation:
+    needs: [pr-freshness, packaging]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/sql-fun-artifact
+
+      - name: Validate the installed CLI contract
+        env:
+          DOTSLASH_VERSION: v0.5.9
+          DOTSLASH_SHA256: 4c75c6eb7890ae35993b962073f6d9bbe78b42b81a5691303ad70f63bfbf7196
+          SCRUT_VERSION: v0.4.3
+          SCRUT_DOTSLASH_SHA256: d2e4d5d36198f889dd7f827c29cc1b8cb2a362df98e47cdf84b5ee0e207151fc
+        run: |
+          validation_root="$RUNNER_TEMP/sql-fun-install-validation"
+          mkdir -p "$validation_root/contracts"
+          cp -R cli/contracts/. "$validation_root/contracts/"
+          mkdir -p "$validation_root/e2e"
+          cp -R cli/tests/scrut/. "$validation_root/e2e/"
+          cp "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb "$validation_root/"
+          curl -fsSL -o "$validation_root/dotslash.tar.gz" \
+            "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
+          printf '%s  %s\n' "$DOTSLASH_SHA256" "$validation_root/dotslash.tar.gz" | sha256sum --check --status
+          tar -xzf "$validation_root/dotslash.tar.gz" -C "$validation_root"
+          curl -fsSL -o "$validation_root/scrut.dotslash" \
+            "https://github.com/facebookincubator/scrut/releases/download/${SCRUT_VERSION}/scrut"
+          printf '%s  %s\n' "$SCRUT_DOTSLASH_SHA256" "$validation_root/scrut.dotslash" | sha256sum --check --status
+          scrut_binary=$("$validation_root/dotslash" -- fetch "$validation_root/scrut.dotslash")
+          install -m 0755 "$scrut_binary" "$validation_root/scrut"
+          docker run --rm \
+            --mount "type=bind,source=$validation_root,target=/validation,readonly" \
+            ubuntu:24.04 bash -ceu '
+              apt-get update
+              apt-get install -y --no-install-recommends jq /validation/sql-fun_*.deb
+              BASH_ENV=/validation/contracts/setup.sh \
+                SQL_FUN_BIN=/usr/bin/sql-fun \
+                /validation/scrut test /validation/contracts
+              SQL_FUN_BIN=/usr/bin/sql-fun \
+                SQL_FUN_TEST_SERVER_BIN=/usr/bin/sql-fun-server \
+                PATH="/validation:$PATH" \
+                /validation/e2e/run.sh /validation/e2e
+            '
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-expand@1.0.126
+
+      - name: Execute checked SQL against PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client build-essential pkg-config libssl-dev clang \
+            "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          tests/postgres-e2e/run.sh --installed /usr/bin/sql-fun /usr/bin/sql-fun-server
+
+      - name: Clean PostgreSQL E2E build artifacts
+        if: ${{ always() }}
+        run: cargo clean
+
+  postgres-extraction:
+    needs: [pr-freshness, packaging]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/sql-fun-artifact
+
+      - name: Install packaged extraction tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 postgresql-client "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+
+      - name: Install Scrut
+        env:
+          DOTSLASH_VERSION: v0.5.9
+          DOTSLASH_SHA256: 4c75c6eb7890ae35993b962073f6d9bbe78b42b81a5691303ad70f63bfbf7196
+          SCRUT_VERSION: v0.4.3
+          SCRUT_DOTSLASH_SHA256: d2e4d5d36198f889dd7f827c29cc1b8cb2a362df98e47cdf84b5ee0e207151fc
+        run: |
+          scrut_root="$RUNNER_TEMP/sql-fun-postgres-scrut"
+          mkdir -p "$scrut_root"
+          curl -fsSL -o "$scrut_root/dotslash.tar.gz" \
+            "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
+          printf '%s  %s\n' "$DOTSLASH_SHA256" "$scrut_root/dotslash.tar.gz" | sha256sum --check --status
+          tar -xzf "$scrut_root/dotslash.tar.gz" -C "$scrut_root"
+          curl -fsSL -o "$scrut_root/scrut.dotslash" \
+            "https://github.com/facebookincubator/scrut/releases/download/${SCRUT_VERSION}/scrut"
+          printf '%s  %s\n' "$SCRUT_DOTSLASH_SHA256" "$scrut_root/scrut.dotslash" | sha256sum --check --status
+          scrut_binary=$("$scrut_root/dotslash" -- fetch "$scrut_root/scrut.dotslash")
+          install -m 0755 "$scrut_binary" "$scrut_root/scrut"
+
+      - name: Validate installed PostgreSQL initialization contract
+        env:
+          SQL_FUN_BIN: /usr/bin/sql-fun
+          SQL_FUN_TEST_DOCKER_HOST: 127.0.0.1
+          SQL_FUN_TEST_DOCKER_BIND: 127.0.0.1
+        run: |
+          BASH_ENV="$GITHUB_WORKSPACE/cli/postgres-contracts/setup.sh" \
+            "$RUNNER_TEMP/sql-fun-postgres-scrut/scrut" test cli/postgres-contracts
+
+      - name: Validate installed PostgreSQL extraction and import
+        run: |
+          .local/bin/test-postgres-extraction \
+            --binary /usr/bin/sql-fun \
+            --output "$RUNNER_TEMP/sql-fun-postgres"
+          for version in 17 18; do
+            diff -r "sql-fun-home/postgres/$version" "$RUNNER_TEMP/sql-fun-postgres/$version"
+          done
+
+      - name: Validate installed SQLAST regression contracts
+        env:
+          SQL_FUN_BIN: /usr/bin/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: /usr/bin/sql-fun-server
+        run: |
+          SQL_FUN_HOME="$RUNNER_TEMP/sql-fun-postgres/initialized-docker" \
+            SQL_FUN_REGRESSION_REPORT_DIR="$RUNNER_TEMP/sqlast-regressions" \
+            tests/sqlast-regressions/run.sh
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-installed
+          path: ${{ runner.temp }}/sqlast-regressions/
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-postgres-extracted
+          path: |
+            ${{ runner.temp }}/sql-fun-postgres/17/**
+            ${{ runner.temp }}/sql-fun-postgres/18/**
+          if-no-files-found: error
 
   build:
     runs-on: ubuntu-24.04
     needs:
       - workspace
       - workspace-all-features
-      - proc-macro-tests
+      - msrv
       - fmt
       - lint
       - server-api-spec
       - deny
       - dependency-updates
       - doc
-      - typos
+      - packaging
+      - install-validation
+      - postgres-extraction
     steps:
       - name: Complete
         run: true

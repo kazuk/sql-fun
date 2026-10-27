@@ -1,23 +1,58 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
-        AnalysisError, AnalysisProblem, AstAndContextPair, ColumnCollection, ColumnDefinition,
-        DefElemKey, FullName, FunctionOverloadCollection, FunctionParam, OverloadVariant,
-        ParseContext, SemAst, type_system::ArgumentBindingCollection,
+        AnalysisError, AstAndContextPair, ColumnCollection, FullName, FunctionOverloadCollection,
+        OverloadVariant, ParseContext, type_system::ArgumentBindingCollection,
     },
-    syn::{ListOpt, Opt, ScanToken},
+    syn::ScanToken,
 };
 
 /// analyzed [`crate::syn::CreateFunctionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
+    replace: bool,
+
+    owner: Option<crate::sem::OwnerSpecification>,
+    object_kind: crate::sem::ObjectKind,
     name: FullName,
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
 }
 
 impl CreateFunction {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> bool {
+        let previous = self.clone();
+        self.overloads.rename_relation(old, new);
+        if let Some(columns) = &mut self.returning_columdef {
+            columns.rename_relation(old, new);
+        }
+        !self.overloads.same_signatures(&previous.overloads)
+            || self.returning_columdef != previous.returning_columdef
+    }
+
+    pub(crate) const fn replace(&self) -> bool {
+        self.replace
+    }
+    pub(crate) const fn with_replace(mut self, value: bool) -> Self {
+        self.replace = value;
+        self
+    }
+
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     /// create new instance
     #[must_use]
     pub fn new(
@@ -26,6 +61,9 @@ impl CreateFunction {
         returning_columns: &Option<ColumnCollection>,
     ) -> Self {
         Self {
+            replace: false,
+            owner: None,
+            object_kind: crate::sem::ObjectKind::from(20),
             name: name.clone(),
             overloads: overloads.clone(),
             returning_columdef: returning_columns.clone(),
@@ -70,7 +108,7 @@ impl CreateFunction {
 
     /// analyze [`crate::syn::CreateFunctionStmt`]
     pub fn analyze_create_function<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         syn: crate::syn::CreateFunctionStmt,
         tokens: &IVec<ScanToken>,
@@ -78,84 +116,76 @@ impl CreateFunction {
     where
         TParseContext: ParseContext,
     {
-        let name = FullName::try_from(syn.get_funcname())?;
-        let Some(params) = syn.get_parameters().map(|a| a.as_function_parameter()) else {
-            AnalysisError::raise_unexpected_none("create_function_stmt.parameters")?
-        };
-
-        let Some(ret_type) = syn.get_return_type().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_function_stmt.return_type")?
-        };
-
-        let returning_col_def = if ret_type.get_setof() {
-            let ret_type = FullName::try_from(ret_type.clone())?;
-            if ret_type.name().as_str() == "record" {
-                FunctionParam::collect_output_params_as_columns(&params)?
-            } else if let Some(result_set_type) = context.get_type(&ret_type) {
-                if result_set_type.is_composite_type() {
-                    Some(result_set_type.get_composite_type_columns())
-                } else if let Some(result_type) = result_set_type.type_reference() {
-                    // returning record type
-                    let columns = vec![ColumnDefinition::new(&None, Some(result_type), None, &[])];
-                    Some(ColumnCollection::new(columns))
-                } else {
-                    // returns dynamic type
-                    None
-                }
-            } else {
-                context.report_problem(AnalysisProblem::function_result_set_type_not_found(
-                    &ret_type,
-                ))?;
-                Some(ColumnCollection::new(Vec::new()))
-            }
-        } else {
-            None
-        };
-
-        let (def_elem_list, new_context) =
-            super::analyze_def_elem_list(context, syn.get_options())?;
-        context = new_context;
-        let is_strict = def_elem_list.contains(&DefElemKey::strict());
-        let mut func_params = Vec::new();
-        for param in params {
-            let (function_param, new_context) = FunctionParam::analyze(context, param, tokens)?;
-            context = new_context;
-            func_params.push(function_param);
-        }
-
-        let ret_type = FullName::try_from(ret_type)?;
-        let ret_type = context.get_type(&ret_type);
-        let overload_variant = OverloadVariant::new(
-            &ret_type.and_then(|v| v.type_reference()).cloned(),
-            &func_params,
-            is_strict,
-            false,
-        );
-
-        let func = Self::new(
-            &name,
-            &FunctionOverloadCollection::new(&[overload_variant]),
-            &returning_col_def,
-        );
-
-        let result_context = context.apply_create_function(&func)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateFunction(func),
-            result_context,
-        ))
+        crate::ast::Function::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }
 
-/// analyze [`crate::syn::CreateFunctionStmt`]
-#[deprecated = "use CreateFunction::analyze_create_function"]
-pub fn analyze_create_function<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CreateFunctionStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateFunction::analyze_create_function(context, parent_schema, syn, tokens)
+impl CreateFunction {
+    pub(crate) fn previous_definition<'a>(
+        &self,
+        existing: &'a [Self],
+        pending: &'a [Self],
+    ) -> Option<&'a Self> {
+        for definitions in [existing, pending] {
+            for previous in definitions {
+                if self.same_signature(previous) {
+                    return Some(previous);
+                }
+            }
+        }
+        None
+    }
+    fn same_signature(&self, other: &Self) -> bool {
+        self.overloads
+            .get_at(0)
+            .map(OverloadVariant::identity_arguments)
+            == other
+                .overloads
+                .get_at(0)
+                .map(OverloadVariant::identity_arguments)
+    }
+    pub(crate) fn can_replace(&self, other: &Self) -> bool {
+        self.object_kind == other.object_kind
+            && self.returning_columdef == other.returning_columdef
+            && self.overloads.get_at(0).map(OverloadVariant::ret_type)
+                == other.overloads.get_at(0).map(OverloadVariant::ret_type)
+    }
+    pub(crate) fn contains_identity(
+        definitions: &[Self],
+        name: &FullName,
+        identity: &crate::sem::OwnershipIdentity,
+    ) -> bool {
+        for definition in definitions {
+            if definition.ownership_identity(name) == *identity {
+                return true;
+            }
+        }
+        false
+    }
+    pub(crate) fn with_procedure_kind(mut self, procedure: bool) -> Self {
+        if procedure {
+            self.object_kind = crate::sem::ObjectKind::from(30);
+        }
+        self
+    }
+    /// Actual routine kind (FUNCTION or PROCEDURE).
+    pub const fn object_kind(&self) -> crate::sem::ObjectKind {
+        self.object_kind
+    }
+    pub(crate) fn split_definitions(&self) -> Vec<Self> {
+        let mut definitions = Vec::new();
+        for overload in &self.overloads {
+            let mut definition = self.clone();
+            definition.overloads = FunctionOverloadCollection::new(std::slice::from_ref(overload));
+            definitions.push(definition);
+        }
+        definitions
+    }
+    pub(crate) fn ownership_identity(&self, key: &FullName) -> crate::sem::OwnershipIdentity {
+        let arguments = self
+            .overloads
+            .get_at(0)
+            .map_or_else(Vec::new, OverloadVariant::identity_arguments);
+        crate::sem::OwnershipIdentity::with_arguments(self.object_kind, key, &arguments)
+    }
 }

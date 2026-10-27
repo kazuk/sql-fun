@@ -19,7 +19,8 @@ fn path_owner<P: AsRef<Path>>(path: P) -> Result<u32, std::io::Error> {
 )]
 #[builder(build_fn(error = "SqlFunArgsBuilderError"))]
 pub struct MetadataArgs {
-    /// `home_dir`
+    /// sql-fun home path. Accepts absolute paths, working-directory-relative
+    /// paths, and paths beginning with `~/` from the option or `SQL_FUN_HOME`.
     #[clap(long, env = Self::SQL_FUN_HOME)]
     #[builder(setter(into, strip_option), default)]
     sql_fun_home: Option<PathBuf>,
@@ -53,6 +54,12 @@ pub struct MetadataArgs {
     #[clap(long, env = Self::SQL_FUN_CTE_CATALOG_DIR)]
     #[builder(setter(into, strip_option), default)]
     cte_catalog_dir: Option<PathBuf>,
+}
+
+impl MetadataArgs {
+    pub(super) fn schema_file_override(&self) -> Option<&Path> {
+        self.schema_file.as_deref()
+    }
 }
 
 impl MetadataArgsBuilder {
@@ -193,6 +200,7 @@ impl MetadataArgs {
 
 #[cfg(test)]
 mod test_apply_envs {
+    use std::path::Path;
     use testresult::TestResult;
 
     use super::{MetadataArgs, SqlFunArgsBuilder};
@@ -242,6 +250,22 @@ mod test_apply_envs {
     }
 
     #[test]
+    fn home_relative_environment_value_resolves_from_home_directory() -> TestResult {
+        let envs = TestMetadataEnvs::new()
+            .with_sql_fun_home(Path::new("~/work"))
+            .into_map();
+        let mut builder = SqlFunArgsBuilder::default();
+        MetadataArgs::apply_envs(&mut builder, &envs)?;
+        let args = builder.build()?;
+
+        assert_eq!(
+            args.initialization_home()?,
+            std::env::home_dir().unwrap().join("work")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn rejects_unsupported_sql_dialect_env_value() {
         let envs = TestMetadataEnvs::new().with_sql_dialect("mysql").into_map();
 
@@ -259,29 +283,36 @@ mod test_apply_envs {
 impl MetadataArgs {
     /// get home dir path
     ///
-    /// If `--sql-fun-home` or `SQL_FUN_HOME` env present : configured value
+    /// If `--sql-fun-home` or `SQL_FUN_HOME` env present: the configured value,
+    /// resolved from the working directory or user's home when relative.
     /// Else returns `${HOME}/.sql-fun`
     ///
     /// # Errors
     ///
     /// Returns [`SqlFunArgsError`] when the directory cannot be determined or does not exist.
     pub fn sql_fun_home(&self) -> Result<PathBuf, SqlFunArgsError> {
-        if let Some(home_arg) = &self.sql_fun_home {
-            let result = if home_arg.is_relative() {
-                std::env::current_dir()?.join(home_arg)
-            } else {
-                home_arg.clone()
-            };
+        let result = self.initialization_home()?;
+        if self.sql_fun_home.is_some() {
             if result.exists() {
                 Ok(result.canonicalize()?)
             } else {
                 SqlFunArgsError::home_not_exist(result)?
             }
-        } else if let Some(home) = std::env::home_dir() {
-            Ok(home.join(".sql-fun"))
         } else {
-            SqlFunArgsError::user_home_not_defined()?
+            Ok(result)
         }
+    }
+
+    pub(crate) fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
+        if let Some(path) = &self.sql_fun_home {
+            super::resolve_sql_fun_home_path(path)
+        } else {
+            super::resolve_sql_fun_home_path(Path::new("~/.sql-fun"))
+        }
+    }
+
+    pub(crate) fn initialization_home_candidate(&self) -> Option<&Path> {
+        self.sql_fun_home.as_deref()
     }
 }
 
@@ -353,6 +384,10 @@ mod test_metadata_file_raw {
 }
 
 impl MetadataArgs {
+    pub(super) const fn has_explicit_file(&self) -> bool {
+        self.metadata_file.is_some()
+    }
+
     /// search metadata file with same-owner policy
     ///
     /// # Errors
@@ -611,18 +646,11 @@ mod test_cte_catalog_dir {
 }
 
 impl MetadataArgs {
-    /// Populate env map with derived values.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SqlFunArgsError`] when metadata resolution fails.
-    pub fn get_envs(
+    /// Transfer common choices without selecting or resolving a datasource.
+    pub(super) fn get_common_envs(
         &self,
         envs: &mut HashMap<String, String>,
-        metadata: &SqlFunMetadata,
     ) -> Result<(), SqlFunArgsError> {
-        let metadata_file = self.metadata_file()?;
-
         envs.insert(
             Self::SQL_FUN_HOME.to_string(),
             self.sql_fun_home()?.to_string_lossy().to_string(),
@@ -633,9 +661,39 @@ impl MetadataArgs {
         );
         envs.insert(
             Self::SQL_FUN_METADATA_FILE.to_string(),
-            metadata_file.to_string_lossy().to_string(),
+            self.metadata_file()?.to_string_lossy().to_string(),
         );
         envs.insert(Self::SQL_FUN_SCHEMA.to_string(), self.schema.clone());
+        if let Some(path) = &self.schema_file {
+            envs.insert(
+                Self::SQL_FUN_SCHEMA_FILE.to_string(),
+                path.to_string_lossy().to_string(),
+            );
+        }
+        if let Some(dialect) = &self.sql_dialect {
+            envs.insert(Self::SQL_FUN_DIALECT.to_string(), dialect.clone());
+        }
+        if let Some(path) = &self.cte_catalog_dir {
+            envs.insert(
+                Self::SQL_FUN_CTE_CATALOG_DIR.to_string(),
+                path.to_string_lossy().to_string(),
+            );
+        }
+        Ok(())
+    }
+
+    /// Populate env map with derived values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when metadata resolution fails.
+    pub fn get_envs(
+        &self,
+        envs: &mut HashMap<String, String>,
+        metadata: &SqlFunMetadata,
+    ) -> Result<(), SqlFunArgsError> {
+        self.get_common_envs(envs)?;
+        let metadata_file = self.metadata_file()?;
         envs.insert(
             Self::SQL_FUN_SCHEMA_FILE.to_string(),
             self.schema_file(&metadata_file)?

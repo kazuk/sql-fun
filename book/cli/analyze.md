@@ -1,0 +1,95 @@
+# Analyze SQL files
+
+`sql-fun analyze` statically analyzes SQL without extracting queries from Rust
+or creating query lockfiles. It uses `sql-fun-server` and an installed builtin
+catalog; it does not execute the SQL or require a live database or `cargo-expand`.
+
+Select the datasource explicitly using `--datasource` or `SQL_FUN_DATASOURCE`.
+This selection authorizes reading that datasource's project metadata. You can
+select the metadata file with `--metadata-file`; otherwise the common metadata
+configuration applies. The command does not choose an available datasource for you.
+
+```sh
+sql-fun --metadata-file Cargo.toml --datasource app analyze queries.sql
+sql-fun --metadata-file Cargo.toml --datasource app analyze 'queries.toml#$.queries'
+```
+
+Without `#`, the input is UTF-8 SQL text, regardless of filename extension.
+With `#`, the file must have a `.json`, `.toml`, or `.yaml` extension, and the
+suffix is a JSONPath selecting exactly one node. A selected string is one input;
+a selected string array is an ordered sequence of independent inputs. Zero or
+multiple selected nodes, empty arrays, mixed arrays, and other selected types
+are input errors. Multiple selected nodes are never flattened. Relative filenames
+are resolved from the command's working directory.
+
+Each selected SQL string can contain multiple statements. For every returned
+statement, output identifies the input and zero-based statement index and shows
+the query kind, completion status, executable SQL, parameters, result columns,
+and relation/column accesses. Parameters include their SQL placeholder index,
+name, type, and nullability; result columns appear in ordinal order with their
+name, type, and nullability. Array types have a `[]` suffix. Unavailable SQL or
+query kinds and unresolved types are marked explicitly; collection counts show
+when no parameters, columns, or accesses were returned.
+
+Diagnostics are shown for every statement with SQL source context. Error
+diagnostics do not stop later inputs. Each input uses the same selected schema
+base, without inheriting changes from preceding inputs.
+
+## Parameter bindings
+
+Analysis finalizes the application's input binding contract. If SQL inference
+and supported explicit input type hints leave several possible input types or
+no type restriction, `parameter_type_unresolved` is an error. The statement is
+incomplete and `analyze` exits with status 1, while later inputs still run.
+Conflicting requirements instead retain their conflict diagnostics.
+
+This error does not mean PostgreSQL rejects the SQL. For example,
+`SELECT $1::text AS value` can be prepared by PostgreSQL but leaves the
+application's input binding unresolved here. Its `value` column is still
+reported as `pg_catalog.text`; known output columns do not establish a complete
+input binding. Analysis does not automatically choose PostgreSQL PREPARE's
+inferred parameter signature.
+
+Use the supported named-placeholder input hint to select the source type:
+
+```sql
+SELECT ${src:text}::text AS value;
+```
+
+This completes with a `text` input binding. `${src}::text` supplies a result cast
+and may leave multiple input types admissible. Similarly, for a function
+`record_fun(src text) RETURNS record`, the following explicit input hint
+resolves the binding while preserving the declared result columns:
+
+```sql
+SELECT a,b FROM record_fun(${src:text}::text) AS r(a int,b text);
+```
+
+Hints must be compatible with every use of the parameter. Use either named
+placeholders or native numbered parameters in one input, never both. See
+[parameter analysis](../sql-analysis.md#parameter-analysis) for the distinction
+between admissible type domains and the public binding contract.
+
+## Schema loading
+
+Both `analyze` and `test` accept `--schema-level`:
+
+| Value | Loaded schema |
+| --- | --- |
+| `builtin` | Builtin catalog/type/function/operator definitions only |
+| `default` | Builtins plus the server's bundled `schema.sql` |
+| `extensions` | Default SQL plus configured extension SQL, in configured order |
+| `project` | Extensions plus the selected project schema dump |
+
+The default is `project`. Lower levels do not require or access SQL files from
+higher levels. In particular, the project dump need not exist for `builtin`,
+`default`, or `extensions`; `builtin` also does not read bundled `schema.sql`.
+Datasource configuration and the installed builtin catalog are still required.
+The existing initialization API currently supports PostgreSQL schema contexts.
+
+Server connection uses the same `USER`, `SQL_FUN_SERVER`, and
+`SQL_FUN_SERVER_COMMAND` settings as [`sql-fun api`](api.md).
+
+The command exits with status 0 if all analysis completes without error-level
+diagnostics. Warnings and advice alone succeed. Error diagnostics and execution
+errors produce status 1; invalid CLI usage produces status 2.

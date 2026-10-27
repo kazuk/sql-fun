@@ -1,338 +1,650 @@
 [
   {
-    "name": "bool"
+    "category": "B",
+    "collatable": false,
+    "name": "bool",
+    "schema": "pg_catalog"
   },
   {
-    "name": "bytea"
+    "category": "U",
+    "collatable": false,
+    "name": "bytea",
+    "schema": "pg_catalog"
   },
   {
-    "name": "char"
+    "category": "Z",
+    "collatable": false,
+    "name": "char",
+    "schema": "pg_catalog"
   },
   {
-    "name": "name"
+    "category": "S",
+    "collatable": true,
+    "name": "name",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int8"
+    "category": "N",
+    "collatable": false,
+    "name": "int8",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int2"
+    "category": "N",
+    "collatable": false,
+    "name": "int2",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int2vector"
+    "category": "A",
+    "collatable": false,
+    "name": "int2vector",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int4"
+    "category": "N",
+    "collatable": false,
+    "name": "int4",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regproc"
+    "category": "N",
+    "collatable": false,
+    "name": "regproc",
+    "schema": "pg_catalog"
   },
   {
-    "name": "text"
+    "category": "S",
+    "collatable": true,
+    "name": "text",
+    "schema": "pg_catalog"
   },
   {
-    "name": "oid"
+    "category": "N",
+    "collatable": false,
+    "name": "oid",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tid"
+    "category": "U",
+    "collatable": false,
+    "name": "tid",
+    "schema": "pg_catalog"
   },
   {
-    "name": "xid"
+    "category": "U",
+    "collatable": false,
+    "name": "xid",
+    "schema": "pg_catalog"
   },
   {
-    "name": "cid"
+    "category": "U",
+    "collatable": false,
+    "name": "cid",
+    "schema": "pg_catalog"
   },
   {
-    "name": "oidvector"
+    "category": "A",
+    "collatable": false,
+    "name": "oidvector",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_type"
+    "category": "P",
+    "collatable": false,
+    "name": "pg_ddl_command",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_attribute"
+    "category": "U",
+    "collatable": false,
+    "name": "json",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_proc"
+    "category": "U",
+    "collatable": false,
+    "name": "xml",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_class"
+    "category": "Z",
+    "collatable": true,
+    "name": "pg_node_tree",
+    "schema": "pg_catalog"
   },
   {
-    "name": "json"
+    "category": "P",
+    "collatable": false,
+    "name": "table_am_handler",
+    "schema": "pg_catalog"
   },
   {
-    "name": "xml"
+    "category": "P",
+    "collatable": false,
+    "name": "index_am_handler",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_node_tree"
+    "category": "G",
+    "collatable": false,
+    "name": "point",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_ndistinct"
+    "category": "G",
+    "collatable": false,
+    "name": "lseg",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_dependencies"
+    "category": "G",
+    "collatable": false,
+    "name": "path",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_mcv_list"
+    "category": "G",
+    "collatable": false,
+    "name": "box",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_ddl_command"
+    "category": "G",
+    "collatable": false,
+    "name": "polygon",
+    "schema": "pg_catalog"
   },
   {
-    "name": "xid8"
+    "category": "G",
+    "collatable": false,
+    "name": "line",
+    "schema": "pg_catalog"
   },
   {
-    "name": "point"
+    "category": "I",
+    "collatable": false,
+    "name": "cidr",
+    "schema": "pg_catalog"
   },
   {
-    "name": "lseg"
+    "category": "N",
+    "collatable": false,
+    "name": "float4",
+    "schema": "pg_catalog"
   },
   {
-    "name": "path"
+    "category": "N",
+    "collatable": false,
+    "name": "float8",
+    "schema": "pg_catalog"
   },
   {
-    "name": "box"
+    "category": "X",
+    "collatable": false,
+    "name": "unknown",
+    "schema": "pg_catalog"
   },
   {
-    "name": "polygon"
+    "category": "G",
+    "collatable": false,
+    "name": "circle",
+    "schema": "pg_catalog"
   },
   {
-    "name": "line"
+    "category": "U",
+    "collatable": false,
+    "name": "macaddr8",
+    "schema": "pg_catalog"
   },
   {
-    "name": "float4"
+    "category": "N",
+    "collatable": false,
+    "name": "money",
+    "schema": "pg_catalog"
   },
   {
-    "name": "float8"
+    "category": "U",
+    "collatable": false,
+    "name": "macaddr",
+    "schema": "pg_catalog"
   },
   {
-    "name": "unknown"
+    "category": "I",
+    "collatable": false,
+    "name": "inet",
+    "schema": "pg_catalog"
   },
   {
-    "name": "circle"
+    "category": "U",
+    "collatable": false,
+    "name": "aclitem",
+    "schema": "pg_catalog"
   },
   {
-    "name": "money"
+    "category": "S",
+    "collatable": true,
+    "name": "bpchar",
+    "schema": "pg_catalog"
   },
   {
-    "name": "macaddr"
+    "category": "S",
+    "collatable": true,
+    "name": "varchar",
+    "schema": "pg_catalog"
   },
   {
-    "name": "inet"
+    "category": "D",
+    "collatable": false,
+    "name": "date",
+    "schema": "pg_catalog"
   },
   {
-    "name": "cidr"
+    "category": "D",
+    "collatable": false,
+    "name": "time",
+    "schema": "pg_catalog"
   },
   {
-    "name": "macaddr8"
+    "category": "D",
+    "collatable": false,
+    "name": "timestamp",
+    "schema": "pg_catalog"
   },
   {
-    "name": "aclitem"
+    "category": "D",
+    "collatable": false,
+    "name": "timestamptz",
+    "schema": "pg_catalog"
   },
   {
-    "name": "bpchar"
+    "category": "T",
+    "collatable": false,
+    "name": "interval",
+    "schema": "pg_catalog"
   },
   {
-    "name": "varchar"
+    "category": "D",
+    "collatable": false,
+    "name": "timetz",
+    "schema": "pg_catalog"
   },
   {
-    "name": "date"
+    "category": "V",
+    "collatable": false,
+    "name": "bit",
+    "schema": "pg_catalog"
   },
   {
-    "name": "time"
+    "category": "V",
+    "collatable": false,
+    "name": "varbit",
+    "schema": "pg_catalog"
   },
   {
-    "name": "timestamp"
+    "category": "N",
+    "collatable": false,
+    "name": "numeric",
+    "schema": "pg_catalog"
   },
   {
-    "name": "timestamptz"
+    "category": "U",
+    "collatable": false,
+    "name": "refcursor",
+    "schema": "pg_catalog"
   },
   {
-    "name": "interval"
+    "category": "N",
+    "collatable": false,
+    "name": "regprocedure",
+    "schema": "pg_catalog"
   },
   {
-    "name": "timetz"
+    "category": "N",
+    "collatable": false,
+    "name": "regoper",
+    "schema": "pg_catalog"
   },
   {
-    "name": "bit"
+    "category": "N",
+    "collatable": false,
+    "name": "regoperator",
+    "schema": "pg_catalog"
   },
   {
-    "name": "varbit"
+    "category": "N",
+    "collatable": false,
+    "name": "regclass",
+    "schema": "pg_catalog"
   },
   {
-    "name": "numeric"
+    "category": "N",
+    "collatable": false,
+    "name": "regtype",
+    "schema": "pg_catalog"
   },
   {
-    "name": "refcursor"
+    "category": "P",
+    "collatable": false,
+    "name": "record",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regprocedure"
+    "category": "P",
+    "collatable": false,
+    "name": "cstring",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regoper"
+    "category": "P",
+    "collatable": false,
+    "name": "any",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regoperator"
+    "category": "P",
+    "collatable": false,
+    "name": "anyarray",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regclass"
+    "category": "P",
+    "collatable": false,
+    "name": "void",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regcollation"
+    "category": "P",
+    "collatable": false,
+    "name": "trigger",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regtype"
+    "category": "P",
+    "collatable": false,
+    "name": "language_handler",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regrole"
+    "category": "P",
+    "collatable": false,
+    "name": "internal",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regnamespace"
+    "category": "P",
+    "collatable": false,
+    "name": "anyelement",
+    "schema": "pg_catalog"
   },
   {
-    "name": "uuid"
+    "category": "P",
+    "collatable": false,
+    "name": "_record",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_lsn"
+    "category": "P",
+    "collatable": false,
+    "name": "anynonarray",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tsvector"
+    "category": "U",
+    "collatable": false,
+    "name": "uuid",
+    "schema": "pg_catalog"
   },
   {
-    "name": "gtsvector"
+    "category": "U",
+    "collatable": false,
+    "name": "txid_snapshot",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tsquery"
+    "category": "P",
+    "collatable": false,
+    "name": "fdw_handler",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regconfig"
+    "category": "U",
+    "collatable": false,
+    "name": "pg_lsn",
+    "schema": "pg_catalog"
   },
   {
-    "name": "regdictionary"
+    "category": "P",
+    "collatable": false,
+    "name": "tsm_handler",
+    "schema": "pg_catalog"
   },
   {
-    "name": "jsonb"
+    "category": "Z",
+    "collatable": true,
+    "name": "pg_ndistinct",
+    "schema": "pg_catalog"
   },
   {
-    "name": "jsonpath"
+    "category": "Z",
+    "collatable": true,
+    "name": "pg_dependencies",
+    "schema": "pg_catalog"
   },
   {
-    "name": "txid_snapshot"
+    "category": "P",
+    "collatable": false,
+    "name": "anyenum",
+    "schema": "pg_catalog"
   },
   {
-    "name": "pg_snapshot"
+    "category": "U",
+    "collatable": false,
+    "name": "tsvector",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int4range"
+    "category": "U",
+    "collatable": false,
+    "name": "tsquery",
+    "schema": "pg_catalog"
   },
   {
-    "name": "numrange"
+    "category": "U",
+    "collatable": false,
+    "name": "gtsvector",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tsrange"
+    "category": "N",
+    "collatable": false,
+    "name": "regconfig",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tstzrange"
+    "category": "N",
+    "collatable": false,
+    "name": "regdictionary",
+    "schema": "pg_catalog"
   },
   {
-    "name": "daterange"
+    "category": "U",
+    "collatable": false,
+    "name": "jsonb",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int8range"
+    "category": "P",
+    "collatable": false,
+    "name": "anyrange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int4multirange"
+    "category": "P",
+    "collatable": false,
+    "name": "event_trigger",
+    "schema": "pg_catalog"
   },
   {
-    "name": "nummultirange"
+    "category": "R",
+    "collatable": false,
+    "name": "int4range",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tsmultirange"
+    "category": "R",
+    "collatable": false,
+    "name": "numrange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tstzmultirange"
+    "category": "R",
+    "collatable": false,
+    "name": "tsrange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "datemultirange"
+    "category": "R",
+    "collatable": false,
+    "name": "tstzrange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "int8multirange"
+    "category": "R",
+    "collatable": false,
+    "name": "daterange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "record"
+    "category": "R",
+    "collatable": false,
+    "name": "int8range",
+    "schema": "pg_catalog"
   },
   {
-    "name": "_record"
+    "category": "U",
+    "collatable": false,
+    "name": "jsonpath",
+    "schema": "pg_catalog"
   },
   {
-    "name": "cstring"
+    "category": "N",
+    "collatable": false,
+    "name": "regnamespace",
+    "schema": "pg_catalog"
   },
   {
-    "name": "any"
+    "category": "N",
+    "collatable": false,
+    "name": "regrole",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anyarray"
+    "category": "N",
+    "collatable": false,
+    "name": "regcollation",
+    "schema": "pg_catalog"
   },
   {
-    "name": "void"
+    "category": "R",
+    "collatable": false,
+    "name": "int4multirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "trigger"
+    "category": "R",
+    "collatable": false,
+    "name": "nummultirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "event_trigger"
+    "category": "R",
+    "collatable": false,
+    "name": "tsmultirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "language_handler"
+    "category": "R",
+    "collatable": false,
+    "name": "tstzmultirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "internal"
+    "category": "R",
+    "collatable": false,
+    "name": "datemultirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anyelement"
+    "category": "R",
+    "collatable": false,
+    "name": "int8multirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anynonarray"
+    "category": "P",
+    "collatable": false,
+    "name": "anymultirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anyenum"
+    "category": "P",
+    "collatable": false,
+    "name": "anycompatiblemultirange",
+    "schema": "pg_catalog"
   },
   {
-    "name": "fdw_handler"
+    "category": "Z",
+    "collatable": true,
+    "name": "pg_brin_bloom_summary",
+    "schema": "pg_catalog"
   },
   {
-    "name": "index_am_handler"
+    "category": "Z",
+    "collatable": true,
+    "name": "pg_brin_minmax_multi_summary",
+    "schema": "pg_catalog"
   },
   {
-    "name": "tsm_handler"
+    "category": "Z",
+    "collatable": true,
+    "name": "pg_mcv_list",
+    "schema": "pg_catalog"
   },
   {
-    "name": "table_am_handler"
+    "category": "U",
+    "collatable": false,
+    "name": "pg_snapshot",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anyrange"
+    "category": "U",
+    "collatable": false,
+    "name": "xid8",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anycompatible"
+    "category": "P",
+    "collatable": false,
+    "name": "anycompatible",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anycompatiblearray"
+    "category": "P",
+    "collatable": false,
+    "name": "anycompatiblearray",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anycompatiblenonarray"
+    "category": "P",
+    "collatable": false,
+    "name": "anycompatiblenonarray",
+    "schema": "pg_catalog"
   },
   {
-    "name": "anycompatiblerange"
-  },
-  {
-    "name": "anymultirange"
-  },
-  {
-    "name": "anycompatiblemultirange"
-  },
-  {
-    "name": "pg_brin_bloom_summary"
-  },
-  {
-    "name": "pg_brin_minmax_multi_summary"
+    "category": "P",
+    "collatable": false,
+    "name": "anycompatiblerange",
+    "schema": "pg_catalog"
   }
 ]

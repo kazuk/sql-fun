@@ -1,0 +1,52 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+    cat >&2 <<'EOF'
+Usage: agent-worktree-add <branch> [<start-point>]
+
+Create a linked worktree below $GIT_ROOT/.worktrees/. The optional start point
+defaults to HEAD.
+EOF
+}
+
+if (($# < 1 || $# > 2)); then
+    usage
+    exit 2
+fi
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+source "${script_dir}/../lib/agent-git.sh"
+real_git=$(agent_real_git "${script_dir}/../agent-bin")
+
+branch="$1"
+start_point="${2:-HEAD}"
+
+if [[ -z "${GIT_ROOT:-}" ]]; then
+    GIT_ROOT=$("$real_git" rev-parse --show-toplevel)
+fi
+GIT_ROOT=$(cd "$GIT_ROOT" && pwd -P)
+
+if ! "$real_git" -C "$GIT_ROOT" check-ref-format --branch "$branch" >/dev/null; then
+    echo "Invalid branch name: $branch" >&2
+    exit 2
+fi
+
+worktree_root="${GIT_ROOT}/.worktrees"
+worktree_path="${worktree_root}/${branch}"
+case "$worktree_path" in
+    "${worktree_root}"/*) ;;
+    *)
+        echo "Invalid worktree path." >&2
+        exit 2
+        ;;
+esac
+
+if [[ -e "$worktree_path" ]]; then
+    echo "Worktree path already exists: $worktree_path" >&2
+    exit 2
+fi
+
+mkdir -p "$worktree_root"
+"$real_git" -C "$GIT_ROOT" worktree add -b "$branch" "$worktree_path" "$start_point" >&2
+printf '%s\n' "$worktree_path"

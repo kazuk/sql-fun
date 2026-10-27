@@ -1,1 +1,1 @@
-{path} directory exists.
+Reusing {path}

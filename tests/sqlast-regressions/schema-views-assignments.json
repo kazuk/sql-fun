@@ -1,0 +1,157 @@
+[
+  {
+    "name": "view_default_rewrite::identity_insert",
+    "sql": "INSERT INTO public.v(key) VALUES(DEFAULT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_default_rewrite::generated_insert",
+    "sql": "INSERT INTO public.v(calc) VALUES(DEFAULT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_default_rewrite::identity_update",
+    "sql": "UPDATE public.v SET key=DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_default_rewrite::generated_update",
+    "sql": "UPDATE public.v SET calc=DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_default_rewrite::by_default_update",
+    "sql": "UPDATE public.v SET other=DEFAULT",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_cast_lineage::same_type",
+    "sql": "UPDATE public.cast_same SET key=DEFAULT",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_cast_lineage::different_type",
+    "sql": "UPDATE public.cast_different SET key=DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_cast_lineage::star_then_cast",
+    "sql": "UPDATE public.cast_star SET key=DEFAULT",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "view_cast_lineage::typmod",
+    "sql": "UPDATE public.cast_typmod SET key=DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate_projection_assignments::explicit_insert",
+    "sql": "INSERT INTO public.duplicate_view(x,y) VALUES(1,2)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate_projection_assignments::implicit_insert",
+    "sql": "INSERT INTO public.duplicate_view VALUES(1,2)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate_projection_assignments::first_implicit",
+    "sql": "INSERT INTO public.duplicate_view VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate_projection_assignments::default_values",
+    "sql": "INSERT INTO public.duplicate_view DEFAULT VALUES",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate_projection_assignments::duplicate_update",
+    "sql": "UPDATE public.duplicate_view SET x=1,y=2",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate_projection_assignments::subscripts",
+    "sql": "UPDATE public.duplicate_view SET p[1]=1,q[2]=2",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "writable_columns_preserve_effective_constraints::identity_assignment",
+    "sql": "UPDATE public.effective_view SET key=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "writable_columns_preserve_effective_constraints::generated_assignment",
+    "sql": "UPDATE public.effective_view SET key=DEFAULT, calc=DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics",
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  }
+]

@@ -30,14 +30,17 @@ async fn lookup(client: &Client, #[parameter_source] dto: &Dto) -> Result<IdWith
 async fn lookup_opt(client: &Client, #[parameter_source(getter_prefix = "get_", field_bind = false)] dto: &Dto) -> Result<Option<IdWithName>, anyhow::Error> {}
 
 #[sql_fun::sql_query_many(sql = "select id, name from users where id = ${id}")]
-async fn lookup_many<F, Fut>(client: &Client, #[parameter_source(field_bind = false)] dto: &Dto, mut collector: Vec<IdWithName>, handler: F) -> Result<Vec<IdWithName>, anyhow::Error>
+async fn lookup_many<F, Fut>(client: &Client, #[parameter_source(field_bind = false)] dto: &Dto, mut rows: Vec<IdWithName>, handler: F) -> Result<Vec<IdWithName>, anyhow::Error>
 where F: Fn(Vec<IdWithName>, IdWithName) -> Fut, Fut: Future<Output = Result<Vec<IdWithName>, anyhow::Error>> {}
 
 #[sql_fun::sql_statement(sql = "delete from users where id = ${id}")]
 async fn direct_wins(client: &Client, #[parameter_source] dto: &str, id: i64) -> Result<u64, anyhow::Error> {}
 
 #[sql_fun::sql_statement(sql = "delete from users where id = ${id}")]
-async fn interrupted(client: &Client, #[parameter_source] dto: &Dto, #[interrupt_future] interrupt: &mut (impl Future<Output = tokio_postgres::Error> + Unpin)) -> Result<u64, tokio_postgres::Error> {}
+async fn interrupted(client: &Client, #[parameter_source] dto: &Dto, #[interrupt_future] interrupt: &mut (impl Future<Output = anyhow::Error> + Unpin)) -> Result<u64, anyhow::Error> {}
+
+#[sql_fun::sql_statement(sql = "delete from users where id = ${id}")]
+async fn interrupted_native(client: &Client, #[parameter_source] dto: &Dto, #[interrupt_future] interrupt: &mut (impl Future<Output = tokio_postgres::Error> + Unpin)) -> Result<u64, tokio_postgres::Error> {}
 
 #[sql_fun::sql_statement(sql = "#[choice]")]
 #[sql_fragment(choice, dto.mode(), (), {

@@ -5,10 +5,27 @@ use super::{AnalysisError, ParseContext, SemAst};
 /// analyzed [`crate::syn::CreateExtensionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateExtension {
+    if_not_exists: bool,
+
     name: String,
 }
 
 impl CreateExtension {
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
+    pub(crate) fn from_name(name: &str) -> Self {
+        Self {
+            if_not_exists: false,
+            name: name.to_owned(),
+        }
+    }
+
     /// get extension name
     #[must_use]
     pub fn name(&self) -> &str {
@@ -24,25 +41,12 @@ impl CreateExtension {
     where
         TParseContext: ParseContext,
     {
-        let name = syn.get_extname();
-        let extension = Self { name };
+        let extension =
+            Self::from_name(&syn.get_extname()).with_if_not_exists(syn.get_if_not_exists());
         let result_context = context.apply_create_extension(&extension)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateExtension(extension),
             result_context,
         ))
     }
-}
-
-/// analyze [`crate::syn::CreateExtensionStmt`]
-#[deprecated = "use CreateExtension::analyze_create_extension"]
-pub fn analyze_create_extension<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CreateExtensionStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateExtension::analyze_create_extension(context, parent_schema, syn)
 }

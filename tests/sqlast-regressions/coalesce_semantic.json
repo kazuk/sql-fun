@@ -1,0 +1,50 @@
+[
+  {
+    "name": "sem::scalar_expr::coalesce::tests::incompatible_concrete_operands_retain_a_failed_type_domain",
+    "sql": "SELECT COALESCE(1,true)",
+    "expected": {
+      "diagnostics": [
+        "unreachable_coalesce_argument",
+        "coalesce_expr_type_unknown"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "sem::scalar_expr::coalesce::tests::failures_retain_operands_and_allow_next_statement::contradictory",
+    "sql": "SELECT COALESCE($1,1) WHERE $1",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "sem::scalar_expr::coalesce::tests::failures_retain_operands_and_allow_next_statement::unreachable_mixed",
+    "sql": "SELECT COALESCE(1,$1,true)",
+    "expected": {
+      "diagnostics": [
+        "unreachable_coalesce_argument",
+        "parameter_constraint",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

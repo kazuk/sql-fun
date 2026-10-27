@@ -1,21 +1,28 @@
-use sql_fun_core::IVec;
+mod result_column;
+
+pub(crate) use self::result_column::ResultColumn;
+pub use self::result_column::ResultColumnCollection;
 
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
-        AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext,
-        ScalarAnalysisContext, SemAst, SemScalarExpr, TypeDefinition, TypeReference, WithClause,
+        AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
+        SemScalarExpr, TypeDefinition, TypeReference, WithClause,
         create_table::{ColumnDefinition, ColumnName},
     },
-    syn::{ListOpt, Opt, ScanToken, SetOperation},
+    syn::ScanToken,
 };
 
-mod result_column;
-pub use self::result_column::ResultColumnCollection;
+use ::sql_fun_core::IVec;
 
 /// select statement
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SelectStatement {
+    /// Query boundary with local CTEs and trailing clauses.
+    Query(Box<crate::sem::SemanticQuery>),
+    /// VALUES rows.
+    Values(crate::sem::SemanticValues),
     /// simple query
     Simple(SelectStatementNode),
     /// union
@@ -27,6 +34,85 @@ pub enum SelectStatement {
 }
 
 impl SelectStatement {
+    pub(crate) fn has_pending_stars(&self) -> bool {
+        match self {
+            Self::Simple(query) => query.result_columns.has_pending_stars(),
+            Self::Query(query) => query.body().has_pending_stars(),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                Self::set_has_pending_stars(left, right)
+            }
+            Self::Values(_) => false,
+        }
+    }
+
+    fn set_has_pending_stars(left: &Self, right: &Self) -> bool {
+        left.has_pending_stars() || right.has_pending_stars()
+    }
+
+    pub(crate) fn expand_pending_stars(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        match self {
+            Self::Simple(query) => query.result_columns.expand_pending_stars(context),
+            Self::Query(query) => query.body_mut().expand_pending_stars(context),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                Self::expand_set_pending_stars(left, right, context)
+            }
+            Self::Values(_) => Ok(false),
+        }
+    }
+
+    fn expand_set_pending_stars(
+        left: &mut Self,
+        right: &mut Self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        let left_changed = left.expand_pending_stars(context)?;
+        let right_changed = right.expand_pending_stars(context)?;
+        Ok(left_changed || right_changed)
+    }
+
+    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        index: usize,
+        ty: &TypeReference,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Simple(query) => query
+                .result_columns
+                .assign_update_output(visitor, index, ty),
+            Self::Query(query) => query.body_mut().assign_update_output(visitor, index, ty),
+            Self::Values(values) => values.assign_update_output(visitor, index, ty),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                left.assign_update_output(visitor, index, ty)?;
+                right.assign_update_output(visitor, index, ty)
+            }
+        }
+    }
+
+    pub(crate) fn has_width(&self, width: usize) -> bool {
+        match self {
+            Self::Simple(query) => query.result_columns.len() == width,
+            Self::Query(query) => query.body().has_width(width),
+            Self::Values(values) => values.rows().iter().all(|row| row.len() == width),
+            Self::Union(left, right) | Self::Except(left, right) | Self::Intersect(left, right) => {
+                left.has_width(width) && right.has_width(width)
+            }
+        }
+    }
+    pub(crate) fn rename_columns(&mut self, names: &[String]) {
+        match self {
+            Self::Simple(query) => query.result_columns.rename(names),
+            Self::Query(query) => query.body_mut().rename_columns(names),
+            Self::Values(values) => values.rename(names),
+            Self::Union(left, _) | Self::Intersect(left, _) | Self::Except(left, _) => {
+                left.rename_columns(names)
+            }
+        }
+    }
+
     /// create a simple select query node
     #[must_use]
     pub fn simple(node: &SelectStatementNode) -> Self {
@@ -56,6 +142,8 @@ impl SelectStatement {
     pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
         match self {
             Self::Simple(query) => query.get_result_column_def(column),
+            Self::Query(query) => query.body().get_result_column_def(column),
+            Self::Values(values) => values.columns().get_result_column_def(column),
             Self::Union(l, _r) => l.get_result_column_def(column),
             Self::Intersect(l, _r) => l.get_result_column_def(column),
             Self::Except(l, _r) => l.get_result_column_def(column),
@@ -67,6 +155,8 @@ impl SelectStatement {
     pub fn has_column(&self, column: &ColumnName) -> bool {
         match self {
             Self::Simple(query) => query.has_column(column),
+            Self::Query(query) => query.body().has_column(column),
+            Self::Values(values) => values.columns().has_column(column),
             Self::Union(l, _r) => l.has_column(column),
             Self::Intersect(l, _r) => l.has_column(column),
             Self::Except(l, _r) => l.has_column(column),
@@ -78,6 +168,8 @@ impl SelectStatement {
     pub fn result_columns(&self) -> &ResultColumnCollection {
         match self {
             Self::Simple(query) => &query.result_columns,
+            Self::Query(query) => query.body().result_columns(),
+            Self::Values(values) => values.columns(),
             Self::Union(l, _r) => l.result_columns(),
             Self::Intersect(l, _r) => l.result_columns(),
             Self::Except(l, _r) => l.result_columns(),
@@ -88,103 +180,32 @@ impl SelectStatement {
     pub fn returning_composite_type(&self) -> Result<TypeReference, AnalysisError> {
         match self {
             Self::Simple(query) => query.returning_composite_type(),
+            Self::Query(query) => query.body().returning_composite_type(),
+            Self::Values(values) => {
+                let fields = values.columns().composite_field_collection()?;
+                Ok(TypeReference::dynamic(&TypeDefinition::CompositeType(
+                    CreateCompositeType::from_fields(&fields),
+                )))
+            }
             Self::Union(l, _r) => l.returning_composite_type(),
             Self::Intersect(l, _r) => l.returning_composite_type(),
             Self::Except(l, _r) => l.returning_composite_type(),
         }
     }
 
-    fn analyze_select_union<TParseContext>(
-        context: TParseContext,
-        syn: &crate::syn::SelectStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let (larg, rarg, context) = Self::analyze_setop_select(context, syn, tokens)?;
-        Ok(AstAndContextPair::new(
-            SemAst::SelectStatement(Self::union(larg, rarg)),
-            context,
-        ))
-    }
-
-    fn analyze_select_intersect<TParseContext>(
-        context: TParseContext,
-        syn: &crate::syn::SelectStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let (larg, rarg, context) = Self::analyze_setop_select(context, syn, tokens)?;
-        Ok(AstAndContextPair::new(
-            SemAst::SelectStatement(Self::intersect(larg, rarg)),
-            context,
-        ))
-    }
-
-    fn analyze_select_except<TParseContext>(
-        context: TParseContext,
-        syn: &crate::syn::SelectStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let (larg, rarg, context) = Self::analyze_setop_select(context, syn, tokens)?;
-        Ok(AstAndContextPair::new(
-            SemAst::SelectStatement(Self::except(larg, rarg)),
-            context,
-        ))
-    }
-
-    fn analyze_setop_select<TParseContext>(
-        context: TParseContext,
-        syn: &crate::syn::SelectStmt,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(larg) = syn.get_larg().as_inner() else {
-            AnalysisError::raise_unexpected_none("selectstmt.larg")?
-        };
-        let Some(rarg) = syn.get_rarg().as_inner() else {
-            AnalysisError::raise_unexpected_none("selectstmt.rarg")?
-        };
-        let (larg, context) = SelectStatementNode::analyze_select_node(context, larg, tokens)?;
-        let (rarg, context) = SelectStatementNode::analyze_select_node(context, rarg, tokens)?;
-        Ok((larg, rarg, context))
-    }
-
     /// analyze [`crate::syn::SelectStmt`]
     pub fn analyze_select<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         syn: crate::syn::SelectStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let Some(set_operation) = syn.get_op().as_inner() else {
-            AnalysisError::raise_unexpected_none("selectstmt.op")?
-        };
-
-        match set_operation {
-            SetOperation::SetopNone => {
-                let (node, context) =
-                    SelectStatementNode::analyze_select_node(context, syn, tokens)?;
-                Ok(AstAndContextPair::new(
-                    SemAst::SelectStatement(node),
-                    context,
-                ))
-            }
-            SetOperation::SetopUnion => Self::analyze_select_union(context, &syn, tokens),
-            SetOperation::SetopIntersect => Self::analyze_select_intersect(context, &syn, tokens),
-            SetOperation::SetopExcept => Self::analyze_select_except(context, &syn, tokens),
-            _ => AnalysisError::raise_unexpected_input("selectstmt.op")?,
-        }
+        let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&mut context);
+        let query = outcome?;
+        Ok(AstAndContextPair::new(SemAst::select(&query), context))
     }
 }
 
@@ -195,9 +216,16 @@ pub struct SelectStatementNode {
     with_clause: WithClause,
     from_clause: FromClause,
     where_clause: Option<SemScalarExpr>,
+    // Keep clause payloads indirect: SelectStatement also determines the size
+    // of every SemAst retained while loading a schema dump.
+    #[serde(default)]
+    clauses: Box<crate::sem::SelectClauses>,
 }
 
 impl SelectStatementNode {
+    pub(crate) const fn with_clause(&self) -> &WithClause {
+        &self.with_clause
+    }
     pub fn new(
         result_columns: &ResultColumnCollection,
         with_clause: &WithClause,
@@ -209,6 +237,7 @@ impl SelectStatementNode {
             with_clause: with_clause.clone(),
             from_clause: from_clause.clone(),
             where_clause: where_clause.clone(),
+            clauses: Box::default(),
         }
     }
     /// enumerate result set columns
@@ -242,70 +271,23 @@ impl SelectStatementNode {
     where
         TParseContext: ParseContext,
     {
-        let (with_clause, new_context) =
-            WithClause::analyze(context, syn.get_with_clause(), tokens)?;
-        context = new_context;
-        let (from_clause, new_context) =
-            FromClause::analyze(context, &with_clause, syn.get_from_clause(), tokens)?;
-        context = new_context;
-
-        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
-        let where_clause = if let Some(where_clause) = syn.get_where_clause().as_inner() {
-            let (where_expr, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, &scalar_context, where_clause, tokens)?;
-            context = new_context;
-            Some(where_expr)
-        } else {
-            None
-        };
-
-        let Some(target_list) = syn.get_target_list().map(|n| n.as_res_target()) else {
-            AnalysisError::raise_unexpected_none("select_stmt.target_list")?
-        };
-        let mut result_columns = ResultColumnCollection::default();
-        for res_target in target_list {
-            let Some(val) = res_target.get_val().as_inner() else {
-                AnalysisError::raise_unexpected_none("restarget.val")?
-            };
-            let (val_sem, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, &scalar_context, val, tokens)?;
-            context = new_context;
-
-            let mut name = res_target.get_name();
-            if name.is_empty() {
-                name = val_sem.get_column_name();
-            }
-            let name = ColumnName::new(&name);
-            result_columns.push_column(&name, &val_sem);
-        }
-
-        let select = Self::new(&result_columns, &with_clause, &from_clause, &where_clause);
-        Ok((SelectStatement::simple(&select), context))
+        let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&mut context);
+        let query = outcome?;
+        Ok((query, context))
     }
-}
-
-/// analyze [`crate::syn::SelectStmt`]
-#[deprecated = "use SelectStatement::analyze_select"]
-pub fn analyze_select<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::SelectStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    SelectStatement::analyze_select(context, syn, tokens)
 }
 
 #[cfg(test)]
 mod test_scalar_scope {
-    use sql_fun_core::IVec;
-
     use crate::{
-        sem::{ColumnName, MutSourcePathWithSpan, PgBuiltInType, SourcePathWithSpan},
+        context::MutSourcePathWithSpan,
+        sem::{ColumnName, PgBuiltInType, SourcePathWithSpan},
         syn::Opt,
         test_helpers::{SynBuilder, TestParseContext, source_span},
     };
+
+    use ::sql_fun_core::IVec;
 
     #[rstest::rstest]
     fn source_columns_remain_visible_in_nested_scalar_expressions(
@@ -357,5 +339,124 @@ mod test_scalar_scope {
         assert_eq!(column.get_type_cloned(), None);
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())
+    }
+}
+
+impl SelectStatement {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.enter_query();
+        let result = self.walk_body(visitor);
+        visitor.leave_query();
+        result?;
+        Ok(())
+    }
+}
+
+impl SelectStatement {
+    pub(super) fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.walk_body_assigned(visitor, &[])
+    }
+    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_query();
+        let result = self.walk_body_assigned(visitor, targets);
+        visitor.leave_query();
+        result
+    }
+    pub(super) fn walk_body_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Simple(query) => query.walk_assigned(visitor, targets),
+            Self::Query(query) => query.walk_assigned(visitor, targets),
+            Self::Values(values) => values.walk_assigned(visitor, targets),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                left.walk_assigned(visitor, targets)?;
+                visitor.retain_set_outputs();
+                right.walk_assigned(visitor, targets)
+            }
+        }
+    }
+}
+
+impl SelectStatementNode {
+    fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        self.with_clause.walk(visitor)?;
+        self.from_clause.walk(visitor)?;
+        crate::sem::traversal::optional(&mut self.where_clause, visitor)?;
+        if let Some(predicate) = &self.where_clause {
+            visitor.predicate(predicate);
+        }
+        self.clauses.walk_windows(visitor)?;
+        self.result_columns.walk_assigned(visitor, targets)?;
+        self.clauses.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl From<SelectStatementNode> for SelectStatement {
+    fn from(node: SelectStatementNode) -> Self {
+        Self::Simple(node)
+    }
+}
+impl SelectStatementNode {
+    pub(crate) fn from_resolution(
+        result_columns: ResultColumnCollection,
+        with_clause: &WithClause,
+        from_clause: FromClause,
+        where_clause: Option<SemScalarExpr>,
+        clauses: crate::sem::SelectClauses,
+    ) -> Self {
+        Self {
+            result_columns,
+            with_clause: with_clause.clone(),
+            from_clause,
+            where_clause,
+            clauses: Box::new(clauses),
+        }
+    }
+}
+
+impl SelectStatement {
+    pub(crate) fn query(query: crate::sem::SemanticQuery) -> Self {
+        Self::Query(Box::new(query))
+    }
+    pub(crate) fn values(rows: Vec<Vec<SemScalarExpr>>) -> Self {
+        Self::Values(crate::sem::SemanticValues::new(rows))
+    }
+    /// Query-wide clauses, if this value owns a query boundary.
+    pub const fn query_clauses(&self) -> Option<&crate::sem::SemanticQuery> {
+        match self {
+            Self::Query(query) => Some(query),
+            _ => None,
+        }
+    }
+    /// SELECT-specific clauses, if this is a simple SELECT body.
+    pub fn select_clauses(&self) -> Option<&crate::sem::SelectClauses> {
+        match self {
+            Self::Simple(node) => Some(&node.clauses),
+            _ => None,
+        }
+    }
+    pub(crate) const fn source_scope(&self) -> Option<&FromClause> {
+        match self {
+            Self::Simple(node) => Some(&node.from_clause),
+            _ => None,
+        }
     }
 }

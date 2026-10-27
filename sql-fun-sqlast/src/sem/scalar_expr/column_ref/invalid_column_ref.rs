@@ -1,9 +1,8 @@
+use crate::sem::scalar_expr::column_ref::ColumnReference;
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ParseContext, SemScalarExpr,
-    TypeReference, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, SemScalarExpr, TypeReference,
+    data_source::AliasName, scalar_expr::ColumnReferenceExpr,
 };
-
-use super::ColumnReference;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UndefinedAliasColumnRef {
@@ -36,9 +35,9 @@ impl UndefinedAliasColumnRef {
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::ParseContext,
     {
-        context.report_problem(AnalysisProblem::undefined_alias(alias.to_string()))?;
+        context.report_analysis_problem(AnalysisProblem::undefined_alias(alias.as_str()))?;
 
         Ok(SemScalarExpr::ColumnRef(
             ColumnReferenceExpr::UndefinedAlias(Self {
@@ -84,11 +83,11 @@ impl UnknownSourceColumnRef {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn unknown_source_ref<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn unknown_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError> {
         Ok((UnknownSourceColumnRef::new(alias, column), context))
     }
 }
@@ -128,11 +127,11 @@ impl UnknownTableFuncColumnRef {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn unknown_function_source_ref<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn unknown_function_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError> {
         Ok((UnknownTableFuncColumnRef::new(alias, column), context))
     }
 }

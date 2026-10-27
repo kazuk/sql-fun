@@ -1,11 +1,12 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    context::ParseContext,
     sem::{AstAndContextPair, ScalarAnalysisContext, SemScalarExpr},
     syn::{ListOpt, ScanToken},
 };
 
-use super::{AnalysisError, ParseContext, SemAst};
+use super::{AnalysisError, SemAst};
 
 /// set a variable
 #[derive(Debug, Clone)]
@@ -15,6 +16,13 @@ pub struct VariableSet {
 }
 
 impl VariableSet {
+    pub(crate) fn new(name: &str, value: &SemScalarExpr) -> Self {
+        Self {
+            name: name.to_owned(),
+            value: value.clone(),
+        }
+    }
+
     /// name of variable
     #[must_use]
     pub fn name(&self) -> &str {
@@ -56,7 +64,7 @@ impl VariableSet {
         )?;
         context = new_context;
 
-        let var_set = Self { name, value };
+        let var_set = Self::new(&name, &value);
         let result_context = context.apply_variable_set(&var_set)?;
         Ok(AstAndContextPair::new(
             SemAst::VariableSet(var_set),

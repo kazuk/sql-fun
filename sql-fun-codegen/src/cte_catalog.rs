@@ -4,9 +4,7 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 
-use sql_fun_core::{
-    CteCatalog, CteCatalogReference, CteName, PlaceholderedSql, ResolvedCteCatalog,
-};
+use ::sql_fun_core::{CteCatalog, CteCatalogReference, CteName, ResolvedCteCatalog};
 
 use crate::{
     error::{ConfigurationKind, SqlFunCodegenError},
@@ -87,10 +85,22 @@ impl CteCatalogCache<'_> {
 /// CTE catalog resolve result
 pub enum CteReferenceResolveResult {
     /// success fully resolved
+    #[expect(
+        dead_code,
+        reason = "Resolved names are stored, but resolution-result consumers are not yet implemented."
+    )]
     Success(CteName),
     /// resolved but definition error
+    #[expect(
+        dead_code,
+        reason = "Resolved names are stored, but resolution-result consumers are not yet implemented."
+    )]
     HasError(CteName),
     /// undefined CTE name
+    #[expect(
+        dead_code,
+        reason = "Resolved names are stored, but resolution-result consumers are not yet implemented."
+    )]
     Missing(CteName),
 }
 
@@ -132,14 +142,13 @@ impl From<Vec<CteReferenceAttr>> for CteReferenceCollection {
 }
 
 impl CteReferenceCollection {
-    #[tracing::instrument(skip(metadata, query))]
+    #[tracing::instrument(skip(metadata))]
     pub fn resolve(
         &self,
         metadata: &sql_fun_core::SqlFunMetadata,
-        query: &PlaceholderedSql,
     ) -> Result<ResolvedCteCatalog, SqlFunCodegenError> {
         if self.0.is_empty() {
-            return Ok(ResolvedCteCatalog::from(query));
+            return Ok(ResolvedCteCatalog::default());
         }
         let Some(cte_catalog_path) = metadata.cte_catalog()? else {
             return SqlFunCodegenError::configuration_missing_error(
@@ -156,7 +165,7 @@ impl CteReferenceCollection {
                     .map(|item| item.as_cte_reference().clone())
                     .collect();
 
-                let resolved = catalog.resolve(query, &cte_refs)?;
+                let resolved = catalog.resolve(&cte_refs, metadata.sql_dialect())?;
                 Ok(resolved)
             },
         )?;

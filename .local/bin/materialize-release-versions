@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+function usage() {
+  cat <<'USAGE'
+usage: materialize-release-versions (--release | --snapshot=NAME) [--output=PATH]
+
+Materialize the next release version for every publishable workspace package.
+Exactly one release mode is required. The snapshot mode appends
+`-NAME` to each next release version.
+USAGE
+}
+
+mode=""
+snapshot_name=""
+output_path=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --release)
+      [[ -z "$mode" ]] || { echo "exactly one release mode is required" >&2; exit 1; }
+      mode="release"
+      ;;
+    --snapshot=*)
+      [[ -z "$mode" ]] || { echo "exactly one release mode is required" >&2; exit 1; }
+      mode="snapshot"
+      snapshot_name="${arg#--snapshot=}"
+      ;;
+    --output=*) output_path="${arg#--output=}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unsupported argument: $arg" >&2; usage >&2; exit 1 ;;
+  esac
+done
+
+[[ -n "$mode" ]] || { echo "exactly one release mode is required" >&2; usage >&2; exit 1; }
+if [[ "$mode" == "snapshot" ]] && ! [[ "$snapshot_name" =~ ^[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$ ]]; then
+  echo "invalid snapshot name: $snapshot_name" >&2
+  exit 1
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+metadata="$(cargo metadata --no-deps --format-version=1)"
+release_metadata="$(taplo get --file-path Cargo.toml --output-format json 'workspace.metadata.next-release')"
+mapfile -t packages < <(jq -r '.packages[] | select(.source == null and .publish != []) | .name' <<<"$metadata" | sort)
+
+(( ${#packages[@]} > 0 )) || { echo "no publishable workspace packages found" >&2; exit 1; }
+
+declare -A next_versions=()
+for package in "${packages[@]}"; do
+  release_level="$(jq -er --arg package "$package" '.[$package]' <<<"$release_metadata")" \
+    || { echo "missing workspace.metadata.next-release entry for publishable package: $package" >&2; exit 1; }
+  case "$release_level" in
+    major|minor|patch) ;;
+    *) echo "invalid release level for $package: $release_level" >&2; exit 1 ;;
+  esac
+
+  next_version="$("$repo_root/.local/bin/bump-version" "$package" "$release_level")"
+  if [[ "$mode" == "snapshot" ]]; then
+    next_version+="-$snapshot_name"
+  fi
+  next_versions["$package"]="$next_version"
+done
+
+# All validation above is read-only. Start changing manifests only after every
+# publishable package has complete, valid release metadata.
+for package in "${packages[@]}"; do
+  cargo set-version --package "$package" "${next_versions[$package]}"
+done
+
+updated_metadata="$(cargo metadata --no-deps --format-version=1)"
+for package in "${packages[@]}"; do
+  actual_version="$(jq -er --arg package "$package" '.packages[] | select(.name == $package) | .version' <<<"$updated_metadata")"
+  [[ "$actual_version" == "${next_versions[$package]}" ]] \
+    || { echo "materialized version mismatch for $package" >&2; exit 1; }
+done
+
+result="$(for package in "${packages[@]}"; do printf '%s\t%s\n' "$package" "${next_versions[$package]}"; done)"
+if [[ -n "$output_path" ]]; then
+  mkdir -p "$(dirname "$output_path")"
+  printf '%s\n' "$result" > "$output_path"
+else
+  printf '%s\n' "$result"
+fi

@@ -43,6 +43,38 @@ impl super::ColumnReference for TableColumnRef {
 }
 
 impl TableColumnRef {
+    pub(super) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+        if let Some(column) = &mut self.column_def {
+            column.rename_relation(old, new);
+        }
+    }
+
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
+        self.alias = alias.clone();
+        self.column = column.clone();
+        self
+    }
+
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
+    /// Exact relation identity for this resolved column.
+    pub const fn relation(&self) -> &crate::sem::FullName {
+        self.table_name.full_name()
+    }
+    /// Local source alias, including trigger OLD/NEW aliases.
+    pub const fn alias(&self) -> &AliasName {
+        &self.alias
+    }
+    pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
+        self.table_name.full_name() == relation
+    }
+
+    pub(in crate::sem) fn canonicalize_alias(&mut self) {
+        self.alias = AliasName::from(self.table_name.full_name().local_name().as_str());
+    }
+
     /// create instance
     #[must_use]
     pub fn new(
@@ -59,5 +91,11 @@ impl TableColumnRef {
             column_def: column_def.cloned(),
             datasource_nullable,
         }
+    }
+}
+
+impl TableColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
     }
 }

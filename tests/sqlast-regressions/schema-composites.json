@@ -1,0 +1,144 @@
+[
+  {
+    "name": "ast::resolve::query::tests::array_subquery::named_composite_elements_keep_nominal_identity::named",
+    "sql": "SELECT ARRAY(SELECT NULL::singleton)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "public",
+            "local_name": "singleton",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::named_composite_elements_keep_nominal_identity::named_pair",
+    "sql": "SELECT ARRAY(SELECT NULL::pair)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "public",
+            "local_name": "pair",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::deferred_star_checks_final_output_width::one",
+    "sql": "SELECT ARRAY(SELECT ($1).*) AS result, take_singleton($1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "take_singleton",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::deferred_star_checks_final_output_width::two",
+    "sql": "SELECT ARRAY(SELECT ($1).*) AS result, take_pair($1)",
+    "expected": {
+      "diagnostics": [
+        "array_subquery_columns",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        },
+        {
+          "name": "take_pair",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::deferred_star_preserves_enclosing_result_link",
+    "sql": "SELECT (ARRAY(SELECT ($1).*))[1], take_singleton($1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "take_singleton",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::nested_deferred_arrays_finish_after_each_projection_expands",
+    "sql": "SELECT ARRAY(SELECT ((ARRAY(SELECT ($1).*))[1]).*), take_container($1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "take_container",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

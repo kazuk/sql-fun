@@ -4,6 +4,9 @@ use crate::sem::{FunctionParam, TypeReference};
 
 #[derive(thiserror::Error, Debug)]
 pub enum TypeError {
+    #[error("too many function arguments")]
+    TooManyArguments,
+
     #[error("parameter binding failed , no parameter supplied for parameter {0}")]
     BindFailed(Box<FunctionParam>),
 
@@ -39,6 +42,14 @@ pub enum TypeError {
 }
 
 impl TypeError {
+    pub(super) fn simple_infer_ambiguous(types: &std::collections::HashSet<TypeReference>) -> Self {
+        Self::SimpleInferAmbiguous(types.iter().cloned().collect())
+    }
+
+    pub(crate) const fn too_many_arguments() -> Self {
+        Self::TooManyArguments
+    }
+
     pub const fn common_infer_no_implicit_castable() -> Result<Infallible, Self> {
         Err(Self::CommonInferNoImplicitCastable())
     }

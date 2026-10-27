@@ -1,0 +1,49 @@
+#!/bin/bash
+set -euo pipefail
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+source "${script_dir}/../lib/agent-git.sh"
+
+reject_worktree_add() {
+    cat >&2 <<'EOF'
+Direct `git worktree add` is disabled in the agent environment.
+Use the `agent-worktree` repository skill or `agent-worktree-add` so the
+worktree is created below $GIT_ROOT/.worktrees/.
+EOF
+    exit 2
+}
+
+args=("$@")
+index=0
+command=""
+
+while ((index < ${#args[@]})); do
+    argument="${args[index]}"
+    case "$argument" in
+        --)
+            ((index += 1))
+            break
+            ;;
+        -C|-c|--git-dir|--work-tree|--namespace|--config-env|--exec-path)
+            ((index += 2))
+            ;;
+        -C?*|-c?*|--git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--exec-path=*)
+            ((index += 1))
+            ;;
+        -*)
+            ((index += 1))
+            ;;
+        *)
+            command="$argument"
+            ((index += 1))
+            break
+            ;;
+    esac
+done
+
+if [[ "$command" == "worktree" && "${args[index]:-}" == "add" ]]; then
+    reject_worktree_add
+fi
+
+real_git=$(agent_real_git "$script_dir")
+exec "$real_git" "${args[@]}"

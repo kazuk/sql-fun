@@ -1,8 +1,11 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, ParseContext,
-    SelectStatement, WithClause,
-    data_source::AliasName,
-    scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable,
+        SelectStatement, WithClause,
+        data_source::AliasName,
+        scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -44,7 +47,13 @@ impl SubQueryDataSource {
     ) where
         TParseContext: ParseContext,
     {
-        if self.select_statement.has_column(column) {
+        let result_columns = self.select_statement.result_columns();
+        let result_column = if let Some(index) = self.alias.derived_column_index(column) {
+            result_columns.get_column_at(index)
+        } else {
+            result_columns.get_column_with_skip_count(column, self.alias.len_derived_column())
+        };
+        if result_column.is_some() {
             names.push(self.alias.clone());
         }
     }
@@ -56,6 +65,7 @@ impl SubQueryDataSource {
     pub(super) fn create_column_ref<TParseContext>(
         &self,
         context: &mut TParseContext,
+        alias: &AliasName,
         column: &ColumnName,
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
@@ -68,7 +78,7 @@ impl SubQueryDataSource {
                 let column_def = result_column_ref.create_column_definition();
                 Some(column_def)
             } else {
-                context.report_problem(
+                context.report_analysis_problem(
                     AnalysisProblem::subquery_not_have_column_for_derived_column_name(),
                 )?;
                 None
@@ -79,18 +89,34 @@ impl SubQueryDataSource {
             let column_def = result_column_ref.create_column_definition();
             Some(column_def)
         } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_subquery(
-                self.alias.name(),
-                column,
+            context.report_analysis_problem(AnalysisProblem::column_not_found_in_subquery(
+                alias, column,
             ))?;
             None
         };
 
         Ok(ColumnReferenceExpr::SubQueryColumn(SubQueryColumnRef::new(
-            self.alias.name(),
+            alias,
             column,
             column_def.as_ref(),
             nullability,
         )))
+    }
+}
+
+impl SubQueryDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.select_statement.walk(visitor)?;
+        visitor.derived(self.alias.name().as_str(), &self.alias.inference_columns());
+        Ok(())
+    }
+}
+
+impl SubQueryDataSource {
+    pub(super) fn projection_column_names(&self) -> Vec<ColumnName> {
+        self.select_statement.result_columns().names()
     }
 }

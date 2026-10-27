@@ -15,6 +15,10 @@ pub struct UniqueColumnConstraint {
 }
 
 impl UniqueColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// create instance
     pub fn new(
         table_name: &TableName,

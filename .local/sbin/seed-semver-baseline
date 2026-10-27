@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Create the approved initial source-package baseline, never a release candidate."""
+import argparse
+import gzip
+import io
+import json
+from pathlib import Path
+import re
+import subprocess
+import tarfile
+import tempfile
+
+REVISION = 'bd53b083b028dc8423f6c4e5b232cbd3c851c8c1'
+
+
+def run(args, cwd):
+    return subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=True).stdout
+
+
+def seed(repository, output, target):
+    if output.exists():
+        raise ValueError('refusing to replace an existing baseline')
+    with tempfile.TemporaryDirectory(prefix='semver-seed-') as scratch:
+        root = Path(scratch)
+        source = root / 'source'
+        source.mkdir()
+        archive = subprocess.check_output(['git', '-C', str(repository), 'archive', REVISION])
+        with tarfile.open(fileobj=io.BytesIO(archive)) as contents:
+            contents.extractall(source, filter='data')
+        metadata = json.loads(run(['cargo', 'metadata', '--no-deps', '--format-version=1'], source))
+        packages = {p['name']: p for p in metadata['packages']
+                    if p['id'] in metadata['workspace_members'] and p['publish'] != []}
+        # This approved revision predates version-qualified local dependencies.
+        # Normalize only dependency metadata in the isolated export, not API sources.
+        for manifest in source.rglob('Cargo.toml'):
+            text = manifest.read_text()
+            for name, package in packages.items():
+                pattern = rf'({re.escape(name)}\s*=\s*\{{)([^}}]*\bpath\s*=[^}}]*)(\}})'
+                def qualified(match):
+                    if re.search(r'\bversion\s*=', match[2]):
+                        return match[0]
+                    return match[1] + f' version = "={package["version"]}",' + match[2] + match[3]
+                text = re.sub(pattern, qualified, text)
+            manifest.write_text(text)
+        patches = []
+        for name, package in packages.items():
+            patches += ['--config', f'patch.crates-io."{name}".path={json.dumps(str(Path(package["manifest_path"]).parent))}']
+        payload = root / 'payload'
+        payload.mkdir()
+        records = {}
+        for name, package in sorted(packages.items()):
+            run(['cargo', 'package', '--package', name, '--allow-dirty', '--no-verify',
+                 '--target-dir', str(root / 'target'), *patches], source)
+            crate = root / 'target/package' / f'{name}-{package["version"]}.crate'
+            with tarfile.open(crate) as contents:
+                contents.extractall(payload / 'packages', filter='data')
+            records[name] = f'packages/{name}-{package["version"]}'
+        descriptor = dict(schema=1, source_revision=REVISION, target=target,
+                          default_features=True, packages=records,
+                          configurations={'postgres': {name: [] for name in sorted(records)}})
+        (payload / 'baseline.json').write_text(json.dumps(descriptor, indent=2) + '\n')
+        output.parent.mkdir(parents=True, exist_ok=True)
+        # Stable archive bytes make regeneration reviewable.
+        with output.open('xb') as destination, gzip.GzipFile(fileobj=destination, mode='wb', mtime=0) as compressed:
+            with tarfile.open(fileobj=compressed, mode='w') as bundle:
+                for path in sorted(payload.rglob('*')):
+                    if not path.is_file():
+                        continue
+                    info = bundle.gettarinfo(str(path), str(path.relative_to(payload)))
+                    info.uid = info.gid = info.mtime = 0
+                    info.uname = info.gname = ''
+                    with path.open('rb') as data:
+                        bundle.addfile(info, data)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--repository', required=True, type=Path)
+    parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--target', required=True)
+    args = parser.parse_args()
+    seed(args.repository.resolve(), args.output.resolve(), args.target)

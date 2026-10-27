@@ -1,16 +1,11 @@
-use std::path::Path;
-
 use crate::{
-    PostgresDialect, StringSpan,
+    context::TypeInfoRead,
     sem::{
-        AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
-        CreateIndex, CreateSequence, CreateTable, FullName, FunctionInfoRead,
-        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
-        OperatorDefinition, OperatorInfoRead, OperatorName, SchemaFileContext, SchemaName,
-        SearchPathRead, SemAst, SequenceInfoRead, SourceAccessService, SourcePathWithSpan,
-        TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference, ViewInfoRead, ViewLike,
+        AnalysisError, AnalysisProblem, FrozenBaseContext, FullName, SemAst, TypeDefinition,
+        TypeReference,
     },
 };
+
 /// Error for reading schema dump
 #[derive(Debug, thiserror::Error)]
 pub enum ParseDumpFileError {
@@ -22,14 +17,9 @@ pub enum ParseDumpFileError {
     #[error(transparent)]
     Syn(#[from] ::pg_query::Error),
 
-    /// Semantic Analysis Error
+    /// Fatal semantic analysis error.
     ///
-    /// # Note
-    ///
-    /// Semantic analysis normally continues semantic error and reports to [`crate::sem::ParseContext`].
-    ///
-    /// Semantic Analysis Error indicates Analyzer Bug.(Unexpected syntax AST structure)
-    ///
+    /// Recoverable analysis problems remain on a successful [`ParsedSchemaDump`].
     #[error(transparent)]
     Sem(#[from] AnalysisError),
 
@@ -39,202 +29,78 @@ pub enum ParseDumpFileError {
     SqliteSyn(#[from] ::turso_parser::error::Error),
 }
 
-/// load schema dump file
-///
-/// # Errors
-///
-/// - [`ParseDumpFileError`]
-///
-#[expect(dead_code)]
-#[deprecated = "use PostgresDialect::parse_schema_file"]
-pub fn parse_schema_file<TContext>(
-    dump_file: &Path,
-    input_context: TContext,
-) -> Result<ParsedSchemaDump<TContext>, ParseDumpFileError>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    PostgresDialect::parse_schema_file(dump_file, input_context)
-}
-
-///  schema dump file context
-#[expect(dead_code)]
-#[derive(Debug)]
-pub struct ParsedSchemaDump<TContext>(Vec<SemAst>, SchemaFileContext<TContext>)
-where
-    TContext: BaseParseContext + std::fmt::Debug;
-
-impl<TContext> ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    /// create instance
-    pub const fn new(sem_results: Vec<SemAst>, context: SchemaFileContext<TContext>) -> Self {
-        Self(sem_results, context)
+impl ParseDumpFileError {
+    /// Whether retrying file access may succeed without changing SQL contents.
+    pub const fn is_io(&self) -> bool {
+        matches!(self, Self::Io(_))
     }
 }
 
-impl<TContext> TypeInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
+/// A loaded schema file and its immutable catalog.
+///
+/// The semantic statements and recoverable problems belong to this file's
+/// result. Chaining [`Self::base_context`] shares only its completed catalog,
+/// including the effective search path and final source provenance.
+#[derive(Debug)]
+pub struct ParsedSchemaDump {
+    _sem_results: Vec<SemAst>,
+    base: FrozenBaseContext,
+    problems: Vec<AnalysisProblem>,
+    presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
+}
+
+impl ParsedSchemaDump {
+    pub(crate) const fn new(
+        sem_results: Vec<SemAst>,
+        base: FrozenBaseContext,
+        problems: Vec<AnalysisProblem>,
+        presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
+    ) -> Self {
+        Self {
+            _sem_results: sem_results,
+            base,
+            problems,
+            presentations,
+        }
+    }
+
+    /// The completed catalog, suitable as the explicit base for another file.
+    ///
+    /// Cloning this handle keeps the catalog alive independently of this parse
+    /// result, without retaining its semantic statements or problems.
+    pub const fn base_context(&self) -> &FrozenBaseContext {
+        &self.base
+    }
+
+    /// Presentation context for each problem, in the same reporting order.
+    ///
+    /// An absent entry means the context was not given statement source text.
+    pub fn diagnostic_presentations(&self) -> &[Option<::sql_fun_core::DiagnosticPresentation>] {
+        &self.presentations
+    }
+
+    /// Recoverable problems from this file, in reporting order.
+    ///
+    /// Problems from earlier files stay on their own parse results.
+    pub fn problems(&self) -> &[AnalysisProblem] {
+        &self.problems
+    }
+}
+
+impl TypeInfoRead for ParsedSchemaDump {
+    fn type_references(&self) -> Vec<TypeReference> {
+        self.base_context().type_references()
+    }
+
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
+        self.base_context().builtin_type_ordered(name)
+    }
+
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
-        self.1.get_type_impl(key)
+        self.base_context().get_type_impl(key)
     }
 
     fn get_array_item_type(&self, _type_name: &TypeReference) -> Option<TypeReference> {
         todo!()
-    }
-}
-
-impl<TContext> TableInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable> {
-        self.1.get_table_impl(key)
-    }
-}
-
-impl<TContext> ViewInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
-        self.1.get_view_impl(key)
-    }
-}
-
-impl<TContext> IndexInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_index(&self, index_name: &str) -> Option<&CreateIndex> {
-        self.1.get_index(index_name)
-    }
-}
-
-impl<TContext> SequenceInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_sequence_impl(&self, key: &FullName) -> Option<&CreateSequence> {
-        self.1.get_sequence_impl(key)
-    }
-}
-
-impl<TContext> FunctionInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
-        self.1.get_function_impl(name)
-    }
-}
-
-impl<TContext> CastInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_explicit_cast(
-        &self,
-        source_type: &TypeReference,
-        target_type: &TypeReference,
-    ) -> Option<CastDefinition> {
-        self.1.get_explicit_cast(source_type, target_type)
-    }
-
-    fn get_implicit_cast(
-        &self,
-        source_type: &TypeReference,
-        target_type: &TypeReference,
-    ) -> Option<CastDefinition> {
-        self.1.get_implicit_cast(source_type, target_type)
-    }
-
-    fn get_implicit_castable(
-        &self,
-        source_type: &TypeReference,
-    ) -> std::collections::HashSet<TypeReference> {
-        self.1.get_implicit_castable(source_type)
-    }
-}
-
-impl<TContext> OperatorInfoRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_operator_op(
-        &self,
-        name: &OperatorName,
-        has_left: bool,
-        has_right: bool,
-    ) -> Option<&OperatorDefinition> {
-        self.1.get_operator_op(name, has_left, has_right)
-    }
-}
-
-impl<TContext> SearchPathRead for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn set_search_path(&mut self, search_path: Vec<SchemaName>) {
-        self.1.set_search_path(search_path);
-    }
-
-    fn get_default_schema(&self) -> Option<SchemaName> {
-        self.1.get_default_schema()
-    }
-
-    fn get_search_path(&self) -> &[SchemaName] {
-        self.1.get_search_path()
-    }
-}
-
-impl<TContext> GetSourcePathWithSpanOpt for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
-        self.1.get_source_path_with_span()
-    }
-}
-
-impl<TContext> MutSourcePathWithSpan for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
-        self.1.set_source_path_with_span(value);
-    }
-}
-
-impl<TContext> BaseParseContext for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        self.1.report_problem(problem)?;
-        Ok(())
-    }
-
-    fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
-        self.1.extend(extension);
-    }
-
-    fn set_statement_span(&mut self, statement_span: StringSpan) {
-        self.1.set_statement_span(statement_span);
-    }
-
-    fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
-        self.1.get_args()
-    }
-
-    fn get_source_file_path(&self) -> Option<&Path> {
-        self.1.get_source_file_path()
-    }
-
-    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>) {
-        self.1.set_source_file(source_access_service);
     }
 }

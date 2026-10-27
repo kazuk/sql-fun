@@ -76,6 +76,10 @@ pub struct IdentityColumnConstraint {
 }
 
 impl IdentityColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// create instance
     pub fn new(
         table_name: &TableName,
@@ -105,6 +109,11 @@ impl ColumnConstraintTrait for IdentityColumnConstraint {
 }
 
 impl IdentityColumnConstraint {
+    /// Whether explicit values require an OVERRIDING clause.
+    pub const fn is_always(&self) -> bool {
+        matches!(self.generated_when, IdentityColumnMode::Always)
+    }
+
     /// analyze [`crate::syn::Constraint`]
     pub fn analyze_constraint<TParseContext>(
         context: TParseContext,

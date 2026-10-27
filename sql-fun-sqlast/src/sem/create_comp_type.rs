@@ -1,15 +1,28 @@
 use crate::{
+    context::ParseContext,
     sem::{AstAndContextPair, ColumnDefinition, ColumnName, Nullable},
     syn::{ColumnDef, ListOpt, Opt},
 };
 
-use super::{AnalysisError, ColumnCollection, FullName, ParseContext, SemAst, TypeReference};
+use super::{AnalysisError, ColumnCollection, FullName, SemAst, TypeReference};
 
 /// collection for composite type field
 #[derive(Debug, Default, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CompositeFieldCollection(Vec<CompositeFieldDefinition>);
 
 impl CompositeFieldCollection {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        for field in &mut self.0 {
+            if let Some(ty) = &mut field.field_type {
+                ty.rename_relation(old, new);
+            }
+        }
+    }
+
     pub fn push(&mut self, item: CompositeFieldDefinition) {
         self.0.push(item);
     }
@@ -36,13 +49,42 @@ impl CompositeFieldCollection {
 }
 
 /// analyzed [`crate::syn::CompositeTypeStmt`]
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateCompositeType {
+    #[serde(skip)]
+    owner: Option<crate::sem::OwnerSpecification>,
     type_ref: Option<TypeReference>,
     fields: CompositeFieldCollection,
 }
 
 impl CreateCompositeType {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        self.fields.rename_relation(old, new);
+    }
+
+    /// Retained ownership; None means no ownership information was supplied.
+    /// Ownership is catalog state: it is omitted from the existing serialized
+    /// type format and does not affect SQL type equality or hashing.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
+    pub(crate) fn new(name: &FullName, fields: &CompositeFieldCollection) -> Self {
+        Self {
+            owner: None,
+            type_ref: Some(TypeReference::from_full_name(name.clone())),
+            fields: fields.clone(),
+        }
+    }
+
     /// name of composite type,
     ///
     /// When instance is dynamic type and no-name , returns None
@@ -75,6 +117,7 @@ impl CreateCompositeType {
     #[must_use]
     pub fn from_fields(fields: &CompositeFieldCollection) -> Self {
         Self {
+            owner: None,
             type_ref: None,
             fields: fields.clone(),
         }
@@ -102,10 +145,7 @@ impl CreateCompositeType {
         }
 
         let name = FullName::try_from(typevar)?;
-        let comp_def = Self {
-            type_ref: Some(TypeReference::from_full_name(name.clone())),
-            fields,
-        };
+        let comp_def = Self::new(&name, &fields);
         let result_context = context.apply_create_comp_type(&comp_def)?;
 
         Ok(AstAndContextPair::new(
@@ -163,15 +203,16 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
     }
 }
 
-/// analyze [`crate::syn::CompositeTypeStmt`]
-#[deprecated = "use CreateCompositeType::analyze_create_comp_type"]
-pub fn analyze_create_comp_type<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CompositeTypeStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateCompositeType::analyze_create_comp_type(context, parent_schema, syn)
+// Ownership changes do not change SQL type identity or the existing serialized type format.
+impl PartialEq for CreateCompositeType {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_ref == other.type_ref && self.fields == other.fields
+    }
+}
+impl Eq for CreateCompositeType {}
+impl std::hash::Hash for CreateCompositeType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.type_ref, state);
+        std::hash::Hash::hash(&self.fields, state);
+    }
 }

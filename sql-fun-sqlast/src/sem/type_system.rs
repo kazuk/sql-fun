@@ -5,9 +5,12 @@ mod infer;
 
 use std::collections::VecDeque;
 
-use crate::sem::{
-    ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType, SemScalarExpr,
-    TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
+use crate::{
+    context::ParseContext,
+    sem::{
+        ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType, SemScalarExpr,
+        TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
+    },
 };
 
 use self::func_params::ParameterBindResult;
@@ -15,7 +18,7 @@ pub use self::{
     err::TypeError,
     func_params::FunctionParam,
     function_overload_collection::FunctionOverloadCollection,
-    infer::{CommonInferContext, SimpleInferContext},
+    infer::{CommonInferContext, SimpleInferContext, SimpleInferResult},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -51,10 +54,61 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(ty) = &mut self.ret_type {
+            ty.rename_relation(old, new);
+        }
+        for param in &mut self.params {
+            param.rename_relation(old, new);
+        }
+    }
+
+    pub(crate) fn is_variadic(&self) -> bool {
+        self.params.iter().any(FunctionParam::is_variadic)
+    }
+
+    pub(crate) fn call_argument(&self, position: usize) -> Option<&FunctionParam> {
+        let mut input_index = 0;
+        for parameter in &self.params {
+            if !parameter.is_input() {
+                continue;
+            }
+            if input_index == position || parameter.is_variadic() {
+                return Some(parameter);
+            }
+            input_index += 1;
+        }
+        None
+    }
+
+    pub(crate) fn identity_arguments(&self) -> Vec<Option<TypeReference>> {
+        self.params
+            .iter()
+            .filter_map(FunctionParam::identity_argument)
+            .collect()
+    }
+
+    pub(crate) fn has_input_parameters(&self) -> bool {
+        self.params.iter().any(FunctionParam::is_input)
+    }
+    pub(crate) fn input_bindings(&self) -> ArgumentBindingCollection {
+        let mut arguments = ArgumentBindingCollection::default();
+        for parameter in &self.params {
+            if parameter.is_input() {
+                arguments.push(parameter.get_type().cloned());
+            }
+        }
+        arguments
+    }
+
     /// apply simple infer result
-    pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
+    pub fn apply_simple_infer_result(&mut self, infer_result_type: &SimpleInferResult) {
         if let Some(t) = self.ret_type.as_mut() {
-            t.apply_simple_infer_result(infer_result_type);
+            infer_result_type.apply(t);
         }
 
         for param in &mut self.params {
@@ -111,6 +165,43 @@ impl OverloadVariant {
         } else {
             self.ret_type.clone()
         }
+    }
+
+    pub(crate) fn table_output_depends_on_table(&self, context: &impl ParseContext) -> bool {
+        if !self.returning_table().is_empty() {
+            return false;
+        }
+        let Some(ty) = self.ret_type() else {
+            return false;
+        };
+        let Some(definition) = ty.definition_from_catalog(context) else {
+            return false;
+        };
+        definition.row_table_name(context).is_some()
+    }
+
+    pub(crate) fn table_function_output_columns(
+        &self,
+        context: &impl ParseContext,
+        scalar_name: &crate::sem::ColumnName,
+    ) -> crate::sem::ColumnCollection {
+        let declared = self.returning_table();
+        if !declared.is_empty() {
+            return declared;
+        }
+        let Some(ty) = self.ret_type() else {
+            return declared;
+        };
+        if let Some(definition) = ty.definition_from_catalog(context)
+            && let Some(columns) = definition.row_columns(context)
+        {
+            return columns;
+        }
+        crate::sem::ColumnCollection::scalar_function_output(scalar_name, ty)
+    }
+
+    pub(crate) fn requires_record_definition(&self) -> bool {
+        self.returns_record() && self.returning_table().is_empty()
     }
 
     fn returns_record(&self) -> bool {
@@ -176,6 +267,9 @@ impl OverloadVariant {
         let mut results = Vec::new();
         for param in &self.params {
             results.push(param.bind_arg(&mut arg_types)?);
+        }
+        if arg_types.pop_front().is_some() {
+            return Err(TypeError::too_many_arguments());
         }
         Ok(results)
     }

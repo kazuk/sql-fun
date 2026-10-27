@@ -4,15 +4,16 @@ use sql_fun_core::IVec;
 use crate::SqliteToken;
 
 use crate::{
+    ast::TryFromWithTokens,
+    context::GetSourcePathWithSpan,
     sem::{
-        AlterSequence, AstAndContextPair, ColumnDefinition, ColumnName, Constraint, FromClause,
-        GetSourcePathWithSpan, ScalarAnalysisContext, SemScalarExpr, SourcePathWithSpan, ViewName,
-        WithClause,
+        AstAndContextPair, ColumnDefinition, ColumnName, Constraint, SemScalarExpr,
+        SourcePathWithSpan, ViewName,
     },
-    syn::{AlterTableType, ListOpt, ObjectType, Opt, ScanToken},
+    syn::{AlterTableType, ScanToken},
 };
 
-use super::{AnalysisError, AnalysisProblem, ParseContext, SemAst, create_table::TableName};
+use super::{AnalysisError, ParseContext, create_table::TableName};
 
 /// analyzed alter table statement
 #[derive(Debug, Clone, derive_getters::Getters)]
@@ -20,6 +21,10 @@ pub struct AlterTable {
     table: TableName,
     commands: Vec<AlterObjSubCommand>,
     source_span: SourcePathWithSpan,
+    #[getter(skip)]
+    applicable: bool,
+    #[getter(skip)]
+    resolved_target: Option<TableName>,
 }
 
 impl GetSourcePathWithSpan for AlterTable {
@@ -29,9 +34,88 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    /// Whether completed semantic analysis permits catalog application.
+    pub const fn can_apply(&self) -> bool {
+        self.applicable
+    }
+    /// Canonical target binding retained by semantic analysis.
+    pub const fn resolved_target(&self) -> Option<&TableName> {
+        self.resolved_target.as_ref()
+    }
+    pub(crate) fn table_rename(
+        table: &TableName,
+        target: Option<&TableName>,
+        destination: &TableName,
+        permitted: bool,
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(table, &[AlterObjSubCommand::rename_to(destination)], source);
+        statement.resolved_target = target.cloned();
+        statement.applicable = target.is_some() && permitted;
+        statement
+    }
+
+    /// Destination identity retained for a standalone table rename.
+    pub const fn rename_destination(&self) -> Option<&TableName> {
+        let [command] = self.commands.as_slice() else {
+            return None;
+        };
+        command.rename_destination()
+    }
+
+    pub(crate) fn column_attributes(
+        table: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(table, commands, source);
+        statement.resolved_target = target.cloned();
+        statement.applicable = target.is_some()
+            && commands
+                .iter()
+                .all(AlterObjSubCommand::can_apply_column_attributes);
+        statement
+    }
+    pub(crate) fn conflicting_constraint(&self, table: &crate::sem::CreateTable) -> Option<String> {
+        let mut names = Vec::new();
+        for command in &self.commands {
+            if let Some(constraint) = command.added_constraint() {
+                let name = constraint.name();
+                if !name.is_empty() {
+                    if table.constraint(name).is_some() || names.contains(&name) {
+                        return Some(name.to_owned());
+                    }
+                    names.push(name);
+                }
+            }
+        }
+        None
+    }
+
+    pub(crate) fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.commands
+            .iter()
+            .rev()
+            .find_map(AlterObjSubCommand::applied_owner)
+    }
+
+    pub(crate) fn new(
+        table: &TableName,
+        commands: &[AlterObjSubCommand],
+        source_span: &SourcePathWithSpan,
+    ) -> Self {
+        Self {
+            table: table.clone(),
+            commands: commands.to_vec(),
+            source_span: source_span.clone(),
+            applicable: true,
+            resolved_target: None,
+        }
+    }
     /// analyze [`crate::syn::AlterTableStmt`]
     pub fn analyze_alter_table_statement<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         syn: crate::syn::AlterTableStmt,
         tokens: &IVec<ScanToken>,
@@ -40,49 +124,15 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        let Some(rel) = syn.get_relation().as_inner() else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.relation")?
-        };
-        let table_name = TableName::try_from(rel)?;
-        if context.get_table(&table_name).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(&table_name))?;
-        }
-
-        let Some(cmds) = syn.get_cmds().map(|c| c.as_alter_table_cmd()) else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.cmds")?
-        };
-        let mut sub_cmds = Vec::new();
-        for cmd in cmds {
-            let Some(subtyp) = cmd.get_subtype().as_inner() else {
-                AnalysisError::raise_unexpected_none("alter_table_cmd.subtype")?
-            };
-            let (sub_cmd, new_context) = AlterObjSubCommand::analyze_alter_table_cmd(
-                context,
-                &table_name,
-                cmd,
-                subtyp,
-                tokens,
-            )?;
-            context = new_context;
-            sub_cmds.push(sub_cmd);
-        }
-        let alter_table = Self {
-            table: table_name,
-            commands: sub_cmds,
-            source_span: source_span.clone(),
-        };
-        context = context.apply_alter_table(&alter_table)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterTable(alter_table),
-            context,
-        ))
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 
     /// analyze [`crate::syn::AlterTableStmt`]
-    #[tracing::instrument(skip(context, parent_schema, syn))]
+    #[tracing::instrument(skip(context, _parent_schema, syn))]
     pub fn analyze_alter_statement<TParseContext>(
         context: TParseContext,
-        parent_schema: &Option<String>,
+        _parent_schema: &Option<String>,
         syn: crate::syn::AlterTableStmt,
         tokens: &IVec<ScanToken>,
         source_span: &SourcePathWithSpan,
@@ -90,35 +140,15 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        let Some(obj_type) = syn.get_objtype().as_inner() else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.objtype")?
-        };
-        match obj_type {
-            ObjectType::ObjectTable => Self::analyze_alter_table_statement(
-                context,
-                parent_schema,
-                syn,
-                tokens,
-                source_span,
-            ),
-            ObjectType::ObjectView => {
-                AlterView::analyze_alter_view_statement(context, parent_schema, false, syn)
-            }
-            ObjectType::ObjectSequence => {
-                AlterSequence::analyze_alter_seq_statement(context, parent_schema, syn)
-            }
-            ObjectType::ObjectMatview => {
-                AlterView::analyze_alter_view_statement(context, parent_schema, true, syn)
-            }
-            _ => todo!("{obj_type:?}"),
-        }
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 
     /// analyze [`crate::syn::sqlite::AlterTable`]
     #[cfg(feature = "sqlite")]
     #[tracing::instrument(skip(context, syn))]
     pub fn analyze_alter_table<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         syn: crate::syn::sqlite::AlterTable,
         tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
@@ -126,26 +156,7 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        let table_name = TableName::try_from(syn.name())?;
-        if context.get_table(&table_name).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(&table_name))?;
-        }
-        let body = syn.body();
-
-        let (sub_cmd, new_context) =
-            AlterObjSubCommand::analyze_alter_table_body(context, &table_name, body, tokens)?;
-        context = new_context;
-
-        let alter_table = Self {
-            table: table_name,
-            commands: vec![sub_cmd],
-            source_span: source_span.clone(),
-        };
-        context = context.apply_alter_table(&alter_table)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterTable(alter_table),
-            context,
-        ))
+        crate::ast::AlterRelation::try_from(&syn)?.resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -185,7 +196,7 @@ mod test_analyze_alter_table_statement {
         );
         let cmds = builder.as_node_list(&[NodeInner::AlterTableCmd(cmd).into()]);
         let alter_table_stmt =
-            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable.into());
+            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable);
         let tokens = IVec::default();
         let AstAndContextPair(res, ctx) = AlterTable::analyze_alter_table_statement(
             test_context,
@@ -211,14 +222,8 @@ mod test_analyze_alter_table_statement {
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
         let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = match cmd {
-            turso_parser::ast::Cmd::Stmt(stmt) => crate::syn::sqlite::Stmt::from(stmt),
-            _ => panic!("expected sqlite statement command"),
-        };
-        let alter_table = match stmt {
-            crate::syn::sqlite::Stmt::AlterTable(alter_table) => alter_table,
-            _ => panic!("expected alter table statement"),
-        };
+        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
+        let alter_table = stmt.into_alter_table().expect("ALTER TABLE statement");
         (alter_table, tokens)
     }
 
@@ -226,7 +231,7 @@ mod test_analyze_alter_table_statement {
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_missing_relation(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
-        let context = TestParseContext::default();
+        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
 
         let AstAndContextPair(res, context) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
@@ -245,8 +250,8 @@ mod test_analyze_alter_table_statement {
 
     #[cfg(feature = "sqlite")]
     fn sqlite_context() -> TestParseContext {
-        let mut context = TestParseContext::default();
-        context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "text"),
             false,
@@ -341,10 +346,16 @@ pub struct AlterView {
 }
 
 impl AlterView {
+    pub(crate) fn new(view: &ViewName, commands: &[AlterObjSubCommand]) -> Self {
+        Self {
+            view: view.clone(),
+            commands: commands.to_vec(),
+        }
+    }
     /// analyze [`crate::syn::AlterTableStmt`]
     #[tracing::instrument(skip(context, _parent_schema, syn))]
     pub fn analyze_alter_view_statement<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         as_matview: bool,
         syn: crate::syn::AlterTableStmt,
@@ -352,50 +363,20 @@ impl AlterView {
     where
         TParseContext: ParseContext,
     {
-        let Some(rel) = syn.get_relation().as_inner() else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.relation")?
-        };
-        let view_name = ViewName::from(rel);
-        if let Some(view) = context.get_view(&view_name) {
-            if as_matview && !view.is_materialized() {
-                context.report_problem(AnalysisProblem::view_not_matview(&view_name))?;
-            }
-        } else {
-            context.report_problem(AnalysisProblem::view_not_found(&view_name))?;
-        }
-
-        let Some(cmds) = syn.get_cmds().map(|c| c.as_alter_table_cmd()) else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.cmds")?
-        };
-        let mut sub_cmds = Vec::new();
-        for cmd in cmds {
-            let Some(subtyp) = cmd.get_subtype().as_inner() else {
-                AnalysisError::raise_unexpected_none("alter_table_cmd.subtype")?
-            };
-            let sub_cmd = match subtyp {
-                AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&context, cmd)?,
-
-                _ => todo!("{subtyp:?}"),
-            };
-            sub_cmds.push(sub_cmd);
-        }
-        let alter_view = Self {
-            view: view_name,
-            commands: sub_cmds,
-        };
-
-        context = context.apply_alter_view(&alter_view)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterView(alter_view),
-            context,
-        ))
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
+            .with_view_kind(as_matview)
+            .resolve_and_apply(context)
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum AlterObjSubCommand {
-    ChangeOwner(String),
+    /// An analyzed PostgreSQL column-attribute operation.
+    ColumnAttributes(Box<crate::sem::AlterColumnAttributes>),
+    ChangeOwner(crate::sem::OwnerSpecification),
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
+    /// Remove a column default.
+    DropColumnDefault(ColumnName),
     AddConstraint(Constraint),
     ClusterOn(String),
 
@@ -406,45 +387,86 @@ pub enum AlterObjSubCommand {
     DropColumn(ColumnName),
 }
 
-fn report_missing_column_in_table<TParseContext>(
-    context: &mut TParseContext,
-    table_name: &TableName,
-    column_name: &ColumnName,
-) -> Result<(), AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    if let Some(table) = context.get_table(table_name)
-        && !table.has_column(column_name)
-    {
-        context.report_problem(AnalysisProblem::column_not_found_in_table(
-            table_name,
-            column_name,
-        ))?;
+impl AlterObjSubCommand {
+    const fn rename_destination(&self) -> Option<&TableName> {
+        if let Self::RenameTo(name) = self {
+            Some(name)
+        } else {
+            None
+        }
     }
-    Ok(())
+
+    pub(crate) fn column_attributes(value: &crate::sem::AlterColumnAttributes) -> Self {
+        Self::ColumnAttributes(Box::new(value.clone()))
+    }
+    /// Retained column binding, requested action, and validation outcomes.
+    pub fn column_attribute_change(&self) -> Option<&crate::sem::AlterColumnAttributes> {
+        if let Self::ColumnAttributes(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    fn can_apply_column_attributes(&self) -> bool {
+        self.column_attribute_change()
+            .is_some_and(crate::sem::AlterColumnAttributes::can_apply)
+    }
+    pub(crate) fn apply_column_attributes(&self, table: &mut crate::sem::CreateTable) {
+        if let Self::ColumnAttributes(value) = self {
+            value.apply(table);
+        }
+    }
+    const fn added_constraint(&self) -> Option<&Constraint> {
+        if let Self::AddConstraint(constraint) = self {
+            Some(constraint)
+        } else {
+            None
+        }
+    }
+
+    const fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        if let Self::ChangeOwner(owner) = self
+            && owner.can_apply()
+        {
+            Some(owner)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn resolved_owner(owner: &crate::sem::OwnerSpecification) -> Self {
+        Self::ChangeOwner(owner.clone())
+    }
+    pub(crate) fn drop_column_default(column: &ColumnName) -> Self {
+        Self::DropColumnDefault(column.clone())
+    }
+    pub(crate) fn column_default(column: &ColumnName, expression: &SemScalarExpr) -> Self {
+        Self::SetColumnDefault(column.clone(), Box::new(expression.clone()))
+    }
+    pub(crate) fn add_constraint(constraint: &Constraint) -> Self {
+        Self::AddConstraint(constraint.clone())
+    }
+    pub(crate) fn cluster_on(index: &str) -> Self {
+        Self::ClusterOn(index.to_owned())
+    }
+    pub(crate) fn rename_to(table: &TableName) -> Self {
+        Self::RenameTo(table.clone())
+    }
+    pub(crate) fn add_column(column: &ColumnDefinition) -> Self {
+        Self::AddColumn(column.clone())
+    }
+    pub(crate) fn alter_column(name: &ColumnName, column: &ColumnDefinition) -> Self {
+        Self::AlterColumn(name.clone(), column.clone())
+    }
+    pub(crate) fn rename_column(from: &ColumnName, to: &ColumnName) -> Self {
+        Self::RenameColumn(from.clone(), to.clone())
+    }
+    pub(crate) fn drop_column(column: &ColumnName) -> Self {
+        Self::DropColumn(column.clone())
+    }
 }
 
-#[cfg(feature = "sqlite")]
-fn report_existing_column_in_table<TParseContext>(
-    context: &mut TParseContext,
-    table_name: &TableName,
-    column_name: &ColumnName,
-) -> Result<(), AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    if let Some(table) = context.get_table(table_name)
-        && table.has_column(column_name)
-    {
-        context.report_problem(AnalysisProblem::column_already_exists(
-            table_name,
-            column_name,
-        ))?;
-    }
-    Ok(())
-}
-
+#[cfg(test)]
 pub fn analyze_alter_obj_change_owner<TParseContext>(
     _context: &TParseContext,
     cmd: crate::syn::AlterTableCmd,
@@ -452,7 +474,9 @@ pub fn analyze_alter_obj_change_owner<TParseContext>(
     let Some(new_owner) = cmd.get_newowner().get_rolename() else {
         AnalysisError::raise_unexpected_none("alter_table_cmd.newwoner")?
     };
-    Ok(AlterObjSubCommand::ChangeOwner(new_owner))
+    Ok(AlterObjSubCommand::resolved_owner(
+        &crate::sem::OwnerSpecification::named(&new_owner),
+    ))
 }
 
 #[cfg(test)]
@@ -472,8 +496,9 @@ mod test_analyze_alter_obj_change_owner {
 }
 
 impl AlterObjSubCommand {
+    #[cfg(test)]
     fn analyze_alter_obj_column_default<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         cmd: crate::syn::AlterTableCmd,
         tokens: &IVec<ScanToken>,
@@ -481,20 +506,8 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        let column_name = ColumnName::from(cmd.get_name().clone());
-        let with_clause = WithClause::default();
-        let from_clause = FromClause::default();
-        let (expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-            context,
-            &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            cmd.get_def(),
-            tokens,
-        )?;
-        context = new_context;
-
-        report_missing_column_in_table(&mut context, table_name, &column_name)?;
-
-        Ok((Self::SetColumnDefault(column_name, Box::new(expr)), context))
+        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?
+            .resolve_and_report(context, table_name)
     }
 }
 
@@ -559,147 +572,30 @@ mod test_analyze_alter_obj_column_default {
 #[cfg(feature = "sqlite")]
 impl AlterObjSubCommand {
     pub fn analyze_alter_table_body<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         body: &crate::syn::sqlite::AlterTableBody,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        use crate::syn::sqlite::AlterTableBody;
-        let sub_cmd = match body {
-            AlterTableBody::RenameTo(name) => {
-                let rename_to = TableName::try_from(name)?;
-                if context.get_table(&rename_to).is_some() {
-                    context.report_problem(AnalysisProblem::relation_already_exists(&rename_to))?;
-                }
-                Self::RenameTo(rename_to)
-            }
-            AlterTableBody::AddColumn(column_definition) => {
-                let (col_def, new_context) = ColumnDefinition::analyze_column_definition(
-                    context,
-                    table_name,
-                    column_definition,
-                    tokens,
-                )?;
-                context = new_context;
-                if let Some(column_name) = col_def.name() {
-                    report_existing_column_in_table(&mut context, table_name, column_name)?;
-                }
-                Self::AddColumn(col_def)
-            }
-            AlterTableBody::AlterColumn(name, column_definition) => {
-                let column_name = ColumnName::from(name);
-                report_missing_column_in_table(&mut context, table_name, &column_name)?;
-                let (col_def, new_context) = ColumnDefinition::analyze_column_definition(
-                    context,
-                    table_name,
-                    column_definition,
-                    tokens,
-                )?;
-                context = new_context;
-                Self::AlterColumn(column_name, col_def)
-            }
-            AlterTableBody::RenameColumn(rename_from, rename_to) => {
-                let rename_from = ColumnName::from(rename_from);
-                let rename_to = ColumnName::from(rename_to);
-                report_missing_column_in_table(&mut context, table_name, &rename_from)?;
-                if rename_from != rename_to {
-                    report_existing_column_in_table(&mut context, table_name, &rename_to)?;
-                }
-                Self::RenameColumn(rename_from, rename_to)
-            }
-            AlterTableBody::DropColumn(name) => {
-                let column_name = ColumnName::from(name);
-                report_missing_column_in_table(&mut context, table_name, &column_name)?;
-                Self::DropColumn(column_name)
-            }
-        };
-        Ok((sub_cmd, context))
+        crate::ast::AlterCommand::try_from(body)?.resolve_and_report(context, table_name)
     }
 }
 
 impl AlterObjSubCommand {
     pub fn analyze_alter_table_cmd<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         cmd: crate::syn::AlterTableCmd,
-        subtyp: AlterTableType,
+        _subtyp: AlterTableType,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let sub_cmd = match subtyp {
-            AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&context, cmd)?,
-            AlterTableType::AtColumnDefault => {
-                let (column_default, new_context) =
-                    Self::analyze_alter_obj_column_default(context, table_name, cmd, tokens)?;
-                context = new_context;
-                column_default
-            }
-            AlterTableType::AtAddConstraint => {
-                Constraint::analyze_alter_obj_add_constraint(&mut context, table_name, cmd)?
-            }
-            AlterTableType::AtClusterOn => {
-                let index_name = cmd.get_name();
-                if context.get_index(&index_name).is_none() {
-                    context.report_problem(AnalysisProblem::index_not_found(&index_name))?;
-                }
-                Self::ClusterOn(cmd.get_name())
-            }
-            AlterTableType::AtAddColumn => {
-                todo!()
-            }
-            AlterTableType::AtDropColumn => {
-                todo!()
-            }
-
-            _ => todo!("{subtyp:?}"),
-        };
-        Ok((sub_cmd, context))
+        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?
+            .resolve_and_report(context, table_name)
     }
-}
-
-#[deprecated = "use AlterObjSubCommand::analyze_alter_table_cmd"]
-#[expect(dead_code)]
-pub fn analyze_alter_table_cmd<TParseContext>(
-    context: TParseContext,
-    table_name: &TableName,
-    cmd: crate::syn::AlterTableCmd,
-    subtyp: AlterTableType,
-    tokens: &IVec<ScanToken>,
-) -> Result<(AlterObjSubCommand, TParseContext), AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterObjSubCommand::analyze_alter_table_cmd(context, table_name, cmd, subtyp, tokens)
-}
-
-#[deprecated = "use AlterView::analyze_alter_view_statement"]
-#[expect(dead_code)]
-pub fn analyze_alter_view_statement<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    as_matview: bool,
-    syn: crate::syn::AlterTableStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterView::analyze_alter_view_statement(context, parent_schema, as_matview, syn)
-}
-
-#[deprecated = "use AlterSequence::analyze_alter_seq_statement"]
-#[expect(dead_code)]
-pub fn analyze_alter_seq_statement<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::AlterTableStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterSequence::analyze_alter_seq_statement(context, parent_schema, syn)
 }

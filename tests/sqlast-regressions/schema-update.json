@@ -1,0 +1,431 @@
+[
+  {
+    "name": "update::resolves_update::literal",
+    "sql": "UPDATE items SET id=2 RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::only",
+    "sql": "UPDATE ONLY items SET id=2 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::default",
+    "sql": "UPDATE items SET id=DEFAULT RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::alias",
+    "sql": "UPDATE items AS i SET id=i.id RETURNING i.id AS changed",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "changed",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::simultaneous",
+    "sql": "UPDATE items SET id=id,label=label",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::resolves_update::row",
+    "sql": "UPDATE items SET (id,label)=(2,'two') RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::row_query",
+    "sql": "UPDATE items SET (id,label)=(SELECT 2,'two') RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::from",
+    "sql": "UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING s.n",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::target_star",
+    "sql": "UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::source_star",
+    "sql": "UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING s.*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::cte",
+    "sql": "WITH s AS (SELECT 2 n) UPDATE items SET id=s.n FROM s RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::resolves_update::subquery",
+    "sql": "UPDATE items SET id=(SELECT items.id)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::duplicate",
+    "sql": "UPDATE items SET id=2,id=3",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::type_mismatch",
+    "sql": "UPDATE items SET id=true",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::alias_hidden",
+    "sql": "UPDATE items AS i SET id=items.id",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::ambiguous",
+    "sql": "UPDATE items SET id=id FROM items AS other",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::predicate",
+    "sql": "UPDATE items SET id=1 WHERE 1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::cte_default",
+    "sql": "WITH s AS (SELECT $1 n) UPDATE items SET id=s.n FROM s",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::subquery_default",
+    "sql": "UPDATE items SET id=(SELECT $1)",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::row_subquery_default",
+    "sql": "UPDATE items SET (id,label)=(SELECT $1,'two')",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::returning_default",
+    "sql": "UPDATE items SET id=$1 RETURNING $1",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::parameter_conflict",
+    "sql": "UPDATE items SET id=$1,label=$1",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::reports_invalid_update::cte_aliases",
+    "sql": "WITH u(a,b) AS (UPDATE items SET id=1 RETURNING id) SELECT a FROM u",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": [
+        {
+          "name": "a",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::identity_value",
+    "sql": "UPDATE identity_items SET id=2",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::identity_default",
+    "sql": "UPDATE identity_items SET id=DEFAULT",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::generated_value",
+    "sql": "UPDATE generated_items SET g=2",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::generated_default",
+    "sql": "UPDATE generated_items SET g=DEFAULT",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::element_default",
+    "sql": "UPDATE arrays SET a[1]=DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::array_element",
+    "sql": "UPDATE arrays SET a[1]=2",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::multiple_elements",
+    "sql": "UPDATE arrays SET a[1]=2,a[2]=3",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update::validates_destination_rules::overlap",
+    "sql": "UPDATE arrays SET a=DEFAULT,a[1]=2",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "output_names::returning_update",
+    "sql": "UPDATE items SET id=2 RETURNING (SELECT items.label)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

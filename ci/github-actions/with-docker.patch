@@ -1,0 +1,33 @@
+diff --git a/ci/github-actions/Dockerfile b/ci/github-actions/Dockerfile
+--- a/ci/github-actions/Dockerfile
++++ b/ci/github-actions/Dockerfile
+@@ -49,6 +49,6 @@ RUN chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+ 
+ RUN apt-get update && apt-get install -y --no-install-recommends \
+-    ca-certificates curl direnv git gh \
++    ca-certificates curl direnv git gh docker.io \
+     build-essential pkg-config \
+     unzip zip xz-utils sudo \
+     libssl-dev clang jq \
+diff --git a/ci/github-actions/check b/ci/github-actions/check
+--- a/ci/github-actions/check
++++ b/ci/github-actions/check
+@@ -78,8 +78,18 @@ else
+   echo "Warning: OPENAI_API_KEY is not set; AI/LLM tasks are disabled."
+ fi
+ 
++docker_socket=/var/run/docker.sock
++if [[ ! -S "$docker_socket" ]]; then
++  echo "Docker socket not found: $docker_socket" >&2
++  exit 1
++fi
++docker_socket_gid=$(stat -c '%g' "$docker_socket")
++
+ docker run --rm -it \
+   --user "$(id -u):$(id -g)" \
++  --volume "$docker_socket:$docker_socket" \
++  --group-add "$docker_socket_gid" \
++  --add-host host.docker.internal:host-gateway \
+   --volume "user_home:/home:rw" \
+   --volume "${GIT_ROOT}:/home/builder/workspace:rw" \
+   --volume "ci_target:/home/builder/workspace/target:rw" \

@@ -10,10 +10,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::PlaceholderedSql;
-use indexmap::IndexMap;
-use petgraph::graph::NodeIndex;
-use walkdir::WalkDir;
+use crate::{PlaceholderedSql, SqlDialect};
+use ::indexmap::IndexMap;
+use ::petgraph::graph::NodeIndex;
+use ::walkdir::WalkDir;
 
 pub use self::error::{
     CteCatalogCheckError, CteCatalogCheckErrorCollection, CteCatalogError,
@@ -27,6 +27,7 @@ pub use self::params::{
 /// CTE definition name
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct CteName(String);
 
 impl PartialEq<str> for CteName {
@@ -61,6 +62,7 @@ where
 /// CTE alias name
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct CteAlias(String);
 
 impl PartialEq<str> for CteAlias {
@@ -76,6 +78,12 @@ impl Display for CteAlias {
 }
 
 impl CteAlias {
+    /// Resolved alias spelling used in the application query.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
     /// create instance
     #[must_use]
     pub fn new(alias: &str) -> Self {
@@ -310,21 +318,68 @@ impl<'a> CteCatalogEntry<'a> {
     /// # Errors
     ///
     /// [`CteCatalogError`]
-    pub fn expand(
+    fn expand(
         &self,
         catalog: &CteCatalog<'a>,
         alias: &CteAlias,
-        cte_queries: &mut IndexMap<CteAlias, PlaceholderedSql>,
+        state: &mut CteResolutionState,
     ) -> Result<(), CteCatalogError> {
+        if state.already_expanded(alias, &self.cte_name)? {
+            return Ok(());
+        }
         for cte in &self.with {
             let Some(entry) = catalog.get_cte(cte.cte_name()) else {
                 CteCatalogError::raise_cte_not_found(cte.cte_name())?;
                 CteCatalogError::never()
             };
-            entry.expand(catalog, cte.alias(), cte_queries)?;
+            entry.expand(catalog, cte.alias(), state)?;
         }
-        cte_queries.insert(alias.clone(), self.query.clone());
+        if !state.already_expanded(alias, &self.cte_name)? {
+            state.insert(alias, &self.cte_name, &self.query);
+        }
         Ok(())
+    }
+}
+
+/// Definition identity is retained only during one validated catalog expansion.
+struct CteResolutionState {
+    dialect: SqlDialect,
+    definitions: IndexMap<CteAlias, CteName>,
+    queries: IndexMap<CteAlias, PlaceholderedSql>,
+}
+
+impl CteResolutionState {
+    fn new(dialect: SqlDialect) -> Self {
+        Self {
+            dialect,
+            definitions: IndexMap::new(),
+            queries: IndexMap::new(),
+        }
+    }
+
+    fn already_expanded(&self, alias: &CteAlias, name: &CteName) -> Result<bool, CteCatalogError> {
+        for (existing_alias, existing_name) in &self.definitions {
+            if self
+                .dialect
+                .same_identifier(existing_alias.as_str(), alias.as_str())
+            {
+                if existing_name == name {
+                    return Ok(true);
+                }
+                return CteCatalogError::conflicting_alias(
+                    existing_alias,
+                    existing_name,
+                    alias,
+                    name,
+                );
+            }
+        }
+        Ok(false)
+    }
+
+    fn insert(&mut self, alias: &CteAlias, name: &CteName, query: &PlaceholderedSql) {
+        self.definitions.insert(alias.clone(), name.clone());
+        self.queries.insert(alias.clone(), query.clone());
     }
 }
 
@@ -368,10 +423,16 @@ impl CteCatalog<'_> {
         let Some(obj) = value.as_object() else {
             return false;
         };
-        let Some(version) = obj.get(Self::VERSION_KEY).and_then(|v| v.as_str()) else {
+        let Some(version) = obj.get(Self::VERSION_KEY) else {
             return false;
         };
-        let Some(dialect) = value.get(Self::DIALECT_KEY).and_then(|v| v.as_str()) else {
+        let Some(version) = version.as_str() else {
+            return false;
+        };
+        let Some(dialect) = value.get(Self::DIALECT_KEY) else {
+            return false;
+        };
+        let Some(dialect) = dialect.as_str() else {
             return false;
         };
         version == "1" && Self::SUPPORTED_DIALECT.contains(&dialect)
@@ -391,7 +452,7 @@ sql_dialect = "PostgreSQL"
         "#;
         let parsed: JsonValue = toml::from_str(TOML)?;
 
-        assert_eq!(CteCatalog::is_cte_catalog(&parsed), false);
+        assert!(!CteCatalog::is_cte_catalog(&parsed));
         Ok(())
     }
 
@@ -401,7 +462,7 @@ sql_dialect = "PostgreSQL"
 sql_fun_cte_catalog_format_version="1"
         "#;
         let parsed: JsonValue = toml::from_str(TOML)?;
-        assert_eq!(CteCatalog::is_cte_catalog(&parsed), false);
+        assert!(!CteCatalog::is_cte_catalog(&parsed));
         Ok(())
     }
 
@@ -413,7 +474,7 @@ sql_dialect="PostgreSQL"
         "#;
 
         let parsed: JsonValue = toml::from_str(TOML)?;
-        assert_eq!(CteCatalog::is_cte_catalog(&parsed), false);
+        assert!(!CteCatalog::is_cte_catalog(&parsed));
         Ok(())
     }
 
@@ -512,7 +573,7 @@ impl CteCatalog<'_> {
             let value: serde_json::Value = toml::from_str(&content)?;
             value
         } else if extension == "yaml" {
-            let value: serde_json::Value = serde_yaml_ng::from_str(&content)?;
+            let value: serde_json::Value = serde_saphyr::from_str(&content)?;
             value
         } else {
             unreachable!();
@@ -534,7 +595,7 @@ mod cte_catalog_deserialize_file_to_value_tests {
         let mut temp = NamedTempFile::with_suffix(".json")?;
         assert_eq!(temp.path().extension(), Some(OsStr::new("json")));
         temp.as_file_mut().write_all("{}".as_bytes())?;
-        let value = CteCatalog::deserialize_file_to_value(&temp.path().to_path_buf())?;
+        let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!({}));
         Ok(())
     }
@@ -543,7 +604,7 @@ mod cte_catalog_deserialize_file_to_value_tests {
     fn deserialize_file_to_value_toml() -> TestResult {
         let temp = NamedTempFile::with_suffix(".toml")?;
         assert_eq!(temp.path().extension(), Some(OsStr::new("toml")));
-        let value = CteCatalog::deserialize_file_to_value(&temp.path().to_path_buf())?;
+        let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!({}));
         Ok(())
     }
@@ -552,9 +613,46 @@ mod cte_catalog_deserialize_file_to_value_tests {
     fn deserialize_file_to_value_yaml() -> TestResult {
         let temp = NamedTempFile::with_suffix(".yaml")?;
         assert_eq!(temp.path().extension(), Some(OsStr::new("yaml")));
-        let value = CteCatalog::deserialize_file_to_value(&temp.path().to_path_buf())?;
+        let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!(null));
         Ok(())
+    }
+
+    #[test]
+    fn yaml_preserves_nested_catalog_aliases_and_multiline_queries() -> TestResult {
+        let file = test_helpers::catalog_yaml(false)?;
+        let value = CteCatalog::deserialize_file_to_value(file.path())?;
+        assert_eq!(value["cte"]["users"]["query"], "SELECT id\nFROM users\n");
+        assert_eq!(value["cte"]["users"], value["cte"]["alias"]);
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_yaml_is_rejected() -> TestResult {
+        let file = test_helpers::catalog_yaml(true)?;
+        assert!(CteCatalog::deserialize_file_to_value(file.path()).is_err());
+        Ok(())
+    }
+
+    mod test_helpers {
+        pub(super) fn catalog_yaml(
+            malformed: bool,
+        ) -> testresult::TestResult<::tempfile::NamedTempFile> {
+            let file = ::tempfile::NamedTempFile::with_suffix(".yaml")?;
+            let text = if malformed {
+                "cte: [unfinished"
+            } else {
+                r"cte:
+  users: &users
+    query: |
+      SELECT id
+      FROM users
+  alias: *users
+"
+            };
+            std::fs::write(file.path(), text)?;
+            Ok(file)
+        }
     }
 }
 
@@ -1111,7 +1209,10 @@ impl CteCatalog<'_> {
 }
 
 impl CteCatalog<'_> {
-    /// resolve CTE references
+    /// Resolve references using the explicitly selected SQL dialect.
+    /// Shared definitions under equivalent aliases are emitted once, in dependency
+    /// order. Different definitions claiming equivalent aliases are rejected.
+    /// The catalog must have passed validation before resolution.
     ///
     /// # Errors
     ///
@@ -1119,11 +1220,11 @@ impl CteCatalog<'_> {
     ///
     pub fn resolve(
         &self,
-        base_query: &PlaceholderedSql,
         references: &[CteCatalogReference],
+        dialect: SqlDialect,
     ) -> Result<ResolvedCteCatalog, CteCatalogError> {
         let mut parameters = CteParameterCollection::default();
-        let mut cte_queries = IndexMap::default();
+        let mut state = CteResolutionState::new(dialect);
 
         for reference in references {
             let cte_name = &reference.cte_name();
@@ -1133,47 +1234,178 @@ impl CteCatalog<'_> {
             };
             let params = cte.try_get_parameters()?;
             parameters.marge(params.clone());
-            cte.expand(self, reference.alias(), &mut cte_queries)?;
+            cte.expand(self, reference.alias(), &mut state)?;
         }
 
-        Ok(ResolvedCteCatalog {
-            parameters,
-            base_query: base_query.clone(),
-            cte_queries,
-        })
+        Ok(ResolvedCteCatalog::new(&parameters, &state.queries))
     }
 }
 
+#[cfg(test)]
+mod resolve_tests;
+
 /// resolved CTE catalog
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct ResolvedCteCatalog {
     parameters: CteParameterCollection,
-    base_query: PlaceholderedSql,
+    #[cfg_attr(
+        feature = "openrpc-schema",
+        schemars(with = "std::collections::BTreeMap<CteAlias, PlaceholderedSql>")
+    )]
     cte_queries: IndexMap<CteAlias, PlaceholderedSql>,
 }
 
-impl From<&PlaceholderedSql> for ResolvedCteCatalog {
-    fn from(value: &PlaceholderedSql) -> Self {
+impl ResolvedCteCatalog {
+    /// Construct from queries whose catalog dependencies have already been resolved.
+    #[must_use]
+    pub fn new(
+        parameters: &CteParameterCollection,
+        cte_queries: &IndexMap<CteAlias, PlaceholderedSql>,
+    ) -> Self {
         Self {
-            parameters: CteParameterCollection::default(),
-            base_query: value.clone(),
-            cte_queries: IndexMap::default(),
+            parameters: parameters.clone(),
+            cte_queries: cte_queries.clone(),
         }
     }
-}
 
-impl ResolvedCteCatalog {
-    /// compute query finger print
+    /// Aggregated binding metadata, independent of placeholder numbering.
+    #[must_use]
+    pub const fn parameters(&self) -> &CteParameterCollection {
+        &self.parameters
+    }
+
+    /// Append catalog CTE parameter names in resolved collection order.
+    /// The caller establishes placement relative to the application query.
+    pub fn append_cte_parameter_order(&self, order: &mut Vec<crate::ParameterName>) {
+        for query in self.cte_queries.values() {
+            query.append_parameter_order(order);
+        }
+    }
+
+    /// Transform resolved CTEs in dependency/insertion order without resolving again.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error from the supplied transformation.
+    pub fn try_map_cte_queries<T, E>(
+        &self,
+        mut transform: impl FnMut(&CteAlias, &PlaceholderedSql) -> Result<T, E>,
+    ) -> Result<Vec<T>, E> {
+        self.cte_queries
+            .iter()
+            .map(|(alias, query)| transform(alias, query))
+            .collect()
+    }
+
+    /// Compute full query identity from explicit application SQL and resolved dependencies.
     ///
     /// # Errors
     ///
     /// [`CteCatalogError`]
-    #[tracing::instrument(ret, err, skip(self))]
-    pub fn finger_print(&self) -> Result<String, CteCatalogError> {
+    #[tracing::instrument(ret, err, skip(self, base_query))]
+    pub fn finger_print(&self, base_query: &PlaceholderedSql) -> Result<String, CteCatalogError> {
         let mut hasher = crate::Hasher::new();
         hasher.append_str(&serde_json::to_string(&self.parameters)?);
-        hasher.append_str(&serde_json::to_string(&self.base_query)?);
+        hasher.append_str(&serde_json::to_string(base_query)?);
         hasher.append_str(&serde_json::to_string(&self.cte_queries)?);
         Ok(hasher.finish())
     }
 }
+
+#[cfg(test)]
+mod test_resolved_cte_catalog {
+    use super::{CteAlias, CteName, CteParameterCollection, ResolvedCteCatalog};
+    use crate::{ParameterName, PlaceholderedSql};
+    use ::indexmap::IndexMap;
+
+    fn ordered_names(
+        base_query: &PlaceholderedSql,
+        catalog: &ResolvedCteCatalog,
+    ) -> Vec<ParameterName> {
+        let mut names = Vec::new();
+        catalog.append_cte_parameter_order(&mut names);
+        base_query.append_parameter_order(&mut names);
+        names
+    }
+
+    #[test]
+    fn empty_catalog_keeps_application_parameter_metadata_separate() {
+        let base_query = PlaceholderedSql::from_query("select ${id:int}, ${id}, ${other}");
+        let catalog = ResolvedCteCatalog::default();
+        assert_eq!(
+            ordered_names(&base_query, &catalog),
+            [ParameterName::from("id"), ParameterName::from("other")]
+        );
+        assert_eq!(
+            ::serde_json::to_string(catalog.parameters()).unwrap(),
+            r#"{"parameters":{}}"#
+        );
+        let name = ParameterName::from("id");
+        assert!(catalog.parameters().binding(&name).is_none());
+        let (_, hints) = base_query
+            .parameters()
+            .find(|(parameter_name, _)| *parameter_name == &name)
+            .unwrap();
+        assert_eq!(hints.len(), 1);
+    }
+
+    #[test]
+    fn prefix_order_retains_catalog_and_base_binding_metadata() {
+        let mut parameters = CteParameterCollection::default();
+        let mut queries = IndexMap::new();
+        let query = PlaceholderedSql::from_query("select ${shared:int}, ${first}");
+        for (name, hints) in query.parameters() {
+            parameters.push_query_parameter(&CteName::new("definition"), name, hints);
+        }
+        queries.insert(CteAlias::new("chosen"), query);
+        let base_query = PlaceholderedSql::from_query(
+            "with existing as (select ${second:text}) select ${shared}, ${base}",
+        );
+        let catalog = ResolvedCteCatalog::new(&parameters, &queries);
+        assert_eq!(
+            ordered_names(&base_query, &catalog),
+            ["shared", "first", "second", "base"].map(ParameterName::from)
+        );
+        let name = ParameterName::from("shared");
+        let shared = catalog.parameters().binding(&name).unwrap();
+        let bindings = shared.catalog_bindings().collect::<Vec<_>>();
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].0, &CteName::new("definition"));
+        assert_eq!(bindings[0].1.len(), 1);
+        assert_eq!(
+            ::serde_json::to_value(catalog.parameters()).unwrap()["parameters"]["shared"],
+            ::serde_json::json!([["definition", ["int"]]])
+        );
+        assert!(
+            ::serde_json::to_value(&catalog)
+                .unwrap()
+                .get("base_query")
+                .is_none()
+        );
+        let restored: ResolvedCteCatalog =
+            ::serde_json::from_str(&::serde_json::to_string(&catalog).unwrap()).unwrap();
+        assert_eq!(
+            ordered_names(&base_query, &restored),
+            ordered_names(&base_query, &catalog)
+        );
+    }
+
+    #[test]
+    fn resolver_keeps_base_only_metadata_in_query() {
+        let base_query = PlaceholderedSql::from_query("select ${base:int}");
+        let catalog = super::CteCatalog::default()
+            .resolve(&[], crate::SqlDialect::PostgreSQL)
+            .unwrap();
+        let name = ParameterName::from("base");
+        assert!(catalog.parameters().binding(&name).is_none());
+        let (_, hints) = base_query
+            .parameters()
+            .find(|(parameter_name, _)| *parameter_name == &name)
+            .unwrap();
+        assert_eq!(hints.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod fingerprint_tests;

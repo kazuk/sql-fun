@@ -1,0 +1,40 @@
+[
+  {
+    "name": "type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::concrete",
+    "sql": "SELECT choose(1.2)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "choose",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::parameter",
+    "sql": "SELECT choose($1::numeric)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "choose",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

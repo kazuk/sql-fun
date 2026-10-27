@@ -1,8 +1,6 @@
-use std::collections::{HashMap, hash_map::Entry};
-
-use crate::placehlodered_sql::{ParameterName, PlaceholderTypeHint};
-
 use super::CteName;
+use crate::placehlodered_sql::{ParameterName, PlaceholderTypeHint};
+use std::collections::{HashMap, hash_map::Entry};
 
 /// renaming definition
 #[derive(Debug, serde::Deserialize)]
@@ -105,11 +103,17 @@ impl CteParameterBinding {
 
 /// collection of parameter binding
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct CteParameterBindingCollection(Vec<(CteName, Vec<PlaceholderTypeHint>)>);
 
 impl CteParameterBindingCollection {
+    /// Read catalog contributions without exposing the serialized tuple layout.
+    pub fn catalog_bindings(&self) -> impl Iterator<Item = (&CteName, &[PlaceholderTypeHint])> {
+        self.0.iter().map(|(name, hints)| (name, hints.as_slice()))
+    }
+
     /// add binding to parameter
-    pub fn push_binding(&mut self, cte_name: &CteName, hints: &Vec<PlaceholderTypeHint>) {
+    pub fn push_binding(&mut self, cte_name: &CteName, hints: &[PlaceholderTypeHint]) {
         self.0.push((cte_name.clone(), hints.to_owned()));
     }
 
@@ -123,17 +127,24 @@ impl CteParameterBindingCollection {
 
 /// parameter collection for CTE
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct CteParameterCollection {
     parameters: HashMap<ParameterName, CteParameterBindingCollection>,
 }
 
 impl CteParameterCollection {
+    /// Catalog binding metadata for one parameter identity.
+    #[must_use]
+    pub fn binding(&self, name: &ParameterName) -> Option<&CteParameterBindingCollection> {
+        self.parameters.get(name)
+    }
+
     /// register parameter
     pub fn push_query_parameter(
         &mut self,
         cte_name: &CteName,
         parameter_name: &ParameterName,
-        hints: &Vec<PlaceholderTypeHint>,
+        hints: &[PlaceholderTypeHint],
     ) {
         match self.parameters.entry(parameter_name.clone()) {
             Entry::Occupied(mut o) => {
@@ -226,7 +237,7 @@ impl From<HashMap<String, Vec<CteParameterRename>>> for ParameterRenameCollectio
         Self(
             value
                 .into_iter()
-                .map(|(k, v)| (ParameterName::from(&k), v))
+                .map(|(k, v)| (ParameterName::from(k.as_str()), v))
                 .collect(),
         )
     }

@@ -13,7 +13,9 @@ working with SQL and `sql-fun` easier.
 2. Make sure the PostgreSQL submodule is available if your change needs it.
 3. Install `direnv` or an equivalent tool that can load [`.envrc`](.envrc)
    files.
-4. Install Docker CLI access.
+4. Install Docker CLI access. For interactive development-builder sessions, also
+   install the host Docker Compose plugin as described in
+   [the builder instructions](ci/github-actions/README.md#postgresql-development-oracles).
 5. Enable the repository environment.
 6. Make the Rust toolchain required by the workspace available.
 
@@ -27,6 +29,12 @@ direnv allow
 
 If you use another environment loader, make sure it applies the same
 [`.envrc`](.envrc) settings before running build, test, or development scripts.
+
+For `sql-fun api`, `.envrc` supplies an absolute debug server reference and a
+`cargo run -p sql-fun-server` launch command. Run from the repository directory;
+startup compilation counts toward the 40-second connection budget. Prebuild
+with `cargo build -p sql-fun-server` if necessary. See
+[the API command reference](book/cli/api.md) for installed CLI usage.
 
 Docker is required for workflows that extract built-in function and extension
 definitions from official PostgreSQL images.
@@ -47,9 +55,24 @@ cargo install --locked --force \
   sccache cargo-sort cargo-edit cargo-expand cargo-binstall typos-cli
 ```
 
+`mdbook` is required by the documentation build. The `doc` check-flow step
+builds both the Rust API documentation and the user manual.
+
 `cargo-expand` is a runtime prerequisite of `sql-fun check`, which invokes
 `cargo expand` to read the generated query stubs. Install it before using the
 command and ensure it is available on `PATH`.
+
+Contributors working on Debian packaging also need `cargo-deb`. The standard
+CI/development image includes it. When developing outside that image, install
+it and ensure Cargo's binary directory is on `PATH`:
+
+```sh
+cargo install --locked cargo-deb
+cargo deb --version
+```
+
+For the Linux distribution build command, native packaging prerequisites, and
+artifact validation, see [Linux packaging](docs/internal-rules/linux-packaging.md).
 
 Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
 to install. If installation fails, update stable first and try again.
@@ -66,12 +89,79 @@ Make sure the tool's executable directory is available on `PATH`. See the
 [Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
 for platform-specific setup.
 
+Codex contributors also need [`jq`](https://jqlang.org/download/) on `PATH`.
+The repository's Codex pre-tool-use policy uses it to read hook input. The
+standard CI/development image already includes `jq`.
+
+The full `check-test-flow` includes a `skill-lint` step that validates repository
+skills with `skill-validator`. Contributors running this flow outside the project
+CI image need the tool available on `PATH`; see the upstream
+[installation instructions](https://github.com/agent-ecosystem/skill-validator#install).
+The CI image currently pins version 1.6.2 for reproducibility.
+The validation accepts a skill-root README when `SKILL.md` links to it, so skills
+can include maintainer-facing guidance without producing a structural warning.
+
+The optional `cli-contract` check-flow step evaluates source-owned Scrut CLI
+contracts against the locally built `sql-fun` executable. It requires the
+`scrut` executable on `PATH` (CI pins Scrut v0.4.3). A DotSlash wrapper additionally
+requires `dotslash` on `PATH` (CI pins v0.5.9). See the upstream
+[Scrut installation instructions](https://github.com/facebookincubator/scrut#installation).
+Neither tool is currently bundled in the CI/development image; the existing
+installed-CLI validation job downloads the pinned tools and verifies checksums.
+
+Run `.local/bin/check-test-flow --step=cli-e2e` for the real-server Scrut suite.
+This opt-in step requires Bash, `jq`, and Scrut, prebuilds the CLI and server,
+and invokes `scrut test cli/tests/scrut` so every supported Markdown file under
+that directory is discovered recursively. `--all-features` also applies to
+these source builds. The same suite runs in normal PR CI's `install-validation`
+job against the actual installed distribution, using that job's existing Scrut
+installation. Its fixture creates isolated test-owned `/tmp` user namespaces,
+starts its own server child, and cleans up that child and directory when the
+suite runner exits, including failed assertions. It never uses a developer's
+per-user server.
+
+To invoke Scrut directly, explicitly select both binaries and use the suite runner:
+
+```sh
+SQL_FUN_BIN=/absolute/path/to/sql-fun \
+  SQL_FUN_TEST_SERVER_BIN=/absolute/path/to/sql-fun-server \
+  cli/tests/scrut/run.sh cli/tests/scrut
+```
+
+Source builds of the SQL analyzer require a C compiler and assembler for the
+`stacker`/`psm` stack-growth backend, in addition to the native prerequisites of
+`pg_query`. On Ubuntu, install `build-essential` and `clang`; both are already
+included in the CI/development image. Cross-compilation requires the corresponding
+target toolchain. Stack growth adds no executable prerequisite at CLI runtime.
+
 Some Rust dependencies may require additional native build dependencies. Package
 names vary by operating system and distribution, so install the missing packages
 reported by the build errors for your environment.
 
 Useful local scripts live under [`.local/bin/`](.local/bin/). The repository
 environment adds this directory to `PATH`.
+
+## Release workflow validation
+
+The standard `version-materialization` step includes offline release publication
+and preparation contract tests. They require the existing Bash, Git, Cargo,
+`jq`, `taplo` (from `taplo-cli`), and `cargo set-version` (from `cargo-edit`)
+development setup and do not publish packages or deploy Pages. The release-state
+boundary checks also require GNU `realpath` (coreutils), included in the Ubuntu
+CI/development image. Outside that image, install GNU coreutils and put its
+`realpath` on `PATH`.
+
+For additional local workflow syntax validation, optionally install
+[`actionlint` 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12).
+Download the archive for your platform from that release, verify it against the
+published checksums, and put the extracted executable on `PATH`. It is an
+optional contributor tool, not a runtime or standard CI-image prerequisite.
+Validate the release workflow without requiring optional ShellCheck integration:
+
+```sh
+actionlint -shellcheck='' .github/workflows/release-publish.yml \
+  .github/workflows/release-prepare.yml
+```
 
 ## Development Workflow
 
@@ -97,9 +187,9 @@ discuss the direction.
 
 ## Code Style
 
-Rust code should follow the project coding guidelines:
-
-- [docs/internal-rules/rust-coding-guideline.md](docs/internal-rules/rust-coding-guideline.md)
+Implementation and review guidelines are maintained in
+[docs/internal-rules/](docs/internal-rules/). Read the documents relevant to your
+change before starting work.
 
 In general:
 
@@ -125,6 +215,27 @@ To check formatting without rewriting files:
 .local/bin/check-test-flow --step=fmt --fmt-check
 ```
 
+## Markdown linting
+
+Install the same rumdl version used by the development/CI image:
+
+```sh
+cargo install --locked rumdl --version 0.2.76
+```
+
+Run the Markdown checks from the repository root:
+
+```sh
+.local/bin/check-test-flow --step=markdown-lint
+```
+
+This excludes Git submodules, whose Markdown is maintained externally, while
+checking this repository's Markdown files. The standard check flow uses the same
+exclusions.
+
+Use `rumdl fmt <path>` to apply automatic fixes to your Markdown files, then
+review the diff and rerun the check.
+
 ## Generated Files
 
 Do not edit generated files directly.
@@ -149,6 +260,13 @@ The script runs the workspace checks, tests, formatting, linting, documentation
 build, dependency checks, API spec generation, and typo checks. After all other
 steps pass, it updates the repository graph index with `graphify update .`.
 
+The `doc` step builds the documentation and explicitly runs
+`cargo test --doc -p sql-fun-sqlast` with both default features and
+`--all-features`, regardless of the script's feature flag. This executes the
+library's documentation examples, including compile-failure API checks, in
+the standard local flow and the required CI `doc` job. Neither `cargo doc`
+nor the nextest-based `workspace` steps execute doctests.
+
 `check-test-flow` prioritizes consistent behavior between CI and local runs.
 Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):
 incremental compilation is disabled, and the `dev` and `test` profiles use
@@ -171,9 +289,19 @@ For faster iteration, run only selected steps:
 .local/bin/check-test-flow --step=workspace
 .local/bin/check-test-flow --step=proc-macro-tests
 .local/bin/check-test-flow --step=lint
+.local/bin/check-test-flow --step=package-metadata
 .local/bin/check-test-flow --step=doc
 .local/bin/check-test-flow --step=graphify
+.local/bin/check-test-flow --step=packaging
 ```
+
+`package-metadata` checks that every publishable workspace crate can form a
+Cargo source package. It skips verification builds; the generated archives are
+not release artifacts.
+
+`packaging` is an opt-in step and is not part of the default check flow. It
+builds Linux distributions and always validates them before publishing outputs.
+See [Linux packaging](docs/internal-rules/linux-packaging.md) for prerequisites.
 
 List available steps with:
 
@@ -185,16 +313,34 @@ Some checks require extra tools, such as `cargo-nextest`, `cargo-deny`,
 `cargo-sort`, `cargo-llvm-cov`, `cargo-edit`, `cargo-expand`, `taplo`, `typos`,
 `jq`, and `graphify`.
 
-## Updating Statistics
+## PostgreSQL extraction integration
 
-Before submitting a pull request, update project statistics:
+Run this check in an environment with Python 3, `psql` (PostgreSQL client tools),
+Docker CLI, and access to a Docker daemon. Build the CLI, then run the check with
+a new or empty output directory:
+
+```sh
+cargo build -p sql-fun-cli --bin sql-fun
+.local/bin/test-postgres-extraction --binary target/debug/sql-fun \
+  --output /tmp/sql-fun-extraction-validation
+```
+
+To check an installed CLI, supply its executable path with `--binary`.
+Use `--host` and `--bind` when the Docker host is reached through a specific
+interface instead of loopback.
+
+## Inspecting Coverage
+
+To inspect coverage, you can run:
 
 ```sh
 .local/bin/update-stats
 ```
 
-This updates files under [stats/](stats/), including the coverage summary in
-[stats/coverage.txt](stats/coverage.txt).
+The report is written to `stats/coverage.txt`, which is ignored by Git.
+
+Run `check-test-flow` and `update-stats` sequentially; their tests share
+temporary build directories.
 
 ## Commit Messages
 
@@ -222,6 +368,22 @@ Common types include:
 
 ## AI-assisted Contributions
 
+### Optional agent harness
+
+This repository may enable an agent-only harness from [`.envrc`](.envrc) when
+it detects a supported agent environment marker. The harness is an optional
+repository-provided guardrail for maintainer and operator observability; it is
+not a requirement for contributors to use a particular AI tool or setup.
+
+Contributors who do not want their local agent to receive the harness may
+locally comment out or disable the relevant agent-detection and `PATH` setup in
+`.envrc`. This is a personal environment change and must not be included in a
+pull request.
+
+Support for additional agent runtimes is welcome. A contribution may add a
+positive environment-marker detection path so the same harness applies to that
+runtime, provided it does not weaken or broaden the existing Codex detection.
+
 AI-assisted contributions are allowed, but AI tools are not accepted as authors
 or co-authors.
 
@@ -237,6 +399,16 @@ provenance, licensing issues, broken tests, or low-quality code.
 If a contributor cannot take responsibility for the change as their own work,
 they should not submit it.
 
+## Issue and Pull Request Labels
+
+Repository labels have defined workflow semantics. Before creating or updating
+an issue or pull request, read
+[docs/internal-rules/issue-pull-request-labels.md](docs/internal-rules/issue-pull-request-labels.md).
+
+In particular, distinguish preparation state (`not-ready`), concrete dependency
+state (`blocked` / `blocker`), and work that currently requires a human-only
+operation (`require-human-work`).
+
 ## Pull Requests
 
 Before opening a pull request:
@@ -244,9 +416,8 @@ Before opening a pull request:
 1. Rebase or merge the latest target branch as needed.
 2. Run [`.local/bin/check-test-flow`](.local/bin/check-test-flow) without
    arguments and make sure it passes.
-3. Run [`.local/bin/update-stats`](.local/bin/update-stats).
-4. Make sure generated files are updated only through their generator.
-5. Write a clear summary of the change and include test results.
+3. Make sure generated files are updated only through their generator.
+4. Write a clear summary of the change and include test results.
 
 Good pull requests explain:
 
@@ -254,6 +425,15 @@ Good pull requests explain:
 - Why the change is needed.
 - How it was tested.
 - Any limitations, follow-up work, or compatibility concerns.
+
+## CI Image Changes
+
+Changes to `ci/github-actions/Dockerfile` and related CI image tooling use a
+dedicated review and publication workflow.
+
+Before changing the CI image, read
+[ci/README.md](ci/README.md) and follow the documented `ci-image` branch and
+image adoption procedure.
 
 ## Dependency Documentation
 

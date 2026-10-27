@@ -8,11 +8,35 @@ categories = ["database", "development-tools", "command-line-utilities"]
 keywords.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+autotests = false
+
+[package.metadata.deb]
+name = "sql-fun"
+maintainer = "kazuk <kazuk.dll@gmail.com>"
+copyright = "2025 kazuk <kazuk.dll@gmail.com>"
+license-file = ["../LICENSE", "0"]
+# cargo-deb excludes libgcc from $auto; dpkg-shlibdeps on both binaries requires it.
+depends = "$auto, libgcc-s1 (>= 4.2)"
+revision = ""
+section = "devel"
+priority = "optional"
+assets = [
+    ["target/release/sql-fun", "usr/bin/sql-fun", "755"],
+    ["target/release/sql-fun-server", "usr/bin/sql-fun-server", "755"],
+]
 
 [[bin]]
 name = "sql-fun"
 path = "src/main.rs"
 doc = false
+
+[features]
+sqlite = [
+    "sql-fun-client/sqlite",
+    "sql-fun-server-api/sqlite",
+    "sql-fun-core/sqlite",
+    "sql-fun-codegen/sqlite",
+]
 
 [dependencies]
 anyhow.workspace = true
@@ -23,28 +47,57 @@ derive_builder.workspace = true
 directories.workspace = true
 either.workspace = true
 env_logger.workspace = true
+fs-err.workspace = true
 futures-util.workspace = true
 glob.workspace = true
+handlebars.workspace = true
 inquire.workspace = true
 log.workspace = true
+miette.workspace = true
 nix.workspace = true
+owo-colors.workspace = true
+quick-xml.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_json_path.workspace = true
+serde_saphyr.workspace = true
 shellexpand.workspace = true
+sql-fun-client.workspace = true
 sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
-statig.workspace = true
+sql-fun-server-api.workspace = true
 syn.workspace = true
+tar.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 toml.workspace = true
+tracing-subscriber.workspace = true
 url.workspace = true
 walkdir.workspace = true
 which.workspace = true
 
 [dev-dependencies]
+pg_query.workspace = true
 rstest.workspace = true
+sha256.workspace = true
+testresult.workspace = true
+
+[[test]]
+name = "check_prerequisite"
+
+[[test]]
+name = "extracted_artifacts"
+
+[[test]]
+name = "initialization"
+
+[[test]]
+name = "api"
+
+[[test]]
+name = "direct_sql"
+path = "tests/direct_sql/main.rs"
 
 [lints]
 workspace = true

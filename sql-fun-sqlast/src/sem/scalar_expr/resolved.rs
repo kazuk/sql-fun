@@ -1,0 +1,122 @@
+use crate::sem::{AnalysisError, SelectStatement, TypeReference};
+use crate::{
+    context::ParseContext,
+    sem::scalar_expr::{
+        ArrayExpr, BooleanExpr, ExistsExpr, ListExpr, NullTestExpr, ScalarConstExpr, SemScalarExpr,
+        SubLinkExpr, TypeCastExpr,
+        boolean::{BooleanExprBody, NullTestType},
+    },
+};
+
+impl SemScalarExpr {
+    pub(crate) fn truth_test(value: &super::TruthTestExpr) -> Self {
+        Self::TruthTest(value.clone())
+    }
+    /// SQL truth predicate, including its retained operand after inference.
+    pub const fn as_truth_test(&self) -> Option<&super::TruthTestExpr> {
+        match self {
+            Self::TruthTest(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn distinct(value: super::DistinctExpr) -> Self {
+        Self::Distinct(value)
+    }
+    /// Null-safe distinctness predicate, preserved through parameter inference.
+    pub const fn as_distinct(&self) -> Option<&super::DistinctExpr> {
+        if let Self::Distinct(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn distinct_row_comparisons(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+        other: &Self,
+    ) -> Result<Option<Vec<Self>>, AnalysisError> {
+        match (self, other) {
+            (Self::Row(left), Self::Row(right)) => left.distinct_comparisons(context, right),
+            _ => AnalysisError::raise_unexpected_input("distinctness explicit row pair"),
+        }
+    }
+    pub(crate) fn row(fields: &[Self]) -> Self {
+        Self::Row(super::RowExpr::new(fields))
+    }
+    pub(crate) fn function_call(value: &crate::sem::FuncCallExpr) -> Self {
+        Self::FuncCall(value.clone())
+    }
+    pub(crate) fn sql_value(value: &crate::sem::SqlValueExpr) -> Self {
+        Self::SqlValue(value.clone())
+    }
+    pub(crate) fn indirection(value: &crate::sem::IndirectionExpr) -> Self {
+        Self::Indirection(value.clone())
+    }
+    pub(crate) fn coalesce(value: &super::CoalesceExpr) -> Self {
+        Self::Coalesce(value.clone())
+    }
+    pub(crate) fn case(value: &super::CaseExpr) -> Self {
+        Self::Case(value.clone())
+    }
+    pub(crate) fn into_list_values(self) -> Result<Vec<Self>, AnalysisError> {
+        match self {
+            Self::List(values) => Ok(values.into_inner()),
+            _ => AnalysisError::raise_unexpected_input("expression list"),
+        }
+    }
+
+    pub(crate) fn literal(value: &ScalarConstExpr) -> Self {
+        Self::Const(value.clone())
+    }
+    pub(crate) fn analyzed_array(value: &ArrayExpr) -> Self {
+        Self::Array(value.clone())
+    }
+    pub(crate) fn list(values: &[Self]) -> Self {
+        Self::List(ListExpr(values.to_vec()))
+    }
+    pub(crate) fn logical_and(values: &[Self]) -> Self {
+        Self::Boolean(BooleanExpr::new(BooleanExprBody::and(values)))
+    }
+    pub(crate) fn logical_or(values: &[Self]) -> Self {
+        Self::Boolean(BooleanExpr::new(BooleanExprBody::or(values)))
+    }
+    pub(crate) fn logical_not(value: &Self) -> Self {
+        Self::Boolean(BooleanExpr::new(BooleanExprBody::not(value)))
+    }
+    pub(crate) fn null_test(value: &Self, negated: bool) -> Self {
+        let kind = NullTestType::from_negated(negated);
+        Self::NullTest(NullTestExpr::new(kind, value.clone()))
+    }
+    pub(crate) fn explicit_cast(value: &Self, target: &TypeReference) -> Self {
+        Self::TypeCast(TypeCastExpr::from_resolved(target, value))
+    }
+    pub(crate) fn array_subquery(
+        context: &mut impl ParseContext,
+        query: &SelectStatement,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::ArraySubquery(super::ArraySubqueryExpr::resolve(
+            context, query,
+        )?))
+    }
+    /// ARRAY(query), including its analyzed query and result domain.
+    pub const fn as_array_subquery(&self) -> Option<&super::ArraySubqueryExpr> {
+        match self {
+            Self::ArraySubquery(value) => Some(value),
+            _ => None,
+        }
+    }
+    pub(crate) fn exists(query: &SelectStatement) -> Self {
+        Self::Exists(ExistsExpr::from(query))
+    }
+    /// EXISTS predicate, when this expression directly represents one.
+    pub const fn as_exists(&self) -> Option<&ExistsExpr> {
+        match self {
+            Self::Exists(value) => Some(value),
+            _ => None,
+        }
+    }
+    pub(crate) fn subquery(query: &SelectStatement) -> Result<Self, AnalysisError> {
+        Ok(Self::SubLink(SubLinkExpr::from_resolved(query)?))
+    }
+}

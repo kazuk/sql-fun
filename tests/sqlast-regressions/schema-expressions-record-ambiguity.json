@@ -1,0 +1,12 @@
+[
+  {
+    "name": "arrays::record_overloads_preserve_postgres_ambiguity::scalar",
+    "sql": "SELECT g(pg_control_system(), NULL)",
+    "expected": {"diagnostics": ["function_overload_resolution_failed"], "columns": [{"name": "g", "type": null, "nullability": "unknown"}]}
+  },
+  {
+    "name": "arrays::record_overloads_preserve_postgres_ambiguity::array",
+    "sql": "SELECT ga(ARRAY[pg_control_system()], NULL)",
+    "expected": {"diagnostics": ["function_overload_resolution_failed"], "columns": [{"name": "ga", "type": null, "nullability": "unknown"}]}
+  }
+]

@@ -55,6 +55,16 @@ pub struct FunctionParamIn {
 }
 
 impl FunctionParamIn {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(ty) = &mut self.param_type {
+            ty.rename_relation(old, new);
+        }
+    }
+
     pub fn new(
         name: Option<&String>,
         param_type: Option<&TypeReference>,
@@ -89,7 +99,7 @@ impl FunctionParameterTrait for FunctionParamIn {
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
-        None
+        self.default_expr.as_ref()
     }
 
     fn from_syn<TParseContext>(
@@ -121,11 +131,15 @@ impl FunctionParameterTrait for FunctionParamIn {
         context = new_context;
 
         let param_type = FullName::try_from(param_type)?;
-        let param_type = context.get_type(&param_type);
+        let param_type = if let Some(definition) = context.get_type(&param_type) {
+            definition.type_reference().cloned()
+        } else {
+            None
+        };
         Ok((
             FunctionParam::from(&Self {
                 name: Some(param_name),
-                param_type: param_type.and_then(|v| v.type_reference()).cloned(),
+                param_type,
                 default_expr,
             }),
             context,
@@ -137,6 +151,9 @@ impl FunctionParameterTrait for FunctionParamIn {
         arg_types: &mut ArgumentBindingCollection,
     ) -> Result<ParameterBindResult, TypeError> {
         let Some(arg) = arg_types.pop_front() else {
+            if self.default_expr.is_some() {
+                return Ok(ParameterBindResult::no_input(&FunctionParam::from(self)));
+            }
             Err(TypeError::BindFailed(Box::new(FunctionParam::In(
                 self.clone(),
             ))))?
@@ -148,9 +165,12 @@ impl FunctionParameterTrait for FunctionParamIn {
         true
     }
 
-    fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
+    fn apply_simple_infer_result(
+        &mut self,
+        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
+    ) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result);
+            simple_infer_result.apply(ty);
         }
     }
 

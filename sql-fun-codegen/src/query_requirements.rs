@@ -92,6 +92,12 @@ impl QueryRequirement {
         &self.query
     }
 
+    /// Transfer the already-resolved catalog to an analysis request.
+    #[must_use]
+    pub fn into_cte_catalog(self) -> ResolvedCteCatalog {
+        self.cte_catalog
+    }
+
     /// Deserialized CTE information, ready for analysis.
     #[must_use]
     pub const fn cte_catalog(&self) -> &ResolvedCteCatalog {
@@ -116,9 +122,10 @@ mod test_query_requirement {
         assert_eq!(requirement.datasource(), "reporting");
         let spec = test_helpers::specification();
         assert_eq!(requirement.query(), spec.query.encode());
+        let query = ::sql_fun_core::PlaceholderedSql::from_query(requirement.query());
         assert_eq!(
-            requirement.cte_catalog().finger_print().unwrap(),
-            spec.resolved_cte_catalog.finger_print().unwrap()
+            requirement.cte_catalog().finger_print(&query).unwrap(),
+            spec.resolved_cte_catalog.finger_print(&spec.query).unwrap()
         );
     }
 
@@ -153,9 +160,10 @@ mod test_query_requirement {
             let requirement = requirements.iter().next().unwrap();
             assert_eq!(requirement.datasource(), "reporting");
             assert_eq!(requirement.query(), spec.query.encode());
+            let query = ::sql_fun_core::PlaceholderedSql::from_query(requirement.query());
             assert_eq!(
-                requirement.cte_catalog().finger_print().unwrap(),
-                spec.resolved_cte_catalog.finger_print().unwrap()
+                requirement.cte_catalog().finger_print(&query).unwrap(),
+                spec.resolved_cte_catalog.finger_print(&spec.query).unwrap()
             );
         }
     }
@@ -198,6 +206,15 @@ impl QueryRequirements {
     /// Visit the extracted requirements.
     pub fn iter(&self) -> impl Iterator<Item = &QueryRequirement> {
         self.0.iter()
+    }
+}
+
+impl IntoIterator for QueryRequirements {
+    type Item = QueryRequirement;
+    type IntoIter = std::vec::IntoIter<QueryRequirement>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

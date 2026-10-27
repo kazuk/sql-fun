@@ -45,10 +45,6 @@ pub enum AnalysisError {
     #[error(transparent)]
     Meta(#[from] sql_fun_core::MetadataError),
 
-    /// highlighter theme replated errors
-    #[error(transparent)]
-    HighlighterTheme(#[from] sql_fun_core::HighlighterThemeError),
-
     /// file not found
     #[error("file not found : {0}")]
     FileNotFound(PathBuf),
@@ -59,9 +55,30 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn check_dialect(
+        parsed: crate::ast::Dialect,
+        configured: crate::ast::Dialect,
+    ) -> Result<(), Self> {
+        if parsed != configured {
+            return Err(Self::dialect_mismatch(parsed, configured));
+        }
+        Ok(())
+    }
+
+    fn dialect_mismatch(parsed: crate::ast::Dialect, configured: crate::ast::Dialect) -> Self {
+        Self::UnexpectedInput(format!(
+            "statement dialect {parsed:?} does not match analysis metadata dialect {configured:?}"
+        ))
+    }
+
     /// raise `UnexpectedNone` error
     pub fn raise_unexpected_none<T>(message: &str) -> Result<T, Self> {
         Err(Self::UnexpectedNone(String::from(message)))
+    }
+
+    /// Construct a recoverable unexpected-input error without a test-only panic.
+    pub(crate) fn unexpected_input_error(message: &str) -> Self {
+        Self::UnexpectedInput(message.to_owned())
     }
 
     /// raise `UnexpectedInput` error
@@ -144,14 +161,11 @@ impl ProblemLikeError {
         }
     }
 
-    pub fn report_problem_to<TParseContext>(
-        self,
-        context: &mut TParseContext,
-    ) -> Result<(), AnalysisError>
+    pub fn report_problem_to<TContext>(self, context: &mut TContext) -> Result<(), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TContext: ParseContext,
     {
-        context.report_problem(self.into_problem())?;
+        context.report_analysis_problem(self.into_problem())?;
         Ok(())
     }
 }

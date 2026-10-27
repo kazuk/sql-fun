@@ -110,6 +110,19 @@ pub struct Deferrability {
 }
 
 impl Deferrability {
+    pub(crate) const fn is_deferrable(&self) -> bool {
+        self.deferrable
+    }
+    pub(crate) const fn is_initially_deferred(&self) -> bool {
+        self.init_deferred
+    }
+
+    pub(crate) const fn new(deferrable: bool, init_deferred: bool) -> Self {
+        Self {
+            deferrable,
+            init_deferred,
+        }
+    }
     fn from_postgres_constraint(syn: &crate::syn::Constraint) -> Self {
         let deferrable = syn.get_deferrable();
         let init_deferred = syn.get_initdeferred();
@@ -146,6 +159,11 @@ pub struct ForeignKeyColumnConstraint {
 }
 
 impl ForeignKeyColumnConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+        self.primary_key_table.rename_reference(old, new);
+    }
+
     /// create instance
     #[expect(clippy::too_many_arguments)]
     pub fn new(
@@ -252,14 +270,15 @@ impl ForeignKeyColumnConstraint {
             if let Some(pk_col_def) = pk_table.get_column_def(&primary_key_column) {
                 pk_col_def.get_type()
             } else {
-                context.report_problem(AnalysisProblem::column_not_found_in_table(
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     &primary_key_table,
                     &primary_key_column,
                 ))?;
                 None
             }
         } else {
-            context.report_problem(AnalysisProblem::table_not_found(&primary_key_table))?;
+            context
+                .report_analysis_problem(AnalysisProblem::table_not_found(&primary_key_table))?;
             None
         };
 
@@ -288,7 +307,7 @@ impl ForeignKeyColumnConstraint {
 
 #[cfg(feature = "sqlite")]
 impl ForeignKeyColumnConstraint {
-    /// analyze [`crate::syn::sqlite::ForeignKeyColumnConstrraint`]
+    /// analyze [`crate::syn::sqlite::ForeignKeyColumnConstraint`]
     pub fn analyze_constraint_sqlite<TParseContext>(
         mut context: TParseContext,
         table_name: &TableName,
@@ -310,11 +329,11 @@ impl ForeignKeyColumnConstraint {
                 RefArg::OnInsert(_) => {
                     AnalysisError::raise_unexpected_input("RefArg::OnInsert in FK args")?;
                 }
-                RefArg::Match(name) => context.report_problem(
+                RefArg::Match(name) => context.report_analysis_problem(
                     AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(
                         table_name,
                         column_name,
-                        name,
+                        name.value(),
                     ),
                 )?,
             }
@@ -332,13 +351,13 @@ impl ForeignKeyColumnConstraint {
             if let Some(pk_col_def) = pk_table_def.get_column_def(&pk_column) {
                 pk_col_def.get_type()
             } else {
-                context.report_problem(AnalysisProblem::column_not_found_in_table(
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     &pk_table, &pk_column,
                 ))?;
                 None
             }
         } else {
-            context.report_problem(AnalysisProblem::table_not_found(&pk_table))?;
+            context.report_analysis_problem(AnalysisProblem::table_not_found(&pk_table))?;
             None
         };
         let deferrability = syn

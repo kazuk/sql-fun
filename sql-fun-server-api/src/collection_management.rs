@@ -1,39 +1,4 @@
-use time::UtcDateTime;
-
-/// collection handle
-#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-#[serde(transparent)]
-pub struct CollectionHandle(String);
-
-/// argument for [`crate::SqlFunServerApi::release_collection`]
-#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
-#[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
-pub struct ReleaseCollectionArgs {
-    /// releasing collection handle
-    collection_handle: CollectionHandle,
-}
-
-/// argument for [`crate::SqlFunServerApi::read_collection`]
-///
-/// The item type returned by `read_collection` is identical to the element type
-/// of the original `Collection<T>` that produced the handle, and never changes.
-/// This method only reads the continuation of that collection; no type conversion
-/// is performed.
-#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
-#[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
-pub struct ReadCollectionArgs {
-    /// collection
-    collection_handle: CollectionHandle,
-
-    /// start offset
-    start_offset: usize,
-
-    /// read count
-    ///
-    /// when None, client requests read to end, but server implementation has a hard limit
-    count: Option<usize>,
-}
+use crate::payloads::CollectionHandle;
 
 /// collection
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -51,25 +16,83 @@ pub struct Collection<T> {
     /// When true, client must be call `SqlFunServerApi::release_collection`
     require_release: bool,
 
-    /// expiration time
-    #[cfg_attr(
-        feature = "openrpc-schema",
-        schemars(schema_with = "self::schema_util::utc_datetime_schema")
-    )]
-    expire_at: UtcDateTime,
-
     /// collection items
     items: Vec<T>,
 }
 
-#[cfg(feature = "openrpc-schema")]
-mod schema_util {
-    use schemars::{Schema, SchemaGenerator};
+impl<T> Collection<T> {
+    /// Construct a page without converting its items.
+    ///
+    /// Retained collections remain readable until explicit release or connection
+    /// teardown. Reaching the last page does not release a retained collection.
+    /// This constructor takes ownership of the page's items to avoid cloning them.
+    #[must_use]
+    pub fn new(
+        handle: &CollectionHandle,
+        total_length: usize,
+        offset: usize,
+        require_release: bool,
+        items: Vec<T>,
+    ) -> Self {
+        Self {
+            handle: handle.clone(),
+            total_length,
+            offset,
+            require_release,
+            items,
+        }
+    }
+}
 
-    pub fn utc_datetime_schema(_gen: &mut SchemaGenerator) -> Schema {
-        schemars::json_schema!({
-            "type": "string",
-            "format": "date-time"
-        })
+impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+    crate::payloads::CollectionTraversal for Collection<T>
+{
+    fn collections(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+        vec![self]
+    }
+    fn collections_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+        vec![self]
+    }
+}
+impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+    crate::payloads::CollectionReference for Collection<T>
+{
+    fn page(&self) -> Option<crate::payloads::CollectionPage> {
+        Some(crate::payloads::CollectionPage::new(
+            &self.handle,
+            self.total_length,
+            self.offset,
+            self.require_release,
+            self.items.len(),
+        ))
+    }
+    fn insert(
+        &mut self,
+        offset: usize,
+        values: Vec<::serde_json::Value>,
+    ) -> Result<(), ::serde_json::Error> {
+        let page = self;
+        let index = offset.saturating_sub(page.offset);
+        if index > page.items.len() {
+            return Err(<::serde_json::Error as ::serde::de::Error>::custom(
+                "collection insertion exceeds decoded storage",
+            ));
+        }
+        for (inserted, value) in values.into_iter().enumerate() {
+            let item = ::serde_json::from_value(value)?;
+            page.items.insert(index + inserted, item);
+            // Preserve successfully decoded prefix items even if a later item fails.
+            page.offset = page.offset.min(offset);
+        }
+        Ok(())
+    }
+    fn children(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+        crate::payloads::CollectionTraversal::collections(&self.items)
+    }
+    fn children_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+        crate::payloads::CollectionTraversal::collections_mut(&mut self.items)
+    }
+    fn finish(&mut self) {
+        // Server pages retain their wire representation; only clients own completion state.
     }
 }

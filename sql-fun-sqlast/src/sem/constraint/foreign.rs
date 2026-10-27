@@ -9,9 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ForeignKeyConstraint {
     name: String,
-    #[expect(dead_code)]
     source_table: Option<TableName>,
-    #[expect(dead_code)]
     target_table: TableName,
     #[expect(dead_code)]
     source_columns: Vec<ColumnName>,
@@ -20,6 +18,28 @@ pub struct ForeignKeyConstraint {
 }
 
 impl ForeignKeyConstraint {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        if let Some(table) = &mut self.source_table {
+            table.rename_reference(old, new);
+        }
+        self.target_table.rename_reference(old, new);
+    }
+
+    pub(crate) fn new(
+        name: &str,
+        source_table: &TableName,
+        target_table: &TableName,
+        source_columns: &[ColumnName],
+        target_columns: &Option<Vec<ColumnName>>,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            source_table: Some(source_table.clone()),
+            target_table: target_table.clone(),
+            source_columns: source_columns.to_vec(),
+            target_columns: target_columns.clone(),
+        }
+    }
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -54,11 +74,11 @@ where
         if let Some(s) = source_table
             && context.get_table(s).is_none()
         {
-            context.report_problem(AnalysisProblem::relation_not_found(s))?;
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(s))?;
         }
         let target_table = TableName::try_from(target_table)?;
         if context.get_table(&target_table).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(&target_table))?;
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(&target_table))?;
         }
 
         let target_columns = if let Some(target_columns) = constraint
@@ -79,7 +99,7 @@ where
         {
             for key_col_name in &source_columns {
                 if !table.has_column(key_col_name) {
-                    context.report_problem(AnalysisProblem::column_not_found_in_table(
+                    context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                         table_name,
                         key_col_name,
                     ))?;
@@ -92,7 +112,7 @@ where
         {
             for key_col_name in cols {
                 if !table.has_column(key_col_name) {
-                    context.report_problem(AnalysisProblem::column_not_found_in_table(
+                    context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                         &target_table,
                         key_col_name,
                     ))?;

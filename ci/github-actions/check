@@ -13,6 +13,18 @@ for a in "$@"; do
     esac
 done
 
+if (( BUILD_ONLY == 0 )); then
+    if ! docker compose version >/dev/null 2>&1; then
+        echo "Install the host Docker Compose plugin to launch the builder; see ci/github-actions/README.md." >&2
+        exit 1
+    fi
+    compose_help=$(docker compose up --help)
+    if [[ "$compose_help" != *--wait-timeout* ]]; then
+        echo "Upgrade the host Docker Compose plugin: up --wait and --wait-timeout are required." >&2
+        exit 1
+    fi
+fi
+
 if (( REBUILD ==1 )); then
     REBUILD_ARGS=(--pull --no-cache)
 else
@@ -122,22 +134,35 @@ else
     bash -lc "chown -R $(id -u):$(id -g) /home/builder/workspace/target"
 fi
 
-docker_args=()
+compose_project="sql-fun-oracle-$(id -u)-$(date +%s)-$$-$RANDOM"
+compose=(docker compose --env-file /dev/null
+    --project-name "$compose_project"
+    --file "${GIT_ROOT}/ci/github-actions/compose.yaml")
+export BUILDER_UID="$(id -u)" BUILDER_GID="$(id -g)"
+GITHUB_TOKEN=$(gh auth token)
+export GITHUB_TOKEN
+compose_args=(-e GITHUB_TOKEN)
 if [[ -n "${OPENAI_API_KEY:-}" ]]; then
-  docker_args+=( -e "OPENAI_API_KEY=$OPENAI_API_KEY" )
+    export OPENAI_API_KEY
+    compose_args+=(-e OPENAI_API_KEY)
 else
-  echo "Warning: OPENAI_API_KEY is not set; AI/LLM tasks are disabled."
+    echo "Warning: OPENAI_API_KEY is not set; AI/LLM tasks are disabled."
 fi
 
-docker run --rm -it \
-  --user "$(id -u):$(id -g)" \
-  --volume "user_home:/home:rw" \
-  --volume "${GIT_ROOT}:/home/builder/workspace:rw" \
-  --volume "ci_target:/home/builder/workspace/target:rw" \
-  -e HOME=/home/builder \
-  -e CARGO_HOME=/home/builder/.cargo \
-  -e USER=builder \
-  -e GITHUB_TOKEN=$(gh auth token) \
-  "${docker_args[@]}" \
-  -w /home/builder/workspace \
-  ci-builder:local bash
+cleanup() {
+    session_status=$?
+    trap - EXIT INT TERM
+    if ! "${compose[@]}" down --volumes --timeout 10; then
+        echo "Compose cleanup failed; remove project $compose_project using the recovery instructions in ci/github-actions/README.md." >&2
+        if (( session_status == 0 )); then
+            session_status=1
+        fi
+    fi
+    exit "$session_status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+printf 'Oracle Compose project: %s\n' "$compose_project"
+"${compose[@]}" up --wait --wait-timeout 120 postgres15 postgres16 postgres17 postgres18
+"${compose[@]}" run --rm --no-deps "${compose_args[@]}" builder bash

@@ -1,4 +1,5 @@
 mod error;
+mod home_path;
 mod impl_metadata;
 mod impl_sql_fun_home;
 mod init_args;
@@ -16,6 +17,7 @@ use clap::Parser;
 
 pub use self::{
     error::SqlFunArgsError,
+    home_path::resolve_sql_fun_home_path,
     init_args::InitializeArgs,
     log_args::{LoggingArgs, LoggingArgsBuilder},
     metadata_args::{MetadataArgs, MetadataArgsBuilder},
@@ -23,7 +25,7 @@ pub use self::{
 };
 
 use crate::{
-    HighlighterTheme, PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
+    PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
     metadata::{PostgresEngineVersion, SqlFunMetadataCollection},
 };
 
@@ -131,6 +133,9 @@ impl SqlFunArgs {
         MetadataArgs::apply_envs(&mut builder, envs)?;
         PostgresArgs::apply_envs(&mut builder, envs)?;
         LoggingArgs::apply_envs(&mut builder, envs);
+        if let Some(datasource) = envs.get(Self::SQL_FUN_DATASOURCE) {
+            builder.datasource(Some(datasource.clone()));
+        }
 
         if let Some(value) = envs.get(Self::SQL_FUN_OUTPUT_FORMAT) {
             builder.output_format(value);
@@ -147,6 +152,184 @@ impl SqlFunArgs {
         }
 
         Ok(builder)
+    }
+}
+
+impl SqlFunArgs {
+    /// Restore explicitly transferred configuration without reading process variables.
+    /// Home and metadata must be selected so a receiver cannot discover ambient assets.
+    /// Unknown environment keys follow the existing builder's behavior and are ignored.
+    ///
+    /// # Errors
+    /// Rejects malformed settings and omitted or empty home/metadata selections.
+    pub fn from_environments(envs: &HashMap<String, String>) -> Result<Self, SqlFunArgsError> {
+        let args = Self::builder(envs)?
+            .build()
+            .map_err(|error| SqlFunArgsError::Unexpected(error.to_string()))?;
+        if args
+            .initialization_home_candidate()
+            .is_none_or(|path| path.as_os_str().is_empty())
+        {
+            return Err(SqlFunArgsError::Unexpected(
+                "explicit SQL_FUN_HOME is required".into(),
+            ));
+        }
+        if !args.metadata_file_is_explicit() || args.metadata_file_raw()?.is_empty() {
+            return Err(SqlFunArgsError::Unexpected(
+                "explicit SQL_FUN_METADATA_FILE is required".into(),
+            ));
+        }
+        Ok(args)
+    }
+
+    /// Load only the datasource explicitly selected by a caller.
+    ///
+    /// # Errors
+    /// Rejects unavailable metadata and missing or malformed selected datasources.
+    pub fn selected_metadata(&self, datasource: &str) -> Result<SqlFunMetadata, SqlFunArgsError> {
+        let declarations = crate::InitializationDatasources::load_from(&self.metadata_file()?)?;
+        Ok(declarations.selected_metadata(datasource)?)
+    }
+}
+
+#[cfg(test)]
+mod test_transferred_configuration {
+    use super::SqlFunArgs;
+    use crate::test_helpers::{TestMetadataEnvs, TestProjectDir, write_postgres_metadata_project};
+
+    #[test]
+    fn restores_core_serialized_configuration_and_overrides_metadata() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_postgres_metadata_project(&project);
+        let original = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_project(&fixture, "qa")
+                .into_map(),
+        )
+        .unwrap()
+        .datasource(Some("default".to_owned()))
+        .postgres_version("17".parse::<crate::PostgresEngineVersion>().unwrap())
+        .postgres_search_path(vec!["chosen".to_owned()])
+        .builtin_schema_dir(project.path().join("selected-builtins"))
+        .postgres_extensions_dir(project.path().join("selected-extensions"))
+        .build()
+        .unwrap();
+        let restored = SqlFunArgs::from_environments(&original.environments().unwrap()).unwrap();
+        assert_eq!(restored.datasource(), Some("default"));
+        let metadata = restored.selected_metadata("default").unwrap();
+        assert_eq!(
+            restored.postgres_search_path(&metadata).unwrap(),
+            vec!["chosen"]
+        );
+        assert_eq!(
+            restored.postgres_version(&metadata).unwrap().to_string(),
+            "17"
+        );
+        assert_eq!(
+            restored.builtin_info_dir(&metadata).unwrap(),
+            original.builtin_info_dir(&metadata).unwrap()
+        );
+        assert_eq!(
+            restored.postgres_extensions_dir(&metadata).unwrap(),
+            original.postgres_extensions_dir(&metadata).unwrap()
+        );
+        assert_eq!(restored.sql_fun_home().unwrap(), project.path());
+        assert!(restored.selected_metadata("missing").is_err());
+    }
+
+    #[test]
+    fn transfers_overrides_without_selecting_a_datasource() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_postgres_metadata_project(&project);
+        let catalog = project.path().join("chosen-catalog");
+        let original = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_project(&fixture, "qa")
+                .with_cte_catalog_dir(&catalog)
+                .with_sql_dialect("postgresql")
+                .into_map(),
+        )
+        .unwrap()
+        .postgres_version("17".parse::<crate::PostgresEngineVersion>().unwrap())
+        .postgres_search_path(vec!["chosen".to_owned()])
+        .builtin_schema_dir(project.path().join("selected-builtins"))
+        .postgres_extensions_dir(project.path().join("selected-extensions"))
+        .build()
+        .unwrap();
+        let environments = original.environments().unwrap();
+        assert!(!environments.contains_key("SQL_FUN_DATASOURCE"));
+        let restored = SqlFunArgs::from_environments(&environments).unwrap();
+        assert_eq!(restored.datasource(), None);
+        assert_eq!(restored.metadata_file().unwrap(), fixture.metadata_file);
+        let metadata = restored.selected_metadata("default").unwrap();
+        assert_eq!(restored.cte_catalog_dir(&metadata).unwrap(), Some(catalog));
+        assert_eq!(
+            restored.schema_file(&fixture.metadata_file).unwrap(),
+            fixture.schema_file
+        );
+        assert_eq!(
+            restored.postgres_search_path(&metadata).unwrap(),
+            vec!["chosen"]
+        );
+        assert_eq!(
+            restored.postgres_version(&metadata).unwrap().to_string(),
+            "17"
+        );
+        assert_eq!(
+            restored.builtin_info_dir(&metadata).unwrap(),
+            original.builtin_info_dir(&metadata).unwrap()
+        );
+        assert_eq!(
+            restored.postgres_extensions_dir(&metadata).unwrap(),
+            original.postgres_extensions_dir(&metadata).unwrap()
+        );
+    }
+
+    #[test]
+    fn unselected_datasource_does_not_supply_derived_environment_values() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_postgres_metadata_project(&project);
+        let args = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_file(&fixture.metadata_file)
+                .into_map(),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+        let environments = args.environments().unwrap();
+        for name in [
+            "SQL_FUN_DATASOURCE",
+            "SQL_FUN_DIALECT",
+            "SQL_FUN_CTE_CATALOG_DIR",
+            "SQL_FUN_SCHEMA_FILE",
+            "SQL_FUN_POSTGRES_VERSION",
+            "SQL_FUN_PG_SEARCH_PATH",
+            "SQL_FUN_EXTENSIONS",
+            "SQL_FUN_BUILTIN_SCHEMA",
+            "SQL_FUN_EXTENSIONS_DIR",
+        ] {
+            assert!(
+                !environments.contains_key(name),
+                "unexpected derived value: {name}"
+            );
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::omitted_home(false)]
+    #[case::omitted_metadata(true)]
+    fn omitted_assets_do_not_use_process_configuration(#[case] home: bool) {
+        let envs = if home {
+            TestMetadataEnvs::new().with_sql_fun_home(std::path::Path::new("/chosen-home"))
+        } else {
+            TestMetadataEnvs::new().with_metadata_file(std::path::Path::new("/chosen-metadata"))
+        }
+        .into_map();
+        assert!(SqlFunArgs::from_environments(&envs).is_err());
     }
 }
 
@@ -216,6 +399,22 @@ impl SqlFunArgs {
         self.metadata_args.cte_catalog_dir(metadata)
     }
 
+    /// `PostgreSQL` version explicitly selected by CLI or environment, without project metadata.
+    ///
+    /// # Errors
+    /// Returns an error if the configured version cannot be parsed.
+    pub fn postgres_version_override(
+        &self,
+    ) -> Result<Option<PostgresEngineVersion>, SqlFunArgsError> {
+        self.postgres_args.version_override()
+    }
+
+    /// Whether metadata was explicitly configured rather than discovered by default.
+    #[must_use]
+    pub const fn metadata_file_is_explicit(&self) -> bool {
+        self.metadata_args.has_explicit_file()
+    }
+
     /// get `PostgreSQL` version
     ///
     /// # Errors
@@ -244,6 +443,22 @@ impl SqlFunArgs {
     #[must_use]
     pub fn postgres_extensions(&self, metadata: &SqlFunMetadata) -> PostgresExtensionsCollection {
         self.postgres_args.postgres_extensions(metadata)
+    }
+
+    /// Resolve the common home path before initialization creates it.
+    ///
+    /// Uses the same CLI/environment/default precedence as analysis.
+    ///
+    /// # Errors
+    /// Returns an error when the current directory or user home cannot be resolved.
+    pub fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
+        self.metadata_args.initialization_home()
+    }
+
+    /// Return the configured home path without selecting or resolving it.
+    #[must_use]
+    pub fn initialization_home_candidate(&self) -> Option<&Path> {
+        self.metadata_args.initialization_home_candidate()
     }
 
     /// get builtin schema directory path
@@ -290,13 +505,24 @@ impl SqlFunArgs {
     const SQL_FUN_DATASOURCE: &str = "SQL_FUN_DATASOURCE";
     const SQL_FUN_MODE: &str = "SQL_FUN_MODE";
 
+    /// Copy the effective options with an explicitly selected datasource.
+    /// Other selections and overrides are preserved.
+    #[must_use]
+    pub fn with_datasource(&self, datasource: &str) -> Self {
+        let mut selected = self.clone();
+        selected.datasource = Some(datasource.to_owned());
+        selected
+    }
+
     /// selected datasource name
     #[must_use]
     pub fn datasource(&self) -> Option<&str> {
         self.datasource.as_ref().map(std::convert::AsRef::as_ref)
     }
 
-    /// get environments for child process
+    /// Get child-process configuration, preserving common overrides even when no
+    /// datasource is selected. Datasource-derived values are resolved only for an
+    /// explicit selection.
     ///
     /// # Errors
     ///
@@ -304,9 +530,8 @@ impl SqlFunArgs {
     /// encounters an error.
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
-        let metadata_file = self.metadata_file()?;
-        let metadatas = SqlFunMetadataCollection::load_from(&metadata_file)?;
         if let Some(datasource) = &self.datasource {
+            let metadatas = SqlFunMetadataCollection::load_from(&self.metadata_file()?)?;
             let Some(metadata) = metadatas.get(datasource) else {
                 return SqlFunArgsError::datasource_not_found(datasource);
             };
@@ -314,6 +539,9 @@ impl SqlFunArgs {
             self.postgres_args.get_envs(&mut result, self, metadata)?;
 
             result.insert(Self::SQL_FUN_DATASOURCE.to_string(), datasource.clone());
+        } else {
+            self.metadata_args.get_common_envs(&mut result)?;
+            self.postgres_args.get_explicit_envs(&mut result);
         }
 
         self.log_args.get_envs(&mut result);
@@ -325,46 +553,48 @@ impl SqlFunArgs {
         Ok(result)
     }
 
-    /// get terminal color value
-    #[must_use]
-    pub fn term_color(&self) -> TerminalColor {
-        self.term_color.get_value()
-    }
-
-    /// get syntax highlighter theme
-    ///
-    /// when [`Self::term_color`] is never, returns [`HighlighterTheme::default`]
-    /// when [`Self::highlighter_theme`] is None, returns `${SQL_FUN_HOME}/highlighter/default.toml`
-    /// when [`Self::highlighter_theme`] is Some and relative path,
-    ///     returns ${SQL_FUN_HOME}/highlighter/specified-path
-    /// when [`Self::highlighter_theme`] is Some and absolute path,
-    ///     returns load from absolute path
+    /// Transfer explicitly selected analysis settings without resolving excluded schema files.
     ///
     /// # Errors
-    ///
-    /// Returns [`SqlFunArgsError`] if failed load theme.
-    ///
-    pub fn highlighter_theme(&self) -> Result<HighlighterTheme, SqlFunArgsError> {
-        let term_color = self.term_color();
-        if term_color.is_never() {
-            Ok(HighlighterTheme::default())
+    /// Rejects missing datasource, metadata, or invalid selected configuration.
+    pub fn analysis_environments(
+        &self,
+        level: crate::SchemaLevel,
+    ) -> Result<HashMap<String, String>, SqlFunArgsError> {
+        let datasource = self
+            .datasource()
+            .ok_or_else(|| SqlFunArgsError::Unexpected("explicit datasource is required".into()))?;
+        let metadata = self.selected_metadata(datasource)?;
+        let mut result = HashMap::new();
+        if level.includes_project() {
+            self.metadata_args.get_envs(&mut result, &metadata)?;
+            self.postgres_args.get_envs(&mut result, self, &metadata)?;
         } else {
-            let theme_path = if let Some(theme_path) = &self.highlighter_theme {
-                if theme_path.is_absolute() {
-                    theme_path.clone()
-                } else {
-                    let mut base = self.sql_fun_home()?;
-                    base.push("highlighter");
-                    base.push(theme_path);
-                    base
-                }
-            } else {
-                let mut path = self.sql_fun_home()?;
-                path.push("highlighter/default.toml");
-                path
-            };
-            Ok(HighlighterTheme::from_toml(theme_path)?)
+            self.metadata_args.get_common_envs(&mut result)?;
+            self.postgres_args.get_explicit_envs(&mut result);
         }
+        self.log_args.get_envs(&mut result);
+        result.insert(
+            Self::SQL_FUN_OUTPUT_FORMAT.to_owned(),
+            self.output_format.clone(),
+        );
+        // Validate the selected engine configuration without opening any SQL layer.
+        self.postgres_version(&metadata)?;
+        self.postgres_search_path(&metadata)?;
+        result.insert(Self::SQL_FUN_DATASOURCE.to_owned(), datasource.to_owned());
+        Ok(result)
+    }
+
+    /// Requested terminal color mode, without inspecting the terminal.
+    #[must_use]
+    pub const fn term_color(&self) -> TerminalColor {
+        self.term_color
+    }
+
+    /// Explicitly configured highlighter theme path.
+    #[must_use]
+    pub fn highlighter_theme_path(&self) -> Option<&Path> {
+        self.highlighter_theme.as_deref()
     }
 
     /// get project dir
@@ -396,12 +626,15 @@ impl SqlFunArgs {
         ))
     }
 
-    /// get schema dump path
+    /// Get the explicitly selected schema dump, or derive its datasource-specific path.
     ///
     /// # Errors
     ///
     /// Returns an error if the metadata file cannot be located.
     pub fn schema_dump_path(&self, datasource_name: &str) -> Result<PathBuf, SqlFunArgsError> {
+        if let Some(path) = self.metadata_args.schema_file_override() {
+            return Ok(path.to_path_buf());
+        }
         let schema = self.schema();
         Ok(Self::with_file_name(
             self.project_dir()?,
@@ -434,6 +667,38 @@ impl SqlFunArgs {
             args.log_args.set_log_level("debug");
         }
         Ok(args)
+    }
+}
+
+#[cfg(test)]
+mod test_analysis_transfer {
+    use crate::{
+        SchemaLevel, SqlFunArgs,
+        test_helpers::{TestProjectDir, write_postgres_metadata_project},
+    };
+    #[rstest::rstest]
+    #[case::builtin(SchemaLevel::builtin())]
+    #[case::default_sql(SchemaLevel::default_sql())]
+    #[case::extensions(SchemaLevel::extensions())]
+    fn lower_prefix_transfer_does_not_require_a_dump_or_resolve_extensions(
+        #[case] level: SchemaLevel,
+    ) -> ::testresult::TestResult {
+        let project = TestProjectDir::new()?;
+        let fixture = write_postgres_metadata_project(&project);
+        std::fs::remove_file(&fixture.schema_file)?;
+        let args = SqlFunArgs::builder(&std::collections::HashMap::new())?
+            .metadata_file(fixture.metadata_file.to_str().unwrap())
+            .sql_fun_home(project.path())
+            .schema_file(&fixture.schema_file)
+            .datasource(Some("default".to_owned()))
+            .postgres_extensions_dir(project.path().join("missing-extensions"))
+            .build()?;
+        assert!(args.environments().is_err());
+        let restored = SqlFunArgs::from_environments(&args.analysis_environments(level)?)?;
+        let metadata = restored.selected_metadata("default")?;
+        assert_eq!(restored.postgres_version(&metadata)?.to_string(), "16");
+        assert_eq!(restored.postgres_search_path(&metadata)?, ["public"]);
+        Ok(())
     }
 }
 

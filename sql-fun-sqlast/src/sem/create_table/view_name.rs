@@ -1,13 +1,19 @@
-use std::fmt::Display;
-
 use crate::{
     sem::{CatalogName, FullName, LocalName, SchemaName},
     syn::RangeVar,
 };
 
+use std::fmt::Display;
+
 /// view name type
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewName(FullName);
+
+impl From<&Self> for ViewName {
+    fn from(value: &Self) -> Self {
+        value.clone()
+    }
+}
 
 impl Display for ViewName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -17,6 +23,11 @@ impl Display for ViewName {
 }
 
 impl ViewName {
+    /// Construct a view name from an explicit catalog identity.
+    pub fn from_full_name(name: &FullName) -> Self {
+        Self(name.clone())
+    }
+
     fn to_option(string: String) -> Option<String> {
         if string.is_empty() {
             None

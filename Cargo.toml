@@ -36,7 +36,7 @@ members = [
 [workspace.package]
 rust-version = "1.93.1"
 repository = "https://github.com/kazuk/sql-fun/"
-keywords = ["PostgreSQL", "SQLite", "SQL", "Semantic validator", "Schema aware validator"]
+keywords = ["postgresql", "sqlite", "sql", "semantic-validation", "schema-validation"]
 
 [workspace.metadata]
 baseline = "v0.1.0-baseline"
@@ -49,6 +49,8 @@ sql-fun-server-api = "patch"
 sql-fun-core = "patch"
 sql-fun-client = "patch"
 sql-fun-sqlast = "patch"
+sql-fun-codegen = "patch"
+sql-fun-collector = "patch"
 
 [workspace.lints]
 
@@ -71,6 +73,9 @@ use_self = { level = "warn" }
 multiple_crate_versions = { level = "allow" }
 missing_const_for_fn = "warn"
 disallowed_methods = "deny"
+mod_module_files = "deny"
+# See "Test placement" in docs/internal-rules/rust-coding-guideline.md.
+items_after_test_module = "allow"
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
@@ -91,12 +96,13 @@ derive-getters = "0.5"
 derive_builder = "0.20"
 directories = "6.0"
 either = { version = "1.16", features = ["serde"] }
+elsa = { version = "1.11.2", default-features = false }
 env_logger = "0.11"
 fs-err = "3.2.2"
-fs2 = "0.4"
 futures-core = "0.3"
 futures-util = "0.3"
 glob = "0.3"
+handlebars = "6.4"
 hex = "0.4.3"
 indexmap = { version = "2.14.0", features = ["serde"] }
 inquire = "0.9"
@@ -109,7 +115,8 @@ owo-colors = "4.2.3"
 petgraph = "0.8.3"
 pg_query = "6.1"
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
-proc_macro2_diagnostic = "0.6.3"
+proc_macro2_diagnostic = "0.8.0"
+quick-xml = "0.42.0"
 quote = "1.0"
 rand = "0.10"
 rstest = "0.27"
@@ -117,8 +124,8 @@ schemars = { version = "1.2.1", features = ["url2"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_json_path = "0.7.2"
+serde_saphyr = { package = "serde-saphyr", version = "1.3.0", default-features = false, features = ["deserialize"] }
 serde_spanned = "1.1.1"
-serde_yaml_ng = "0.10.0"
 sha2 = "0.11"
 sha256 = "1.6.0"
 shellexpand = "3.1"
@@ -129,13 +136,13 @@ sql-fun-codegen = { path = "./sql-fun-codegen", version = "0.1.0" }
 sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
-statig = "0.4.1"
+stacker = "0.1.23"
 syn = { version = "3.0", features = ["extra-traits", "full", "visit"] }
-sysinfo = "0.39"
+sysinfo = "0.38.4"
+tar = "0.4"
 tempfile = "3.27.0"
 testresult = "0.4"
 thiserror = "2.0"
-time = { version = "0.3.45", features = ["serde"] }
 tokio = { version = "1.52", features = ["full"] }
 tokio-postgres = "0.7"
 toml = "1.0.6"

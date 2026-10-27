@@ -1,9 +1,7 @@
+use crate::sem::scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr};
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable, ParseContext,
-    SemScalarExpr, TypeReference, ViewName, data_source::AliasName,
+    ColumnDefinition, ColumnName, Nullable, TypeReference, ViewName, data_source::AliasName,
 };
-
-use super::{ColumnReference, ColumnReferenceExpr};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewColumnRef {
@@ -45,6 +43,19 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
+        self.alias = alias.clone();
+        self.column = column.clone();
+        self
+    }
+
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
+    pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
+        self.view_name.full_name() == relation
+    }
+
     fn new(
         alias: &AliasName,
         column: &ColumnName,
@@ -60,46 +71,28 @@ impl ViewColumnRef {
             datasource_nullable,
         }
     }
+}
 
-    pub(crate) fn view_source_ref<TParseContext>(
-        mut context: TParseContext,
+impl ColumnReferenceExpr {
+    pub(crate) fn view_column(
         alias: &AliasName,
         column: &ColumnName,
-        view_name: &ViewName,
-        nullability: Nullable,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(view) = context.get_view(view_name) else {
-            AnalysisError::raise_unexpected_input(&format!(
-                "view {view_name} not found in context"
-            ))?
-        };
-
-        let column_def = view.get_column_def(column);
-        if column_def.is_none() {
-            context.report_problem(AnalysisProblem::column_not_found_in_view(view_name, column))?;
-        }
-        let col_ref = Self::new(alias, column, view_name, &column_def, nullability);
-        Ok((
-            SemScalarExpr::ColumnRef(ColumnReferenceExpr::ViewColumn(col_ref)),
-            context,
+        view: &ViewName,
+        definition: Option<&ColumnDefinition>,
+        nullable: Nullable,
+    ) -> Self {
+        Self::ViewColumn(ViewColumnRef::new(
+            alias,
+            column,
+            view,
+            &definition.cloned(),
+            nullable,
         ))
     }
 }
 
-impl ColumnReferenceExpr {
-    pub(crate) fn view_source_ref<TParseContext>(
-        context: TParseContext,
-        alias: &AliasName,
-        column: &ColumnName,
-        view_name: &ViewName,
-        nullability: Nullable,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        ViewColumnRef::view_source_ref(context, alias, column, view_name, nullability)
+impl ViewColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
     }
 }

@@ -1,6 +1,7 @@
 //! internal build utilities for `sql-fun`
 
 mod protobuf_prost;
+mod public_api_diff;
 
 /// command line args
 #[derive(clap::Parser)]
@@ -13,6 +14,7 @@ pub struct Args {
 enum Command {
     EnumTypes(self::protobuf_prost::EnumTypesCommand),
     StructTypes(self::protobuf_prost::StructTypesCommand),
+    PublicApiDiff(self::public_api_diff::PublicApiDiffCommand),
 }
 
 impl Args {
@@ -29,6 +31,7 @@ impl Command {
         match self {
             Self::EnumTypes(e) => e.run(args)?,
             Self::StructTypes(e) => e.run(args)?,
+            Self::PublicApiDiff(command) => command.run()?,
         }
         Ok(())
     }

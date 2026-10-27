@@ -18,15 +18,16 @@ doc = false
 sqlite = ["sql-fun-core/sqlite", "sql-fun-sqlast/sqlite", "sql-fun-server-api/sqlite"]
 
 [dependencies]
-async-trait.workspace = true
 clap = { workspace = true }
 derive-getters = { workspace = true }
 either.workspace = true
-fs2 = { workspace = true }
+elsa.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
 indexmap = { workspace = true }
+notify = "8.2.0"
 rand = { workspace = true }
+scopeguard = "1.2.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sql-fun-core.workspace = true
@@ -38,7 +39,10 @@ tokio = { workspace = true }
 tracing.workspace = true
 
 [dev-dependencies]
+rstest.workspace = true
+tempfile.workspace = true
 testresult.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

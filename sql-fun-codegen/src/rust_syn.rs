@@ -1,5 +1,7 @@
+mod generated_identifiers;
 mod parameter_bindings;
 
+pub(crate) use self::generated_identifiers::GeneratedIdentifiers;
 pub(crate) use self::parameter_bindings::ParameterBindings;
 
 use proc_macro2::Span;
@@ -236,8 +238,10 @@ impl ItemFunction {
         self.0.sig.inputs = iter.collect();
     }
 
-    pub fn append_arg(&mut self, arg: &FnArg) {
-        self.0.sig.inputs.push(arg.clone());
+    pub(crate) fn insert_args(&mut self, index: usize, args: &[PatType]) {
+        for (index, arg) in (index..).zip(args) {
+            self.0.sig.inputs.insert(index, FnArg::Typed(arg.clone()));
+        }
     }
 }
 
@@ -259,7 +263,7 @@ mod test_parameter_sources {
                 .to_string(),
             "& dto . id ()"
         );
-        child.append_arg(&syn::parse_quote!(id: i64));
+        child.insert_args(child.sig().inputs.len(), &[syn::parse_quote!(id: i64)]);
         assert_eq!(
             child
                 .parameter_bindings()
@@ -320,6 +324,10 @@ impl SqlFragmentArgs {
 
 #[derive(Debug, Clone)]
 pub struct FragmentArm {
+    #[expect(
+        dead_code,
+        reason = "The parsed arm name is retained while function naming uses the pattern."
+    )]
     name: String,
     pat: Pat,
     guard: Option<Box<Expr>>,

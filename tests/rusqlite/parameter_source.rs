@@ -34,7 +34,7 @@ fn lookup(connection: &Connection, #[parameter_source] dto: &Dto) -> Result<User
 fn lookup_opt(connection: &Connection, #[parameter_source(getter_prefix = "get_", field_bind = false)] dto: &Dto) -> Result<Option<User>, anyhow::Error> {}
 
 #[sql_fun::sql_query_many(datasource = "sqlite", sql = "select id, name from users where id = ${id}")]
-fn lookup_many<F>(connection: &Connection, #[parameter_source(field_bind = false)] dto: &Dto, mut collector: Vec<User>, handler: F) -> Result<Vec<User>, anyhow::Error>
+fn lookup_many<F>(connection: &Connection, #[parameter_source(field_bind = false)] dto: &Dto, mut rows: Vec<User>, handler: F) -> Result<Vec<User>, anyhow::Error>
 where F: Fn(Vec<User>, User) -> Result<Vec<User>, anyhow::Error> {}
 
 #[sql_fun::sql_statement(datasource = "sqlite", sql = "delete from users where id = ${id}")]

@@ -5,7 +5,7 @@
 - `enum` convert to variant `as_variant_name`
 - access `struct` field `get_field_name`
 - AST query simplify as `as_variant().get_field().as_variant().get_field()`
-  - finally `as_inner()` returns `Option<TFinalFieldValue>` 
+  - finally `as_inner()` returns `Option<TFinalFieldValue>`
 
 ## struct wrapping
 

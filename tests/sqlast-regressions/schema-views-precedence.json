@@ -1,0 +1,296 @@
+[
+  {
+    "name": "automatic_rule_precedence::conditional::insert",
+    "sql": "INSERT INTO public.v_conditional(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional::returning",
+    "sql": "INSERT INTO public.v_conditional(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional::conflict",
+    "sql": "INSERT INTO public.v_conditional(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional::update",
+    "sql": "UPDATE public.v_conditional SET id=1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional::insert",
+    "sql": "INSERT INTO public.v_additional(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional::returning",
+    "sql": "INSERT INTO public.v_additional(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional::conflict",
+    "sql": "INSERT INTO public.v_additional(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional::update",
+    "sql": "UPDATE public.v_additional SET id=1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_update::insert",
+    "sql": "INSERT INTO public.v_additional_update(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_update::returning",
+    "sql": "INSERT INTO public.v_additional_update(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_update::conflict",
+    "sql": "INSERT INTO public.v_additional_update(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_update::update",
+    "sql": "UPDATE public.v_additional_update SET id=1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::instead::insert",
+    "sql": "INSERT INTO public.v_instead(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::instead::returning",
+    "sql": "INSERT INTO public.v_instead(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::instead::conflict",
+    "sql": "INSERT INTO public.v_instead(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::instead::update",
+    "sql": "UPDATE public.v_instead SET id=1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional_trigger::insert",
+    "sql": "INSERT INTO public.v_conditional_trigger(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional_trigger::returning",
+    "sql": "INSERT INTO public.v_conditional_trigger(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional_trigger::conflict",
+    "sql": "INSERT INTO public.v_conditional_trigger(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::conditional_trigger::update",
+    "sql": "UPDATE public.v_conditional_trigger SET id=1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_trigger::insert",
+    "sql": "INSERT INTO public.v_additional_trigger(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_trigger::returning",
+    "sql": "INSERT INTO public.v_additional_trigger(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_trigger::conflict",
+    "sql": "INSERT INTO public.v_additional_trigger(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_rule_precedence::additional_trigger::update",
+    "sql": "UPDATE public.v_additional_trigger SET id=1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

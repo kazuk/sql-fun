@@ -1,0 +1,314 @@
+[
+  {
+    "name": "delete::resolves_delete::plain",
+    "sql": "DELETE FROM items",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "delete::resolves_delete::star",
+    "sql": "DELETE FROM items RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::only",
+    "sql": "DELETE FROM ONLY items RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::alias",
+    "sql": "DELETE FROM items AS i WHERE true RETURNING i.id AS removed",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "removed",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::using",
+    "sql": "DELETE FROM items USING (SELECT 2 n) s RETURNING s.n",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::target_star",
+    "sql": "DELETE FROM items USING (SELECT 2 n) s RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::source_star",
+    "sql": "DELETE FROM items USING (SELECT 2 n) s RETURNING s.*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::with",
+    "sql": "WITH s AS (SELECT 2 n) DELETE FROM items USING s RETURNING s.n",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::correlated",
+    "sql": "DELETE FROM items WHERE (SELECT items.id IS NULL) RETURNING (SELECT items.label)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::resolves_delete::cte_shadow",
+    "sql": "WITH items AS (SELECT 2 other) DELETE FROM items RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::alias_hidden",
+    "sql": "DELETE FROM items AS i RETURNING items.id",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::ambiguous",
+    "sql": "DELETE FROM items USING items AS other RETURNING id",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::duplicate_alias",
+    "sql": "DELETE FROM items USING items RETURNING id",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column",
+        "duplicate_alias"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::missing_column",
+    "sql": "DELETE FROM items RETURNING absent",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "absent",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::predicate",
+    "sql": "DELETE FROM items WHERE 1",
+    "expected": {
+      "diagnostics": [
+        "delete_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::using_correlation",
+    "sql": "DELETE FROM items USING LATERAL (SELECT items.id) s RETURNING s.id",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete::reports_invalid_delete::cte_aliases",
+    "sql": "WITH d(a,b,c) AS (DELETE FROM items RETURNING id) SELECT a FROM d",
+    "expected": {
+      "diagnostics": [
+        "delete_semantics"
+      ],
+      "columns": [
+        {
+          "name": "a",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_names::returning_delete",
+    "sql": "DELETE FROM items RETURNING (SELECT items.label) AS chosen",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "chosen",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

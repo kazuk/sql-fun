@@ -1,6 +1,7 @@
 use crate::{
-    sem::{AnalysisProblem, AstAndContextPair, FullName, alter_table::AlterObjSubCommand},
-    syn::{AlterTableType, ListOpt, Opt},
+    ast::TryFromWithTokens,
+    sem::{AstAndContextPair, FullName, alter_table::AlterObjSubCommand},
+    syn::Opt,
 };
 
 use super::{AnalysisError, ParseContext, SemAst};
@@ -10,15 +11,23 @@ use super::{AnalysisError, ParseContext, SemAst};
 pub struct AlterSequence {
     seq_name: FullName,
     commands: Vec<AlterObjSubCommand>,
+    /// Explicit dependency change; absent means preserve the current dependency.
+    owned_by: Option<SequenceDependency>,
 }
 
 impl AlterSequence {
+    pub(crate) fn with_owned_by(mut self, relation: Option<&crate::sem::TableName>) -> Self {
+        self.owned_by = Some(SequenceDependency::from(relation));
+        self
+    }
+
     /// create `alter sequence` statement
     #[must_use]
     pub fn new(seq_name: &FullName, commands: &[AlterObjSubCommand]) -> Self {
         Self {
             seq_name: seq_name.clone(),
             commands: commands.to_vec(),
+            owned_by: None,
         }
     }
 
@@ -39,6 +48,7 @@ impl AlterSequence {
         let alter_seq = Self {
             seq_name: seq,
             commands: Default::default(),
+            owned_by: None,
         };
         context = context.apply_alter_sequence(&alter_seq)?;
         Ok(AstAndContextPair::new(
@@ -49,59 +59,29 @@ impl AlterSequence {
 
     /// analyze [`crate::syn::AlterTableStmt`]
     pub fn analyze_alter_seq_statement<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         syn: crate::syn::AlterTableStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let Some(rel) = syn.get_relation().as_inner() else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.relation")?
-        };
-        let seq_name = FullName::try_from(rel)?;
-        if context.get_sequence(&seq_name).is_none() {
-            context.report_problem(AnalysisProblem::sequence_not_found(&seq_name))?;
-        }
-        let Some(cmds) = syn.get_cmds().map(|c| c.as_alter_table_cmd()) else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.cmds")?
-        };
-        let mut sub_cmds = Vec::new();
-
-        for cmd in cmds {
-            let Some(subtyp) = cmd.get_subtype().as_inner() else {
-                AnalysisError::raise_unexpected_none("alter_table_cmd.subtype")?
-            };
-            let sub_cmd = match subtyp {
-                AlterTableType::AtChangeOwner => {
-                    crate::sem::alter_table::analyze_alter_obj_change_owner(&context, cmd)?
-                }
-
-                _ => todo!("{subtyp:?}"),
-            };
-            sub_cmds.push(sub_cmd);
-        }
-
-        let alter_seq = Self::new(&seq_name, &sub_cmds);
-
-        context = context.apply_alter_sequence(&alter_seq)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterSequence(alter_seq),
-            context,
-        ))
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
+            .resolve_and_apply(context)
     }
 }
 
-/// analyze [`crate::syn::AlterSeqStmt`]
-#[deprecated = "use AlterSequence::analyze_alter_seq"]
-#[expect(dead_code)]
-pub fn analyze_alter_seq<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::AlterSeqStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterSequence::analyze_alter_seq(context, parent_schema, syn)
+/// An explicit sequence dependency, distinguishing OWNED BY NONE from an omitted edit.
+#[derive(Clone, Debug)]
+pub struct SequenceDependency(Option<crate::sem::TableName>);
+impl From<Option<&crate::sem::TableName>> for SequenceDependency {
+    fn from(relation: Option<&crate::sem::TableName>) -> Self {
+        Self(relation.cloned())
+    }
+}
+impl SequenceDependency {
+    /// Bound owning relation; None is the explicit OWNED BY NONE choice.
+    pub const fn relation(&self) -> Option<&crate::sem::TableName> {
+        self.0.as_ref()
+    }
 }

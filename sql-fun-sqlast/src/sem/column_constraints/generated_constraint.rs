@@ -91,6 +91,23 @@ pub struct GeneratedColumnConstraint {
 }
 
 impl GeneratedColumnConstraint {
+    pub(super) fn rename_expression(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        self.expr.walk(visitor)
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
+    pub(crate) fn is_stored(&self) -> bool {
+        self.generated_when == Some(GeneratedColumnMode::stored())
+    }
+    pub(crate) fn is_virtual(&self) -> bool {
+        self.generated_when == Some(GeneratedColumnMode::r#virtual())
+    }
     /// create instance
     pub fn new(
         table_name: &TableName,

@@ -1,10 +1,14 @@
 use std::collections::HashSet;
 
+// This module uses combine for lexical analysis and parsing. New lexical or parsing logic should
+// use combine by default. A different parsing strategy is acceptable only when it provides an
+// overwhelming, clearly explainable technical advantage that outweighs the additional maintenance
+// and conceptual cost of introducing another strategy.
 use combine::{
-    Parser, between, many, optional,
+    Parser, any, attempt, between, many, optional,
+    parser::char::{alpha_num, char, letter, spaces, string},
     parser::{
-        char::{alpha_num, char, letter, spaces, string},
-        range::recognize,
+        combinator::not_followed_by, range::recognize, repeat::take_until, token::tokens_cmp,
     },
     satisfy,
 };
@@ -13,28 +17,49 @@ use toml_parser::decoder::StringBuilder;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+/// A named sql-fun query parameter.
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct ParameterName(String);
 
-impl<T> From<T> for ParameterName
-where
-    T: AsRef<str>,
-{
-    fn from(value: T) -> Self {
-        Self(String::from(value.as_ref()))
+impl From<&str> for ParameterName {
+    fn from(value: &str) -> Self {
+        Self(String::from(value))
+    }
+}
+
+impl From<String> for ParameterName {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 
 impl ParameterName {
+    /// get the parameter name text
+    #[must_use]
+    pub const fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
     fn encode(&self, buffer: &mut String) {
         buffer.push_str(&self.0);
     }
 }
 
+impl AsRef<str> for ParameterName {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+/// Type annotation written on a named SQL parameter placeholder.
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct PlaceholderTypeHint(String);
 
 impl PlaceholderTypeHint {
+    /// Return the type annotation text.
+    #[must_use]
     pub const fn hint_value(&self) -> &str {
         self.0.as_str()
     }
@@ -53,9 +78,87 @@ fn ident<'a>() -> impl combine::Parser<&'a str, Output = String> {
     })
 }
 
+combine::parser! {
+    fn closed_block_comment[Input]()(Input) -> ()
+    where [
+        Input: combine::stream::RangeStream<Token = char>,
+        Input::Range: combine::stream::Range + PartialEq,
+    ]
+    {
+        string("/*").with(
+            many(
+                attempt(closed_block_comment()).or(not_followed_by(
+                        attempt(string("/*")).or(attempt(string("*/"))),
+                    )
+                    .with(any())
+                    .map(|_| ())),
+            ),
+        ).skip(string("*/"))
+    }
+}
+
+fn line_comment<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    recognize((
+        string("--"),
+        many::<String, _, _>(satisfy(|character| character != '\n')),
+        optional(char('\n')),
+    ))
+}
+
+fn quoted_identifier<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    recognize(between(
+        char('"'),
+        char('"'),
+        many::<String, _, _>(
+            attempt(string("\"\"").map(|_| '"')).or(satisfy(|character| character != '"')),
+        ),
+    ))
+}
+
+fn dollar_quote_delimiter<'a>() -> impl Parser<&'a str, Output = String> {
+    recognize((
+        char('$'),
+        optional((
+            satisfy(|character: char| character.is_ascii_alphabetic() || character == '_'),
+            many::<String, _, _>(satisfy(|character: char| {
+                character.is_ascii_alphanumeric() || character == '_'
+            })),
+        )),
+        char('$'),
+    ))
+    .map(String::from)
+}
+
+fn dollar_quoted<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    recognize(dollar_quote_delimiter().then(|delimiter| {
+        let closing_delimiter = move || {
+            tokens_cmp(
+                delimiter.chars().collect::<Vec<_>>(),
+                |expected: char, actual: char| expected == actual,
+            )
+        };
+        take_until::<String, _, _>(attempt(closing_delimiter())).skip(closing_delimiter())
+    }))
+}
+
+fn host_sql_region<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    attempt(line_comment())
+        .or(attempt(recognize(closed_block_comment())))
+        .or(attempt(dollar_quoted()))
+        .or(attempt(quoted_identifier()))
+}
+
+fn host_sql_opener<'a>() -> impl Parser<&'a str, Output = ()> {
+    attempt(string("--").map(|_| ()))
+        .or(attempt(string("/*").map(|_| ())))
+        .or(attempt(char('"').map(|_| ())))
+        .or(attempt(dollar_quote_delimiter()).map(|_| ()))
+}
+
 /// fragment embedding placeholder name
 #[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct FragmentName(String);
 
 impl FragmentName {
@@ -98,6 +201,7 @@ impl std::fmt::Display for FragmentName {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct NamedParameterPlaceholder {
     name: ParameterName,
     type_hint: Option<PlaceholderTypeHint>,
@@ -106,10 +210,11 @@ pub struct NamedParameterPlaceholder {
 impl NamedParameterPlaceholder {
     /// get parser accepts `${ name:type_hint }` or `${name}`
     pub fn parser<'a>() -> impl combine::Parser<&'a str, Output = Self> {
-        let name_with_type_opt = (ident(), optional(ident())).map(|(name, type_hint)| Self {
-            name: ParameterName(name),
-            type_hint: type_hint.map(PlaceholderTypeHint),
-        });
+        let name_with_type_opt =
+            (ident(), optional(char(':').with(ident()))).map(|(name, type_hint)| Self {
+                name: ParameterName(name),
+                type_hint: type_hint.map(PlaceholderTypeHint),
+            });
         char('$').with(between(
             char('{').skip(spaces()),
             spaces().with(char('}')),
@@ -140,11 +245,21 @@ impl NamedParameterPlaceholder {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct SqlLiteralText(String);
 
 impl SqlLiteralText {
+    /// get literal contents without SQL quote delimiters
     pub const fn text(&self) -> &str {
         self.0.as_str()
+    }
+
+    /// encode as SQL literal text
+    #[must_use]
+    pub fn sql(&self) -> String {
+        let mut buffer = String::new();
+        self.encode(&mut buffer);
+        buffer
     }
 }
 
@@ -153,12 +268,12 @@ impl SqlLiteralText {
     pub fn parser<'a>() -> impl combine::Parser<&'a str, Output = Self> {
         let escaped_char = string(r"''").map(|_| '\'');
 
-        recognize(between(
+        between(
             char('\''),
             char('\''),
-            many::<Vec<_>, _, _>(escaped_char.or(satisfy(|c| c != '\''))).map(|_| ()),
-        ))
-        .map(|s| Self(String::from(s)))
+            many::<Vec<_>, _, _>(attempt(escaped_char).or(satisfy(|c| c != '\''))),
+        )
+        .map(|text| Self(text.into_iter().collect()))
     }
 
     fn encode(&self, buffer: &mut String) {
@@ -170,6 +285,7 @@ impl SqlLiteralText {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct RawSqlText(String);
 
 impl RawSqlText {
@@ -183,14 +299,25 @@ impl RawSqlText {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// A token in SQL containing sql-fun placeholders.
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum PlaceholderedSqlToken {
+    /// A named parameter placeholder such as `${user_id}`.
     ParameterPlaceholder(NamedParameterPlaceholder),
+    /// A fragment placeholder such as `#[where_clause]`.
     FragmentPlaceholder(FragmentName),
+    /// A SQL string literal.
     LiteralText(SqlLiteralText),
+    /// SQL text that is neither a placeholder nor a string literal.
     RawSqlText(RawSqlText),
 }
 
 impl PlaceholderedSqlToken {
+    /// Parse one special token from the start of `source`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original source when it does not begin with a special token.
     pub fn try_take_special_item(source: &str) -> Result<(Self, &str), &str> {
         if let Ok((item, rest)) = NamedParameterPlaceholder::parser().parse(source) {
             return Ok((Self::ParameterPlaceholder(item), rest));
@@ -206,36 +333,42 @@ impl PlaceholderedSqlToken {
         Err(source)
     }
 
+    /// Split SQL into placeholder-aware tokens.
+    ///
+    /// The `combine` host-SQL lexer preserves comments, dollar-quoted strings,
+    /// and quoted identifiers as raw text before applying the sql-fun token
+    /// parsers. This keeps placeholders in those regions from being substituted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lexer cannot consume a character from nonempty input.
+    #[must_use]
     pub fn scan(input: &str) -> Vec<Self> {
-        fn take_push_char<'a>(input: &'a str, buffer: &mut String) -> &'a str {
-            assert!(!input.is_empty());
-
-            let mut chars = input.char_indices();
-            let (_, first_char) = chars.next().unwrap(); // safe to unwrap, asserted
-            buffer.push(first_char);
-            let Some((rest_start, _)) = chars.next() else {
-                return &input[input.len()..];
-            };
-            &input[rest_start..]
-        }
-
         let mut results = Vec::new();
         let mut rest = input;
         let mut buffer = String::new();
         while !rest.is_empty() {
-            match Self::try_take_special_item(rest) {
-                Ok((item, new_rest)) => {
-                    if !buffer.is_empty() {
-                        buffer.shrink_to_fit();
-                        results.push(Self::RawSqlText(RawSqlText(buffer)));
-                        buffer = String::new();
-                    }
-                    results.push(item);
-                    rest = new_rest;
+            if let Ok((region, new_rest)) = host_sql_region().parse(rest) {
+                buffer.push_str(region);
+                rest = new_rest;
+                continue;
+            }
+            if host_sql_opener().parse(rest).is_ok() {
+                buffer.push_str(rest);
+                break;
+            }
+            if let Ok((item, new_rest)) = Self::try_take_special_item(rest) {
+                if !buffer.is_empty() {
+                    buffer.shrink_to_fit();
+                    results.push(Self::RawSqlText(RawSqlText(buffer)));
+                    buffer = String::new();
                 }
-                Err(_) => {
-                    rest = take_push_char(rest, &mut buffer);
-                }
+                results.push(item);
+                rest = new_rest;
+            } else {
+                let (character, new_rest) = any().parse(rest).expect("rest is not empty");
+                buffer.push(character);
+                rest = new_rest;
             }
         }
         if !buffer.is_empty() {
@@ -244,6 +377,17 @@ impl PlaceholderedSqlToken {
         results
     }
 
+    /// Named binding identity when this token is a parameter placeholder.
+    #[must_use]
+    pub const fn parameter_name(&self) -> Option<&ParameterName> {
+        match self {
+            Self::ParameterPlaceholder(parameter) => Some(parameter.name()),
+            _ => None,
+        }
+    }
+
+    /// Return the fragment name when this is a fragment placeholder.
+    #[must_use]
     pub const fn as_fragment_placeholder(&self) -> Option<&FragmentName> {
         match self {
             Self::FragmentPlaceholder(v) => Some(v),
@@ -272,8 +416,13 @@ impl PlaceholderedSqlToken {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// SQL text contains `sql-fun` named parameter syntax and fragment embedding marker
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct PlaceholderedSql {
     tokens: Vec<PlaceholderedSqlToken>,
+    #[cfg_attr(
+        feature = "openrpc-schema",
+        schemars(with = "std::collections::BTreeMap<ParameterName, Vec<PlaceholderTypeHint>>")
+    )]
     parameters: IndexMap<ParameterName, Vec<PlaceholderTypeHint>>,
     fragments: HashSet<FragmentName>,
 }
@@ -343,6 +492,40 @@ impl PlaceholderedSql {
             .filter_map(|t| t.as_fragment_placeholder())
     }
 
+    /// Append distinct names in token first-occurrence order to a shared ordering.
+    ///
+    /// Only parameter tokens contribute names; literals and comments are ignored.
+    /// Existing positions remain unchanged across independently scanned pieces.
+    pub fn append_parameter_order(&self, order: &mut Vec<ParameterName>) {
+        for token in &self.tokens {
+            if let Some(name) = token.parameter_name()
+                && !order.contains(name)
+            {
+                order.push(name.clone());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_append_parameter_order {
+    use super::{ParameterName, PlaceholderedSql};
+
+    #[test]
+    fn shares_positions_and_ignores_sql_literals_and_comments() {
+        let mut order = Vec::new();
+        PlaceholderedSql::from_query("select ${first}, ${shared}, ${first}")
+            .append_parameter_order(&mut order);
+        PlaceholderedSql::from_query("select '${ignored}', ${shared}, ${second} -- ${comment}\n")
+            .append_parameter_order(&mut order);
+        assert_eq!(
+            order,
+            ["first", "shared", "second"].map(ParameterName::from)
+        );
+    }
+}
+
+impl PlaceholderedSql {
     /// get parameter placeholders
     pub fn parameters(&self) -> impl Iterator<Item = (&ParameterName, &Vec<PlaceholderTypeHint>)> {
         self.parameters.iter()

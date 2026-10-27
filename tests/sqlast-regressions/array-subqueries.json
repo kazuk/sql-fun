@@ -1,0 +1,517 @@
+[
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::one",
+    "sql": "SELECT ARRAY(SELECT 1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::empty",
+    "sql": "SELECT ARRAY(SELECT 1 WHERE false) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::many",
+    "sql": "SELECT ARRAY(SELECT 1 UNION ALL SELECT 2) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::null",
+    "sql": "SELECT ARRAY(SELECT NULL::integer) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::unknown_null",
+    "sql": "SELECT ARRAY(SELECT NULL) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::unknown_string",
+    "sql": "SELECT ARRAY(SELECT 'hello') AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::array",
+    "sql": "SELECT ARRAY(SELECT ARRAY[1,2]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::empty_array_result",
+    "sql": "SELECT ARRAY(SELECT NULL::integer[] WHERE false) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::nested",
+    "sql": "SELECT ARRAY(SELECT ARRAY(SELECT 1)) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::star",
+    "sql": "SELECT ARRAY(SELECT s.* FROM (SELECT 1 AS n) s) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::array_query_constructs_non_null_array::clauses",
+    "sql": "SELECT ARRAY(SELECT 1 AS n ORDER BY n LIMIT 2 OFFSET 0) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::invalid_output_shape_retains_query_and_reports_problem::zero",
+    "sql": "SELECT ARRAY(SELECT)",
+    "expected": {
+      "diagnostics": [
+        "array_subquery_columns"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::invalid_output_shape_retains_query_and_reports_problem::two",
+    "sql": "SELECT ARRAY(SELECT 1,2)",
+    "expected": {
+      "diagnostics": [
+        "array_subquery_columns"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::invalid_output_shape_retains_query_and_reports_problem::star",
+    "sql": "SELECT ARRAY(SELECT s.* FROM (SELECT 1 AS n, 2 AS m) s)",
+    "expected": {
+      "diagnostics": [
+        "array_subquery_columns"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::projection",
+    "sql": "SELECT ARRAY(SELECT $1::integer)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::predicate",
+    "sql": "SELECT ARRAY(SELECT 1 WHERE $1::integer IS NULL)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::order",
+    "sql": "SELECT ARRAY(SELECT 1 ORDER BY $1::integer)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::correlated",
+    "sql": "SELECT ARRAY(SELECT s.n WHERE $1::integer IS NULL) FROM (SELECT 1 AS n) s",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::nested",
+    "sql": "SELECT ARRAY(SELECT ARRAY(SELECT $1::integer))",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::child_parameters_are_visited_and_finalized::repeated",
+    "sql": "SELECT ARRAY(SELECT $1::integer), $1::integer",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::unconstrained_source_keeps_functional_array_relationship",
+    "sql": "SELECT ARRAY(SELECT $1)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::anonymous_record_identity_is_retained_in_array_type",
+    "sql": "SELECT ARRAY(SELECT ROW(1,'x'))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::correlated_binding_and_serialized_query_survive_analysis",
+    "sql": "SELECT ARRAY(SELECT s.n WHERE s.n IS NOT NULL ORDER BY s.n) FROM (SELECT 1 AS n) s",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::enclosing_expressions_consume_array_result::subscript",
+    "sql": "SELECT (ARRAY(SELECT 1))[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::enclosing_expressions_consume_array_result::cast",
+    "sql": "SELECT ARRAY(SELECT 1)::integer[]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::empty_query",
+    "sql": "SELECT (ARRAY(SELECT 1 WHERE false))[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::null_query_element",
+    "sql": "SELECT (ARRAY(SELECT NULL::integer))[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::array_subquery::enclosing_expressions_consume_array_result::parameter_subscript",
+    "sql": "SELECT (ARRAY(SELECT $1::integer))[1]",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

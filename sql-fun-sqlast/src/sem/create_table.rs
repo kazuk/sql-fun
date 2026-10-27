@@ -11,10 +11,12 @@ use sql_fun_core::IVec;
 use std::collections::HashMap;
 
 use crate::{
+    ast::TryFromWithTokens,
+    context::{GetSourcePathWithSpan, ParseContext},
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
-        GetSourcePathWithSpan, ImplicitChange, ParseContext, SemAst, SourcePathWithSpan,
-        alter_table::AlterObjSubCommand,
+        ImplicitChange, InsertArbiter, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
+        SourcePathWithSpan, TriggerReferences, alter_table::AlterObjSubCommand,
     },
     syn::{ListOpt, Opt, ScanToken},
 };
@@ -22,23 +24,92 @@ use crate::{
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 
-#[macro_use]
-#[path = "./macros.rs"]
-mod macros;
-
-impl_from_ref!(TableName);
-impl_from_ref!(ColumnName);
-impl_from_ref!(ViewName);
-
 /// columns in table
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    fn rename_expressions(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        for column in &mut self.0 {
+            column.rename_expressions(visitor)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        for column in &mut self.0 {
+            column.rename_relation(old, new);
+        }
+    }
+
+    pub(crate) fn column_at(&self, index: usize) -> Option<&ColumnDefinition> {
+        self.0.get(index)
+    }
+
     /// add column
     #[must_use]
     pub const fn new(columns: Vec<ColumnDefinition>) -> Self {
         Self(columns)
+    }
+
+    pub(crate) fn matches_type_structure_with(
+        &self,
+        other: &Self,
+        matches: impl Fn(&crate::sem::TypeReference, &crate::sem::TypeReference) -> bool,
+    ) -> bool {
+        self.0.len() == other.0.len()
+            && self.0.iter().zip(&other.0).all(|(left, right)| {
+                match (left.get_type_cloned(), right.get_type_cloned()) {
+                    (Some(left), Some(right)) => matches(&left, &right),
+                    _ => false,
+                }
+            })
+    }
+
+    /// Whether the collection contains no columns.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Named columns in declaration order, preserving duplicate names.
+    #[must_use]
+    pub fn names(&self) -> Vec<ColumnName> {
+        self.0
+            .iter()
+            .filter_map(|column| column.name().clone())
+            .collect()
+    }
+
+    pub(crate) fn scalar_function_output(
+        name: &ColumnName,
+        ty: &crate::sem::TypeReference,
+    ) -> Self {
+        Self(vec![ColumnDefinition::new(
+            &Some(name.clone()),
+            Some(ty),
+            None,
+            &[],
+        )])
+    }
+
+    pub(crate) fn row_type_columns(&self) -> Self {
+        Self(
+            self.0
+                .iter()
+                .map(|column| {
+                    ColumnDefinition::new(
+                        column.name(),
+                        column.get_type_cloned().as_ref(),
+                        None,
+                        &[],
+                    )
+                })
+                .collect(),
+        )
     }
 
     /// find mutateble column by name
@@ -80,9 +151,34 @@ impl ColumnCollection {
             .find(|c| c.name().as_ref() == Some(column_name))
     }
 
+    fn apply_inline_primary_key_nullability(&mut self) {
+        for column in &mut self.0 {
+            column.apply_primary_key_nullability();
+        }
+    }
+
     /// append column definition
     pub fn push(&mut self, column: &ColumnDefinition) {
         self.0.push(column.clone());
+    }
+}
+
+#[cfg(test)]
+mod column_collection_tests {
+    use super::{ColumnCollection, ColumnDefinition, ColumnName};
+
+    #[test]
+    fn names_keep_order_and_duplicates_without_unnamed_columns() {
+        let b = ColumnName::from("b");
+        let a = ColumnName::from("a");
+        let columns = ColumnCollection::new(vec![
+            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
+            ColumnDefinition::new(&None, None, None, &[]),
+            ColumnDefinition::new(&Some(a.clone()), None, None, &[]),
+            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
+        ]);
+        assert_eq!(columns.names(), vec![b.clone(), a, b]);
+        assert!(ColumnCollection::default().names().is_empty());
     }
 }
 
@@ -102,6 +198,9 @@ pub enum CreateTableMode {
 }
 
 impl CreateTableMode {
+    pub(crate) const fn if_not_exists(self) -> bool {
+        matches!(self, Self::IfNotExists)
+    }
     /// create instance for if not exists
     pub const fn from_if_not_exists(if_not_exists: bool) -> Self {
         if if_not_exists {
@@ -113,13 +212,15 @@ impl CreateTableMode {
 }
 
 /// `create table` SQL statement
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CreateTable {
     name: TableName,
     columns: ColumnCollection,
+    triggers: TriggerReferences,
+    rules: RuleReferences,
     alter_statements: Vec<AlterTable>,
     drop_statements: Vec<DropTable>,
-    owner: Option<String>,
+    owner: Option<OwnerSpecification>,
     cluster_on: Option<String>,
     constraints: HashMap<String, Constraint>,
     mode: CreateTableMode,
@@ -127,19 +228,67 @@ pub struct CreateTable {
     source: SourcePathWithSpan,
 }
 
-impl Clone for CreateTable {
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            columns: self.columns.clone(),
-            alter_statements: self.alter_statements.clone(),
-            drop_statements: self.drop_statements.clone(),
-            owner: Default::default(),
-            cluster_on: Default::default(),
-            constraints: Default::default(),
-            mode: self.mode,
-            temporary: self.temporary,
-            source: self.source.clone(),
+#[cfg(test)]
+mod test_create_table_clone {
+    use crate::context::BaseParseContext;
+    use crate::test_helpers::TestParseContext;
+    use crate::{
+        context::TableInfoWrite,
+        sem::{ColumnName, ParseContext},
+    };
+    use std::path::Path;
+
+    #[test]
+    fn clone_and_catalog_insertion_preserve_primary_key_columns() -> testresult::TestResult {
+        let table = test_helpers::table_with_primary_key()?;
+        let id = ColumnName::from("id");
+        assert_eq!(table.primary_key_columns(), vec![&id]);
+
+        let cloned = table.clone();
+        assert_eq!(cloned.primary_key_columns(), vec![&id]);
+
+        let mut context = crate::test_helpers::schema_layer(
+            Path::new("schema.sql"),
+            &TestParseContext::default().freeze(),
+        );
+        context.insert_create_table(cloned.name().full_name(), &cloned);
+        let inserted = context.get_table(cloned.name()).expect("inserted table");
+        assert_eq!(inserted.primary_key_columns(), vec![&id]);
+        Ok(())
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, ColumnName,
+            Constraint, CreateTable, CreateTableMode, FullName, PgBuiltInType,
+            PrimaryKeyConstraint, TableName,
+        };
+
+        pub(super) fn table_with_primary_key() -> Result<CreateTable, AnalysisError> {
+            let name = TableName::from(FullName::with_schema("public", "items"));
+            let id = ColumnName::from("id");
+            let source = crate::test_helpers::source_span();
+            let mut table = CreateTable::new(
+                &name,
+                vec![ColumnDefinition::new(
+                    &Some(id.clone()),
+                    Some(&PgBuiltInType::int4()),
+                    Some(true),
+                    &[],
+                )],
+                CreateTableMode::from_if_not_exists(false),
+                false,
+                &source,
+            );
+            let primary_key = PrimaryKeyConstraint::new("items_pk", &name, &[id]);
+            let constraint = Constraint::primary_key(&primary_key);
+            let alteration = AlterTable::new(
+                &name,
+                &[AlterObjSubCommand::add_constraint(&constraint)],
+                &source,
+            );
+            table.apply_alter(&alteration)?;
+            Ok(table)
         }
     }
 }
@@ -151,6 +300,65 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    pub(crate) fn rename_expressions(
+        &mut self,
+        old: &TableName,
+        new: &TableName,
+    ) -> Result<(), AnalysisError> {
+        self.columns
+            .rename_expressions(&mut crate::sem::traversal::RelationRenamer::new(old, new))
+    }
+
+    /// Applied ALTER statements in source order, retaining their original bindings and spans.
+    pub fn alter_statements(&self) -> &[AlterTable] {
+        &self.alter_statements
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.columns.rename_relation(old, new);
+        self.rules.rename_relation(old, new);
+        for constraint in self.constraints.values_mut() {
+            constraint.rename_relation(old, new);
+        }
+    }
+
+    fn rename_identity(&mut self, new: &TableName) {
+        let old = self.name.clone();
+        self.rename_relation(&old, new);
+        self.name = new.clone();
+    }
+
+    /// Rule links owned by this relation; resolve against the effective context.
+    pub const fn rules(&self) -> &RuleReferences {
+        &self.rules
+    }
+    pub(crate) fn associate_rule(&mut self, identity: &RuleIdentity) {
+        self.rules.associate(identity);
+    }
+    pub(crate) fn dissociate_rule(&mut self, identity: &RuleIdentity) {
+        self.rules.dissociate(identity);
+    }
+
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
+    /// Fully qualified trigger references associated with this relation.
+    pub const fn triggers(&self) -> &TriggerReferences {
+        &self.triggers
+    }
+    pub(crate) fn associate_trigger(&mut self, name: &FullName) {
+        self.triggers.associate(name);
+    }
+    pub(crate) fn dissociate_trigger(&mut self, name: &FullName) {
+        self.triggers.dissociate(name);
+    }
+
     /// new instance with column definitions
     #[must_use]
     pub fn new(
@@ -162,6 +370,8 @@ impl CreateTable {
     ) -> Self {
         Self {
             name: name.clone(),
+            triggers: TriggerReferences::default(),
+            rules: RuleReferences::default(),
             columns: ColumnCollection(columns),
             alter_statements: Default::default(),
             drop_statements: Default::default(),
@@ -172,6 +382,21 @@ impl CreateTable {
             temporary,
             source: source.clone(),
         }
+    }
+
+    pub(crate) fn declared_indexes(
+        &self,
+        name: &FullName,
+    ) -> Result<Vec<crate::sem::CreateIndex>, AnalysisError> {
+        let mut indexes = Vec::new();
+        for constraint in self.constraints.values() {
+            if !constraint.name().is_empty() {
+                for change in constraint.implicit_changes()? {
+                    indexes.push(change.into_index().with_table_identity(name));
+                }
+            }
+        }
+        Ok(indexes)
     }
 
     /// get table name
@@ -222,10 +447,19 @@ impl CreateTable {
             .get_column_def_with_skip_count(column_name, skip_count)
     }
 
+    pub(crate) fn function_row_columns(&self) -> ColumnCollection {
+        // A function returns the row type, without the table's storage constraints.
+        self.columns.row_type_columns()
+    }
+
     /// get column definition by index
     #[must_use]
     pub fn get_column_at(&self, column_index: usize) -> Option<&ColumnDefinition> {
         self.columns.get_at(column_index)
+    }
+
+    pub(crate) fn column_names(&self) -> Vec<ColumnName> {
+        self.columns.names()
     }
 
     /// check column existing
@@ -234,32 +468,49 @@ impl CreateTable {
         self.columns.has_column(column)
     }
 
+    pub(crate) fn apply_column_attributes(
+        &mut self,
+        column: &ColumnName,
+        action: &crate::sem::ColumnAttributeAction,
+    ) {
+        if let Some(column) = self.columns.get_column_mut(column) {
+            action.apply(&self.name, column);
+        }
+    }
+
     /// apply `alter table` statement
     pub fn apply_alter(
         &mut self,
         alter_table: &AlterTable,
     ) -> Result<Vec<ImplicitChange>, AnalysisError> {
+        if !alter_table.can_apply() {
+            return Ok(Vec::new());
+        }
         self.alter_statements.push(alter_table.clone());
-
+        let mut implicit_changes = Vec::new();
         for cmd in alter_table.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
+                AlterObjSubCommand::ColumnAttributes(_) => cmd.apply_column_attributes(self),
+                AlterObjSubCommand::ChangeOwner(new_owner) => {
+                    if new_owner.can_apply() {
+                        self.change_owner(new_owner);
+                    }
+                }
                 AlterObjSubCommand::SetColumnDefault(column_name, sem_scalar_expr) => {
                     if let Some(column) = self.columns.get_column_mut(column_name) {
                         column.set_default(sem_scalar_expr);
                     }
                 }
+                AlterObjSubCommand::DropColumnDefault(_) => todo!(),
                 AlterObjSubCommand::AddConstraint(constraint) => {
                     self.constraints
                         .insert(constraint.name().to_string(), constraint.clone());
-                    return constraint.implicit_changes();
+                    implicit_changes.extend(constraint.implicit_changes()?);
                 }
                 AlterObjSubCommand::ClusterOn(index_name) => {
                     self.cluster_on = Some(index_name.clone())
                 }
-                AlterObjSubCommand::RenameTo(_) => {
-                    todo!()
-                }
+                AlterObjSubCommand::RenameTo(name) => self.rename_identity(name),
                 AlterObjSubCommand::AddColumn(_) => {
                     todo!()
                 }
@@ -275,7 +526,67 @@ impl CreateTable {
             }
         }
 
-        Ok(Vec::new())
+        Ok(implicit_changes)
+    }
+
+    pub(crate) fn apply_primary_key_nullability(&mut self) {
+        self.columns.apply_inline_primary_key_nullability();
+        let keys: Vec<_> = self.primary_key_columns().into_iter().cloned().collect();
+        for key in keys {
+            if let Some(column) = self.columns.get_column_mut(&key) {
+                column.set_not_null(Some(true));
+            }
+        }
+    }
+
+    pub(crate) fn record_declared_key(
+        &mut self,
+        constraint: &Constraint,
+    ) -> Result<(), AnalysisError> {
+        let key = if constraint.name().is_empty() {
+            // An internal map slot identifies an unnamed declaration; it is never
+            // exposed as a fabricated SQL constraint/index name.
+            format!("<unnamed:{}>", self.constraints.len())
+        } else {
+            constraint.name().to_owned()
+        };
+        if self.constraints.contains_key(&key) {
+            return Err(AnalysisError::unexpected_input_error(
+                "duplicate constraint name",
+            ));
+        }
+        self.constraints.insert(key, constraint.clone());
+        Ok(())
+    }
+
+    /// Look up an explicitly named table constraint.
+    pub(crate) fn constraint(&self, name: &str) -> Option<&Constraint> {
+        self.constraints
+            .get(name)
+            .filter(|constraint| constraint.name() == name)
+    }
+
+    pub(crate) fn infer_insert_arbiters(
+        &self,
+        destination: &TableName,
+        columns: &[ColumnName],
+    ) -> Vec<InsertArbiter> {
+        let mut arbiters = Vec::new();
+        for constraint in self.constraints.values() {
+            if constraint.matches_unique_columns(columns) {
+                arbiters.push(InsertArbiter::table_constraint(destination, constraint));
+            }
+        }
+        // Named inline keys also occur in the table constraint collection.
+        // Use a column identity only when no table key already identifies it.
+        if arbiters.is_empty()
+            && columns.len() == 1
+            && let Some(column) = self.columns.get_column_def(&columns[0])
+            && column.has_unique_key()
+        {
+            arbiters.push(InsertArbiter::column_constraint(&columns[0]));
+        }
+        arbiters
     }
 
     /// get primary key column names
@@ -295,7 +606,7 @@ impl CreateTable {
     /// analyze [`crate::syn::CreateStmt`]
     #[tracing::instrument(skip(context))]
     pub fn analyze_create_stmt<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         parent_schema: &Option<String>,
         create: crate::syn::CreateStmt,
         tokens: &IVec<ScanToken>,
@@ -304,30 +615,8 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        let table_name = create.get_relation().unwrap();
-        let table_name = TableName::try_from(table_name)?;
-        let Some(column_defs) = create.get_table_elts().map(|f| f.as_column_def()) else {
-            AnalysisError::raise_unexpected_none("create_stmt.get_table_elts")?
-        };
-        let mut cols: Vec<ColumnDefinition> = Vec::new();
-        for column_def in column_defs {
-            let (coldef, new_context) =
-                ColumnDefinition::analyze_column_def(context, &table_name, &column_def, tokens)?;
-            context = new_context;
-            cols.push(coldef);
-        }
-        let table_def = Self::new(
-            &table_name,
-            cols,
-            CreateTableMode::from_if_not_exists(create.get_if_not_exists()),
-            false,
-            source_span,
-        );
-        context = context.apply_create_table(&table_def)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateTable(table_def),
-            context,
-        ))
+        crate::ast::Table::try_from_with_tokens(&create, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
@@ -337,7 +626,7 @@ impl CreateTable {
 
 #[cfg(feature = "sqlite")]
 impl CreateTable {
-    /// analyze [`crate::syn::sqlite::ColumnAndConstraint`]
+    /// analyze [`crate::syn::sqlite::ColumnsAndConstraint`]
     #[expect(clippy::too_many_arguments)]
     pub fn analyze_columns_and_constraint<TParseContext>(
         mut context: TParseContext,
@@ -346,22 +635,64 @@ impl CreateTable {
         mode: &CreateTableMode,
         temporary: bool,
         syn: crate::syn::sqlite::ColumnsAndConstraint,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let mut cols = Vec::new();
-        for col_def in syn.columns() {
-            let (col, new_context) =
-                ColumnDefinition::analyze_column_definition(context, table_name, col_def, tokens)?;
-            context = new_context;
-            cols.push(col);
-        }
+        let syntax =
+            crate::ast::Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
+        let table = syntax.resolve(&mut context, source_span)?;
+        Ok((table, context))
+    }
+}
 
-        let table_def = Self::new(table_name, cols, *mode, temporary, source_span);
-        Ok((table_def, context))
+#[cfg(all(test, feature = "sqlite"))]
+mod test_analyze_columns_and_constraint {
+    use crate::{
+        sem::{CreateTableMode, SchemaName, SourcePathWithSpan},
+        syn::sqlite::{CreateTableBody, Stmt},
+        test_helpers::{
+            SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case(CreateTableMode::Default)]
+    #[case(CreateTableMode::IfNotExists)]
+    #[case(CreateTableMode::OrReplace)]
+    fn preserves_explicit_creation_mode(
+        mut test_context: TestParseContext,
+        sqlite_syn: SqliteSynBuilder,
+        source_span: SourcePathWithSpan,
+        #[case] mode: CreateTableMode,
+    ) -> testresult::TestResult {
+        test_context.set_get_search_path_result(&[
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let Stmt::CreateTable(table) = sqlite_syn.parse_as_stmt("create table users(id integer)")
+        else {
+            panic!("expected CREATE TABLE");
+        };
+        let (_, _, _, body) = table.dissolve();
+        let CreateTableBody::ColumnsAndConstraint(body) = body else {
+            panic!("expected column definitions");
+        };
+        let (table, _) = super::CreateTable::analyze_columns_and_constraint(
+            test_context,
+            &None,
+            &sem_builder().table_name("users"),
+            &mode,
+            true,
+            body,
+            &Vec::new().into(),
+            &source_span,
+        )?;
+        assert_eq!(table.mode(), &mode);
+        assert!(table.temporary());
+        Ok(())
     }
 }
 
@@ -371,39 +702,20 @@ impl CreateTable {
     #[expect(clippy::too_many_arguments)]
     pub fn analyze_create_table_body<TParseContext>(
         context: TParseContext,
-        parent_schema: &Option<String>,
+        _parent_schema: &Option<String>,
         table_name: &TableName,
         mode: &CreateTableMode,
         temporary: bool,
         syn: CreateTableBody,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        use crate::syn::sqlite::CreateTableBody;
-
-        match syn {
-            CreateTableBody::ColumnsAndConstraint(columns_and_constraint) => {
-                let (result, context) = Self::analyze_columns_and_constraint(
-                    context,
-                    parent_schema,
-                    table_name,
-                    mode,
-                    temporary,
-                    columns_and_constraint,
-                    tokens,
-                    source_span,
-                )?;
-                let new_context = context.apply_create_table(&result)?;
-                Ok(AstAndContextPair::new(
-                    SemAst::CreateTable(result),
-                    new_context,
-                ))
-            }
-            CreateTableBody::AsSelect(_select) => todo!(),
-        }
+        crate::ast::Table::try_from(&syn)?
+            .named(table_name.full_name(), *mode, temporary)
+            .resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -421,20 +733,7 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        let (temporary, if_not_exists, table_name, body) = syn.dissolve();
-        let table_name = TableName::try_from(&table_name)?;
-        let mode = CreateTableMode::from_if_not_exists(if_not_exists);
-
-        Self::analyze_create_table_body(
-            context,
-            parent_schema,
-            &table_name,
-            &mode,
-            temporary,
-            body,
-            tokens,
-            source_span,
-        )
+        crate::ast::Table::try_from(&syn)?.resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -443,13 +742,13 @@ mod test_analyze_create_table {
     use assert_matches::assert_matches;
     use testresult::TestResult;
 
+    use crate::context::BaseParseContext;
     use crate::{
         AstAndContextPair,
-        sem::{BaseParseContext, CreateTableMode, SchemaName, SemAst, SourcePathWithSpan},
+        sem::{CreateTableMode, FullName, SchemaName, SemAst, SourcePathWithSpan, TableName},
         syn::sqlite::Stmt,
         test_helpers::{
-            SemValueBuilder, SqliteSynBuilder, TestParseContext, sem_builder, source_span,
-            sqlite_syn, test_context,
+            SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
         },
     };
 
@@ -476,14 +775,14 @@ mod test_analyze_create_table {
         mut test_context: TestParseContext,
         sqlite_syn: SqliteSynBuilder,
         source_span: SourcePathWithSpan,
-        sem_builder: SemValueBuilder,
         #[case] sql: &str,
         #[case] table_name: &str,
         #[case] table_mode: CreateTableMode,
         #[case] temporary: bool,
     ) -> TestResult {
+        let sem_builder = sem_builder();
         // FIXME: PostgreSQL specific config require in SQLite tests
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
@@ -509,8 +808,12 @@ mod test_analyze_create_table {
         assert_eq!(create_table.mode(), &table_mode);
         assert_eq!(create_table.temporary(), temporary);
 
-        let Some(_table_in_context) = result_context.get_table(&sem_builder.table_name(table_name))
-        else {
+        let lookup_name = if temporary {
+            TableName::from(FullName::with_schema("pg_temp", table_name))
+        } else {
+            sem_builder.table_name(table_name)
+        };
+        let Some(_table_in_context) = result_context.get_table(&lookup_name) else {
             panic!("table not found in context")
         };
 
@@ -527,6 +830,16 @@ pub struct DropTable {
 }
 
 impl DropTable {
+    /// Create a `DROP TABLE` statement.
+    #[must_use]
+    pub fn new(table_names: &[TableName], if_exists: bool, cascade: bool) -> Self {
+        Self {
+            if_exists,
+            table_names: table_names.to_vec(),
+            cascade,
+        }
+    }
+
     /// True when `IF EXISTS` or same meaning specified.
     pub const fn if_exists(&self) -> bool {
         self.if_exists
@@ -583,16 +896,12 @@ impl DropTable {
             let full_name = FullName::try_from(object.as_list().get_items())?;
             let table_name = TableName::from(full_name);
             if context.get_table(&table_name).is_none() {
-                context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+                context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
             }
             table_names.push(table_name);
         }
 
-        let result = Self {
-            if_exists: syn.get_missing_ok(),
-            table_names,
-            cascade,
-        };
+        let result = Self::new(&table_names, syn.get_missing_ok(), cascade);
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
     }
@@ -655,13 +964,9 @@ impl DropTable {
         let if_exists = syn.if_exists();
         let table_name = TableName::try_from(syn.name())?;
         if context.get_table(&table_name).is_none() {
-            context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+            context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
         }
-        let result = Self {
-            if_exists: *if_exists,
-            table_names: vec![table_name.to_owned()],
-            cascade: false,
-        };
+        let result = Self::new(std::slice::from_ref(&table_name), *if_exists, false);
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
     }
@@ -689,7 +994,7 @@ mod test_drop_table_analyze_drop_table {
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable")
         };
-        assert_eq!(drop_table.if_exists(), true);
+        assert!(drop_table.if_exists());
         let table_name = drop_table.table_names().first().unwrap();
         table_name.assert_table_name("table_one");
         assert_eq!(result_context.reported_problem_count(), 1);

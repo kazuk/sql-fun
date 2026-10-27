@@ -1,0 +1,272 @@
+[
+  {
+    "name": "constructed_types_reach_existing_consumers::subscript",
+    "sql": "SELECT (ARRAY[1,2])[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "constructed_types_reach_existing_consumers::array_function",
+    "sql": "SELECT array_length(ARRAY[1,2],1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array_length",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "constructed_types_reach_existing_consumers::record_array_function",
+    "sql": "SELECT array_length(ARRAY[pg_control_system()],1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array_length",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::null_constructor_element",
+    "sql": "SELECT (ARRAY[NULL::integer])[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::empty_constructor",
+    "sql": "SELECT (ARRAY[]::integer[])[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::out_of_range",
+    "sql": "SELECT (ARRAY[1])[2]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::null_array",
+    "sql": "SELECT (NULL::integer[])[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::null_index",
+    "sql": "SELECT (ARRAY[1])[NULL::integer]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::multidimensional",
+    "sql": "SELECT (ARRAY[[1,2],[3,4]])[1][3]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::parameter_index",
+    "sql": "SELECT (ARRAY[1])[$1]",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::parameter_base",
+    "sql": "SELECT ($1::integer[])[1]",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::unresolved_base_and_index",
+    "sql": "SELECT ($1)[$2]",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::late_element_constraint",
+    "sql": "SELECT (ARRAY[$1])[1] + 1",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::slice_control",
+    "sql": "SELECT (ARRAY[1,2])[1:2]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_access_nullability::mixed_slice_control",
+    "sql": "SELECT (ARRAY[[1,2],[3,4]])[1][1:2]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

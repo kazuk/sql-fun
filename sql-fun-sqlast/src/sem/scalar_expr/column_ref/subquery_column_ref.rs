@@ -38,6 +38,19 @@ impl super::ColumnReference for SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
+        self.alias = alias.clone();
+        self.column = column.clone();
+        self
+    }
+
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
+    pub(super) const fn binding_alias(&self) -> &AliasName {
+        &self.alias
+    }
+
     /// create instance
     #[must_use]
     pub fn new(
@@ -52,5 +65,11 @@ impl SubQueryColumnRef {
             column_def: column_def.cloned(),
             datasource_nullable,
         }
+    }
+}
+
+impl SubQueryColumnRef {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+        Some((self.alias.as_str(), &self.column))
     }
 }

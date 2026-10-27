@@ -10,6 +10,96 @@ use crate::{
     PostgresExtensionsCollection, PostgresVersion, SqlDialect, SqlFunArgs, SqlFunArgsError,
 };
 
+/// Engine choices for initialization, independent of enabled analysis features.
+/// Full analysis metadata is resolved only for selected implemented setup tasks.
+pub struct InitializationDatasources(toml::Table);
+
+impl InitializationDatasources {
+    /// Read datasource declarations without choosing or initializing an engine.
+    ///
+    /// # Errors
+    /// Rejects unreadable or malformed project metadata.
+    pub fn load_from(path: &Path) -> Result<Self, MetadataError> {
+        let text = std::fs::read_to_string(path)?;
+        let document: toml::Value = toml::from_str(&text)?;
+        let database = if let Some(package) = document.get("package")
+            && let Some(metadata) = package.get("metadata")
+        {
+            metadata.get("database")
+        } else {
+            None
+        };
+        let Some(database) = database else {
+            return Ok(Self(toml::Table::new()));
+        };
+        let Some(table) = database.as_table() else {
+            return MetadataError::metadata_load_from_file(
+                path,
+                "package.metadata.database requires a table",
+            );
+        };
+        Ok(Self(table.clone()))
+    }
+
+    /// Datasource names in deterministic prompt order.
+    #[must_use]
+    pub fn names(&self) -> Vec<String> {
+        let mut names = self
+            .0
+            .iter()
+            .filter(|(_, value)| value.is_table())
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    /// The explicitly configured engine of a selected datasource.
+    ///
+    /// # Errors
+    /// Rejects missing datasources or omitted engine choices, even for one option.
+    pub fn engine(&self, name: &str) -> Result<&str, MetadataError> {
+        if let Some(datasource) = self.0.get(name)
+            && let Some(engine) = datasource.get("engine")
+            && let Some(engine) = engine.as_str()
+        {
+            return Ok(engine);
+        }
+        MetadataError::metadata_load_from_file(
+            name,
+            "selected datasource not found or engine not specified",
+        )
+    }
+
+    /// Resolve normal analysis metadata for a selected implemented setup task.
+    ///
+    /// # Errors
+    /// Rejects missing or invalid selected datasource metadata.
+    pub fn selected_metadata(&self, name: &str) -> Result<SqlFunMetadata, MetadataError> {
+        let Some(value) = self.0.get(name) else {
+            return MetadataError::metadata_load_from_file(name, "selected datasource not found");
+        };
+        SqlFunMetadata::from_value(name, value)
+    }
+}
+
+#[cfg(test)]
+mod test_initialization_candidates {
+    use super::InitializationDatasources;
+    use crate::test_helpers::initialization_choices_project;
+
+    #[rstest::rstest]
+    #[case::connector_only("connector = 'tokio-postgres'", &[])]
+    #[case::scalar_settings("connector = 'tokio-postgres'\nengine = 'PostgreSQL'\nversion = '17'", &[])]
+    #[case::named_with_setting("connector = 'tokio-postgres'\n[package.metadata.database.main]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '17'", &["main"])]
+    fn settings_are_not_datasource_candidates(#[case] declarations: &str, #[case] names: &[&str]) {
+        let project = initialization_choices_project(declarations);
+        let choices =
+            InitializationDatasources::load_from(&project.path().join("Cargo.toml")).unwrap();
+        assert_eq!(choices.names(), names);
+    }
+}
+
 /// Metadata collection
 #[derive(Default)]
 pub struct SqlFunMetadataCollection(HashMap<String, SqlFunMetadata>);
@@ -130,7 +220,9 @@ impl std::fmt::Display for PostgresEngineVersion {
 }
 
 impl PostgresEngineVersion {
-    /// is wellknown version
+    /// Whether this uses canonical `PostgreSQL` major/prerelease naming.
+    ///
+    /// This does not imply that builtin extraction is supported for the version.
     #[must_use]
     pub fn is_wellknown(&self) -> bool {
         self.0.is_left()
@@ -138,21 +230,33 @@ impl PostgresEngineVersion {
 
     /// get definition base path
     pub fn definition_base_path<P: AsRef<Path>>(&self, home: P) -> PathBuf {
-        if self.is_wellknown() {
-            home.as_ref()
-                .join("postgres")
-                .join(Path::new(&self.to_string()))
-        } else {
-            home.as_ref()
-                .join("postgres")
-                .join("custom")
-                .join(self.to_string())
+        match &self.0 {
+            Either::Left(version) => version.definition_base_path(home.as_ref()),
+            Either::Right(custom) => home.as_ref().join("postgres").join("custom").join(custom),
         }
     }
 }
 
+#[cfg(test)]
+mod test_postgres_engine_version_paths {
+    use super::PostgresEngineVersion;
+    use std::path::{Path, PathBuf};
+
+    #[rstest::rstest]
+    #[case::future_stable("19", "home/postgres/19")]
+    #[case::prerelease("19beta1", "home/postgres/19beta1")]
+    #[case::custom("fixture", "home/postgres/custom/fixture")]
+    fn resolves_canonical_loader_paths(#[case] text: &str, #[case] expected: &str) {
+        let version: PostgresEngineVersion = text.parse().unwrap();
+        assert_eq!(
+            version.definition_base_path(Path::new("home")),
+            PathBuf::from(expected)
+        );
+    }
+}
+
 /// Well known database engine
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 pub enum WellKnownDbEngine {
     /// `PostgreSQL` Engine
     PostgreSQL,
@@ -171,7 +275,7 @@ impl FromStr for WellKnownDbEngine {
 }
 
 /// Database engine name
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabaseEngine(Either<WellKnownDbEngine, String>);
 
 impl<'de> serde::Deserialize<'de> for DatabaseEngine {
@@ -215,12 +319,47 @@ impl DatabaseEngine {
     }
 }
 
+/// Validated exact catalog role names, ordered independently of input order.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RoleInventory(std::collections::BTreeSet<String>);
+
+impl<'de> serde::Deserialize<'de> for RoleInventory {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let names = <Vec<String> as serde::Deserialize>::deserialize(deserializer)?;
+        let mut result = std::collections::BTreeSet::new();
+        for name in names {
+            if name.is_empty() || name.contains('\0') {
+                return Err(serde::de::Error::custom(
+                    "roles require nonempty names without NUL",
+                ));
+            }
+            if !result.insert(name.clone()) {
+                return Err(serde::de::Error::custom(format!(
+                    "duplicate role name: {name}"
+                )));
+            }
+        }
+        Ok(Self(result))
+    }
+}
+
+impl RoleInventory {
+    /// Convert exact names into the consumer's role definitions.
+    #[must_use]
+    pub fn definitions<T: for<'a> From<&'a str>>(&self) -> Vec<T> {
+        self.0.iter().map(|name| T::from(name.as_str())).collect()
+    }
+}
+
 /// `sql-fun` metadata structures
 ///
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct SqlFunMetadata {
     #[serde(flatten)]
     codegen_options: crate::CodegenOptions,
+
+    #[serde(default)]
+    rewrite_options: crate::RewriteOptions,
 
     /// Datasource name
     #[serde(skip)]
@@ -238,6 +377,17 @@ pub struct SqlFunMetadata {
 
     /// Database extensions
     extensions: Option<PostgresExtensionsCollection>,
+
+    /// Explicit `PostgreSQL` database identity for catalog-qualified SQL references.
+    #[serde(
+        rename = "database-name",
+        default,
+        deserialize_with = "SqlFunMetadata::deserialize_database_name"
+    )]
+    database_name: Option<String>,
+
+    /// Explicit exact-name role inventory for offline ownership analysis.
+    roles: Option<RoleInventory>,
 
     /// Schema search path
     search_path: Option<Vec<String>>,
@@ -293,10 +443,37 @@ impl MetadataError {
 }
 
 impl SqlFunMetadata {
+    fn deserialize_database_name<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<String>, D::Error> {
+        let name = <Option<String> as serde::Deserialize>::deserialize(deserializer)?;
+        if name
+            .as_ref()
+            .is_some_and(|name| name.is_empty() || name.contains('\0'))
+        {
+            return Err(serde::de::Error::custom(
+                "database-name must be a nonempty identifier without NUL",
+            ));
+        }
+        Ok(name)
+    }
+
+    /// Explicit role inventory; omission differs from an explicitly empty list.
+    #[must_use]
+    pub const fn roles(&self) -> Option<&RoleInventory> {
+        self.roles.as_ref()
+    }
+
     /// Code generation options configured for this datasource.
     #[must_use]
     pub const fn codegen_options(&self) -> &crate::CodegenOptions {
         &self.codegen_options
+    }
+
+    /// Executable SQL rewrite choices configured for this datasource.
+    #[must_use]
+    pub const fn rewrite_options(&self) -> &crate::RewriteOptions {
+        &self.rewrite_options
     }
 
     /// deserialize form TOML Value
@@ -318,6 +495,12 @@ impl SqlFunMetadata {
         } else {
             "default"
         }
+    }
+
+    /// Explicit database identity, independent of the datasource selection name.
+    #[must_use]
+    pub fn database_name(&self) -> Option<&str> {
+        self.database_name.as_deref()
     }
 
     /// get CTE catalog directory path
@@ -402,6 +585,59 @@ impl SqlFunMetadata {
 }
 
 #[cfg(test)]
+mod test_rewrite_metadata {
+    use crate::test_helpers::metadata_with_codegen_options;
+
+    #[rstest::rstest]
+    #[case::omitted("", None)]
+    #[case::empty("[package.metadata.database.default.rewrite_options]", None)]
+    #[case::disabled("rewrite_options = { expand_asterisk = false }", Some(false))]
+    #[case::enabled("rewrite_options = { expand_asterisk = true }", Some(true))]
+    #[case::nested(
+        "[package.metadata.database.default.rewrite_options]\nexpand_asterisk = true",
+        Some(true)
+    )]
+    fn retains_explicit_rewrite_choice(#[case] input: &str, #[case] expected: Option<bool>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        assert_eq!(selected.rewrite_options().expand_asterisk(), expected);
+        assert!(selected.codegen_options().builder_setter().is_mutable());
+    }
+
+    #[rstest::rstest]
+    #[case::scalar("rewrite_options = true")]
+    #[case::string(r#"rewrite_options = { expand_asterisk = "true" }"#)]
+    #[case::number("rewrite_options = { expand_asterisk = 1 }")]
+    fn rejects_invalid_rewrite_options(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
+    }
+}
+
+#[cfg(test)]
+mod test_database_name {
+    use crate::test_helpers::metadata_with_codegen_options;
+
+    #[rstest::rstest]
+    #[case::absent("", None)]
+    #[case::explicit("database-name = 'my.db'", Some("my.db"))]
+    #[case::case_sensitive("database-name = 'My DB'", Some("My DB"))]
+    fn retains_only_explicit_identity(#[case] input: &str, #[case] expected: Option<&str>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        assert_eq!(selected.database_name(), expected);
+        assert_eq!(selected.name(), "default");
+    }
+
+    #[rstest::rstest]
+    #[case::empty("database-name = ''")]
+    #[case::wrong_type("database-name = 42")]
+    #[case::nul(r#"database-name = "bad\u0000name""#)]
+    fn rejects_invalid_identity(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
+    }
+}
+
+#[cfg(test)]
 mod test_codegen_metadata {
     use crate::test_helpers::metadata_with_codegen_options;
 
@@ -446,5 +682,58 @@ mod test_codegen_metadata {
         ] {
             assert!(metadata_with_codegen_options(input).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod test_role_metadata {
+    use crate::test_helpers::{initialization_choices_project, metadata_with_codegen_options};
+
+    #[rstest::rstest]
+    #[case::omitted("", None)]
+    #[case::empty("roles = []", Some(vec![]))]
+    #[case::exact_names(r#"roles = ['Owner', 'owner', 'a.b', '所有者', 'a"b', ' spaced ']"#,
+        Some(vec![" spaced ", "Owner", "a\"b", "a.b", "owner", "所有者"]))]
+    fn preserves_explicit_inventory(#[case] input: &str, #[case] expected: Option<Vec<&str>>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        let names = selected
+            .roles()
+            .map(super::RoleInventory::definitions::<String>);
+        assert_eq!(
+            names,
+            expected.map(|names| names.into_iter().map(String::from).collect())
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::scalar("roles = 'owner'")]
+    #[case::table("roles = { owner = true }")]
+    #[case::number("roles = [42]")]
+    #[case::empty_name("roles = ['']")]
+    #[case::nul(r#"roles = ["bad\u0000name"]"#)]
+    #[case::duplicate("roles = ['owner', 'owner']")]
+    fn rejects_invalid_inventory_in_both_loaders(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
+        let project = initialization_choices_project(&format!(
+            "[package.metadata.database.app]\nengine = 'PostgreSQL'\ndialect = 'postgres'\n{input}"
+        ));
+        let declarations =
+            super::InitializationDatasources::load_from(&project.path().join("Cargo.toml"))
+                .unwrap();
+        assert!(declarations.selected_metadata("app").is_err());
+    }
+
+    #[test]
+    fn selected_loader_does_not_decode_unselected_role_inventory() {
+        let project = initialization_choices_project(
+            "[package.metadata.database.app]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nroles = ['owner']\n[package.metadata.database.other]\nroles = 42",
+        );
+        let declarations =
+            super::InitializationDatasources::load_from(&project.path().join("Cargo.toml"))
+                .unwrap();
+        let selected = declarations.selected_metadata("app").unwrap();
+        assert_eq!(selected.roles().unwrap().definitions::<String>(), ["owner"]);
+        assert!(declarations.selected_metadata("other").is_err());
     }
 }

@@ -1,27 +1,76 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
-        AstAndContextPair, CreateTableMode, SourcePathWithSpan, alter_table::AlterObjSubCommand,
+        AstAndContextPair, SourcePathWithSpan, alter_table::AlterObjSubCommand,
         create_table::ColumnDefinition,
     },
-    syn::{ObjectType, Opt, ScanToken},
+    syn::{ObjectType, ScanToken},
 };
 
-use super::{AlterView, AnalysisError, CreateTable, FullName, ParseContext, SemAst, TableName};
+use super::{AlterView, AnalysisError, FullName, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::CreateTableAsStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateTableAs {
+    if_not_exists: bool,
+
     name: FullName,
-    #[expect(dead_code)]
     query: Box<SemAst>,
     obj_type: ObjectType,
-    owner: Option<String>,
+    owner: Option<crate::sem::OwnerSpecification>,
     alter_statements: Vec<AlterView>,
 }
 
 impl CreateTableAs {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        self.query
+            .walk_nested_command(&mut crate::sem::traversal::RelationRenamer::new(old, new))
+    }
+
+    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+        self.query
+            .select_statement()
+            .expect("CREATE AS query is a SELECT")
+            .result_columns()
+    }
+
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
+    pub(crate) fn new(name: &FullName, query: &SemAst, materialized: bool) -> Self {
+        Self {
+            if_not_exists: false,
+            name: name.clone(),
+            query: Box::new(query.clone()),
+            obj_type: if materialized {
+                ObjectType::ObjectMatview
+            } else {
+                ObjectType::ObjectTable
+            },
+            owner: None,
+            alter_statements: Vec::new(),
+        }
+    }
     /// object name
     #[must_use]
     pub const fn name(&self) -> &FullName {
@@ -39,7 +88,11 @@ impl CreateTableAs {
 
         for cmd in alter_view.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
+                AlterObjSubCommand::ChangeOwner(new_owner) => {
+                    if new_owner.can_apply() {
+                        self.change_owner(new_owner);
+                    }
+                }
                 _ => todo!(),
             }
         }
@@ -47,22 +100,18 @@ impl CreateTableAs {
         Ok(())
     }
 
-    pub(crate) fn get_column_def(
-        &self,
-        _column_name: &super::ColumnName,
-    ) -> Option<ColumnDefinition> {
-        todo!()
+    pub(crate) fn get_column_def(&self, column: &super::ColumnName) -> Option<ColumnDefinition> {
+        self.result_columns().get_result_column_def(column)
     }
-
-    pub(crate) fn has_column(&self, _column_name: &super::ColumnName) -> bool {
-        todo!()
+    pub(crate) fn has_column(&self, column: &super::ColumnName) -> bool {
+        self.result_columns().has_column(column)
     }
 
     /// analyze [`crate::syn::CreateTableAsStmt`]
     #[tracing::instrument(skip_all)]
     pub fn analyze_create_table_as<TParseContext>(
         context: TParseContext,
-        parent_schema: &Option<String>,
+        _parent_schema: &Option<String>,
         syn: crate::syn::CreateTableAsStmt,
         tokens: &IVec<ScanToken>,
         source_span: &SourcePathWithSpan,
@@ -70,48 +119,7 @@ impl CreateTableAs {
     where
         TParseContext: ParseContext,
     {
-        let Some(obj_type) = syn.get_objtype().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_table_as.obj_type")?
-        };
-
-        let Some(into) = syn.get_into().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_table_as.into")?
-        };
-        let Some(into_rel) = into.get_rel().as_inner() else {
-            AnalysisError::raise_unexpected_none("into_clause.rel")?
-        };
-        let name = FullName::try_from(into_rel.clone())?;
-        let Some(q) = syn.get_query().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_table_as.query")?
-        };
-        let AstAndContextPair(sem, context) =
-            SemAst::analyze_node(context, parent_schema, q, tokens)?;
-        let context = match &sem {
-            SemAst::SelectStatement(s) => {
-                let columns = s.result_columns().column_definitions()?;
-                // FIXME: create table mode , temporary value
-                let create_table = CreateTable::new(
-                    &TableName::try_from(into_rel)?,
-                    columns,
-                    CreateTableMode::Default,
-                    false,
-                    source_span,
-                );
-                context.apply_create_table(&create_table)?
-            }
-            _ => AnalysisError::raise_unexpected_none("SemAst As Select statement")?,
-        };
-        let create_table_as = Self {
-            name,
-            query: Box::new(sem),
-            obj_type,
-            owner: None,
-            alter_statements: Vec::new(),
-        };
-        let result_context = context.apply_create_table_as(&create_table_as)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateTableAs(create_table_as),
-            result_context,
-        ))
+        crate::ast::TableAs::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 }

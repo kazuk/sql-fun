@@ -34,16 +34,25 @@ pub struct TestMetadataEnvs {
 
 impl TestProjectDir {
     /// Create a temporary project directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the temporary directory cannot be created.
     pub fn new() -> Result<Self, std::io::Error> {
         Ok(Self(tempfile::tempdir()?))
     }
 
     /// Return the root path of the temporary project.
+    #[must_use]
     pub fn path(&self) -> &Path {
         self.0.path()
     }
 
     /// Create a directory relative to the project root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the directory cannot be created.
     pub fn create_dir(&self, relative: &str) -> Result<PathBuf, std::io::Error> {
         let path = self.path().join(relative);
         std::fs::create_dir_all(&path)?;
@@ -51,6 +60,10 @@ impl TestProjectDir {
     }
 
     /// Write a file relative to the project root, creating parent directories as needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the path has no parent or the directory or file cannot be written.
     pub fn write_file(&self, relative: &str, content: &str) -> Result<PathBuf, std::io::Error> {
         let path = self.path().join(relative);
         let Some(parent) = path.parent() else {
@@ -151,6 +164,10 @@ impl TestMetadataEnvs {
 }
 
 /// Parse `SqlFunMetadata` from inline Cargo-style TOML used by unit tests.
+///
+/// # Errors
+///
+/// Returns a metadata error if parsing fails or the default datasource is absent.
 pub fn parse_metadata<P: AsRef<Path> + std::fmt::Debug>(
     source: &str,
     path_hint: P,
@@ -163,7 +180,11 @@ pub fn parse_metadata<P: AsRef<Path> + std::fmt::Debug>(
     }
 }
 
-/// Parse PostgreSQL metadata without a CTE catalog.
+/// Parse `PostgreSQL` metadata without a CTE catalog.
+///
+/// # Errors
+///
+/// Returns a metadata error if the fixture metadata cannot be parsed.
 pub fn parse_postgres_metadata<P: AsRef<Path> + std::fmt::Debug>(
     path_hint: P,
 ) -> Result<SqlFunMetadata, MetadataError> {
@@ -181,7 +202,11 @@ dialect = "postgres"
     )
 }
 
-/// Parse PostgreSQL metadata with a CTE catalog path.
+/// Parse `PostgreSQL` metadata with a CTE catalog path.
+///
+/// # Errors
+///
+/// Returns a metadata error if the fixture metadata cannot be parsed.
 pub fn parse_postgres_metadata_with_cte_catalog<P, Q>(
     path_hint: P,
     cte_catalog: Q,
@@ -209,6 +234,10 @@ cte_catalog = "{}"
 }
 
 /// Write a SQL fixture file with a default SQL comment body.
+///
+/// # Errors
+///
+/// Returns an I/O error if the fixture file cannot be written.
 pub fn write_sql_fixture(
     project_dir: &TestProjectDir,
     relative: &str,
@@ -217,6 +246,10 @@ pub fn write_sql_fixture(
 }
 
 /// Write a schema dump file for the given schema name.
+///
+/// # Errors
+///
+/// Returns an I/O error if the schema dump cannot be written.
 pub fn write_schema_dump(
     project_dir: &TestProjectDir,
     schema: &str,
@@ -225,6 +258,10 @@ pub fn write_schema_dump(
 }
 
 /// Write a CTE catalog TOML fixture with the standard catalog header.
+///
+/// # Errors
+///
+/// Returns an I/O error if the catalog file cannot be written.
 pub fn write_cte_catalog_toml(
     project_dir: &TestProjectDir,
     relative: &str,
@@ -243,6 +280,10 @@ sql_dialect = \"PostgreSQL\"
 }
 
 /// test specific validation error exists
+///
+/// # Panics
+///
+/// Panics if the named CTE is absent from the test catalog.
 pub fn cte_catalog_has_error(
     catalog: &CteCatalog<'_>,
     cte_name: &str,
@@ -255,6 +296,10 @@ pub fn cte_catalog_has_error(
 }
 
 /// Write a manifest and matching schema dump for a metadata test fixture.
+///
+/// # Errors
+///
+/// Returns an I/O error if the manifest or schema dump cannot be written.
 pub fn write_metadata_project(
     project_dir: &TestProjectDir,
     package_name: &str,
@@ -269,6 +314,10 @@ pub fn write_metadata_project(
 }
 
 /// Write a manifest, schema dump, and CTE catalog directory for a metadata test fixture.
+///
+/// # Errors
+///
+/// Returns an I/O error if any fixture file or directory cannot be created.
 pub fn write_metadata_project_with_cte(
     project_dir: &TestProjectDir,
     package_name: &str,
@@ -285,6 +334,10 @@ pub fn write_metadata_project_with_cte(
 }
 
 /// Write a minimal Cargo manifest for tests and return its path.
+///
+/// # Errors
+///
+/// Returns an I/O error if the manifest cannot be written.
 pub fn write_test_manifest(
     project_dir: &TestProjectDir,
     package_name: &str,
@@ -304,4 +357,32 @@ pub(crate) fn metadata_with_codegen_options(
         ),
         "Metadata.toml",
     )
+}
+
+pub(crate) fn initialization_choices_project(declarations: &str) -> tempfile::TempDir {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(
+        directory.path().join("Cargo.toml"),
+        format!("[package.metadata.database]\n{declarations}\n"),
+    )
+    .unwrap();
+    directory
+}
+
+/// Write a schema project with a named `PostgreSQL` datasource for configuration transfer.
+pub(crate) fn write_postgres_metadata_project(project: &TestProjectDir) -> TestMetadataProject {
+    let fixture = write_metadata_project(project, "transfer", "qa").unwrap();
+    project
+        .write_file(
+            "Cargo.toml",
+            r#"
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "16"
+search_path = ["public"]
+"#,
+        )
+        .unwrap();
+    fixture
 }

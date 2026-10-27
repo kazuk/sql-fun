@@ -1,0 +1,3086 @@
+[
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "aclitem_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "aclitem",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "aclitem_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "array_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyarray",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "array_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gin",
+    "default": true,
+    "family": {
+      "access_method": "gin",
+      "name": "array_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyarray",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "anyelement",
+      "schema": "pg_catalog"
+    },
+    "name": "array_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "array_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyarray",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "array_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "bit_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bit",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "bit",
+      "schema": "pg_catalog"
+    },
+    "name": "bit_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "bit_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bit",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bit_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "bool_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bool",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bool_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "bool_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bool",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bool_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "box_inclusion_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "name": "box_inclusion_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "box_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "box_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": true,
+    "family": {
+      "access_method": "spgist",
+      "name": "box_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "box_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "bpchar_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "name": "bpchar_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "bpchar_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "name": "bpchar_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "bpchar_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bpchar_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "bpchar_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bpchar_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": false,
+    "family": {
+      "access_method": "btree",
+      "name": "bpchar_pattern_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bpchar_pattern_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": false,
+    "family": {
+      "access_method": "hash",
+      "name": "bpchar_pattern_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bpchar",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bpchar_pattern_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "bytea_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bytea",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "bytea",
+      "schema": "pg_catalog"
+    },
+    "name": "bytea_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "bytea_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bytea",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "bytea",
+      "schema": "pg_catalog"
+    },
+    "name": "bytea_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "bytea_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bytea",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bytea_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "bytea_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "bytea",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "bytea_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "char_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "char",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "char",
+      "schema": "pg_catalog"
+    },
+    "name": "char_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "char_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "char",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "char",
+      "schema": "pg_catalog"
+    },
+    "name": "char_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "char_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "char",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "char_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "char_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "char",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "char_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "cid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "cid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "cid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": false,
+    "family": {
+      "access_method": "btree",
+      "name": "network_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "cidr_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": false,
+    "family": {
+      "access_method": "hash",
+      "name": "network_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "cidr_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "circle_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "circle",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "name": "circle_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "name": "date_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "name": "date_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "name": "date_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "datetime_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "date_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "date_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "date",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "date_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "enum_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyenum",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "enum_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "enum_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyenum",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "enum_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "float_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "name": "float4_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "float_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "name": "float4_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "float_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "name": "float4_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "float_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "float4_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "float_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float4",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "float4_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "float_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "name": "float8_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "float_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "name": "float8_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "float_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "name": "float8_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "float_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "float8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "float_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "float8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "float8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "network_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "name": "inet_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "network_inclusion_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "name": "inet_inclusion_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "network_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "name": "inet_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "network_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "name": "inet_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "network_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "inet_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": false,
+    "family": {
+      "access_method": "gist",
+      "name": "network_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "inet_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "network_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "inet_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": true,
+    "family": {
+      "access_method": "spgist",
+      "name": "network_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "inet",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "inet_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "name": "int2_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "name": "int2_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "name": "int2_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "integer_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "int2_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "integer_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int2",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "int2_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "name": "int4_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "name": "int4_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "name": "int4_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "integer_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "int4_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "integer_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "int4_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "name": "int8_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "name": "int8_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "integer_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "name": "int8_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "integer_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "int8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "integer_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "int8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "interval_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "name": "interval_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "interval_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "name": "interval_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "interval_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "name": "interval_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "interval_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "interval_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "interval_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "interval",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "interval_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "jsonb_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "jsonb",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "jsonb_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gin",
+    "default": true,
+    "family": {
+      "access_method": "gin",
+      "name": "jsonb_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "jsonb",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "name": "jsonb_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "jsonb_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "jsonb",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "jsonb_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gin",
+    "default": false,
+    "family": {
+      "access_method": "gin",
+      "name": "jsonb_path_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "jsonb",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int4",
+      "schema": "pg_catalog"
+    },
+    "name": "jsonb_path_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": false,
+    "family": {
+      "access_method": "spgist",
+      "name": "kd_point_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "point",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "kd_point_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "macaddr8_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "name": "macaddr8_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "macaddr8_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "name": "macaddr8_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "macaddr8_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "name": "macaddr8_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "macaddr8_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "macaddr8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "macaddr8_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "macaddr8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "macaddr_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "name": "macaddr_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "macaddr_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "name": "macaddr_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "macaddr_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "name": "macaddr_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "macaddr_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "macaddr_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "macaddr_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "macaddr",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "macaddr_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "money_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "money",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "money_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "multirange_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anymultirange",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "multirange_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "multirange_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anymultirange",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "name": "multirange_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "multirange_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anymultirange",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "multirange_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "name_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "name",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "name",
+      "schema": "pg_catalog"
+    },
+    "name": "name_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "name_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "name",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "name",
+      "schema": "pg_catalog"
+    },
+    "name": "name_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "name",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "cstring",
+      "schema": "pg_catalog"
+    },
+    "name": "name_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "name",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "name_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "numeric_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "name": "numeric_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "numeric_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "name": "numeric_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "numeric_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "name": "numeric_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "numeric_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "numeric_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "numeric_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "numeric",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "numeric_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "oid_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "name": "oid_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "oid_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "name": "oid_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "oid_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "name": "oid_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "oid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "oid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "oid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "oid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "oidvector_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oidvector",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "oidvector_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "oidvector_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "oidvector",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "oidvector_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "pg_lsn_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "name": "pg_lsn_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "pg_lsn_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "name": "pg_lsn_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "pg_lsn_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "name": "pg_lsn_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "pg_lsn_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "pg_lsn_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "pg_lsn_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "pg_lsn",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "pg_lsn_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "point_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "point",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "name": "point_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "poly_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "polygon",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "name": "poly_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": true,
+    "family": {
+      "access_method": "spgist",
+      "name": "poly_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "polygon",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "box",
+      "schema": "pg_catalog"
+    },
+    "name": "poly_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": true,
+    "family": {
+      "access_method": "spgist",
+      "name": "quad_point_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "point",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "quad_point_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "range_inclusion_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "name": "range_inclusion_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "range_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "range_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "range_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "range_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "range_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "range_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": true,
+    "family": {
+      "access_method": "spgist",
+      "name": "range_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "anyrange",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "range_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": false,
+    "family": {
+      "access_method": "btree",
+      "name": "record_image_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "record",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "record_image_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "record_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "record",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "record_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "record_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "record",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "record_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "text_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "name": "text_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "text_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "name": "text_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "text_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "text_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "spgist",
+    "default": true,
+    "family": {
+      "access_method": "spgist",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "text_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": false,
+    "family": {
+      "access_method": "btree",
+      "name": "text_pattern_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "text_pattern_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": false,
+    "family": {
+      "access_method": "hash",
+      "name": "text_pattern_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "text_pattern_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "tid_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "name": "tid_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "tid_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "name": "tid_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "tid_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "name": "tid_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "tid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "tid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "tid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "tid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "time_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "name": "time_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "time_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "name": "time_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "time_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "name": "time_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "time_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "time_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "time_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "time",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "time_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "name": "timestamp_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "name": "timestamp_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "name": "timestamp_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "datetime_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "timestamp_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "timestamp_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamp",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "timestamp_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "name": "timestamptz_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "name": "timestamptz_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "datetime_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "name": "timestamptz_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "datetime_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "timestamptz_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "timestamptz_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timestamptz",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "timestamptz_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "timetz_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "name": "timetz_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "timetz_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "name": "timetz_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "timetz_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "name": "timetz_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "timetz_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "timetz_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "timetz_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "timetz",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "timetz_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "tsquery_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tsquery",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "tsquery_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "tsquery_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tsquery",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "int8",
+      "schema": "pg_catalog"
+    },
+    "name": "tsquery_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "tsvector_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tsvector",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "tsvector_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gin",
+    "default": true,
+    "family": {
+      "access_method": "gin",
+      "name": "tsvector_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tsvector",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "name": "tsvector_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "gist",
+    "default": true,
+    "family": {
+      "access_method": "gist",
+      "name": "tsvector_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "tsvector",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "gtsvector",
+      "schema": "pg_catalog"
+    },
+    "name": "tsvector_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "uuid_bloom_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "name": "uuid_bloom_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": false,
+    "family": {
+      "access_method": "brin",
+      "name": "uuid_minmax_multi_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "name": "uuid_minmax_multi_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "uuid_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "name": "uuid_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "uuid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "uuid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "uuid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "uuid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "uuid_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "brin",
+    "default": true,
+    "family": {
+      "access_method": "brin",
+      "name": "varbit_minmax_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "varbit",
+      "schema": "pg_catalog"
+    },
+    "key_type": {
+      "name": "varbit",
+      "schema": "pg_catalog"
+    },
+    "name": "varbit_minmax_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "varbit_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "varbit",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "varbit_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": false,
+    "family": {
+      "access_method": "btree",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "varchar_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": false,
+    "family": {
+      "access_method": "hash",
+      "name": "text_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "varchar_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": false,
+    "family": {
+      "access_method": "btree",
+      "name": "text_pattern_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "varchar_pattern_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": false,
+    "family": {
+      "access_method": "hash",
+      "name": "text_pattern_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "text",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "varchar_pattern_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "btree",
+    "default": true,
+    "family": {
+      "access_method": "btree",
+      "name": "xid8_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "xid8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "xid8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "xid8_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "xid8",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "xid8_ops",
+    "schema": "pg_catalog"
+  },
+  {
+    "access_method": "hash",
+    "default": true,
+    "family": {
+      "access_method": "hash",
+      "name": "xid_ops",
+      "schema": "pg_catalog"
+    },
+    "input_type": {
+      "name": "xid",
+      "schema": "pg_catalog"
+    },
+    "key_type": null,
+    "name": "xid_ops",
+    "schema": "pg_catalog"
+  }
+]

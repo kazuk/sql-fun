@@ -5,6 +5,12 @@
 //! keep type ownership inside this crate so future traits and helper APIs are
 //! not constrained by orphan rules.
 //!
+//! The adapter is information-preserving: it may reshape ownership and serving
+//! shape, but must retain every parser-provided field, variant, and syntax
+//! distinction. Semantic or code-generation support must never determine which
+//! syntax is retained. SQL rejected before the parser produces an AST is an
+//! inherited parser limitation, not an adapter or semantic restriction.
+//!
 //! Together with `crate::sqlite`, it forms the interface boundary to
 //! `turso_parser`, while semantic objects in `crate::sem` remain shared
 //! between PostgreSQL and SQLite.
@@ -12,8 +18,12 @@
 //! As a secondary benefit, it also acts as a boundary layer so changes in
 //! `turso_parser` do not leak directly into the semantic layer.
 
+#[cfg(test)]
+mod upgrade_tests;
+
 mod analyze_statement;
 mod column_definition;
+mod command;
 mod connection_context_statement;
 mod constraints;
 mod delete_statement;
@@ -32,6 +42,7 @@ mod over;
 mod pragma;
 mod resolve_type;
 mod select;
+mod sequence_statements;
 mod sorted_column;
 mod subquery_type;
 mod table_internal_id;
@@ -51,6 +62,7 @@ use crate::syn::sqlite::{domain::DomainConstraint, pragma::PragmaBody};
 pub use self::{
     analyze_statement::AnalyzeStatement,
     column_definition::ColumnDefinition,
+    command::{Cmd, EqpFormat, ExplainQueryPlan},
     connection_context_statement::{AttachStatement, DetachStatement},
     constraints::{
         CheckColumnConstraint, CheckConstraint, CollateColumnConstraint, ColumnConstraint,
@@ -92,6 +104,7 @@ pub use self::{
         CompoundOperator, CompoundSelect, Distinctness, IndexedColumn, Limit, OneSelect,
         OneSelectItem, ResultColumn, ResultColumnExpr, Select, SelectBody,
     },
+    sequence_statements::{CreateSequenceStatement, DropSequenceStatement},
     sorted_column::{NullsOrder, SortOrder, SortedColumn},
     subquery_type::{SubqueryType, SubqueryTypeExists, SubqueryTypeIn, SubqueryTypeRowValue},
     table_internal_id::TableInternalId,
@@ -205,6 +218,11 @@ pub enum Stmt {
     /// drop type
     DropType(DropTypeStatement),
 
+    /// Create a Turso sequence.
+    CreateSequence(CreateSequenceStatement),
+    /// Drop a Turso sequence.
+    DropSequence(DropSequenceStatement),
+
     /// create domain
     CreateDomain(CreateDomainStatement),
     /// drop domain
@@ -224,6 +242,40 @@ pub enum Stmt {
 }
 
 impl Stmt {
+    /// Borrow DELETE syntax, if present.
+    pub const fn as_delete(&self) -> Option<&DeleteStatement> {
+        if let Self::Delete(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Borrow PRAGMA syntax, if present.
+    pub const fn as_pragma(&self) -> Option<&PragmaStatement> {
+        if let Self::Pragma(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Consume ALTER TABLE syntax, if present.
+    pub fn into_alter_table(self) -> Option<AlterTable> {
+        if let Self::AlterTable(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Borrow the UPDATE syntax, if this statement is an UPDATE.
+    pub const fn as_update(&self) -> Option<&Update> {
+        if let Self::Update(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
     /// get CreateTable variant
     pub const fn as_create_table(&self) -> Option<&CreateTableStatement> {
         match self {
@@ -244,6 +296,27 @@ impl Stmt {
 impl From<StmtIn> for Stmt {
     fn from(value: StmtIn) -> Self {
         match value {
+            StmtIn::CreateSequence {
+                if_not_exists,
+                seq_name,
+                start,
+                increment,
+                min_value,
+                max_value,
+                cycle,
+            } => Self::create_sequence(
+                if_not_exists,
+                &QualifiedName::from(seq_name),
+                start,
+                increment,
+                min_value,
+                max_value,
+                cycle,
+            ),
+            StmtIn::DropSequence {
+                if_exists,
+                seq_name,
+            } => Self::drop_sequence(if_exists, &QualifiedName::from(seq_name)),
             StmtIn::AlterTable(alter_table) => Self::AlterTable(AlterTable::from(alter_table)),
             StmtIn::Analyze { name } => {
                 Self::Analyze(AnalyzeStatement::new(name.map(QualifiedName::from)))
@@ -354,16 +427,12 @@ impl From<StmtIn> for Stmt {
                 indexed,
                 where_clause,
                 returning,
-                order_by,
-                limit,
             } => Self::Delete(DeleteStatement::new(
                 with.map(With::from),
                 QualifiedName::from(tbl_name),
                 indexed.map(Indexed::from),
                 where_clause.map(|v| Box::new(Expr::from(*v))),
                 returning.into_iter().map(ResultColumn::from).collect(),
-                order_by.into_iter().map(SortedColumn::from).collect(),
-                limit.map(Limit::from),
             )),
             StmtIn::Detach { name } => Self::Detach(DetachStatement::new(Expr::from(*name))),
             StmtIn::DropIndex {

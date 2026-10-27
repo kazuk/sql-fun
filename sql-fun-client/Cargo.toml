@@ -9,16 +9,41 @@ keywords.workspace = true
 repository.workspace = true
 readme = "README.md"
 rust-version.workspace = true
+autotests = false
 
 [features]
-sqlite = ["sql-fun-server-api/sqlite"]
+openrpc-schema = ["sql-fun-core/openrpc-schema", "dep:schemars"]
+sqlite = ["sql-fun-server-api/sqlite", "sql-fun-core/sqlite"]
 
 [dependencies]
+bon = "3.10.1"
+derive-getters.workspace = true
+nix.workspace = true
+schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
+sql-fun-core.workspace = true
 sql-fun-server-api.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+clap.workspace = true
+rstest.workspace = true
+sha256.workspace = true
+tempfile.workspace = true
+testresult.workspace = true
+tracing-subscriber.workspace = true
+
+[[test]]
+name = "lifecycle"
+path = "tests/lifecycle.rs"
+
+[[test]]
+name = "completion"
+path = "tests/completion.rs"
 
 [lints]
 workspace = true

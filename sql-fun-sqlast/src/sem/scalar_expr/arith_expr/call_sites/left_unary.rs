@@ -6,13 +6,15 @@ use crate::sem::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LeftUnaryCallSite {
     operator_name: OperatorName,
+    #[serde(default)]
+    binding: Option<Box<crate::sem::ResolvedOperator>>,
     operator_def: UnaryOperatorDefinition,
     arg: SemScalarExpr,
 }
 
 impl LeftUnaryCallSite {
     pub fn op_left_unary<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         operator_def: UnaryOperatorDefinition,
         lexpr: SemScalarExpr,
@@ -20,8 +22,22 @@ impl LeftUnaryCallSite {
     where
         TParseContext: ParseContext,
     {
+        let (value, _) = Self::op_left_unary_resolved(&mut context, name, operator_def, lexpr)?;
+        Ok((value, context))
+    }
+
+    pub(crate) fn op_left_unary_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        operator_def: UnaryOperatorDefinition,
+        lexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::ParseContext,
+    {
         let call_site = Self {
             operator_name: name.clone(),
+            binding: None,
             operator_def,
             arg: lexpr,
         };
@@ -46,8 +62,7 @@ impl LeftUnaryCallSite {
 
 #[cfg(test)]
 mod test_left_unary_call_site {
-    use testresult::TestResult;
-
+    use crate::sem::scalar_expr::arith_expr::call_sites::left_unary::LeftUnaryCallSite;
     use crate::{
         sem::{
             OperatorName, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
@@ -56,7 +71,7 @@ mod test_left_unary_call_site {
         test_helpers::{TestParseContext, test_context},
     };
 
-    use super::LeftUnaryCallSite;
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     fn test_op_left_unary(test_context: TestParseContext) -> TestResult {
@@ -72,5 +87,38 @@ mod test_left_unary_call_site {
             expr.clone(),
         )?;
         Ok(())
+    }
+}
+
+impl LeftUnaryCallSite {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl LeftUnaryCallSite {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if let Some(binding) = &self.binding {
+            binding.infer(parameters, context, Some(&self.arg), None)
+        } else {
+            parameters.operator(context, &self.operator_name, Some(&self.arg), None)
+        }
+    }
+}
+
+impl LeftUnaryCallSite {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        self.binding = Some(Box::new(binding));
+    }
+    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.binding.as_deref()
     }
 }

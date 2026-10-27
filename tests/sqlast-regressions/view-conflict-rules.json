@@ -1,0 +1,60 @@
+[
+  {
+    "name": "instead_action::conflict",
+    "sql": "INSERT INTO public.v_instead_action(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "conditional_action_trigger::conflict",
+    "sql": "INSERT INTO public.v_conditional_action_trigger(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "mixed_rules::conflict",
+    "sql": "INSERT INTO public.v_mixed_rules(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_nothing_instead::conflict",
+    "sql": "INSERT INTO public.v_update_nothing_instead(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_nothing_trigger::conflict",
+    "sql": "INSERT INTO public.v_update_nothing_trigger(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "also_nothing_trigger::conflict",
+    "sql": "INSERT INTO public.v_also_nothing_trigger(id) VALUES(1) ON CONFLICT DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

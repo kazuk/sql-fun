@@ -1,8 +1,17 @@
 mod alias;
 mod analyze;
+mod column_candidates;
 mod cte;
+mod deferred_fun;
+mod function_columns;
+mod group;
 mod join_expr;
 mod join_kind;
+mod merge_record;
+mod namespace;
+mod projection;
+mod qualified;
+mod resolved;
 mod rows_fun;
 mod sub_query;
 mod table;
@@ -10,13 +19,14 @@ mod table_fun;
 mod undefined;
 mod view;
 
-use sql_fun_core::IVec;
-
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
+    deferred_fun::DeferredTableFunction,
+    group::GroupedDataSource,
     join_expr::JoinExprDataSource,
     join_kind::JoinKind,
+    merge_record::{MergeRecordDataSource, MergeRecordRole},
     rows_fun::{DataSourceRowFunctions, DataSourceRowsFromFunc},
     sub_query::SubQueryDataSource,
     table::TableDataSource,
@@ -24,14 +34,18 @@ pub use self::{
     undefined::UndefinedTableFuncDataSource,
     view::ViewDataSource,
 };
+pub(crate) use self::{
+    column_candidates::ColumnCandidates,
+    function_columns::TableFunctionOutput,
+    join_expr::JoinUsingClause,
+    namespace::SourceNamespace,
+    projection::{ProjectionColumn, WildcardProjection},
+    qualified::QualifiedSource,
+};
 
 use crate::{
-    sem::{
-        AnalysisError, ColumnName, FromClause, FullName, ParseContext, ScalarAnalysisContext,
-        SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr,
-        type_system::ArgumentBindingCollection,
-    },
-    syn::{ListOpt, ScanToken},
+    context::ParseContext,
+    sem::{AnalysisError, ColumnName, SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr},
 };
 
 /// source nullability type
@@ -48,10 +62,16 @@ pub enum DataSource {
     View(ViewDataSource),
     /// join expression
     JoinExpr(Box<JoinExprDataSource>),
+    /// A target or source record exposed by a MERGE scope.
+    MergeRecord(Box<MergeRecordDataSource>),
+    /// SQLite parenthesized source with a group alias.
+    Group(Box<GroupedDataSource>),
     /// sub-query
     SubQuery(Box<SubQueryDataSource>),
     /// table function
     CallTableFunc(TableFunctionDataSource),
+    /// Function name lookup is complete; signature and output columns are deferred.
+    DeferredTableFunc(DeferredTableFunction),
     /// table function as source but not found
     UndefinedTableFunc(UndefinedTableFuncDataSource),
     /// ROWS clause
@@ -63,66 +83,86 @@ pub enum DataSource {
 }
 
 impl DataSource {
-    pub(super) fn create_column_ref<TParseContext>(
+    pub(crate) fn projection_shape_is_resolved(&self) -> bool {
+        crate::sem::with_stack(|| match self {
+            Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
+            Self::DeferredTableFunc(source) => source.projection_shape_is_resolved(),
+            Self::RowFunctions(source) => source.projection_shape_is_resolved(),
+            Self::JoinExpr(source) => source.projection_shape_is_resolved(),
+            Self::Group(source) => source.projection_shape_is_resolved(),
+            Self::MergeRecord(source) => source.projection_shape_is_resolved(),
+            _ => true,
+        })
+    }
+
+    pub(crate) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        match self {
+            Self::Table(_) => true,
+            Self::JoinExpr(join) => join.projection_is_table_dependent(context),
+            Self::Group(group) => group.projection_is_table_dependent(context),
+            Self::MergeRecord(record) => record.projection_is_table_dependent(context),
+            Self::CallTableFunc(source) => source.projection_is_table_dependent(context),
+            Self::DeferredTableFunc(source) => source.projection_is_table_dependent(context),
+            Self::RowFunctions(source) => source.projection_is_table_dependent(context),
+            _ => false,
+        }
+    }
+
+    pub(super) fn create_column_ref<'context, TParseContext>(
         &self,
-        mut context: TParseContext,
+        context: &'context mut TParseContext,
         with_clause: &WithClause,
         alias: &AliasName,
         column: &ColumnName,
         nullability: bool,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
         match self {
             Self::CteQuery(cteds) => {
                 let column_ref =
-                    cteds.create_column_ref(&mut context, with_clause, column, nullability)?;
+                    cteds.create_column_ref(context, with_clause, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::Table(tableds) => {
-                let column_ref = tableds.create_column_ref(&mut context, column, nullability)?;
+                let column_ref = tableds.create_column_ref(context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
-            Self::View(viewds) => ColumnReferenceExpr::view_source_ref(
-                context,
-                alias,
-                column,
-                viewds.view_name(),
-                nullability,
-            ),
+            Self::View(viewds) => {
+                let reference = viewds.create_column_ref(context, alias, column, nullability)?;
+                Ok((SemScalarExpr::column_reference(reference), context))
+            }
             Self::SubQuery(subqds) => {
-                let column_ref = subqds.create_column_ref(&mut context, column, nullability)?;
+                let column_ref = subqds.create_column_ref(context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::Unknown(_, _) => {
                 // DataSource::Unknown ready report_problem in from_clause analysis
                 ColumnReferenceExpr::unknown_source_ref(context, alias, column)
             }
-            // resolve_alias not returns this variants
-            Self::JoinExpr(_) => unreachable!(),
-            Self::CallTableFunc(ds) => ColumnReferenceExpr::function_source_ref(
-                context,
-                alias,
-                column,
-                ds.function(),
-                ds.arguments(),
-                nullability,
-            ),
-            Self::UndefinedTableFunc(_ds) => {
+            Self::Group(group) => {
+                group.create_column_ref(context, with_clause, alias, column, nullability)
+            }
+            Self::JoinExpr(join) => {
+                join.create_column_ref(context, with_clause, column, nullability)
+            }
+            Self::MergeRecord(record) => {
+                record.create_column_ref(context, with_clause, alias, column, nullability)
+            }
+            Self::CallTableFunc(ds) => ds.bind_column(context, alias, column, nullability),
+            Self::DeferredTableFunc(ds) => ds.bind_column(context, alias, column, nullability),
+            Self::UndefinedTableFunc(_) => {
                 ColumnReferenceExpr::unknown_function_source_ref(context, alias, column)
             }
             Self::RangeTableSample() => todo!(),
-            Self::RowFunctions(_) => todo!(),
+            Self::RowFunctions(source) => {
+                source.bind_column(context, with_clause, alias, column, nullability)
+            }
         }
     }
 
-    #[track_caller]
     fn unknown(name: &str, alias: &AliasSpec) -> Self {
-        #[cfg(test)]
-        panic!("unknown datasource {name}, alias {alias:?}");
-
-        #[cfg(not(test))]
         Self::Unknown(name.to_string(), alias.clone())
     }
 
@@ -132,12 +172,15 @@ impl DataSource {
             Self::Table(d) => d.push_alias_names(names),
             Self::View(d) => d.push_alias_names(names),
             Self::JoinExpr(d) => d.push_alias_names(names),
+            Self::MergeRecord(d) => d.push_alias_names(names),
+            Self::Group(d) => d.push_alias_names(names),
             Self::SubQuery(d) => d.push_alias_names(names),
             Self::CallTableFunc(d) => d.push_alias_names(names),
+            Self::DeferredTableFunc(d) => d.push_alias_names(names),
             Self::UndefinedTableFunc(d) => d.push_alias_names(names),
-            Self::RowFunctions(_data_source_row_functions) => todo!(),
+            Self::RowFunctions(functions) => names.extend(functions.get_aliases()),
             Self::RangeTableSample() => todo!(),
-            Self::Unknown(_, _) => todo!(),
+            Self::Unknown(_, alias) => names.push(alias.clone()),
         }
     }
 
@@ -149,16 +192,20 @@ impl DataSource {
         results
     }
 
-    /// resolve alias name to data source
+    /// Resolve a unique visible alias. Missing or ambiguous aliases return `None`.
     #[must_use]
     pub fn resolve_alias(&self, name: &AliasName) -> Option<(&Self, Nullable)> {
+        self.namespace().resolve_name(name).ok().flatten()?;
         match self {
             Self::CteQuery(d) => d.resolve_alias(self, name),
             Self::Table(d) => d.resolve_alias(self, name),
             Self::View(d) => d.resolve_alias(self, name),
-            Self::JoinExpr(d) => d.resolve_alias(name),
+            Self::JoinExpr(d) => d.resolve_alias(self, name),
+            Self::MergeRecord(d) => d.resolve_alias(self, name),
+            Self::Group(d) => d.resolve_alias(self, name),
             Self::SubQuery(d) => d.resolve_alias(self, name),
             Self::CallTableFunc(d) => d.resolve_alias(self, name),
+            Self::DeferredTableFunc(d) => d.resolve_alias(self, name),
             Self::UndefinedTableFunc(d) => d.resolve_alias(self, name),
             Self::RangeTableSample() => todo!(),
             Self::Unknown(_, alias) => {
@@ -172,83 +219,197 @@ impl DataSource {
         }
     }
 
-    /// list alias name for column name
+    /// Look up aliases that can conclusively supply a column.
+    ///
+    /// An unresolved source makes this lookup `Unknown`, even when another
+    /// source has a known candidate. Only `NotFound` proves local absence.
     pub fn get_aliases_for_column<TParseContext>(
         &self,
         column: &ColumnName,
         context: &TParseContext,
         with_clause: &WithClause,
-    ) -> Vec<AliasSpec>
+    ) -> ::sql_fun_core::LookupResult<Vec<AliasSpec>>
     where
         TParseContext: ParseContext,
     {
+        self.aliases_for_column_resolved(column, context, with_clause)
+            .into_lookup()
+    }
+
+    pub(crate) fn aliases_for_column_resolved<TContext: ParseContext>(
+        &self,
+        column: &ColumnName,
+        context: &TContext,
+        with_clause: &WithClause,
+    ) -> ColumnCandidates {
         let mut result = Vec::new();
         match self {
             Self::CteQuery(d) => d.get_aliases_for_column(column, with_clause, &mut result),
             Self::Table(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::View(d) => d.get_aliases_for_column(column, context, &mut result),
-            Self::JoinExpr(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result);
-            }
+            Self::JoinExpr(d) => return d.column_candidates(column, context, with_clause),
+            Self::MergeRecord(d) => return d.column_candidates(column, context, with_clause),
+            Self::Group(d) => return d.column_candidates(column, context, with_clause),
             Self::SubQuery(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::CallTableFunc(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
-            Self::UndefinedTableFunc(_) => {}
+            Self::UndefinedTableFunc(_) => return ColumnCandidates::unknown(),
+            Self::DeferredTableFunc(d) => return d.candidates(column),
             Self::RangeTableSample() => todo!(),
-            Self::Unknown(_, _) => todo!(),
-            Self::RowFunctions(_) => todo!(),
-        }
-        result
-    }
-
-    fn call_table_func<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        call: crate::syn::FuncCall,
-        alias: Option<crate::syn::Alias>,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let func_name = FullName::try_from(call.get_funcname())?;
-
-        let alias_name = if let Some(alias) = alias {
-            let (alias, new_context) = AliasSpec::analyze(context, &func_name, &alias)?;
-            context = new_context;
-            alias
-        } else {
-            AliasSpec::from_local_name(&func_name.local_name())
-        };
-
-        let mut arg_exprs = Vec::new();
-        let mut arg_types = ArgumentBindingCollection::default();
-        if let Some(args) = call.get_args().as_inner() {
-            for arg in args {
-                let (sarg, new_context) = SemScalarExpr::analyze_scaler_expr(
-                    context,
-                    &ScalarAnalysisContext::new(with_clause, from_clause),
-                    arg,
-                    tokens,
-                )?;
-                context = new_context;
-                arg_types.push(sarg.get_type());
-                arg_exprs.push(sarg);
+            Self::Unknown(_, _) => return ColumnCandidates::unknown(),
+            Self::RowFunctions(source) => {
+                return source.candidates(column);
             }
         }
+        ColumnCandidates::from(result)
+    }
+}
 
-        let ds = context.resolve_table_function(
-            &call,
-            func_name,
-            &alias_name,
-            arg_exprs.into(),
-            arg_types,
-        )?;
+impl DataSource {
+    pub(crate) fn with_group_alias(&self, alias: &AliasSpec) -> Self {
+        Self::Group(Box::new(GroupedDataSource::new(self, alias)))
+    }
 
-        Ok((ds, context))
+    pub(crate) fn is_joined(&self) -> bool {
+        match self {
+            Self::JoinExpr(_) => true,
+            Self::Group(group) => group.is_joined(),
+            _ => false,
+        }
+    }
+
+    fn group_column_source<'a, C: ParseContext>(
+        &'a self,
+        column: &ColumnName,
+        context: &C,
+        with: &WithClause,
+    ) -> Option<(&'a Self, Nullable)> {
+        // An unresolved descendant can compete even with a known column.
+        if self
+            .aliases_for_column_resolved(column, context, with)
+            .is_unknown()
+        {
+            return None;
+        }
+        match self {
+            Self::JoinExpr(join) => join.group_column_source(column, context, with),
+            Self::Group(group) => group.column_source(column, context, with),
+            _ => {
+                if self
+                    .aliases_for_column_resolved(column, context, with)
+                    .is_empty()
+                {
+                    None
+                } else {
+                    Some((self, false))
+                }
+            }
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::CteQuery(v) => v.walk(visitor)?,
+            Self::Table(v) => v.walk(visitor)?,
+            Self::View(v) => v.walk(visitor)?,
+            Self::JoinExpr(v) => v.walk(visitor)?,
+            Self::MergeRecord(v) => v.walk(visitor)?,
+            Self::Group(v) => v.walk(visitor)?,
+            Self::SubQuery(v) => v.walk(visitor)?,
+            Self::CallTableFunc(value) => value.walk(visitor)?,
+            Self::DeferredTableFunc(value) => value.walk(visitor)?,
+            Self::UndefinedTableFunc(value) => value.walk(visitor)?,
+            Self::RowFunctions(value) => value.walk(visitor)?,
+            Self::RangeTableSample() | Self::Unknown(_, _) => {}
+        }
+        Ok(())
+    }
+}
+
+impl DataSource {
+    pub(crate) fn merge_action_available(&self) -> bool {
+        match self {
+            Self::MergeRecord(record) => record.merge_action_available(),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn merge_row_target(
+        &self,
+        alias: &AliasName,
+    ) -> Option<(&AliasName, MergeRecordRole, bool)> {
+        match self {
+            Self::MergeRecord(record) => record.merge_row_target(alias),
+            _ => None,
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn apply_function_output(
+        &mut self,
+        context: &mut impl ParseContext,
+        output: &TableFunctionOutput,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::CallTableFunc(source) => source.apply_output(context, output),
+            Self::DeferredTableFunc(source) => source.apply_output(context, output),
+            Self::UndefinedTableFunc(source) => {
+                source.retain_output(output);
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn validate_function_aliases(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::RowFunctions(source) => source.validate_aliases(context),
+            Self::CallTableFunc(source) => source.validate_aliases(context),
+            Self::DeferredTableFunc(source) => source.validate_aliases(context),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn append_function_ordinality(&mut self) {
+        match self {
+            Self::CallTableFunc(source) => source.append_ordinality(),
+            Self::DeferredTableFunc(source) => source.append_ordinality(),
+            Self::RowFunctions(source) => source.append_ordinality(),
+            _ => {}
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn retain_rows_definition(&mut self, definition: &TableFunctionOutput) {
+        if let Self::RowFunctions(source) = self {
+            source.retain_outer_definition(definition);
+        }
+    }
+}
+
+impl DataSource {
+    pub(super) fn known_function_columns(&self) -> Option<Vec<ColumnName>> {
+        match self {
+            Self::CallTableFunc(source) => Some(source.column_names()),
+            Self::DeferredTableFunc(source) => source.known_column_names(),
+            _ => None,
+        }
     }
 }

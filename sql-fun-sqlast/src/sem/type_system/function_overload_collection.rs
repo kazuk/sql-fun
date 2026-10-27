@@ -1,8 +1,14 @@
-use crate::sem::{
-    OverloadVariant, ParseContext,
-    type_system::{
-        ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
-        func_params::ParameterBindResult,
+use crate::context::BaseParseContext;
+use crate::{
+    context::ParseContext,
+    sem::{
+        FullName, OverloadVariant, SemScalarExpr,
+        overload_rank::OverloadRank,
+        parameter_resolution::Signature,
+        type_system::{
+            ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
+            func_params::ParameterBindResult,
+        },
     },
 };
 
@@ -22,6 +28,64 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    pub(crate) fn same_signatures(&self, other: &Self) -> bool {
+        self.overloads == other.overloads
+    }
+    pub(crate) fn renamed_row_properties(
+        &self,
+        context: &impl BaseParseContext,
+        name: &FullName,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Vec<((FullName, OverloadVariant), bool)> {
+        self.overloads
+            .iter()
+            .map(|signature| {
+                let preserves = context.function_preserves_view_rows(name, signature);
+                let mut renamed = signature.clone();
+                renamed.rename_relation(old, new);
+                ((name.clone(), renamed), preserves)
+            })
+            .collect()
+    }
+
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        for overload in &mut self.overloads {
+            overload.rename_relation(old, new);
+        }
+    }
+
+    pub(crate) fn view_row_properties(
+        &self,
+        name: &FullName,
+        preserves_rows: bool,
+    ) -> Vec<((FullName, OverloadVariant), bool)> {
+        self.overloads
+            .iter()
+            .map(|overload| ((name.clone(), overload.clone()), preserves_rows))
+            .collect()
+    }
+
+    pub(crate) fn record_definition_requirement(&self) -> Option<bool> {
+        let requirement = self.overloads.first()?.requires_record_definition();
+        if self
+            .overloads
+            .iter()
+            .all(|overload| overload.requires_record_definition() == requirement)
+        {
+            Some(requirement)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn into_snapshot(self) -> Vec<OverloadVariant> {
+        self.overloads
+    }
     /// create new instance
     #[must_use]
     pub fn new(overloads: &[OverloadVariant]) -> Self {
@@ -82,10 +146,11 @@ impl FunctionOverloadCollection {
     fn infer_simple(
         bind_result: &Vec<ParameterBindResult>,
         overload: &mut OverloadVariant,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         let mut simple_infer_context = SimpleInferContext::default();
         for param in bind_result {
-            param.collect_simple(&mut simple_infer_context)?;
+            param.collect_simple(&mut simple_infer_context, catalog)?;
         }
         if simple_infer_context.is_require_infer() {
             let inferred_type = simple_infer_context.get_inference_result()?;
@@ -100,31 +165,51 @@ impl FunctionOverloadCollection {
         context: &TParseContext,
     ) -> Result<(), TypeError>
     where
-        TParseContext: ParseContext,
+        TParseContext: BaseParseContext,
     {
         let mut common_infer_context = CommonInferContext::default();
         for param in bind_result {
-            param.collect_common(&mut common_infer_context)?;
+            param.collect_common(&mut common_infer_context, context)?;
         }
         if common_infer_context.is_require_infer() {
-            let inferred_type = common_infer_context.get_inference_result(context)?;
+            let inferred_type = common_infer_context.infer_from_catalog(context)?;
             overload.apply_common_infer_result(&inferred_type);
         }
         Ok(())
     }
 
-    fn test_castability<TParseContext>(
-        bind_result: &Vec<ParameterBindResult>,
-        context: &TParseContext,
-    ) -> Result<i32, TypeError>
-    where
-        TParseContext: ParseContext,
-    {
-        let mut total_score = 0i32;
-        for param in bind_result {
-            total_score += param.test_castability(context)?;
+    // PostgreSQL prefers a non-variadic declaration over an expanded variadic
+    // declaration with the same effective input signature in this collection.
+    fn shadows_expanded_variadic(
+        &self,
+        overload: &OverloadVariant,
+        bindings: &[ParameterBindResult],
+        arguments: &ArgumentBindingCollection,
+    ) -> bool {
+        if !overload.is_variadic() {
+            return false;
         }
-        Ok(total_score)
+        let Some(inputs) = ParameterBindResult::constraint_inputs(bindings) else {
+            return false;
+        };
+        self.overloads.iter().any(|other| {
+            !other.is_variadic()
+                && other.bind_args(arguments.clone()).is_ok_and(|bindings| {
+                    ParameterBindResult::constraint_inputs(&bindings).as_ref() == Some(&inputs)
+                })
+        })
+    }
+
+    fn overload_rank(
+        bindings: &[ParameterBindResult],
+        declarations: &[ParameterBindResult],
+        context: &impl BaseParseContext,
+    ) -> Option<OverloadRank> {
+        let mut rank = OverloadRank::default();
+        for (binding, declaration) in std::iter::zip(bindings, declarations) {
+            rank = rank + binding.overload_rank(context, declaration)?;
+        }
+        Some(rank)
     }
 
     /// resolve variant for parameter types
@@ -136,6 +221,14 @@ impl FunctionOverloadCollection {
     where
         TParseContext: ParseContext,
     {
+        self.resolve_from_catalog(context, arg_types)
+    }
+
+    pub(crate) fn resolve_from_catalog<TCatalog: BaseParseContext>(
+        &self,
+        context: &TCatalog,
+        arg_types: &ArgumentBindingCollection,
+    ) -> Option<OverloadVariant> {
         let mut candidates = Vec::new();
 
         'overload: for overload in &self.overloads {
@@ -144,11 +237,15 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Ok(()) = Self::infer_simple(&bind_result, &mut overload) else {
+            if self.shadows_expanded_variadic(&overload, &bind_result, arg_types) {
+                continue;
+            }
+            let declared_bindings = bind_result;
+            let Ok(()) = Self::infer_simple(&declared_bindings, &mut overload, context) else {
                 continue 'overload;
             };
 
-            let Ok(()) = Self::infer_common(&bind_result, &mut overload, context) else {
+            let Ok(()) = Self::infer_common(&declared_bindings, &mut overload, context) else {
                 continue 'overload;
             };
 
@@ -157,19 +254,73 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Ok(score) = Self::test_castability(&bind_result, context) else {
+            let Some(score) = Self::overload_rank(&bind_result, &declared_bindings, context) else {
                 continue 'overload;
             };
 
             candidates.push((overload, score));
         }
 
-        if candidates.len() == 1 {
-            // candidates[0]
-            candidates.into_iter().next().map(|(overload, _)| overload)
-        } else {
-            // multiple overload found, then ambiguous
+        let best = candidates.iter().map(|(_, rank)| *rank).max()?;
+        let mut best_candidates = candidates.into_iter().filter(|(_, rank)| *rank == best);
+        let (overload, _) = best_candidates.next()?;
+        if best_candidates.next().is_some() {
             None
+        } else {
+            Some(overload)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests;
+
+impl FunctionOverloadCollection {
+    pub(crate) fn parameter_signatures(
+        &self,
+        catalog: &impl BaseParseContext,
+        arguments: &[SemScalarExpr],
+    ) -> Vec<Signature> {
+        let arguments = ArgumentBindingCollection::from_expr_list(arguments);
+        let mut signatures = Vec::new();
+        for overload in &self.overloads {
+            let mut overload = overload.clone();
+            let Ok(bindings) = overload.bind_args(arguments.clone()) else {
+                continue;
+            };
+            if self.shadows_expanded_variadic(&overload, &bindings, &arguments) {
+                continue;
+            }
+            let declared_bindings = bindings;
+            if Self::infer_simple(&declared_bindings, &mut overload, catalog).is_err()
+                || Self::infer_common(&declared_bindings, &mut overload, catalog).is_err()
+            {
+                continue;
+            }
+            let Ok(bindings) = overload.bind_args(arguments.clone()) else {
+                continue;
+            };
+            if let Some(signature) = overload.parameter_signature(&bindings, &declared_bindings) {
+                signatures.push(signature);
+            }
+        }
+        signatures
+    }
+}
+
+impl OverloadVariant {
+    fn parameter_signature(
+        &self,
+        bindings: &[ParameterBindResult],
+        declarations: &[ParameterBindResult],
+    ) -> Option<Signature> {
+        let inputs = ParameterBindResult::constraint_inputs(bindings)?;
+        let declared_inputs = ParameterBindResult::constraint_inputs(declarations)?;
+        Signature::new_function(
+            &inputs,
+            &declared_inputs,
+            &ParameterBindResult::unrestricted_inputs(bindings),
+            self.ret_type.as_ref()?,
+        )
     }
 }

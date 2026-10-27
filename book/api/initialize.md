@@ -1,29 +1,27 @@
 # initialize method
 
-JSON-RPC initialization method.  
+`initialize` authenticates a TCP connection to `sql-fun-server`. Send it as the
+first request on every new connection, and wait for the successful response
+before sending API requests. Each connection must authenticate independently.
 
-This server supports both MCP and LSP clients.
+This page describes the current sql-fun protocol. The server does not currently
+provide an MCP or LSP initialization handshake or advertise capabilities.
 
-## Request examples
+## Connection and framing
 
-### LSP Client
+The server listens on `127.0.0.1` using a dynamically allocated port. Its JSON
+PID file at `/tmp/<user>/sql-fun-server.pid` contains `pid`, `port`, and `token`.
+Here, `<user>` is the server's `--user` argument, which can also be supplied
+through `USER`. Connect to the recorded port and use that server's token.
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "processId": 1234,
-    "clientInfo": { "name": "vscode", "version": "1.89" },
-    "capabilities": { ... },
-    ...
-  }
-}
-```
+Send each request as a JSON object followed by LF (`\n`). Compact JSON is
+recommended. Spaces, tabs, and CR (`\r`) between the object and LF are accepted;
+CRLF is therefore accepted too. Responses are compact JSON followed by LF.
 
-### MCP Client
+## Request
 
+Replace the example token with the `token` from the server PID file. The example
+is formatted for readability; send it on one line with a trailing LF.
 
 ```json
 {
@@ -31,90 +29,66 @@ This server supports both MCP and LSP clients.
   "id": 1,
   "method": "initialize",
   "params": {
-    "protocolVersion": "2025-03-26",
-    "clientInfo": { "name": "cline", "version": "0.3.1" },
-    "capabilities": {
-      "tools": {},
-      "resources": {},
-      "prompts": {}
-    }
+    "sql_fun_token": "<token from the server PID file>"
   }
 }
 ```
 
-## Response example
+`sql_fun_token` must be a string matching the server's token. `initialize` is
+separate from `initialize_schema_context`: it authenticates the connection and
+does not load a schema context.
 
-The server returns combined capabilities for both `LSP` and `MCP`.
+## Response
 
-The `methods` key lists `sql-fun` specific JSON-RPC methods.
-To inspect each method’s request and response schema, use the `sql-fun/help-method`.
-
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "capabilities": {
-      "textDocumentSync": 2,
-      "completionProvider": { "resolveProvider": true },
-      "tools": {
-        "list": true,
-        "describe": true
-      },
-      "methods": [
-        {"name": "sql-fun/help-method/1","version": "1.0.0"},
-        {"name": "sql-fun/list/1", "version": "1.2.3"},
-        {"name": "sql-fun/describe/1", "version": "1.2.3"},
-        {"name": "sql-fun/describe/2", "version": "2.0.0", "experimental": true}
-        {"name": "sql-fun/validate/1", "version": "1.2.3"}
-      ]
-    }
-  }
-}
-```
-
-### Method Entry Format
-
-Each entry in the methods array contains:
-
-- name: The full method name, including version.
-- version: Semantic version (semver) of the method implementation.
-- experimental (optional): Whether the method is experimental. Defaults to false.
-
-Methods marked with "experimental": true are provided for evaluation and feedback purposes only.
-These methods are subject to change or removal at any time without prior notice.
-Stability, compatibility, and long-term support are not guaranteed.
-
-You are welcome to explore and test these methods, but use them at your own risk.
-We recommend not relying on experimental methods in production environments.
-
-### Method Naming Convention
-
-Method names follow this format:
-
-```
-sql-fun/{method-name}/{major}[Experimental suffix]
-```
-
-- `sql-fun` is the namespace prefix.
-- `{method-name}` is the logical name of the method.
-- `{major}` is the major version number.
-- `[suffix]` *(optional)*: Variant identifier for experimental or pre-release versions (e.g., `-exp`, `-rc1`, `-beta3`).
-
-Suffixes are used for unstable variants and **must be marked with `"experimental": true`** in the method entry.
-
-Example:
+Successful authentication returns the request's `id` and the string `"OK"`:
 
 ```json
- {"name": "sql-fun/describe/2", "version": "2.0.0"},
- {"name": "sql-fun/describe/2-exp", "version": "2.1.0"}
+{"jsonrpc":"2.0","id":1,"result":"OK"}
 ```
 
-In this case:
+After this response, the connection can send ordinary API requests using their
+existing method names and parameter shapes. The current dispatcher supports
+`initialize_schema_context`; it does not add a `sql-fun/` prefix or method
+version suffix.
 
-- `sql-fun/describe/2` refers to the stable 2.0.0 implementation.
-- `sql-fun/describe/2-exp` refers to the experimental 2.1.0 implementation.
+## Rejection and repeated initialization
 
-Use `sql-fun/help-method/1` to obtain the schema of any listed method.
+Before authentication, an unexpected method, an unacceptable request, or a
+missing, incorrectly typed, or mismatched token closes the connection without
+a JSON-RPC response. This also applies to requests for `rpc.discover` or
+`initialize_schema_context` before authentication.
 
+After authentication, `initialize` is handled as an unknown method. The current
+response is:
+
+```json
+{"jsonrpc":"2.0","id":2,"error":{"code":0,"message":"unknown method : initialize"}}
+```
+
+The connection remains authenticated and can continue sending API requests.
+The current error code is a placeholder, not a standardized JSON-RPC state
+error code.
+
+## Timeouts and size limits
+
+The current server options are:
+
+| Option | Environment variable | Default | Behavior |
+| --- | --- | --- | --- |
+| `--auth-timeout` | `AUTH_TIMEOUT` | 5 seconds | Limits the initial request read. |
+| `--idle-timeout` | `IDLE_TIMEOUT` | 30 seconds | Limits each wait for more input. |
+| `--request-length-limit` | `REQUEST_LENGTH_LIMIT` | 2 MiB | Limits requests after authentication. |
+
+The initial authentication request has a fixed limit: its encoded size,
+including trailing whitespace and LF, must be less than 1024 bytes. The
+configured request length limit applies after the successful initialization
+response and is also exclusive: a request reaching the limit is rejected.
+
+An authentication timeout closes the connection without a response. Input
+idle timeouts and request length errors also terminate the connection. The
+idle timeout remains active after authentication; the authentication timeout
+no longer applies. The current CLI accepts zero timeout values; choose positive
+values for normal operation.
+
+The authentication timeout currently covers reading the initial request, not
+the subsequent validation or response write.

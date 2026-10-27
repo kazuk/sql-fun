@@ -1,14 +1,15 @@
-use sql_fun_core::IVec;
-
 use crate::sem::{
     AliasSpec, AnalysisError, DataSource, FullName, Nullable, SemScalarExpr, data_source::AliasName,
 };
+
+use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UndefinedTableFuncDataSource {
     func_name: FullName,
     args: IVec<SemScalarExpr>,
     alias: AliasSpec,
+    output: super::TableFunctionOutput,
 }
 
 impl super::DataSource {
@@ -23,6 +24,15 @@ impl super::DataSource {
 }
 
 impl UndefinedTableFuncDataSource {
+    pub(super) fn from_name(name: &FullName, args: &[SemScalarExpr], alias: &AliasSpec) -> Self {
+        Self {
+            func_name: name.clone(),
+            args: args.to_vec().into(),
+            alias: alias.clone(),
+            output: super::TableFunctionOutput::default(),
+        }
+    }
+
     pub const fn alias(&self) -> &AliasSpec {
         &self.alias
     }
@@ -38,6 +48,7 @@ impl UndefinedTableFuncDataSource {
             func_name,
             args,
             alias: alias.clone(),
+            output: super::TableFunctionOutput::default(),
         }))
     }
 
@@ -55,5 +66,29 @@ impl UndefinedTableFuncDataSource {
         } else {
             None
         }
+    }
+}
+
+impl UndefinedTableFuncDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        let mut args = self.args.to_vec();
+        for argument in &mut args {
+            argument.walk(visitor)?;
+        }
+        self.args = args.into();
+        Ok(())
+    }
+}
+
+impl UndefinedTableFuncDataSource {
+    pub(super) fn retain_output(&mut self, output: &super::TableFunctionOutput) {
+        self.output = output.clone();
+    }
+    /// Caller-declared columns retained even when function lookup failed.
+    pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
+        self.output.columns()
     }
 }

@@ -119,12 +119,16 @@ impl JsonRpcError {
     }
 
     /// API execution error
+    ///
+    /// # Panics
+    ///
+    /// Panics if the API error serialization contract is violated.
     #[must_use]
-    pub fn server_api_execution_error(_err: SqlFunServerApiError) -> Self {
+    pub fn server_api_execution_error(err: SqlFunServerApiError) -> Self {
         Self {
             code: Self::CODE_INTERNAL_SERVER_ERROR,
-            message: "internal server error".to_string(),
-            data: None,
+            message: err.to_string(),
+            data: Some(serde_json::to_value(err).expect("API error serializes")),
         }
     }
 }

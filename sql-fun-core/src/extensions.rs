@@ -1,6 +1,9 @@
 mod config_error;
+mod control_file;
 mod extension_collection;
 mod name_version_pair;
+#[cfg(test)]
+mod test_helpers;
 
 pub use self::{
     config_error::ExtensionConfigError,
@@ -20,6 +23,43 @@ impl ExtensionVersion {
     #[must_use]
     pub fn new(version: &str) -> Self {
         Self(version.to_string())
+    }
+}
+
+impl ExtensionVersion {
+    fn installation(version: &str) -> Result<Self, ExtensionConfigError> {
+        if version.is_empty()
+            || version.contains("--")
+            || version.contains('\0')
+            || version.starts_with('-')
+            || version.ends_with('-')
+        {
+            return ExtensionConfigError::invalid_extension_version(version);
+        }
+        Self::try_from(version)
+    }
+}
+
+#[cfg(test)]
+mod test_installation_version {
+    use super::ExtensionVersion;
+
+    #[test]
+    fn validates_postgres_installation_version_names() {
+        for invalid in [
+            "", "1--2", "-1", "1-", "../1", "a/b", "a\\b", "a:b", "..", ".", "1\0",
+        ] {
+            assert!(
+                ExtensionVersion::installation(invalid).is_err(),
+                "{invalid:?}"
+            );
+        }
+        for valid in ["1.1", "release-2", "v_3", "1.0beta", "a'b"] {
+            assert_eq!(
+                ExtensionVersion::installation(valid).unwrap().to_string(),
+                valid
+            );
+        }
     }
 }
 

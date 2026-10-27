@@ -19,6 +19,17 @@ pub struct CheckColumnConstraint {
 }
 
 impl CheckColumnConstraint {
+    pub(super) fn rename_expression(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        self.expr.walk(visitor)
+    }
+
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        self.table_name.rename_reference(old, new);
+    }
+
     /// create instance
     pub fn new(table_name: &TableName, column_name: &ColumnName, expr: SemScalarExpr) -> Self {
         Self {

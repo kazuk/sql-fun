@@ -1,8 +1,11 @@
 # 🧪 `sql-fun` Example: AdventureWorks Sample Database
 
-This example demonstrates how to use [`sql-fun`](https://github.com/your-org/sql-fun) with the classic [AdventureWorks](https://github.com/lorint/AdventureWorks-for-Postgres) database for PostgreSQL.
+This example demonstrates how to use
+[`sql-fun`](https://github.com/your-org/sql-fun) with the classic
+[AdventureWorks](https://github.com/lorint/AdventureWorks-for-Postgres) database
+for PostgreSQL.
 
-> ✅ Realistic schema.  ✅ Real-world SQL.  ✅ Fully compile-time checked.
+> ✅ Realistic schema. ✅ Real-world SQL. ✅ Fully compile-time checked.
 
 ---
 
@@ -10,6 +13,8 @@ This example demonstrates how to use [`sql-fun`](https://github.com/your-org/sql
 
 ### 1. Clone and Launch the Database
 
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```bash
 git clone https://github.com/lorint/AdventureWorks-for-Postgres.git
 cd AdventureWorks-for-Postgres
@@ -20,10 +25,10 @@ wget https://github.com/Microsoft/sql-server-samples/releases/download/adventure
 docker compose up -d
 ```
 
+<!-- rumdl-enable MD013 -->
 ### 2. Configure Environment Variables
 
 - Setting up for database connection environment variables.
-
 
 ```bash
 cat <<EOF > .env
@@ -48,7 +53,10 @@ chmod 600 ~/.pgpass
 ```
 
 Example output:
-```
+
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
+```text
                                   List of relations
        Schema       |                 Name                  |    Type     |  Owner   
 --------------------+---------------------------------------+-------------+----------
@@ -61,14 +69,18 @@ Example output:
  information_schema | sql_features                          | table       | postgres
 ```
 
+<!-- rumdl-enable MD013 -->
 ### 4. Dump the Schema
 
-The `adventureworks-for-postgres-db` container runs `PostgreSQL` version 14,
-but your local `pg_dump` might be a different version (e.g., 15, 16, or 17).
-Because `pg_dump` must exactly match the server version, we run it inside the container to avoid version mismatch errors.
+The `adventureworks-for-postgres-db` container runs `PostgreSQL` version 14, but
+your local `pg_dump` might be a different version (e.g., 15, 16, or 17). Because
+`pg_dump` must exactly match the server version, we run it inside the container
+to avoid version mismatch errors.
 
 Run the following to dump the schema:
 
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```bash
 CONTAINER_NAME=$(docker container list --format json | \
   jq -r 'select(.Image=="adventureworks-for-postgres-db") | .Names')
@@ -81,8 +93,8 @@ CONTAINER_NAME=$(docker container list --format json | \
 )
 ```
 
+<!-- rumdl-enable MD013 -->
 ### 5. Shut Down the Container (Optional)
-
 
 ```bash
 docker compose down
@@ -96,6 +108,8 @@ The requirement is just three words: **“Show list customers.”**
 
 Let's start by exploring the raw data.
 
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```console
 kazuk:~/sql-fun/examples/adventure-works$ psql
 psql (14.17 (Ubuntu 14.17-0ubuntu0.22.04.1), server 17.4 (Debian 17.4-1.pgdg120+2))
@@ -112,10 +126,11 @@ Adventureworks=# select * from sales.customer;
 ...
 ```
 
+<!-- rumdl-enable MD013 -->
 Oh no. These columns don’t contain very user-friendly information.
 
-Let’s check the schema. Open `schema.develop.sql` in your editor and search for `sales.customer`.
-
+Let’s check the schema. Open `schema.develop.sql` in your editor and search for
+`sales.customer`.
 
 ```sql
 CREATE TABLE sales.customer (
@@ -131,6 +146,8 @@ CREATE TABLE sales.customer (
 That’s... not much help either.
 Keep searching, and you’ll eventually find something more interesting:
 
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```sql
 CREATE VIEW sales.vindividualcustomer AS
  SELECT p.businessentityid,
@@ -150,10 +167,14 @@ CREATE VIEW sales.vindividualcustomer AS
   WHERE (c.storeid IS NULL); <----- and selects storeid is null
 ```
 
+<!-- rumdl-enable MD013 -->
 Ok, check the this view.
 
-> 🔍 Pro Tip: Pretty JSON Output
-> You can use `psql -t -c` along with `row_to_json()` and `jq` to see clean, structured output:
+> 🔍 Pro Tip: Pretty JSON Output You can use `psql -t -c` along with
+> `row_to_json()` and `jq` to see clean, structured output:
+
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```console
 :~/sql-fun/examples/adventure-works$ psql -t -c "select row_to_json(v) from sales.vindividualcustomer v limit 2 offset 0" | jq
 {
@@ -190,19 +211,26 @@ Ok, check the this view.
 }
 ```
 
+<!-- rumdl-enable MD013 -->
 Ok lets find `customer.storeid` relationship target.
 
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```console
 kazuk:~/sql-fun/examples/adventure-works$ grep 'customer.storeid' schema.develop.sql 
 -- Name: COLUMN customer.storeid; Type: COMMENT; Schema: sales; Owner: postgres
 COMMENT ON COLUMN sales.customer.storeid IS 'Foreign key to Store.BusinessEntityID';
 ```
+
+<!-- rumdl-enable MD013 -->
 What?! It’s just a comment, not an actual foreign key?
 
 ...but maybe we can still join it.
 
 Let’s try:
 
+<!-- Preserve the original terminal transcript and output. -->
+<!-- rumdl-disable MD013 -->
 ```console
 kazuk:~/sql-fun/examples/adventure-works$ psql -t -c "select row_to_json(v) from (select c.*, s.* from sales.customer c inner join sales.store s on c.storeid = s.businessentityid limit 2 offset 0) v " | jq
 {
@@ -220,16 +248,19 @@ kazuk:~/sql-fun/examples/adventure-works$ psql -t -c "select row_to_json(v) from
 ...
 ```
 
+<!-- rumdl-enable MD013 -->
+#### Now We know
 
-#### Now We know.
+> ⚠️ Table and view names often lie. Because names are costly to change, they
+> can become outdated, misleading, or simply wrong over time.
 
-> ⚠️ Table and view names often lie.
-> Because names are costly to change, they can become outdated, misleading, or simply wrong over time.
-
-- The `sales.customer` table appears to include both `person.person` and `sales.store` customers.
+- The `sales.customer` table appears to include both `person.person` and
+  `sales.store` customers.
 - When `storeid` is NULL, the customer may be an individual.
-  - This is suggested by the `sales.vindividualcustomer` view, which joins on `personid` and filters for `storeid` IS NULL.
-  - The view name hints at "individual customers", but that naming isn’t a guarantee.
+  - This is suggested by the `sales.vindividualcustomer` view, which joins on
+    `personid` and filters for `storeid` IS NULL.
+  - The view name hints at "individual customers", but that naming isn’t a
+    guarantee.
 - When `storeid` is present, it likely represents a store.
   - You can join it with `sales.store` for more details.
 
@@ -237,32 +268,40 @@ kazuk:~/sql-fun/examples/adventure-works$ psql -t -c "select row_to_json(v) from
 > but an excess of results becomes a data leak incident.
 
 So we ask the PM:  
-> "Which type of customer should be listed — those linked to `person`, or `store`, or both?"
+> "Which type of customer should be listed — those linked to `person`, or
+> `store`, or both?"
 
 ### 🗣️ Developer–PM Conversation (Customer Listing)
 
-**Dev:** To clarify — which type of customer should we support in this feature?  
+**Dev:** To clarify — which type of customer should we support in this
+feature?  
 Customers linked to `person.person`, `sales.store`, or both?
 
 **PM:** Yeah, let’s start with just the individual customers.  
-The store-based ones are corporate accounts — they follow a different workflow and will be handled on a separate screen later.
+The store-based ones are corporate accounts — they follow a different workflow
+and will be handled on a separate screen later.
 
 **Dev:** Got it.  
-What fields do you need? I already know how to retrieve name, phone, email, and address.
+What fields do you need? I already know how to retrieve name, phone, email, and
+address.
 
 **PM:** Just the name and email address.  
 This is for a list to send new product announcements via email.
 
 **Dev:** Understood.  
-There’s a view called `sales.vindividualcustomer`. I’ve confirmed that it includes all the info we need.  
+There’s a view called `sales.vindividualcustomer`. I’ve confirmed that it
+includes all the info we need.  
 Should I just filter down the result to name and email from that?
 
 **PM:** That should be sufficient.
 
-**Dev:** One more thing — the view seems to only contain individual customers, so would you be okay with an endpoint named `/individual_customers`?  
-Or do you prefer a more specific name, since the fields are limited to name and email?
+**Dev:** One more thing — the view seems to only contain individual customers,
+so would you be okay with an endpoint named `/individual_customers`?  
+Or do you prefer a more specific name, since the fields are limited to name and
+email?
 
-**PM:** Hmm… with an endpoint like `/individual_customers`, it kind of implies the full entity.  
+**PM:** Hmm… with an endpoint like `/individual_customers`, it kind of implies
+the full entity.  
 Would that be misleading?
 
 **Dev:** I’m fine with returning all the fields if that’s more consistent.
@@ -270,31 +309,33 @@ Would that be misleading?
 **PM:** Then let’s go with that.  
 Just return everything — we’ll consume only what we need on the client side.
 
-
 ### ✅ Refined Requirement: Our Defined Goal
 
 The original requirement was vague:
 
->  "Show list customers."
+> "Show list customers."
 
 After clarification with the PM. we refined each term in the requirement:
 
 Breakdown:
-Term	  | Clarified Meaning
+
+Term      | Clarified Meaning
 -- | --
-Show	  | Provide an HTTP API (RESTful) to serve the data.
-list	  | Return the result as a JSON array.
+Show      | Provide an HTTP API (RESTful) to serve the data.
+list      | Return the result as a JSON array.
 customers | Refer specifically to individual customers, not stores — based on the view `sales.vindividualcustomer`.
 
 The PM has confirmed:
 
- - Only person-based customers are in scope.
- - Full view output is acceptable (even if some fields are unused).
- - The endpoint name `/individual_customers` is appropriate and clear.
+- Only person-based customers are in scope.
+- Full view output is acceptable (even if some fields are unused).
+- The endpoint name `/individual_customers` is appropriate and clear.
 
 Based on this, we define our implementation goal as follows:
 
->  Implement a REST API endpoint at `/individual_customers` that returns a JSON array of all records from the `sales.vindividualcustomer` view, including all fields.
+> Implement a REST API endpoint at `/individual_customers` that returns a JSON
+> array of all records from the `sales.vindividualcustomer` view, including all
+> fields.
 
 ### Result set definition
 
@@ -311,15 +352,15 @@ struct IndividualCustomer {}
 
 this struct fits `select ic.* from sales.vindividualcustomer ic`.
 
-
-
 ## 🛠 Troubleshooting
 
 - **Database container won’t start?**  
-  Make sure the `.zip` file was downloaded and unzipped correctly before running `docker compose up`.
+  Make sure the `.zip` file was downloaded and unzipped correctly before running
+  `docker compose up`.
 
 - **Can't connect via `psql`?**  
   Double-check your `.env` and make sure you’ve run `source .env`.
 
 - **No tables shown with `\dt`?**  
-  Use `\dt *.*` to show tables across all schemas, or run `\dn` to check which schemas exist.
+  Use `\dt *.*` to show tables across all schemas, or run `\dn` to check which
+  schemas exist.

@@ -1,11 +1,16 @@
+mod arbiter;
+mod settings;
+pub use self::settings::IndexStorageValue;
+
 use sql_fun_core::IVec;
 
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
-        AnalysisError, AstAndContextPair, ColumnName, ParseContext, ScalarAnalysisContext, SemAst,
-        SemScalarExpr, TableName,
+        AnalysisError, AstAndContextPair, ColumnName, FullName, ParseContext, SemScalarExpr,
+        TableName,
     },
-    syn::{ListOpt, Opt, ScanToken, SortByDir},
+    syn::ScanToken,
 };
 
 /// Index item sort order
@@ -38,6 +43,21 @@ pub enum IndexElement {
     Expr(Box<SemScalarExpr>),
 }
 
+impl IndexElement {
+    fn rename_relation(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Expr(expression) = self {
+            expression.walk(visitor)?;
+        }
+        Ok(())
+    }
+
+    const fn is_expression(&self) -> bool {
+        matches!(self, Self::Expr(_))
+    }
+}
 impl From<&ColumnName> for IndexElement {
     fn from(value: &ColumnName) -> Self {
         Self::ColumnName(value.clone())
@@ -53,7 +73,6 @@ impl From<&SemScalarExpr> for IndexElement {
 /// combine column and sort order , `col_name`
 #[derive(Debug, Clone)]
 pub struct IndexElementWithOrder {
-    #[cfg_attr(not(test), expect(dead_code))]
     element: IndexElement,
     #[cfg_attr(not(test), expect(dead_code))]
     col_name: Option<String>,
@@ -77,6 +96,16 @@ impl IndexElementWithOrder {
 pub struct IndexElementCollection(Vec<IndexElementWithOrder>);
 
 impl IndexElementCollection {
+    fn rename_relation(
+        &mut self,
+        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+    ) -> Result<(), AnalysisError> {
+        for column in &mut self.0 {
+            column.element.rename_relation(visitor)?;
+        }
+        Ok(())
+    }
+
     pub fn from_column_names(column_names: &IVec<ColumnName>) -> Self {
         Self(
             column_names
@@ -89,14 +118,16 @@ impl IndexElementCollection {
         )
     }
 
-    fn push(&mut self, item: IndexElementWithOrder) {
+    pub(crate) fn push(&mut self, item: IndexElementWithOrder) {
         self.0.push(item);
     }
 }
 
 #[cfg(test)]
 mod index_element_collection_tests {
-    use super::*;
+    use super::{IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder};
+    use crate::sem::ColumnName;
+    use ::sql_fun_core::IVec;
 
     #[test]
     fn from_column_names_uses_asc_order_and_no_alias() {
@@ -136,58 +167,175 @@ mod index_element_collection_tests {
 /// analyzed [`crate::syn::IndexStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
-    name: String,
-    #[cfg_attr(not(test), expect(dead_code))]
+    if_not_exists: bool,
+    access_method: String,
+    storage_parameters: std::collections::BTreeMap<String, IndexStorageValue>,
+    statistics: std::collections::BTreeMap<i32, i32>,
+
+    name: FullName,
     table: TableName,
-    #[cfg_attr(not(test), expect(dead_code))]
     key_columns: IndexElementCollection,
-    #[cfg_attr(not(test), expect(dead_code))]
     include_columns: IndexElementCollection,
-    #[cfg_attr(not(test), expect(dead_code))]
     unique: bool,
+    predicate: Option<SemScalarExpr>,
 }
 
 impl CreateIndex {
-    /// create a instance
-    #[must_use]
-    pub fn new(name: &str, table: &TableName, key_columns: &IndexElementCollection) -> Self {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &TableName,
+        new: &TableName,
+    ) -> Result<(), AnalysisError> {
+        self.table.rename_reference(old, new);
+        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        self.key_columns.rename_relation(&mut visitor)?;
+        self.include_columns.rename_relation(&mut visitor)?;
+        crate::sem::traversal::optional(&mut self.predicate, &mut visitor)
+    }
+
+    /// Index access method retained from CREATE INDEX.
+    pub fn access_method(&self) -> &str {
+        &self.access_method
+    }
+    pub(crate) fn set_access_method(&mut self, method: &str) {
+        self.access_method = if method.is_empty() {
+            "btree".to_owned()
+        } else {
+            method.to_owned()
+        };
+    }
+    /// Explicit storage override; None means the database default is in effect.
+    pub fn storage_parameter(&self, name: &str) -> Option<&IndexStorageValue> {
+        self.storage_parameters.get(name)
+    }
+    /// Explicit expression-column statistics target; None means the system default.
+    pub fn statistics_target(&self, column: i32) -> Option<i32> {
+        self.statistics.get(&column).copied()
+    }
+    pub(crate) fn apply_statistics(&mut self, column: i32, target: i32) {
+        if target == -1 {
+            self.statistics.remove(&column);
+        } else {
+            self.statistics.insert(column, target);
+        }
+    }
+    pub(crate) fn statistics_column_problem(
+        &self,
+        column: i32,
+    ) -> Option<crate::sem::problem::IndexProblemKind> {
+        use crate::sem::problem::IndexProblemKind;
+        let position = usize::try_from(column - 1).ok()?;
+        if let Some(element) = self.key_columns.0.get(position) {
+            if element.element.is_expression() {
+                None
+            } else {
+                Some(IndexProblemKind::non_expression_column())
+            }
+        } else if position < self.key_columns.0.len() + self.include_columns.0.len() {
+            Some(IndexProblemKind::included_column())
+        } else {
+            Some(IndexProblemKind::invalid_column())
+        }
+    }
+
+    pub(crate) fn contains_name(indexes: &[Self], name: &FullName) -> bool {
+        indexes.iter().any(|index| index.name() == name)
+    }
+    pub(crate) fn with_table_identity(mut self, table: &FullName) -> Self {
+        self.table = TableName::from(table.clone());
+        self.name = FullName::new(
+            &table.catalog().cloned(),
+            &table.schema().cloned(),
+            self.name.name(),
+        );
+        self
+    }
+
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
+    pub(crate) fn set_predicate(&mut self, predicate: Option<SemScalarExpr>) {
+        self.predicate = predicate;
+    }
+
+    pub(crate) fn belongs_to(&self, table: &TableName) -> bool {
+        &self.table == table
+    }
+    pub(crate) fn from_resolved(
+        name: &FullName,
+        table: &TableName,
+        keys: &IndexElementCollection,
+        includes: &IndexElementCollection,
+        unique: bool,
+    ) -> Self {
         Self {
-            name: name.to_string(),
+            if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
+            name: name.clone(),
+            table: table.clone(),
+            key_columns: keys.clone(),
+            include_columns: includes.clone(),
+            unique,
+            predicate: None,
+        }
+    }
+    /// Create an index with its qualified catalog identity and resolved target table.
+    #[must_use]
+    pub fn new(name: &FullName, table: &TableName, key_columns: &IndexElementCollection) -> Self {
+        Self {
+            if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
+            name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),
             include_columns: IndexElementCollection::default(),
             unique: true,
+            predicate: None,
         }
     }
 
-    /// create with `include_columns`
+    /// Create a qualified index with `include_columns`
     #[must_use]
     pub fn new_with_include_column(
-        name: &str,
+        name: &FullName,
         table: &TableName,
         key_columns: &IndexElementCollection,
         include_columns: &IndexElementCollection,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
+            name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),
             include_columns: include_columns.clone(),
             unique: true,
+            predicate: None,
         }
     }
 
-    /// get index name
+    /// Return the qualified catalog identity, including the target table schema.
     #[must_use]
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 }
 
 #[cfg(test)]
 mod create_index_tests {
-    use super::*;
-    use crate::sem::FullName;
+    use super::{CreateIndex, IndexElementCollection};
+    use crate::sem::{ColumnName, FullName, TableName};
 
     #[test]
     fn new_sets_defaults_and_clones_fields() {
@@ -195,9 +343,13 @@ mod create_index_tests {
         let key_columns =
             IndexElementCollection::from_column_names(&vec![ColumnName::from("id")].into());
 
-        let index = CreateIndex::new("idx_items_id", &table, &key_columns);
+        let index = CreateIndex::new(
+            &FullName::with_schema("public", "idx_items_id"),
+            &table,
+            &key_columns,
+        );
 
-        assert_eq!(index.name, "idx_items_id");
+        assert_eq!(index.name, FullName::with_schema("public", "idx_items_id"));
         assert_eq!(index.table, table);
         assert_eq!(index.key_columns.0.len(), 1);
         assert_eq!(index.include_columns.0.len(), 0);
@@ -213,7 +365,7 @@ mod create_index_tests {
             IndexElementCollection::from_column_names(&vec![ColumnName::from("metadata")].into());
 
         let index = CreateIndex::new_with_include_column(
-            "idx_items_id",
+            &FullName::with_schema("public", "idx_items_id"),
             &table,
             &key_columns,
             &include_columns,
@@ -225,66 +377,31 @@ mod create_index_tests {
     }
 }
 
+#[cfg(test)]
 impl CreateIndex {
-    fn sort_order(key: &crate::syn::IndexElem) -> Result<SortOrder, AnalysisError> {
-        let order = if let Some(order) = key.get_ordering().as_inner() {
-            match order {
-                SortByDir::SortbyUsing => {
-                    AnalysisError::raise_unexpected_input("SortbyUsing in IndexElem")?
-                }
-                SortByDir::SortbyDesc => SortOrder::Desc,
-                _ => SortOrder::Asc,
-            }
-        } else {
-            SortOrder::Asc
-        };
-        Ok(order)
-    }
-
-    fn analyze_index_elem<TParseContext>(
-        mut context: TParseContext,
+    fn analyze_index_elem<TContext: ParseContext>(
+        mut context: TContext,
         keys: Vec<crate::syn::IndexElem>,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(IndexElementCollection, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let mut key_columns = IndexElementCollection::default();
-        for key in keys {
-            let element = if let Some(expr) = key.get_expr().as_inner() {
-                let (scaler_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-                    context,
-                    &ScalarAnalysisContext::default(),
-                    expr,
-                    tokens,
-                )?;
-                context = new_context;
-                IndexElement::from(&scaler_expr)
-            } else {
-                let name = key.get_name();
-                IndexElement::from(&ColumnName::from(name))
-            };
-
-            let order = Self::sort_order(&key)?;
-            let col_name = key.get_indexcolname();
-            let col_name = if col_name.is_empty() {
-                None
-            } else {
-                Some(col_name)
-            };
-
-            key_columns.push(IndexElementWithOrder::new(&element, order, &col_name));
-        }
-        Ok((key_columns, context))
+    ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
+        use crate::ast::{Index, IndexExpression};
+        let keys = keys
+            .iter()
+            .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
+            .collect::<Result<Vec<_>, _>>()?;
+        context.begin_parameter_type_analysis();
+        let result = Index::resolve_elements(&keys, &mut context);
+        let elements = context.finish_analysis(result)?;
+        Ok((elements, context))
     }
 }
 
 #[cfg(test)]
 mod analyze_index_elem_tests {
-    use super::*;
+    use super::{CreateIndex, IndexElement, SortOrder};
     use crate::{
-        sem::ScalarConstExpr,
-        syn::{Node, NodeInner, SortByDir},
+        sem::{ColumnName, ScalarConstExpr, SemScalarExpr},
+        syn::{Node, NodeInner, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext},
     };
     use sql_fun_core::IVec;
@@ -350,7 +467,7 @@ mod analyze_index_elem_tests {
 impl CreateIndex {
     /// analyze [`crate::syn::IndexStmt`]
     pub fn analyze_index_stmt<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         syn: crate::syn::IndexStmt,
         tokens: &IVec<ScanToken>,
@@ -358,75 +475,26 @@ impl CreateIndex {
     where
         TParseContext: ParseContext,
     {
-        let Some(table) = syn.get_relation().as_inner() else {
-            AnalysisError::raise_unexpected_none("indexstmt.relation")?
-        };
-        let Some(keys) = syn.get_index_params().map(|v| v.as_index_elem()) else {
-            AnalysisError::raise_unexpected_none("indexstmt.index_params")?
-        };
-
-        let name = syn.get_idxname();
-        let table = TableName::try_from(table)?;
-        let unique = syn.get_unique();
-
-        let (key_columns, new_context) = Self::analyze_index_elem(context, keys, tokens)?;
-        context = new_context;
-
-        let include_columns =
-            if let Some(includes) = syn.get_index_including_params().map(|v| v.as_index_elem()) {
-                let (cols, new_context) = Self::analyze_index_elem(context, includes, tokens)?;
-                context = new_context;
-                cols
-            } else {
-                IndexElementCollection::default()
-            };
-
-        let create_index = Self {
-            name,
-            table,
-            key_columns,
-            include_columns,
-            unique,
-        };
-
-        context = context.apply_create_index(&create_index)?;
-
-        Ok(AstAndContextPair::new(
-            SemAst::CreateIndex(create_index),
-            context,
-        ))
+        crate::ast::Index::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
-}
-
-/// analyze [`crate::syn::IndexStmt`]
-#[deprecated = "use CreateIndex::analyze_index_stmt"]
-pub fn analyze_index_stmt<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::IndexStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateIndex::analyze_index_stmt(context, parent_schema, syn, tokens)
 }
 
 #[cfg(test)]
 mod analyze_index_stmt_tests {
-    use super::*;
+    use super::{CreateIndex, IndexElement, SortOrder};
+    use crate::sem::SemAst;
     use crate::{
-        sem::FullName,
-        syn::{AliasOpt, RangeVarOpt, SortByDir},
+        sem::{AstAndContextPair, ColumnName, FullName},
+        syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
-    use rstest::rstest;
     use sql_fun_core::IVec;
 
-    #[rstest]
+    #[rstest::rstest]
     fn analyze_index_stmt_collects_keys_including_order_and_includes(
-        test_context: TestParseContext,
+        mut test_context: TestParseContext,
     ) {
+        test_context.setup_table("items", &[], &crate::test_helpers::source_span());
         let builder = SynBuilder::new();
         let relation = RangeVarOpt::from(
             builder.range_var(&FullName::with_schema("public", "items"), &AliasOpt::none()),
@@ -452,7 +520,10 @@ mod analyze_index_stmt_tests {
             panic!("expected create index ast");
         };
 
-        assert_eq!(create_index.name, "idx_items");
+        assert_eq!(
+            create_index.name,
+            FullName::with_schema("public", "idx_items")
+        );
         assert!(matches!(
             create_index.table.full_name().schema(),
             Some(schema) if schema.as_str() == "public"

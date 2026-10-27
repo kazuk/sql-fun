@@ -1,339 +1,137 @@
-#![doc= include_str!("problem.md")]
-
-mod name_resolution;
-mod overload_resolution;
-mod sql_highlighter;
-
-use std::collections::HashSet;
-
-use miette::{GraphicalReportHandler, LabeledSpan, NamedSource, Report};
-use sql_fun_core::HighlighterTheme;
-
-use crate::{
-    StringSpan,
-    sem::{
-        AnalysisError, ColumnName, DefElemKey, FullName, OperatorName, SemScalarExpr, TableName,
-        TypeDefinition, TypeReference, create_table::ViewName,
-        type_system::ArgumentBindingCollection,
-    },
+//! SQL analysis diagnostic adapters.
+use ::sql_fun_core::analysis_problem as diagnostic;
+pub use ::sql_fun_core::analysis_problem::{
+    AlterColumnProblem, AnalysisProblem, ArrayProblem, CallArgumentProblem, ColumnAttributeProblem,
+    CreationProblem, DeleteProblem, DeleteProblemKind, DistinctProblem, DomainBaseTypeNameNotFound,
+    FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem, InsertProblemKind,
+    MinMaxProblem, NameResolution, OverloadResolution, OwnershipProblem,
+    ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem,
+    TableFunctionProblem, TriggerProblem, TruthTestProblem, UpdateProblem, UpdateProblemKind,
+    ViewProblem,
 };
-
-pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
-
-pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
-
-trait Problem {
-    const CODE: &'static str;
-    const MESSAGE: &'static str;
-    const SEVERITY: miette::Severity;
-    const SPAN_LABEL: &'static str;
-
-    fn get_problem_span(&self) -> StringSpan;
-
-    fn labeled_problem_span(&self) -> LabeledSpan {
-        self.get_problem_span().new_labeled_span(Self::SPAN_LABEL)
+impl From<&crate::sem::FullName> for diagnostic::FullName {
+    fn from(value: &crate::sem::FullName) -> Self {
+        Self::new(&value.to_string())
     }
 }
-
-trait RenderProblemReport: Problem {
-    fn generate_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let diag = miette::MietteDiagnostic::new(Self::MESSAGE)
-            .with_code(Self::CODE)
-            .with_severity(Self::SEVERITY)
-            .with_label(self.labeled_problem_span());
-
-        let report = Report::new(diag).with_source_code(NamedSource::new("SQL", source));
-
-        let mut out = String::new();
-        handler.render_report(&mut out, &*report)?;
-        Ok(out)
+impl From<&crate::sem::ColumnName> for diagnostic::ColumnName {
+    fn from(value: &crate::sem::ColumnName) -> Self {
+        Self::new(&value.to_string())
     }
 }
-
-/// Semantic analysis problems
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
-pub enum AnalysisProblem {
-    /// Name resolution problems
-    NameResolution(NameResolution),
-    /// Overload resolution problems
-    OverloadResolution(OverloadResolution),
-
-    /// extension not found
-    ExtensionNotFound(String),
-
-    /// can not to guess nullablity
-    NullabilityUnknown(String),
-
-    /// Argument type mismatch
-    ArgumentTypeMismatch(FullName, usize),
-
-    /// duplicate def elem key
-    DuplicateDefElemKey(DefElemKey),
-
-    /// explicit cast not defined
-    ExplicitCastNotDefined(TypeReference, TypeReference),
-
-    /// Coalesce expr type unknown
-    CoalesceExprTypeUnknown(Vec<SemScalarExpr>),
-
-    /// Expression type not known
-    ExpressionTypeNotKnown(SemScalarExpr),
-
-    /// Operator Not Defined
-    UndefinedOperator(
-        crate::syn::AExprKind,
-        OperatorName,
-        Option<SemScalarExpr>,
-        Option<SemScalarExpr>,
-    ),
-
-    /// Array Required
-    RequireArray(SemScalarExpr, TypeReference),
-
-    /// sub query not have a derived column
-    SubQueryNotHaveColumnForDerivedColumnName(),
-
-    /// incompatible case values
-    IncompatibleCaseValues(HashSet<TypeReference>),
-
-    /// case when expr type unknown
-    CaseWhenExprTypeUnknown(SemScalarExpr),
-
-    /// array type mismatch
-    ArrayIndexTypeMismatch(SemScalarExpr, TypeReference),
-
-    /// member access requires composite type
-    MemberAccessRequiresCompositeType(FullName, String),
-
-    /// function argument implicit cast not found
-    FunctionArgImplicitCastNotFound(FullName, usize, TypeDefinition, SemScalarExpr),
-
-    /// implicit cast not found
-    ImplicitCastNotFound(TypeReference, TypeReference),
+impl From<&crate::sem::TableName> for diagnostic::TableName {
+    fn from(value: &crate::sem::TableName) -> Self {
+        Self::new(&value.to_string())
+    }
 }
-
-impl AnalysisProblem {
-    /// covert problem to report
-    pub fn render_report(
-        &self,
-        theme: &HighlighterTheme,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let report_handler = GraphicalReportHandler::new()
-            .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
-
-        let report = match self {
-            Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
-            _ => todo!(),
-        };
-        Ok(report)
+impl From<&crate::sem::TypeReference> for diagnostic::TypeReference {
+    fn from(value: &crate::sem::TypeReference) -> Self {
+        Self::new(&if value.is_dynamic() {
+            "record".to_owned()
+        } else {
+            value.to_string()
+        })
     }
-
-    /// extension not found
-    #[tracing::instrument()]
-    pub fn extension_not_found(name: &str) -> Self {
-        Self::ExtensionNotFound(String::from(name))
+}
+impl From<&crate::sem::TypeDefinition> for diagnostic::TypeDefinition {
+    fn from(value: &crate::sem::TypeDefinition) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// expression nullability not known
-    #[tracing::instrument()]
-    pub fn nullability_unknown(item_name: &str) -> Self {
-        Self::NullabilityUnknown(String::from(item_name))
+}
+impl From<&crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
+    fn from(value: &crate::sem::SemScalarExpr) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// function argument type mismatch
-    #[tracing::instrument()]
-    pub fn argument_type_mismatch(func_name: &FullName, index: usize) -> Self {
-        Self::ArgumentTypeMismatch(func_name.clone(), index)
+}
+impl From<crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
+    fn from(value: crate::sem::SemScalarExpr) -> Self {
+        Self::from(&value)
     }
-
-    /// duplicate name in definition element
-    #[tracing::instrument()]
-    pub fn duplicate_def_elem_key(key: &DefElemKey) -> Self {
-        Self::DuplicateDefElemKey(key.clone())
+}
+impl From<&crate::sem::DefElemKey> for diagnostic::DefElemKey {
+    fn from(value: &crate::sem::DefElemKey) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// doing explicit cast conversion , but not allowed
-    #[tracing::instrument()]
-    pub fn explicit_cast_not_defined(source: &TypeReference, target: &TypeReference) -> Self {
-        Self::ExplicitCastNotDefined(source.clone(), target.clone())
+}
+impl From<&crate::sem::OperatorName> for diagnostic::OperatorName {
+    fn from(value: &crate::sem::OperatorName) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// expression requires array but not
-    #[tracing::instrument()]
-    pub fn array_required(expr: &SemScalarExpr, type_inspected: &TypeReference) -> Self {
-        Self::RequireArray(expr.clone(), type_inspected.clone())
+}
+impl From<&crate::sem::type_system::ArgumentBindingCollection>
+    for diagnostic::ArgumentBindingCollection
+{
+    fn from(value: &crate::sem::type_system::ArgumentBindingCollection) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// array index type not integer
-    #[tracing::instrument()]
-    pub fn array_index_type_mismatch(expr: &SemScalarExpr, type_inspected: &TypeReference) -> Self {
-        Self::ArrayIndexTypeMismatch(expr.clone(), type_inspected.clone())
+}
+impl From<&crate::syn::AExprKind> for diagnostic::AExprKind {
+    fn from(value: &crate::syn::AExprKind) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// member accessing to non-composite type
-    #[tracing::instrument()]
-    pub fn member_access_requires_composite_type(type_name: &FullName, member_name: &str) -> Self {
-        Self::MemberAccessRequiresCompositeType(type_name.clone(), member_name.to_string())
+}
+impl From<crate::syn::AExprKind> for diagnostic::AExprKind {
+    fn from(value: crate::syn::AExprKind) -> Self {
+        Self::from(&value)
     }
-
-    /// operator not defined
-    #[track_caller]
-    #[tracing::instrument()]
-    pub fn undefined_operator(
-        aexpr_op: crate::syn::AExprKind,
-        name: &OperatorName,
-        left_arg: &Option<SemScalarExpr>,
-        right_arg: &Option<SemScalarExpr>,
-    ) -> Self {
-        Self::UndefinedOperator(aexpr_op, name.clone(), left_arg.clone(), right_arg.clone())
+}
+impl From<&crate::sem::data_source::AliasName> for diagnostic::AliasName {
+    fn from(value: &crate::sem::data_source::AliasName) -> Self {
+        Self::new(&value.to_string())
     }
-
-    /// parameter type can not cast to function argument
-    #[tracing::instrument()]
-    pub fn parameter_type_mismatch_for_table_function(
-        call: &crate::syn::FuncCall,
-        arg_types: ArgumentBindingCollection,
-    ) -> Self {
-        todo!()
+}
+impl From<&crate::sem::ViewName> for diagnostic::ViewName {
+    fn from(value: &crate::sem::ViewName) -> Self {
+        Self::new(&value.to_string())
     }
-
-    /// specified function result set type not found
-    #[track_caller]
-    #[tracing::instrument()]
-    pub fn function_result_set_type_not_found(ret_type: &super::FullName) -> Self {
-        todo!("{ret_type:?}")
+}
+impl From<&crate::sem::RuleIdentity> for diagnostic::RuleIdentity {
+    fn from(value: &crate::sem::RuleIdentity) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// coalece argument unreachable
-    #[tracing::instrument()]
-    pub fn unreachable_coalesce_argument(
-        arg_expr: &SemScalarExpr,
-        first_non_null: &SemScalarExpr,
-    ) -> Self {
-        todo!()
+}
+impl From<&crate::sem::TriggerIdentity> for diagnostic::TriggerIdentity {
+    fn from(value: &crate::sem::TriggerIdentity) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// unknown type used in coalesce
-    #[tracing::instrument()]
-    pub fn unknown_type_in_coalesce_expr(arg_expr: &SemScalarExpr) -> Self {
-        todo!()
+}
+impl From<&crate::sem::OwnershipIdentity> for diagnostic::OwnershipIdentity {
+    fn from(value: &crate::sem::OwnershipIdentity) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// colesce expression result type ambiguous
-    #[tracing::instrument()]
-    pub fn coalesce_expr_type_ambiguous(
-        arg_exprs: &Vec<SemScalarExpr>,
-        candidates: &HashSet<TypeReference>,
-        choose: Option<&TypeReference>,
-    ) -> Self {
-        todo!()
+}
+impl From<&crate::sem::OwnershipLookup> for diagnostic::OwnershipLookup {
+    fn from(value: &crate::sem::OwnershipLookup) -> Self {
+        Self::new(value.code(), &value.diagnostic_message())
     }
-
-    /// all of coalesce type is not known
-    #[tracing::instrument()]
-    pub fn coalesce_expr_type_unknown(arg_exprs: &[SemScalarExpr]) -> Self {
-        tracing::warn!("{arg_exprs:#?}");
-        Self::CoalesceExprTypeUnknown(arg_exprs.to_vec())
+}
+impl From<&crate::sem::Kind> for diagnostic::Kind {
+    fn from(value: &crate::sem::Kind) -> Self {
+        Self::new(&value.to_string())
     }
-
-    /// implicit cast not allowed
-    #[tracing::instrument()]
-    pub fn function_arg_implicit_cast_not_found(
-        func_name: &FullName,
-        index: usize,
-        t: &TypeDefinition,
-        arg: &SemScalarExpr,
-    ) -> Self {
-        Self::FunctionArgImplicitCastNotFound(func_name.clone(), index, t.clone(), arg.clone())
+}
+impl From<crate::sem::Kind> for diagnostic::Kind {
+    fn from(value: crate::sem::Kind) -> Self {
+        Self::from(&value)
     }
-
-    /// view used as materialized view, but not a materialized view
-    #[tracing::instrument()]
-    pub fn view_not_matview(view_name: &ViewName) -> Self {
-        todo!()
+}
+impl From<&crate::sem::OperatorDefinition> for diagnostic::OperatorDefinition {
+    fn from(value: &crate::sem::OperatorDefinition) -> Self {
+        Self::new(&format!("{value:?}"))
     }
-
-    /// operator name syntax is invalid
-    #[tracing::instrument()]
-    pub fn operator_name_syntax(v: &[String]) -> Self {
-        todo!()
+}
+impl From<&crate::syn::TypeName> for diagnostic::TypeName {
+    fn from(value: &crate::syn::TypeName) -> Self {
+        Self::new(&value.full_name().to_string())
     }
-
-    /// expression type not known
-    #[tracing::instrument()]
-    pub fn expression_type_not_known(expr: &SemScalarExpr) -> Self {
-        Self::ExpressionTypeNotKnown(expr.clone())
+}
+impl From<&crate::StringSpan> for diagnostic::StringSpan {
+    fn from(value: &crate::StringSpan) -> Self {
+        Self::new(value.offset(), value.len())
     }
-
-    /// case when type unknown
-    #[tracing::instrument()]
-    pub fn case_when_type_unknown(case_when_expr: SemScalarExpr) -> Self {
-        Self::CaseWhenExprTypeUnknown(case_when_expr)
-    }
-
-    /// implicit cast not found
-    #[tracing::instrument()]
-    pub fn implicit_cast_not_found(ty: &TypeReference, result_type: &TypeReference) -> Self {
-        Self::ImplicitCastNotFound(ty.clone(), result_type.clone())
-    }
-
-    /// incompatible cast values
-    #[tracing::instrument()]
-    pub fn incompatible_case_values(result_types: HashSet<TypeReference>) -> Self {
-        Self::IncompatibleCaseValues(result_types)
-    }
-
-    /// unexpected dynamic type
-    #[tracing::instrument()]
-    pub fn unexpected_dynamic_type(sem_type: &TypeDefinition) -> Self {
-        todo!()
-    }
-
-    /// table not have column
-    #[tracing::instrument()]
-    pub fn table_not_have_column_for_derived_column_name() -> Self {
-        todo!()
-    }
-
-    /// cte not have column
-    #[tracing::instrument()]
-    pub fn cte_not_have_column_for_derived_column_name() -> Self {
-        todo!()
-    }
-
-    /// subquery not have column
-    #[tracing::instrument()]
-    pub fn subquery_not_have_column_for_derived_column_name() -> Self {
-        Self::SubQueryNotHaveColumnForDerivedColumnName()
-    }
-
-    pub(crate) fn foreign_key_column_type_mismatch(
-        _fk_table_name: &TableName,
-        _fk_column_name: &ColumnName,
-        _fk_column_type: &TypeReference,
-        _pk_table_name: &TableName,
-        _pk_column_name: &ColumnName,
-        _pk_column_type: &TypeReference,
-    ) -> Self {
-        todo!()
-    }
-
-    #[cfg(feature = "sqlite")]
-    pub(crate) fn sqlite_ignores_match_option_in_fk_constraint(
-        _table_name: &TableName,
-        _column_name: &ColumnName,
-        _name: &crate::syn::sqlite::Name,
-    ) -> Self {
-        todo!()
-    }
-
-    pub(crate) fn type_not_found(_type_name: &FullName) -> Self {
-        todo!()
+}
+impl From<&crate::sem::FullName> for diagnostic::DebugName {
+    fn from(value: &crate::sem::FullName) -> Self {
+        Self::new(&format!("{value:?}"))
     }
 }

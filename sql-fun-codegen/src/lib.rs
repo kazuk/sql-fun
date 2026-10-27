@@ -13,6 +13,9 @@ mod lockfile;
 mod query_requirements;
 mod row_builder;
 mod rust_syn;
+/// Lightweight fixtures for code-generation unit tests.
+#[cfg(test)]
+pub mod test_helpers;
 
 use crate::{
     connectors::ConnectorSpec,
@@ -35,12 +38,12 @@ use std::{collections::VecDeque, sync::Arc};
 use ::sql_fun_core::{
     BuilderSetter, CodegenOptions, CteName, PlaceholderedSql, ResolvedCteCatalog, SqlFunArgs,
     SqlFunMetadata,
-    lockfile::{Lockfile, LockfileEntry},
+    lockfile::{Lockfile, LockfileEntry, LockfileStatement},
 };
 use proc_macro2::{Span, TokenStream};
 use proc_macro2_diagnostic::DiagnosticResult;
 use quote::{ToTokens, quote};
-use syn::{Expr, FnArg, Ident, ItemFn, Type};
+use syn::{Expr, Ident, ItemFn, Type};
 
 /// diagnostics
 #[derive(Debug)]
@@ -76,7 +79,13 @@ impl SqlFunDiagnostic {
 
 /// diagnostics
 #[derive(Debug)]
-pub struct SqlFunDiagnosticCollection(Vec<SqlFunDiagnostic>);
+pub struct SqlFunDiagnosticCollection(
+    #[expect(
+        dead_code,
+        reason = "Diagnostic storage is retained until collection consumers are implemented."
+    )]
+    Vec<SqlFunDiagnostic>,
+);
 
 /// attributes for `sql_fun::sql_query_one`
 #[derive(Debug)]
@@ -240,6 +249,19 @@ pub enum QueryFunctionKind {
 }
 
 impl QueryFunctionKind {
+    fn fragment_argument_index(self, input_count: usize) -> Result<usize, SqlFunCodegenError> {
+        match self {
+            Self::QueryMany => input_count.checked_sub(2).ok_or_else(|| {
+                syn::Error::new(
+                    proc_macro2::Span::call_site(),
+                    "sql_query_many requires collector before its handler",
+                )
+                .into()
+            }),
+            Self::QueryOne | Self::QueryOpt | Self::Execute => Ok(input_count),
+        }
+    }
+
     /// Generate a query returning exactly one row.
     #[must_use]
     pub const fn query_one() -> Self {
@@ -288,14 +310,25 @@ impl QueryFunctionSpec {
         &self.connection
     }
 
-    const fn lockfile_entry(&self) -> Option<&LockfileEntry> {
-        self.lockfile_entry.as_ref()
+    fn lockfile_entry(&self) -> Result<Option<&LockfileStatement>, SqlFunCodegenError> {
+        self.lockfile_entry
+            .as_ref()
+            .map(LockfileEntry::single_statement)
+            .transpose()
+            .map_err(SqlFunCodegenError::from)
     }
 
     const fn row_type(&self) -> &Type {
         &self.result_type.return_type
     }
 
+    #[cfg_attr(
+        not(feature = "sqlite"),
+        expect(
+            dead_code,
+            reason = "Only SQLite interrupt wrappers use this accessor."
+        )
+    )]
     const fn error_type(&self) -> &Type {
         &self.result_type.error_type
     }
@@ -331,14 +364,17 @@ impl FragmentMatcher {
         let is_async = self.item_fn.is_async();
         let inputs: Vec<_> = self.child_fn.argument_name_idents().cloned().collect();
 
+        let insertion_index = self.function_kind.fragment_argument_index(inputs.len())?;
         let expr = self.match_expr();
         let arms = self.match_arms();
         let arms = arms.iter().map(|arm| {
             let pat = arm.pat();
             let name = arm.arm_function_name(&self.item_fn);
-            let mut introduce_args = arm.introduce_arg_idents().to_vec();
             let mut args = inputs.clone();
-            args.append(&mut introduce_args);
+            args.splice(
+                insertion_index..insertion_index,
+                arm.introduce_arg_idents().to_vec(),
+            );
 
             match (is_async, arm.guard()) {
                 (true, Some(guard)) => quote! {
@@ -491,6 +527,13 @@ pub trait ConditionalQuery {
 #[derive(Debug, Clone)]
 pub struct ResultType {
     return_type: Type,
+    #[cfg_attr(
+        not(feature = "sqlite"),
+        expect(
+            dead_code,
+            reason = "Only SQLite interrupt wrappers read the stored error type."
+        )
+    )]
     error_type: Type,
 }
 
@@ -549,9 +592,9 @@ impl FragmentExpandQueueItem {
                 let mut child_fn = child_fn.clone();
                 child_fn.set_sig_ident(match_arm.arm_function_name(&child_fn));
 
-                for arg in match_arm.introduce_args() {
-                    child_fn.append_arg(&FnArg::Typed(arg.clone()));
-                }
+                let insertion_index =
+                    function_kind.fragment_argument_index(child_fn.sig().inputs.len())?;
+                child_fn.insert_args(insertion_index, match_arm.introduce_args());
 
                 let embedded_query =
                     query.embed_fragment(fragment.fragment_name(), match_arm.sql_fragment())?;
@@ -583,8 +626,8 @@ impl FragmentExpandQueueItem {
             let interrupt_handler = item_fn
                 .find_attributed_argument_ident(&connector_spec.interrupt_arg_attr())?
                 .cloned();
-            let resolved_cte_catalog = cte_references.resolve(metadata, &query)?;
-            let query_finger_print = &resolved_cte_catalog.finger_print()?;
+            let resolved_cte_catalog = cte_references.resolve(metadata)?;
+            let query_finger_print = &resolved_cte_catalog.finger_print(&query)?;
 
             let lockfile_entry = if let Some(lockfile) = lockfile {
                 let Some(lockfile_entry) = lockfile.get_entry(query_finger_print)? else {

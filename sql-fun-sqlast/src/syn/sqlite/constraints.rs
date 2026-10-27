@@ -44,18 +44,26 @@ impl UniqueConstraint {
 #[derive(Debug, derive_getters::Getters)]
 pub struct CheckConstraint {
     expr: Box<Expr>,
+    #[getter(skip)]
+    source: Option<String>,
 }
 
 impl CheckConstraint {
-    /// create instance
-    pub fn new(expr: Expr) -> Self {
+    /// Create a CHECK payload, preserving parser-supplied source text.
+    pub fn new(expr: &Expr, source: Option<&str>) -> Self {
         Self {
-            expr: Box::new(expr),
+            expr: Box::new(expr.clone()),
+            source: source.map(str::to_owned),
         }
+    }
+
+    /// Captured CHECK text, or None when the parser supplied no source.
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
     }
 }
 
-use turso_parser::ast::RefAct as RefActIn;
+use ::turso_parser::ast::RefAct as RefActIn;
 
 /// ref action
 #[derive(Debug)]
@@ -84,7 +92,7 @@ impl From<RefActIn> for RefAct {
     }
 }
 
-use turso_parser::ast::RefArg as RefArgIn;
+use ::turso_parser::ast::RefArg as RefArgIn;
 
 /// ref argument
 #[derive(Debug)]
@@ -110,7 +118,7 @@ impl From<RefArgIn> for RefArg {
     }
 }
 
-use turso_parser::ast::ForeignKeyClause as ForeignKeyClauseIn;
+use ::turso_parser::ast::ForeignKeyClause as ForeignKeyClauseIn;
 
 /// foreign key clause
 #[derive(Debug, derive_getters::Getters)]
@@ -130,7 +138,7 @@ impl From<ForeignKeyClauseIn> for ForeignKeyClause {
     }
 }
 
-use turso_parser::ast::InitDeferredPred as InitDeferredPredIn;
+use ::turso_parser::ast::InitDeferredPred as InitDeferredPredIn;
 
 /// init deferred predicate
 #[derive(Debug, Default, Clone, Copy)]
@@ -158,7 +166,7 @@ impl From<InitDeferredPredIn> for InitDeferredPred {
     }
 }
 
-use turso_parser::ast::DeferSubclause as DeferSubclauseIn;
+use ::turso_parser::ast::DeferSubclause as DeferSubclauseIn;
 
 /// defer subclause
 #[derive(Debug, derive_getters::Getters)]
@@ -199,7 +207,7 @@ impl ForeignKeyConstraint {
     }
 }
 
-use turso_parser::ast::TableConstraint as TableConstraintIn;
+use ::turso_parser::ast::TableConstraint as TableConstraintIn;
 
 /// table constraint
 #[derive(Debug)]
@@ -233,7 +241,9 @@ impl From<TableConstraintIn> for TableConstraint {
                 columns.into_iter().map(SortedColumn::from).collect(),
                 conflict_clause.map(ResolveType::from),
             )),
-            TableConstraintIn::Check(expr) => Self::Check(CheckConstraint::new(Expr::from(*expr))),
+            TableConstraintIn::Check { expr, source } => {
+                Self::check(&Expr::from(*expr), source.as_deref())
+            }
             TableConstraintIn::ForeignKey {
                 columns,
                 clause,
@@ -334,14 +344,21 @@ impl UniqueColumnConstraint {
 #[derive(Debug)]
 pub struct CheckColumnConstraint {
     expr: Box<Expr>,
+    source: Option<String>,
 }
 
 impl CheckColumnConstraint {
-    /// create instance
-    pub fn new(expr: Expr) -> Self {
+    /// Create a CHECK payload, preserving parser-supplied source text.
+    pub fn new(expr: &Expr, source: Option<&str>) -> Self {
         Self {
-            expr: Box::new(expr),
+            expr: Box::new(expr.clone()),
+            source: source.map(str::to_owned),
         }
+    }
+
+    /// Captured CHECK text, or None when the parser supplied no source.
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
     }
 
     /// expression
@@ -408,22 +425,26 @@ impl ForeignKeyColumnConstraint {
 /// generated column constraint
 #[derive(Debug, derive_getters::Getters)]
 pub struct GeneratedColumnConstraint {
+    #[getter(copy)]
+    generated_always: bool,
     expr: Box<Expr>,
+    #[getter(copy)]
     typ: Option<GeneratedColumnType>,
 }
 
 impl GeneratedColumnConstraint {
     /// create instance
-    pub fn new(expr: Expr, typ: Option<GeneratedColumnType>) -> Self {
+    pub fn new(expr: &Expr, typ: &Option<GeneratedColumnType>, generated_always: bool) -> Self {
         Self {
-            expr: Box::new(expr),
-            typ,
+            generated_always,
+            expr: Box::new(expr.clone()),
+            typ: *typ,
         }
     }
 }
 
 /// generated column type
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GeneratedColumnType {
     /// store value in database file
     Stored,
@@ -431,17 +452,28 @@ pub enum GeneratedColumnType {
     Virtual,
 }
 
-use turso_parser::ast::GeneratedColumnType as GeneratedColumnTypeIn;
+impl GeneratedColumnType {
+    /// Construct explicit STORED syntax.
+    pub const fn stored() -> Self {
+        Self::Stored
+    }
+    /// Construct explicit VIRTUAL syntax.
+    pub const fn virtual_column() -> Self {
+        Self::Virtual
+    }
+}
+
+use ::turso_parser::ast::GeneratedColumnType as GeneratedColumnTypeIn;
 impl From<GeneratedColumnTypeIn> for GeneratedColumnType {
     fn from(value: GeneratedColumnTypeIn) -> Self {
         match value {
-            GeneratedColumnTypeIn::Stored => Self::Stored,
-            GeneratedColumnTypeIn::Virtual => Self::Virtual,
+            GeneratedColumnTypeIn::Stored => Self::stored(),
+            GeneratedColumnTypeIn::Virtual => Self::virtual_column(),
         }
     }
 }
 
-use turso_parser::ast::ColumnConstraint as ColumnConstraintIn;
+use ::turso_parser::ast::ColumnConstraint as ColumnConstraintIn;
 
 /// column constraint
 #[derive(Debug)]
@@ -486,8 +518,8 @@ impl From<ColumnConstraintIn> for ColumnConstraint {
             ColumnConstraintIn::Unique(resolve_type) => Self::Unique(UniqueColumnConstraint::new(
                 resolve_type.map(ResolveType::from),
             )),
-            ColumnConstraintIn::Check(expr) => {
-                Self::Check(CheckColumnConstraint::new(Expr::from(*expr)))
+            ColumnConstraintIn::Check { expr, source } => {
+                Self::check(&Expr::from(*expr), source.as_deref())
             }
             ColumnConstraintIn::Default(expr) => {
                 Self::Default(DefaultColumnConstraint::new(Expr::from(*expr)))
@@ -502,12 +534,137 @@ impl From<ColumnConstraintIn> for ColumnConstraint {
                 ForeignKeyClause::from(clause),
                 defer_clause.map(DeferSubclause::from),
             )),
-            ColumnConstraintIn::Generated { expr, typ } => {
-                Self::Generated(GeneratedColumnConstraint::new(
-                    Expr::from(*expr),
-                    typ.map(GeneratedColumnType::from),
-                ))
-            }
+            ColumnConstraintIn::Generated {
+                expr,
+                typ,
+                generated_always,
+            } => Self::generated(
+                &Expr::from(*expr),
+                &typ.map(GeneratedColumnType::from),
+                generated_always,
+            ),
         }
+    }
+}
+
+impl ColumnConstraint {
+    /// Construct a CHECK constraint from its expression and captured source.
+    pub fn check(expr: &Expr, source: Option<&str>) -> Self {
+        Self::Check(CheckColumnConstraint::new(expr, source))
+    }
+
+    /// Borrow the CHECK payload, if present.
+    pub const fn as_check(&self) -> Option<&CheckColumnConstraint> {
+        if let Self::Check(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Construct a generated column without inferring omitted syntax.
+    pub fn generated(
+        expr: &Expr,
+        typ: &Option<GeneratedColumnType>,
+        generated_always: bool,
+    ) -> Self {
+        Self::Generated(GeneratedColumnConstraint::new(expr, typ, generated_always))
+    }
+
+    /// Borrow the generated-column payload, if present.
+    pub const fn as_generated(&self) -> Option<&GeneratedColumnConstraint> {
+        if let Self::Generated(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+impl TableConstraint {
+    /// Construct a CHECK constraint from its expression and captured source.
+    pub fn check(expr: &Expr, source: Option<&str>) -> Self {
+        Self::Check(CheckConstraint::new(expr, source))
+    }
+
+    /// Borrow the CHECK payload, if present.
+    pub const fn as_check(&self) -> Option<&CheckConstraint> {
+        if let Self::Check(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_constraint_conversion {
+    use super::{ColumnConstraint, GeneratedColumnType, TableConstraint};
+    use crate::test_helpers::SqliteSynBuilder;
+    use ::turso_parser::ast::{
+        ColumnConstraint as ColumnConstraintIn, Expr as ExprIn, Literal as LiteralIn,
+        TableConstraint as TableConstraintIn,
+    };
+
+    #[rstest::rstest]
+    #[case::bare("AS", false)]
+    #[case::generated_always("GENERATED ALWAYS AS", true)]
+    fn preserves_generated_spelling_and_optional_storage_type(
+        #[case] spelling: &str,
+        #[case] always: bool,
+        #[values(("", None), (" STORED", Some(GeneratedColumnType::stored())), (" VIRTUAL", Some(GeneratedColumnType::virtual_column())))]
+        storage_case: (&str, Option<GeneratedColumnType>),
+    ) {
+        let (suffix, storage) = storage_case;
+        let sql = format!("CREATE TABLE items (base INT, derived INT {spelling} (42){suffix})");
+        let stmt = SqliteSynBuilder.parse_as_stmt(&sql);
+        let table = stmt.as_create_table().unwrap();
+        let columns = table.body().as_columns_and_constraint().unwrap();
+        let generated = columns.columns()[1].constraints()[0]
+            .constraint()
+            .as_generated()
+            .unwrap();
+        assert_eq!(generated.generated_always(), always);
+        assert_eq!(generated.typ(), storage);
+        assert_eq!(generated.expr().numeric_literal_text(), Some("42"));
+    }
+
+    #[test]
+    fn retains_column_and_table_check_source_verbatim() {
+        let stmt = SqliteSynBuilder.parse_as_stmt(
+            "CREATE TABLE items (value INT CONSTRAINT column_check CHECK ( value  >  0 ), CONSTRAINT table_check CHECK ( [value] > 1 /*keep*/ ))",
+        );
+        let table = stmt.as_create_table().unwrap();
+        let columns = table.body().as_columns_and_constraint().unwrap();
+        let named = &columns.columns()[0].constraints()[0];
+        assert_eq!(named.name().unwrap().value(), "column_check");
+        assert_eq!(
+            named.constraint().as_check().unwrap().source(),
+            Some("value  >  0")
+        );
+        let named = &columns.constraints()[0];
+        assert_eq!(named.name().as_ref().unwrap().value(), "table_check");
+        assert_eq!(
+            named.constraint().as_check().unwrap().source(),
+            Some("[value] > 1 /*keep*/")
+        );
+    }
+
+    #[test]
+    fn retains_check_source_absence_without_regenerating_it() {
+        let column = ColumnConstraint::from(ColumnConstraintIn::Check {
+            expr: Box::new(ExprIn::Literal(LiteralIn::Numeric("7".to_owned()))),
+            source: None,
+        });
+        let column = column.as_check().unwrap();
+        assert_eq!(column.source(), None);
+        assert_eq!(column.expr().numeric_literal_text(), Some("7"));
+        let table = TableConstraint::from(TableConstraintIn::Check {
+            expr: Box::new(ExprIn::Literal(LiteralIn::Numeric("8".to_owned()))),
+            source: None,
+        });
+        let table = table.as_check().unwrap();
+        assert_eq!(table.source(), None);
+        assert_eq!(table.expr().numeric_literal_text(), Some("8"));
     }
 }

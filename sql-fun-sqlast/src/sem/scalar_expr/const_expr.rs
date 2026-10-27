@@ -1,14 +1,5 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, ParseContext, PgBuiltInType, ScalarAnalysisContext, SemScalarExpr,
-        TypeReference,
-    },
-    syn::ScanToken,
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{PgBuiltInType, SemScalarExpr, TypeReference};
 
 /// constant expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -28,6 +19,23 @@ pub enum ScalarConstExpr {
 }
 
 impl ScalarConstExpr {
+    pub(crate) const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    pub(crate) fn numeric(value: &str) -> Self {
+        Self::Float(value.to_owned())
+    }
+    pub(crate) fn string(value: &str) -> Self {
+        Self::String(value.to_owned())
+    }
+    pub(crate) const fn boolean(value: bool) -> Self {
+        Self::Bool(value)
+    }
+    pub(crate) fn bit_string(value: &str) -> Self {
+        Self::BitString(value.to_owned())
+    }
+
     /// get string variant value
     pub const fn as_string(&self) -> Option<&str> {
         match self {
@@ -46,33 +54,6 @@ impl ScalarConstExpr {
     #[must_use]
     pub const fn new_integer(value: i32) -> Self {
         Self::Integer(value)
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::AConst> for ScalarConstExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        context: TParseContext,
-        _scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::AConst,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let cval = if let Some(ival) = syn.as_ival().get_ival() {
-            Self::Integer(ival)
-        } else if let Some(fval) = syn.as_fval().get_fval() {
-            Self::Float(fval)
-        } else if let Some(bval) = syn.as_boolval().get_boolval() {
-            Self::Bool(bval)
-        } else if let Some(sval) = syn.as_sval().get_sval() {
-            Self::String(sval)
-        } else if let Some(bsval) = syn.as_bsval().get_bsval() {
-            Self::BitString(bsval)
-        } else {
-            AnalysisError::raise_unexpected_none("AConst: unknown variant")?
-        };
-        Ok((SemScalarExpr::Const(cval), context))
     }
 }
 

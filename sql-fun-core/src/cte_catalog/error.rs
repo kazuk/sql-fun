@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    CatalogFileIndex, CteCatalog, CteCatalogReference, CteName, CteParameterRename,
+    CatalogFileIndex, CteAlias, CteCatalog, CteCatalogReference, CteName, CteParameterRename,
     placehlodered_sql::ParameterName,
 };
 
@@ -27,9 +27,9 @@ pub enum CteCatalogError {
     #[error(transparent)]
     TomlError(#[from] toml::de::Error),
 
-    /// [`serde_yaml_ng::Error`]
+    /// [`serde_saphyr::Error`]
     #[error(transparent)]
-    YamlError(#[from] serde_yaml_ng::Error),
+    YamlError(#[from] serde_saphyr::Error),
 
     /// specified path not exist
     #[error("Specified path not exist {0}")]
@@ -51,6 +51,10 @@ pub enum CteCatalogError {
     #[error("{0} is not defined in CTE catalog.")]
     CteNotFound(CteName),
 
+    /// Distinct catalog definitions claim equivalent aliases.
+    #[error("CTE alias {0} ({1}) conflicts with alias {2} ({3})")]
+    ConflictingAlias(CteAlias, CteName, CteAlias, CteName),
+
     /// Parameter collection not exist
     #[error("[Unexpected internal error / BUG] Parameter collection not exist.")]
     ParameterCollectionNotExist(),
@@ -61,6 +65,20 @@ pub enum CteCatalogError {
 }
 
 impl CteCatalogError {
+    pub(super) fn conflicting_alias<T>(
+        existing_alias: &CteAlias,
+        existing_name: &CteName,
+        alias: &CteAlias,
+        name: &CteName,
+    ) -> Result<T, Self> {
+        Err(Self::ConflictingAlias(
+            existing_alias.clone(),
+            existing_name.clone(),
+            alias.clone(),
+            name.clone(),
+        ))
+    }
+
     pub(super) fn raise_path_not_exist<P: AsRef<Path>>(path: P) -> Result<Infallible, Self> {
         Err(Self::PathNotExists(path.as_ref().to_path_buf()))
     }

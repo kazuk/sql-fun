@@ -1,0 +1,93 @@
+name: Release preparation
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: release-preparation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/kazuk/ci-builder@sha256:5a9fb8282de0a11c8291cdc368461e8ed432a528adddc2777e8d9dd744386e8f
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      version: ${{ steps.identity.outputs.version }}
+      snapshot: ${{ steps.identity.outputs.snapshot }}
+      classification: ${{ steps.identity.outputs.classification }}
+      revision: ${{ steps.identity.outputs.revision }}
+      ci-run-id: ${{ steps.ci.outputs.run_id }}
+      ci-run-url: ${{ steps.ci.outputs.run_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - name: Parse release branch identity
+        id: identity
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: .local/sbin/release-branch-identity "$RELEASE_REF" "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Require successful exact-SHA normal CI
+        id: ci
+        run: |
+          selected="$(.local/sbin/resolve-release-ci-run "$GITHUB_REPOSITORY" "$RELEASE_SHA")"
+          {
+            echo "run_id=$(jq -r '.id' <<<"$selected")"
+            echo "run_url=$(jq -r '.html_url' <<<"$selected")"
+          } >> "$GITHUB_OUTPUT"
+      - name: Adopt required CI release inputs
+        env:
+          CI_RUN_ID: ${{ steps.ci.outputs.run_id }}
+        run: |
+          .local/sbin/adopt-release-ci-inputs "$GITHUB_REPOSITORY" "$CI_RUN_ID" \
+            "$RUNNER_TEMP/release-inputs" \
+            sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual
+      - name: Materialize crate versions
+        id: materialize
+        env:
+          RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
+          RELEASE_SNAPSHOT: ${{ steps.identity.outputs.snapshot }}
+        run: |
+          state="$RUNNER_TEMP/release-state"
+          .local/sbin/materialize-release-state "$RELEASE_CLASSIFICATION" "$RELEASE_SNAPSHOT" "$state"
+          {
+            echo "versions=$state/crates.tsv"
+            echo "paths=$state/changed-paths.txt"
+          } >> "$GITHUB_OUTPUT"
+      - name: Record adopted release inputs
+        env:
+          CI_RUN_URL: ${{ steps.ci.outputs.run_url }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+          RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
+          CRATE_VERSIONS: ${{ steps.materialize.outputs.versions }}
+        run: |
+          {
+            echo "Product release: $RELEASE_TAG ($RELEASE_CLASSIFICATION)"
+            echo "Release target: $RELEASE_SHA"
+            echo "Normal CI: $CI_RUN_URL"
+            echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual"
+            echo 'Materialized crate versions:'
+            echo '```text'
+            cat "$CRATE_VERSIONS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

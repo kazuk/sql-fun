@@ -1,5 +1,10 @@
-use crate::sem::{
-    AlterView, AnalysisError, ColumnDefinition, ColumnName, CreateTableAs, CreateView,
+use crate::{
+    context::ParseContext,
+    sem::{
+        AlterView, AnalysisError, ColumnDefinition, ColumnName, CreateTableAs, CreateView,
+        FullName, OwnerSpecification, ResultColumnCollection, RuleIdentity, RuleReferences,
+        SelectStatement, TriggerReferences,
+    },
 };
 
 /// view like object
@@ -12,15 +17,109 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
-    /// apply alter view statement
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::View(value) => value.rename_relation(old, new),
+            Self::MaterializedView(value) => value.rename_relation(old, new),
+        }
+    }
+
+    /// Ordinary View semantic definition; materialized views have a different definition.
+    pub fn ordinary_definition(&self) -> Option<&CreateView> {
+        if let Self::View(view) = self {
+            Some(view)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn with_rule_query(&self, query: &SelectStatement) -> Option<CreateView> {
+        if let Self::View(view) = self {
+            let mut view = view.as_ref().clone();
+            view.replace_rule_query(query);
+            Some(view.with_replace(true))
+        } else {
+            None
+        }
+    }
+
+    /// Rule links of an ordinary view; materialized views cannot own user rules.
+    pub fn rules(&self) -> Option<&RuleReferences> {
+        match self {
+            Self::View(view) => Some(view.rules()),
+            Self::MaterializedView(_) => None,
+        }
+    }
+    pub(crate) fn associate_rule(&mut self, identity: &RuleIdentity) {
+        if let Self::View(view) = self {
+            view.associate_rule(identity);
+        }
+    }
+    pub(crate) fn dissociate_rule(&mut self, identity: &RuleIdentity) {
+        if let Self::View(view) = self {
+            view.dissociate_rule(identity);
+        }
+    }
+
+    /// Ownership of the retained view or materialized-view definition.
+    pub fn owner(&self) -> Option<&OwnerSpecification> {
+        match self {
+            Self::View(view) => view.owner(),
+            Self::MaterializedView(view) => view.owner(),
+        }
+    }
+    /// Replace ownership, preserving all view data.
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
+        match self {
+            Self::View(view) => view.change_owner(owner),
+            Self::MaterializedView(view) => view.change_owner(owner),
+        }
+    }
+
+    /// Trigger references for an ordinary view. Materialized views cannot own triggers.
+    pub fn triggers(&self) -> Option<&TriggerReferences> {
+        match self {
+            Self::View(view) => Some(view.triggers()),
+            Self::MaterializedView(_) => None,
+        }
+    }
+    pub(crate) fn associate_trigger(&mut self, name: &FullName) {
+        if let Self::View(view) = self {
+            view.associate_trigger(name);
+        }
+    }
+    pub(crate) fn dissociate_trigger(&mut self, name: &FullName) {
+        if let Self::View(view) = self {
+            view.dissociate_trigger(name);
+        }
+    }
+
+    pub(crate) fn result_columns(&self) -> &ResultColumnCollection {
+        match self {
+            Self::View(view) => view.result_columns(),
+            Self::MaterializedView(view) => view.result_columns(),
+        }
+    }
+
+    /// Apply ALTER VIEW; false means a problem was reported without changing the view.
     ///
     /// # Errors
     ///
     /// - `AnalysisError`
-    pub fn apply_alter(&mut self, alter_view: &AlterView) -> Result<(), AnalysisError> {
+    pub fn apply_alter(
+        &mut self,
+        context: &mut impl ParseContext,
+        alter_view: &AlterView,
+    ) -> Result<bool, AnalysisError> {
         match self {
-            Self::View(create_view) => create_view.apply_alter(alter_view),
-            Self::MaterializedView(create_table_as) => create_table_as.apply_alter(alter_view),
+            Self::View(create_view) => create_view.apply_alter(context, alter_view),
+            Self::MaterializedView(create_table_as) => {
+                create_table_as.apply_alter(alter_view).map(|()| true)
+            }
         }
     }
 

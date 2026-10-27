@@ -16,8 +16,8 @@ required-features = ["openrpc-schema", "bin-deps"]
 
 [features]
 bin-deps = ["dep:clap", "dep:anyhow"]
-openrpc-schema = ["dep:typed-openrpc", "dep:schemars"]
-sqlite = []
+openrpc-schema = ["sql-fun-core/openrpc-schema", "dep:typed-openrpc", "dep:schemars"]
+sqlite = ["sql-fun-core/sqlite"]
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
@@ -27,12 +27,13 @@ derive-getters.workspace = true
 schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
+sql-fun-core.workspace = true
 thiserror.workspace = true
-time.workspace = true
 typed-openrpc = { workspace = true, optional = true }
 url.workspace = true
 
 [dev-dependencies]
+rstest.workspace = true
 testresult.workspace = true
 
 [lints]

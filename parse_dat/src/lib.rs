@@ -176,10 +176,9 @@ fn dat_parser<'a>() -> impl Parser<'a, &'a str, serde_json::Value, extra::Err<Ri
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rstest::rstest;
-    use serde_json::Value;
-    use testresult::TestResult;
+    use super::{dat_parser, parse_pair, parse_record, parse_value};
+    use ::chumsky::Parser;
+    use ::serde_json::Value;
 
     const WRAPPERS: &[(&str, &str)] = &[
         ("", ""),
@@ -190,75 +189,71 @@ mod tests {
         ("\n# comment\n", "\n"),
     ];
 
-    #[rstest(input, expected,
+    #[rstest::rstest(input, expected,
         case("'hello'", Value::String("hello".to_string())),
         case("'a'",     Value::String("a".to_string())),
         case("-",       Value::Null),
     )]
-    fn test_parse_value(input: &str, expected: Value) -> TestResult {
+    fn test_parse_value(input: &str, expected: Value) {
         for (pre, suf) in WRAPPERS {
-            let s = format!("{}{}{}", pre, input, suf);
+            let s = format!("{pre}{input}{suf}");
             let v = parse_value().parse(s.as_str()).unwrap();
-            assert_eq!(v, expected, "failed on {:?}", s);
+            assert_eq!(v, expected, "failed on {s:?}");
         }
-        Ok(())
     }
 
-    #[rstest(input, exp_key, exp_val,
+    #[rstest::rstest(input, exp_key, exp_val,
         case("key=>'value'", "key", Value::String("value".to_string())),
     )]
-    fn test_parse_pair(input: &str, exp_key: &str, exp_val: Value) -> TestResult {
+    fn test_parse_pair(input: &str, exp_key: &str, exp_val: Value) {
         for (pre, suf) in WRAPPERS {
-            let s = format!("{}{}{}", pre, input, suf);
+            let s = format!("{pre}{input}{suf}");
             let (key, val) = parse_pair().parse(s.as_str()).unwrap();
-            assert_eq!(key, exp_key.to_string(), "failed on {:?}", s);
-            assert_eq!(val, exp_val, "failed on {:?}", s);
+            assert_eq!(key, exp_key.to_string(), "failed on {s:?}");
+            assert_eq!(val, exp_val, "failed on {s:?}");
         }
-        Ok(())
     }
 
-    #[rstest(input, exp_pairs,
+    #[rstest::rstest(input, exp_pairs,
         case("{a=>'b',c=>-}", vec![("a", Value::String("b".to_string())), ("c", Value::Null)]),
     )]
-    fn test_parse_record(input: &str, exp_pairs: Vec<(&str, Value)>) -> TestResult {
+    fn test_parse_record(input: &str, exp_pairs: Vec<(&str, Value)>) {
         for (pre, suf) in WRAPPERS {
-            let s = format!("{}{}{}", pre, input, suf);
+            let s = format!("{pre}{input}{suf}");
             let rec = parse_record().parse(s.as_str()).unwrap();
             if let Value::Object(map) = rec {
                 for (key, expected_val) in &exp_pairs {
-                    assert_eq!(map.get(*key), Some(expected_val), "failed on {:?}", s);
+                    assert_eq!(map.get(*key), Some(expected_val), "failed on {s:?}");
                 }
             } else {
-                panic!("Expected object on {:?}", s);
+                panic!("Expected object on {s:?}");
             }
         }
-        Ok(())
     }
 
-    #[rstest(
+    #[rstest::rstest(
         input,
         expected_len,
         case("[{a=>'b'},{c=>'d'}]", 2),
         case(
-            r#"
+            r"
 # comment line
 [
     {a=>'b'}
 ]
-"#,
+",
             1
         )
     )]
-    fn test_parse_list(input: &str, expected_len: usize) -> TestResult {
+    fn test_parse_list(input: &str, expected_len: usize) {
         for (pre, suf) in WRAPPERS {
-            let s = format!("{}{}{}", pre, input, suf);
+            let s = format!("{pre}{input}{suf}");
             let arr = dat_parser().parse(s.as_str()).unwrap();
             if let Value::Array(items) = arr {
-                assert_eq!(items.len(), expected_len, "failed on {:?}", s);
+                assert_eq!(items.len(), expected_len, "failed on {s:?}");
             } else {
-                panic!("Expected array on {:?}", s);
+                panic!("Expected array on {s:?}");
             }
         }
-        Ok(())
     }
 }

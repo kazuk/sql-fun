@@ -1,0 +1,148 @@
+use crate::context::BaseParseContext;
+use crate::sem::{AnalysisError, FullName, InsertArbiter, InsertConflict, TableName};
+
+/// A completed catalog name lookup, retaining the requested spelling separately
+/// from catalog identities (schema-qualified in PostgreSQL). Missing and
+/// ambiguous are distinct results.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CatalogNameLookup {
+    requested: FullName,
+    outcome: LookupOutcome,
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+enum LookupOutcome {
+    Found(FullName),
+    Missing,
+    Ambiguous(Vec<FullName>),
+}
+impl CatalogNameLookup {
+    /// Record a unique catalog binding.
+    pub fn found(requested: &FullName, resolved: &FullName) -> Self {
+        Self {
+            requested: requested.clone(),
+            outcome: LookupOutcome::found(resolved),
+        }
+    }
+    /// Record a completed lookup with no matching definition.
+    pub fn missing(requested: &FullName) -> Self {
+        Self {
+            requested: requested.clone(),
+            outcome: LookupOutcome::missing(),
+        }
+    }
+    /// Record competing definitions after dialect visibility rules are applied.
+    pub fn ambiguous(requested: &FullName, candidates: &[FullName]) -> Self {
+        Self {
+            requested: requested.clone(),
+            outcome: LookupOutcome::ambiguous(candidates),
+        }
+    }
+    /// Name supplied by the SQL statement.
+    pub const fn requested(&self) -> &FullName {
+        &self.requested
+    }
+    /// Catalog identity, present only for a unique binding.
+    pub const fn resolved_name(&self) -> Option<&FullName> {
+        self.outcome.resolved_name()
+    }
+    /// Whether the catalog found no visible definition.
+    pub const fn is_missing(&self) -> bool {
+        self.outcome.is_missing()
+    }
+    /// Competing catalog identities, present only for an ambiguous lookup.
+    pub fn ambiguous_candidates(&self) -> Option<&[FullName]> {
+        self.outcome.ambiguous_candidates()
+    }
+}
+impl LookupOutcome {
+    fn found(name: &FullName) -> Self {
+        Self::Found(name.clone())
+    }
+    const fn missing() -> Self {
+        Self::Missing
+    }
+    fn ambiguous(names: &[FullName]) -> Self {
+        Self::Ambiguous(names.to_vec())
+    }
+    const fn resolved_name(&self) -> Option<&FullName> {
+        if let Self::Found(name) = self {
+            Some(name)
+        } else {
+            None
+        }
+    }
+    const fn is_missing(&self) -> bool {
+        matches!(self, Self::Missing)
+    }
+    fn ambiguous_candidates(&self) -> Option<&[FullName]> {
+        if let Self::Ambiguous(names) = self {
+            Some(names)
+        } else {
+            None
+        }
+    }
+}
+
+/// A completed arbiter lookup or an explicit catalog diagnostic.
+/// Missing view metadata must not masquerade as a completed empty inference.
+#[derive(Debug, Clone)]
+pub struct ConflictArbiterInference(Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>>);
+impl ConflictArbiterInference {
+    /// Record completed inference, including a genuine no-match result.
+    pub fn complete(arbiters: &[InsertArbiter]) -> Self {
+        Self(Ok(arbiters.to_vec()))
+    }
+    pub(crate) fn problem(problem: &crate::sem::AnalysisProblem) -> Self {
+        Self(Err(Box::new(problem.clone())))
+    }
+    /// Consume the lookup while preserving an incomplete catalog diagnostic.
+    pub fn into_result(self) -> Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>> {
+        self.0
+    }
+}
+
+/// Existing catalog support, shared by production contexts until extractor
+/// metadata can provide index modifiers and predicate implication services.
+pub(crate) fn infer_from_catalog(
+    context: &impl BaseParseContext,
+    table: &TableName,
+    conflict: &InsertConflict,
+) -> Result<ConflictArbiterInference, AnalysisError> {
+    if conflict.has_modifiers() {
+        todo!("catalog index modifier eligibility metadata");
+    }
+    let mut columns = Vec::new();
+    let mut only_columns = true;
+    for expression in conflict.inference() {
+        if let Some(name) = expression.index_column_name() {
+            if !columns.contains(name) {
+                columns.push(name.clone());
+            }
+        } else {
+            only_columns = false;
+        }
+    }
+    let mut arbiters = if only_columns {
+        context
+            .get_table(table)
+            .expect("bound INSERT destination")
+            .infer_insert_arbiters(table, &columns)
+    } else {
+        Vec::new()
+    };
+    let mut needs_implication = false;
+    for index in context.indexes_for_table(table) {
+        if let Some(eligible) = index.matches_inference(conflict)? {
+            if eligible && !InsertArbiter::contains_backing_index(&arbiters, index.name()) {
+                arbiters.push(InsertArbiter::index(index.name()));
+            }
+        } else {
+            needs_implication = true;
+        }
+    }
+    if arbiters.is_empty() && needs_implication {
+        todo!("catalog partial-index predicate implication service");
+    }
+    Ok(ConflictArbiterInference::complete(&arbiters))
+}

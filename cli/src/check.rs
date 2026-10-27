@@ -1,3 +1,10 @@
+mod diagnostics;
+mod lockfiles;
+mod progress;
+mod submission;
+
+use self::progress::{Progress, ProgressMode};
+
 use std::{
     ffi::OsStr,
     io::{Read, Seek, SeekFrom},
@@ -13,6 +20,15 @@ use syn::File;
 #[derive(clap::Parser, Debug, Clone)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckArgs {
+    /// Progress output on stdout (CLI overrides `SQL_FUN_CHECK_PROGRESS`).
+    #[clap(
+        long,
+        env = "SQL_FUN_CHECK_PROGRESS",
+        value_enum,
+        default_value = "names"
+    )]
+    progress: ProgressMode,
+
     /// Check all packages in the cargo workspace
     #[clap(long, help_heading = Self::PACKAGE_SELECTION_HEADING, conflicts_with ="package")]
     workspace: bool,
@@ -57,22 +73,20 @@ pub struct CheckArgs {
     #[clap(long, help_heading = Self::FEATURE_SELECTION_HEADING, conflicts_with ="all_features")]
     no_default_features: bool,
 
-    /// Force rebuild schema cache
-    ///
-    /// When specified, Clean schema dump cache before checking, force parse schema dump and rebuild schema information
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "validate_only")]
+    /// Build the lockfile from an empty initial state
+    #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "validate_only")]
     force_rebuild: bool,
 
     /// Validate only
     ///
     /// When specified, Fail if schema dump or SQL statement change.
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
+    #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     validate_only: bool,
 
     /// Expect Schema dump not changed
     ///
     /// When specified, Fail if schema dump changed
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
+    #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     expect_schema_dump_valid: bool,
 
     /// Number of parallel jobs, default to # of CPUs
@@ -116,7 +130,7 @@ impl CheckArgs {
     const PACKAGE_SELECTION_HEADING: &str = "Package Selection";
     const TARGET_SELECTION_HEADING: &str = "Target Selection";
     const FEATURE_SELECTION_HEADING: &str = "Feature Selection";
-    const SCHEMA_CACHE_CONTROL_HEADING: &str = "Schema Cache Control";
+    const LOCKFILE_CONTROL_HEADING: &str = "Lockfile Control";
     const COMPILATION_OPTIONS_HEADERS: &str = "Compilation Options";
     const MANIFEST_OPTIONS_HEADERS: &str = "Manifest Options";
 
@@ -126,26 +140,146 @@ impl CheckArgs {
     ///
     /// [`anyhow::Error`] for runtime error
     ///
-    pub async fn execute(&self, _common_args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
-        if self.workspace {
-            let deps_members = Self::dependent_members()?;
-            for member in deps_members {
-                self.expand_member(member.as_str()).await?;
-            }
-        } else if let Some(member) = &self.package {
-            self.expand_member(member).await?;
-        } else {
-            let default_members = Self::default_packages()?;
-            for member in default_members {
-                self.expand_member(&member).await?;
-            }
-        }
-
-        todo!()
+    pub async fn execute(&self, common_args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
+        ::which::which("cargo-expand").map_err(|_| anyhow::anyhow!(
+            "sql-fun check requires cargo-expand on PATH; install it with \"cargo install --locked cargo-expand\" and ensure Cargo's binary directory is on PATH"
+        ))?;
+        let mut progress = Progress::new(std::io::stdout(), self.progress);
+        let result = self.execute_with_progress(common_args, &mut progress).await;
+        // Finish framing even when extraction, RPC, or finalization fails.
+        progress.finish(matches!(&result, Ok(code) if *code == ExitCode::SUCCESS))?;
+        result
     }
 
-    async fn expand_member(&self, member: &str) -> Result<(), anyhow::Error> {
-        let mut cargo_expand_command = CargoExpand::new(member)?;
+    async fn execute_with_progress<W: std::io::Write>(
+        &self,
+        common_args: &SqlFunArgs,
+        progress: &mut Progress<W>,
+    ) -> Result<ExitCode, anyhow::Error> {
+        progress.phase("Extracting SQL queries from selected Cargo targets")?;
+        let mut requirements = Vec::new();
+        let members = if self.workspace {
+            Self::dependent_members()?
+        } else if let Some(member) = &self.package {
+            vec![member.clone()]
+        } else {
+            Self::default_packages()?
+        };
+        for member in members {
+            requirements.extend(self.expand_member(&member, common_args).await?);
+        }
+        if requirements.is_empty() {
+            eprintln!("warning: no SQL queries found in the selected targets");
+            return Ok(ExitCode::SUCCESS);
+        }
+        progress.set_total(requirements.len());
+        let lockfiles = lockfiles::Lockfiles::new(
+            common_args,
+            &requirements,
+            self.force_rebuild,
+            self.expect_schema_dump_valid,
+        )?;
+        let client = crate::api::ApiArgs::from_environment()?.connect().await?;
+        self.process_analyses(client, common_args, requirements, lockfiles, progress)
+            .await
+    }
+
+    async fn process_analyses<W: std::io::Write>(
+        &self,
+        client: ::sql_fun_client::TcpJsonRpcClientAsync,
+        args: &SqlFunArgs,
+        requirements: Vec<::sql_fun_codegen::QueryRequirement>,
+        lockfiles: lockfiles::Lockfiles,
+        progress: &mut Progress<W>,
+    ) -> Result<ExitCode, anyhow::Error> {
+        self.process_analyses_to(
+            client,
+            args,
+            requirements,
+            lockfiles,
+            progress,
+            &mut std::io::stderr(),
+        )
+        .await
+    }
+
+    async fn process_analyses_to<W: std::io::Write, D: std::io::Write>(
+        &self,
+        mut client: ::sql_fun_client::TcpJsonRpcClientAsync,
+        args: &SqlFunArgs,
+        requirements: Vec<::sql_fun_codegen::QueryRequirement>,
+        mut lockfiles: lockfiles::Lockfiles,
+        progress: &mut Progress<W>,
+        diagnostics_output: &mut D,
+    ) -> Result<ExitCode, anyhow::Error> {
+        progress.begin(requirements.len())?;
+        let renderer = crate::diagnostic::DiagnosticRenderer::from_args(args)?;
+        let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
+        let producer = async {
+            let submitted = submission::submit(&mut client, args, requirements, sender).await;
+            let finished = client.finish().await;
+            submitted?;
+            finished?;
+            Ok::<(), anyhow::Error>(())
+        };
+        let consumer = async {
+            let mut failure = None;
+            while let Some(analysis) = receiver.recv().await {
+                analysis.log_received();
+                let reported = progress.received(analysis.function_name());
+                if let Err(error) = reported
+                    && failure.is_none()
+                {
+                    failure = Some(anyhow::Error::from(error));
+                }
+                if let Err(error) =
+                    diagnostics::render_all(&analysis, &renderer, diagnostics_output)
+                    && failure.is_none()
+                {
+                    failure = Some(error);
+                }
+                if let Some(error) = analysis.tokenization_error()
+                    && failure.is_none()
+                {
+                    failure = Some(anyhow::anyhow!(
+                        "cannot tokenize SQL diagnostic for {}: {error}",
+                        analysis.function_name()
+                    ));
+                }
+                if failure.is_none()
+                    && let Err(error) = lockfiles.receive(&analysis)
+                {
+                    failure = Some(error);
+                }
+            }
+            if let Some(error) = failure {
+                Err(error)
+            } else {
+                Ok(())
+            }
+        };
+        let (completed, processed) = ::tokio::join!(producer, consumer);
+        completed?;
+        processed?;
+        let phase = if self.validate_only {
+            "Validating lockfiles"
+        } else {
+            "Writing lockfiles"
+        };
+        progress.phase(phase)?;
+        if lockfiles.finalize(self.validate_only)? {
+            Ok(ExitCode::SUCCESS)
+        } else {
+            Ok(ExitCode::FAILURE)
+        }
+    }
+
+    async fn expand_member(
+        &self,
+        member: &str,
+        common_args: &SqlFunArgs,
+    ) -> Result<::sql_fun_codegen::QueryRequirements, anyhow::Error> {
+        let mut cargo_expand_command = CargoExpand::new(member, common_args)?;
         cargo_expand_command.set("--lib", self.lib);
         cargo_expand_command.set("--tests", self.tests);
         cargo_expand_command.set_value("--bin", self.bin.as_deref());
@@ -189,7 +323,7 @@ impl CheckArgs {
             "extracted {} query requirements from {member}",
             requirements.len()
         );
-        Ok(())
+        Ok(requirements)
     }
 
     fn dependent_members() -> Result<Vec<String>, anyhow::Error> {
@@ -217,19 +351,11 @@ impl CheckArgs {
     }
 
     fn depends_sql_fun(package: &cargo_metadata::Package) -> bool {
-        package
-            .dependencies
-            .iter()
-            .find(|d| d.name == "sql-fun")
-            .is_some()
+        package.dependencies.iter().any(|d| d.name == "sql-fun")
     }
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::items_after_test_module,
-    reason = "Keep tests next to their implementation."
-)]
 mod test_check_args {
     use super::CheckArgs;
     use ::clap::Parser;
@@ -244,13 +370,14 @@ mod test_check_args {
 pub struct CargoExpand(tokio::process::Command, std::fs::File);
 
 impl CargoExpand {
-    pub fn new(package: &str) -> Result<Self, anyhow::Error> {
+    pub fn new(package: &str, common_args: &SqlFunArgs) -> Result<Self, anyhow::Error> {
         let temp = tempfile::tempfile()?;
 
         let mut command = tokio::process::Command::new("cargo");
         command.stdin(Stdio::null());
         command.stdout(Stdio::from(temp.try_clone()?));
         command.arg("expand");
+        command.envs(common_args.environments()?);
         command.env("SQL_FUN_MODE", "CHECK");
         command.args(["--package", package]);
 
@@ -302,5 +429,69 @@ impl CargoExpand {
         } else {
             anyhow::bail!("cargo-expand exited non-success ({status})");
         }
+    }
+}
+
+#[cfg(test)]
+mod test_cargo_expand {
+    use super::CargoExpand;
+    use ::sql_fun_core::SqlFunArgs;
+
+    #[rstest::rstest]
+    #[case::query_selected(None)]
+    #[case::cli_selected(Some("selected"))]
+    fn forwards_explicit_configuration_in_check_mode(#[case] datasource: Option<&str>) {
+        let project = ::tempfile::tempdir().unwrap();
+        let metadata = project.path().join("selected.toml");
+        std::fs::write(
+            &metadata,
+            r#"
+[package.metadata.database.selected]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+search_path = ["chosen"]
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            project.path().join("selected.sql"),
+            "CREATE TABLE entries(id int4);",
+        )
+        .unwrap();
+        let catalog = project.path().join("selected-catalog");
+        let args = SqlFunArgs::builder(&std::collections::HashMap::new())
+            .unwrap()
+            .sql_fun_home(project.path())
+            .metadata_file(metadata.to_str().unwrap())
+            .schema_file(project.path().join("selected.sql"))
+            .cte_catalog_dir(&catalog)
+            .datasource(datasource.map(str::to_owned))
+            .build()
+            .unwrap();
+        let expansion = CargoExpand::new("selected-package", &args).unwrap();
+        let environments: std::collections::HashMap<_, _> = expansion
+            .0
+            .as_std()
+            .get_envs()
+            .map(|(name, value)| {
+                (
+                    name.to_str().unwrap().to_owned(),
+                    value.unwrap().to_str().unwrap().to_owned(),
+                )
+            })
+            .collect();
+        assert_eq!(environments["SQL_FUN_MODE"], "CHECK");
+        assert_eq!(
+            environments["SQL_FUN_METADATA_FILE"],
+            metadata.to_str().unwrap()
+        );
+        assert_eq!(
+            environments["SQL_FUN_CTE_CATALOG_DIR"],
+            catalog.to_str().unwrap()
+        );
+        let restored = SqlFunArgs::from_environments(&environments).unwrap();
+        assert_eq!(restored.datasource(), datasource);
+        assert_eq!(restored.metadata_file().unwrap(), metadata);
     }
 }

@@ -1,35 +1,55 @@
 #![deny(missing_docs)]
 #![allow(clippy::pedantic)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::items_after_test_module,
+        reason = "The repository coding guideline requires tests immediately after the implementation they cover"
+    )
+)]
 #![doc = include_str!("lib.md")]
 
+pub mod ast;
+pub mod context;
 pub mod engine_specific;
 pub mod sem;
 pub mod syn;
 
+mod identifier;
+mod parse_statements;
+mod placeholdered_sql;
 mod schema_dump_file;
 mod sql_file;
+mod sql_tokens;
 #[cfg(feature = "sqlite")]
 mod sqlite;
+#[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
+mod sqlite_parser;
+mod stack;
 mod trie_map;
 
-use miette::LabeledSpan;
 use sql_fun_core::IVec;
 
-use self::sql_file::read_sql_file;
+pub use self::sql_file::SqlFileSnapshot;
 
 #[cfg(feature = "sqlite")]
 pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
 
-pub use self::trie_map::TrieMap;
-
 use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 use crate::{
-    sem::{BaseParseContext, ParseContext, SchemaFileContext, SemAst},
+    context::ParseContext,
+    sem::{FrozenBaseContext, SchemaFileContext, SemAst},
     syn::ParseResult,
 };
 
-pub use self::schema_dump_file::{ParseDumpFileError, ParsedSchemaDump};
+pub use self::{
+    parse_statements::{ParseStatementError, parse_statements},
+    placeholdered_sql::PlaceholderedSqlRenderError,
+    schema_dump_file::{ParseDumpFileError, ParsedSchemaDump},
+    sql_tokens::{TokenizeSqlError, tokenize_sql},
+    trie_map::TrieMap,
+};
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 /// Semantic AST and parse context result
@@ -44,6 +64,23 @@ where
     /// create instance
     pub const fn new(ast: SemAst, context: TParseContext) -> Self {
         Self(ast, context)
+    }
+
+    /// Analyzed statement produced by the selected parse context.
+    #[must_use]
+    pub const fn ast(&self) -> &SemAst {
+        &self.0
+    }
+
+    /// Consume the analysis result and continue with its updated catalog context.
+    pub fn into_context(self) -> TParseContext {
+        self.1
+    }
+
+    /// Context containing diagnostics and catalog updates from analysis.
+    #[must_use]
+    pub const fn context(&self) -> &TParseContext {
+        &self.1
     }
 }
 
@@ -72,26 +109,64 @@ impl PostgresDialect {
         Ok(tokens.into())
     }
 
-    /// load schema dump file
+    /// Load a schema file as an ordered layer over the supplied frozen base.
+    ///
+    /// Clears `content_hash` before reading, then sets the SHA-256 of the
+    /// original UTF-8 file text before parsing (before psql preprocessing for
+    /// PostgreSQL). The hash remains available on syntax/semantic failure;
+    /// failed reads leave it unset. The file is never reopened to hash it.
+    ///
+    /// `args` and `metadata` explicitly select the current analysis environment.
+    /// Configuration retained by `input_context` is historical only. The selected
+    /// metadata dialect must match this loader.
+    ///
+    /// The base and its siblings remain unchanged. Successful results retain the
+    /// file's semantic statements and recoverable problems; their frozen base
+    /// can be passed to the next file without retaining those statements.
     ///
     /// # Errors
     ///
-    /// - [`ParseDumpFileError`]
+    /// Returns [`ParseDumpFileError`] for file, syntax, or fatal analysis failures.
+    /// Earlier successfully loaded bases remain usable after a failure.
     ///
-    pub fn parse_schema_file<TContext>(
+    pub fn parse_schema_file(
         dump_file: &Path,
-        input_context: TContext,
-    ) -> Result<ParsedSchemaDump<TContext>, ParseDumpFileError>
-    where
-        TContext: BaseParseContext + std::fmt::Debug,
-    {
-        let sql_statements = read_sql_file(dump_file)?;
+        input_context: &FrozenBaseContext,
+        content_hash: &mut Option<String>,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        *content_hash = None;
+        let snapshot = SqlFileSnapshot::read(dump_file)?;
+        *content_hash = Some(snapshot.content_hash().to_owned());
+        Self::parse_schema_snapshot(&snapshot, input_context, args, metadata)
+    }
 
-        let statements = ::pg_query::split_with_parser(&sql_statements)?;
-        let mut context = SchemaFileContext::new(dump_file, input_context);
+    /// Analyze exactly the previously read snapshot, without reopening its file.
+    /// The supplied args and selected metadata configure this analysis independently
+    /// of the frozen catalog; metadata must select this loader's dialect.
+    ///
+    /// # Errors
+    /// Returns syntax or fatal semantic analysis failures.
+    pub fn parse_schema_snapshot(
+        snapshot: &SqlFileSnapshot,
+        input_context: &FrozenBaseContext,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        let sql_statements = snapshot.postgres_text();
+        let dump_file = snapshot.path();
+
+        let statements = self::parse_statements::split_postgres_statements(&sql_statements)?;
+        let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
+        crate::sem::AnalysisError::check_dialect(
+            crate::ast::Dialect::postgres(),
+            context.dialect(),
+        )?;
         let mut sem_results = Vec::new();
         for statement in statements {
             context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
+            context.set_diagnostic_source(statement);
             let syn = Self::parse(statement)?;
             let tokens = Self::scan(statement)?;
             let AstAndContextPair(sem, rcontext) =
@@ -99,25 +174,80 @@ impl PostgresDialect {
             sem_results.push(sem);
             context = rcontext;
         }
-        Ok(ParsedSchemaDump::new(sem_results, context))
+        Ok(context.into_parsed(sem_results))
     }
 }
 
-/// parse SQL statement
-///
-/// # Errors
-///
-/// - [`pg_query::Error`] : syntax error
-///
-#[deprecated = "use PostgresDialect::parse"]
-pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
-    PostgresDialect::parse(sql)
-}
+#[cfg(test)]
+mod test_schema_content_hash {
+    use crate::PostgresDialect;
+    use ::sql_fun_core::Hasher;
 
-/// scan SQL Statement
-#[deprecated = "use PostgresDialect::scan"]
-pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
-    PostgresDialect::scan(sql)
+    #[rstest::rstest]
+    #[case::success("CREATE TABLE hash_test (id INTEGER);", true)]
+    #[case::syntax_error("CREATE TABLE broken (id", false)]
+    #[case::psql(
+        "\\restrict token\r\nCREATE TABLE hash_test (id INTEGER);\r\n\\unrestrict token\n",
+        true
+    )]
+    fn hashes_original_text_before_analysis(#[case] sql: &str, #[case] succeeds: bool) {
+        let file = test_helpers::schema_file(sql);
+        let base = test_helpers::base_with_public_schema();
+        let mut hash = Some("previous output".to_owned());
+        let result = {
+            let analysis_base = &base;
+            let environment = crate::test_helpers::TestParseContext::default()
+                .with_dialect(crate::ast::Dialect::postgres());
+            PostgresDialect::parse_schema_file(
+                file.path(),
+                analysis_base,
+                &mut hash,
+                crate::context::BaseParseContext::get_args(&environment),
+                crate::context::BaseParseContext::metadata(&environment),
+            )
+        };
+        assert_eq!(result.is_ok(), succeeds, "{result:?}");
+        assert_eq!(hash, Some(Hasher::hash_file(file.path()).unwrap()));
+    }
+
+    #[test]
+    fn failed_read_clears_previous_hash() {
+        let directory = ::tempfile::tempdir().unwrap();
+        let base = test_helpers::base_with_public_schema();
+        let mut hash = Some("previous output".to_owned());
+        let error = {
+            let analysis_base = &base;
+            let environment = crate::test_helpers::TestParseContext::default()
+                .with_dialect(crate::ast::Dialect::postgres());
+            PostgresDialect::parse_schema_file(
+                &directory.path().join("missing.sql"),
+                analysis_base,
+                &mut hash,
+                crate::context::BaseParseContext::get_args(&environment),
+                crate::context::BaseParseContext::metadata(&environment),
+            )
+        }
+        .unwrap_err();
+        assert!(error.is_io());
+        assert!(hash.is_none());
+    }
+
+    mod test_helpers {
+        pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
+            use crate::context::ParseContext;
+            use crate::sem::SchemaName;
+
+            let mut base = crate::test_helpers::TestParseContext::default();
+            base.set_get_search_path_result(&[SchemaName::from("public")]);
+            base.freeze()
+        }
+
+        pub(super) fn schema_file(sql: &str) -> ::tempfile::NamedTempFile {
+            let file = ::tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(file.path(), sql).unwrap();
+            file
+        }
+    }
 }
 
 // TODO(msrv >= 1.98): replace with str::substr_range
@@ -133,13 +263,21 @@ fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
 }
 
 ///  offset and length for SQL statement
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct StringSpan {
     offset: usize,
     len: usize,
 }
 
 impl StringSpan {
+    /// Byte offset retained when this span was created.
+    #[must_use]
+    pub const fn offset(&self) -> usize {
+        self.offset
+    }
+
     /// create a new instance
     pub const fn new(offset: usize, len: usize) -> Self {
         Self { offset, len }
@@ -182,10 +320,6 @@ impl StringSpan {
         self.len == 0
     }
 
-    fn new_labeled_span(&self, label: &str) -> LabeledSpan {
-        LabeledSpan::new(Some(String::from(label)), self.offset, self.len)
-    }
-
     fn from_scan_token(tok: &crate::syn::ScanToken) -> Self {
         Self {
             offset: tok.get_start() as usize,
@@ -210,11 +344,8 @@ pub mod test_helpers;
 #[cfg(test)]
 mod tests {
 
-    use std::path::PathBuf;
-
     use crate::{
         PostgresDialect,
-        sem::{BaseContext, BaseParseContext},
         syn::{ListOpt, Opt},
     };
 
@@ -339,27 +470,54 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[rstest::rstest]
     fn parse_adventure_works_schema(
         context_args: SqlFunArgs,
         _enable_stack_overflow_backtrace: EnableStackOverflowBacktrace,
     ) -> TestResult {
-        let mut analyze_context = BaseContext::new(context_args.clone())?;
-
-        let builtin_context = BaseContext::new(context_args.clone())?;
-        let home_path = PathBuf::from(env!("SQL_FUN_HOME"));
-        let builtin = home_path.join("postgres/17/schema.sql");
-        let builtin = PostgresDialect::parse_schema_file(&builtin, builtin_context)?;
-        analyze_context.extend(Box::new(builtin));
-
-        let tablefunc_ext = home_path.join("postgres/17/extension/tablefunc--1.0.sql");
-        let input_context = BaseContext::new(context_args.clone())?;
-        let tablefunc_ext = PostgresDialect::parse_schema_file(&tablefunc_ext, input_context)?;
-
-        analyze_context.extend(Box::new(tablefunc_ext));
-        let file = PathBuf::from("../examples/adventure-works/schema.develop.sql");
-        let _dump = PostgresDialect::parse_schema_file(&file, analyze_context)?;
+        crate::test_helpers::small_stack_regression(2 * 1024 * 1024, || {
+            let dump = crate::test_helpers::adventure_works_schema(&context_args)
+                .expect("full AdventureWorks schema on a small stack");
+            let view = crate::context::BaseParseContext::get_view(
+                &dump,
+                &crate::sem::ViewName::from_full_name(&crate::sem::FullName::with_schema(
+                    "humanresources",
+                    "vemployee",
+                )),
+            )
+            .expect("AdventureWorks employee view");
+            for name in [
+                "businessentityid",
+                "title",
+                "firstname",
+                "middlename",
+                "lastname",
+                "suffix",
+                "jobtitle",
+                "phonenumber",
+                "phonenumbertype",
+                "emailaddress",
+                "emailpromotion",
+                "addressline1",
+                "addressline2",
+                "city",
+                "stateprovincename",
+                "postalcode",
+                "countryregionname",
+                "additionalcontactinfo",
+            ] {
+                assert!(
+                    view.has_column(&crate::sem::ColumnName::from(name)),
+                    "{name}"
+                );
+            }
+            assert_eq!(
+                view.get_column_def(&crate::sem::ColumnName::from("businessentityid"))
+                    .expect("employee id")
+                    .get_type_cloned(),
+                Some(crate::sem::PgBuiltInType::int4())
+            );
+        });
         Ok(())
     }
 }

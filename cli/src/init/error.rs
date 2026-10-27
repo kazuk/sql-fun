@@ -1,11 +1,11 @@
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
     #[error("{0}")]
+    Setup(#[from] anyhow::Error),
+    #[error("{0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Prompt(#[from] inquire::InquireError),
-    #[error("{}", Self::unexpected_version_message(.0))]
-    UnexpectedVersion(String),
 }
 
 impl InitError {
@@ -56,33 +56,5 @@ mod test_prompt {
         let error = InitError::prompt::<()>(source).unwrap_err();
         assert_eq!(error.to_string(), message);
         assert!(error.source().unwrap().is::<inquire::InquireError>());
-    }
-}
-
-impl InitError {
-    #[track_caller]
-    pub fn unexpected_version<T>(version: &str) -> Result<T, Self> {
-        Err(Self::UnexpectedVersion(version.to_owned()))
-    }
-
-    fn unexpected_version_message(version: &str) -> String {
-        format!(include_str!("unexpected_version.txt"), version = version)
-            .trim_end()
-            .to_owned()
-    }
-}
-
-#[cfg(test)]
-mod test_unexpected_version {
-    use super::InitError;
-    use std::error::Error as StdError;
-
-    #[rstest::rstest]
-    #[case::unsupported("19", "unexpected version 19")]
-    #[case::invalid("invalid", "unexpected version invalid")]
-    fn reports_the_supplied_version(#[case] version: &str, #[case] message: &str) {
-        let error = InitError::unexpected_version::<()>(version).unwrap_err();
-        assert_eq!(error.to_string(), message);
-        assert!(error.source().is_none());
     }
 }

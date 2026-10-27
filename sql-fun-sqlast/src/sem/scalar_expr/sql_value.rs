@@ -1,13 +1,5 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, FullName, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
-    },
-    syn::{Opt, ScanToken, SqlValueFunctionOp},
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{AnalysisError, FullName, SemScalarExpr, TypeReference};
 
 /// SQL value function
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -38,6 +30,26 @@ pub enum SqlValueExpr {
 pub struct UnexpectedVariant;
 
 impl SqlValueExpr {
+    pub(crate) fn from_common(
+        name: &str,
+        precision: Option<i32>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let precision = precision.map(TimePrecision::from_typmod);
+        let value = match name {
+            "current_date" => Self::CurrentDate,
+            "current_time" => Self::CurrentTime(precision),
+            "current_timestamp" => Self::CurrentTimestamp(precision),
+            "localtime" => Self::LocalTime(precision),
+            "localtimestamp" => Self::LocalTimestamp(precision),
+            "current_user" | "current_role" | "user" => Self::CurrentUser,
+            "session_user" => Self::SessionUser,
+            "current_schema" => Self::CurrentSchema,
+            "current_catalog" => Self::CurrentCatalog,
+            _ => return AnalysisError::raise_unexpected_input("SQL value name"),
+        };
+        Ok(SemScalarExpr::sql_value(&value))
+    }
+
     /// get CurrentTimestamp variant
     pub const fn as_current_timestamp(&self) -> Result<&Option<TimePrecision>, UnexpectedVariant> {
         match self {
@@ -94,56 +106,5 @@ impl SemScalarExprNode for SqlValueExpr {
             Self::CurrentSchema => Some(false),
             _ => Some(true),
         }
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::SqlValueFunction> for SqlValueExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        context: TParseContext,
-        _scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::SqlValueFunction,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(operator) = syn.get_op().as_inner() else {
-            AnalysisError::raise_unexpected_none("sqlvaluefunction.op")?
-        };
-
-        let node = match operator {
-            SqlValueFunctionOp::SvfopCurrentDate => Self::CurrentDate,
-            SqlValueFunctionOp::SvfopCurrentTime => Self::CurrentTime(None),
-            SqlValueFunctionOp::SvfopCurrentTimeN => {
-                let typmod = syn.get_typmod();
-                Self::CurrentTime(Some(TimePrecision::from_typmod(typmod)))
-            }
-            SqlValueFunctionOp::SvfopCurrentTimestamp => Self::CurrentTimestamp(None),
-            SqlValueFunctionOp::SvfopCurrentTimestampN => {
-                let typmod = syn.get_typmod();
-                Self::CurrentTimestamp(Some(TimePrecision::from_typmod(typmod)))
-            }
-            SqlValueFunctionOp::SvfopLocaltime => Self::LocalTime(None),
-            SqlValueFunctionOp::SvfopLocaltimeN => {
-                let typmod = syn.get_typmod();
-                Self::LocalTime(Some(TimePrecision::from_typmod(typmod)))
-            }
-            SqlValueFunctionOp::SvfopLocaltimestamp => Self::LocalTimestamp(None),
-            SqlValueFunctionOp::SvfopLocaltimestampN => {
-                let typmod = syn.get_typmod();
-                Self::LocalTimestamp(Some(TimePrecision::from_typmod(typmod)))
-            }
-            SqlValueFunctionOp::SvfopCurrentRole => Self::CurrentUser,
-            SqlValueFunctionOp::SvfopCurrentUser => Self::CurrentUser,
-            SqlValueFunctionOp::SvfopUser => Self::CurrentUser,
-            SqlValueFunctionOp::SvfopSessionUser => Self::SessionUser,
-            SqlValueFunctionOp::SvfopCurrentCatalog => Self::CurrentCatalog,
-            SqlValueFunctionOp::SvfopCurrentSchema => Self::CurrentSchema,
-            SqlValueFunctionOp::OptionNone | SqlValueFunctionOp::SqlvalueFunctionOpUndefined => {
-                AnalysisError::raise_unexpected_input("sqlvaluefunctionop value")?;
-                AnalysisError::never();
-            }
-        };
-        Ok((SemScalarExpr::SqlValue(node), context))
     }
 }

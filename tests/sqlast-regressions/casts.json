@@ -1,0 +1,164 @@
+[
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::cast",
+    "sql": "SELECT CAST(NULL AS integer[]) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::postgres_cast",
+    "sql": "SELECT NULL::integer[] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::qualified",
+    "sql": "SELECT NULL::pg_catalog.int4[] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::bounded",
+    "sql": "SELECT CAST(NULL AS integer[3][4]) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::scalar",
+    "sql": "SELECT CAST(NULL AS integer) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::cast::indexed",
+    "sql": "SELECT (CAST(NULL AS integer[]))[1] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::postgres_cast::indexed",
+    "sql": "SELECT (NULL::integer[])[1] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::qualified::indexed",
+    "sql": "SELECT (NULL::pg_catalog.int4[])[1] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "schema_context_chain::sql_casts_preserve_array_identity::bounded::indexed",
+    "sql": "SELECT (CAST(NULL AS integer[3][4]))[1] AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

@@ -101,6 +101,13 @@ pub enum OperatorDefinition {
 }
 
 impl OperatorDefinition {
+    pub(crate) const fn binary_overloads(&self) -> Option<&[BinaryOperatorDefinition]> {
+        match self {
+            Self::Binary(overloads) => Some(overloads.as_slice()),
+            _ => None,
+        }
+    }
+
     /// binary
     #[must_use]
     pub fn binary(binaries: &[BinaryOperatorDefinition]) -> Self {
@@ -117,5 +124,38 @@ impl OperatorDefinition {
     #[must_use]
     pub fn right_unary(unaries: &[UnaryOperatorDefinition]) -> Self {
         Self::RightUnary(Vec::from_iter(unaries.to_vec()))
+    }
+}
+
+impl BinaryOperatorDefinition {
+    fn parameter_signature(&self) -> crate::sem::parameter_resolution::Signature {
+        crate::sem::parameter_resolution::Signature::new(
+            &[self.left_arg_type.clone(), self.right_arg_type.clone()],
+            &self.result_type,
+        )
+    }
+}
+
+impl UnaryOperatorDefinition {
+    fn parameter_signature(&self) -> crate::sem::parameter_resolution::Signature {
+        crate::sem::parameter_resolution::Signature::new(
+            std::slice::from_ref(&self.arg_type),
+            &self.result_type,
+        )
+    }
+}
+
+impl OperatorDefinition {
+    pub(crate) fn parameter_signatures(&self) -> Vec<crate::sem::parameter_resolution::Signature> {
+        match self {
+            Self::Binary(overloads) => overloads
+                .iter()
+                .map(BinaryOperatorDefinition::parameter_signature)
+                .collect(),
+            Self::LeftUnary(overloads) | Self::RightUnary(overloads) => overloads
+                .iter()
+                .map(UnaryOperatorDefinition::parameter_signature)
+                .collect(),
+        }
     }
 }

@@ -1,27 +1,75 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    ast::TryFromWithTokens,
+    context::ParseContext,
     sem::{AstAndContextPair, TypeReference},
-    syn::{Opt, ScanToken},
+    syn::ScanToken,
 };
 
-use super::{AnalysisError, AnalysisProblem, FullName, ParseContext, SemAst};
+use super::{AnalysisError, FullName};
 
 /// analyzed [`crate::syn::CreateDomainStmt`]
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateDomain {
+    #[serde(skip)]
+    owner: Option<crate::sem::OwnerSpecification>,
     type_ref: TypeReference,
-    base_type: Option<FullName>,
+    base_type: Option<TypeReference>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    category: Option<crate::sem::TypeCategory>,
 }
 
 impl CreateDomain {
+    pub(crate) fn rename_relation(
+        &mut self,
+        old: &crate::sem::TableName,
+        new: &crate::sem::TableName,
+    ) {
+        if let Some(base) = &mut self.base_type {
+            base.rename_relation(old, new);
+        }
+    }
+
+    /// Retained ownership; None means no ownership information was supplied.
+    /// Ownership is catalog state: it is omitted from the existing serialized
+    /// type format and does not affect SQL type equality or hashing.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
+    pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<TypeReference>) -> Self {
+        Self {
+            owner: None,
+            category: None,
+            type_ref: type_ref.clone(),
+            base_type: base_type.clone(),
+        }
+    }
+    pub(crate) const fn category(&self) -> Option<crate::sem::TypeCategory> {
+        self.category
+    }
+
+    pub(crate) const fn set_category(&mut self, category: Option<crate::sem::TypeCategory>) {
+        self.category = category;
+    }
+
     /// get name
     #[must_use]
     pub fn name(&self) -> &FullName {
         self.type_ref.full_name()
     }
 
-    /// get base type reference
+    /// Resolved base type, including array qualification, when lookup succeeded.
+    pub(crate) const fn base_type(&self) -> Option<&TypeReference> {
+        self.base_type.as_ref()
+    }
+
+    /// Reference identifying this domain, distinct from its base type.
     #[must_use]
     pub const fn type_ref(&self) -> &TypeReference {
         &self.type_ref
@@ -29,52 +77,65 @@ impl CreateDomain {
 
     /// analyze [`crate::syn::CreateDomainStmt`]
     pub fn analyze_create_domain<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         syn: crate::syn::CreateDomainStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let name = FullName::try_from(syn.get_domainname())?;
-        let Some(base) = syn.get_type_name().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_domain_stmt.type_name")?
-        };
-
-        let base_span = base.get_name_span(tokens);
-
-        let create_domain =
-            if let Some(base_type) = context.get_type(&FullName::try_from(base.clone())?) {
-                Self {
-                    type_ref: TypeReference::from_full_name(name),
-                    base_type: base_type.full_name().cloned(),
-                }
-            } else {
-                context.report_problem(AnalysisProblem::domain_type_name_not_found(
-                    &name, &base, &base_span,
-                ))?;
-                Self {
-                    type_ref: TypeReference::from_full_name(name),
-                    base_type: None,
-                }
-            };
-        let result_context = context.apply_create_domain(&create_domain)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateDomain(create_domain),
-            result_context,
-        ))
+        crate::ast::Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }
 
-/// analyze [`crate::syn::CreateDomainStmt`]
-#[deprecated = "use CreateDomain::analyze_create_domain"]
-pub fn analyze_create_domain<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::CreateDomainStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateDomain::analyze_create_domain(context, syn, tokens)
+#[cfg(test)]
+mod tests {
+    use super::CreateDomain;
+    use crate::sem::{FullName, TypeReference};
+
+    #[rstest::rstest]
+    #[case::unresolved(None)]
+    #[case::scalar(Some(TypeReference::from_master_type_name("int4")))]
+    #[case::array(Some(TypeReference::from_master_type_name("_int4")))]
+    #[case::nested_domain(Some(TypeReference::from_full_name(FullName::with_schema(
+        "public", "amounts"
+    ))))]
+    fn domain_base_survives_serialization(#[case] base: Option<TypeReference>) {
+        let reference = TypeReference::from_full_name(FullName::with_schema("public", "amount"));
+        let domain = CreateDomain::new(&reference, &base);
+        let serialized = ::serde_json::to_value(&domain).unwrap();
+        assert_eq!(
+            serialized["base_type"],
+            ::serde_json::to_value(&base).unwrap()
+        );
+        let restored: CreateDomain = ::serde_json::from_value(serialized).unwrap();
+        assert_eq!(restored.base_type(), base.as_ref());
+        assert_eq!(restored.type_ref(), &reference);
+        assert_eq!(restored, domain);
+    }
+}
+
+// Ownership changes do not change SQL type identity or the existing serialized type format.
+impl PartialEq for CreateDomain {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_ref == other.type_ref && self.base_type == other.base_type
+    }
+}
+impl Eq for CreateDomain {}
+impl std::hash::Hash for CreateDomain {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.type_ref, state);
+        std::hash::Hash::hash(&self.base_type, state);
+    }
+}
+
+impl CreateDomain {
+    pub(crate) fn row_table_name(
+        &self,
+        context: &impl ParseContext,
+    ) -> Option<crate::sem::TableName> {
+        self.base_type()?
+            .definition_from_catalog(context)?
+            .row_table_name(context)
+    }
 }

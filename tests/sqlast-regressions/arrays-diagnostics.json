@@ -1,0 +1,186 @@
+[
+  {
+    "name": "invalid_arrays_keep_failure_and_allow_next_statement::empty",
+    "sql": "SELECT ARRAY[]",
+    "expected": {
+      "diagnostics": [
+        "array_empty"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_arrays_keep_failure_and_allow_next_statement::categories",
+    "sql": "SELECT ARRAY[1,true]",
+    "expected": {
+      "diagnostics": [
+        "array_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_arrays_keep_failure_and_allow_next_statement::typed_string",
+    "sql": "SELECT ARRAY['1'::text,2]",
+    "expected": {
+      "diagnostics": [
+        "array_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_arrays_keep_failure_and_allow_next_statement::nested_boundary",
+    "sql": "SELECT ARRAY[ARRAY[NULL],ARRAY[1]]",
+    "expected": {
+      "diagnostics": [
+        "array_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_arrays_keep_failure_and_allow_next_statement::explicit_bad",
+    "sql": "SELECT ARRAY[true]::date[]",
+    "expected": {
+      "diagnostics": [
+        "array_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "date",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_array_equality_retains_failure::different_elements",
+    "sql": "SELECT ARRAY[1::oid] = ARRAY['x'::text]",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_array_equality_retains_failure::numeric_elements",
+    "sql": "SELECT ARRAY[1::integer] = ARRAY[1::bigint]",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_array_equality_retains_failure::scalar_right",
+    "sql": "SELECT ARRAY[1::oid] = 1::oid",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_array_equality_retains_failure::scalar_left",
+    "sql": "SELECT 1::oid = ARRAY[1::oid]",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "conflicting_parameter_use_reports_a_constraint_failure",
+    "sql": "SELECT ARRAY[$1,1] WHERE $1",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "subscripted_anonymous_record_has_no_sql_field_descriptor",
+    "sql": "SELECT ((ARRAY[pg_control_system()])[1]).pg_control_version",
+    "expected": {
+      "diagnostics": [
+        "composite_type_field_not_found"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

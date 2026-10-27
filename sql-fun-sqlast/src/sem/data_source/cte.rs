@@ -1,8 +1,9 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteName, DataSource, Nullable,
-    ParseContext, WithClause,
-    data_source::AliasName,
-    scalar_expr::{ColumnReferenceExpr, CteColumnRef},
+use crate::{
+    context::ParseContext,
+    sem::{
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteName, DataSource, Nullable,
+        WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -56,6 +57,7 @@ impl CteDataSource {
         &self,
         context: &mut TParseContext,
         with_clause: &WithClause,
+        alias: &AliasName,
         column: &ColumnName,
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
@@ -70,29 +72,54 @@ impl CteDataSource {
             AnalysisError::never()
         };
 
-        let column_def = if let Some(index) = self.alias.derived_column_index(column) {
-            if let Some(column_def) = cte.get_column_at(context, index) {
-                Some(column_def)
-            } else {
-                context.report_problem(
+        let index = self.alias.derived_column_index(column);
+        let column_def = cte.resolved_column(column, index, self.alias.len_derived_column());
+        if column_def.is_none() {
+            if index.is_some() {
+                context.report_analysis_problem(
                     AnalysisProblem::cte_not_have_column_for_derived_column_name(),
                 )?;
-                None
+            } else {
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_cte(
+                    &self.name, column,
+                ))?;
             }
-        } else if let Some(column_def) =
-            cte.get_column_def_with_skip_count(context, column, self.alias.len_derived_column())
-        {
-            Some(column_def)
-        } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_cte(&self.name, column))?;
-            None
-        };
-        Ok(ColumnReferenceExpr::CteColumn(CteColumnRef::new(
-            self.alias.name(),
+        }
+        Ok(ColumnReferenceExpr::cte_column(
+            alias,
             &self.name,
             column,
-            column_def,
+            column_def.as_ref(),
             nullability,
-        )))
+        ))
+    }
+}
+
+impl CteDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.relation(
+            Some(&self.name),
+            self.alias.name().as_str(),
+            &self.alias.inference_columns(),
+        );
+        Ok(())
+    }
+}
+
+impl CteDataSource {
+    pub(super) fn projection_column_names(
+        &self,
+        with: &WithClause,
+    ) -> Result<Vec<ColumnName>, AnalysisError> {
+        let Some(cte) = with.get(&self.name) else {
+            return AnalysisError::raise_unexpected_none("star CTE");
+        };
+        let Some(columns) = cte.result_columns() else {
+            return AnalysisError::raise_unexpected_none("star CTE columns");
+        };
+        Ok(columns.names())
     }
 }

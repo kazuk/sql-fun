@@ -1,19 +1,9 @@
+mod between;
 mod binary;
 mod call_sites;
-mod impl_analyze;
 mod impl_build_op;
 mod null_if;
 mod unary;
-
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
-        scalar_expr::SemScalarExprNode,
-    },
-    syn::ScanToken,
-};
 
 pub use self::{
     call_sites::{
@@ -23,6 +13,8 @@ pub use self::{
     },
     null_if::NullIfExpr,
 };
+
+use crate::sem::{SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
 
 /// arith expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -61,6 +53,14 @@ pub struct BetweenExpr {
 }
 
 impl ArithExpr {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        if let Some(binding) = self.binding() {
+            let mut binding = binding.clone();
+            binding.canonicalize_grouping_key();
+            self.set_binding(binding);
+        }
+    }
+
     /// build between expression node
     pub fn between(left: SemScalarExpr, range: (SemScalarExpr, SemScalarExpr)) -> SemScalarExpr {
         SemScalarExpr::Arith(Self::Between(Box::new(BetweenExpr {
@@ -84,144 +84,6 @@ impl ArithExpr {
         })))
     }
 
-    fn build_distinct<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_not_distinct<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_in<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_like<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_ilike<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_similar<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_between<TParseContext>(
-        context: TParseContext,
-        lexpr: Option<SemScalarExpr>,
-        rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(lexpr) = lexpr else {
-            AnalysisError::raise_unexpected_none("lexpr")?;
-            AnalysisError::never()
-        };
-
-        let Some(SemScalarExpr::List(list_expr)) = rexpr else {
-            AnalysisError::raise_unexpected_input("rexpr")?;
-            AnalysisError::never();
-        };
-        if list_expr.len() != 2 {
-            AnalysisError::raise_unexpected_input("rexpr len!=2")?;
-            AnalysisError::never();
-        };
-        let mut iter = list_expr.into_inner().into_iter();
-        let Some(start) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr start")?;
-            AnalysisError::never();
-        };
-        let Some(end) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr end")?;
-            AnalysisError::never();
-        };
-
-        let body = BetweenExpr {
-            left: lexpr,
-            start,
-            end,
-            not: false,
-        };
-        Ok((SemScalarExpr::Arith(Self::Between(Box::new(body))), context))
-    }
-
-    fn build_not_between<TParseContext>(
-        context: TParseContext,
-        lexpr: Option<SemScalarExpr>,
-        rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(lexpr) = lexpr else {
-            AnalysisError::raise_unexpected_none("lexpr")?;
-            AnalysisError::never()
-        };
-
-        let Some(SemScalarExpr::List(list_expr)) = rexpr else {
-            AnalysisError::raise_unexpected_input("rexpr")?;
-            AnalysisError::never();
-        };
-        if list_expr.len() != 2 {
-            AnalysisError::raise_unexpected_input("rexpr len!=2")?;
-            AnalysisError::never();
-        };
-        let mut iter = list_expr.into_inner().into_iter();
-        let Some(start) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr start")?;
-            AnalysisError::never();
-        };
-        let Some(end) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr end")?;
-            AnalysisError::never();
-        };
-
-        let body = BetweenExpr {
-            left: lexpr,
-            start,
-            end,
-            not: true,
-        };
-        Ok((SemScalarExpr::Arith(Self::Between(Box::new(body))), context))
-    }
-
-    fn build_between_sym<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_not_between_sym<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
     fn inputs_is_not_null(&self) -> Option<bool> {
         match &self {
             Self::OpLeftUnary(call_site) => call_site.is_not_null(),
@@ -239,23 +101,6 @@ impl ArithExpr {
 
     const fn operator_returns_null(&self) -> Option<bool> {
         None
-    }
-
-    fn analyze_optional_expr<TParseContext>(
-        context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        expr: Option<crate::syn::Node>,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(expr) = expr else {
-            return Ok((None, context));
-        };
-        let (sem_expr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, scalar_context, expr, tokens)?;
-        Ok((Some(sem_expr), new_context))
     }
 }
 
@@ -280,8 +125,8 @@ impl SemScalarExprNode for ArithExpr {
             Self::OpLeftUnary(site) => site.is_strict(),
             Self::OpRightUnary(site) => site.is_strict(),
             Self::OpBinary(call_site) => call_site.is_strict(),
-            Self::OpAnyBinary(call_site) => call_site.is_strict(),
-            Self::OpAllBinary(call_site) => call_site.is_strict(),
+            Self::OpAnyBinary(call_site) => return call_site.is_not_null(),
+            Self::OpAllBinary(call_site) => return call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_strict(),
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
@@ -300,6 +145,161 @@ impl SemScalarExprNode for ArithExpr {
             }
         } else {
             None
+        }
+    }
+}
+
+impl BetweenExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left.walk(visitor)?;
+        self.start.walk(visitor)?;
+        self.end.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::OpBinary(v) => v.walk(visitor)?,
+            Self::OpLeftUnary(v) => v.walk(visitor)?,
+            Self::OpRightUnary(v) => v.walk(visitor)?,
+            Self::OpAnyBinary(v) => v.walk(visitor)?,
+            Self::OpAllBinary(v) => v.walk(visitor)?,
+            Self::UndefinedOperator(v) => v.walk(visitor)?,
+            Self::UndefinedOperatorAny(v) => v.walk(visitor)?,
+            Self::UndefinedOperatorAll(v) => v.walk(visitor)?,
+            Self::NullIfExpr(v) => v.walk(visitor)?,
+            Self::Between(v) => v.walk(visitor)?,
+        }
+        Ok(())
+    }
+}
+
+impl BetweenExpr {
+    fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self.left.constraint_node().is_some()
+            || self.start.constraint_node().is_some()
+            || self.end.constraint_node().is_some()
+        {
+            parameters.special_operator("BETWEEN", &[&self.left, &self.start, &self.end]);
+        }
+    }
+}
+impl ArithExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        match self {
+            Self::OpBinary(v) => v.collect_constraints(parameters, context),
+            Self::OpLeftUnary(v) => v.collect_constraints(parameters, context),
+            Self::OpRightUnary(v) => v.collect_constraints(parameters, context),
+            Self::UndefinedOperator(v) => v.collect_constraints(parameters, context),
+            Self::OpAnyBinary(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::OpAllBinary(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::UndefinedOperatorAny(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::UndefinedOperatorAll(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::NullIfExpr(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::Between(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+        }
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn deferred_operator(
+        name: &crate::sem::OperatorName,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> SemScalarExpr {
+        let call = UndefinedOperatorCallSite::from_inputs(name, left, right);
+        SemScalarExpr::arithmetic(Self::UndefinedOperator(Box::new(call)))
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn deferred_any_operator(
+        name: &crate::sem::OperatorName,
+        left: SemScalarExpr,
+        right: SemScalarExpr,
+    ) -> SemScalarExpr {
+        let call = UndefinedOperatorAnyCallSite::from_inputs(name, left, right);
+        SemScalarExpr::arithmetic(Self::UndefinedOperatorAny(Box::new(call)))
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn deferred_all_operator(
+        name: &crate::sem::OperatorName,
+        left: SemScalarExpr,
+        right: SemScalarExpr,
+    ) -> SemScalarExpr {
+        let call = UndefinedOperatorAllCallSite::from_inputs(name, left, right);
+        SemScalarExpr::arithmetic(Self::UndefinedOperatorAll(Box::new(call)))
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn binary_argument(&self, index: usize) -> Option<&SemScalarExpr> {
+        match self {
+            Self::OpBinary(value) => value.argument(index),
+            Self::UndefinedOperator(value) => value.argument(index),
+            _ => None,
+        }
+    }
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        match self {
+            Self::OpBinary(call) => call.set_binding(binding),
+            Self::OpLeftUnary(call) => call.set_binding(binding),
+            Self::OpRightUnary(call) => call.set_binding(binding),
+            Self::OpAnyBinary(call) => call.set_binding(binding),
+            Self::OpAllBinary(call) => call.set_binding(binding),
+            Self::UndefinedOperator(call) => call.set_binding(binding),
+            Self::UndefinedOperatorAny(call) => call.set_binding(binding),
+            Self::UndefinedOperatorAll(call) => call.set_binding(binding),
+            _ => {}
+        }
+    }
+    /// Operator-name resolution, retained separately from overload/type selection.
+    pub fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        match self {
+            Self::OpBinary(call) => call.binding(),
+            Self::OpLeftUnary(call) => call.binding(),
+            Self::OpRightUnary(call) => call.binding(),
+            Self::OpAnyBinary(call) => call.binding(),
+            Self::OpAllBinary(call) => call.binding(),
+            Self::UndefinedOperator(call) => call.binding(),
+            Self::UndefinedOperatorAny(call) => call.binding(),
+            Self::UndefinedOperatorAll(call) => call.binding(),
+            _ => None,
         }
     }
 }

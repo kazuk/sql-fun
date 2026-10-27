@@ -89,22 +89,10 @@ impl RunnableCommand {
     ///
     /// Returns an error when spawning or waiting on the child process fails.
     pub async fn execute(&self, args: &SqlFunCliArgs) -> Result<ExitCode, anyhow::Error> {
-        match &self.sub_command {
-            CliSubCommand::External(external_args) => {
-                let exit_code = self.run_external(args, external_args).await?;
-                Ok(ExitCode::from(u8::try_from(exit_code).unwrap_or(u8::MAX)))
-            }
-            CliSubCommand::Start(_daemon_control_args) => todo!(),
-            CliSubCommand::Stop(_daemon_control_args) => todo!(),
-            CliSubCommand::Status(_daemon_control_args) => todo!(),
-            CliSubCommand::Restart(_daemon_control_args) => todo!(),
-            CliSubCommand::Initialize(_initialize_args) => todo!(),
-            CliSubCommand::Check(_check_args) => todo!(),
-            CliSubCommand::Versions => todo!(),
-        }
+        self.sub_command.execute_external(self, args).await
     }
 
-    async fn run_external(
+    pub(crate) async fn run_external(
         &self,
         core_args: &SqlFunCliArgs,
         args: &[String],

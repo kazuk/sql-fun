@@ -13,4 +13,5 @@ junit.path = "junit.xml"
 
 [profile.ci-b]
 fail-fast = false
+test-threads = 1
 junit.path = "junit.xml"

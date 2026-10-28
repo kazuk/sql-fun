@@ -48,6 +48,22 @@ class Source(unittest.TestCase):
                 capture_source(source, root / 'invalid', 'HEAD')
             self.assertEqual(source_fingerprint(source), before)
 
+    def test_cargo_default_membership_uses_current_staged_tracking_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'repository'
+            source_repository(source, explicit_includes=False)
+            dirty_source(source)
+            before = source_fingerprint(source)
+            captured = root / 'captured'
+            capture_source(source, captured, None)
+            completed = subprocess.run(['cargo', 'package', '--list', '--allow-dirty', '--offline'],
+                                       cwd=captured, text=True, capture_output=True, check=True)
+            members = completed.stdout.splitlines()
+            self.assertIn('src/staged_ignored.rs', members)
+            self.assertNotIn('src/removed_from_index.rs', members)
+            self.assertEqual(source_fingerprint(source), before)
+
 
 if __name__ == '__main__':
     unittest.main()

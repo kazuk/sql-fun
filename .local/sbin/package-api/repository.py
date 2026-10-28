@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tarfile
 import time
 import tomllib
@@ -72,6 +73,14 @@ def overlay_working_tree(repository, destination):
         elif target.is_symlink() or target.exists():
             target.unlink()
         shutil.copy2(source, target)
+    # Git tracking affects Cargo's default inclusion rules. Preserve the current
+    # staged tracking set (including forced additions and cached removals), while
+    # keeping the captured working-file contents rather than staged blob contents.
+    entries = git(repository, 'ls-files', '--stage', '-z')
+    git(destination, 'read-tree', '--empty')
+    updated = subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', 'update-index', '-z', '--index-info'], cwd=destination,
+                             env=repository_environment(), input=entries, text=True, capture_output=True)
+    require(updated.returncode == 0, f'cannot capture Git tracking state: {updated.stderr}')
     exclude = git(repository, 'rev-parse', '--git-path', 'info/exclude').strip()
     exclude = Path(exclude) if Path(exclude).is_absolute() else repository / exclude
     if exclude.is_file():

@@ -20,7 +20,10 @@ an installed toolchain and an explicit target:
 The working-tree operation selects current on-disk contents. Staged and unstaged
 edits, tracked deletions and untracked files are captured. Git-ignored input files
 are also captured because explicit Cargo include rules may package them. Cargo
-owns the final include/exclude decision. Build target directories and linked
+owns the final include/exclude decision. Scratch Git tracking state mirrors the
+current index so forced additions of ignored files and cached removals retain
+Cargo's effective package membership; file contents still come from the working
+tree, including unstaged edits. Build target directories and linked
 `.worktrees` administration are excluded from source capture. Submodules are not
 initialized by the operation; source symlinks are rejected before materialization.
 The command never stages, commits, updates caller manifests/lockfiles or advances

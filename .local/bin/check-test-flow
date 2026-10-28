@@ -114,6 +114,7 @@ done
 
 cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
+source "$GIT_ROOT/.local/sbin/workspace-nextest"
 
 echo '== Copy payload module from sql-fun-server-api to sql-fun-client'
 rm sql-fun-client/src/payloads.rs
@@ -197,7 +198,7 @@ function run_affected() {
     echo "== Affected crates: ${!AFFECTED[*]}"
     for pkg in "${!AFFECTED[@]}"; do
       run_check   -p "$pkg" "${FEATURES[@]}"
-      run_nextest -p "$pkg" "${FEATURES[@]}" ${NEXTEST_EXTRA}  --no-tests pass
+      run_workspace_nextest -p "$pkg" "${FEATURES[@]}" ${NEXTEST_EXTRA}  --no-tests pass
       run_clippy  -p "$pkg" "${FEATURES[@]}" --no-deps --all-targets \
         -- -D warnings --allow unfulfilled_lint_expectations
     done
@@ -284,12 +285,12 @@ function run_workspace() {
       source "$GIT_ROOT/.local/sbin/workspace-test-groups"
       run_grouped_workspace_verification
     else
-      run_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst" \
+      run_workspace_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst" \
         ${NEXTEST_EXTRA} --no-tests pass
       run_sqlast_regressions
     fi
   else
-    run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+    run_workspace_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
     run_sqlast_regressions
   fi
 }

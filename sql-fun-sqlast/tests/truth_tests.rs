@@ -21,7 +21,7 @@ fn shipped_catalog_preserves_semantics_and_constraints(
     #[case] negated: bool,
 ) -> testresult::TestResult {
     // Actual builtin casts must reject integer/text inputs while accepting bool.
-    let analyzed = heavy::analyze(&format!("SELECT $1 IS {kind}, NULL IS {kind}"), false)?;
+    let analyzed = heavy::analyze(&format!("SELECT $1 IS {kind}, NULL IS {kind}"))?;
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::bool())])));
     assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
@@ -43,7 +43,7 @@ fn shipped_catalog_preserves_semantics_and_constraints(
 #[case::invalid_literal("'invalid' IS UNKNOWN")]
 fn shipped_catalog_retains_rejected_operand(#[case] expression: &str) -> testresult::TestResult {
     // Verify the real catalog does not confuse explicit casts with implicit ones.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), false)?;
+    let analyzed = heavy::analyze(&format!("SELECT {expression}"))?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let test = query
         .result_columns()

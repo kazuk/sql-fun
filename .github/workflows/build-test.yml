@@ -86,7 +86,6 @@ jobs:
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
           .local/bin/check-test-flow --step=workspace --nextest-extra="
-            --config-file ./ci/nextest/config.toml
             --profile ci
             --show-progress none"
           sccache --show-stats
@@ -313,7 +312,6 @@ jobs:
           export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
           chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
           .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
-            --config-file ./ci/nextest/config.toml
             --show-progress none"
       - name: Disk usage after tests
         if: ${{ always() }}

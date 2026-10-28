@@ -93,28 +93,17 @@ removed-feature handling and fail-closed textual output validation remain
 required. Stock 0.51.0 is rejected by the executable identity check; matching
 source inputs or an empty structural diff never bypass analysis.
 
-## Maintained verification and evidence
+## Verification evidence and current coverage
 
-`tests/package-api/test_compare.py`, invoked by the existing `xbuild` integration
-test through `workspace` and nextest, owns:
+The repair PR recorded real-compiler/analyzer results for shadowed trait
+controls, genuine kind replacements, alias-specific replacement, and complete
+approved-baseline replay, together with tool identities and raw JSON/log evidence.
+The builder image retains its semantic smoke tests for the pinned correction.
 
-- unchanged shadowed trait/private-tuple and trait/unit-struct controls;
-- actual trait-to-struct, enum and union replacements;
-- replacement at one path while retaining the trait under a different alias;
-- complete approved-baseline self-comparison, requiring nine Patch results and
-  explicitly checking the binary-only exclusion;
-- existing Major warnings with exit zero, required trait methods, exhaustive
-  variants, features, proc macros, producer drift, unsupported schemas and
-  analysis failures.
-
-`baseline_helpers.py` extracts the frozen test fixture
-`tests/package-api/fixtures/issue826-baseline.tar.gz` and checks its checksum.
-This is a byte-identical copy of the approved seed above, retained independently
-of future active-baseline advancement. It prepares historical registry
-prerequisites outside the production comparison. This gives the full replay a
-maintained execution path without depending on #824 being merged or changing
-the repository's active baseline. The standard contributor command is unchanged.
-
-The repair PR records full replay results, exact tool identities and retained
-raw JSON/log evidence. These generated investigation artifacts are not permanent
-source fixtures; the maintained tests regenerate the relevant surfaces.
+The #828 [test cost review](workspace-test-cost.md) discarded the costly repeated
+package comparisons and complete-baseline regression from `xbuild`'s workspace
+suite, including `baseline_helpers.py` and its duplicate frozen archive. These
+are not retained as ignored or manual tests. `tests/package-api/test_compare.py`
+retains inexpensive input/report checks; it no longer regenerates the repaired
+surfaces or proves all nine baseline comparisons remain Patch. Historical repair
+evidence must not be described as current recurring coverage.

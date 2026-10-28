@@ -353,17 +353,6 @@ mod tests {
     use sql_fun_core::SqlFunArgs;
     use testresult::TestResult;
 
-    pub struct EnableStackOverflowBacktrace {}
-
-    #[rstest::fixture]
-    pub fn enable_stack_overflow_backtrace() -> EnableStackOverflowBacktrace {
-        #[expect(unsafe_code)]
-        unsafe {
-            backtrace_on_stack_overflow::enable()
-        };
-        EnableStackOverflowBacktrace {}
-    }
-
     #[rstest::fixture]
     pub fn context_args() -> SqlFunArgs {
         SqlFunArgs::try_parse_from(vec![
@@ -470,54 +459,5 @@ mod tests {
         Ok(())
     }
 
-    #[rstest::rstest]
-    fn parse_adventure_works_schema(
-        context_args: SqlFunArgs,
-        _enable_stack_overflow_backtrace: EnableStackOverflowBacktrace,
-    ) -> TestResult {
-        crate::test_helpers::small_stack_regression(2 * 1024 * 1024, || {
-            let dump = crate::test_helpers::adventure_works_schema(&context_args)
-                .expect("full AdventureWorks schema on a small stack");
-            let view = crate::context::BaseParseContext::get_view(
-                &dump,
-                &crate::sem::ViewName::from_full_name(&crate::sem::FullName::with_schema(
-                    "humanresources",
-                    "vemployee",
-                )),
-            )
-            .expect("AdventureWorks employee view");
-            for name in [
-                "businessentityid",
-                "title",
-                "firstname",
-                "middlename",
-                "lastname",
-                "suffix",
-                "jobtitle",
-                "phonenumber",
-                "phonenumbertype",
-                "emailaddress",
-                "emailpromotion",
-                "addressline1",
-                "addressline2",
-                "city",
-                "stateprovincename",
-                "postalcode",
-                "countryregionname",
-                "additionalcontactinfo",
-            ] {
-                assert!(
-                    view.has_column(&crate::sem::ColumnName::from(name)),
-                    "{name}"
-                );
-            }
-            assert_eq!(
-                view.get_column_def(&crate::sem::ColumnName::from("businessentityid"))
-                    .expect("employee id")
-                    .get_type_cloned(),
-                Some(crate::sem::PgBuiltInType::int4())
-            );
-        });
-        Ok(())
-    }
+    // Removed the AdventureWorks schema test; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 }

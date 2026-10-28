@@ -1,7 +1,6 @@
 #![cfg(test)]
 //! test helper types
 
-mod adventure_works;
 pub(crate) mod ownership;
 mod syn_builder;
 mod test_parse_context;
@@ -17,7 +16,6 @@ use crate::{
 };
 
 pub use self::{
-    adventure_works::adventure_works_schema,
     syn_builder::SynBuilder,
     test_parse_context::{TestParseContext, test_context},
 };

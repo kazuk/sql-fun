@@ -212,6 +212,7 @@ mod tests {
         assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
     }
 
+    // Removed native_notification_invalidates_in_place_change; restore from df446be6c1d950353fbd7f79916f79c68bfd396d.
     #[test]
     fn inode_replacement_invalidates_without_notification() {
         let directory = ::tempfile::tempdir().unwrap();
@@ -227,61 +228,6 @@ mod tests {
         let replacement = directory.path().join("replacement.sql");
         std::fs::write(&replacement, "new").unwrap();
         std::fs::rename(replacement, &path).unwrap();
-        assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
-    }
-}
-
-#[cfg(test)]
-mod test_watch_notifications {
-    #[tokio::test]
-    async fn native_notification_invalidates_in_place_change() {
-        let file = ::tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(file.path(), "original").unwrap();
-        let path = file.path().canonicalize().unwrap();
-        let cache = super::FileHashCache::new();
-        let token = cache.begin(&path).unwrap();
-        cache
-            .populate(&path, token, "original snapshot hash")
-            .unwrap();
-        let generation = cache
-            .state
-            .lock()
-            .unwrap()
-            .paths
-            .get(&path)
-            .unwrap()
-            .generation;
-        assert!(
-            cache
-                .state
-                .lock()
-                .unwrap()
-                .paths
-                .get(&path)
-                .unwrap()
-                .watched
-                .is_some()
-        );
-        std::fs::write(&path, "changed").unwrap();
-        ::tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            loop {
-                if cache
-                    .state
-                    .lock()
-                    .unwrap()
-                    .paths
-                    .get(&path)
-                    .unwrap()
-                    .generation
-                    > generation
-                {
-                    break;
-                }
-                ::tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
         assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
     }
 }

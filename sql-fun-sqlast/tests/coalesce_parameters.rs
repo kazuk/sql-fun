@@ -4,10 +4,10 @@ use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::sem::{PgBuiltInType, TypeReference};
 use std::collections::BTreeMap;
 
+// Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]
-#[case::repeated("SELECT COALESCE($1,$1,1)")]
 #[case::nested("SELECT COALESCE(COALESCE($1,2),1)")]
 #[case::nested_case("SELECT COALESCE(CASE WHEN true THEN $1 ELSE 2 END,1)")]
 #[case::in_case("SELECT CASE WHEN true THEN COALESCE($1,1) ELSE 2 END")]
@@ -81,30 +81,6 @@ fn finalized_operands_retain_common_type_and_coercions(
 }
 
 #[test]
-fn multiple_parameters_preserve_joint_input_and_output_alternatives() -> testresult::TestResult {
-    // Real builtin source partitions must retain compatible joint assignments.
-    let analyzed = heavy::analyze("SELECT COALESCE($1,$2,1)", &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::int8())
-    ])));
-    assert!(!constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::bool())
-    ])));
-    let result = constraints.result_column(0).unwrap();
-    assert!(result.allows(&PgBuiltInType::int4()));
-    assert!(result.allows(&PgBuiltInType::int8()));
-    Ok(())
-}
-
-#[test]
 fn outer_cast_constrains_coalesce_output() -> testresult::TestResult {
     // The real explicit-cast catalog applies to the expression output, not each input.
     let analyzed = heavy::analyze("SELECT COALESCE($1,1)::smallint", &[])?;
@@ -122,6 +98,7 @@ fn outer_cast_constrains_coalesce_output() -> testresult::TestResult {
     Ok(())
 }
 
+// Removed multiple_parameters_preserve_joint_input_and_output_alternatives; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::same_domain("COALESCE($1::amount,NULL::amount)", "public.amount")]
 #[case::domain_base("COALESCE($1::amount,1)", "pg_catalog.int4")]

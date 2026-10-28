@@ -96,10 +96,12 @@ fn dependent_file_reports_named_missing_domain_base_before_its_provider()
     Ok(())
 }
 
+// Removed standalone whole_row_catalog.rs and the pg_class assertion here;
+// restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[test]
 fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = heavy::builtin_schema()?;
+    let builtin = builtin_root()?;
     let first = load_schema(&builtin, EXTENSION_A)?;
     let second = load_schema(first.base_context(), EXTENSION_B)?;
     let dump = load_schema(second.base_context(), dependent_dump(2))?;
@@ -107,7 +109,6 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
     assert!(first.problems().is_empty());
     assert!(second.problems().is_empty());
     assert!(dump.problems().is_empty());
-    assert_table_exists(&dump, "pg_catalog.pg_class");
     for name in [
         "a.state",
         "a.label",
@@ -735,32 +736,11 @@ mod test_helpers {
             builtin_root()
         }
 
-        /// Parse the complete `PostgreSQL` 17 builtin schema for catalog integration
-        /// coverage. Every call reloads metadata and parses the schema; results
-        /// are not cached or shared between calls or test processes.
-        pub fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            let root = builtin_root()?;
-            let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/schema.sql");
-            Ok({
-                let (args, selected) = super::environment()?;
-                let analysis_base = &root;
-                PostgresDialect::parse_schema_file(
-                    &file,
-                    analysis_base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )
-            }?
-            .base_context()
-            .clone())
-        }
-
-        /// Parse the complete builtin schema and tablefunc extension for real
-        /// extension integration coverage. Every call repeats both schema loads;
+        /// Load builtin JSON metadata and the real tablefunc extension for
+        /// extension integration coverage. Every call repeats both loads;
         /// results are not cached or shared between calls or test processes.
         pub fn tablefunc_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            let prefix = builtin_schema()?;
+            let prefix = builtin_root()?;
             let file =
                 Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
             Ok({

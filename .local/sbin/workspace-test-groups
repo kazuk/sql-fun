@@ -58,7 +58,7 @@ function run_workspace_test_groups() {
   for group in a b; do
     # Each invocation owns its extraction and metadata. Profiles keep JUnit
     # outside the temporary extraction, under target/nextest/ci-{a,b}/.
-    if ! run_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest-${group}.tar.zst" \
+    if ! run_workspace_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest-${group}.tar.zst" \
       --workspace-remap "$GIT_ROOT" --profile "ci-${group}" \
       ${NEXTEST_EXTRA} --no-tests pass; then
       status=1

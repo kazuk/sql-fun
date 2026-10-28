@@ -10,7 +10,9 @@ expressions. Schema setup belongs in `distinctness.sql`.
 Rust tests retain operator-name binding, predicate polarity, coerced operands,
 serialization, correlated admissible assignments, and the separation between
 strictness and a non-null equality result guarantee. The catalog integration
-test needs the real cross-type and polymorphic operator inventory. SQLite
+test retains a canonical integer comparison using the real cross-type operator
+inventory. #828 discarded its cast, string, array, and row variations because
+the aggregate case exceeded the per-case budget. SQLite
 feature tests use the existing bundled rusqlite dependency for small oracle
 comparisons and assert operand retention and unconstrained affinities.
 

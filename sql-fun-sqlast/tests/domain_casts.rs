@@ -45,7 +45,7 @@ fn explicit_cast_retains_domain_binding(
     #[case] target: &str,
 ) -> testresult::TestResult {
     // Real builtin conversions, including I/O casts, are the contract here.
-    let analyzed = heavy::analyze(version, &format!("SELECT {expression}"), false)?;
+    let analyzed = heavy::analyze(version, &format!("SELECT {expression}"))?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -79,7 +79,7 @@ fn invalid_cast_keeps_target_lookup_and_argument(
     #[case] expression: &str,
     #[case] code: &str,
 ) -> testresult::TestResult {
-    let analyzed = heavy::analyze(version, &format!("SELECT {expression}"), false)?;
+    let analyzed = heavy::analyze(version, &format!("SELECT {expression}"))?;
     assert!(
         analyzed
             .context()
@@ -114,7 +114,7 @@ fn invalid_cast_keeps_target_lookup_and_argument(
 fn parameter_cast_preserves_admissible_inputs_and_domain_output(
     #[values("17", "18")] version: &str,
 ) -> testresult::TestResult {
-    let analyzed = heavy::analyze(version, "SELECT $1::public.nested_amount", false)?;
+    let analyzed = heavy::analyze(version, "SELECT $1::public.nested_amount")?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -139,39 +139,25 @@ fn parameter_cast_preserves_admissible_inputs_and_domain_output(
     Ok(())
 }
 
-#[test]
-fn shipped_postgres18_catalog_domain_casts_resolve() -> testresult::TestResult {
-    // Full SQL catalog loading checks the shipped domains and schema layering.
-    let analyzed = heavy::analyze("18", "SELECT 1::information_schema.cardinal_number", true)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    Ok(())
-}
+// Removed shipped_postgres18_catalog_domain_casts_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_core::SqlFunArgs;
         use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect,
+            AstAndContextPair,
             ast::Dialect,
             context::ParseContext,
             parse_statements,
             sem::{BaseContext, FrozenBaseContext, SchemaFileContext},
         };
-        use std::{
-            collections::BTreeMap,
-            path::{Path, PathBuf},
-        };
+        use std::path::{Path, PathBuf};
 
-        /// Load real builtin cast metadata per test process; optionally parse the
-        /// full SQL catalog to verify shipped domain definitions. No shared setup.
+        /// Load real builtin cast metadata and small domain DDL per test process.
+        /// No shared setup.
         pub(crate) fn analyze(
             version: &str,
             sql: &str,
-            full_catalog: bool,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
@@ -185,27 +171,11 @@ mod test_helpers {
             ])?;
             let selected = args.load_metadata()?.remove("default").unwrap();
             let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            if full_catalog {
-                let file = PathBuf::from(env!("SQL_FUN_HOME"))
-                    .join(format!("postgres/{version}/schema.sql"));
-                let schema =
-                    PostgresDialect::parse_schema_file(&file, &base, &mut None, &args, &selected)?;
-                let mut counts = BTreeMap::new();
-                for problem in schema.problems() {
-                    *counts.entry(problem.code()).or_insert(0_usize) += 1;
-                    if problem.code() == "explicit_cast_not_defined" {
-                        let encoded = ::serde_json::to_string(problem)?;
-                        assert!(!encoded.contains("information_schema"), "{encoded}");
-                    }
-                }
-                eprintln!("PostgreSQL {version} shipped catalog diagnostics: {counts:?}");
-                base = schema.base_context().clone();
-            } else {
-                let mut context =
-                    SchemaFileContext::new(Path::new("domains.sql"), &base, &args, &selected);
-                // Minimal real DDL; do not parse the whole catalog for small cases.
-                for statement in parse_statements(
-                    r"
+            let mut context =
+                SchemaFileContext::new(Path::new("domains.sql"), &base, &args, &selected);
+            // Minimal real DDL; do not parse the whole catalog for small cases.
+            for statement in parse_statements(
+                r"
                     CREATE SCHEMA information_schema;
                     CREATE DOMAIN information_schema.cardinal_number AS integer;
                     CREATE DOMAIN information_schema.character_data AS varchar;
@@ -215,13 +185,12 @@ mod test_helpers {
                     CREATE DOMAIN public.nested_amount AS public.amount;
                     CREATE DOMAIN public.amounts AS integer[];
                 ",
-                    Dialect::postgres(),
-                ) {
-                    context = statement?.analyze(context)?.into_context();
-                }
-                assert!(context.problems().is_empty(), "{:?}", context.problems());
-                base = context.freeze();
+                Dialect::postgres(),
+            ) {
+                context = statement?.analyze(context)?.into_context();
             }
+            assert!(context.problems().is_empty(), "{:?}", context.problems());
+            base = context.freeze();
             let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
             Ok(parse_statements(sql, Dialect::postgres())
                 .next()

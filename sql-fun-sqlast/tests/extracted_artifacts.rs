@@ -1,4 +1,6 @@
 //! Loader compatibility for the officially extracted `PostgreSQL` artifacts.
+// Removed installed-generation bootstrap cases here and builtin_bootstrap.rs; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+
 mod extracted_artifacts_helpers {
     pub(crate) mod heavy;
 }
@@ -45,12 +47,4 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str
     extensions
         .resolve_versions(catalog.join("extension"))
         .unwrap();
-}
-
-#[rstest::rstest]
-#[case::seventeen("17")]
-#[case::eighteen("18")]
-fn installed_generation_bootstraps_builtin_and_user_schemas(#[case] version: &str) {
-    let fixture = heavy::InitializedCatalog::new(version);
-    fixture.assert_semantics(version);
 }

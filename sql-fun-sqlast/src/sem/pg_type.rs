@@ -100,7 +100,7 @@ mod builtin_type_definition_tests {
 }
 
 // deserialize_with makes presence mandatory while accepting explicit JSON null.
-pub(super) fn deserialize_collatable<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+pub(crate) fn deserialize_collatable<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

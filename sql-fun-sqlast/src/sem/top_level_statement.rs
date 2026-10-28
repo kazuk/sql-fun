@@ -173,8 +173,9 @@ impl SemAst {
 mod tests {
     use crate::{
         AstAndContextPair, PostgresDialect,
+        context::BaseContext,
         context::MutSourcePathWithSpan,
-        sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
+        sem::{FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
         test_helpers::source_span,
         tests::context_args,
     };

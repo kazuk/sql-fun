@@ -205,8 +205,8 @@ mod test_helpers {
     pub(super) mod heavy {
         use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
         use super::{SchemaName, layer};
+        use crate::context::BaseContext;
         use crate::context::ParseContext;
-        use crate::sem::BaseContext;
 
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.

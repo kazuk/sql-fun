@@ -2,9 +2,9 @@ mod parse_util;
 
 use self::parse_util::{deserialize_braced_list, deserialize_braced_list_opt};
 use crate::sem::{
-    AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType,
-    CreateFunction, FullName, FunctionOverloadCollection, FunctionParam, OverloadVariant,
-    TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
+    AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, CompositeFieldCollection,
+    CreateCompositeType, CreateFunction, FullName, FunctionOverloadCollection, FunctionParam,
+    OverloadVariant, TypeDefinition, TypeReference,
 };
 use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
@@ -168,6 +168,7 @@ impl<'a> Iterator for PgFunctionArgIter<'a> {
 }
 
 #[derive(Debug)]
+/// Builtin function definitions loaded from the selected master files.
 pub struct PgBuiltInFunctions {
     function_by_name: HashMap<String, Vec<PgFunctionProto>>,
     function_details: HashMap<String, Vec<PgFunctionDetail>>,

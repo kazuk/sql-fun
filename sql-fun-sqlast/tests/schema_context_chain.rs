@@ -765,11 +765,11 @@ mod test_helpers {
     use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParsedSchemaDump, PostgresDialect, SqlFunArgs,
+        context::BaseContext,
         context::{ParseContext, ViewInfoRead},
         sem::{
-            AnalysisProblem, BaseContext, ColumnName, FrozenBaseContext, FullName,
-            SchemaFileContext, SchemaName, TableName, TypeReference, ViewLike,
-            problem::NameResolution,
+            AnalysisProblem, ColumnName, FrozenBaseContext, FullName, SchemaFileContext,
+            SchemaName, TableName, TypeReference, ViewLike, problem::NameResolution,
         },
     };
 

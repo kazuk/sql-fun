@@ -147,9 +147,10 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair,
             ast::Dialect,
+            context::BaseContext,
             context::ParseContext,
             parse_statements,
-            sem::{BaseContext, FrozenBaseContext, SchemaFileContext},
+            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::{Path, PathBuf};
 

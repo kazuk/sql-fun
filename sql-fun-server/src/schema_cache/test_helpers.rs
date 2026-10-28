@@ -289,7 +289,7 @@ impl SchemaProject {
         datasource: &str,
     ) -> ::sql_fun_sqlast::sem::SchemaFileContext {
         let (args, metadata) = self.analysis_inputs(datasource);
-        let base = ::sql_fun_sqlast::sem::BaseContext::new(&args, &metadata).unwrap();
+        let base = ::sql_fun_sqlast::context::BaseContext::new(&args, &metadata).unwrap();
         ::sql_fun_sqlast::sem::SchemaFileContext::new(
             &self.home().join("query.sql"),
             &::sql_fun_sqlast::sem::FrozenBaseContext::from(base),

@@ -376,7 +376,7 @@ mod test_helpers {
 
     pub(super) fn base_without_masters(
         dialect: crate::ast::Dialect,
-    ) -> Result<crate::sem::BaseContext, Box<dyn std::error::Error>> {
+    ) -> Result<crate::context::BaseContext, Box<dyn std::error::Error>> {
         let directory = ::tempfile::tempdir()?;
         for file in ["pg_type.json", "functions.json", "func_detail.json"] {
             std::fs::write(directory.path().join(file), "[]")?;
@@ -397,7 +397,7 @@ mod test_helpers {
             .builtin_schema_dir(directory.path())
             .build()?;
         let metadata = TestParseContext::default().with_dialect(dialect);
-        Ok(crate::sem::BaseContext::new(
+        Ok(crate::context::BaseContext::new(
             &args,
             crate::context::BaseParseContext::metadata(&metadata),
         )?)

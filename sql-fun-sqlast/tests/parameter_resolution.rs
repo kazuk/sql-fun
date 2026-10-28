@@ -53,7 +53,8 @@ mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             SqlFunArgs,
-            sem::{BaseContext, FrozenBaseContext, SchemaFileContext},
+            context::BaseContext,
+            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::PathBuf;
 

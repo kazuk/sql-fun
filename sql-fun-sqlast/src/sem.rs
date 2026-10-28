@@ -6,12 +6,11 @@ mod alter_owner;
 mod alter_seq;
 mod alter_table;
 mod analysis_state;
-mod base_context;
 mod cast;
 mod column_constraints;
 mod comment;
 pub(crate) mod conflict_info;
-mod conflict_masters;
+pub(crate) mod conflict_masters;
 mod constraint;
 mod create_comp_type;
 mod create_domain;
@@ -46,7 +45,7 @@ mod overload_rank;
 pub(crate) mod ownership;
 mod parameter_constraints;
 pub(crate) mod parameter_resolution;
-mod pg_type;
+pub(crate) mod pg_type;
 pub mod problem;
 mod query;
 mod query_metadata;
@@ -121,7 +120,6 @@ pub use self::{
     alter_seq::{AlterSequence, SequenceDependency},
     alter_table::{AlterTable, AlterView},
     analysis_state::AnalysisState,
-    base_context::BaseContext,
     cast::{CastContext, CastDefinition},
     column_constraints::{
         AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,

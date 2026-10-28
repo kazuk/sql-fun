@@ -1,6 +1,9 @@
 name: build and test
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches-ignore:
       - ci-image
@@ -9,6 +12,7 @@ on:
       - synchronize
       - reopened
   merge_group:
+  workflow_dispatch:
 
 concurrency:
   group: build-test-${{ github.event.pull_request.number || github.ref }}

@@ -109,7 +109,9 @@ sides. Missing offline dependencies fail clearly rather than replacing history.
 
 `check-test-flow --step=semver` is opt-in. It uses the active installed Rust
 toolchain and its host target, and the repository's checked-in product mappings;
-`--all-features` does not replace that policy. Defaults continue to skip it.
+`--all-features` does not replace that policy. A SemVer-only invocation skips
+the normal flow's payload-copy preparation so local edits are analyzed unchanged.
+Defaults continue to skip it.
 JSON `timings` reports package production, analysis and total elapsed seconds,
 including source/tool preparation in the total. Record tool versions, source,
 target, cache conditions and runner resources with developer/CI measurements.

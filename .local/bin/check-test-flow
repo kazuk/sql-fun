@@ -117,13 +117,6 @@ cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
 source "$GIT_ROOT/.local/sbin/workspace-nextest"
 
-echo '== Copy payload module from sql-fun-server-api to sql-fun-client'
-rm sql-fun-client/src/payloads.rs
-rm -rf sql-fun-client/src/payloads
-cp sql-fun-server-api/src/payloads.rs sql-fun-client/src/payloads.rs
-cp -r sql-fun-server-api/src/payloads sql-fun-client/src/payloads
-
-
 declare -A STEP_SELECTED=()
 if (( ${#SELECTED_STEPS[@]} > 0 )); then
   for step in "${SELECTED_STEPS[@]}"; do
@@ -134,6 +127,18 @@ else
     STEP_SELECTED["$step"]=1
   done
 fi
+
+# A SemVer-only invocation must analyze the selected working files unchanged.
+# Other steps keep the established payload preparation before their execution.
+for step in "${!STEP_SELECTED[@]}"; do
+  [[ "$step" != semver ]] || continue
+  echo '== Copy payload module from sql-fun-server-api to sql-fun-client'
+  rm sql-fun-client/src/payloads.rs
+  rm -rf sql-fun-client/src/payloads
+  cp sql-fun-server-api/src/payloads.rs sql-fun-client/src/payloads.rs
+  cp -r sql-fun-server-api/src/payloads sql-fun-client/src/payloads
+  break
+done
 
 function step_enabled() {
   [[ -n "${STEP_SELECTED[$1]+x}" ]]

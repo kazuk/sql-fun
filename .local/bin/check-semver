@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Standalone repository validation; source mode, toolchain and target are explicit.
+set -euo pipefail
+scripts=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../sbin" && pwd)
+exec uv run --no-project --no-config --python 3.12 "$scripts/check-release-intent" "$@"

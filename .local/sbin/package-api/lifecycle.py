@@ -29,6 +29,12 @@ def read_state(path, policy=None):
     require(isinstance(state, dict), 'coverage descriptor must be an object')
     require(state.get('schema') == 1, 'unsupported coverage descriptor schema')
     require(isinstance(state.get('source_revision'), str) and state['source_revision'], 'source revision required')
+    if 'source' in state:
+        provenance = state['source']
+        require(isinstance(provenance, dict) and provenance.get('mode') in ('commit', 'working-tree') and
+                provenance.get('revision') == state['source_revision'] and type(provenance.get('dirty')) is bool,
+                'invalid source provenance')
+        require(provenance['mode'] != 'commit' or not provenance['dirty'], 'commit source cannot be dirty')
     require(isinstance(state.get('target'), str) and state['target'], 'explicit target required')
     require(state.get('default_features') is True, 'repository configurations require enabled defaults')
     require(isinstance(state.get('packages'), dict) and state['packages'], 'package set must not be empty')
@@ -114,8 +120,6 @@ def schedule(old, old_packages, new, new_packages):
     """Keep old obligations; names do not freeze mappings or invent predecessors."""
     calls, removals, additions, binaries = [], [], [], []
     common = set(old_packages) & set(new_packages)
-    for name in sorted(set(old_packages) - set(new_packages)):
-        removals.append(dict(package=name, reason='released-package-removed'))
     for name in sorted(common):
         removed = old_packages[name]['features'] - new_packages[name]['features']
         if removed:
@@ -172,7 +176,32 @@ def schedule(old, old_packages, new, new_packages):
                 # it does not invent a historical contract for that selection.
                 kind = 'new-coverage' if product not in old['configurations'] else 'current-validation'
                 compare_pair(name, product, None, features, kind)
+    binaries.extend(dict(package=name, reason="no-longer-publishable")
+                    for name in sorted(set(old_packages) - set(new_packages)))
+    binaries.extend(dict(package=name, reason="never-published")
+                    for name in sorted(set(new_packages) - set(old_packages)))
     return calls, removals, additions, binaries
+
+
+def compare_selection(call, target, toolchain, comparator, wrapper, semver, scratch, index):
+    try:
+        request = dict(old=resolve_dependencies(call['old'], target, toolchain),
+                       new=resolve_dependencies(call['new'], target, toolchain),
+                       target=target, toolchain=toolchain)
+        request_path = scratch / f'comparison-{index}.json'
+        request_path.write_text(json.dumps(request))
+        completed = subprocess.run([str(comparator), '--request', str(request_path), '--diff-wrapper', str(wrapper),
+                                    '--semver-checks', str(semver)], text=True, capture_output=True)
+        try:
+            report = json.loads(completed.stdout)
+        except ValueError as error:
+            raise AnalysisError(f'{call["package"]}/{call["configuration"]}: invalid comparator report '
+                                f'(exit {completed.returncode}): {completed.stderr}') from error
+        require(completed.returncode == 0 and report.get('status') == 'detected' and report.get('impact') in LEVELS,
+                f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {report}')
+        return report
+    except AnalysisError as error:
+        raise AnalysisError(f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {error}') from error
 
 
 def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch):
@@ -185,20 +214,7 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
                       not addition.get('released_selection', False) for addition in added)
     impact = 'major' if removed else ('minor' if new_surface else 'patch')
     for index, call in enumerate(calls):
-        request = dict(old=resolve_dependencies(call['old'], new['target'], toolchain),
-                       new=resolve_dependencies(call['new'], new['target'], toolchain),
-                       target=new['target'], toolchain=toolchain)
-        request_path = scratch / f'comparison-{index}.json'
-        request_path.write_text(json.dumps(request))
-        completed = subprocess.run([str(comparator), '--request', str(request_path), '--diff-wrapper', str(wrapper),
-                                    '--semver-checks', str(semver)], text=True, capture_output=True)
-        try:
-            report = json.loads(completed.stdout)
-        except ValueError as error:
-            raise AnalysisError(f'{call["package"]}/{call["configuration"]}: invalid comparator report '
-                                f'(exit {completed.returncode}): {completed.stderr}') from error
-        require(completed.returncode == 0 and report.get('status') == 'detected' and report.get('impact') in LEVELS,
-                f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {report}')
+        report = compare_selection(call, new['target'], toolchain, comparator, wrapper, semver, scratch, index)
         coverage = report['coverage']
         lost = set(coverage['old']['resolved_features']) - set(coverage['new']['resolved_features'])
         if lost:
@@ -210,6 +226,16 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
         reports.append(dict(package=call['package'], configuration=call['configuration'], kind=call['kind'], result=report))
     return dict(status='detected', impact=impact, comparisons=reports, removed_coverage=removed,
                 new_coverage=added, excluded=binaries, next_coverage=new, limits=LIMITS)
+
+
+def unpack_baseline(path, destination):
+    with tarfile.open(path) as archive:
+        require(all(m.isfile() or m.isdir() for m in archive.getmembers()),
+                'baseline links/special files forbidden')
+        archive.extractall(destination, filter='data')
+    descriptor = destination / 'baseline.json'
+    read_state(descriptor)
+    return descriptor
 
 
 def main():
@@ -227,9 +253,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='coverage-lifecycle-') as directory:
             scratch = Path(directory)
             unpacked = scratch / 'baseline'
-            with tarfile.open(baseline) as archive:
-                require(all(m.isfile() or m.isdir() for m in archive.getmembers()), 'baseline links/special files forbidden')
-                archive.extractall(unpacked, filter='data')
+            unpack_baseline(baseline, unpacked)
             report = execute(unpacked / 'baseline.json', candidate, policy,
                              Path(__file__).resolve().parents[1] / 'compare-package-api',
                              wrapper, semver, args.toolchain, scratch)

@@ -10,6 +10,16 @@ fn feature_coverage_contracts() {
     run_contracts("test_lifecycle.py");
 }
 
+#[test]
+fn release_intent_contracts() {
+    run_contracts("test_intent.py");
+}
+
+#[test]
+fn release_source_contracts() {
+    run_contracts("test_source.py");
+}
+
 fn run_contracts(script: &str) {
     // nextest remaps these runtime paths when running a CI build archive.
     let manifest_dir =

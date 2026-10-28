@@ -38,6 +38,7 @@ Optional steps (explicit --step required):
   packaging
   cli-contract
   cli-e2e
+  semver
 USAGE
 }
 
@@ -59,7 +60,7 @@ DEFAULT_STEPS=(
   skill-lint
 )
 
-ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract cli-e2e)
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract cli-e2e semver)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
@@ -67,7 +68,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e)
+    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e|semver)
       printf '%s\n' "$1"
       ;;
     format)
@@ -388,26 +389,16 @@ function run_packaging() {
 }
 
 function run_package_metadata() {
-  require_command cargo
-  require_command jq
-  local crates name version manifest_path directory
-  local -a patches=()
-  crates="$("${GIT_ROOT}/.local/bin/release-crate-manifest" --with-paths)"
+  "${GIT_ROOT}/.local/sbin/package-release-sources" > /dev/null
+}
 
-  # Cargo resolves registry dependencies even with --no-verify. Point workspace
-  # dependencies at their local sources while their versions are unpublished.
-  while IFS=$'\t' read -r name version manifest_path; do
-    directory="$(dirname "$manifest_path")"
-    patches+=(--config "patch.crates-io.\"$name\".path=$(jq -Rn --arg path "$directory" '$path')")
-  done <<< "$crates"
-
-  while IFS=$'\t' read -r name version manifest_path; do
-    echo ">> cargo package --package $name --allow-dirty --no-verify"
-    if ! cargo package --package "$name" --allow-dirty --no-verify --quiet "${patches[@]}"; then
-      echo "error: package construction failed for $name" >&2
-      return 1
-    fi
-  done <<< "$crates"
+function run_semver() {
+  local tools toolchain target
+  tools="$("${GIT_ROOT}/.local/sbin/prepare-package-api-tests")"
+  toolchain="$(jq -er .toolchain <<< "$tools")"
+  target="$(rustup run "$toolchain" rustc -vV | sed -n 's/^host: //p')"
+  "${GIT_ROOT}/.local/bin/check-semver" --repository "$GIT_ROOT" --working-tree \
+    --toolchain "$toolchain" --target "$target"
 }
 
 function run_cli_contract() {
@@ -489,6 +480,7 @@ for step in "${ALL_STEPS[@]}"; do
       packaging) run_packaging ;;
       cli-contract) run_cli_contract ;;
       cli-e2e) run_cli_e2e ;;
+      semver) run_semver ;;
     esac
   fi
 done

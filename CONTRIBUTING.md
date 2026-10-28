@@ -303,6 +303,26 @@ not release artifacts.
 builds Linux distributions and always validates them before publishing outputs.
 See [Linux packaging](docs/internal-rules/linux-packaging.md) for prerequisites.
 
+SemVer release-intent validation is opt-in:
+
+```sh
+.local/bin/check-test-flow --step=semver
+```
+
+It checks current working-tree contents, including staged/unstaged edits and
+untracked files selected by Cargo packaging, without requiring a commit or
+changing your manifests/index. It uses the active installed Rust toolchain and
+its host target, plus the checked-in product feature mappings. It requires the
+corrected `cargo-semver-checks 0.51.0-sqlfun.1` supplied by the documented
+CI/development builder, existing uv/Cargo release tools, and cached comparison
+dependencies. The xbuild wrapper and Python 3.12 are prepared automatically.
+Private and never-published crates are outside SemVer verdicts; binary-only
+packages do not receive Rust API analysis. Failures report crate, product,
+declared intent and detected impact, or an analysis error. Normal checks
+continue to skip this step. For standalone invocation, explicit committed inputs
+for CI, prerequisites and limitations, see
+[repository SemVer integration](docs/internal-rules/semver-repository-integration.md).
+
 List available steps with:
 
 ```sh

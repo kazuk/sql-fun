@@ -110,6 +110,30 @@ cmp "$fixture/expected.tsv" "$fixture/crates.tsv"
 printf 'consumer\t4.5.6\t/consumer/Cargo.toml\ndependency\t1.2.3-snapshot1\t/dependency/Cargo.toml\n' > "$fixture/expected.tsv"
 cmp "$fixture/expected.tsv" "$fixture/crates-with-paths.tsv"
 "$scripts/check-test-flow" --list-steps | grep -qx package-metadata
+"$scripts/check-test-flow" --list-steps | grep -qx semver
+# SemVer dispatch is optional and the default step list must not contain it.
+"$scripts/check-test-flow" --help > "$fixture/flow-help"
+awk '/Default steps:/,/Optional steps/' "$fixture/flow-help" > "$fixture/default-steps"
+! grep -qx '  semver' "$fixture/default-steps"
+# Exercise dispatch without repeating expensive analyzer/tool builds.
+mkdir -p "$fixture/flow/.local/bin" "$fixture/flow/.local/sbin" "$fixture/flow/sql-fun-server-api/src/payloads" "$fixture/flow/sql-fun-client/src/payloads"
+cp "$scripts/check-test-flow" "$fixture/flow/.local/bin/"
+cp "$repo_root/.local/sbin/workspace-nextest" "$fixture/flow/.local/sbin/"
+touch "$fixture/flow/sql-fun-server-api/src/payloads.rs" "$fixture/flow/sql-fun-client/src/payloads.rs"
+git -C "$fixture/flow" init -q
+cat > "$fixture/flow/.local/sbin/prepare-package-api-tests" <<'MOCK'
+#!/usr/bin/env bash
+printf '%s\n' '{"toolchain":"stable"}'
+MOCK
+cat > "$fixture/flow/.local/bin/check-semver" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$*" == "--repository $RELEASE_TEST_ROOT/flow --working-tree --toolchain stable --target "* ]]
+touch "$RELEASE_TEST_ROOT/semver-dispatched"
+MOCK
+chmod +x "$fixture/flow/.local/"{bin/check-semver,sbin/prepare-package-api-tests}
+(cd "$fixture/flow"; .local/bin/check-test-flow --step=semver)
+[[ -f "$fixture/semver-dispatched" ]]
 CI=true "$scripts/check-test-flow" --step=package-metadata
 printf 'consumer\ndependency\n' > "$fixture/expected-packaged"
 cmp "$fixture/expected-packaged" "$fixture/packaged"

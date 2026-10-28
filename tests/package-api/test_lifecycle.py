@@ -73,7 +73,7 @@ class Scheduling(unittest.TestCase):
         self.assertEqual(calls[0]['new']['features'], [])
         self.assertIn('released-manifest-features-removed', [r['reason'] for r in removed])
 
-    def test_new_crate_then_adoption_then_removal(self):
+    def test_new_crate_then_adoption_then_exclusion(self):
         write_package(self.new, name='new-crate')
         self.after['packages']['new-crate'] = 'new-crate'
         self.after['configurations']['postgres']['new-crate'] = []
@@ -86,8 +86,9 @@ class Scheduling(unittest.TestCase):
         calls, removed, added, _ = schedule(new, new_packages, new, new_packages)
         self.assertFalse(added)
         self.assertTrue(all(c['kind'] == 'released' for c in calls))
-        _, removed, _, _ = schedule(new, new_packages, old, old_packages)
-        self.assertIn(dict(package='new-crate', reason='released-package-removed'), removed)
+        _, removed, _, excluded = schedule(new, new_packages, old, old_packages)
+        self.assertFalse(any(item['package'] == 'new-crate' for item in removed))
+        self.assertIn(dict(package='new-crate', reason='no-longer-publishable'), excluded)
 
     def test_removed_product_is_reported(self):
         self.after['configurations'] = {'replacement': {'probe': []}}

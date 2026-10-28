@@ -67,8 +67,9 @@ product/crate list. The checked-in policy initially defines `postgres` and
 
 ## Comparison and results
 
-For every historical package/configuration, compare its released selection
-against that selection in the candidate. If the retained product gains
+For every currently publishable package with historical coverage, compare its
+released selection against that selection in the candidate. If the retained
+product gains
 features, also compare the historical selection against the expanded current
 selection. Identical package/selection pairs execute once. A released selection
 is not discarded when another product is added.
@@ -99,9 +100,11 @@ removal evidence, but never use Major removal evidence as a substitute for
 successful analysis: a compile failure still produces `analysis-error` without
 an impact or `next_coverage`.
 
-Removed released manifest features, dropped product/mapping coverage, removed
-packages and removed library targets contribute explicit Major evidence. Also
-retain lost resolved feature coverage from #357's old/new coverage evidence,
+Removed released manifest features, dropped product/mapping coverage and removed
+library targets of checked packages contribute explicit Major evidence. Packages
+that are now private/no longer publishable are excluded, even when the baseline
+contains historical coverage; their removal does not contribute a SemVer verdict.
+Also retain lost resolved feature coverage from #357's old/new coverage evidence,
 even when no public API item changes. Package inputs reproduce the released
 defaults/forwarding; a second historical feature-resolution representation is
 not needed. Detect known missing features before attempting impossible
@@ -143,8 +146,8 @@ archive.
 The initial state records default-enabled `postgres` coverage for that
 revision's complete publishable set, including then-publishable tooling and
 examples. SQLite coverage did not exist there. Current package additions and
-previously publishable packages becoming private are normal addition/removal
-results, not seed-specific exceptions.
+previously publishable packages becoming private are excluded from SemVer
+verdicts, not seed-specific exceptions.
 
 `.local/sbin/seed-semver-baseline` reproduces this approved initial seed only.
 It requires explicit repository, output and target arguments, exports the fixed
@@ -181,14 +184,17 @@ image-owned correction and historical complete-baseline validation evidence.
 Compare the two source package sets independently. A candidate-only crate does
 not require an old mapping/package, a self-comparison, a Minor bump or a manual
 baseline rewrite. Continue released-crate comparisons in the same run. After
-explicit stable adoption, new packages become historical obligations. A missing
-released package is reported as removal even when no current workspace member
-can be enumerated. A rename is removal plus addition; no rename inference is
-performed.
+explicit stable adoption, new packages become historical obligations. A historical
+package absent from the current publication set is reported as an
+explicit `no-longer-publishable` exclusion. A new package is explicitly
+`never-published`; neither receives an API/intent verdict. Dependency closures
+retain the package inputs needed by checked crates independently on each side.
+The complete current package map and `next_coverage`, including never-published
+packages, remain available for #360 adoption. No rename inference is performed.
 
 `xbuild/tests/package_api.rs` runs lightweight lifecycle Python contracts through
 the existing `workspace` check and nextest archive group. They verify scheduling,
-policy errors, package addition/adoption/removal, impact aggregation and error
+policy errors, package addition/adoption/exclusion, impact aggregation and error
 propagation using small source packages and supplied comparator reports. They
 also extract the checked-in seed and validate its complete replay mappings
 without compiling historical sources. Replacement/shrink cases check that the
@@ -207,3 +213,6 @@ Issue #360 owns ongoing candidate generation/validation, stable adoption/advance
 and snapshot non-advancement. #361 owns release CI wiring. This implementation
 does not enforce release-intent metadata, implement release transactions,
 optimize caches or expand the installed product CLI.
+
+Repository source selection, package production and intent enforcement are
+documented in [repository integration](semver-repository-integration.md).

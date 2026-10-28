@@ -170,3 +170,12 @@ selected regression metadata. `project-roles` supplies exact role names;
 `project-roles-omitted` has no role configuration. All three run through the
 shared source and installed checks. Rust tests retain owner bindings, catalog
 application, current-configuration isolation, and cache identity assertions.
+
+Issue #484 adds the `collate` project-schema fixture on PostgreSQL 17/18 through
+both source and installed checks. It checks explicit name lookup diagnostics,
+operand types/nullability, output names, nesting, parameter consumers and GROUPING
+matching by resolved collation identity across qualification differences. Rust
+tests retain completed binding identities, missing/ambiguous outcomes, nested
+operands, serialization and traversal. SQLite feature tests verify its explicit
+lookup and mandatory static not-found diagnostics; registration is not implemented.
+Expression-wide collation derivation and conflict checking are outside this scope.

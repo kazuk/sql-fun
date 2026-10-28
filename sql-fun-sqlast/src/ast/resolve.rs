@@ -12,15 +12,15 @@ mod update;
 use crate::{
     StringSpan,
     ast::{
-        Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr,
+        Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Collate, Dialect, Expr,
         Indirection, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, SqlValue,
         Subquery, SubqueryKind, TruthTest, TypeName,
     },
     context::ParseContext,
     sem::{
         AliasName, AnalysisError, AnalysisProblem, ArithExpr, ArrayExpr, ArraySubscript, CaseExpr,
-        CaseExprAnalysisContext, CoalesceExpr, ColumnName, DistinctExpr, FullName, FuncCallExpr,
-        IndirectionExpr, MinMaxExpr, OperatorName, QueryNameResolution, QueryProblem,
+        CaseExprAnalysisContext, CoalesceExpr, CollateExpr, ColumnName, DistinctExpr, FullName,
+        FuncCallExpr, IndirectionExpr, MinMaxExpr, OperatorName, QueryNameResolution, QueryProblem,
         ReferenceCapture, ResolvedOperator, ScalarAnalysisContext, ScalarConstExpr,
         SelectStatement, SemScalarExpr, SqlValueExpr, TypeReference, problem::RuleProblem,
     },
@@ -191,12 +191,10 @@ impl Expr {
             Self::Indirection(indirection) => indirection.resolve(context, scope),
             Self::SqlValue(value) => value.resolve(),
             Self::MergeAction => Self::resolve_merge_action(scope),
-            Self::Collate(collate) if context.dialect() == Dialect::sqlite() => {
-                collate.argument.resolve_in(context, scope)
-            }
+            Self::Collate(collate) => collate.resolve(context, scope),
             // Retain the legacy rejection of raw PostgreSQL syntax that was not
             // accepted by the scalar dispatcher, independently of its conversion.
-            Self::Collate(_) | Self::Document(_) | Self::CurrentOf(_) => {
+            Self::Document(_) | Self::CurrentOf(_) => {
                 AnalysisError::raise_unexpected_input("unsupported raw scalar expression")
             }
             Self::Default if context.dialect() == Dialect::postgres() => {
@@ -980,5 +978,18 @@ impl Expr {
             ))?;
         }
         Ok(SemScalarExpr::grouping(&arguments, owner, levels_up, valid))
+    }
+}
+
+impl Collate {
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let argument = self.argument.resolve_in(context, scope)?;
+        let value =
+            CollateExpr::resolve(context, &argument, &self.name.full_name()?, &self.location)?;
+        Ok(SemScalarExpr::collate(value))
     }
 }

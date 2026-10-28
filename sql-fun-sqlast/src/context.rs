@@ -184,6 +184,14 @@ where
         crate::ast::Dialect::from(self.metadata())
     }
 
+    /// Resolve an explicit SQLite COLLATE name from the loaded analysis metadata.
+    /// This is separate from conflict-target catalog services. Registration is
+    /// not implemented yet, so every name is currently absent, including builtins.
+    /// No connection or ambient registry is inspected.
+    fn resolve_sqlite_collation(&self, _name: &FullName) -> Option<FullName> {
+        None
+    }
+
     /// Resolve an exact portal name in the current session scope.
     /// An absent binding is an unresolved cursor, including in an empty scope.
     /// Portal names are distinct from procedural refcursor variable names.

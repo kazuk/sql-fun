@@ -1,0 +1,652 @@
+[
+  {
+    "name": "literal",
+    "sql": "SELECT 'x' COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "typed_null",
+    "sql": "SELECT NULL::text COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "bare_null",
+    "sql": "SELECT NULL COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified",
+    "sql": "SELECT 'x' COLLATE pg_catalog.\"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested",
+    "sql": "SELECT ('x' COLLATE \"C\") COLLATE \"POSIX\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "required_name",
+    "sql": "SELECT required COLLATE \"C\" FROM collate_inputs",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "required",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nullable_name",
+    "sql": "SELECT optional COLLATE \"C\" FROM collate_inputs",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "optional",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "alias",
+    "sql": "SELECT required COLLATE \"C\" AS chosen FROM collate_inputs",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "chosen",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing",
+    "sql": "SELECT 'x' COLLATE absent484 AS value",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_inner",
+    "sql": "SELECT ('x' COLLATE absent484) COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_schema",
+    "sql": "SELECT 'x' COLLATE absent484.\"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted_case",
+    "sql": "SELECT 'x' COLLATE c AS value",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "integer",
+    "sql": "SELECT 1 COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "boolean",
+    "sql": "SELECT TRUE COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_text",
+    "sql": "SELECT ARRAY['x'] COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_integer",
+    "sql": "SELECT ARRAY[1] COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "derived",
+    "sql": "SELECT value FROM (SELECT required COLLATE \"C\" AS value FROM collate_inputs) s",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cte",
+    "sql": "WITH c AS (SELECT optional COLLATE \"C\" AS value FROM collate_inputs) SELECT value FROM c",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "coalesce",
+    "sql": "SELECT COALESCE(NULL COLLATE \"C\",'x') AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_cast",
+    "sql": "SELECT ($1 COLLATE \"C\")::text AS value",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_late",
+    "sql": "SELECT $1 COLLATE \"C\" AS value, $1::text AS typed",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "unknown"
+        },
+        {
+          "name": "typed",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "recovery",
+    "sql": "SELECT 'x' COLLATE absent484 AS bad, 1 AS good",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "bad",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "good",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_text",
+    "sql": "SELECT NULL::collate_text COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collate_text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_integer",
+    "sql": "SELECT NULL::collate_integer COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collate_integer",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "order",
+    "sql": "SELECT required FROM collate_inputs ORDER BY required COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "required",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "order_missing",
+    "sql": "SELECT required FROM collate_inputs ORDER BY required COLLATE absent484",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "required",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "group",
+    "sql": "SELECT required COLLATE \"C\" FROM collate_inputs GROUP BY required COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "required",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "where",
+    "sql": "SELECT required FROM collate_inputs WHERE (required COLLATE \"C\") = 'x'",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "required",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_hint",
+    "sql": "SELECT ${src:text} COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "parameter_invalid_hint",
+    "sql": "SELECT ${src:int4} COLLATE \"C\" AS value",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_qualified_argument",
+    "sql": "SELECT GROUPING(required COLLATE pg_catalog.\"C\") AS value FROM collate_inputs GROUP BY required COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_qualified_key",
+    "sql": "SELECT GROUPING(required COLLATE \"C\") AS value FROM collate_inputs GROUP BY required COLLATE pg_catalog.\"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_nested_qualification",
+    "sql": "SELECT GROUPING((required COLLATE pg_catalog.\"C\") COLLATE \"POSIX\") AS value FROM collate_inputs GROUP BY (required COLLATE \"C\") COLLATE pg_catalog.\"POSIX\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_distinct_collations",
+    "sql": "SELECT GROUPING(required COLLATE \"POSIX\") AS value FROM collate_inputs GROUP BY required COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [
+        "query_grouping_argument_not_grouped"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

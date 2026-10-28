@@ -1266,6 +1266,7 @@ impl TryFrom<&syn::ExprCollate> for Collate {
         Ok(Self {
             argument: Expr::try_from(value.expr())?,
             name: Name::local(value.name().value()),
+            location: None,
         })
     }
 }

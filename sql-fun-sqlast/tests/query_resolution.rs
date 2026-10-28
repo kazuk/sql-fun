@@ -12,7 +12,6 @@ fn supported_select_reaches_public_resolution(#[case] sql: &str) {
 
 #[rstest::rstest]
 #[case("select json_object('x': 1)")]
-#[case("select 'x' collate \"C\"")]
 #[case("select merge_action()")]
 #[case("select 1 from coalesce(1, 2) as t")]
 #[case("select 1 from rows from(coalesce(1, 2)) as t")]

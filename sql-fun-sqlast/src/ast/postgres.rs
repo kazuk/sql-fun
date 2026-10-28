@@ -1032,6 +1032,11 @@ impl TryFromWithTokens<&syn::CollateClause> for Collate {
         Ok(Self {
             argument: Expr::try_from_with_tokens(&collate.get_arg(), tokens)?,
             name: Name::try_from(collate.get_collname())?,
+            location: if collate.get_location() < 0 {
+                None
+            } else {
+                source_span(collate.get_location() + "COLLATE".len() as i32, tokens)
+            },
         })
     }
 }

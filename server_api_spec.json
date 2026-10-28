@@ -546,6 +546,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Explicit COLLATE binding or operand applicability failed.",
+                  "type": "object",
+                  "properties": {
+                    "Collate": {
+                      "$ref": "#/$defs/CollateProblem"
+                    }
+                  },
+                  "required": [
+                    "Collate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid null-safe distinctness predicate.",
                   "type": "object",
                   "properties": {
@@ -1274,6 +1287,37 @@
                   },
                   "required": [
                     "InvalidLiteral"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CollateProblem": {
+              "description": "A failed explicit COLLATE binding or type applicability check.",
+              "oneOf": [
+                {
+                  "description": "The independently known operand type does not support collations.",
+                  "type": "object",
+                  "properties": {
+                    "OperandType": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "OperandType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More than one definition remains after name visibility is applied.",
+                  "type": "object",
+                  "properties": {
+                    "Ambiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Ambiguous"
                   ],
                   "additionalProperties": false
                 }
@@ -4247,6 +4291,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Explicit COLLATE binding or operand applicability failed.",
+                  "type": "object",
+                  "properties": {
+                    "Collate": {
+                      "$ref": "#/$defs/CollateProblem"
+                    }
+                  },
+                  "required": [
+                    "Collate"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid null-safe distinctness predicate.",
                   "type": "object",
                   "properties": {
@@ -4975,6 +5032,37 @@
                   },
                   "required": [
                     "InvalidLiteral"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CollateProblem": {
+              "description": "A failed explicit COLLATE binding or type applicability check.",
+              "oneOf": [
+                {
+                  "description": "The independently known operand type does not support collations.",
+                  "type": "object",
+                  "properties": {
+                    "OperandType": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "OperandType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More than one definition remains after name visibility is applied.",
+                  "type": "object",
+                  "properties": {
+                    "Ambiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Ambiguous"
                   ],
                   "additionalProperties": false
                 }

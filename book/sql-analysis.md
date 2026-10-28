@@ -840,3 +840,21 @@ as `"CURRENT_USER"` instead request a named role from the inventory.
 
 This is offline semantic analysis of known role identities. It does not check
 whether a connected user could transfer ownership or grant database permissions.
+
+## Explicit COLLATE annotations
+
+PostgreSQL `COLLATE` names are resolved against the loaded collation catalog,
+using schema qualification or the configured search path. Missing names are
+diagnosed. An annotation preserves its operand's type, nullability and output
+name; an explicit column alias still takes precedence. Known PostgreSQL operand
+types that do not support collation are diagnosed when their type is available.
+
+SQLite explicit `COLLATE` expressions are checked against the analysis metadata.
+Expression collation registration is not implemented yet, so every explicit name,
+including `BINARY`, `NOCASE` and `RTRIM`, currently produces a not-found diagnostic.
+This static check also applies to projections that SQLite could execute without
+using the collation.
+
+Analysis retains nested annotations and unresolved names. It does not yet derive
+collations across expressions or check precedence and collation conflicts among
+function/operator inputs, query boundaries or ordering expressions.

@@ -145,18 +145,19 @@ fn binds_columns_and_retains_null_literal_row_distinction() -> testresult::TestR
 
 #[cfg(feature = "sqlite")]
 #[rstest::rstest]
-#[case::distinct("1 IS DISTINCT FROM NULL", false, 1)]
-#[case::not_distinct("NULL IS NOT DISTINCT FROM NULL", true, 1)]
-#[case::is("1 IS 1", true, 1)]
-#[case::is_not("1 IS NOT 1", false, 0)]
-#[case::mixed("'1' IS DISTINCT FROM 1", false, 1)]
-#[case::truth("2 IS TRUE", true, 1)]
-#[case::truth_distinct("2 IS NOT DISTINCT FROM TRUE", true, 1)]
-#[case::collation("'A' COLLATE NOCASE IS NOT DISTINCT FROM 'a'", true, 1)]
+#[case::distinct("1 IS DISTINCT FROM NULL", false, 1, false)]
+#[case::not_distinct("NULL IS NOT DISTINCT FROM NULL", true, 1, false)]
+#[case::is("1 IS 1", true, 1, false)]
+#[case::is_not("1 IS NOT 1", false, 0, false)]
+#[case::mixed("'1' IS DISTINCT FROM 1", false, 1, false)]
+#[case::truth("2 IS TRUE", true, 1, false)]
+#[case::truth_distinct("2 IS NOT DISTINCT FROM TRUE", true, 1, false)]
+#[case::collation("'A' COLLATE NOCASE IS NOT DISTINCT FROM 'a'", true, 1, true)]
 fn sqlite_predicates_preserve_operands_without_catalog_equality(
     #[case] sql: &str,
     #[case] negated: bool,
     #[case] oracle: i32,
+    #[case] missing_collation: bool,
 ) -> testresult::TestResult {
     let sql = format!("SELECT {sql}");
     let connection = ::rusqlite::Connection::open_in_memory()?;
@@ -170,7 +171,19 @@ fn sqlite_predicates_preserve_operands_without_catalog_equality(
     assert_eq!(test.negated(), negated);
     assert!(test.equality().is_none());
     assert_eq!(test.comparisons().len(), 2);
-    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    if missing_collation {
+        assert_eq!(context.problems().len(), 1);
+        assert_eq!(context.problems()[0].code(), "collation_not_found");
+        assert!(
+            test.comparisons()[0]
+                .as_collate()
+                .unwrap()
+                .collation()
+                .is_missing()
+        );
+    } else {
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+    }
     Ok(())
 }
 

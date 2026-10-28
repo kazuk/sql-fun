@@ -1126,7 +1126,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Fin
     }
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.apply_constraints(self.constraints);
-        Ok(())
+        expression.validate_collation(self.context)
     }
     fn output(&mut self, _name: &str, expression: &mut SemScalarExpr) {
         if self.context.dialect() == Dialect::postgres() && expression.is_unconstrained_parameter()

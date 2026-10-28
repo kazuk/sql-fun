@@ -246,6 +246,7 @@ impl SemScalarExpr {
             Self::Arith(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
             Self::NamedArg(value) => value.canonicalize_grouping_key(),
+            Self::Collate(value) => value.canonicalize_grouping_key(),
             Self::Constrained(value) => value.canonicalize_grouping_key(),
             Self::ColumnRef(value) => value.canonicalize_grouping_key(),
             _ => {}
@@ -471,6 +472,7 @@ impl SemScalarExpr {
             Self::TruthTest(value) => value.node(),
             Self::Distinct(value) => value.node(),
             Self::Coalesce(value) => value.node(),
+            Self::Collate(value) => value.argument().constraint_node(),
             _ => None,
         }
     }
@@ -481,6 +483,29 @@ impl SemScalarExpr {
     ) -> Self {
         Self::Param(ParamRef::new(position, node, constraint))
     }
+    /// Retained explicit collation reference and its analyzed operand.
+    pub const fn as_collate(&self) -> Option<&CollateExpr> {
+        if let Self::Collate(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) const fn collate(value: CollateExpr) -> Self {
+        Self::Collate(value)
+    }
+
+    pub(crate) fn validate_collation(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Collate(value) = self {
+            value.validate_type(context)?;
+        }
+        Ok(())
+    }
+
     /// Structured COALESCE with analyzed operands and inferred coercions.
     pub const fn as_coalesce(&self) -> Option<&CoalesceExpr> {
         if let Self::Coalesce(value) = self {
@@ -690,7 +715,7 @@ impl SemScalarExpr {
             Self::Row(_) => String::new(),
             Self::WholeRow(row) => row.qualifier().name().as_str().to_owned(),
             Self::MinMax(value) => value.operation().to_owned(),
-            Self::Collate(_collate_expr) => todo!(),
+            Self::Collate(value) => value.argument().get_column_name(),
             Self::SqlValue(_sql_value_expr) => todo!(),
             Self::Param(_) => String::new(),
             Self::Constrained(value) => value.name().to_owned(),
@@ -1022,6 +1047,7 @@ impl SemScalarExpr {
             Self::Exists(value) => value.walk(visitor)?,
             Self::ArraySubquery(value) => value.walk(visitor)?,
             Self::Coalesce(v) => v.walk(visitor)?,
+            Self::Collate(v) => v.walk(visitor)?,
             Self::Row(v) => v.walk(visitor)?,
             Self::WholeRow(v) => v.walk(visitor)?,
             Self::MinMax(v) => v.walk(visitor)?,
@@ -1031,7 +1057,6 @@ impl SemScalarExpr {
             Self::List(v) => v.walk(visitor)?,
             Self::Const(_)
             | Self::ColumnRef(_)
-            | Self::Collate(_)
             | Self::SqlValue(_)
             | Self::Param(_)
             | Self::MergeAction

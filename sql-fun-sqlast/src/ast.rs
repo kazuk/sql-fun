@@ -1298,6 +1298,7 @@ pub(crate) struct Cast {
 pub(crate) struct Collate {
     argument: Expr,
     name: Name,
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]

@@ -62,6 +62,9 @@ impl MinMaxExpr {
     }
 
     pub(crate) fn input_type(value: &SemScalarExpr) -> Option<TypeReference> {
+        if let Some(collate) = value.as_collate() {
+            return Self::input_type(collate.argument());
+        }
         // Bare PostgreSQL strings and NULL have type unknown, unlike typed
         // strings or the legacy generic constant accessor's text approximation.
         if value

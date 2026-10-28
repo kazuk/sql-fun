@@ -129,6 +129,12 @@ own validation environment.
 
 ## Execution cost
 
+The standard `version-materialization` check runs the release-input integration
+contracts through `test-release-publication`: real baseline extraction/replay
+and Git/Cargo source membership. They retain all assertions without running
+archive I/O and subprocess setup under nextest's unit-test time budget. The
+lightweight comparator and intent contracts remain in xbuild's nextest suite.
+
 `check-test-flow --step=semver` is opt-in. It uses the active installed Rust
 toolchain and its host target, and the repository's checked-in product mappings;
 `--all-features` does not replace that policy. A SemVer-only invocation skips

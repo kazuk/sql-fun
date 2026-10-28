@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 #[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]
 #[case::nested("SELECT COALESCE(COALESCE($1,2),1)")]
-// Removed nested_case after a local timeout; restore from 0d13b775b7215b3ecf152dce36f6133345f9a3fb.
-// Removed in_case after a local timeout; restore from 0d13b775b7215b3ecf152dce36f6133345f9a3fb.
+// Removed nested_case after a local timeout; restore from 6c7f829bcb277d420af773c30c8833014e682e8c.
+// Removed in_case after a local timeout; restore from 6c7f829bcb277d420af773c30c8833014e682e8c.
 #[case::operator("SELECT COALESCE($1,1)+2")]
 #[case::function("SELECT abs(COALESCE($1,1))")]
 #[case::cte("WITH c AS (SELECT COALESCE($1,1) AS n) SELECT n FROM c")]

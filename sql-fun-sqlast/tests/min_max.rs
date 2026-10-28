@@ -84,9 +84,9 @@ fn invalid_operands_render_specific_diagnostics(
 // Removed the repeated parameter-source variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
 #[case::numeric("select greatest($1,1) as result")]
-// Removed nested after a local timeout; restore from b9fb99ce47f98c21742c1d342f2ae3065988c505.
+// Removed nested after a local timeout; restore from f6df712fec50f75b4c00475cf96eb8bf6e9776e3.
 #[case::subquery("select greatest((select $1),1) as result")]
-// Removed cte after a local timeout; restore from b9fb99ce47f98c21742c1d342f2ae3065988c505.
+// Removed cte after a local timeout; restore from f6df712fec50f75b4c00475cf96eb8bf6e9776e3.
 fn parameter_sources_allow_numeric_promotion(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {

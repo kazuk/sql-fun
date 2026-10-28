@@ -15,7 +15,8 @@ mod test_helpers {
         use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
         use ::sql_fun_sqlast::{
             ParsedSchemaDump, PostgresDialect,
-            sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SemAst},
+            context::BaseContext,
+            sem::{FrozenBaseContext, SchemaFileContext, SemAst},
         };
         use sql_fun_sqlast::context::ParseContext;
         use std::path::Path;

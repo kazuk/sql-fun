@@ -21,7 +21,7 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str
     let catalog = root.join("sql-fun-home/postgres").join(version);
     let fixture = heavy::CatalogProject::new();
     let args = fixture.arguments(&catalog);
-    let context = ::sql_fun_sqlast::sem::BaseContext::new(
+    let context = ::sql_fun_sqlast::context::BaseContext::new(
         &args,
         args.load_metadata()
             .expect("fixture metadata")

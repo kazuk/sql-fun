@@ -2,8 +2,9 @@ use ::sql_fun_core::SqlFunArgs;
 use ::sql_fun_sqlast::{
     AstAndContextPair,
     ast::Dialect,
+    context::BaseContext,
     parse_statements,
-    sem::{BaseContext, FrozenBaseContext, SchemaFileContext},
+    sem::{FrozenBaseContext, SchemaFileContext},
 };
 use std::path::{Path, PathBuf};
 

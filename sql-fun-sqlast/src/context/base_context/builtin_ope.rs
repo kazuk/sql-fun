@@ -22,6 +22,7 @@ struct UnaryOperatorTypeDecl {
     strict: bool,
 }
 
+/// Loads builtin operator definitions from the selected master files.
 pub struct PgBuiltinOperators {}
 
 impl PgBuiltinOperators {

@@ -1,5 +1,5 @@
-use crate::context::BaseParseContext;
-use crate::sem::{BaseContext, FullName, TypeDefinition, TypeReference};
+use crate::context::{BaseContext, BaseParseContext};
+use crate::sem::{FullName, TypeDefinition, TypeReference};
 use std::sync::Arc;
 
 /// An owned, immutable schema context that can be shared across threads.
@@ -123,7 +123,8 @@ mod test_frozen_root {
     }
 
     mod test_helpers {
-        use crate::sem::{BaseContext, FrozenBaseContext};
+        use crate::context::BaseContext;
+        use crate::sem::FrozenBaseContext;
         use ::sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
         use std::path::Path;
 

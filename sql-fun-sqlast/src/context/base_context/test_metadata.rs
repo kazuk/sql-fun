@@ -61,7 +61,7 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
 fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
 -> testresult::TestResult {
     use crate::context::BaseParseContext;
-    use crate::sem::ParseContext;
+    use crate::context::ParseContext;
     let base = crate::test_helpers::TestParseContext::default().freeze();
     let selected = test_helpers::selected_metadata("selected-sqlite.toml")?;
     let context = test_helpers::context_over_catalog(&base, &selected)?;
@@ -99,7 +99,7 @@ fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
 #[test]
 fn selected_dialect_does_not_depend_on_the_engine_name() -> testresult::TestResult {
     use crate::context::BaseParseContext;
-    use crate::sem::ParseContext;
+    use crate::context::ParseContext;
     let metadata = test_helpers::sqlite_compatible_engine()?;
     let context = crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
     assert_eq!(context.dialect(), crate::ast::Dialect::sqlite());
@@ -128,8 +128,8 @@ mod test_helpers {
 
     use crate::context::BaseParseContext;
     use crate::{
-        context::MutSourcePathWithSpan,
-        sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
+        context::{BaseContext, MutSourcePathWithSpan},
+        sem::{FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
     };
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 

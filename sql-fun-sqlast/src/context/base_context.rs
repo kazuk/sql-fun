@@ -18,9 +18,9 @@ use crate::{
         SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
     sem::{
-        AnalysisError, CastDefinition, CreateTable, FullName, FunctionOverloadCollection,
-        OperatorDefinition, SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference,
-        ViewLike,
+        AnalysisError, CastDefinition, CreateIndex, CreateSequence, CreateTable, FullName,
+        FunctionOverloadCollection, OperatorDefinition, OperatorName, SchemaName,
+        SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
     },
 };
 use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
@@ -384,17 +384,17 @@ impl ViewInfoRead for BaseContext {
 }
 
 impl IndexInfoRead for BaseContext {
-    fn indexes_for_table(&self, _table: &crate::sem::TableName) -> Vec<&super::CreateIndex> {
+    fn indexes_for_table(&self, _table: &crate::sem::TableName) -> Vec<&CreateIndex> {
         Vec::new()
     }
-    fn get_index_impl(&self, _index_name: &FullName) -> Option<&super::CreateIndex> {
+    fn get_index_impl(&self, _index_name: &FullName) -> Option<&CreateIndex> {
         // Builtin metadata contains no index definitions.
         None
     }
 }
 
 impl SequenceInfoRead for BaseContext {
-    fn get_sequence_impl(&self, _seq_name: &FullName) -> Option<&super::CreateSequence> {
+    fn get_sequence_impl(&self, _seq_name: &FullName) -> Option<&CreateSequence> {
         None
     }
 }
@@ -418,10 +418,10 @@ impl FunctionInfoRead for BaseContext {
 }
 
 impl OperatorInfoRead for BaseContext {
-    fn operator_result_is_not_null(&self, name: &super::OperatorName) -> Option<bool> {
+    fn operator_result_is_not_null(&self, name: &OperatorName) -> Option<bool> {
         // The shipped equality implementations return a boolean for non-null
         // operands. This guarantee does not extend to arbitrary SQL functions.
-        if *name == super::OperatorName::from_parts(None, "=")
+        if *name == OperatorName::from_parts(None, "=")
             && self.get_operator_op(name, true, true).is_some()
         {
             Some(true)
@@ -433,10 +433,10 @@ impl OperatorInfoRead for BaseContext {
     #[tracing::instrument(skip(self))]
     fn get_operator_op(
         &self,
-        name: &super::OperatorName,
+        name: &OperatorName,
         has_left: bool,
         has_right: bool,
-    ) -> Option<&super::OperatorDefinition> {
+    ) -> Option<&OperatorDefinition> {
         if !name.is_valid() {
             return None;
         }

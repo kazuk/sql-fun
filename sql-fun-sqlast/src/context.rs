@@ -1,5 +1,6 @@
 //! Shared catalog interfaces and services for SQL analysis.
 
+mod base_context;
 mod base_parse_context;
 mod cast_info;
 mod conflict_info;
@@ -20,6 +21,7 @@ mod type_hint;
 mod type_info;
 mod view_info;
 
+pub use self::base_context::{BaseContext, PgBuiltInFunctions, PgBuiltinCasts, PgBuiltinOperators};
 pub use self::base_parse_context::BaseParseContext;
 pub use self::cast_info::CastInfoRead;
 pub use self::conflict_info::ConflictInfoRead;

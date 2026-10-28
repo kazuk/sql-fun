@@ -37,9 +37,8 @@ mod test_helpers {
 
         use ::sql_fun_sqlast::{
             PostgresDialect, SqlFunArgs,
-            sem::{
-                AnalysisError, BaseContext, FrozenBaseContext, SchemaFileContext, SelectStatement,
-            },
+            context::BaseContext,
+            sem::{AnalysisError, FrozenBaseContext, SchemaFileContext, SelectStatement},
             syn::{ListOpt, Opt},
         };
 

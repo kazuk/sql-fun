@@ -9,6 +9,7 @@ use crate::{
     sem::{AnalysisError, CastContext, CastDefinition, FullName, TypeReference},
 };
 
+/// Loads builtin cast definitions from the selected master file.
 pub struct PgBuiltinCasts {}
 
 #[expect(dead_code)]
@@ -272,8 +273,8 @@ mod test_builtin_cast_identity {
     use ::sql_fun_core::SqlFunArgs;
 
     use crate::{
-        context::CastInfoRead,
-        sem::{BaseContext, FrozenBaseContext, FullName, SchemaFileContext, TypeReference},
+        context::{BaseContext, CastInfoRead},
+        sem::{FrozenBaseContext, FullName, SchemaFileContext, TypeReference},
     };
 
     #[test]

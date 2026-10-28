@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 
 sys.dont_write_bytecode = True
-from lifecycle_helpers import ROOT, state_for, write_package
+from lifecycle_helpers import ROOT, state_for, write_package, write_resource_baseline
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
 from compare import AnalysisError
 from lifecycle import read_state, schedule, execute
@@ -33,6 +33,8 @@ class Scheduling(unittest.TestCase):
             path = root / 'coverage.json'
             path.write_text(json.dumps(state))
             result.extend(read_state(path))
+            if root == self.old:
+                write_resource_baseline(root, state)
         return result
 
     def test_growth_preserves_historical_replay_and_compares_expanded_selection(self):
@@ -50,7 +52,7 @@ class Scheduling(unittest.TestCase):
         self.assertEqual([c['kind'] for c in calls], ['released', 'new-coverage'])
         self.assertFalse(removed)
         self.assertTrue(added)
-        self.assertEqual(calls[1]['old'], calls[1]['new'])
+        self.assertIsNone(calls[1]['old'])
 
     def test_new_name_for_released_selection_reuses_existing_comparison(self):
         self.after['configurations']['alias'] = {'probe': ['released']}
@@ -118,7 +120,7 @@ class Scheduling(unittest.TestCase):
         calls, removed, added, _ = schedule(*self.inputs())
         self.assertFalse(removed)
         self.assertEqual(added[0]['reason'], 'new-api-target')
-        self.assertEqual(calls[0]['old'], calls[0]['new'])
+        self.assertIsNone(calls[0]['old'])
 
     def test_sides_resolve_their_own_packaged_dependency_closure(self):
         write_package(self.new, name='new-dependency')
@@ -135,6 +137,8 @@ class Scheduling(unittest.TestCase):
         with tarfile.open(ROOT / '.local/semver_baseline.tar.gz') as archive:
             archive.extractall(self.root / 'seed', filter='data')
         state, packages = read_state(self.root / 'seed/baseline.json')
+        self.assertEqual(state['schema'], 2)
+        self.assertFalse((self.root / 'seed/packages').exists())
         calls, removed, added, excluded = schedule(state, packages, state, packages)
         self.assertFalse(removed)
         self.assertFalse(added)
@@ -150,7 +154,7 @@ class Scheduling(unittest.TestCase):
         completed = [subprocess.CompletedProcess([], 0 if report['status'] == 'detected' else 1,
                                                 json.dumps(report)) for report in reports]
         with mock.patch('lifecycle.subprocess.run', side_effect=completed) as comparator:
-            result = execute(self.old / 'coverage.json', self.new / 'coverage.json', policy,
+            result = execute(self.old / 'baseline.json', self.new / 'coverage.json', policy,
                              Path('/comparator'), Path('/wrapper'), Path('/semver'), 'stable', self.root)
         self.assertEqual(comparator.call_count, len(reports))
         return result
@@ -212,7 +216,7 @@ class Scheduling(unittest.TestCase):
             'old': {'resolved_features': ['released']}, 'new': {'resolved_features': []}})
         completed = subprocess.CompletedProcess([], 0, json.dumps(report))
         with mock.patch('lifecycle.subprocess.run', return_value=completed):
-            result = execute(self.old / 'coverage.json', self.new / 'coverage.json', policy,
+            result = execute(self.old / 'baseline.json', self.new / 'coverage.json', policy,
                              Path('/comparator'), Path('/wrapper'), Path('/semver'), 'stable', self.root)
         self.assertEqual(result['impact'], 'major')
         self.assertEqual(result['removed_coverage'][0]['features'], ['released'])
@@ -223,7 +227,7 @@ class Scheduling(unittest.TestCase):
         policy.write_text('[feature-set.postgres]\nprobe=["released"]\n')
         failed = subprocess.CompletedProcess([], 1, json.dumps({'status': 'analysis-error', 'diagnostics': 'build failed'}))
         with mock.patch('lifecycle.subprocess.run', return_value=failed), self.assertRaisesRegex(AnalysisError, 'build failed'):
-            execute(self.old / 'coverage.json', self.new / 'coverage.json', policy,
+            execute(self.old / 'baseline.json', self.new / 'coverage.json', policy,
                     Path('/comparator'), Path('/wrapper'), Path('/semver'), 'stable', self.root)
 
 

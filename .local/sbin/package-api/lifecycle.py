@@ -9,6 +9,8 @@ import tomllib
 
 from compare import AnalysisError, LIMITS, explicit_path, prepare_side, require, run, tool_environment
 
+from resources import read_baseline
+
 LEVELS = {'patch': 0, 'minor': 1, 'major': 2}
 
 
@@ -27,6 +29,14 @@ def inventory(manifest):
 def read_state(path, policy=None):
     state = json.loads(path.read_text())
     require(isinstance(state, dict), 'coverage descriptor must be an object')
+    if state.get('schema') == 2:
+        from resources import read_resource_state
+        result = read_resource_state(path, state)
+        if policy is not None:
+            document = tomllib.loads(policy.read_text())
+            require(set(document) == {'feature-set'} and document['feature-set'] == state['configurations'],
+                    'candidate resource configurations must match the selected policy')
+        return result
     require(state.get('schema') == 1, 'unsupported coverage descriptor schema')
     require(isinstance(state.get('source_revision'), str) and state['source_revision'], 'source revision required')
     if 'source' in state:
@@ -81,13 +91,17 @@ def dependency_closure(name, packages):
 
 
 def selection(name, features, packages):
+    if 'resources' in packages[name]:
+        key = tuple(sorted(features))
+        require(key in packages[name]['resources'], f'missing released API resource: {name}/{features}')
+        return packages[name]['resources'][key]
     return dict(package=str(packages[name]['path']), dependencies=dependency_closure(name, packages),
                 features=sorted(set(features)), default_features=True)
 
 
 def resolve_dependencies(side, target, toolchain, context):
     """Let Cargo select active local dependencies; reuse comparator staging."""
-    if not side['dependencies']:
+    if side is None or 'rustdoc' in side or not side['dependencies']:
         return side
     with tempfile.TemporaryDirectory(prefix='coverage-dependencies-') as directory:
         scratch = Path(directory)
@@ -111,6 +125,8 @@ def resolve_dependencies(side, target, toolchain, context):
 
 
 def has_api(package):
+    if 'has_api' in package:
+        return package['has_api']
     manifest = package['manifest']
     return manifest.get('lib') is not None or (manifest['package'].get('autolib', True) and
                                                 (package['path'] / 'src/lib.rs').is_file())
@@ -128,8 +144,6 @@ def schedule(old, old_packages, new, new_packages):
     current_selections = set()
 
     def compare_pair(name, product, before, after, kind):
-        new_side = selection(name, after, new_packages)
-        current_selections.add(json.dumps(new_side, sort_keys=True))
         if not has_api(new_packages[name]):
             if name in old_packages and has_api(old_packages[name]):
                 removals.append(dict(package=name, reason='released-api-target-removed'))
@@ -138,7 +152,9 @@ def schedule(old, old_packages, new, new_packages):
         if before is not None and not has_api(old_packages[name]):
             additions.append(dict(package=name, configuration=product, reason='new-api-target'))
             before = None
-        old_side = selection(name, before, old_packages) if before is not None else selection(name, after, new_packages)
+        new_side = selection(name, after, new_packages)
+        current_selections.add(json.dumps(new_side, sort_keys=True))
+        old_side = selection(name, before, old_packages) if before is not None else None
         key = json.dumps([old_side, new_side], sort_keys=True)
         if key not in seen:
             seen.add(key)
@@ -169,6 +185,8 @@ def schedule(old, old_packages, new, new_packages):
                     set(previous[name]) == set(features) for previous in old['configurations'].values())
                 additions.append(dict(package=name, configuration=product, reason='new-coverage',
                                       released_selection=released_selection))
+            if not has_api(new_packages[name]):
+                continue
             current = selection(name, features, new_packages)
             if json.dumps(current, sort_keys=True) not in current_selections:
                 # Removal evidence must not hide an invalid replacement/shrink.
@@ -206,7 +224,7 @@ def compare_selection(call, target, toolchain, comparator, wrapper, semver, scra
 
 def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch, cargo_context=None):
     context = cargo_context or Path.cwd()
-    old, old_packages = read_state(old_path)
+    old, old_packages = read_baseline(old_path)
     new, new_packages = read_state(new_path, policy)
     require(old['target'] == new['target'], 'baseline/candidate targets differ')
     calls, removed, added, binaries = schedule(old, old_packages, new, new_packages)
@@ -235,7 +253,7 @@ def unpack_baseline(path, destination):
                 'baseline links/special files forbidden')
         archive.extractall(destination, filter='data')
     descriptor = destination / 'baseline.json'
-    read_state(descriptor)
+    read_baseline(descriptor)
     return descriptor
 
 

@@ -20,17 +20,19 @@ Invoke the internal script with absolute input/tool paths:
   --toolchain stable
 ```
 
-The selected installed toolchain and explicit target govern both sides. The
+The selected installed toolchain and target govern current API production.
+Released APIs retain their recorded producer information. The
 comparator's Bash/rustup/tool prerequisites and analysis limits apply. The
 lifecycle/seed scripts require Python 3.12 for archive extraction filters; the
 maintained test harness provisions that interpreter through existing uv setup.
 This operation does not install tools or discover releases. It uses the current
 directory as its Cargo configuration/build context, including compiler wrappers,
-flags and persistent build outputs; Cargo may download dependencies. Source
-packages and policy still come from the explicit baseline and descriptor inputs.
+flags and persistent build outputs; Cargo may download dependencies. Current
+source packages and policy come from explicit candidate inputs.
+The baseline contains generated resources, never historical build inputs.
 Repository integration supplies the selected repository as the Cargo context.
 
-The candidate descriptor and `baseline.json` use schema 1:
+Internal current-source preparation uses schema 1:
 
 ```json
 {
@@ -47,13 +49,13 @@ Package paths are relative to and contained within the descriptor directory.
 Each path contains extracted, normalized Cargo package contents. The package
 map is the complete publishable set selected from that source's Cargo metadata:
 workspace membership, local source and `publish != []`, matching
-`release-crate-manifest`. The producer owns that selection; the consumer validates
+`release-crate-manifest`. The producer owns that selection; the consumer
+validates
 identities, publishability and policy mappings against the supplied set.
-Local packaged dependency closures are derived from supplied packages and passed
-to #357 independently on each side. Reuse #357 staging and Cargo metadata to
-select active dependencies under that side's requested features; disabled
-optional local crates are not required to appear in the resolved graph. No
-workspace sources substitute for them.
+Only the candidate's packaged dependency closure is resolved and built. Released
+features, resolved coverage and API target kinds come from the saved baseline
+metadata. The historical source/dependency graph is neither retained nor
+rebuilt.
 
 For the candidate, the explicit TOML policy supplies current configurations;
 its descriptor's configurations are replaced by that policy. Released state
@@ -104,12 +106,14 @@ an impact or `next_coverage`.
 Removed released manifest features, dropped product/mapping coverage and removed
 library targets of checked packages contribute explicit Major evidence. Packages
 that are now private/no longer publishable are excluded, even when the baseline
-contains historical coverage; their removal does not contribute a SemVer verdict.
-Also retain lost resolved feature coverage from #357's old/new coverage evidence,
-even when no public API item changes. Package inputs reproduce the released
-defaults/forwarding; a second historical feature-resolution representation is
-not needed. Detect known missing features before attempting impossible
-historical builds. A policy requesting an unknown current feature is an input
+contains historical coverage; their removal does not contribute a SemVer
+verdict.
+Also retain lost resolved feature coverage from #357's old/new coverage
+evidence,
+even when no public API item changes. Saved resource metadata preserves released
+defaults and resolved forwarding.
+Detect missing released features before requesting an impossible current build.
+A policy requesting an unknown current feature is an input
 error. Binary-only packages remain explicit in policy but their reports exclude
 Rust API analysis; this is not a CLI compatibility guarantee.
 
@@ -123,19 +127,36 @@ owns that decision. Failure is exit 1 with `status: "analysis-error"`,
 diagnostics and limits, without an impact. Invalid command syntax uses argparse
 exit 2.
 
-`next_coverage` records the candidate state using its relative package paths.
-Its consumer must retain the corresponding package contents with it. Merely
-emitting that state does not publish or adopt it. Only an explicitly supplied
-active baseline grants released status. Missing/corrupt baseline input fails;
-it never bootstraps from the candidate.
+`next_coverage` records internal current-source preparation state and is not an
+adoptable baseline. The explicit resource producer generates the complete
+current
+publishable set for #360, including never-published crates. Adoption grants
+released
+status only after #360 validates and installs those resources. Missing/corrupt
+baseline input fails; it never bootstraps from the candidate.
+
+## Resource baseline format
+
+Schema 2 contains `source_revision`, `target`, default-feature policy, complete
+`configurations` and a `packages` inventory. Each package records its version,
+feature inventory, whether it has a Rust API, and generated `selections`. Each
+selection contains its relative rustdoc JSON path, SHA-256 digest, coverage
+metadata (selected/resolved features, target kind, identity and schema), and
+producer information. Every configured library/proc-macro selection must have a
+resource. Binary-only packages retain metadata without a JSON artifact.
+
+Paths must remain within the bundle. Missing artifacts, inconsistent coverage,
+corrupt digests and unsupported formats fail analysis. No historical Cargo
+manifest, source package, registry dependency or compiler environment is
+required.
+Both consumers read JSON directly; no duplicate public-API text is needed.
 
 ## Initial active baseline
 
 The shared active path is `.local/semver_baseline.tar.gz`. The archive contains
-`baseline.json` and normalized source packages under `packages/`; no archived
-rustdoc JSON, registry lookup or pointer file is needed. Links and special files
-are rejected during reading. #357 generates fresh API artifacts with the same
-selected toolchain on both sides.
+`baseline.json` and generated JSON under `rustdoc/`, with no source packages.
+Links and special files are rejected. Schema 1 source archives are not accepted
+as a baseline and never trigger a rebuild fallback.
 
 The maintainer approved revision
 `bd53b083b028dc8423f6c4e5b232cbd3c851c8c1`, recorded in the crates.io
@@ -150,16 +171,16 @@ examples. SQLite coverage did not exist there. Current package additions and
 previously publishable packages becoming private are excluded from SemVer
 verdicts, not seed-specific exceptions.
 
-`.local/sbin/seed-semver-baseline` reproduces this approved initial seed only.
-It requires explicit repository, output and target arguments, exports the fixed
-approved revision in isolation, supplements missing local dependency version
-requirements with the versions at that revision, and runs Cargo packaging with
-local patches and `--no-verify`. API source files are preserved. Registry
-resolution during seed packaging can require network access. Existing baseline
-files are never overwritten. It is not a candidate producer or adoption command.
-Archive metadata is normalized for review; Cargo-generated package contents may
-still change with Cargo versions, so source identity and package inputs, not
-regenerated archive byte identity, define the baseline.
+`.local/sbin/seed-semver-baseline` produces this initial baseline once. It
+requires explicit repository, output, target and toolchain arguments, exports
+the
+fixed approved revision, supplements its missing local dependency versions and
+packages its sources. It generates JSON for that revision's configured API
+selections, retaining only resources and metadata in the final archive. This
+one-time migration/production operation is separate from normal validation.
+Existing output files are never overwritten. It neither advances the source
+revision nor adopts a release candidate. Producing resources requires a build
+environment; consuming them never recreates that environment or rebuilds them.
 
 ### Observed analyzer limitation in full-seed replay
 
@@ -182,19 +203,23 @@ image-owned correction and historical complete-baseline validation evidence.
 
 ## Package-set lifecycle and maintained verification
 
-Compare the two source package sets independently. A candidate-only crate does
+Compare the released resource inventory with the current publication set. A
+candidate-only crate does
 not require an old mapping/package, a self-comparison, a Minor bump or a manual
 baseline rewrite. Continue released-crate comparisons in the same run. After
-explicit stable adoption, new packages become historical obligations. A historical
+explicit stable adoption, new packages become historical obligations. A
+historical
 package absent from the current publication set is reported as an
 explicit `no-longer-publishable` exclusion. A new package is explicitly
-`never-published`; neither receives an API/intent verdict. Dependency closures
-retain the package inputs needed by checked crates independently on each side.
+`never-published`; neither receives an API/intent verdict. Only current API
+production requires a packaged dependency closure.
 The complete current package map and `next_coverage`, including never-published
 packages, remain available for #360 adoption. No rename inference is performed.
 
-`xbuild/tests/package_api.rs` runs lightweight lifecycle Python contracts through
-the existing `workspace` check and nextest archive group. They verify scheduling,
+`xbuild/tests/package_api.rs` runs lightweight lifecycle Python contracts
+through
+the existing `workspace` check and nextest archive group. They verify
+scheduling,
 policy errors, package addition/adoption/exclusion, impact aggregation and error
 propagation using small source packages and supplied comparator reports. They
 also extract the checked-in seed and validate its complete replay mappings
@@ -207,10 +232,12 @@ compiler/analyzer comparison suite and duplicate historical-baseline fixture;
 that coverage is not moved to a manual test path. The lifecycle suite remains
 within the per-case limit and does not repeat isolated Cargo/rustdoc builds or
 fetch historical dependencies. Real-source lifecycle acceptance checks performed
-during implementation remain validation evidence, rather than recurring CI tests.
+during implementation remain validation evidence, rather than recurring CI
+tests.
 Normal contributor commands and prerequisites remain unchanged.
 
-Issue #360 owns ongoing candidate generation/validation, stable adoption/advancement
+Issue #360 owns ongoing candidate generation/validation, stable
+adoption/advancement
 and snapshot non-advancement. #361 owns release CI wiring. This implementation
 does not enforce release-intent metadata, implement release transactions,
 optimize caches or expand the installed product CLI.

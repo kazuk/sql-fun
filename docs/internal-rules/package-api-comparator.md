@@ -1,187 +1,123 @@
-# One-configuration package API comparison
+# One-configuration API comparison
 
-This internal interface implements #357 for the coverage coordinator (#358)
-and release-intent consumer (#359). It follows the
-[approved policy](semver-release-intent.md) and
-[measured analyzer limits](semver-analyzer-probe.md). It does not select
-publication history, feature sets, release intent, or baseline archives.
+The internal `.local/sbin/compare-package-api` command implements #357 for the
+coverage coordinator (#358) and release-intent consumer (#359). It compares a
+saved released API resource with a current API, using the
+[release policy](semver-release-intent.md). It does not select publication
+history, release intent or baseline adoption.
 
-## Boundary and invocation
+## Inputs
 
-`.local/sbin/compare-package-api` is a script, outside the installed product CLI.
-It owns preparation, execution, classification, cleanup and integration. Rust is
-used only to obtain structured public API differences unavailable from the
-upstream CLI. `xbuild public-api-diff --old OLD_JSON --new NEW_JSON` is that thin
-wrapper; it is not a package/release orchestration library.
+The command requires absolute `--request`, `--diff-wrapper` and
+`--semver-checks` paths. The request contains `old`, `new`, `target`, `toolchain`
+and optionally an absolute `cargo_context` directory.
 
-The script takes three required arguments:
-
-```sh
-.local/sbin/compare-package-api \
-  --request /absolute/path/comparison.json \
-  --diff-wrapper /absolute/path/xbuild \
-  --semver-checks /absolute/path/cargo-semver-checks
-```
-
-The request is explicit, including empty lists and both default-feature policies:
+The old side is a generated resource:
 
 ```json
 {
-  "old": {
-    "package": "/absolute/path/old-package",
-    "dependencies": ["/absolute/path/old-local-dependency"],
+  "rustdoc": "/baseline/rustdoc/example/0.json",
+  "coverage": {
+    "name": "example",
+    "version": "1.0.0",
     "features": [],
-    "default_features": false
+    "default_features": true,
+    "resolved_features": [],
+    "feature_inventory": [],
+    "target_kind": ["lib"],
+    "schema": 61,
+    "documented_target": "x86_64-unknown-linux-gnu"
   },
-  "new": {
-    "package": "/absolute/path/new-package",
-    "dependencies": ["/absolute/path/new-local-dependency"],
-    "features": ["new-feature"],
-    "default_features": true
-  },
-  "target": "x86_64-unknown-linux-gnu",
-  "toolchain": "stable"
+  "producer": {
+    "toolchain": "stable",
+    "target": "x86_64-unknown-linux-gnu",
+    "host": "x86_64-unknown-linux-gnu",
+    "rustc": "recorded producer identity",
+    "cargo": "recorded producer identity",
+    "rustdoc": "recorded producer identity"
+  }
 }
 ```
 
-Package directories contain already extracted Cargo source-package contents,
-including normalized, self-contained `Cargo.toml` files. The example's
-`stable` names an explicitly supplied installed toolchain. The comparator uses
-that toolchain’s Cargo, rustc and rustdoc by default. Explicit compiler executable
-overrides from the developer environment remain effective.
+Historical source-package requests are rejected. The comparator never runs
+Cargo metadata, dependency resolution, compilation or rustdoc for the old side.
+Missing, corrupt or unsupported resources fail analysis; there is no rebuild
+fallback or compiler substitution. Producer information describes how the saved
+resource was generated; consumers do not recreate that environment.
 
-Supply the complete local packaged dependency closure on each side, including
-transitive and proc-macro dependencies. No workspace discovery or source/version
-materialization occurs. Source path dependencies, external workspace references,
-workspace inheritance, target sources outside the package, and symlinks are
-rejected. Each supplied dependency name must be unique and resolve
-to the supplied package/version through operation-local crates.io patches.
-Other dependencies follow the developer's normal Cargo configuration, including
-registry access and configured patches.
-A missing requested feature fails analysis; it is never silently omitted.
+The new side is either another generated resource, or an explicit current
+source-package selection:
 
-The script copies the selected package inputs into temporary source directories
-so Cargo can update their lockfiles without modifying the inputs. Builds run in
-the caller's Cargo context, inheriting compiler wrappers (including sccache),
-compiler/rustdoc flags, Cargo configuration and profile settings. The optional
-absolute `cargo_context` request field explicitly selects that directory; when
-omitted, the command's current directory is the Cargo context. Repository
-release-intent validation supplies its selected repository root.
+```json
+{
+  "package": "/prepared/packages/example-1.0.1",
+  "dependencies": [],
+  "features": [],
+  "default_features": true
+}
+```
 
-When the context contains a Cargo manifest, its ordinary Cargo metadata selects
-the persistent target directory, including environment/configuration overrides.
-Both sides and subsequent comparisons reuse that directory. Each side's rustdoc
-JSON is copied aside before the other side can replace the shared output.
-Only dependency patches for the supplied source packages and the required JSON
-output arguments are added. Cargo may fetch dependencies as in an ordinary
-build. The requested toolchain and target remain explicit inputs; existing
-compiler executable overrides are honored. Local results reflect the developer's
-environment; CI owns a controlled validation environment. No isolated compiler
-environment, forced profile, or fresh per-comparison build directory is imposed.
+Source inputs are extracted Cargo packages with normalized manifests and their
+complete local packaged dependency closure. The comparator adds local crates.io
+patches for those dependencies and validates their selected versions. For new
+coverage with no released predecessor, `old: null` validates the generated
+current JSON against itself. It generates that JSON once, not twice.
 
-## Producer and analyzer contract
+## Current API production
 
-Analyzer versions are pinned independently of compiler versions:
+Only the current source selection is built. Temporary source copies allow Cargo
+to update package lockfiles without changing the caller's files. Builds inherit
+the selected Cargo context's configuration, flags, compiler wrappers (including
+sccache) and normal persistent target directory. The context is the explicitly
+selected repository for repository validation, or the invocation directory for
+the standalone command when `cargo_context` is omitted. Cargo may fetch normal
+registry dependencies. No isolated compiler environment, forced profile or fresh
+per-comparison build directory is imposed. CI owns its controlled environment.
 
-- `public-api` library 0.52.0, with rustdoc-types 0.57.3 in `Cargo.lock`;
-- `cargo-semver-checks` executable **0.51.0-sqlfun.1**, built from upstream
-  0.51.0 with the [#826 trait-presence query correction](semver-shadowed-trait.md).
-  Stock 0.51.0 is rejected; its identical-input false positive is reproducible.
+The explicit toolchain and target apply to current production. Compiler
+executable overrides remain effective. The operation scopes `RUSTC_BOOTSTRAP=1`
+to generate rustdoc JSON and records current compiler/Cargo/rustdoc identities.
+Proc-macro JSON is produced for the host; libraries use the requested target.
+Each generated JSON is saved before a subsequent build can overwrite its shared
+target-directory output. Identity, version, target, public coverage and schema
+are validated before analysis.
 
-The #356 producer (Rust/Cargo 1.99.1, JSON schema 61) records a successful
-probe, not a mandatory contributor toolchain. Use the explicitly requested
-installed toolchain, with scoped `RUSTC_BOOTSTRAP=1` for JSON production. Record
-its actual rustc verbose identity, Cargo/rustdoc versions, host and requested
-target in the report. Each side records the actual generated schema version.
-There is no compiler-version equality gate or automatic compiler substitution.
+A resource-to-resource comparison invokes no compiler or Cargo command. This
+allows #360 to validate already generated release candidates before adoption.
 
-Both pinned analyzers must successfully consume the same freshly generated JSON
-files. Validate package/version identity, private-item coverage, target selection
-and complete successful production before comparison. A positive schema marker
-alone does not establish compatibility: the SemVer reader checks supported
-formats, and both analyzers must parse and complete their respective analyses.
-Unsupported input returns an analysis error with the actual schema, producer and
-underlying diagnostics. Update and re-probe the pinned analyzers when necessary;
-do not install an older compiler to hide incompatibility.
+## Analyzers and verdicts
 
-The explicit `--target` controls library builds; Cargo documents proc-macro
-targets for the host, placing their JSON in the host output directory. The
-script selects that path from the target kind, without replacing a macro target
-with a library target. Unavailable target support fails generation. Arbitrary
-archived JSON is not an input contract.
+Both analyzers consume the saved old JSON and current JSON directly:
 
-The Rust wrapper retains auto, blanket and derived impls and omits value
-parameter names, matching the probe. It emits the library's added/removed lists
-and changed old/new pairs as JSON. Its successful empty output categories are
-not a behavioral compatibility proof. The library's debug-oriented
-`missing_item_ids` is not a completeness validator: valid ordinary types refer
-to external/private items not included in rustdoc's index.
+- `public-api` 0.52.0 through `xbuild public-api-diff` retains auto, blanket and
+  derived impls and omits value-parameter names;
+- corrected `cargo-semver-checks 0.51.0-sqlfun.1` compares JSON directly with an
+  explicit Patch release type. Stock 0.51.0 is rejected because of #826.
 
-The SemVer adapter invokes JSON comparison once with explicit Patch release
-type. The pinned CLI has no structured finding-level output, and its public
-Rust report API does not expose warning bump counts. The script therefore
-validates its textual run boundaries, completion counts (229 selected checks,
-31 skipped allow-by-default checks), finding headers, required-level summaries
-and status. Both denied and warning-level Major/Minor counts contribute.
-Unknown/incomplete output, unsupported status or inconsistent counts fail
-analysis. Exit 100 with valid completed findings is a successful analysis;
-exit 0 with Major warnings still requires Major. Manifest lint overrides are
-not assumed to apply to JSON input.
+A second text copy of the public API is unnecessary: both consumers already
+accept the saved JSON. The baseline format does not require identical old/new
+compiler versions. Both analyzers must successfully read and analyze each
+artifact; unsupported schemas produce an analysis error, not a baseline rebuild.
 
-## Result and limits
-
-Standard output contains one JSON object. Exit 0 means completed analysis with
-`status: "detected"`, an `impact` of `patch`, `minor` or `major`, structured
-`diff`, `removed_features`, SemVer counts/diagnostics, old/new coverage,
-producer details and visible `limits`. It does not mean the change is within
-release intent. Exit 1 returns `status: "analysis-error"` with diagnostics and
-limits, without an impact. Argument syntax errors use argparse diagnostics and
-exit 2 before analysis starts.
+The adapter validates the SemVer tool's run boundaries, 229 completed checks,
+31 skipped checks, denied/warning findings and exit status. Major/Minor warnings
+contribute to required impact. Unknown/incomplete output fails analysis.
+Manifest lint overrides are not assumed to apply to JSON input.
 
 No structural difference starts at Patch; added-only starts at Minor;
-removed/changed starts at Major. Take the maximum with all applicable SemVer
-findings, including warnings, and with Major for removed old manifest features.
-Full feature inventories come from Cargo metadata because JSON lacks them.
-Adding feature names alone does not imply a removal. Requested coverage that
-cannot be generated is an error, distinct from an observed inventory removal.
-An unrecognized analyzer representation fails validation rather than pretending
-that parsing failure is a successfully observed unclassifiable API change.
+removed/changed API starts at Major. Take the maximum with SemVer findings and
+removed released manifest features. Full feature inventories and resolved
+features are saved with resources, independently of the JSON API item graph.
+Build/tool errors remain `analysis-error` without an impact verdict.
 
-Publication history and comparisons needed to preserve every released surface
-belong to #358. This operation evaluates exactly the supplied pair; candidate
-additions never cancel removals visible in that pair. Macro expansion, accepted
-macro input and runtime behavior remain outside structural proof and need
-complementary tests/review. A known unresolved behavioral concern cannot be
-cleared by an empty structural diff.
+Success exits 0 with `status: "detected"`, impact, structural diff, SemVer
+counts/diagnostics, old/new coverage, current and baseline producer information,
+and limitations. Exit 0 does not mean the change fits its release intent.
+Analysis failures exit 1; invalid CLI syntax exits 2.
 
-## Maintained checks and preparation
-
-The existing `workspace` check runs `xbuild`'s integration test through Cargo or
-nextest, including its CI archive group. `tests/package-api/test_compare.py`
-retains inexpensive explicit-input, preparation, wrapper-error, JSON and report
-checks. The #828 cost review also discarded the repeated Cargo metadata,
-producer, source-boundary and analyzer-version rejection cases after CI timed
-out the reduced aggregate near one second. The comparator runtime
-requires Python 3.11+ (`tomllib`), Bash, rustup and Cargo. Maintained tests use
-`uv run --no-project --no-config --python 3.12` through existing contributor/CI
-setup. Runtime nextest paths support archive relocation.
-
-The #828 [test cost review](workspace-test-cost.md) discarded the repeated real
-Cargo/rustdoc/analyzer comparisons and complete historical-baseline replay.
-These assertions are not retained as ignored or manual tests. Compiler/analyzer
-integration, feature/proc-macro API comparisons, producer/schema mutation, and
-complete-baseline Patch verdicts are no longer recurring test coverage. The
-comparison implementation and its runtime analysis guarantees are unchanged.
-
-`.local/sbin/prepare-package-api-tests` records the active contributor toolchain,
-including an explicit rustup override, and verifies the corrected analyzer
-provided by the documented development/CI builder image. It never installs or
-patches tools. A missing or stock executable fails with the required identity.
-`ci/github-actions/Dockerfile` owns the checksum-pinned source download, query
-correction, locked build and semantic smoke tests. Image publication and adoption
-follow `ci/README.md`; the comparator must not be adopted before that image.
-
-The [feature-coverage coordinator](semver-feature-coverage.md) consumes this
-interface under the repository's additive-feature rule. Its maintained tests
-share the existing `workspace` integration path. Production comparison remains
-offline; the discarded historical replay no longer provisions dependencies.
+Structural analysis does not prove runtime behavior or accepted macro inputs.
+The maintained lightweight contracts run through `xbuild/tests/package_api.rs`
+and the standard workspace/nextest archive groups. They include the no-old-build
+boundary and corrupt/legacy resource rejection without recurring compiler
+replays. Historical compiler-test deletions remain documented in
+[the workspace test cost review](workspace-test-cost.md).

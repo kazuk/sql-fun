@@ -124,18 +124,23 @@ def validate_policy(source, packages):
     return configurations
 
 
-def prepare_input(repository, revision, scratch, toolchain, target):
+def prepare_source(repository, revision, scratch, toolchain):
     source = scratch / 'source'
     provenance = capture_source(repository, source, revision)
     env = repository_environment()
     env.update(RUSTUP_TOOLCHAIN=toolchain, CARGO_TARGET_DIR=str(scratch / 'target'),
                SQL_FUN_HOME=str(source / 'sql-fun-home'))
     metadata, packages = publication_metadata(source, env)
+    configurations = validate_policy(source, packages)
+    return source, provenance, env, metadata, packages, configurations
+
+
+def prepare_input(repository, revision, scratch, toolchain, target):
+    source, provenance, env, metadata, packages, configurations = prepare_source(repository, revision, scratch, toolchain)
     baseline = unpack_baseline(source / '.local/semver_baseline.tar.gz', scratch / 'baseline')
     old, _ = read_state(baseline)
     require(old['target'] == target, 'baseline/candidate targets differ')
     intent = release_intent(metadata, set(packages) & set(old['packages']))
-    configurations = validate_policy(source, packages)
     return source, provenance, env, baseline, intent, configurations
 
 

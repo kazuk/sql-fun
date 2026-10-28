@@ -60,6 +60,17 @@ def tool_environment(toolchain, context):
     return env
 
 
+def producer_environment(toolchain, target, context):
+    env = tool_environment(toolchain, context)
+    rustc = run([env.get("RUSTC", "rustc"), "--version", "--verbose"], context, env).stdout.strip()
+    host = re.search(r"^host: (\S+)$", rustc, re.M)
+    require(host is not None, "selected rustc did not report its host in --version --verbose")
+    producer = dict(toolchain=toolchain, target=target, rustc=rustc, host=host[1])
+    for command in ("cargo", "rustdoc"):
+        producer[command] = run([env.get(command.upper(), command), "--version"], context, env).stdout.strip()
+    return env, producer
+
+
 def prepare_side(paths, root):
     root.mkdir()
     packages = []
@@ -158,8 +169,6 @@ def validate_json(artifact, name, version, target):
 
 
 def analyze(artifacts, coverage, wrapper, semver, scratch, env):
-    require(coverage["old"]["schema"] == coverage["new"]["schema"],
-            "old/new JSON schemas differ despite using the same selected toolchain")
     try:
         result = run([str(semver), "check-release", "--baseline-rustdoc", str(artifacts["old"]),
                       "--current-rustdoc", str(artifacts["new"]), "--release-type", "patch", "--color", "never"],
@@ -219,30 +228,45 @@ def parse_semver(output, status):
             "exit_status": status, "diagnostics": output}
 
 
+def saved_resource(side, target):
+    require(isinstance(side, dict) and set(side) == {"rustdoc", "coverage", "producer"},
+            "old side must be a saved API resource; source builds are forbidden")
+    artifact = explicit_path(side["rustdoc"])
+    coverage = side["coverage"]
+    require(side["producer"].get("target") == target, "resource target mismatch")
+    require(validate_json(artifact, coverage["name"], coverage["version"], coverage["documented_target"]) == coverage["schema"],
+            "resource schema mismatch")
+    return artifact, coverage
+
+
+def current_api(side, target, toolchain, context, scratch):
+    if isinstance(side, dict) and "rustdoc" in side:
+        artifact, coverage = saved_resource(side, target)
+        return artifact, coverage, side["producer"], dict(os.environ)
+    paths = validate_side(side)
+    env, producer = producer_environment(toolchain, target, context)
+    try:
+        artifact, coverage = generate(side, paths, scratch / "new", target, producer["host"], env, context)
+    except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration) as error:
+        raise AnalysisError(f"new JSON production: {error}") from error
+    return artifact, coverage, producer, env
+
+
 def compare(request, wrapper, semver, scratch):
     require(isinstance(request, dict), "comparison request must be an object")
     require(set(request) - {"cargo_context"} == {"old", "new", "target", "toolchain"}, "invalid request fields")
     require(isinstance(request["target"], str) and re.fullmatch(r"[\w-]+", request["target"]), "explicit target triple required")
     require(isinstance(request["toolchain"], str) and request["toolchain"], "explicit toolchain required")
-    paths = {side: validate_side(request[side]) for side in ("old", "new")}
     context = explicit_path(request.get("cargo_context", str(Path.cwd())))
-    env = tool_environment(request["toolchain"], context)
-    producer = {"toolchain": request["toolchain"], "target": request["target"]}
-    rustc_details = run([env.get("RUSTC", "rustc"), "--version", "--verbose"], scratch, env).stdout
-    host_match = re.search(r"^host: (\S+)$", rustc_details, re.M)
-    require(host_match is not None, "selected rustc did not report its host in --version --verbose")
-    host = host_match[1]
-    producer.update(rustc=rustc_details.strip(), host=host)
-    for command in ("cargo", "rustdoc"):
-        producer[command] = run([env.get(command.upper(), command), "--version"], scratch, env).stdout.strip()
+    artifacts, coverage = {}, {}
+    if request["old"] is not None:
+        artifacts["old"], coverage["old"] = saved_resource(request["old"], request["target"])
+    artifacts["new"], coverage["new"], producer, env = current_api(
+        request["new"], request["target"], request["toolchain"], context, scratch)
     require(run([str(semver), "--version"], scratch, env).stdout.strip() == "cargo-semver-checks 0.51.0-sqlfun.1",
             "expected cargo-semver-checks 0.51.0-sqlfun.1")
-    artifacts, coverage = {}, {}
-    for side in ("old", "new"):
-        try:
-            artifacts[side], coverage[side] = generate(request[side], paths[side], scratch / side, request["target"], host, env, context)
-        except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration) as error:
-            raise AnalysisError(f"{side} JSON production: {error}") from error
+    if request["old"] is None:
+        artifacts["old"], coverage["old"] = artifacts["new"], coverage["new"]
     require(coverage["old"]["name"] == coverage["new"]["name"], "old/new package names differ")
     try:
         diff, findings = analyze(artifacts, coverage, wrapper, semver, scratch, env)
@@ -256,7 +280,7 @@ def compare(request, wrapper, semver, scratch):
         impact = "major"
     return {"status": "detected", "impact": impact, "diff": diff, "removed_features": removed,
             "semver": findings, "coverage": coverage,
-            "producer": producer,
+            "producer": producer, "baseline_producer": request["old"]["producer"] if request["old"] else producer,
             "limits": LIMITS}
 
 

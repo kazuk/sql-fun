@@ -205,9 +205,10 @@ Both tools accepted the exact same format-61 artifacts in the measured cases.
 Format-55 inputs failed. Mutating only the format marker to 999 was accepted by
 public-api but rejected by SemVer, so provenance and schema checks cannot rely
 on public-api alone. Persist the producer details with artifacts and re-probe
-when they change; reuse of arbitrary archived JSON is not established here.
-The production JSON generation strategy and tool provisioning remain later
-implementation decisions, with no new contributor procedure authorized.
+when they change. The resource-baseline implementation saves validated generated
+JSON and its coverage/producer metadata; incompatible artifacts fail explicitly
+without rebuilding historical sources. See
+[the resource contract](semver-feature-coverage.md#resource-baseline-format).
 
 The conservative over-classification tradeoff, complete released-coverage
 requirement and complementary behavioral review boundary above are approved

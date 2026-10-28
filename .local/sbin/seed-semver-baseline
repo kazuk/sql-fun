@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Create the approved initial source-package baseline, never a release candidate."""
+"""Produce comparison resources once for the approved initial revision."""
 import argparse
 import gzip
 import io
 import json
+import os
+import sys
 from pathlib import Path
 import re
 import subprocess
 import tarfile
 import tempfile
+
+sys.dont_write_bytecode = True
 
 REVISION = 'bd53b083b028dc8423f6c4e5b232cbd3c851c8c1'
 
@@ -17,7 +21,7 @@ def run(args, cwd):
     return subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=True).stdout
 
 
-def seed(repository, output, target):
+def seed(repository, output, target, toolchain):
     if output.exists():
         raise ValueError('refusing to replace an existing baseline')
     with tempfile.TemporaryDirectory(prefix='semver-seed-') as scratch:
@@ -58,9 +62,14 @@ def seed(repository, output, target):
         descriptor = dict(schema=1, source_revision=REVISION, target=target,
                           default_features=True, packages=records,
                           configurations={'postgres': {name: [] for name in sorted(records)}})
-        (payload / 'baseline.json').write_text(json.dumps(descriptor, indent=2) + '\n')
+        source_descriptor = payload / 'coverage.json'
+        source_descriptor.write_text(json.dumps(descriptor, indent=2) + '\n')
+        sys.path.insert(0, str(Path(__file__).resolve().parent / 'package-api'))
+        from resources import produce_resources
+        os.environ['SQL_FUN_HOME'] = str(source / 'sql-fun-home')
+        payload = produce_resources(source_descriptor, root / 'resources', toolchain, repository).parent
         output.parent.mkdir(parents=True, exist_ok=True)
-        # Stable archive bytes make regeneration reviewable.
+        # Archive only generated resources and metadata, never historical sources.
         with output.open('xb') as destination, gzip.GzipFile(fileobj=destination, mode='wb', mtime=0) as compressed:
             with tarfile.open(fileobj=compressed, mode='w') as bundle:
                 for path in sorted(payload.rglob('*')):
@@ -78,5 +87,6 @@ if __name__ == '__main__':
     parser.add_argument('--repository', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--target', required=True)
+    parser.add_argument('--toolchain', required=True)
     args = parser.parse_args()
-    seed(args.repository.resolve(), args.output.resolve(), args.target)
+    seed(args.repository.resolve(), args.output.resolve(), args.target, args.toolchain)

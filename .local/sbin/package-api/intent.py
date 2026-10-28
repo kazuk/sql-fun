@@ -10,7 +10,8 @@ import time
 
 from compare import AnalysisError, LIMITS, explicit_path, require, run
 from lifecycle import LEVELS, execute
-from repository import TOOLS, package_snapshot, prepare_input, repository_environment
+from repository import TOOLS, package_snapshot, prepare_input, prepare_source, repository_environment
+from resources import produce_resources
 
 
 def intent_results(report, intent):
@@ -74,7 +75,7 @@ def arguments(description):
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--working-tree', action='store_true', help='current staged/unstaged and Cargo-included untracked contents')
     mode.add_argument('--revision', help='explicit full commit SHA; never includes dirty working-tree contents')
-    parser.add_argument('--toolchain', required=True, help='installed Rust toolchain, used on both sides')
+    parser.add_argument('--toolchain', required=True, help='installed Rust toolchain for current API production')
     parser.add_argument('--target', required=True)
     return parser
 
@@ -98,8 +99,8 @@ def main():
 
 
 def snapshot_main():
-    parser = arguments('Internal shared source-package snapshot producer for #360')
-    parser.add_argument('--output', required=True, type=Path, help='new absolute output directory outside the selected repository')
+    parser = arguments('Internal generated comparison-resource producer for #360')
+    parser.add_argument('--output', required=True, type=Path, help='new absolute resource directory outside the selected repository')
     args = parser.parse_args()
     try:
         repository = explicit_path(args.repository)
@@ -107,11 +108,14 @@ def snapshot_main():
         require(args.output.is_absolute() and not output.is_relative_to(repository),
                 'snapshot output must be an absolute path outside the selected repository')
         require(not output.exists(), 'snapshot output must not already exist')
-        with tempfile.TemporaryDirectory(prefix='semver-packages-') as directory:
-            source, provenance, env, _, _, configurations = prepare_input(
-                repository, args.revision, Path(directory), args.toolchain, args.target)
-            descriptor, elapsed = package_snapshot(source, provenance, env, configurations, args.target, output)
-            print(json.dumps(dict(descriptor=str(descriptor), packaging_seconds=elapsed, source=provenance)))
+        with tempfile.TemporaryDirectory(prefix='semver-resources-') as directory:
+            source, provenance, env, _, _, configurations = prepare_source(
+                repository, args.revision, Path(directory), args.toolchain)
+            started = time.monotonic()
+            packages, _ = package_snapshot(source, provenance, env, configurations, args.target, Path(directory) / 'candidate')
+            descriptor = produce_resources(packages, output, args.toolchain, repository)
+            elapsed = time.monotonic() - started
+            print(json.dumps(dict(descriptor=str(descriptor), resource_seconds=elapsed, source=provenance)))
         return 0
     except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, tarfile.TarError) as error:
         print(json.dumps(dict(status='analysis-error', diagnostics=str(error))), file=sys.stderr)

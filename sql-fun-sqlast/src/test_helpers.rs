@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! test helper types
 
+pub(crate) mod collate;
 pub(crate) mod ownership;
 mod syn_builder;
 mod test_parse_context;

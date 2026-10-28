@@ -574,5 +574,79 @@
         }
       ]
     }
+  },
+  {
+    "name": "grouping_qualified_argument",
+    "sql": "SELECT GROUPING(required COLLATE pg_catalog.\"C\") AS value FROM collate_inputs GROUP BY required COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_qualified_key",
+    "sql": "SELECT GROUPING(required COLLATE \"C\") AS value FROM collate_inputs GROUP BY required COLLATE pg_catalog.\"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_nested_qualification",
+    "sql": "SELECT GROUPING((required COLLATE pg_catalog.\"C\") COLLATE \"POSIX\") AS value FROM collate_inputs GROUP BY (required COLLATE \"C\") COLLATE pg_catalog.\"POSIX\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "grouping_distinct_collations",
+    "sql": "SELECT GROUPING(required COLLATE \"POSIX\") AS value FROM collate_inputs GROUP BY required COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [
+        "query_grouping_argument_not_grouped"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
   }
 ]

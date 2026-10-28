@@ -5,7 +5,7 @@ use crate::sem::{
 use crate::test_helpers::TestParseContext;
 
 /// Explicit bindings and three type facts; no real catalog initialization.
-pub(super) fn context(dialect: Dialect) -> TestParseContext {
+pub(crate) fn context(dialect: Dialect) -> TestParseContext {
     let mut context = TestParseContext::default().with_dialect(dialect);
     for (ty, collatable) in [
         (PgBuiltInType::text(), true),
@@ -27,11 +27,11 @@ pub(super) fn context(dialect: Dialect) -> TestParseContext {
     context
 }
 
-pub(super) fn query(
+pub(crate) fn query(
     sql: &str,
     context: &mut TestParseContext,
 ) -> Result<SelectStatement, Box<dyn std::error::Error>> {
-    use crate::sem::ParseContext;
+    use crate::context::ParseContext;
     let statement = crate::parse_statements(sql, context.dialect())
         .next()
         .expect("one query")?;
@@ -45,7 +45,7 @@ pub(super) fn query(
     Ok(query)
 }
 
-pub(super) fn expression(query: &SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(crate) fn expression(query: &SelectStatement) -> &crate::sem::SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)

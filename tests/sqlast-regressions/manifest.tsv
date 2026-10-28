@@ -62,4 +62,4 @@ table-renames	project	table-renames.sql	4	17,18
 project-roles	project	project-roles.sql	11	17,18
 project-roles-empty	project	project-roles.sql	1	17,18
 project-roles-omitted	project	project-roles.sql	1	17,18
-collate	project	collate.sql	30	17,18
+collate	project	collate.sql	34	17,18

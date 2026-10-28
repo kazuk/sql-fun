@@ -2,16 +2,18 @@
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
-from compare import AnalysisError, parse_semver, validate_json
+from compare import AnalysisError, compare as compare_api, parse_semver, tool_environment, validate_json
 
 
 def fingerprint(directory):
@@ -114,6 +116,87 @@ class Comparison(unittest.TestCase):
                                          '--old', str(path), '--new', str(path)], capture_output=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(result.stdout)
+
+
+class ResourceBaseline(unittest.TestCase):
+    def test_saved_resource_and_current_validation_build_only_the_current_side(self):
+        from lifecycle_helpers import state_for, write_package, write_resource_baseline
+        from lifecycle import read_state, selection
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old = root / 'old'
+            write_package(old)
+            (old / 'coverage.json').write_text(json.dumps(state_for({'probe': 'probe'})))
+            descriptor = write_resource_baseline(old, state_for({'probe': 'probe'}))
+            _, packages = read_state(descriptor)
+            resource = selection('probe', [], packages)
+            shutil.rmtree(old / 'probe')
+            write_package(root / 'new')
+            current = dict(package=str(root / 'new/probe'), dependencies=[], features=[], default_features=True)
+            replies = ['host: x86_64-unknown-linux-gnu', 'cargo fixture', 'rustdoc fixture', 'cargo-semver-checks 0.51.0-sqlfun.1']
+            for before in (resource, None):
+                request = dict(old=before, new=current, target='x86_64-unknown-linux-gnu', toolchain='stable')
+                with mock.patch('compare.tool_environment', return_value={'CARGO': '/cargo'}), \
+                     mock.patch('compare.run', side_effect=[subprocess.CompletedProcess([], 0, s) for s in replies]), \
+                     mock.patch('compare.generate', return_value=(Path(resource['rustdoc']), resource['coverage'])) as build, \
+                     mock.patch('compare.analyze', return_value=({'added': [], 'removed': [], 'changed': []}, {'major': 0, 'minor': 0})) as analyze:
+                    report = compare_api(request, Path('/wrapper'), Path('/semver'), root)
+                self.assertEqual(report['impact'], 'patch')
+                build.assert_called_once()
+                self.assertEqual(build.call_args.args[0], current)
+                self.assertEqual(analyze.call_args.args[0]['old'], Path(resource['rustdoc']))
+            with mock.patch('compare.generate') as build, self.assertRaisesRegex(AnalysisError, 'source builds are forbidden'):
+                compare_api(dict(request, old=current), Path('/wrapper'), Path('/semver'), root)
+            build.assert_not_called()
+            with mock.patch('compare.tool_environment') as environment, mock.patch('compare.generate') as build, \
+                 mock.patch('compare.run', return_value=subprocess.CompletedProcess([], 0, replies[-1])) as command, \
+                 mock.patch('compare.analyze', return_value=({'added': [], 'removed': [], 'changed': []}, {'major': 0, 'minor': 0})):
+                report = compare_api(dict(request, old=resource, new=resource), Path('/wrapper'), Path('/semver'), root)
+            self.assertEqual(report['impact'], 'patch')
+            environment.assert_not_called()
+            build.assert_not_called()
+            self.assertEqual(command.call_count, 1)
+
+    def test_corrupt_or_legacy_baseline_never_runs_a_build(self):
+        from lifecycle_helpers import state_for, write_package, write_resource_baseline
+        from resources import read_baseline
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_package(root)
+            state = state_for({'probe': 'probe'})
+            (root / 'coverage.json').write_text(json.dumps(state))
+            descriptor = write_resource_baseline(root, state)
+            (root / 'probe-0.json').write_text('{}')
+            with mock.patch('subprocess.run') as command:
+                with self.assertRaisesRegex(AnalysisError, 'digest mismatch'):
+                    read_baseline(descriptor)
+                with self.assertRaisesRegex(AnalysisError, 'schema 2'):
+                    read_baseline(root / 'coverage.json')
+            command.assert_not_called()
+
+
+class DeveloperEnvironment(unittest.TestCase):
+    def test_compiler_cache_flags_and_project_target_are_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = Path(directory)
+            (context / 'Cargo.toml').write_text('[package]\nname="probe"\nversion="1.0.0"\n')
+            inherited = dict(CARGO='/tools/cargo', RUSTC='/tools/rustc', RUSTDOC='/tools/rustdoc',
+                             RUSTC_WRAPPER='sccache', CARGO_BUILD_RUSTC_WRAPPER='sccache',
+                             RUSTFLAGS='--cfg developer_build', RUSTDOCFLAGS='--cfg developer_docs',
+                             CARGO_INCREMENTAL='1', SCCACHE_DIR='/cache/compiler')
+            metadata = subprocess.CompletedProcess([], 0, json.dumps(dict(target_directory='/cache/project-target')))
+            with mock.patch.dict(os.environ, inherited, clear=True), mock.patch('compare.run', return_value=metadata) as cargo:
+                env = tool_environment('selected-toolchain', context)
+            self.assertEqual({key: env[key] for key in inherited}, inherited)
+            self.assertEqual(env['CARGO_TARGET_DIR'], '/cache/project-target')
+            self.assertEqual(env['RUSTUP_TOOLCHAIN'], 'selected-toolchain')
+            self.assertEqual(cargo.call_args.args[1], context)
+            del inherited['RUSTC']
+            del inherited['RUSTDOC']
+            with mock.patch.dict(os.environ, inherited, clear=True), mock.patch('compare.run', return_value=metadata):
+                configured = tool_environment('selected-toolchain', context)
+            self.assertNotIn('RUSTC', configured)
+            self.assertNotIn('RUSTDOC', configured)
 
 
 class JsonBoundary(unittest.TestCase):

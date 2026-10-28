@@ -9,6 +9,12 @@ export RELEASE_TEST_ROOT="$fixture"
 export RELEASE_TEST_SCRIPTS="$scripts"
 export GITHUB_REPOSITORY=fixture/repository
 
+# These release-input integration contracts unpack the real baseline or invoke
+# Git/Cargo. Keep them in the standard release checks, outside nextest's small
+# unit-test time budget, and before the publication tool mocks are installed.
+uv run --no-project --no-config --python 3.12 "$repo_root/tests/package-api/test_lifecycle.py"
+uv run --no-project --no-config --python 3.12 "$repo_root/tests/package-api/test_source.py"
+
 expect_failure() {
   if "$@" > "$fixture/stdout" 2> "$fixture/stderr"; then
     echo "unexpected success: $*" >&2
@@ -110,6 +116,32 @@ cmp "$fixture/expected.tsv" "$fixture/crates.tsv"
 printf 'consumer\t4.5.6\t/consumer/Cargo.toml\ndependency\t1.2.3-snapshot1\t/dependency/Cargo.toml\n' > "$fixture/expected.tsv"
 cmp "$fixture/expected.tsv" "$fixture/crates-with-paths.tsv"
 "$scripts/check-test-flow" --list-steps | grep -qx package-metadata
+"$scripts/check-test-flow" --list-steps | grep -qx semver
+# SemVer dispatch is optional and the default step list must not contain it.
+"$scripts/check-test-flow" --help > "$fixture/flow-help"
+awk '/Default steps:/,/Optional steps/' "$fixture/flow-help" > "$fixture/default-steps"
+! grep -qx '  semver' "$fixture/default-steps"
+# Exercise dispatch without repeating expensive analyzer/tool builds.
+mkdir -p "$fixture/flow/.local/bin" "$fixture/flow/.local/sbin" "$fixture/flow/sql-fun-server-api/src/payloads" "$fixture/flow/sql-fun-client/src/payloads"
+cp "$scripts/check-test-flow" "$fixture/flow/.local/bin/"
+cp "$repo_root/.local/sbin/workspace-nextest" "$fixture/flow/.local/sbin/"
+printf 'server source\n' > "$fixture/flow/sql-fun-server-api/src/payloads.rs"
+printf 'local client edits\n' > "$fixture/flow/sql-fun-client/src/payloads.rs"
+git -C "$fixture/flow" init -q
+cat > "$fixture/flow/.local/sbin/prepare-package-api-tests" <<'MOCK'
+#!/usr/bin/env bash
+printf '%s\n' '{"toolchain":"stable"}'
+MOCK
+cat > "$fixture/flow/.local/bin/check-semver" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$*" == "--repository $RELEASE_TEST_ROOT/flow --working-tree --toolchain stable --target "* ]]
+[[ "$(cat "$RELEASE_TEST_ROOT/flow/sql-fun-client/src/payloads.rs")" == 'local client edits' ]]
+touch "$RELEASE_TEST_ROOT/semver-dispatched"
+MOCK
+chmod +x "$fixture/flow/.local/"{bin/check-semver,sbin/prepare-package-api-tests}
+(cd "$fixture/flow"; .local/bin/check-test-flow --step=semver)
+[[ -f "$fixture/semver-dispatched" ]]
 CI=true "$scripts/check-test-flow" --step=package-metadata
 printf 'consumer\ndependency\n' > "$fixture/expected-packaged"
 cmp "$fixture/expected-packaged" "$fixture/packaged"

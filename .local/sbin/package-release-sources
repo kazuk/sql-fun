@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Shared Cargo source-package construction for preflight and SemVer snapshots.
+set -euo pipefail
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+crates=""
+declare -a patches=()
+crates="$("${GIT_ROOT}/.local/bin/release-crate-manifest" --with-paths)"
+
+# Cargo resolves registry dependencies even with --no-verify. Point workspace
+# dependencies at their local sources while their versions are unpublished.
+while IFS=$'\t' read -r name version manifest_path; do
+  directory="$(dirname "$manifest_path")"
+  patches+=(--config "patch.crates-io.\"$name\".path=$(jq -Rn --arg path "$directory" '$path')")
+done <<< "$crates"
+
+while IFS=$'\t' read -r name version manifest_path; do
+  echo ">> cargo package --package $name --allow-dirty --no-verify" >&2
+  if ! cargo package --package "$name" --allow-dirty --no-verify --quiet "${patches[@]}"; then
+    echo "error: package construction failed for $name" >&2
+    exit 1
+  fi
+done <<< "$crates"
+printf '%s\n' "$crates"

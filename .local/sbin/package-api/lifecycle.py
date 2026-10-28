@@ -9,6 +9,8 @@ import tomllib
 
 from compare import AnalysisError, LIMITS, explicit_path, prepare_side, require, run, tool_environment
 
+from resources import read_baseline
+
 LEVELS = {'patch': 0, 'minor': 1, 'major': 2}
 
 
@@ -27,8 +29,22 @@ def inventory(manifest):
 def read_state(path, policy=None):
     state = json.loads(path.read_text())
     require(isinstance(state, dict), 'coverage descriptor must be an object')
+    if state.get('schema') == 2:
+        from resources import read_resource_state
+        result = read_resource_state(path, state)
+        if policy is not None:
+            document = tomllib.loads(policy.read_text())
+            require(set(document) == {'feature-set'} and document['feature-set'] == state['configurations'],
+                    'candidate resource configurations must match the selected policy')
+        return result
     require(state.get('schema') == 1, 'unsupported coverage descriptor schema')
     require(isinstance(state.get('source_revision'), str) and state['source_revision'], 'source revision required')
+    if 'source' in state:
+        provenance = state['source']
+        require(isinstance(provenance, dict) and provenance.get('mode') in ('commit', 'working-tree') and
+                provenance.get('revision') == state['source_revision'] and type(provenance.get('dirty')) is bool,
+                'invalid source provenance')
+        require(provenance['mode'] != 'commit' or not provenance['dirty'], 'commit source cannot be dirty')
     require(isinstance(state.get('target'), str) and state['target'], 'explicit target required')
     require(state.get('default_features') is True, 'repository configurations require enabled defaults')
     require(isinstance(state.get('packages'), dict) and state['packages'], 'package set must not be empty')
@@ -75,25 +91,29 @@ def dependency_closure(name, packages):
 
 
 def selection(name, features, packages):
+    if 'resources' in packages[name]:
+        key = tuple(sorted(features))
+        require(key in packages[name]['resources'], f'missing released API resource: {name}/{features}')
+        return packages[name]['resources'][key]
     return dict(package=str(packages[name]['path']), dependencies=dependency_closure(name, packages),
                 features=sorted(set(features)), default_features=True)
 
 
-def resolve_dependencies(side, target, toolchain):
+def resolve_dependencies(side, target, toolchain, context):
     """Let Cargo select active local dependencies; reuse comparator staging."""
-    if not side['dependencies']:
+    if side is None or 'rustdoc' in side or not side['dependencies']:
         return side
     with tempfile.TemporaryDirectory(prefix='coverage-dependencies-') as directory:
         scratch = Path(directory)
-        env = tool_environment(toolchain, scratch)
+        env = tool_environment(toolchain, context)
         original = [Path(side['package']), *map(Path, side['dependencies'])]
         staged = scratch / 'packages'
         packages = prepare_side(original, staged)
-        command = [env['CARGO'], 'metadata', '--format-version=1', '--offline',
+        command = [env['CARGO'], 'metadata', '--format-version=1', '--config', str(staged / '.cargo/config.toml'),
                    '--filter-platform', target, '--manifest-path', str(packages[0][1] / 'Cargo.toml')]
         if side['features']:
             command += ['--features', ','.join(side['features'])]
-        metadata = json.loads(run(command, staged, env).stdout)
+        metadata = json.loads(run(command, context, env).stdout)
         resolved = {p['manifest_path'] for p in metadata['packages']}
         resolved_names = {p['name'] for p in metadata['packages']}
         for package, location in packages[1:]:
@@ -105,6 +125,8 @@ def resolve_dependencies(side, target, toolchain):
 
 
 def has_api(package):
+    if 'has_api' in package:
+        return package['has_api']
     manifest = package['manifest']
     return manifest.get('lib') is not None or (manifest['package'].get('autolib', True) and
                                                 (package['path'] / 'src/lib.rs').is_file())
@@ -114,8 +136,6 @@ def schedule(old, old_packages, new, new_packages):
     """Keep old obligations; names do not freeze mappings or invent predecessors."""
     calls, removals, additions, binaries = [], [], [], []
     common = set(old_packages) & set(new_packages)
-    for name in sorted(set(old_packages) - set(new_packages)):
-        removals.append(dict(package=name, reason='released-package-removed'))
     for name in sorted(common):
         removed = old_packages[name]['features'] - new_packages[name]['features']
         if removed:
@@ -124,8 +144,6 @@ def schedule(old, old_packages, new, new_packages):
     current_selections = set()
 
     def compare_pair(name, product, before, after, kind):
-        new_side = selection(name, after, new_packages)
-        current_selections.add(json.dumps(new_side, sort_keys=True))
         if not has_api(new_packages[name]):
             if name in old_packages and has_api(old_packages[name]):
                 removals.append(dict(package=name, reason='released-api-target-removed'))
@@ -134,7 +152,9 @@ def schedule(old, old_packages, new, new_packages):
         if before is not None and not has_api(old_packages[name]):
             additions.append(dict(package=name, configuration=product, reason='new-api-target'))
             before = None
-        old_side = selection(name, before, old_packages) if before is not None else selection(name, after, new_packages)
+        new_side = selection(name, after, new_packages)
+        current_selections.add(json.dumps(new_side, sort_keys=True))
+        old_side = selection(name, before, old_packages) if before is not None else None
         key = json.dumps([old_side, new_side], sort_keys=True)
         if key not in seen:
             seen.add(key)
@@ -165,6 +185,8 @@ def schedule(old, old_packages, new, new_packages):
                     set(previous[name]) == set(features) for previous in old['configurations'].values())
                 additions.append(dict(package=name, configuration=product, reason='new-coverage',
                                       released_selection=released_selection))
+            if not has_api(new_packages[name]):
+                continue
             current = selection(name, features, new_packages)
             if json.dumps(current, sort_keys=True) not in current_selections:
                 # Removal evidence must not hide an invalid replacement/shrink.
@@ -172,22 +194,18 @@ def schedule(old, old_packages, new, new_packages):
                 # it does not invent a historical contract for that selection.
                 kind = 'new-coverage' if product not in old['configurations'] else 'current-validation'
                 compare_pair(name, product, None, features, kind)
+    binaries.extend(dict(package=name, reason="no-longer-publishable")
+                    for name in sorted(set(old_packages) - set(new_packages)))
+    binaries.extend(dict(package=name, reason="never-published")
+                    for name in sorted(set(new_packages) - set(old_packages)))
     return calls, removals, additions, binaries
 
 
-def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch):
-    old, old_packages = read_state(old_path)
-    new, new_packages = read_state(new_path, policy)
-    require(old['target'] == new['target'], 'baseline/candidate targets differ')
-    calls, removed, added, binaries = schedule(old, old_packages, new, new_packages)
-    reports = []
-    new_surface = any(addition['reason'] != 'new-package' and
-                      not addition.get('released_selection', False) for addition in added)
-    impact = 'major' if removed else ('minor' if new_surface else 'patch')
-    for index, call in enumerate(calls):
-        request = dict(old=resolve_dependencies(call['old'], new['target'], toolchain),
-                       new=resolve_dependencies(call['new'], new['target'], toolchain),
-                       target=new['target'], toolchain=toolchain)
+def compare_selection(call, target, toolchain, comparator, wrapper, semver, scratch, index, context):
+    try:
+        request = dict(old=resolve_dependencies(call['old'], target, toolchain, context),
+                       new=resolve_dependencies(call['new'], target, toolchain, context),
+                       target=target, toolchain=toolchain, cargo_context=str(context))
         request_path = scratch / f'comparison-{index}.json'
         request_path.write_text(json.dumps(request))
         completed = subprocess.run([str(comparator), '--request', str(request_path), '--diff-wrapper', str(wrapper),
@@ -199,6 +217,23 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
                                 f'(exit {completed.returncode}): {completed.stderr}') from error
         require(completed.returncode == 0 and report.get('status') == 'detected' and report.get('impact') in LEVELS,
                 f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {report}')
+        return report
+    except AnalysisError as error:
+        raise AnalysisError(f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {error}') from error
+
+
+def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch, cargo_context=None):
+    context = cargo_context or Path.cwd()
+    old, old_packages = read_baseline(old_path)
+    new, new_packages = read_state(new_path, policy)
+    require(old['target'] == new['target'], 'baseline/candidate targets differ')
+    calls, removed, added, binaries = schedule(old, old_packages, new, new_packages)
+    reports = []
+    new_surface = any(addition['reason'] != 'new-package' and
+                      not addition.get('released_selection', False) for addition in added)
+    impact = 'major' if removed else ('minor' if new_surface else 'patch')
+    for index, call in enumerate(calls):
+        report = compare_selection(call, new['target'], toolchain, comparator, wrapper, semver, scratch, index, context)
         coverage = report['coverage']
         lost = set(coverage['old']['resolved_features']) - set(coverage['new']['resolved_features'])
         if lost:
@@ -210,6 +245,16 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
         reports.append(dict(package=call['package'], configuration=call['configuration'], kind=call['kind'], result=report))
     return dict(status='detected', impact=impact, comparisons=reports, removed_coverage=removed,
                 new_coverage=added, excluded=binaries, next_coverage=new, limits=LIMITS)
+
+
+def unpack_baseline(path, destination):
+    with tarfile.open(path) as archive:
+        require(all(m.isfile() or m.isdir() for m in archive.getmembers()),
+                'baseline links/special files forbidden')
+        archive.extractall(destination, filter='data')
+    descriptor = destination / 'baseline.json'
+    read_baseline(descriptor)
+    return descriptor
 
 
 def main():
@@ -227,9 +272,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix='coverage-lifecycle-') as directory:
             scratch = Path(directory)
             unpacked = scratch / 'baseline'
-            with tarfile.open(baseline) as archive:
-                require(all(m.isfile() or m.isdir() for m in archive.getmembers()), 'baseline links/special files forbidden')
-                archive.extractall(unpacked, filter='data')
+            unpack_baseline(baseline, unpacked)
             report = execute(unpacked / 'baseline.json', candidate, policy,
                              Path(__file__).resolve().parents[1] / 'compare-package-api',
                              wrapper, semver, args.toolchain, scratch)

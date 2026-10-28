@@ -10,8 +10,11 @@
 
 - [ ] `check-test-flow`
 - [ ] Other:
-- [ ] I have reviewed the [Rust coding guidelines](../docs/internal-rules/rust-coding-guideline.md) and verified that unit tests are placed immediately after the implementation they verify.
-- [ ] I have reviewed the [Rust coding guidelines](../docs/internal-rules/rust-coding-guideline.md) and verified that reusable test helpers reside under the crate-root `test_helpers` module.
+- [ ] I verified unit tests are placed immediately after the implementation
+      they verify, as required by the [Rust coding guidelines][rust-guidelines].
+- [ ] I verified reusable test helpers reside under the crate-root
+      `test_helpers` module, as required by the
+      [Rust coding guidelines][rust-guidelines].
 
 ## Documentation
 
@@ -21,3 +24,5 @@
 
 - Risk level:
 - Rollback plan:
+
+[rust-guidelines]: ../docs/internal-rules/rust-coding-guideline.md

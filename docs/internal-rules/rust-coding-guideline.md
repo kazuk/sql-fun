@@ -110,12 +110,16 @@ use ::url::Url;
 
 ### Test placement
 
-- Place tests
-  **immediately after the implementation block or function they cover**.  
-  Co-locating tests with the code they verify reduces the risk of tests being
-  orphaned or forgotten when modules are split or reorganized. Keep the test
-  module focused on the nearby implementation; broader integration tests belong
-  in dedicated test modules/files.
+- **Test placement is mandatory (MUST), not a stylistic preference.**
+  Unit tests MUST be placed immediately after the implementation block or
+  function they verify, in a focused local test module. Do not collect unit
+  tests at the end of a source file or move them into separate test files or
+  distant `tests` modules merely for organization. Parameterized tests follow
+  the same rule. Broader integration tests that exercise multiple components
+  may live in dedicated integration-test modules/files.
+- When modifying an implementation, inspect the placement of its existing unit
+  tests and correct placement violations in the affected implementation area.
+  Unrelated legacy violations can be corrected incrementally.
 - Test code SHOULD stay at roughly the same abstraction level as the behavior
   under test.  
   If a unit test needs repeated low-level setup such as writing fixture files,
@@ -131,6 +135,19 @@ use ::url::Url;
   code.  
   Raise the abstraction in `test_helpers` until the test body primarily
   communicates the scenario, action, and assertion.
+- **Test helper ownership is crate-wide (MUST).** All reusable test setup,
+  fixture builders, and helper definitions MUST reside in the crate-root
+  `test_helpers` module or its descendants, across every workspace crate.
+  Feature-specific helpers are not an exception: place them in a suitably named
+  `test_helpers` submodule rather than beside feature implementations.
+  Do not create nested/local `test_helpers` modules under `ast`, `sem`,
+  `cli`, `server`, or other feature modules.
+- Before writing a new test helper, inspect the crate's existing
+  `test_helpers` modules; reuse, extend, or consolidate existing helpers
+  instead of duplicating setup logic. Keep test assertions and test-case
+  scenarios adjacent to the implementation under test; move reusable setup
+  out, not the tests themselves. Small one-off setup statements in a test
+  body are not standalone helper definitions.
 
 ```rust
 impl Foo {

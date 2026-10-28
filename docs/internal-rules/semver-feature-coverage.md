@@ -24,10 +24,11 @@ The selected installed toolchain and explicit target govern both sides. The
 comparator's Bash/rustup/tool prerequisites and analysis limits apply. The
 lifecycle/seed scripts require Python 3.12 for archive extraction filters; the
 maintained test harness provisions that interpreter through existing uv setup.
-This operation neither installs tools nor downloads dependencies. Supply
-registry dependencies in Cargo's cache, as required by #357. It reads only the
-explicit baseline, policy and descriptor/package inputs; it does not discover
-releases, inspect an ambient workspace or mutate sources.
+This operation does not install tools or discover releases. It uses the current
+directory as its Cargo configuration/build context, including compiler wrappers,
+flags and persistent build outputs; Cargo may download dependencies. Source
+packages and policy still come from the explicit baseline and descriptor inputs.
+Repository integration supplies the selected repository as the Cargo context.
 
 The candidate descriptor and `baseline.json` use schema 1:
 

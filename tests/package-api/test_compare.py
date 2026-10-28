@@ -7,11 +7,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
-from compare import AnalysisError, parse_semver, validate_json
+from compare import AnalysisError, parse_semver, tool_environment, validate_json
 
 
 def fingerprint(directory):
@@ -114,6 +115,30 @@ class Comparison(unittest.TestCase):
                                          '--old', str(path), '--new', str(path)], capture_output=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(result.stdout)
+
+
+class DeveloperEnvironment(unittest.TestCase):
+    def test_compiler_cache_flags_and_project_target_are_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = Path(directory)
+            (context / 'Cargo.toml').write_text('[package]\nname="probe"\nversion="1.0.0"\n')
+            inherited = dict(CARGO='/tools/cargo', RUSTC='/tools/rustc', RUSTDOC='/tools/rustdoc',
+                             RUSTC_WRAPPER='sccache', CARGO_BUILD_RUSTC_WRAPPER='sccache',
+                             RUSTFLAGS='--cfg developer_build', RUSTDOCFLAGS='--cfg developer_docs',
+                             CARGO_INCREMENTAL='1', SCCACHE_DIR='/cache/compiler')
+            metadata = subprocess.CompletedProcess([], 0, json.dumps(dict(target_directory='/cache/project-target')))
+            with mock.patch.dict(os.environ, inherited, clear=True), mock.patch('compare.run', return_value=metadata) as cargo:
+                env = tool_environment('selected-toolchain', context)
+            self.assertEqual({key: env[key] for key in inherited}, inherited)
+            self.assertEqual(env['CARGO_TARGET_DIR'], '/cache/project-target')
+            self.assertEqual(env['RUSTUP_TOOLCHAIN'], 'selected-toolchain')
+            self.assertEqual(cargo.call_args.args[1], context)
+            del inherited['RUSTC']
+            del inherited['RUSTDOC']
+            with mock.patch.dict(os.environ, inherited, clear=True), mock.patch('compare.run', return_value=metadata):
+                configured = tool_environment('selected-toolchain', context)
+            self.assertNotIn('RUSTC', configured)
+            self.assertNotIn('RUSTDOC', configured)
 
 
 class JsonBoundary(unittest.TestCase):

@@ -48,22 +48,15 @@ def validate_side(side):
     return [explicit_path(side["package"])] + [explicit_path(p) for p in side["dependencies"]]
 
 
-def tool_environment(toolchain, scratch):
-    # Do not inherit compiler wrappers/flags, target selection or repository Cargo
-    # configuration. Cargo's registry/cache home remains available for offline deps.
-    env = {k: v for k, v in os.environ.items()
-           if not k.startswith(("CARGO_", "RUST"))}
-    if "CARGO_HOME" in os.environ:
-        env["CARGO_HOME"] = os.environ["CARGO_HOME"]
-    if "RUSTUP_HOME" in os.environ:
-        env["RUSTUP_HOME"] = os.environ["RUSTUP_HOME"]
-    env.update(RUSTUP_TOOLCHAIN=toolchain, RUSTC_BOOTSTRAP="1", CARGO_TERM_COLOR="never",
-               CARGO_ENCODED_RUSTFLAGS="", CARGO_ENCODED_RUSTDOCFLAGS="",
-               CARGO_BUILD_RUSTC_WRAPPER="", CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER="")
-    # Explicit executable selection also takes precedence over Cargo home settings.
-    for name in ("cargo", "rustc", "rustdoc"):
-        path = run(["rustup", "which", "--toolchain", toolchain, name], scratch, env).stdout.strip()
-        env[name.upper()] = path
+def tool_environment(toolchain, context):
+    # Use the developer's Cargo configuration, flags and compiler caches.
+    # The requested toolchain and rustdoc JSON output remain operation inputs.
+    env = dict(os.environ, RUSTUP_TOOLCHAIN=toolchain, RUSTC_BOOTSTRAP="1")
+    if "CARGO" not in env:
+        env["CARGO"] = run(["rustup", "which", "--toolchain", toolchain, "cargo"], context, env).stdout.strip()
+    if (context / "Cargo.toml").is_file():
+        metadata = json.loads(run([env["CARGO"], "metadata", "--no-deps", "--format-version=1"], context, env).stdout)
+        env["CARGO_TARGET_DIR"] = metadata["target_directory"]
     return env
 
 
@@ -102,22 +95,20 @@ def prepare_side(paths, root):
     patches = ["[patch.crates-io]"]
     for package, path in packages[1:]:
         patches.append(f'{json.dumps(package["name"])} = {{ path = {json.dumps(str(path))} }}')
-    # Force a predictable profile and avoid Cargo-home flags/rustdoc settings.
-    patches += ['[build]', 'rustflags = []', 'rustdocflags = []',
-                '[profile.dev]', 'debug = 0', 'incremental = false']
     (config / "config.toml").write_text("\n".join(patches) + "\n")
     return packages
 
 
-def generate(side, paths, root, target, host, env):
+def generate(side, paths, root, target, host, env, context):
     packages = prepare_side(paths, root)
     package, directory = packages[0]
-    common = ["--manifest-path", str(directory / "Cargo.toml"), "--offline"]
+    common = ["--manifest-path", str(directory / "Cargo.toml"),
+              "--config", str(root / ".cargo/config.toml")]
     if not side["default_features"]:
         common += ["--no-default-features"]
     if side["features"]:
         common += ["--features", ",".join(side["features"])]
-    metadata = json.loads(run([env["CARGO"], "metadata", "--format-version", "1", "--filter-platform", target, *common], root, env).stdout)
+    metadata = json.loads(run([env["CARGO"], "metadata", "--format-version", "1", "--filter-platform", target, *common], context, env).stdout)
     selected = next(p for p in metadata["packages"] if Path(p["manifest_path"]).parent == directory)
     require(set(side["features"]) <= selected["features"].keys(), "requested package feature is missing")
     libraries = [t for t in selected["targets"] if "lib" in t["kind"] or "proc-macro" in t["kind"]]
@@ -126,25 +117,25 @@ def generate(side, paths, root, target, host, env):
     for dep, path in packages[1:]:
         require(resolved.get(str(path / "Cargo.toml")) == dep["version"],
                 f'supplied dependency not resolved from package contents: {dep["name"]}')
-    # Cargo may resolve registry dependencies, but no other local source is allowed.
     allowed_manifests = {str(path / "Cargo.toml") for _, path in packages}
-    require(all(p["source"] is not None or p["manifest_path"] in allowed_manifests
-                for p in metadata["packages"]), "unexpected local source dependency")
     for local in metadata["packages"]:
         if local["manifest_path"] in allowed_manifests:
             directory_path = Path(local["manifest_path"]).parent
             require(all(Path(t["src_path"]).resolve().is_relative_to(directory_path)
                         for t in local["targets"]), "package target source is outside supplied contents")
     node = next(n for n in metadata["resolve"]["nodes"] if n["id"] == selected["id"])
-    build = root / "build"
+    build = Path(metadata["target_directory"])
     run([env["CARGO"], "rustdoc", *common, "--lib", "--target", target,
-         "--target-dir", str(build), "--", "-Z", "unstable-options", "--output-format", "json"], root, env)
+         "--", "-Z", "unstable-options", "--output-format", "json"], context, env)
     # Cargo builds/document proc-macro targets for the host, even with --target.
     output = build if "proc-macro" in libraries[0]["kind"] else build / target
     artifact = output / "doc" / (libraries[0]["name"].replace("-", "_") + ".json")
     documented_target = host if "proc-macro" in libraries[0]["kind"] else target
     schema = validate_json(artifact, libraries[0]["name"], package["version"], documented_target)
-    return artifact, {"name": package["name"], "version": package["version"],
+    # The next side reuses the same target directory and crate output name.
+    saved = root / "api.json"
+    shutil.copy2(artifact, saved)
+    return saved, {"name": package["name"], "version": package["version"],
                       "target_kind": libraries[0]["kind"], "features": side["features"],
                       "default_features": side["default_features"], "resolved_features": node["features"],
                       "feature_inventory": sorted(selected["features"]), "schema": schema,
@@ -230,25 +221,26 @@ def parse_semver(output, status):
 
 def compare(request, wrapper, semver, scratch):
     require(isinstance(request, dict), "comparison request must be an object")
-    require(set(request) == {"old", "new", "target", "toolchain"}, "invalid request fields")
+    require(set(request) - {"cargo_context"} == {"old", "new", "target", "toolchain"}, "invalid request fields")
     require(isinstance(request["target"], str) and re.fullmatch(r"[\w-]+", request["target"]), "explicit target triple required")
     require(isinstance(request["toolchain"], str) and request["toolchain"], "explicit toolchain required")
     paths = {side: validate_side(request[side]) for side in ("old", "new")}
-    env = tool_environment(request["toolchain"], scratch)
+    context = explicit_path(request.get("cargo_context", str(Path.cwd())))
+    env = tool_environment(request["toolchain"], context)
     producer = {"toolchain": request["toolchain"], "target": request["target"]}
-    rustc_details = run([env["RUSTC"], "--version", "--verbose"], scratch, env).stdout
+    rustc_details = run([env.get("RUSTC", "rustc"), "--version", "--verbose"], scratch, env).stdout
     host_match = re.search(r"^host: (\S+)$", rustc_details, re.M)
     require(host_match is not None, "selected rustc did not report its host in --version --verbose")
     host = host_match[1]
     producer.update(rustc=rustc_details.strip(), host=host)
     for command in ("cargo", "rustdoc"):
-        producer[command] = run([env[command.upper()], "--version"], scratch, env).stdout.strip()
+        producer[command] = run([env.get(command.upper(), command), "--version"], scratch, env).stdout.strip()
     require(run([str(semver), "--version"], scratch, env).stdout.strip() == "cargo-semver-checks 0.51.0-sqlfun.1",
             "expected cargo-semver-checks 0.51.0-sqlfun.1")
     artifacts, coverage = {}, {}
     for side in ("old", "new"):
         try:
-            artifacts[side], coverage[side] = generate(request[side], paths[side], scratch / side, request["target"], host, env)
+            artifacts[side], coverage[side] = generate(request[side], paths[side], scratch / side, request["target"], host, env, context)
         except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration) as error:
             raise AnalysisError(f"{side} JSON production: {error}") from error
     require(coverage["old"]["name"] == coverage["new"]["name"], "old/new package names differ")

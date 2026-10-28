@@ -47,8 +47,8 @@ The request is explicit, including empty lists and both default-feature policies
 Package directories contain already extracted Cargo source-package contents,
 including normalized, self-contained `Cargo.toml` files. The example's
 `stable` names an explicitly supplied installed toolchain. The comparator uses
-that toolchain’s Cargo, rustc and rustdoc together, even if ambient executable
-paths or Cargo-home settings name a different compiler.
+that toolchain’s Cargo, rustc and rustdoc by default. Explicit compiler executable
+overrides from the developer environment remain effective.
 
 Supply the complete local packaged dependency closure on each side, including
 transitive and proc-macro dependencies. No workspace discovery or source/version
@@ -56,19 +56,28 @@ materialization occurs. Source path dependencies, external workspace references,
 workspace inheritance, target sources outside the package, and symlinks are
 rejected. Each supplied dependency name must be unique and resolve
 to the supplied package/version through operation-local crates.io patches.
-Other registry dependencies must already be available to Cargo offline. The
-comparator does not fetch missing dependencies or substitute adjacent sources.
+Other dependencies follow the developer's normal Cargo configuration, including
+registry access and configured patches.
 A missing requested feature fails analysis; it is never silently omitted.
 
-The script copies only the selected package inputs into a fresh temporary
-operation directory. Cargo metadata, lockfile updates, builds and documentation
-run there with separate old/new target directories. Inputs remain unchanged,
-and scratch data is deleted on success or failure. It passes each side's own
-feature/default-feature selection to both Cargo metadata and JSON production.
-Caller compiler flags/wrappers and repository Cargo configuration are excluded;
-Cargo's home remains available for offline registry/cache access. Ordinary Cargo
-home configuration still applies, subject to explicit compiler/flag overrides
-and validation of local dependency resolution.
+The script copies the selected package inputs into temporary source directories
+so Cargo can update their lockfiles without modifying the inputs. Builds run in
+the caller's Cargo context, inheriting compiler wrappers (including sccache),
+compiler/rustdoc flags, Cargo configuration and profile settings. The optional
+absolute `cargo_context` request field explicitly selects that directory; when
+omitted, the command's current directory is the Cargo context. Repository
+release-intent validation supplies its selected repository root.
+
+When the context contains a Cargo manifest, its ordinary Cargo metadata selects
+the persistent target directory, including environment/configuration overrides.
+Both sides and subsequent comparisons reuse that directory. Each side's rustdoc
+JSON is copied aside before the other side can replace the shared output.
+Only dependency patches for the supplied source packages and the required JSON
+output arguments are added. Cargo may fetch dependencies as in an ordinary
+build. The requested toolchain and target remain explicit inputs; existing
+compiler executable overrides are honored. Local results reflect the developer's
+environment; CI owns a controlled validation environment. No isolated compiler
+environment, forced profile, or fresh per-comparison build directory is imposed.
 
 ## Producer and analyzer contract
 

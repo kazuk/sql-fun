@@ -314,8 +314,11 @@ untracked files selected by Cargo packaging, without requiring a commit or
 changing your manifests/index. It uses the active installed Rust toolchain and
 its host target, plus the checked-in product feature mappings. It requires the
 corrected `cargo-semver-checks 0.51.0-sqlfun.1` supplied by the documented
-CI/development builder, existing uv/Cargo release tools, and cached comparison
-dependencies. The xbuild wrapper and Python 3.12 are prepared automatically.
+CI/development builder and existing uv/Cargo release tools. The xbuild wrapper
+and Python 3.12 are prepared automatically. Comparisons inherit your Cargo
+configuration, compiler flags and wrappers (including sccache), and reuse the
+normal target directory. CI is responsible for its controlled validation
+environment.
 Private and never-published crates are outside SemVer verdicts; binary-only
 packages do not receive Rust API analysis. Failures report crate, product,
 declared intent and detected impact, or an analysis error. Normal checks

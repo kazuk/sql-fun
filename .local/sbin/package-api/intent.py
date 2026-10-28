@@ -55,7 +55,7 @@ def validate(args, scratch):
     candidate, package_seconds = package_snapshot(source, provenance, env, configurations, args.target, scratch / 'candidate')
     analysis_started = time.monotonic()
     report = execute(baseline, candidate, source / '.local/semver-feature-sets.toml',
-                     TOOLS / 'sbin/compare-package-api', wrapper, semver, args.toolchain, scratch)
+                     TOOLS / 'sbin/compare-package-api', wrapper, semver, args.toolchain, scratch, explicit_path(args.repository))
     results = intent_results(report, intent)
     passed = all(r['outcome'] == 'pass' for r in results)
     report.update(status='passed' if passed else 'exceeds-intent', source=provenance, target=args.target,

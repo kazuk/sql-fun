@@ -85,21 +85,21 @@ def selection(name, features, packages):
                 features=sorted(set(features)), default_features=True)
 
 
-def resolve_dependencies(side, target, toolchain):
+def resolve_dependencies(side, target, toolchain, context):
     """Let Cargo select active local dependencies; reuse comparator staging."""
     if not side['dependencies']:
         return side
     with tempfile.TemporaryDirectory(prefix='coverage-dependencies-') as directory:
         scratch = Path(directory)
-        env = tool_environment(toolchain, scratch)
+        env = tool_environment(toolchain, context)
         original = [Path(side['package']), *map(Path, side['dependencies'])]
         staged = scratch / 'packages'
         packages = prepare_side(original, staged)
-        command = [env['CARGO'], 'metadata', '--format-version=1', '--offline',
+        command = [env['CARGO'], 'metadata', '--format-version=1', '--config', str(staged / '.cargo/config.toml'),
                    '--filter-platform', target, '--manifest-path', str(packages[0][1] / 'Cargo.toml')]
         if side['features']:
             command += ['--features', ','.join(side['features'])]
-        metadata = json.loads(run(command, staged, env).stdout)
+        metadata = json.loads(run(command, context, env).stdout)
         resolved = {p['manifest_path'] for p in metadata['packages']}
         resolved_names = {p['name'] for p in metadata['packages']}
         for package, location in packages[1:]:
@@ -183,11 +183,11 @@ def schedule(old, old_packages, new, new_packages):
     return calls, removals, additions, binaries
 
 
-def compare_selection(call, target, toolchain, comparator, wrapper, semver, scratch, index):
+def compare_selection(call, target, toolchain, comparator, wrapper, semver, scratch, index, context):
     try:
-        request = dict(old=resolve_dependencies(call['old'], target, toolchain),
-                       new=resolve_dependencies(call['new'], target, toolchain),
-                       target=target, toolchain=toolchain)
+        request = dict(old=resolve_dependencies(call['old'], target, toolchain, context),
+                       new=resolve_dependencies(call['new'], target, toolchain, context),
+                       target=target, toolchain=toolchain, cargo_context=str(context))
         request_path = scratch / f'comparison-{index}.json'
         request_path.write_text(json.dumps(request))
         completed = subprocess.run([str(comparator), '--request', str(request_path), '--diff-wrapper', str(wrapper),
@@ -204,7 +204,8 @@ def compare_selection(call, target, toolchain, comparator, wrapper, semver, scra
         raise AnalysisError(f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {error}') from error
 
 
-def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch):
+def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch, cargo_context=None):
+    context = cargo_context or Path.cwd()
     old, old_packages = read_state(old_path)
     new, new_packages = read_state(new_path, policy)
     require(old['target'] == new['target'], 'baseline/candidate targets differ')
@@ -214,7 +215,7 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
                       not addition.get('released_selection', False) for addition in added)
     impact = 'major' if removed else ('minor' if new_surface else 'patch')
     for index, call in enumerate(calls):
-        report = compare_selection(call, new['target'], toolchain, comparator, wrapper, semver, scratch, index)
+        report = compare_selection(call, new['target'], toolchain, comparator, wrapper, semver, scratch, index, context)
         coverage = report['coverage']
         lost = set(coverage['old']['resolved_features']) - set(coverage['new']['resolved_features'])
         if lost:

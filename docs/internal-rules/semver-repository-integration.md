@@ -5,7 +5,7 @@ future CI adapters. It reuses the #357 comparator and #358 feature lifecycle;
 see [policy](semver-release-intent.md), [coverage](semver-feature-coverage.md),
 and [package comparison](package-api-comparator.md).
 
-## Source selection and isolation
+## Source selection and package preparation
 
 The standalone command requires an absolute repository root, one source mode,
 an installed toolchain and an explicit target:
@@ -102,8 +102,10 @@ retains the complete descriptor and payload for #360.
 The existing corrected analyzer, uv/Python 3.12, Cargo/rustup, Bash, Git, jq, Taplo
 and cargo-edit are prerequisites. The command prepares xbuild automatically and
 never installs/substitutes an analyzer. Packaging may resolve registry inputs;
-comparison remains offline and requires dependencies in Cargo's cache on both
-sides. Missing offline dependencies fail clearly rather than replacing history.
+comparison uses the selected repository's ordinary Cargo configuration, compiler
+wrappers/flags and persistent target directory. Dependencies may be fetched as in
+a normal developer build. CI is responsible for provisioning and controlling its
+own validation environment.
 
 ## Execution cost
 
@@ -113,7 +115,11 @@ toolchain and its host target, and the repository's checked-in product mappings;
 the normal flow's payload-copy preparation so local edits are analyzed unchanged.
 Defaults continue to skip it.
 JSON `timings` reports package production, analysis and total elapsed seconds,
-including source/tool preparation in the total. Record tool versions, source,
+including source/tool preparation in the total. Compiler wrappers such as sccache
+are inherited, and builds reuse the normal Cargo target directory across crates,
+old/new sides and invocations. Cache hits depend on Cargo/compiler-cache keys;
+source packaging still uses temporary files to avoid changing release versions
+in the developer checkout. Record tool versions, source,
 target, cache conditions and runner resources with developer/CI measurements.
 Default enablement requires a separate maintainer decision. Required CI wiring,
 baseline adoption and performance cache optimization remain separate work.

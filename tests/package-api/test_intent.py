@@ -12,11 +12,34 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '.local/sbin/package-api'))
 from compare import AnalysisError
-from intent import intent_results
+from intent import intent_results, prepare_tools
 from repository import release_intent, package_snapshot
 
 
 class Intent(unittest.TestCase):
+    def test_wrapper_uses_host_artifact_with_ambient_target_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / 'custom-target/host-triple/debug/xbuild'
+            executable.parent.mkdir(parents=True)
+            executable.touch()
+            artifact = dict(reason='compiler-artifact', executable=str(executable),
+                            target=dict(name='xbuild', kind=['bin']))
+            replies = [subprocess.CompletedProcess([], 0, 'cargo-semver-checks 0.51.0-sqlfun.1\n'),
+                       subprocess.CompletedProcess([], 0, 'rustc test\nhost: host-triple\n'),
+                       subprocess.CompletedProcess([], 0, json.dumps(artifact) + '\n')]
+            for ambient in ('host-triple', 'cross-triple'):
+                with self.subTest(ambient=ambient), \
+                     mock.patch('intent.repository_environment', return_value={'CARGO_BUILD_TARGET': ambient}), \
+                     mock.patch('intent.shutil.which', return_value='/tools/cargo-semver-checks'), \
+                     mock.patch('intent.run', side_effect=replies) as run:
+                    wrapper, _ = prepare_tools('stable', root)
+                    self.assertEqual(wrapper, executable)
+                    command = run.call_args.args[0]
+                    self.assertEqual(command[command.index('--target') + 1], 'host-triple')
+                    self.assertIn('--message-format=json', command)
+                    self.assertEqual(run.call_args.args[2]['CARGO_BUILD_TARGET'], ambient)
+
     def report(self, impact='patch'):
         return dict(comparisons=[dict(package='checked', configuration='postgres', kind='released',
                                      result=dict(impact=impact))], removed_coverage=[], new_coverage=[])

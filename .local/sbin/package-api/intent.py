@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import sys
 import tarfile
@@ -42,10 +43,18 @@ def prepare_tools(toolchain, scratch):
     require(run([semver, '--version'], scratch, env).stdout.strip() == 'cargo-semver-checks 0.51.0-sqlfun.1',
             'cargo-semver-checks 0.51.0-sqlfun.1 is required')
     root = TOOLS.parent
-    # Prepare the thin wrapper internally; contributors need no separate command.
-    run(['cargo', 'build', '--locked', '-p', 'xbuild', '--bin', 'xbuild'], root, env)
-    metadata = json.loads(run(['cargo', 'metadata', '--locked', '--no-deps', '--format-version=1'], root, env).stdout)
-    return Path(metadata['target_directory']) / 'debug/xbuild', Path(semver)
+    # The wrapper runs here, independently of the API's compilation target.
+    rustc = run([env.get('RUSTC', 'rustc'), '--version', '--verbose'], root, env).stdout
+    host = re.search(r'^host: (\S+)$', rustc, re.M)
+    require(host is not None, 'selected rustc did not report its host in --version --verbose')
+    build = run(['cargo', 'build', '--locked', '-p', 'xbuild', '--bin', 'xbuild',
+                 '--target', host[1], '--message-format=json'], root, env)
+    artifacts = [json.loads(line) for line in build.stdout.splitlines()]
+    executables = [Path(item['executable']) for item in artifacts
+                   if item.get('reason') == 'compiler-artifact' and item.get('executable')
+                   and item['target']['name'] == 'xbuild' and 'bin' in item['target']['kind']]
+    require(len(executables) == 1 and executables[0].is_file(), 'Cargo did not report the built xbuild executable')
+    return executables[0], Path(semver)
 
 
 def validate(args, scratch):

@@ -32,7 +32,9 @@ The command never stages, commits, updates caller manifests/lockfiles or
 advances
 the active baseline. Cargo inspection, version materialization and packaging run
 in a disposable Git clone. The wrapper is automatically built in the tooling
-checkout's ordinary target directory.
+checkout's ordinary target directory, explicitly for the compiler host so it
+can run locally even when an ambient Cargo target selects cross-compilation.
+Its executable path comes from Cargo's build artifact output.
 
 Local results record `source.mode`, base `source.revision` and `source.dirty`.
 The dirty marker is conservative: ignored captured inputs may make it true even

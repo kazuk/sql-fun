@@ -1,6 +1,9 @@
 name: build and test
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches-ignore:
       - ci-image
@@ -9,6 +12,7 @@ on:
       - synchronize
       - reopened
   merge_group:
+  workflow_dispatch:
 
 concurrency:
   group: build-test-${{ github.event.pull_request.number || github.ref }}
@@ -40,7 +44,7 @@ jobs:
             exit 1
           fi
 
-  workspace:
+  workspace-tests-build:
     needs: pr-freshness
     runs-on: ubuntu-24.04
     container: &ci-builder-container
@@ -48,59 +52,198 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [a, b]
     steps:
       - uses: actions/checkout@v5
-
       - name: Install Rust problem matcher
         run: echo "::add-matcher::.github/problem-matchers/rust.json"
-
       - name: Disk usage before cache restore
         run: |
           df -h . /usr/local/cargo /github/home
           df -i . /usr/local/cargo /github/home
-
       - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
             /usr/local/cargo/git
-          key: cargo-${{ runner.os }}-workspace-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-workspace-tests-${{ matrix.group }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
 
       - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
-          key: sccache-${{ runner.os }}-workspace-${{ hashFiles('**/Cargo.lock') }}
+          key: sccache-${{ runner.os }}-workspace-tests-${{ matrix.group }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sccache-${{ runner.os }}-
 
-      - name: Build and test
+      - name: Build nextest archive
+        env:
+          SQL_FUN_CI_TEST_GROUP: ${{ matrix.group }}
+          SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
         run: |
           GIT_ROOT="$(git rev-parse --show-toplevel)"
-          export GIT_ROOT
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
-          export SQL_FUN_BIN="${GIT_ROOT}/target/debug/sql-fun"
-          export SQL_FUN_TEST_SERVER_BIN="${GIT_ROOT}/target/debug/sql-fun-server"
-          sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=workspace --nextest-extra="
-            --profile ci
-            --show-progress none"
+          sccache --start-server
+          .local/bin/check-test-flow --step=workspace --workspace-phase=build
           sccache --show-stats
-
-      - name: Disk usage after build and test
+      - name: Disk usage after test build
         if: ${{ always() }}
         run: |
           df -h . /usr/local/cargo /github/home
           df -i . /usr/local/cargo /github/home
-          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
-            if [ -d "$path" ]; then
-              du -sh "$path"
-            fi
-          done
+          du -sh target "$RUNNER_TEMP/workspace-ci" /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-nextest-${{ matrix.group }}
+          path: ${{ runner.temp }}/workspace-ci/nextest-${{ matrix.group }}.tar.zst
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: cargo-timings-workspace-${{ matrix.group }}
+          path: target/cargo-timings/*.html
+          retention-days: 30
+          if-no-files-found: warn
 
+  workspace-cli-build:
+    needs: pr-freshness
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-workspace-cli-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-workspace-cli-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+      - name: Build cli binary
+        run: |
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
+          cargo build --locked -p sql-fun-cli --bin sql-fun
+          mkdir -p "${RUNNER_TEMP}/workspace-cli"
+          cp "target/debug/sql-fun" "${RUNNER_TEMP}/workspace-cli/"
+          sccache --show-stats
+      - name: Disk usage after cli build
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          du -sh target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-cli
+          path: ${{ runner.temp }}/workspace-cli/
+          if-no-files-found: error
+
+  workspace-server-build:
+    needs: pr-freshness
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-workspace-server-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-workspace-server-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+      - name: Build server binary
+        run: |
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
+          cargo build --locked -p sql-fun-server --bin sql-fun-server
+          mkdir -p "${RUNNER_TEMP}/workspace-server"
+          cp "target/debug/sql-fun-server" "${RUNNER_TEMP}/workspace-server/"
+          sccache --show-stats
+      - name: Disk usage after server build
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          du -sh target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: workspace-server
+          path: ${{ runner.temp }}/workspace-server/
+          if-no-files-found: error
+
+  workspace:
+    needs: [workspace-tests-build, workspace-cli-build, workspace-server-build]
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - name: Disk usage before archive download
+        run: |
+          df -h . /github/home
+          df -i . /github/home
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-nextest-a
+          path: ${{ runner.temp }}/workspace-ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-nextest-b
+          path: ${{ runner.temp }}/workspace-ci
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-cli
+          path: ${{ runner.temp }}/workspace-cli
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-server
+          path: ${{ runner.temp }}/workspace-server
+      - name: Run archived default-feature tests and SQLAST regressions
+        env:
+          SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
+          SQL_FUN_CI_TEST_GROUPS: a b
+          SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
+        run: |
+          export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
+          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
+          .local/bin/check-test-flow --step=workspace --workspace-phase=test --nextest-extra="
+            --show-progress none"
+      - name: Disk usage after tests
+        if: ${{ always() }}
+        run: |
+          df -h . /github/home
+          df -i . /github/home
+          du -sh target ${{ runner.temp }}/workspace-ci ${{ runner.temp }}/workspace-cli ${{ runner.temp }}/workspace-server || true
       - name: Upload SQLAST regression evidence
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
@@ -108,24 +251,37 @@ jobs:
           name: sqlast-regressions-source
           path: target/sqlast-regressions/
           if-no-files-found: warn
-
-      - name: Upload nextest JUnit report
+      - name: Upload nextest JUnit report (a)
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
-          name: nextest-junit-workspace
-          path: target/nextest/ci/junit.xml
+          name: nextest-junit-workspace-a
+          path: target/nextest/ci-a/junit.xml
           retention-days: 30
           if-no-files-found: warn
-
-      - name: Test Report
+      - name: Test Report (a)
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
         with:
-          name: nextest tests
-          path: target/nextest/ci/junit.xml
+          name: nextest tests (default features, group a)
+          path: target/nextest/ci-a/junit.xml
           reporter: java-junit
 
+      - name: Upload nextest JUnit report (b)
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nextest-junit-workspace-b
+          path: target/nextest/ci-b/junit.xml
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Test Report (b)
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: nextest tests (default features, group b)
+          path: target/nextest/ci-b/junit.xml
+          reporter: java-junit
 
   workspace-all-features-tests-build:
     needs: pr-freshness

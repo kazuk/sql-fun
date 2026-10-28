@@ -135,7 +135,6 @@ use ::url::Url;
   code.  
   Raise the abstraction in `test_helpers` until the test body primarily
   communicates the scenario, action, and assertion.
-
 - **Test helper ownership is crate-wide (MUST).** All reusable test setup,
   fixture builders, and helper definitions MUST reside in the crate-root
   `test_helpers` module or its descendants, across every workspace crate.

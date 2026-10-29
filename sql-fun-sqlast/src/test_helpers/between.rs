@@ -1,20 +1,20 @@
 use crate::{
     ast::Dialect,
-    context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
+    context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     sem::{
-        BinaryOperatorDefinition, OperatorDefinition, OperatorName, ParseContext, PgBuiltInType,
-        SchemaName, SourcePathWithSpan, TypeCategory, TypeDefinition,
+        BinaryOperatorDefinition, OperatorDefinition, OperatorName, PgBuiltInType, SchemaName,
+        SourcePathWithSpan, TypeCategory, TypeDefinition,
     },
     test_helpers::TestParseContext,
 };
 
 /// Small catalog with independently selected integer/text comparisons.
 /// These tests need no builtin catalog loading or external services.
-pub(super) fn context(operators: &[&str]) -> SchemaFileContext {
+pub(crate) fn context(operators: &[&str]) -> SchemaFileContext {
     comparison_context(operators, false)
 }
 
-pub(super) fn mixed_bounds_context(operators: &[&str]) -> SchemaFileContext {
+pub(crate) fn mixed_bounds_context(operators: &[&str]) -> SchemaFileContext {
     comparison_context(operators, true)
 }
 
@@ -68,7 +68,7 @@ fn comparison_context(operators: &[&str], mixed_bounds: bool) -> SchemaFileConte
     )
 }
 
-pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
+pub(crate) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
     let mut context = context(&[">=", "<=", "<", ">"]);
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
@@ -81,7 +81,7 @@ pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error:
     Ok(context)
 }
 
-pub(super) fn query(
+pub(crate) fn query(
     sql: &str,
     context: SchemaFileContext,
 ) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
@@ -93,11 +93,68 @@ pub(super) fn query(
     Ok((query, analyzed.into_context()))
 }
 
-pub(super) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(crate) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)
         .unwrap()
         .expression()
         .unwrap()
+}
+
+/// Inspect retained comparison lookups without repeating name resolution.
+pub(crate) fn comparison_bindings(
+    expression: &crate::sem::SemScalarExpr,
+) -> Result<Vec<String>, crate::sem::AnalysisError> {
+    let mut names = Bindings::inspect(expression)?.names;
+    names.sort();
+    Ok(names)
+}
+
+/// Types of each comparison's retained, coerced operand pair.
+pub(crate) fn comparison_argument_types(
+    expression: &crate::sem::SemScalarExpr,
+) -> Result<Vec<[Option<crate::sem::TypeReference>; 2]>, crate::sem::AnalysisError> {
+    Ok(Bindings::inspect(expression)?.argument_types)
+}
+
+#[derive(Default)]
+struct Bindings {
+    names: Vec<String>,
+    argument_types: Vec<[Option<crate::sem::TypeReference>; 2]>,
+}
+
+impl Bindings {
+    fn inspect(expression: &crate::sem::SemScalarExpr) -> Result<Self, crate::sem::AnalysisError> {
+        let mut expression = expression.clone();
+        let mut bindings = Self::default();
+        expression.walk(&mut bindings)?;
+        Ok(bindings)
+    }
+}
+
+impl crate::sem::traversal::SemanticVisitor for Bindings {
+    fn expression(
+        &mut self,
+        expression: &mut crate::sem::SemScalarExpr,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        if let Some(binding) = expression.operator_binding() {
+            assert!(binding.resolution().is_resolved());
+            let encoded = ::serde_json::to_value(binding).unwrap();
+            self.names.push(
+                encoded["name"]["Valid"]["op_name"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned(),
+            );
+            self.argument_types.push(std::array::from_fn(|index| {
+                if let Some(argument) = expression.binary_argument(index) {
+                    argument.get_type()
+                } else {
+                    None
+                }
+            }));
+        }
+        Ok(())
+    }
 }

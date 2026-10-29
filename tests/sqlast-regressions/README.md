@@ -180,3 +180,14 @@ tests retain completed binding identities, missing/ambiguous outcomes, nested
 operands, serialization and traversal. SQLite feature tests verify its explicit
 lookup and mandatory static not-found diagnostics; registration is not implemented.
 Expression-wide collation derivation and conflict checking are outside this scope.
+
+Issue #503 adds ordinary `BETWEEN`, `NOT BETWEEN` and explicit `ASYMMETRIC`
+contracts in `between.json`, selected with `between.sql` on PostgreSQL 17/18.
+The shared source and installed paths cover comparison compatibility, NULL
+positions, columns, parameters, conflicts, recovery and exact result metadata.
+Untyped NULL/string literals use independent comparison targets; invalid
+JSON/NULL comparisons must still report incompatibility.
+Nullability retains the shared comparisons' conservative policy; these are
+static analysis checks, not predicate evaluation. Rust retains comparison
+bindings, serialized public builders, independent operand compatibility and
+correlated parameter domains. SQLite semantics remain tracked in #855.

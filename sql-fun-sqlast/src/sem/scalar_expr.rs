@@ -1031,6 +1031,7 @@ impl SemScalarExpr {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.enter_expression(self)?;
         match self {
             Self::Grouping(v) => v.walk(visitor)?,
             Self::Array(v) => v.walk(visitor)?,
@@ -1217,5 +1218,55 @@ impl SemScalarExpr {
             target.walk_assignment_target(visitor)?;
         }
         Ok(())
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn resolve_between(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Arith(value) = self
+            && let Some(resolved) = value.resolve_between(context)?
+        {
+            *self = resolved;
+        }
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
+    // Unknown literals are SQL input values, not typed text operands. A known
+    // peer supplies the comparison target; two literals use string comparison.
+    pub(crate) fn comparison_literal_operands(
+        context: &impl ParseContext,
+        left: Self,
+        right: Self,
+    ) -> (Self, Self) {
+        let left_unknown =
+            crate::sem::MinMaxExpr::input_type(&left) == Some(crate::sem::MinMaxExpr::unknown());
+        let right_unknown =
+            crate::sem::MinMaxExpr::input_type(&right) == Some(crate::sem::MinMaxExpr::unknown());
+        let left_target = if right_unknown {
+            Some(crate::sem::PgBuiltInType::text())
+        } else {
+            right.get_type()
+        };
+        let right_target = if left_unknown {
+            Some(crate::sem::PgBuiltInType::text())
+        } else {
+            left.get_type()
+        };
+        let left = if left_unknown && let Some(ty) = left_target {
+            Self::wrap_implicit_cast(&crate::sem::MinMaxExpr::base_type(context, &ty), &left)
+        } else {
+            left
+        };
+        let right = if right_unknown && let Some(ty) = right_target {
+            Self::wrap_implicit_cast(&crate::sem::MinMaxExpr::base_type(context, &ty), &right)
+        } else {
+            right
+        };
+        (left, right)
     }
 }

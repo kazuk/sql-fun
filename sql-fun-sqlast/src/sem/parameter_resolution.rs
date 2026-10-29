@@ -899,6 +899,10 @@ struct Collector<'a, C: crate::sem::ParseContext> {
 }
 
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, C> {
+    fn enter_expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        expression.resolve_between(self.context)
+    }
+
     fn array_subquery(
         &mut self,
         value: &mut crate::sem::ArraySubqueryExpr,

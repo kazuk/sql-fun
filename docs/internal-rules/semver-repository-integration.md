@@ -210,8 +210,11 @@ that validation invocation outside the checkout. Validation failure prevents
 upload; missing output or upload failure fails the job. Missing/corrupt active
 baseline state fails through the existing validator without initialization.
 The `build` aggregate depends on `semver` and retains its existing behavior.
-The merge policy requires `semver` individually, alongside the existing checks;
-`build` is not an individual required status check.
+Required-check activation is a separate maintainer rollout decision after PR
+review and merge readiness. The intended policy is to require `semver`
+individually alongside the existing checks, without requiring `build`. Do not
+activate the new requirement before that decision: branches without the job
+cannot satisfy it.
 
 PR checkout analyzes the synthetic merge commit, which may differ from the
 run's recorded head SHA. Release selection uses the exact recorded target SHA

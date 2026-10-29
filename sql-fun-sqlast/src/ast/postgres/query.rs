@@ -178,6 +178,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Target {
         for node in nodes.as_inner().unwrap_or_default() {
             let target = required(node.as_res_target().as_inner(), "query target")?;
             targets.push(Self {
+                implicit_alias: false,
                 location: usize::try_from(target.get_location()).ok(),
                 expression: Expr::try_from_with_tokens(&target.get_val(), tokens)?,
                 alias: nonempty(target.get_name()),

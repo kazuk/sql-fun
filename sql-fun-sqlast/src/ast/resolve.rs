@@ -99,7 +99,11 @@ impl Name {
                 &ColumnName::from(column.as_str()),
             )?
             .0;
-        Ok(value)
+        Ok(if alias.is_none() {
+            value.mark_unqualified_column()
+        } else {
+            value
+        })
     }
 }
 

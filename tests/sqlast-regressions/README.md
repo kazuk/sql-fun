@@ -60,8 +60,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1097 inputs for PostgreSQL 17 and 1103 for
-PostgreSQL 18 (2200 total). These count positive contract inputs separately from
+manifest totals are 1103 inputs for PostgreSQL 17 and 1109 for
+PostgreSQL 18 (2212 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -238,3 +238,10 @@ The query-analysis API analyzes each input statement in an independent context,
 and `sql-fun test` expects one result per case. Catalog transitions and
 whole-statement atomicity therefore remain Rust schema-chain assertions; these
 CLI cases do not claim cross-statement mutation coverage.
+
+Column rename contracts for #530 live in `column-renames.json`, selected with
+`column-renames.sql` on PostgreSQL 17/18 through both maintained execution paths.
+The six cases per version check new names, fixed PostgreSQL view outputs,
+repeated renames, old-name reuse, quoted names and explicit aliases. Rust
+schema-chain tests retain analyzed applicability, bindings, failure atomicity,
+source history, layer isolation, FK identities and SQLite oracle comparisons.

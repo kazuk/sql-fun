@@ -1467,6 +1467,7 @@ pub(crate) struct Select {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Target {
+    implicit_alias: bool,
     location: Option<usize>,
     expression: Expr,
     alias: Option<String>,

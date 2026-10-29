@@ -91,9 +91,15 @@ pub struct GeneratedColumnConstraint {
 }
 
 impl GeneratedColumnConstraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        if owned {
+            rename.rename_name(&mut self.column_name);
+        }
+    }
+
     pub(super) fn rename_expression(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         self.expr.walk(visitor)
     }

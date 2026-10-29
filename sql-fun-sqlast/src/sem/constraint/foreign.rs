@@ -11,13 +11,34 @@ pub struct ForeignKeyConstraint {
     name: String,
     source_table: Option<TableName>,
     target_table: ForeignKeyTarget,
-    #[expect(dead_code)]
     source_columns: Vec<ColumnName>,
-    #[cfg_attr(not(test), expect(dead_code))]
     target_columns: Option<Vec<ColumnName>>,
 }
 
 impl ForeignKeyConstraint {
+    /// Referencing columns in declaration order.
+    pub fn source_columns(&self) -> &[ColumnName] {
+        &self.source_columns
+    }
+    /// Referenced columns; omitted primary-key columns are expanded when resolved.
+    pub fn target_columns(&self) -> Option<&[ColumnName]> {
+        self.target_columns.as_deref()
+    }
+
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        if owned {
+            rename.rename_names(&mut self.source_columns);
+        }
+        if self
+            .target_table
+            .relation()
+            .is_some_and(|table| rename.matches_table(table))
+            && let Some(columns) = &mut self.target_columns
+        {
+            rename.rename_names(columns);
+        }
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(table) = &mut self.source_table {
             table.rename_reference(old, new);

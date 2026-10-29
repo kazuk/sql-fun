@@ -23,20 +23,34 @@ impl TryFromWithTokens<&syn::RenameStmt> for crate::ast::AlterRelation {
         value: &syn::RenameStmt,
         _tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        if !matches!(
-            value.get_rename_type().as_inner(),
-            Some(syn::ObjectType::ObjectTable)
-        ) {
-            return AnalysisError::raise_unexpected_input("expected table rename");
-        }
         let relation = required(value.get_relation().as_inner(), "rename.relation")?;
+        let (kind, command, only) =
+            match required(value.get_rename_type().as_inner(), "rename.rename_type")? {
+                syn::ObjectType::ObjectTable => (
+                    crate::ast::AlterRelationKind::table(),
+                    crate::ast::AlterCommand::Rename(crate::ast::Name::from_parts(&[
+                        value.get_newname()
+                    ])),
+                    false,
+                ),
+                syn::ObjectType::ObjectColumn => (
+                    crate::ast::AlterRelationKind::try_from(required(
+                        value.get_relation_type().as_inner(),
+                        "rename.relation_type",
+                    )?)?,
+                    crate::ast::AlterCommand::RenameColumn(
+                        value.get_subname(),
+                        value.get_newname(),
+                    ),
+                    !relation.get_inh(),
+                ),
+                _ => return AnalysisError::raise_unexpected_input("expected relation rename"),
+            };
         Ok(Self {
-            only: false,
+            only: kind.supports_only() && only,
             name: crate::ast::Name::from(&relation),
-            kind: crate::ast::AlterRelationKind::table(),
-            commands: vec![crate::ast::AlterCommand::Rename(
-                crate::ast::Name::from_parts(&[value.get_newname()]),
-            )],
+            kind,
+            commands: vec![command],
             if_exists: value.get_missing_ok(),
         })
     }

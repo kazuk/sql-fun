@@ -5,6 +5,29 @@ use crate::sem::{ColumnDefinition, ColumnName, ResultColumnCollection, SelectSta
 #[derive(Debug, Clone)]
 pub struct ViewColumnLineage(Vec<Option<ColumnName>>);
 impl ViewColumnLineage {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+        query: &SelectStatement,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for (index, lineage) in self.0.iter_mut().enumerate() {
+            if let Some(lineage) = lineage
+                && let Some(column) = query.result_columns().get_column_at(index)
+                && let Some(expression) = column.expression()
+            {
+                let mut finder = ColumnOrigin {
+                    rename,
+                    found: false,
+                };
+                expression.clone().walk(&mut finder)?;
+                if finder.found {
+                    rename.rename_name(lineage);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn new(columns: &[Option<ColumnName>]) -> Self {
         Self(columns.to_vec())
     }
@@ -90,5 +113,19 @@ impl ViewCheckOption {
     /// CASCADED option.
     pub const fn cascaded() -> Self {
         Self::Cascaded
+    }
+}
+
+struct ColumnOrigin<'a> {
+    rename: &'a crate::sem::ColumnRename,
+    found: bool,
+}
+impl crate::sem::traversal::SemanticVisitor for ColumnOrigin<'_> {
+    fn expression(
+        &mut self,
+        expression: &mut crate::sem::SemScalarExpr,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.found |= expression.matches_column(self.rename);
+        Ok(())
     }
 }

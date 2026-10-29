@@ -411,7 +411,11 @@ impl Target {
             .alias
             .clone()
             .unwrap_or_else(|| expression.get_column_name());
-        results.push_expression(&ColumnName::from(name.as_str()), expression);
+        results.push_projection(
+            &ColumnName::from(name.as_str()),
+            expression,
+            self.alias.is_some() && !self.implicit_alias,
+        );
         Ok(())
     }
 

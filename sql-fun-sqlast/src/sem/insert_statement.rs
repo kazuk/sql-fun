@@ -170,6 +170,7 @@ impl InsertTargetCollection {
     fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for target in &mut self.0 {
             target.destination.walk_assignment_target(visitor)?;
+            visitor.bound_definition(&mut target.column, &target.destination);
         }
         Ok(())
     }
@@ -348,6 +349,7 @@ impl InsertSource {
     ) -> Result<(), AnalysisError> {
         for target in targets.iter_mut() {
             target.destination.walk_assignment_target(visitor)?;
+            visitor.bound_definition(&mut target.column, &target.destination);
         }
         match self {
             Self::DefaultValues => Ok(()),

@@ -811,8 +811,14 @@ impl QueryCte {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        if let Some(columns) = self.statement.result_columns() {
+            visitor.source_outputs(&columns.names());
+        }
         self.statement.walk(visitor)?;
         visitor.cte(&self.name);
+        if let Some(columns) = self.statement.result_columns() {
+            visitor.cte_columns(&self.name, &columns.names());
+        }
         Ok(())
     }
 }

@@ -55,6 +55,7 @@ impl Target {
 
     pub(in crate::ast) fn projection(expression: &Expr, alias: &str) -> Self {
         Self {
+            implicit_alias: false,
             location: None,
             expression: expression.clone(),
             alias: Some(alias.to_owned()),

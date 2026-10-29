@@ -17,6 +17,26 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::View(value) => value.rename_column(rename),
+            Self::MaterializedView(value) => value.rename_column(rename),
+        }
+    }
+
+    pub(crate) fn rename_column_with(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::View(view) => view.rename_column_with(rename, visitor),
+            Self::MaterializedView(view) => view.walk_column_dependencies(visitor),
+        }
+    }
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

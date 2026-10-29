@@ -123,13 +123,10 @@ impl TableDataSource {
             ))?;
             None
         };
-        Ok(ColumnReferenceExpr::table_column(
-            alias,
-            column,
-            &self.name,
-            column_def,
-            nullability,
-        ))
+        Ok(
+            ColumnReferenceExpr::table_column(alias, column, &self.name, column_def, nullability)
+                .with_derived_column_name(self.alias.derived_column_index(column).is_some()),
+        )
     }
 }
 
@@ -142,6 +139,7 @@ impl TableDataSource {
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         visitor.table_binding(&mut self.name);
+        visitor.source_binding(self.name.full_name(), &self.alias);
         visitor.relation_identity(self.name.full_name());
         visitor.relation(None, self.alias.name().as_str(), &[]);
         Ok(())
@@ -186,9 +184,10 @@ impl TableDataSource {
         } else {
             None
         };
-        crate::sem::SemScalarExpr::column_reference(ColumnReferenceExpr::table_column(
-            alias, column, &self.name, definition, nullable,
-        ))
+        crate::sem::SemScalarExpr::column_reference(
+            ColumnReferenceExpr::table_column(alias, column, &self.name, definition, nullable)
+                .with_derived_column_name(index < self.alias.len_derived_column()),
+        )
     }
 }
 

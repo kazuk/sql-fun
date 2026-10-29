@@ -2,6 +2,19 @@
 use crate::sem::{AnalysisError, SemScalarExpr};
 
 pub(crate) trait SemanticVisitor {
+    fn enter_join(&mut self) {}
+    fn join_right(&mut self) {}
+    fn leave_join(
+        &mut self,
+        _using: &[crate::sem::ColumnName],
+        _natural: bool,
+        _alias: Option<&crate::sem::AliasSpec>,
+    ) {
+    }
+    fn source_outputs(&mut self, _columns: &[crate::sem::ColumnName]) {}
+    fn assignment_target(&mut self, _target: &mut SemScalarExpr) {}
+    fn cte_columns(&mut self, _name: &str, _columns: &[crate::sem::ColumnName]) {}
+    fn cte_source(&mut self, _name: &str, _alias: &crate::sem::AliasSpec) {}
     fn table_binding(&mut self, _name: &mut crate::sem::TableName) {}
 
     fn relation_identity(&mut self, _name: &crate::sem::FullName) {}
@@ -55,6 +68,36 @@ pub(crate) trait SemanticVisitor {
     fn relation(&mut self, _name: Option<&str>, _alias: &str, _columns: &[String]) {}
     fn derived(&mut self, _alias: &str, _columns: &[String]) {}
     fn output(&mut self, _name: &str, _value: &mut SemScalarExpr) {}
+    fn projection(
+        &mut self,
+        _name: &mut Option<crate::sem::ColumnName>,
+        _explicit: bool,
+        _expanded: bool,
+        _value: &mut SemScalarExpr,
+    ) {
+    }
+    fn result_name(
+        &mut self,
+        _name: &mut Option<crate::sem::ColumnName>,
+        _explicit: bool,
+        _value: &SemScalarExpr,
+    ) {
+    }
+    fn bound_definition(
+        &mut self,
+        _column: &mut crate::sem::ColumnDefinition,
+        _destination: &SemScalarExpr,
+    ) {
+    }
+    fn derived_binding(
+        &mut self,
+        _alias: &crate::sem::AliasSpec,
+        _columns: &[crate::sem::ColumnName],
+    ) {
+    }
+    fn source_binding(&mut self, _relation: &crate::sem::FullName, _alias: &crate::sem::AliasSpec) {
+    }
+
     fn predicate(&mut self, _value: &SemScalarExpr) {}
     fn order_operator(
         &mut self,
@@ -105,6 +148,54 @@ impl SemanticVisitor for RelationRenamer<'_> {
     }
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.rename_bound_relation(self.old, self.new);
+        Ok(())
+    }
+}
+
+/// Changes bound source columns without changing independently named query outputs.
+pub(crate) struct ColumnRenamer<'a> {
+    rename: &'a crate::sem::ColumnRename,
+    assignment_changed: bool,
+}
+impl<'a> ColumnRenamer<'a> {
+    pub(crate) const fn new(rename: &'a crate::sem::ColumnRename) -> Self {
+        Self {
+            rename,
+            assignment_changed: false,
+        }
+    }
+}
+impl SemanticVisitor for ColumnRenamer<'_> {
+    fn assignment_target(&mut self, target: &mut SemScalarExpr) {
+        self.assignment_changed |= target.matches_column(self.rename);
+        target.rename_bound_column(self.rename);
+    }
+    fn bound_definition(
+        &mut self,
+        column: &mut crate::sem::ColumnDefinition,
+        _destination: &SemScalarExpr,
+    ) {
+        if std::mem::take(&mut self.assignment_changed) {
+            column.rename_column_name(self.rename);
+        }
+    }
+
+    fn result_name(
+        &mut self,
+        name: &mut Option<crate::sem::ColumnName>,
+        explicit: bool,
+        value: &SemScalarExpr,
+    ) {
+        if self.rename.rewrites_outputs()
+            && !explicit
+            && let Some(output) = value.renamed_column_output(self.rename)
+        {
+            *name = Some(output.clone());
+        }
+    }
+
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        expression.rename_bound_column(self.rename);
         Ok(())
     }
 }

@@ -201,6 +201,55 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    pub(crate) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
+        if let Self::ColumnRef(value) = self {
+            value.matches_column(rename)
+        } else {
+            false
+        }
+    }
+
+    pub(crate) const fn namespace_reference(
+        &self,
+    ) -> Option<(&str, &crate::sem::ColumnName, bool)> {
+        if let Self::ColumnRef(value) = self {
+            value.namespace_reference()
+        } else {
+            None
+        }
+    }
+
+    pub(crate) const fn mark_unqualified_column(mut self) -> Self {
+        if let Self::ColumnRef(value) = &mut self {
+            value.mark_unqualified();
+        }
+        self
+    }
+    pub(crate) fn renamed_column_output(
+        &self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Option<&crate::sem::ColumnName> {
+        if let Self::ColumnRef(value) = self {
+            value.renamed_output(rename)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn set_projection_name(&mut self, name: &crate::sem::ColumnName) {
+        if let Self::ColumnRef(value) = self {
+            value.set_projection_name(name);
+        }
+    }
+    pub(crate) fn rename_bound_column(&mut self, rename: &crate::sem::ColumnRename) {
+        match self {
+            Self::ColumnRef(value) => value.rename_column(rename),
+            Self::WholeRow(value) => value.rename_column(rename),
+            Self::Indirection(value) => value.rename_column(rename),
+            _ => {}
+        }
+    }
+
     pub(crate) fn rename_bound_relation(
         &mut self,
         old: &crate::sem::TableName,
@@ -1253,6 +1302,7 @@ impl SemScalarExpr {
         if let Self::Indirection(target) = self {
             target.walk_assignment_target(visitor)?;
         }
+        visitor.assignment_target(self);
         Ok(())
     }
 }

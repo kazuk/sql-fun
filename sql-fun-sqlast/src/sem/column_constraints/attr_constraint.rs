@@ -15,6 +15,12 @@ pub struct AttrDeferrabilityColumnConstraint {
 }
 
 impl AttrDeferrabilityColumnConstraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        if owned {
+            rename.rename_name(&mut self.column_name);
+        }
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.table_name.rename_reference(old, new);
     }
@@ -94,6 +100,12 @@ pub struct AttrDeferredColumnConstraint {
 }
 
 impl AttrDeferredColumnConstraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        if owned {
+            rename.rename_name(&mut self.column_name);
+        }
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.table_name.rename_reference(old, new);
     }
@@ -168,6 +180,12 @@ pub struct AttrImmediateColumnConstraint {
 }
 
 impl AttrImmediateColumnConstraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        if owned {
+            rename.rename_name(&mut self.column_name);
+        }
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.table_name.rename_reference(old, new);
     }

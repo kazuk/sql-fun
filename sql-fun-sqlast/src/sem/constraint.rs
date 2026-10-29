@@ -38,6 +38,14 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        match self {
+            Self::PrimaryKey(value) => value.rename_column(rename, owned),
+            Self::Unique(value) => value.rename_column(rename, owned),
+            Self::Foreign(value) => value.rename_column(rename, owned),
+        }
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
             Self::PrimaryKey(value) => value.rename_relation(old, new),

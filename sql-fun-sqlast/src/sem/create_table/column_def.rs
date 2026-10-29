@@ -49,6 +49,29 @@ impl ColumnAttributes {
 }
 
 impl ColumnDefinition {
+    pub(crate) fn set_projection_name(&mut self, name: &ColumnName) {
+        self.name = Some(name.clone());
+    }
+    pub(crate) fn rename_column_name(&mut self, rename: &crate::sem::ColumnRename) {
+        self.rename_constraint_columns(rename, true);
+        if let Some(name) = &mut self.name {
+            rename.rename_name(name);
+        }
+    }
+    pub(crate) fn rename_column_dependencies(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+        owned: bool,
+    ) -> Result<(), AnalysisError> {
+        self.rename_constraint_columns(rename, owned);
+        self.rename_expressions(&mut crate::sem::traversal::ColumnRenamer::new(rename))
+    }
+    fn rename_constraint_columns(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        for constraint in &mut self.constraints {
+            constraint.rename_column(rename, owned);
+        }
+    }
+
     /// Requested declaration type and modifiers, separate from canonical identity.
     pub fn requested_type(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
         self.declaration.as_ref()?.requested_type.as_ref()
@@ -93,7 +116,7 @@ impl ColumnDefinition {
 
     pub(super) fn rename_expressions(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), crate::sem::AnalysisError> {
         for constraint in &mut self.constraints {
             constraint.rename_expression(visitor)?;

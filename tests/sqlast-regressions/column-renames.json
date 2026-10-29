@@ -1,0 +1,128 @@
+[
+  {
+    "name": "column_rename::new_name",
+    "sql": "SELECT renamed, payload FROM public.column_rename_base",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "renamed",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "payload",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_rename::preserved_view",
+    "sql": "SELECT old, payload FROM public.column_rename_view",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "old",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "payload",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_rename::repeated_rename",
+    "sql": "SELECT c FROM public.column_rename_repeated",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "c",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_rename::old_name_reused",
+    "sql": "SELECT a FROM public.column_rename_repeated",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_rename::quoted",
+    "sql": "SELECT \"New\" FROM public.column_rename_quoted",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "New",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_rename::explicit_alias",
+    "sql": "SELECT renamed AS original FROM public.column_rename_base",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "original",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

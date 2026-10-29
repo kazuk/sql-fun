@@ -162,6 +162,19 @@ pub struct ForeignKeyColumnConstraint {
 }
 
 impl ForeignKeyColumnConstraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        if owned {
+            rename.rename_name(&mut self.column_name);
+        }
+        if self
+            .primary_key_table
+            .relation()
+            .is_some_and(|table| rename.matches_table(table))
+        {
+            rename.rename_name(&mut self.primary_key_column);
+        }
+    }
+
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.table_name.rename_reference(old, new);
         self.primary_key_table.rename_relation(old, new);

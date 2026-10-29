@@ -6,6 +6,10 @@ use crate::sem::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableColumnRef {
     alias: AliasName,
+    #[serde(skip)]
+    derived_name: crate::sem::source_flag::SourceFlag,
+    #[serde(skip)]
+    unqualified: crate::sem::source_flag::SourceFlag,
     column: ColumnName,
     table_name: TableName,
     column_def: Option<ColumnDefinition>,
@@ -43,6 +47,56 @@ impl super::ColumnReference for TableColumnRef {
 }
 
 impl TableColumnRef {
+    pub(super) fn set_projection_name(&mut self, name: &ColumnName) {
+        self.column = name.clone();
+        if let Some(column) = &mut self.column_def {
+            column.set_projection_name(name);
+        }
+    }
+
+    pub(super) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
+        if let Some(column) = &self.column_def
+            && let Some(source) = rename.source()
+        {
+            rename.matches_table(&self.table_name) && column.name() == source.name()
+        } else {
+            false
+        }
+    }
+
+    pub(super) const fn namespace_reference(&self) -> (&str, &ColumnName, bool) {
+        (self.alias.as_str(), &self.column, self.unqualified.get())
+    }
+
+    pub(super) const fn mark_unqualified(&mut self) {
+        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+    }
+    pub(super) fn renamed_output(&self, rename: &crate::sem::ColumnRename) -> Option<&ColumnName> {
+        if rename.matches_table(&self.table_name)
+            && !self.derived_name.get()
+            && &self.column == rename.destination()
+        {
+            Some(&self.column)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        if rename.matches_table(&self.table_name) {
+            if !self.derived_name.get() && self.matches_column(rename) {
+                self.column = rename.destination().clone();
+            }
+            if let Some(column) = &mut self.column_def {
+                column.rename_column_name(rename);
+            }
+        }
+    }
+    pub(in crate::sem) const fn with_derived_name(mut self, value: bool) -> Self {
+        self.derived_name = crate::sem::source_flag::SourceFlag::new(value);
+        self
+    }
+
     pub(super) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.table_name.rename_reference(old, new);
         if let Some(column) = &mut self.column_def {
@@ -86,6 +140,8 @@ impl TableColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
+            derived_name: crate::sem::source_flag::SourceFlag::new(false),
+            unqualified: crate::sem::source_flag::SourceFlag::new(false),
             column: column.clone(),
             table_name: table_name.clone(),
             column_def: column_def.cloned(),

@@ -44,7 +44,7 @@ impl SchemaFileContext {
 }
 
 #[derive(Default)]
-struct RenameUpdates {
+pub(super) struct RenameUpdates {
     tables: Vec<(FullName, CreateTable)>,
     views: Vec<(FullName, ViewLike)>,
     triggers: Vec<(TriggerIdentity, CreateTrigger)>,
@@ -63,7 +63,7 @@ impl RenameUpdates {
         new: &TableName,
     ) -> Result<Self, AnalysisError> {
         let mut updates = Self::default();
-        updates.collect_relations(context, old, new)?;
+        updates.collect_relations(context, &RenameChange::relation(old, new))?;
         updates.collect_types(context, old, new);
         updates.collect_routines(context, old, new);
         updates.indexes = context
@@ -78,53 +78,65 @@ impl RenameUpdates {
         Ok(updates)
     }
 
+    pub(super) fn prepare_column(
+        context: &SchemaFileContext,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<Self, AnalysisError> {
+        let mut updates = Self::default();
+        updates.collect_relations(context, &RenameChange::column(rename))?;
+        updates.indexes = context
+            .indexes_for_table(rename.table())
+            .into_iter()
+            .cloned()
+            .collect();
+        for index in &mut updates.indexes {
+            index.rename_column(rename)?;
+        }
+        Ok(updates)
+    }
     fn collect_relations(
         &mut self,
         context: &SchemaFileContext,
-        old: &TableName,
-        new: &TableName,
+        change: &RenameChange<'_>,
     ) -> Result<(), AnalysisError> {
         for name in context.relation_names() {
             if let Some(table) = context.get_table_impl(&name) {
-                self.collect_links(context, &name, table.triggers(), table.rules(), old, new)?;
-                if &name != old.full_name() {
+                self.collect_links(context, &name, table.triggers(), table.rules(), change)?;
+                if &name != change.original().full_name() {
                     let mut table = table.clone();
-                    table.rename_relation(old, new);
-                    table.rename_expressions(old, new)?;
+                    change.table(&mut table)?;
                     self.tables.push((name.clone(), table));
                 }
             }
             if let Some(view) = context.get_view_impl(&name) {
                 if let (Some(triggers), Some(rules)) = (view.triggers(), view.rules()) {
-                    self.collect_links(context, &name, triggers, rules, old, new)?;
+                    self.collect_links(context, &name, triggers, rules, change)?;
                 }
                 let mut view = view.clone();
-                view.rename_relation(old, new)?;
+                change.view(context, &mut view)?;
                 self.views.push((name, view));
             }
         }
         Ok(())
     }
-
     fn collect_links(
         &mut self,
         context: &SchemaFileContext,
         name: &FullName,
         triggers: &TriggerReferences,
         rules: &RuleReferences,
-        old: &TableName,
-        new: &TableName,
+        change: &RenameChange<'_>,
     ) -> Result<(), AnalysisError> {
         for trigger in triggers.resolve(context, name) {
             let identity = trigger.identity().clone();
             let mut trigger = trigger.clone();
-            trigger.rename_relation(old, new)?;
+            change.trigger(context, &mut trigger)?;
             self.triggers.push((identity, trigger));
         }
         for rule in rules.resolve(context) {
             let identity = rule.identity().clone();
             let mut rule = rule.clone();
-            rule.rename_relation(old, new)?;
+            change.rule(&mut rule)?;
             self.rules.push((identity, rule));
         }
         Ok(())
@@ -165,7 +177,7 @@ impl RenameUpdates {
         }
     }
 
-    fn commit(self, catalog: &mut SchemaCatalog, new: &TableName) {
+    pub(super) fn commit(self, catalog: &mut SchemaCatalog, new: &TableName) {
         for (identity, trigger) in self.triggers {
             catalog.triggers.insert(identity, None);
             catalog
@@ -199,6 +211,63 @@ impl RenameUpdates {
         for mut sequence in self.sequences {
             sequence.set_owned_by(new);
             catalog.store_sequence(sequence.name(), &sequence);
+        }
+    }
+}
+
+// The catalog inventory and staging rules are shared by both identity edits.
+enum RenameChange<'a> {
+    Relation(&'a TableName, &'a TableName),
+    Column(&'a crate::sem::ColumnRename),
+}
+impl<'a> RenameChange<'a> {
+    const fn relation(old: &'a TableName, new: &'a TableName) -> Self {
+        Self::Relation(old, new)
+    }
+    const fn column(rename: &'a crate::sem::ColumnRename) -> Self {
+        Self::Column(rename)
+    }
+    const fn original(&self) -> &TableName {
+        match self {
+            Self::Relation(old, _) => old,
+            Self::Column(rename) => rename.table(),
+        }
+    }
+    fn table(&self, table: &mut CreateTable) -> Result<(), AnalysisError> {
+        match self {
+            Self::Relation(old, new) => {
+                table.rename_relation(old, new);
+                table.rename_expressions(old, new)
+            }
+            Self::Column(rename) => table.rename_column_dependencies(rename, false),
+        }
+    }
+    fn view(&self, context: &SchemaFileContext, view: &mut ViewLike) -> Result<(), AnalysisError> {
+        match self {
+            Self::Relation(old, new) => view.rename_relation(old, new),
+            Self::Column(rename) if rename.rewrites_outputs() => {
+                rename.rewrite_sqlite_view(context, view)
+            }
+            Self::Column(rename) => view.rename_column(rename),
+        }
+    }
+    fn trigger(
+        &self,
+        context: &SchemaFileContext,
+        trigger: &mut CreateTrigger,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Relation(old, new) => trigger.rename_relation(old, new),
+            Self::Column(rename) if rename.rewrites_outputs() => {
+                rename.rewrite_sqlite_trigger(context, trigger)
+            }
+            Self::Column(rename) => trigger.rename_column(rename),
+        }
+    }
+    fn rule(&self, rule: &mut CreateRule) -> Result<(), AnalysisError> {
+        match self {
+            Self::Relation(old, new) => rule.rename_relation(old, new),
+            Self::Column(rename) => rule.rename_column(rename),
         }
     }
 }

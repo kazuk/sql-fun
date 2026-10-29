@@ -17,6 +17,10 @@ pub struct ResultColumn {
     expression: Option<Box<SemScalarExpr>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     star_expansion: Option<StarExpansion>,
+    #[serde(skip)]
+    explicit_name: crate::sem::source_flag::SourceFlag,
+    #[serde(skip)]
+    expanded: crate::sem::source_flag::SourceFlag,
     col_name: Option<ColumnName>,
     col_type: Option<TypeReference>,
     is_not_null: Option<bool>,
@@ -55,6 +59,8 @@ impl ResultColumn {
         is_not_null: &Option<bool>,
     ) -> Self {
         Self {
+            explicit_name: crate::sem::source_flag::SourceFlag::new(false),
+            expanded: crate::sem::source_flag::SourceFlag::new(false),
             expression: None,
             star_expansion: None,
             col_name: col_name.clone(),
@@ -178,6 +184,19 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn push_projection(
+        &mut self,
+        name: &ColumnName,
+        expression: SemScalarExpr,
+        explicit: bool,
+    ) {
+        self.push_expression(name, expression);
+        self.0
+            .last_mut()
+            .expect("inserted projection")
+            .explicit_name = crate::sem::source_flag::SourceFlag::new(explicit);
+    }
+
     pub(crate) fn membership_operands(&self) -> Vec<SemScalarExpr> {
         self.0
             .iter()
@@ -213,7 +232,7 @@ impl ResultColumnCollection {
         for name in fields.names() {
             let expression =
                 IndirectionExpr::resolved_member(context, base.clone(), name.as_str())?;
-            self.push_expression(&name, expression);
+            self.push_expanded(&name, expression);
         }
         Ok(())
     }
@@ -379,6 +398,7 @@ impl ResultColumnCollection {
     pub(crate) fn rename(&mut self, names: &[String]) {
         for (column, name) in self.0.iter_mut().zip(names) {
             column.col_name = Some(ColumnName::from(name.as_str()));
+            column.explicit_name = crate::sem::source_flag::SourceFlag::new(true);
         }
     }
 
@@ -471,6 +491,12 @@ impl ResultColumnCollection {
         let pending = self.has_pending_stars();
         for (index, column) in self.0.iter_mut().enumerate() {
             if let Some(expression) = &mut column.expression {
+                visitor.projection(
+                    &mut column.col_name,
+                    column.explicit_name.get(),
+                    column.expanded.get(),
+                    expression,
+                );
                 expression.walk(visitor)?;
                 if let Some(star) = &mut column.star_expansion {
                     *star = star.with_expression(expression.as_ref().clone());
@@ -482,6 +508,7 @@ impl ResultColumnCollection {
                 if let Some(target) = targets.get(index) {
                     visitor.assignment(expression, target)?;
                 }
+                visitor.result_name(&mut column.col_name, column.explicit_name.get(), expression);
                 visitor.output(
                     column.col_name.as_ref().map_or("", ColumnName::as_str),
                     expression,
@@ -495,6 +522,11 @@ impl ResultColumnCollection {
 }
 
 impl ResultColumnCollection {
+    pub(crate) fn push_expanded(&mut self, name: &ColumnName, expression: SemScalarExpr) {
+        self.push_expression(name, expression);
+        self.0.last_mut().expect("inserted expansion").expanded =
+            crate::sem::source_flag::SourceFlag::new(true);
+    }
     pub(crate) fn push_expression(&mut self, name: &ColumnName, expression: SemScalarExpr) {
         let mut column = ResultColumn::new(
             &Some(name.clone()),

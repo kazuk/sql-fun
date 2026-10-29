@@ -485,10 +485,16 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(rename) = value.as_rename_stmt().as_inner()
-            && matches!(
+            && (matches!(
                 rename.get_rename_type().as_inner(),
                 Some(syn::ObjectType::ObjectTable)
-            )
+            ) || (matches!(
+                rename.get_rename_type().as_inner(),
+                Some(syn::ObjectType::ObjectColumn)
+            ) && matches!(
+                rename.get_relation_type().as_inner(),
+                Some(syn::ObjectType::ObjectTable)
+            )))
         {
             return Ok(Self::alter_relation(
                 super::AlterRelation::try_from_with_tokens(&rename, tokens)?,

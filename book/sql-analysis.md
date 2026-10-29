@@ -838,11 +838,38 @@ Analysis retains rejected renames and their diagnostics without changing the
 catalog. PostgreSQL `IF EXISTS` skips an absent table. SQLite support requires the
 `sqlite` feature and uses its case-insensitive identifier rules.
 
-Two existing analysis limitations are tracked separately: unqualified foreign-key
-references lack canonical target bindings and do not follow table renames
-([#810](https://github.com/kazuk/sql-fun/issues/810)), and explicit SQLite
-`legacy_alter_table`/`foreign_keys` PRAGMA changes are not yet modeled for rename
-propagation ([#811](https://github.com/kazuk/sql-fun/issues/811)).
+Foreign keys retain the referenced relation chosen when they were analyzed,
+including unqualified references; a later search-path change does not change
+that binding. Explicit SQLite `legacy_alter_table`/`foreign_keys` PRAGMA changes
+remain unmodeled for rename propagation
+([#811](https://github.com/kazuk/sql-fun/issues/811)).
+
+## Column renames in schema files
+
+`ALTER TABLE … RENAME [COLUMN] old_name TO new_name` changes the column name for
+later statements in explicitly supplied schema files. The column keeps its
+position, type, nullability, defaults and other analyzed attributes. Retained
+constraints, foreign keys, index references and dependent query bindings follow
+the column; independently named objects and explicit query aliases keep their
+names. PostgreSQL view output names remain fixed. Original declaration and
+previous ALTER source information remain available as history.
+
+An absent source column or occupied destination produces a diagnostic and leaves
+the catalog unchanged. PostgreSQL rejects renaming a column to itself and
+supports `IF EXISTS` for an absent table. SQLite accepts same-name renames and
+uses case-insensitive identifier lookup. With the `sqlite` feature, unaliased
+outputs that directly reference the renamed source column follow it; a rename
+that makes retained view or trigger references ambiguous or invalid is rejected
+atomically. SQLite expression-text output names, such as `a+1`, are not rebuilt.
+Changes to the number of wildcard outputs caused by renamed `NATURAL JOIN`
+columns are not reconstructed; these view shapes remain unsupported.
+
+Propagation covers dependencies already retained by semantic analysis. Table-level
+`CREATE TABLE` foreign-key retention
+([#858](https://github.com/kazuk/sql-fun/issues/858)) and inheritance/partition
+analysis ([#546](https://github.com/kazuk/sql-fun/issues/546)) remain separate
+work; those implementations must connect their new dependencies to column
+renaming. Recognizing their syntax does not provide the missing dependency data.
 
 ## Project role inventory
 

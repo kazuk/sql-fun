@@ -223,6 +223,7 @@ impl UpdateAssignment {
     }
     fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.destination.walk_assignment_target(visitor)?;
+        visitor.bound_definition(&mut self.column, &self.destination);
         self.value
             .walk(visitor, self.destination.get_type().as_ref())
     }

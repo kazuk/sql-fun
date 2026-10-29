@@ -742,7 +742,7 @@ impl<'a> WildcardProjection<'a> {
         let mut sources = ProjectionSources::default();
         for column in &self.columns {
             let expression = column.bind_projection(context, scope, binding_qualifier)?;
-            results.push_expression(column.name(), expression);
+            results.push_expanded(column.name(), expression);
             references.push(column.projection_reference(binding_qualifier));
             column.collect_projection_sources(&mut sources);
         }

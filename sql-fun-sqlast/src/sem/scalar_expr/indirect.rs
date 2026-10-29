@@ -26,6 +26,12 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
+    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        if let Self::MemberRef(value) = self {
+            value.rename_column(rename);
+        }
+    }
+
     pub(super) fn subscripts(value: &ArraySubscripts) -> Self {
         Self::ArraySubscripts(Box::new(value.clone()))
     }

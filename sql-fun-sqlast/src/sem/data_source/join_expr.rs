@@ -224,8 +224,17 @@ impl JoinExprDataSource {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.enter_join();
         self.left.walk(visitor)?;
+        visitor.join_right();
         self.right.walk(visitor)?;
+        visitor.leave_join(
+            self.using_clause
+                .as_ref()
+                .map_or(&[], |using| using.using_columns.as_slice()),
+            self.natural,
+            self.alias.as_ref(),
+        );
         crate::sem::traversal::optional(&mut self.qualifications, visitor)?;
         if let Some(value) = &self.qualifications {
             visitor.predicate(value);

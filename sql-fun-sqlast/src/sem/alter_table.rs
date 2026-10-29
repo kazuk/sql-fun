@@ -34,6 +34,29 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    pub(crate) fn column_rename(
+        table: &TableName,
+        target: Option<&TableName>,
+        rename: &crate::sem::ColumnRename,
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(
+            table,
+            &[AlterObjSubCommand::analyzed_column_rename(rename)],
+            source,
+        );
+        statement.resolved_target = target.cloned();
+        statement.applicable = target.is_some() && rename.can_apply();
+        statement
+    }
+    /// Completed standalone column rename, including rejected operations.
+    pub fn column_rename_change(&self) -> Option<&crate::sem::ColumnRename> {
+        let [command] = self.commands.as_slice() else {
+            return None;
+        };
+        command.column_rename_change()
+    }
+
     /// Whether completed semantic analysis permits catalog application.
     pub const fn can_apply(&self) -> bool {
         self.applicable
@@ -385,13 +408,14 @@ pub enum AlterObjSubCommand {
     RenameTo(TableName),
     AddColumn(ColumnDefinition),
     AlterColumn(ColumnName, ColumnDefinition),
-    RenameColumn(ColumnName, ColumnName),
+    RenameColumn(Box<crate::sem::ColumnRename>),
     DropColumn(ColumnName),
 }
 
 impl AlterObjSubCommand {
     fn declaration_can_apply(&self) -> bool {
         match self {
+            Self::RenameColumn(rename) => rename.can_apply(),
             Self::AddColumn(column) | Self::AlterColumn(_, column) => {
                 column.declaration_can_apply()
             }
@@ -469,8 +493,16 @@ impl AlterObjSubCommand {
     pub(crate) fn alter_column(name: &ColumnName, column: &ColumnDefinition) -> Self {
         Self::AlterColumn(name.clone(), column.clone())
     }
-    pub(crate) fn rename_column(from: &ColumnName, to: &ColumnName) -> Self {
-        Self::RenameColumn(from.clone(), to.clone())
+    pub(crate) fn analyzed_column_rename(rename: &crate::sem::ColumnRename) -> Self {
+        Self::RenameColumn(Box::new(rename.clone()))
+    }
+    /// Completed column-rename semantics.
+    pub fn column_rename_change(&self) -> Option<&crate::sem::ColumnRename> {
+        if let Self::RenameColumn(rename) = self {
+            Some(rename)
+        } else {
+            None
+        }
     }
     pub(crate) fn drop_column(column: &ColumnName) -> Self {
         Self::DropColumn(column.clone())

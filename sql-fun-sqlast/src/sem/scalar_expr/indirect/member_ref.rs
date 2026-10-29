@@ -14,6 +14,20 @@ pub struct MemberRef {
 }
 
 impl MemberRef {
+    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        if self.base.get_type().is_some_and(|ty| {
+            ty == TypeReference::concrete_type_ref(rename.table().full_name(), false)
+        }) && self
+            .base
+            .as_whole_row()
+            .is_none_or(|row| row.has_renamed_field(rename))
+        {
+            let mut name = crate::sem::ColumnName::from(self.member.as_str());
+            rename.rename_name(&mut name);
+            self.member = name.as_str().to_owned();
+        }
+    }
+
     pub const fn new(
         base: SemScalarExpr,
         member: String,

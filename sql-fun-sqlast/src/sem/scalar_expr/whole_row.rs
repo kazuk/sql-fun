@@ -30,6 +30,25 @@ struct RowSource {
 }
 
 impl WholeRowExpr {
+    pub(super) fn has_renamed_field(&self, rename: &crate::sem::ColumnRename) -> bool {
+        self.fields
+            .0
+            .iter()
+            .any(|field| field.value.renamed_column_output(rename).is_some())
+    }
+
+    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        if let RowLookup::Source(source) = &self.lookup
+            && source.relation.as_ref() == Some(rename.table().full_name())
+        {
+            for field in &mut self.fields.0 {
+                if let Some(name) = field.value.renamed_column_output(rename) {
+                    field.name = name.clone();
+                }
+            }
+        }
+    }
+
     pub(super) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

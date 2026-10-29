@@ -44,9 +44,19 @@ pub enum IndexElement {
 }
 
 impl IndexElement {
+    fn rename_column(&mut self, rename: &crate::sem::ColumnRename) -> Result<(), AnalysisError> {
+        match self {
+            Self::ColumnName(name) => rename.rename_name(name),
+            Self::Expr(value) => {
+                value.walk(&mut crate::sem::traversal::ColumnRenamer::new(rename))?
+            }
+        }
+        Ok(())
+    }
+
     fn rename_relation(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         if let Self::Expr(expression) = self {
             expression.walk(visitor)?;
@@ -98,7 +108,7 @@ pub struct IndexElementCollection(Vec<IndexElementWithOrder>);
 impl IndexElementCollection {
     fn rename_relation(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.0 {
             column.element.rename_relation(visitor)?;
@@ -181,6 +191,27 @@ pub struct CreateIndex {
 }
 
 impl CreateIndex {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<(), AnalysisError> {
+        if rename.matches_table(&self.table) {
+            for column in self
+                .key_columns
+                .0
+                .iter_mut()
+                .chain(self.include_columns.0.iter_mut())
+            {
+                column.element.rename_column(rename)?;
+            }
+            crate::sem::traversal::optional(
+                &mut self.predicate,
+                &mut crate::sem::traversal::ColumnRenamer::new(rename),
+            )?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &TableName,

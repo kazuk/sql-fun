@@ -266,6 +266,13 @@ impl<'a> ProjectionColumn<'a> {
         }
     }
 
+    fn requires_join_projection(&self) -> bool {
+        match &self.binding {
+            ProjectionBinding::Source(source) => source.is_joined(),
+            ProjectionBinding::Merged(_) => true,
+            ProjectionBinding::Expression(_) => false,
+        }
+    }
     fn bind_projection(
         &self,
         context: &mut impl ParseContext,
@@ -742,9 +749,16 @@ impl<'a> WildcardProjection<'a> {
         let mut sources = ProjectionSources::default();
         for column in &self.columns {
             let expression = column.bind_projection(context, scope, binding_qualifier)?;
-            results.push_expression(column.name(), expression);
+            results.push_expanded(column.name(), expression);
             references.push(column.projection_reference(binding_qualifier));
             column.collect_projection_sources(&mut sources);
+        }
+        if self
+            .columns
+            .iter()
+            .any(ProjectionColumn::requires_join_projection)
+        {
+            results.mark_join_sensitive_star_since(first);
         }
         let mut expansion =
             WildcardExpansion::new(location, results, first, self.table_dependent, &references);

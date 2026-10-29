@@ -29,13 +29,34 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn find_rename_column(
+        &self,
+        name: &ColumnName,
+        sqlite: bool,
+    ) -> Option<&ColumnDefinition> {
+        self.0.iter().find(|column| {
+            column.name().as_ref().is_some_and(|candidate| {
+                if sqlite {
+                    candidate.as_str().eq_ignore_ascii_case(name.as_str())
+                } else {
+                    candidate == name
+                }
+            })
+        })
+    }
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        for column in &mut self.0 {
+            column.rename_column_name(rename);
+        }
+    }
+
     pub(crate) fn declarations_can_apply(&self) -> bool {
         self.0.iter().all(ColumnDefinition::declaration_can_apply)
     }
 
     fn rename_expressions(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.0 {
             column.rename_expressions(visitor)?;
@@ -304,6 +325,27 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    pub(crate) fn find_rename_column(
+        &self,
+        name: &ColumnName,
+        sqlite: bool,
+    ) -> Option<&ColumnDefinition> {
+        self.columns.find_rename_column(name, sqlite)
+    }
+    pub(crate) fn rename_column_dependencies(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+        owned: bool,
+    ) -> Result<(), AnalysisError> {
+        for column in &mut self.columns.0 {
+            column.rename_column_dependencies(rename, owned)?;
+        }
+        for constraint in self.constraints.values_mut() {
+            constraint.rename_column(rename, owned);
+        }
+        Ok(())
+    }
+
     /// Whether all analyzed column declarations permit catalog application.
     pub(crate) fn declarations_can_apply(&self) -> bool {
         self.columns.declarations_can_apply()
@@ -526,8 +568,10 @@ impl CreateTable {
                 AlterObjSubCommand::AlterColumn(_, _) => {
                     todo!()
                 }
-                AlterObjSubCommand::RenameColumn(_, _) => {
-                    todo!()
+                AlterObjSubCommand::RenameColumn(rename) => {
+                    if rename.can_apply() {
+                        self.columns.rename_column(rename);
+                    }
                 }
                 AlterObjSubCommand::DropColumn(_) => {
                     todo!()

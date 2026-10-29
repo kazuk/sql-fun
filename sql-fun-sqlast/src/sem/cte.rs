@@ -343,8 +343,14 @@ impl WithClause {
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for (name, query) in &mut self.0 {
+            if let Some(columns) = query.result_columns() {
+                visitor.source_outputs(&columns.names());
+            }
             query.walk(visitor)?;
             visitor.cte(name);
+            if let Some(columns) = query.result_columns() {
+                visitor.cte_columns(name, &columns.names());
+            }
         }
         Ok(())
     }

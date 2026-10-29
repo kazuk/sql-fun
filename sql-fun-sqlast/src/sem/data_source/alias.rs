@@ -36,6 +36,17 @@ pub struct AliasSpec {
 }
 
 impl AliasSpec {
+    pub(crate) fn visible_column_names(
+        &self,
+        columns: &[crate::sem::ColumnName],
+    ) -> Vec<crate::sem::ColumnName> {
+        columns
+            .iter()
+            .enumerate()
+            .map(|(index, name)| self.projection_name(index, name))
+            .collect()
+    }
+
     pub(super) fn projection_name(
         &self,
         index: usize,

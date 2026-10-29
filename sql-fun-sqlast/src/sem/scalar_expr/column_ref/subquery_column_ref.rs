@@ -4,6 +4,8 @@ use crate::sem::{ColumnDefinition, ColumnName, Nullable, TypeReference, data_sou
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SubQueryColumnRef {
     alias: AliasName,
+    #[serde(skip)]
+    unqualified: crate::sem::source_flag::SourceFlag,
     column: ColumnName,
     column_def: Option<ColumnDefinition>,
     datasource_nullable: Nullable,
@@ -38,6 +40,20 @@ impl super::ColumnReference for SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
+    pub(super) fn set_projection_name(&mut self, name: &ColumnName) {
+        self.column = name.clone();
+        if let Some(column) = &mut self.column_def {
+            column.set_projection_name(name);
+        }
+    }
+
+    pub(super) const fn mark_unqualified(&mut self) {
+        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+    }
+    pub(super) const fn namespace_reference(&self) -> (&str, &ColumnName, bool) {
+        (self.alias.as_str(), &self.column, self.unqualified.get())
+    }
+
     pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
         self.alias = alias.clone();
         self.column = column.clone();
@@ -61,6 +77,7 @@ impl SubQueryColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
+            unqualified: crate::sem::source_flag::SourceFlag::new(false),
             column: column.clone(),
             column_def: column_def.cloned(),
             datasource_nullable,

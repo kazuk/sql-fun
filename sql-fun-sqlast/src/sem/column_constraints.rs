@@ -86,9 +86,27 @@ pub enum ColumnConstraint {
 }
 
 impl ColumnConstraint {
+    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+        match self {
+            Self::Nullability(value) => value.rename_column(rename, owned),
+            Self::Default(value) => value.rename_column(rename, owned),
+            Self::Identity(value) => value.rename_column(rename, owned),
+            Self::Generated(value) => value.rename_column(rename, owned),
+            Self::Check(value) => value.rename_column(rename, owned),
+            Self::PrimaryKey(value) => value.rename_column(rename, owned),
+            Self::Unique(value) => value.rename_column(rename, owned),
+            Self::Exclusion(value) => value.rename_column(rename, owned),
+            Self::ForeignKey(value) => value.rename_column(rename, owned),
+            Self::AttrDeferrability(value) => value.rename_column(rename, owned),
+            Self::AttrDeferred(value) => value.rename_column(rename, owned),
+            Self::AttrImmediate(value) => value.rename_column(rename, owned),
+            Self::Collate(value) => value.rename_column(rename, owned),
+        }
+    }
+
     pub(crate) fn rename_expression(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Default(value) => value.rename_expression(visitor),

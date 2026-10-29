@@ -103,7 +103,7 @@ impl CreateSequence {
                 | AlterObjSubCommand::RenameTo(_)
                 | AlterObjSubCommand::AddColumn(_)
                 | AlterObjSubCommand::AlterColumn(_, _)
-                | AlterObjSubCommand::RenameColumn(_, _)
+                | AlterObjSubCommand::RenameColumn(_)
                 | AlterObjSubCommand::DropColumn(_)
                 | AlterObjSubCommand::DropColumnDefault(_)
                 | AlterObjSubCommand::SetColumnDefault(_, _) => {

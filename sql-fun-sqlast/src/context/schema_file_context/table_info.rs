@@ -74,6 +74,9 @@ impl TableInfoWrite for SchemaFileContext {
         if let Some(destination) = alter_table.rename_destination() {
             return self.apply_table_rename(alter_table, destination);
         }
+        if let Some(rename) = alter_table.column_rename_change() {
+            return self.apply_column_rename(alter_table, rename);
+        }
         let table_name = alter_table.table();
         let bound_table = alter_table.resolved_target().map(|target| {
             self.get_table_impl(target.full_name())

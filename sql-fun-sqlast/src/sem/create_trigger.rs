@@ -166,6 +166,16 @@ pub enum TriggerEvent {
     Truncate,
 }
 impl TriggerEvent {
+    fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        if let Self::Update(columns) = self {
+            for column in columns {
+                if column.found {
+                    rename.rename_name(&mut column.name);
+                }
+            }
+        }
+    }
+
     /// INSERT event.
     pub const fn insert() -> Self {
         Self::Insert
@@ -230,7 +240,7 @@ pub enum TriggerBody {
 impl TriggerBody {
     fn rename_relation(
         &mut self,
-        visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
     ) -> Result<(), AnalysisError> {
         if let Self::Commands(commands) = self {
             for command in commands {
@@ -344,6 +354,29 @@ pub struct CreateTrigger {
     source: Option<crate::sem::SourcePathWithSpan>,
 }
 impl CreateTrigger {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<(), AnalysisError> {
+        self.rename_column_with(
+            rename,
+            &mut crate::sem::traversal::ColumnRenamer::new(rename),
+        )
+    }
+    pub(crate) fn rename_column_with(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+    ) -> Result<(), AnalysisError> {
+        if &self.target == rename.table().full_name() {
+            for event in &mut self.events {
+                event.rename_column(rename);
+            }
+        }
+        crate::sem::traversal::optional(&mut self.predicate, visitor)?;
+        self.body.rename_relation(visitor)
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

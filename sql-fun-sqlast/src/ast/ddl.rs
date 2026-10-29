@@ -2,6 +2,7 @@
 
 mod alter_index;
 mod column_attributes;
+mod column_rename;
 mod table_rename;
 
 #[path = "deparse/ddl.rs"]
@@ -95,6 +96,9 @@ impl super::AlterRelation {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if self.kind.supports_table_column_attributes() && self.has_column_rename() {
+            return self.resolve_column_rename(context, source);
+        }
         if self.kind.supports_table_column_attributes() && self.has_table_rename() {
             return self.resolve_table_rename(context, source);
         }
@@ -389,13 +393,14 @@ impl super::AlterCommand {
         from: &str,
         to: &str,
     ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let from = ColumnName::from(from);
-        let to = ColumnName::from(to);
-        Self::missing_column(context, table, &from)?;
-        if from != to {
-            Self::existing_column(context, table, &to)?;
-        }
-        Ok(AlterObjSubCommand::rename_column(&from, &to))
+        let (_, rename) = crate::sem::ColumnRename::resolve(
+            context,
+            table,
+            &ColumnName::from(from),
+            &ColumnName::from(to),
+            false,
+        )?;
+        Ok(AlterObjSubCommand::analyzed_column_rename(&rename))
     }
 
     fn resolve_drop_column(

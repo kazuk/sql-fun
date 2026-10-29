@@ -136,6 +136,20 @@ pub struct CreateRule {
     select_lineage: Option<crate::sem::ViewColumnLineage>,
 }
 impl CreateRule {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<(), AnalysisError> {
+        if let Some(lineage) = &mut self.select_lineage
+            && let Some(action) = self.actions.first()
+            && let Some(query) = action.select_statement()
+        {
+            lineage.rename_column(rename, query)?;
+        }
+        self.walk(&mut crate::sem::traversal::ColumnRenamer::new(rename))?;
+        self.retain_dependencies()
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

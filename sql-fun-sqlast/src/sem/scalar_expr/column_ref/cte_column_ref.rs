@@ -6,6 +6,8 @@ use crate::sem::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CteColumnRef {
     alias: AliasName,
+    #[serde(skip)]
+    unqualified: crate::sem::source_flag::SourceFlag,
     cte_name: CteName,
     column_name: ColumnName,
     column_def: Option<ColumnDefinition>,
@@ -43,6 +45,24 @@ impl super::ColumnReference for CteColumnRef {
 }
 
 impl CteColumnRef {
+    pub(super) fn set_projection_name(&mut self, name: &ColumnName) {
+        self.column_name = name.clone();
+        if let Some(column) = &mut self.column_def {
+            column.set_projection_name(name);
+        }
+    }
+
+    pub(super) const fn mark_unqualified(&mut self) {
+        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+    }
+    pub(super) const fn namespace_reference(&self) -> (&str, &ColumnName, bool) {
+        (
+            self.alias.as_str(),
+            &self.column_name,
+            self.unqualified.get(),
+        )
+    }
+
     pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
         self.alias = alias.clone();
         self.column_name = column.clone();
@@ -67,6 +87,7 @@ impl CteColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
+            unqualified: crate::sem::source_flag::SourceFlag::new(false),
             cte_name: cte_name.clone(),
             column_name: column_name.clone(),
             column_def: column_def.cloned(),

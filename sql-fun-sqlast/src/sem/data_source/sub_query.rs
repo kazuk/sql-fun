@@ -109,7 +109,9 @@ impl SubQueryDataSource {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.source_outputs(&self.select_statement.result_columns().names());
         self.select_statement.walk(visitor)?;
+        visitor.derived_binding(&self.alias, &self.select_statement.result_columns().names());
         visitor.derived(self.alias.name().as_str(), &self.alias.inference_columns());
         Ok(())
     }

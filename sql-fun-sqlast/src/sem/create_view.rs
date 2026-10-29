@@ -32,6 +32,28 @@ pub struct CreateView {
 }
 
 impl CreateView {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<(), AnalysisError> {
+        self.rename_column_with(
+            rename,
+            &mut crate::sem::traversal::ColumnRenamer::new(rename),
+        )
+    }
+    pub(crate) fn rename_column_with(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+    ) -> Result<(), AnalysisError> {
+        self.lineage.rename_column(rename, &self.query)?;
+        self.query.walk(visitor)?;
+        for (_, value) in &mut self.defaults {
+            value.walk(visitor)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

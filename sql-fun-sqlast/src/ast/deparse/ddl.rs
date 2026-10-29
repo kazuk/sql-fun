@@ -757,6 +757,11 @@ mod test_alter_emission {
     use crate::parse_statements;
 
     #[rstest::rstest]
+    #[case::rename_column("ALTER TABLE t RENAME COLUMN a TO b")]
+    #[case::rename_column_optional_keyword("ALTER TABLE t RENAME a TO b")]
+    #[case::rename_column_only("ALTER TABLE ONLY t RENAME COLUMN a TO b")]
+    #[case::rename_column_if_exists("ALTER TABLE IF EXISTS t RENAME COLUMN a TO b")]
+    #[case::rename_column_quoted(r#"ALTER TABLE "T" RENAME COLUMN "A" TO "B""#)]
     #[case::add_column("ALTER TABLE ONLY t ADD COLUMN IF NOT EXISTS a integer DEFAULT 2")]
     #[case::foreign_options(
         "ALTER FOREIGN TABLE t OPTIONS (ADD host 'server', SET port '5432', DROP old)"

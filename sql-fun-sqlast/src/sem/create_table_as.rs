@@ -24,6 +24,21 @@ pub struct CreateTableAs {
 }
 
 impl CreateTableAs {
+    pub(crate) fn walk_column_dependencies(
+        &mut self,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+    ) -> Result<(), AnalysisError> {
+        self.query.walk_nested_command(visitor)
+    }
+
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &crate::sem::ColumnRename,
+    ) -> Result<(), AnalysisError> {
+        self.query
+            .walk_nested_command(&mut crate::sem::traversal::ColumnRenamer::new(rename))
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

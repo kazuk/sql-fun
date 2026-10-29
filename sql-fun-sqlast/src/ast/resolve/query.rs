@@ -411,7 +411,11 @@ impl Target {
             .alias
             .clone()
             .unwrap_or_else(|| expression.get_column_name());
-        results.push_expression(&ColumnName::from(name.as_str()), expression);
+        results.push_projection(
+            &ColumnName::from(name.as_str()),
+            expression,
+            self.alias.is_some() && !self.implicit_alias,
+        );
         Ok(())
     }
 
@@ -447,7 +451,11 @@ impl Target {
                 QueryProblem::reference_not_found("star source"),
             ))?;
         }
+        let start = results.len();
         projection.append_results(context, scope, results, self.location, None)?;
+        if relation.is_none() && qualifier.is_none() {
+            results.mark_join_sensitive_star_since(start);
+        }
         Ok(())
     }
 }

@@ -100,6 +100,7 @@ impl CteDataSource {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.cte_source(&self.name, &self.alias);
         visitor.relation(
             Some(&self.name),
             self.alias.name().as_str(),

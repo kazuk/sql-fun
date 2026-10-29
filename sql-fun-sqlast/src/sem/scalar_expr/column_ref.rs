@@ -86,6 +86,64 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(crate) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
+        if let Self::TableColumn(value) = self {
+            value.matches_column(rename)
+        } else {
+            false
+        }
+    }
+
+    pub(crate) const fn namespace_reference(&self) -> Option<(&str, &ColumnName, bool)> {
+        match self {
+            Self::TableColumn(value) => Some(value.namespace_reference()),
+            Self::ViewColumn(value) => Some(value.namespace_reference()),
+            Self::SubQueryColumn(value) => Some(value.namespace_reference()),
+            Self::CteColumn(value) => Some(value.namespace_reference()),
+            _ => None,
+        }
+    }
+
+    pub(super) const fn mark_unqualified(&mut self) {
+        match self {
+            Self::TableColumn(value) => value.mark_unqualified(),
+            Self::ViewColumn(value) => value.mark_unqualified(),
+            Self::SubQueryColumn(value) => value.mark_unqualified(),
+            Self::CteColumn(value) => value.mark_unqualified(),
+            _ => {}
+        }
+    }
+    pub(crate) fn renamed_output(&self, rename: &crate::sem::ColumnRename) -> Option<&ColumnName> {
+        if let Self::TableColumn(value) = self {
+            value.renamed_output(rename)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn with_derived_column_name(self, derived: bool) -> Self {
+        if let Self::TableColumn(value) = self {
+            Self::TableColumn(value.with_derived_name(derived))
+        } else {
+            self
+        }
+    }
+
+    pub(in crate::sem) fn set_projection_name(&mut self, name: &ColumnName) {
+        match self {
+            Self::TableColumn(value) => value.set_projection_name(name),
+            Self::ViewColumn(value) => value.set_projection_name(name),
+            Self::SubQueryColumn(value) => value.set_projection_name(name),
+            Self::CteColumn(value) => value.set_projection_name(name),
+            _ => {}
+        }
+    }
+    pub(in crate::sem) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+        if let Self::TableColumn(value) = self {
+            value.rename_column(rename);
+        }
+    }
+
     pub(in crate::sem) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

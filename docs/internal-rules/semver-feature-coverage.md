@@ -128,9 +128,10 @@ diagnostics and limits, without an impact. Invalid command syntax uses argparse
 exit 2.
 
 `next_coverage` records internal current-source preparation state and is not an
-adoptable baseline. The explicit resource producer generates the complete
-current
-publishable set for #360, including never-published crates. Adoption grants
+adoptable baseline. The `check-semver --candidate-output` option archives the
+complete current publishable set, including never-published crates, reusing
+comparison JSON and
+generating only missing current configured selections. Adoption grants
 released
 status only after #360 validates and installs those resources. Missing/corrupt
 baseline input fails; it never bootstraps from the candidate.

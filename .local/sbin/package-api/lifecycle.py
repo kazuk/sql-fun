@@ -201,11 +201,13 @@ def schedule(old, old_packages, new, new_packages):
     return calls, removals, additions, binaries
 
 
-def compare_selection(call, target, toolchain, comparator, wrapper, semver, scratch, index, context):
+def compare_selection(call, target, toolchain, comparator, wrapper, semver, scratch, index, context, resource_output=None):
     try:
         request = dict(old=resolve_dependencies(call['old'], target, toolchain, context),
                        new=resolve_dependencies(call['new'], target, toolchain, context),
                        target=target, toolchain=toolchain, cargo_context=str(context))
+        if resource_output is not None:
+            request['resource_output'] = str(resource_output)
         request_path = scratch / f'comparison-{index}.json'
         request_path.write_text(json.dumps(request))
         completed = subprocess.run([str(comparator), '--request', str(request_path), '--diff-wrapper', str(wrapper),
@@ -222,7 +224,7 @@ def compare_selection(call, target, toolchain, comparator, wrapper, semver, scra
         raise AnalysisError(f'{call["package"]}/{call["configuration"]}/{call["kind"]}: {error}') from error
 
 
-def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch, cargo_context=None):
+def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, scratch, cargo_context=None, resource_directory=None):
     context = cargo_context or Path.cwd()
     old, old_packages = read_baseline(old_path)
     new, new_packages = read_state(new_path, policy)
@@ -232,8 +234,21 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
     new_surface = any(addition['reason'] != 'new-package' and
                       not addition.get('released_selection', False) for addition in added)
     impact = 'major' if removed else ('minor' if new_surface else 'patch')
+    retained = {}
     for index, call in enumerate(calls):
-        report = compare_selection(call, new['target'], toolchain, comparator, wrapper, semver, scratch, index, context)
+        resource_output = None
+        if resource_directory is not None:
+            key = json.dumps(call['new'], sort_keys=True)
+            if key in retained:
+                call = dict(call, new=retained[key])
+            resource_output = resource_directory / str(index)
+        arguments = (call, new['target'], toolchain, comparator, wrapper, semver, scratch, index, context)
+        if resource_output is None:
+            report = compare_selection(*arguments)
+        else:
+            report = compare_selection(*arguments, resource_output=resource_output)
+        if resource_output is not None:
+            retained[key] = json.loads((resource_output / 'resource.json').read_text())
         coverage = report['coverage']
         lost = set(coverage['old']['resolved_features']) - set(coverage['new']['resolved_features'])
         if lost:
@@ -249,8 +264,12 @@ def execute(old_path, new_path, policy, comparator, wrapper, semver, toolchain, 
 
 def unpack_baseline(path, destination):
     with tarfile.open(path) as archive:
-        require(all(m.isfile() or m.isdir() for m in archive.getmembers()),
-                'baseline links/special files forbidden')
+        members = archive.getmembers()
+        require(all(m.isfile() or m.isdir() for m in members), 'baseline links/special files forbidden')
+        names = [str(Path(m.name)) for m in members]
+        require(len(names) == len(set(names)), 'duplicate baseline archive members')
+        require(all(not Path(name).is_absolute() and '..' not in Path(name).parts for name in names),
+                'baseline archive paths must be relative and contained')
         archive.extractall(destination, filter='data')
     descriptor = destination / 'baseline.json'
     read_baseline(descriptor)
@@ -276,7 +295,7 @@ def main():
             report = execute(unpacked / 'baseline.json', candidate, policy,
                              Path(__file__).resolve().parents[1] / 'compare-package-api',
                              wrapper, semver, args.toolchain, scratch)
-    except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, tarfile.TarError) as error:
+    except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, EOFError, tarfile.TarError) as error:
         print(json.dumps(dict(status='analysis-error', diagnostics=str(error), limits=LIMITS)))
         return 1
     print(json.dumps(report))

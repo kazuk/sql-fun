@@ -1,4 +1,4 @@
-"""Repository-local release-intent validation and reusable snapshot entry point."""
+"""Repository-local release-intent validation and optional candidate archive."""
 import argparse
 import json
 from pathlib import Path
@@ -11,8 +11,9 @@ import time
 
 from compare import AnalysisError, LIMITS, explicit_path, require, run
 from lifecycle import LEVELS, execute
-from repository import TOOLS, package_snapshot, prepare_input, prepare_source, repository_environment
+from repository import TOOLS, package_snapshot, prepare_input, repository_environment
 from resources import produce_resources
+from baseline_archive import write_candidate
 
 
 def intent_results(report, intent):
@@ -59,21 +60,31 @@ def prepare_tools(toolchain, scratch):
 
 def validate(args, scratch):
     started = time.monotonic()
+    output = args.candidate_output
+    if output is not None:
+        require(args.revision is not None, 'candidate output requires explicit commit mode (--revision)')
+        require(output.is_absolute() and not output.exists(), 'new absolute candidate output required')
+        require(not output.resolve().is_relative_to(explicit_path(args.repository)),
+                'candidate output must be outside the selected repository')
+    resources = scratch / 'retained' if output is not None else None
     source, provenance, env, baseline, intent, configurations = prepare_input(
         explicit_path(args.repository), args.revision, scratch, args.toolchain, args.target)
     wrapper, semver = prepare_tools(args.toolchain, scratch)
     candidate, package_seconds = package_snapshot(source, provenance, env, configurations, args.target, scratch / 'candidate')
     analysis_started = time.monotonic()
     report = execute(baseline, candidate, source / '.local/semver-feature-sets.toml',
-                     TOOLS / 'sbin/compare-package-api', wrapper, semver, args.toolchain, scratch, explicit_path(args.repository))
+                     TOOLS / 'sbin/compare-package-api', wrapper, semver, args.toolchain, scratch, explicit_path(args.repository), resource_directory=resources)
     results = intent_results(report, intent)
     passed = all(r['outcome'] == 'pass' for r in results)
+    if passed and output is not None:
+        descriptor = produce_resources(candidate, scratch / 'bundle', args.toolchain, explicit_path(args.repository), resources)
+        write_candidate(descriptor, output)
+        report['candidate'] = str(output)
     report.update(status='passed' if passed else 'exceeds-intent', source=provenance, target=args.target,
                   toolchain=args.toolchain, crates=results,
                   timings=dict(packaging_seconds=package_seconds, analysis_seconds=time.monotonic() - analysis_started,
                                total_seconds=time.monotonic() - started))
-    # The local operation owns temporary packages. Only the explicit snapshot
-    # producer returns a descriptor whose relative package paths remain usable.
+    # Package paths expire with scratch; the optional archive retains resources.
     report.pop('next_coverage')
     return report
 
@@ -90,11 +101,13 @@ def arguments(description):
 
 
 def main():
-    args = arguments(__doc__).parse_args()
+    parser = arguments(__doc__)
+    parser.add_argument('--candidate-output', type=Path, help='new absolute candidate archive outside the repository; commit mode only')
+    args = parser.parse_args()
     try:
         with tempfile.TemporaryDirectory(prefix='semver-intent-') as directory:
             report = validate(args, Path(directory))
-    except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, tarfile.TarError) as error:
+    except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, EOFError, tarfile.TarError) as error:
         report = dict(status='analysis-error', diagnostics=str(error), limits=LIMITS)
     print(json.dumps(report))
     for crate in report.get('crates', []):
@@ -105,27 +118,3 @@ def main():
     if 'diagnostics' in report:
         print(report['diagnostics'], file=sys.stderr)
     return 0 if report['status'] == 'passed' else 1
-
-
-def snapshot_main():
-    parser = arguments('Internal generated comparison-resource producer for #360')
-    parser.add_argument('--output', required=True, type=Path, help='new absolute resource directory outside the selected repository')
-    args = parser.parse_args()
-    try:
-        repository = explicit_path(args.repository)
-        output = args.output.resolve()
-        require(args.output.is_absolute() and not output.is_relative_to(repository),
-                'snapshot output must be an absolute path outside the selected repository')
-        require(not output.exists(), 'snapshot output must not already exist')
-        with tempfile.TemporaryDirectory(prefix='semver-resources-') as directory:
-            source, provenance, env, _, _, configurations = prepare_source(
-                repository, args.revision, Path(directory), args.toolchain)
-            started = time.monotonic()
-            packages, _ = package_snapshot(source, provenance, env, configurations, args.target, Path(directory) / 'candidate')
-            descriptor = produce_resources(packages, output, args.toolchain, repository)
-            elapsed = time.monotonic() - started
-            print(json.dumps(dict(descriptor=str(descriptor), resource_seconds=elapsed, source=provenance)))
-        return 0
-    except (AnalysisError, OSError, ValueError, KeyError, TypeError, AttributeError, tarfile.TarError) as error:
-        print(json.dumps(dict(status='analysis-error', diagnostics=str(error))), file=sys.stderr)
-        return 1

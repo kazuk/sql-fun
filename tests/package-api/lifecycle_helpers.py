@@ -44,7 +44,8 @@ def write_resource_baseline(root, source_state):
                             resolved_features=list(features), feature_inventory=record['features'], schema=61,
                             documented_target=source_state['target'], target_kind=['lib'])
             record['selections'].append(dict(rustdoc=artifact.name, coverage=coverage,
-                producer={'target': source_state['target']}, sha256=hashlib.sha256(artifact.read_bytes()).hexdigest()))
+                producer=dict(target=source_state['target'], host=source_state['target'], toolchain='fixture',
+                              rustc='rustc fixture', cargo='cargo fixture', rustdoc='rustdoc fixture'), sha256=hashlib.sha256(artifact.read_bytes()).hexdigest()))
     result = dict(state, schema=2, packages=records)
     descriptor = root / 'baseline.json'
     descriptor.write_text(json.dumps(result))

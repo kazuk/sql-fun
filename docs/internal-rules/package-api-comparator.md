@@ -121,3 +121,14 @@ and the standard workspace/nextest archive groups. They include the no-old-build
 boundary and corrupt/legacy resource rejection without recurring compiler
 replays. Historical compiler-test deletions remain documented in
 [the workspace test cost review](workspace-test-cost.md).
+
+### Retaining current resources
+
+Repository validation may supply an absolute, new `resource_output` directory in
+its comparison request. After successful analysis, the comparator copies the
+current JSON and writes `resource.json` (artifact path, coverage and producer)
+there before deleting its own temporary files. The lifecycle caller owns this
+invocation-local storage and can reuse the saved side for another comparison.
+This optional handoff does not change impact classification or publish feature
+history. `check-semver --candidate-output` consumes it to avoid rebuilding
+already-generated current APIs. It is not a standalone candidate producer.

@@ -88,7 +88,7 @@ def validate_producer(producer, coverage, target):
 
 
 def produce_resources(descriptor, output, toolchain, context, retained=None):
-    """Generate resources once at baseline production, never during validation."""
+    """Complete current configured resources, reusing retained comparison outputs."""
     from lifecycle import has_api, read_state, resolve_dependencies, selection
     state, packages = read_state(descriptor)
     require(state['schema'] == 1, 'resource production requires candidate source packages')

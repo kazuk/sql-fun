@@ -184,14 +184,8 @@ impl MembershipComparison {
         value.set_operator_binding(binding.clone());
         Ok(value)
     }
-    fn not_null(&self) -> Option<bool> {
-        if let Some(expression) = &self.expression {
-            expression.is_not_null()
-        } else if self.left.is_not_null() == Some(true) && self.right.is_not_null() == Some(true) {
-            Some(true)
-        } else {
-            None
-        }
+    fn inputs_not_null(&self) -> bool {
+        self.left().is_not_null() == Some(true) && self.right().is_not_null() == Some(true)
     }
     fn rename_relation(&mut self, old: &crate::sem::TableName, new: &crate::sem::TableName) {
         let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
@@ -572,7 +566,7 @@ impl SemScalarExprNode for MembershipExpr {
         if self
             .comparisons
             .iter()
-            .all(|value| value.not_null() == Some(true))
+            .all(MembershipComparison::inputs_not_null)
         {
             if self.comparisons.is_empty() {
                 Some(true)

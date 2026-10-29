@@ -471,7 +471,9 @@
     "name": "parameter-list",
     "sql": "SELECT $1 IN (1,2) AS result",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "result",
@@ -489,7 +491,9 @@
     "name": "parameter-query",
     "sql": "SELECT $1 IN (SELECT 1) AS result",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "result",
@@ -507,7 +511,9 @@
     "name": "parameter-query-output",
     "sql": "SELECT 1 IN (SELECT $1) AS result",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "result",
@@ -525,7 +531,9 @@
     "name": "parameter-row",
     "sql": "SELECT ROW($1,2) IN (SELECT 1,2) AS result",
     "expected": {
-      "diagnostics": [],
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
       "columns": [
         {
           "name": "result",
@@ -574,7 +582,8 @@
     "sql": "SELECT 1 IN (true) AS result",
     "expected": {
       "diagnostics": [
-        "binary_operator_overload_resolution_failed"
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
       ],
       "columns": [
         {
@@ -589,7 +598,8 @@
     "sql": "SELECT 1 IN (SELECT NULL) AS result",
     "expected": {
       "diagnostics": [
-        "binary_operator_overload_resolution_failed"
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
       ],
       "columns": [
         {

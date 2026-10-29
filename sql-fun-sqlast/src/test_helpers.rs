@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! test helper types
 
+pub(crate) mod between;
 pub(crate) mod collate;
 pub(crate) mod conflict_masters;
 pub(crate) mod ownership;

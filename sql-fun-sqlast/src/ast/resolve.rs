@@ -526,7 +526,7 @@ impl OperatorKind {
                 )
             }
             Self::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
-            Self::Between | Self::NotBetween => self.resolve_between(left, right),
+            Self::Between | Self::NotBetween => self.resolve_between(context, left, right),
             Self::BetweenSymmetric | Self::NotBetweenSymmetric => {
                 self.resolve_symmetric_between(context, left, right)
             }
@@ -535,6 +535,7 @@ impl OperatorKind {
     }
     fn resolve_between(
         &self,
+        context: &mut impl ParseContext,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
     ) -> Result<SemScalarExpr, AnalysisError> {
@@ -543,6 +544,15 @@ impl OperatorKind {
         let Ok([start, end]): Result<[SemScalarExpr; 2], _> = values.try_into() else {
             return AnalysisError::raise_unexpected_input("BETWEEN bounds");
         };
+        if context.dialect() == Dialect::postgres() {
+            return ArithExpr::ordinary_between(
+                context,
+                &left,
+                &start,
+                &end,
+                matches!(self, Self::NotBetween),
+            );
+        }
         Ok(if matches!(self, Self::NotBetween) {
             ArithExpr::not_between(left, (start, end))
         } else {

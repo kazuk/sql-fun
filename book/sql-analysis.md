@@ -4,6 +4,29 @@ This page is for application developers writing queries or investigating SQL
 analysis diagnostics. It describes supported forms and current limitations;
 installation and initial configuration are covered in [Installation](installation.md).
 
+## PostgreSQL range predicates
+
+Analysis supports `BETWEEN`, `NOT BETWEEN`, and their explicit `ASYMMETRIC`
+forms:
+
+```sql
+SELECT price BETWEEN $1::numeric AND $2::numeric AS within_range
+FROM products
+```
+
+Both endpoints are inclusive. Ordinary `BETWEEN` preserves the endpoint order;
+it does not reorder reversed bounds. Each bound must support the corresponding
+PostgreSQL comparison with the value; compatible mixed types are allowed.
+Analysis checks operand references, conversions and parameter constraints and
+reports a boolean result. It does not evaluate the predicate's value.
+
+NULL follows SQL's three-valued logic: a NULL operand does not always make the
+whole predicate NULL. For example, `0 BETWEEN 1 AND NULL` is false, and
+`0 NOT BETWEEN 1 AND NULL` is true. Result nullability is conservative: analysis
+can report nullable even for comparisons of non-null operands, and unknown
+nullability when comparison information is unresolved. SQLite range predicate
+analysis remains unsupported.
+
 ## PostgreSQL symmetric range predicates
 
 Analysis supports `BETWEEN SYMMETRIC` and `NOT BETWEEN SYMMETRIC`:

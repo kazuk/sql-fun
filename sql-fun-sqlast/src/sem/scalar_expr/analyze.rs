@@ -31,7 +31,6 @@ mod test_scalar_expr_analyze {
     use crate::sem::ScalarAnalysisContext;
     use crate::{
         sem::{
-            ArithExpr,
             ScalarConstExpr::*,
             SemScalarExpr::{self, *},
         },
@@ -44,12 +43,6 @@ mod test_scalar_expr_analyze {
     #[rstest::rstest]
     #[case("42", Const(Integer(42)))]
     #[case("null", Const(Null))]
-    #[case("10 between 1 and 100", ArithExpr::between(
-        Const(Integer(10)), (Const(Integer(1)), Const(Integer(100)))
-    ))]
-    #[case("10 not between 1 and 100", ArithExpr::not_between(
-        Const(Integer(10)), (Const(Integer(1)), Const(Integer(100)))
-    ))]
     fn test_analyze_scalar_expr(
         test_context: TestParseContext,
         #[case] sql_expr: &str,
@@ -250,7 +243,7 @@ mod test_analyze_sqlite_scalar_expr {
         let expr = result_column_expr.expr().as_ref();
         let tokens = Vec::default().into();
         let (sem_expr, _new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
-            test_context,
+            test_context.with_dialect(crate::ast::Dialect::sqlite()),
             &ScalarAnalysisContext::default(),
             expr,
             &tokens,

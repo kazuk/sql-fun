@@ -222,7 +222,7 @@ impl DistinctExpr {
             return Ok(DistinctComparison::deferred(left, right, binding));
         }
 
-        let (left, right) = Self::literal_operands(context, left, right);
+        let (left, right) = SemScalarExpr::comparison_literal_operands(context, left, right);
         let mut equality = ArithExpr::build_op(context, &name, Some(left), Some(right))?.0;
         equality.set_operator_binding(binding);
         if let Some(ty) = equality.get_type() {
@@ -236,38 +236,6 @@ impl DistinctExpr {
             self.types = InputTypeConstraint::types([]);
         }
         Ok(DistinctComparison::equality(equality))
-    }
-
-    // Unknown literals are SQL input values, not typed text operands. A known
-    // peer supplies the equality target; two literals use string comparison.
-    fn literal_operands(
-        context: &impl ParseContext,
-        left: SemScalarExpr,
-        right: SemScalarExpr,
-    ) -> (SemScalarExpr, SemScalarExpr) {
-        let left_unknown = MinMaxExpr::input_type(&left) == Some(MinMaxExpr::unknown());
-        let right_unknown = MinMaxExpr::input_type(&right) == Some(MinMaxExpr::unknown());
-        let left_target = if right_unknown {
-            Some(PgBuiltInType::text())
-        } else {
-            right.get_type()
-        };
-        let right_target = if left_unknown {
-            Some(PgBuiltInType::text())
-        } else {
-            left.get_type()
-        };
-        let left = if left_unknown && let Some(ty) = left_target {
-            SemScalarExpr::wrap_implicit_cast(&MinMaxExpr::base_type(context, &ty), &left)
-        } else {
-            left
-        };
-        let right = if right_unknown && let Some(ty) = right_target {
-            SemScalarExpr::wrap_implicit_cast(&MinMaxExpr::base_type(context, &ty), &right)
-        } else {
-            right
-        };
-        (left, right)
     }
 
     /// Scalar left operand, including equality coercions after analysis.

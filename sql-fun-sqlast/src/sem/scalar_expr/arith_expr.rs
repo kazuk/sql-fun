@@ -61,7 +61,10 @@ impl ArithExpr {
         }
     }
 
-    /// build between expression node
+    /// Build a context-free BETWEEN expression.
+    ///
+    /// PostgreSQL semantic analysis resolves its comparisons before parameter inference.
+    /// Until then, its result type is boolean and its nullability is unknown.
     pub fn between(left: SemScalarExpr, range: (SemScalarExpr, SemScalarExpr)) -> SemScalarExpr {
         SemScalarExpr::Arith(Self::Between(Box::new(BetweenExpr {
             left,
@@ -71,7 +74,10 @@ impl ArithExpr {
         })))
     }
 
-    /// build not between expression node
+    /// Build a context-free NOT BETWEEN expression.
+    ///
+    /// PostgreSQL semantic analysis resolves its comparisons before parameter inference.
+    /// Until then, its result type is boolean and its nullability is unknown.
     pub fn not_between(
         left: SemScalarExpr,
         range: (SemScalarExpr, SemScalarExpr),
@@ -95,7 +101,7 @@ impl ArithExpr {
             Self::UndefinedOperatorAny(call_site) => call_site.is_not_null(),
             Self::UndefinedOperatorAll(call_site) => call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_not_null(),
-            Self::Between(_) => todo!(),
+            Self::Between(value) => value.inputs_is_not_null(),
         }
     }
 
@@ -116,7 +122,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => None,
-            Self::Between(_) => todo!(),
+            Self::Between(_) => Some(crate::sem::PgBuiltInType::bool()),
         }
     }
 
@@ -131,7 +137,9 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => return None,
-            Self::Between(_) => todo!(),
+            // A context-free builder has no selected comparison signatures yet.
+            // Analysis expands it before collecting operand constraints.
+            Self::Between(_) => return None,
         };
         if is_strict {
             if matches!(self.inputs_is_not_null(), Some(true)) {
@@ -301,5 +309,19 @@ impl ArithExpr {
             Self::UndefinedOperatorAll(call) => call.binding(),
             _ => None,
         }
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn resolve_between(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        if context.dialect() == crate::ast::Dialect::postgres()
+            && let Self::Between(value) = self
+        {
+            return Ok(Some(value.resolve(context)?));
+        }
+        Ok(None)
     }
 }

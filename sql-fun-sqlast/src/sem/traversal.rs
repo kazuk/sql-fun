@@ -5,6 +5,10 @@ pub(crate) trait SemanticVisitor {
     fn table_binding(&mut self, _name: &mut crate::sem::TableName) {}
 
     fn relation_identity(&mut self, _name: &crate::sem::FullName) {}
+    // Normalize context-free expressions before walking their newly analyzed children.
+    fn enter_expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        Ok(())
+    }
     fn expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
     }

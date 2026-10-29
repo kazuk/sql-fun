@@ -72,6 +72,8 @@ function run_sqlast_regressions() {
       cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
       ;;
   esac
+  require_command uv
+  uv run --no-project --no-config --python 3.12 python -B "$GIT_ROOT/tests/sqlast-regressions/test_experiment.py" || return $?
   local target_dir
   target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
   local binary_dir="${target_dir}/debug"

@@ -254,3 +254,85 @@ The six cases per version check new names, fixed PostgreSQL view outputs,
 repeated renames, old-name reuse, quoted names and explicit aliases. Rust
 schema-chain tests retain analyzed applicability, bindings, failure atomicity,
 source history, layer isolation, FK identities and SQLite oracle comparisons.
+
+## Opt-in shared-server parallel experiment (#870)
+
+Maintainers can reproduce the experiment after explicitly selecting a real
+builtin installation and prebuilt CLI/server from the same revision. It needs
+Bash, jq, Python 3 (standard library only), and Linux `/proc`. It does not execute
+SQL against PostgreSQL and does not use a developer's existing analysis server.
+From the repository root, with the selected binaries already built:
+
+```sh
+SQL_FUN_HOME="$PWD/sql-fun-home" \
+SQL_FUN_BIN="$PWD/target/debug/sql-fun" \
+SQL_FUN_TEST_SERVER_BIN="$PWD/target/debug/sql-fun-server" \
+python3 -B tests/sqlast-regressions/experiment.py \
+  --workers 1 2 4 --repetitions 3 --output /tmp/sql-fun-parallel-results
+```
+
+The output directory must not exist. Worker choices and repetitions are required;
+start the distinct worker-count sequence with `1`. A separate serial calibration
+trial supplies
+environment-specific group duration estimates. All compared trials use a single
+queue ordered by descending estimated duration (manifest order breaks ties).
+Each persistent shell worker atomically receives its next indivisible
+fixture/version group from the coordinator when idle. Failed tasks are not
+retried or hidden. Trials rotate configuration order after the serial
+calibration and reuse the selected binaries/catalogs. Keep the machine otherwise
+idle during comparisons; local speedups cannot select the CI default.
+
+Every trial owns a fresh server and test-only discovery namespace. Each CLI call
+uses an independent connection, while worker metadata and reports remain isolated.
+The parent checks server identity throughout execution, disables client automatic
+server relaunch, reaps workers and their children, and stops only its owned server.
+A group exceeding the 1800-second worker protocol deadline fails the experiment.
+After the positive suite, the same server revisits conflicting project schemas
+and omitted/empty/populated role selections to check cache isolation. Existing
+negative controls also run once per selected version. Their reports are separate
+from the positive-suite combined JUnit, as are the isolation revisit reports.
+
+`inventory.json` records expected groups and named case identities.
+`estimates.json` records the serial calibration duration measurements. Each trial
+keeps
+raw worker XML/logs, completion records, `combined.xml`, `summary.json`, server
+logs, and `/proc` CPU/RSS/peak-RSS/thread samples. Exact case/group reconciliation,
+worker exits, completion records, report presence, XML counters, and test outcomes
+all contribute to overall failure. Missing cases never become fabricated passes
+or skips. Aggregation preserves failure/error/skipped details; the current CLI
+has no skipped-case producer, so synthetic contracts verify skipped preservation.
+The standard workspace check runs the fast queue/report contracts, while normal
+source/installed regression invocation remains serial.
+
+`calibration.json` records the separate estimate-establishment run.
+`results.json` retains every completed comparison trial, including failed trials.
+A failure
+stops further comparisons. Successful experiments also write `comparison.json`
+with individual end-to-end wall times, medians, ranges, and speedups over the
+serial median. Per-trial summaries distinguish positive-worker-phase elapsed
+time, worker durations, summed CLI command time, throughput, and full wall time
+(including startup, isolation revisits, controls, reporting, and cleanup). Summed
+command time is not parallel wall time. Each primary trial starts with an empty
+server process cache; the operating system page cache is not cleared. Resource
+samples are observations, not proof of a particular lock bottleneck.
+
+After local 1/2/4 correctness is established, explicitly dispatch `build-test.yml`
+on the experiment branch with the `regression-benchmark` boolean input enabled.
+This optional job uses the normal default-feature CLI/server artifacts from that
+same workflow run and the same runner/container selection as workspace execution.
+It benchmarks 1/2/4/8 workers three times, uploading the
+`regression-benchmark` artifact even on failure (30-day retention). Other normal
+workflow jobs still run; the benchmark never rebuilds each trial's binaries.
+Record the run URL, revision, runner/image, CPU/memory, cache conditions, raw
+results, stability and extra CI cost in the findings. Choose a recommendation
+from actual CI measurements, including oversubscription, rather than assuming a
+worker count equal to vCPU count.
+
+Parallel execution stays opt-in. Adopting a CI default requires explicit review
+of results and approval of additional CI/runtime cost, coordinated with #869's
+job separation. File separate bug issues with reproduction evidence for defects
+discovered to arise from concurrent server processing; link them to #870 rather
+than silently repairing or bypassing them in this experiment.
+
+See the [findings](parallel-findings.md) for repeated local measurements and the
+CI recommendation/evidence location.

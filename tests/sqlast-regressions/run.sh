@@ -8,6 +8,7 @@ for executable in "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"; do
   test -x "$executable" || { echo "Not executable: $executable" >&2; exit 1; }
 done
 suite=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$suite/operations.sh"
 reports=${SQL_FUN_REGRESSION_REPORT_DIR:?SQL_FUN_REGRESSION_REPORT_DIR must select the report directory}
 mkdir -p "$reports"
 reports=$(cd -- "$reports" && pwd)
@@ -76,51 +77,7 @@ while IFS=$'\t' read -r fixture level schema count versions; do
     jq -e --argjson version "$version" '.server_version_num / 10000 | floor == $version' \
       "$SQL_FUN_HOME/postgres/$version/metadata.json" >/dev/null
     checked_versions["$version"]=1
-    metadata="$runtime/metadata-$version.toml"
-    cat >"$metadata" <<METADATA
-[package.metadata.database.regression]
-engine = "PostgreSQL"
-dialect = "postgres"
-version = "$version"
-search_path = ["public"]
-connector = "tokio-postgres"
-METADATA
-    # Optional fixture-owned datasource fields are shared by source/installed checks.
-    if [[ -f "$suite/$fixture.metadata.toml" ]]; then
-      cat "$suite/$fixture.metadata.toml" >>"$metadata"
-    fi
-    args=(--term-color never --metadata-file "$metadata" --datasource regression)
-    if [[ "$schema" != - ]]; then args+=(--schema-file "$suite/$schema"); fi
-    echo "== $fixture PostgreSQL $version ($level), expected $count cases; catalog $SQL_FUN_HOME/postgres/$version"
-    rm -f "$reports/$fixture-$version.xml"
-    status=0
-    group_failed=0
-    # Measure only the product invocation; parsing reports and setup are outside.
-    { time "$SQL_FUN_BIN" "${args[@]}" test "$file" \
-        --schema-level "$level" --junit-xml "$reports/$fixture-$version.xml" \
-        >"$reports/$fixture-$version.log" 2>&1;
-    } 2>"$runtime/test-seconds" || status=$?
-    elapsed=$(<"$runtime/test-seconds")
-    test_seconds=$(jq -n --argjson total "$test_seconds" --argjson elapsed "$elapsed" '($total + $elapsed) * 1000 | round / 1000')
-    cat "$reports/$fixture-$version.log"
-    if (( status != 0 )); then group_failed=1; fi
-    if ! grep -F ' failures="0" errors="0"' "$reports/$fixture-$version.xml" >/dev/null 2>&1; then
-      echo "JUnit report missing or contains failures/errors: $fixture PostgreSQL $version" >&2
-      group_failed=1
-    fi
-    # Verify both the declared JUnit total and the actual testcase elements.
-    actual=0
-    if [[ -s "$reports/$fixture-$version.xml" ]]; then
-      actual=$(sed -n 's/.*<testsuite name="sql-fun test" tests="\([0-9]*\)".*/\1/p' "$reports/$fixture-$version.xml")
-    fi
-    elements=$(grep -c '<testcase ' "$reports/$fixture-$version.xml" 2>/dev/null || true)
-    if [[ "$elements" != "$count" ]]; then echo "JUnit testcase count mismatch: expected $count, actual ${elements:-0}" >&2; group_failed=1; fi
-    if [[ "$actual" != "$count" ]]; then echo "Case count mismatch: expected $count, actual $actual" >&2; group_failed=1; fi
-    if (( group_failed != 0 )); then failed=1; result=FAIL; else result=PASS; fi
-    echo "== Result: $fixture PostgreSQL $version: $result; cases=$actual/$count; test-command=${elapsed}s; exit=$status" \
-      | tee -a "$reports/$fixture-$version.log"
-    total=$((total + ${actual:-0}))
-    groups=$((groups + 1))
+    run_group
   done
 done <"$suite/manifest.tsv"
 
@@ -133,50 +90,7 @@ for fixture_file in "$suite"/*.json; do
   fi
 done
 (( groups > 0 && total > 0 )) || { echo 'Empty regression suite' >&2; exit 1; }
-# Deliberately wrong expectations must fail while an independent later case passes.
-# Keep expected-failure XML apart from positive JUnit reports consumed by CI.
-mkdir -p "$reports/controls"
-jq '. + [.[0]] |
-    .[2].name = "independent-later-pass" |
-    .[0].expected.columns[0].name = "intentionally_wrong" |
-    .[1].expected.diagnostics = ["intentionally_missing"]' \
-  "$suite/pilot.json" >"$runtime/negative-cases.json"
-for version in "${!checked_versions[@]}"; do
-  control="$reports/controls/negative-$version"
-  rm -f "$control.xml"
-  echo "== Expected-failure controls: PostgreSQL $version (not regression failures)"
-  echo "The next 2 FAIL results are intentional; exit 1 and a later PASS are required."
-  status=0
-  "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
-    --datasource regression test "$runtime/negative-cases.json" --schema-level builtin \
-    --junit-xml "$control.xml" >"$control.log" 2>&1 || status=$?
-  cat "$control.log"
-  [[ "$status" == 1 ]] || { echo "Negative control returned $status, expected 1" >&2; exit 1; }
-  for evidence in 'tests="3" failures="2" errors="0"' '<testcase' ; do
-    grep -F "$evidence" "$control.xml" >/dev/null
-  done
-  for evidence in "FAIL $runtime/negative-cases.json::$(jq -r '.[0].name' "$runtime/negative-cases.json")" \
-    "FAIL $runtime/negative-cases.json::$(jq -r '.[1].name' "$runtime/negative-cases.json")" "PASS $runtime/negative-cases.json::independent-later-pass" \
-    '  column 0:' '    expected:' '    actual:' '    missing:' '    unexpected:' \
-    '3 cases: 1 passed, 2 failed or errored'; do
-    grep -Fx "$evidence" "$control.log" >/dev/null
-  done
-  # Invalid selection is a command error, never a successful empty test run.
-  status=0
-  "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
-    --datasource regression test "$suite/pilot.json#$.nonexistent" --schema-level builtin \
-    >"$reports/controls/invalid-$version.log" 2>&1 || status=$?
-  [[ "$status" != 0 ]] || { echo 'Invalid selection unexpectedly succeeded' >&2; exit 1; }
-  status=0
-  "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
-    --datasource nonexistent test "$suite/pilot.json" --schema-level builtin \
-    >"$reports/controls/datasource-$version.log" 2>&1 || status=$?
-  [[ "$status" == 1 ]] || { echo "Missing datasource returned $status, expected 1" >&2; exit 1; }
-  if grep -q '^PASS ' "$reports/controls/datasource-$version.log"; then
-    echo 'Unconfigured datasource unexpectedly analyzed a passing query' >&2; exit 1
-  fi
-  echo "PostgreSQL $version: negative controls verified (3 executed, 2 intentional failures, 1 pass; invalid selector and missing datasource rejected)"
-done
+run_controls
 rate=$(jq -n --argjson cases "$total" --argjson seconds "$test_seconds" \
   'if $seconds > 0 then $cases / $seconds * 1000 | round / 1000 else 0 end')
 echo "SQLAST regressions: $total executed cases, in $groups groups; failure=$failed; test-command-total=${test_seconds}s; cases/second=$rate"

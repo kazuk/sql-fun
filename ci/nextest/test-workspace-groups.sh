@@ -125,6 +125,11 @@ function cargo() {
   fi
   jq -n --arg directory "$scratch/target" '{target_directory: $directory}'
 }
+function uv() {
+  [[ "$*" == "run --no-project --no-config --python 3.12 python -B $GIT_ROOT/tests/sqlast-regressions/test_experiment.py" ]] || return 96
+  echo contracts >> "$scratch/order"
+  [[ "$failed" != contracts ]]
+}
 mkdir -p "$scratch/root/tests/sqlast-regressions"
 cat > "$scratch/root/tests/sqlast-regressions/run.sh" <<'RUNNER'
 #!/usr/bin/env bash
@@ -137,7 +142,7 @@ echo regressions >> "$scratch/order"
 RUNNER
 chmod +x "$scratch/root/tests/sqlast-regressions/run.sh"
 export scratch failed
-for failed in none regressions; do
+for failed in none contracts regressions; do
   : > "$scratch/order"
   (
     export GIT_ROOT="$scratch/root"
@@ -147,7 +152,9 @@ for failed in none regressions; do
     SQL_FUN_TEST_SERVER_BIN=/explicit/server
     run_workspace
   ) > "$scratch/route-log" 2>&1 && status=0 || status=$?
-  [[ "$(cat "$scratch/order")" == regressions ]]
+  expected=contracts
+  [[ "$failed" == contracts ]] || expected+=$'\nregressions'
+  [[ "$(cat "$scratch/order")" == "$expected" ]]
   if [[ "$failed" == none ]]; then [[ "$status" == 0 ]]; else [[ "$status" != 0 ]]; fi
 done
 for missing in SQL_FUN_BIN SQL_FUN_TEST_SERVER_BIN; do

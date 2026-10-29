@@ -1,0 +1,625 @@
+{
+  "revision": "dee87637575fd7681ec79c96322ed2b5a3b613c4",
+  "build_command": "cargo build --locked -p sql-fun-cli --bin sql-fun -p sql-fun-server --bin sql-fun-server",
+  "command": "python3 -B tests/sqlast-regressions/experiment.py --workers 1 2 4 --repetitions 3 --output target/parallel-experiment-local-final",
+  "feature_configuration": "default features, one prebuilt CLI/server pair reused throughout",
+  "cpu_model": "AMD Ryzen 7 5800X 8-Core Processor",
+  "cpu_count": 16,
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "cgroup_limits": {
+    "cpu.max": "max 100000",
+    "memory.max": "max"
+  },
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "python": "Python 3.12.3",
+  "groups": 140,
+  "cases": 2212,
+  "calibration": 574.1657215289306,
+  "estimates": {
+    "source": "estimate-baseline",
+    "seconds": {
+      "pilot-17": 0.086,
+      "pilot-18": 0.084,
+      "output-names-17": 0.194,
+      "output-names-18": 0.208,
+      "casts-17": 0.032,
+      "casts-18": 0.033,
+      "vectors-18": 0.025,
+      "arrays-metadata-17": 0.084,
+      "arrays-metadata-18": 0.092,
+      "arrays-names-17": 0.043,
+      "arrays-names-18": 0.046,
+      "arrays-parameters-17": 0.522,
+      "arrays-parameters-18": 0.568,
+      "arrays-diagnostics-17": 0.119,
+      "arrays-diagnostics-18": 0.137,
+      "arrays-consumers-17": 0.468,
+      "arrays-consumers-18": 0.443,
+      "arrays-records-17": 0.022,
+      "arrays-records-18": 0.022,
+      "arrays-operators-17": 0.027,
+      "arrays-operators-18": 0.026,
+      "minmax-metadata-17": 0.117,
+      "minmax-metadata-18": 0.117,
+      "minmax-diagnostics-17": 0.093,
+      "minmax-diagnostics-18": 0.096,
+      "metadata-overloads-17": 0.049,
+      "metadata-overloads-18": 0.082,
+      "case-common-types-17": 3.302,
+      "case-common-types-18": 3.289,
+      "case_semantic-17": 0.139,
+      "case_semantic-18": 0.138,
+      "coalesce_semantic-17": 0.13,
+      "coalesce_semantic-18": 0.133,
+      "array-subqueries-17": 0.247,
+      "array-subqueries-18": 0.214,
+      "bootstrap-array-expressions-18": 0.014,
+      "schema-composites-17": 0.754,
+      "schema-composites-18": 0.729,
+      "schema-enums-17": 0.017,
+      "schema-enums-18": 0.017,
+      "schema-delete-17": 0.081,
+      "schema-delete-18": 0.078,
+      "schema-domains-builtin-17": 0.041,
+      "schema-domains-builtin-18": 0.041,
+      "schema-domains-default-tie-17": 0.012,
+      "schema-domains-default-tie-18": 0.012,
+      "schema-domains-defaults-17": 0.367,
+      "schema-domains-defaults-18": 0.398,
+      "schema-domains-equal-ranks-17": 0.366,
+      "schema-domains-equal-ranks-18": 0.368,
+      "schema-domains-extra-arguments-17": 0.012,
+      "schema-domains-extra-arguments-18": 0.011,
+      "schema-domains-order-forward-17": 0.015,
+      "schema-domains-order-forward-18": 0.014,
+      "schema-domains-order-reverse-17": 0.015,
+      "schema-domains-order-reverse-18": 0.015,
+      "schema-domains-out-parameters-17": 0.377,
+      "schema-domains-out-parameters-18": 0.374,
+      "schema-domains-project-17": 0.799,
+      "schema-domains-project-18": 0.757,
+      "schema-domains-variadic-precedence-17": 0.369,
+      "schema-domains-variadic-precedence-18": 0.363,
+      "schema-domains-variadic-precedence-reverse-17": 0.389,
+      "schema-domains-variadic-precedence-reverse-18": 0.364,
+      "schema-domains-variadic-17": 0.381,
+      "schema-domains-variadic-18": 0.379,
+      "schema-expressions-array-catalog-shape-17": 0.015,
+      "schema-expressions-array-catalog-shape-18": 0.016,
+      "schema-expressions-composite-array-17": 0.011,
+      "schema-expressions-composite-array-18": 0.011,
+      "schema-expressions-record-ambiguity-17": 0.018,
+      "schema-expressions-record-ambiguity-18": 0.018,
+      "schema-expressions-record-array-17": 0.013,
+      "schema-expressions-record-array-18": 0.012,
+      "schema-expressions-record-overloads-17": 0.027,
+      "schema-expressions-record-overloads-18": 0.028,
+      "schema-expressions-record-scalar-17": 0.013,
+      "schema-expressions-record-scalar-18": 0.012,
+      "schema-expressions-17": 6.138,
+      "schema-expressions-18": 6.056,
+      "schema-insert-17": 0.839,
+      "schema-insert-18": 0.836,
+      "schema-join-17": 0.039,
+      "schema-join-18": 0.038,
+      "schema-merge-17": 0.164,
+      "schema-merge-18": 0.177,
+      "schema-qualified-17": 0.132,
+      "schema-qualified-18": 0.136,
+      "schema-table-functions-17": 0.449,
+      "schema-table-functions-18": 0.424,
+      "schema-update-17": 2.32,
+      "schema-update-18": 2.35,
+      "schema-views-assignments-17": 0.085,
+      "schema-views-assignments-18": 0.084,
+      "schema-views-automatic-17": 0.054,
+      "schema-views-automatic-18": 0.057,
+      "schema-views-diagnostics-17": 0.138,
+      "schema-views-diagnostics-18": 0.14,
+      "schema-views-mechanisms-17": 0.098,
+      "schema-views-mechanisms-18": 0.143,
+      "schema-views-precedence-17": 0.137,
+      "schema-views-precedence-18": 0.126,
+      "schema-views-special-17": 0.037,
+      "schema-views-special-18": 0.036,
+      "view-conflict-rules-17": 0.05,
+      "view-conflict-rules-18": 0.052,
+      "parameter-bindings-17": 3.42,
+      "parameter-bindings-18": 3.537,
+      "truth-tests-17": 14.971,
+      "truth-tests-18": 15.038,
+      "between-symmetric-17": 84.946,
+      "between-symmetric-18": 85.721,
+      "distinctness-17": 7.528,
+      "distinctness-18": 7.519,
+      "bounded-parameter-inference-17": 76.427,
+      "bounded-parameter-inference-18": 76.42,
+      "table-renames-17": 0.216,
+      "table-renames-18": 0.2,
+      "project-roles-17": 3.189,
+      "project-roles-18": 3.216,
+      "project-roles-empty-17": 3.162,
+      "project-roles-empty-18": 3.194,
+      "project-roles-omitted-17": 0.012,
+      "project-roles-omitted-18": 0.011,
+      "collate-17": 0.838,
+      "collate-18": 0.841,
+      "between-17": 58.77,
+      "between-18": 58.836,
+      "membership-17": 8.393,
+      "membership-18": 8.325,
+      "membership-comparisons-17": 0.079,
+      "membership-comparisons-18": 0.094,
+      "declaration-collations-17": 0.208,
+      "declaration-collations-18": 0.211,
+      "domain-operators-17": 2.595,
+      "domain-operators-18": 2.577,
+      "domain-operators-default-17": 0.048,
+      "domain-operators-default-18": 0.049,
+      "column-renames-17": 0.266,
+      "column-renames-18": 0.297
+    }
+  },
+  "comparison": {
+    "1": {
+      "samples": [
+        573.2561267539859,
+        610.7237806350458,
+        602.576836687047
+      ],
+      "median": 602.576836687047,
+      "minimum": 573.2561267539859,
+      "maximum": 610.7237806350458,
+      "speedup": 1.0,
+      "positive_samples": [
+        572.7173222228885,
+        610.1864593930077,
+        602.0116279260255
+      ],
+      "positive_median": 602.0116279260255,
+      "positive_speedup": 1.0
+    },
+    "2": {
+      "samples": [
+        294.0886347980704,
+        309.6799502398353,
+        308.3560786449816
+      ],
+      "median": 308.3560786449816,
+      "minimum": 294.0886347980704,
+      "maximum": 309.6799502398353,
+      "speedup": 1.9541590985816415,
+      "positive_samples": [
+        293.7252631580923,
+        309.29644438507967,
+        307.97654773294926
+      ],
+      "positive_median": 307.97654773294926,
+      "positive_speedup": 1.9547320481299706
+    },
+    "4": {
+      "samples": [
+        161.08435368794017,
+        161.3145473441109,
+        163.2819025539793
+      ],
+      "median": 161.3145473441109,
+      "minimum": 161.08435368794017,
+      "maximum": 163.2819025539793,
+      "speedup": 3.7354153522288964,
+      "positive_samples": [
+        160.76862942590378,
+        161.0105345970951,
+        162.93345960089937
+      ],
+      "positive_median": 161.0105345970951,
+      "positive_speedup": 3.738958009377896
+    }
+  },
+  "trials": [
+    {
+      "repetition": 1,
+      "workers": 1,
+      "wall_seconds": 573.2561267539859,
+      "positive_seconds": 572.7173222228885,
+      "command_seconds": 571.092,
+      "cases_per_second": 3.8622893252373816,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 567.34,
+      "peak_rss_kib": 348536,
+      "peak_threads": 20,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 572.7157751210034,
+          "groups": 140,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 1,
+      "workers": 2,
+      "wall_seconds": 294.0886347980704,
+      "positive_seconds": 293.7252631580923,
+      "command_seconds": 585.781,
+      "cases_per_second": 7.530846942537017,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 581.28,
+      "peak_rss_kib": 377436,
+      "peak_threads": 21,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 293.72396550001577,
+          "groups": 70,
+          "exit": 0
+        },
+        {
+          "worker": 1,
+          "seconds": 293.72312113293447,
+          "groups": 70,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 1,
+      "workers": 4,
+      "wall_seconds": 161.08435368794017,
+      "positive_seconds": 160.76862942590378,
+      "command_seconds": 641.294,
+      "cases_per_second": 13.758903138621847,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 629.45,
+      "peak_rss_kib": 407984,
+      "peak_threads": 22,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 160.7552873189561,
+          "groups": 40,
+          "exit": 0
+        },
+        {
+          "worker": 1,
+          "seconds": 160.74243705812842,
+          "groups": 31,
+          "exit": 0
+        },
+        {
+          "worker": 2,
+          "seconds": 160.75530853890814,
+          "groups": 37,
+          "exit": 0
+        },
+        {
+          "worker": 3,
+          "seconds": 160.76670839102007,
+          "groups": 32,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "workers": 1,
+      "wall_seconds": 610.7237806350458,
+      "positive_seconds": 610.1864593930077,
+      "command_seconds": 608.497,
+      "cases_per_second": 3.6251214132159224,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 604.45,
+      "peak_rss_kib": 323692,
+      "peak_threads": 20,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 610.1841898160055,
+          "groups": 140,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "workers": 2,
+      "wall_seconds": 309.6799502398353,
+      "positive_seconds": 309.29644438507967,
+      "command_seconds": 616.88,
+      "cases_per_second": 7.15171493289467,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 612.66,
+      "peak_rss_kib": 377820,
+      "peak_threads": 21,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 309.2951621960383,
+          "groups": 70,
+          "exit": 0
+        },
+        {
+          "worker": 1,
+          "seconds": 309.29457071213983,
+          "groups": 70,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 2,
+      "workers": 4,
+      "wall_seconds": 161.3145473441109,
+      "positive_seconds": 161.0105345970951,
+      "command_seconds": 642.199,
+      "cases_per_second": 13.738231510970389,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 630.66,
+      "peak_rss_kib": 408320,
+      "peak_threads": 23,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 160.9837829049211,
+          "groups": 31,
+          "exit": 0
+        },
+        {
+          "worker": 1,
+          "seconds": 160.98318042908795,
+          "groups": 40,
+          "exit": 0
+        },
+        {
+          "worker": 2,
+          "seconds": 160.9833211270161,
+          "groups": 37,
+          "exit": 0
+        },
+        {
+          "worker": 3,
+          "seconds": 161.0082443410065,
+          "groups": 32,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 3,
+      "workers": 1,
+      "wall_seconds": 602.576836687047,
+      "positive_seconds": 602.0116279260255,
+      "command_seconds": 600.304,
+      "cases_per_second": 3.674347632819823,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 596.17,
+      "peak_rss_kib": 348632,
+      "peak_threads": 20,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 602.0098208929412,
+          "groups": 140,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 3,
+      "workers": 2,
+      "wall_seconds": 308.3560786449816,
+      "positive_seconds": 307.97654773294926,
+      "command_seconds": 614.222,
+      "cases_per_second": 7.1823650738434015,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 609.21,
+      "peak_rss_kib": 352444,
+      "peak_threads": 21,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 307.9752626400441,
+          "groups": 68,
+          "exit": 0
+        },
+        {
+          "worker": 1,
+          "seconds": 307.9744267130736,
+          "groups": 72,
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "repetition": 3,
+      "workers": 4,
+      "wall_seconds": 163.2819025539793,
+      "positive_seconds": 162.93345960089937,
+      "command_seconds": 649.975,
+      "cases_per_second": 13.576094225325036,
+      "outcomes": {
+        "tests": 2212,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "isolation_revisit": {
+        "outcomes": {
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "problems": []
+      },
+      "problems": [],
+      "server_cpu_seconds": 638.39,
+      "peak_rss_kib": 434872,
+      "peak_threads": 24,
+      "worker_durations": [
+        {
+          "worker": 0,
+          "seconds": 162.91220212890767,
+          "groups": 37,
+          "exit": 0
+        },
+        {
+          "worker": 1,
+          "seconds": 162.93194548110478,
+          "groups": 39,
+          "exit": 0
+        },
+        {
+          "worker": 2,
+          "seconds": 162.9084968410898,
+          "groups": 31,
+          "exit": 0
+        },
+        {
+          "worker": 3,
+          "seconds": 162.9311667990405,
+          "groups": 33,
+          "exit": 0
+        }
+      ]
+    }
+  ]
+}

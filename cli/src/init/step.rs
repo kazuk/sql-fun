@@ -49,7 +49,43 @@ pub(super) type StepFuture<'a> =
 /// A step changes the shared state only through accepted inputs. Ordering is
 /// owned by the code assembling the conversation, never by the step or engine.
 pub(super) trait InitStep {
-    fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a>;
+    fn prompt<'a>(
+        &'a mut self,
+        state: &'a mut InitializationState<'_>,
+        direction: Direction,
+    ) -> StepFuture<'a>;
+}
+
+/// The edge at which a conversation is entered, also passed to automatic steps.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Direction {
+    Forward,
+    Backward,
+}
+impl Direction {
+    pub(super) const fn forward() -> Self {
+        Self::Forward
+    }
+    pub(super) const fn backward() -> Self {
+        Self::Backward
+    }
+    pub(super) const fn is_backward(self) -> bool {
+        matches!(self, Self::Backward)
+    }
+    pub(super) const fn completion(self) -> StepCompletion {
+        match self {
+            Self::Forward => StepCompletion::next(),
+            Self::Backward => StepCompletion::back(),
+        }
+    }
+    /// Accepted interactive answers advance; automatic steps preserve entry direction.
+    pub(super) const fn completed(self, automatic: bool) -> StepCompletion {
+        if automatic {
+            self.completion()
+        } else {
+            StepCompletion::next()
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,36 +116,6 @@ impl StepCompletion {
 /// The terminal boundary can be scripted without replacing conversation logic.
 pub(super) trait PromptInput {
     fn answer(&mut self, request: &PromptRequest) -> Result<PromptResponse, InitError>;
-}
-
-pub(super) struct InputSession {
-    input: Box<dyn PromptInput>,
-    prompts: usize,
-}
-impl InputSession {
-    pub(super) fn new(input: impl PromptInput + 'static) -> Self {
-        Self {
-            input: Box::new(input),
-            prompts: 0,
-        }
-    }
-    pub(super) const fn prompts(&self) -> usize {
-        self.prompts
-    }
-}
-impl PromptInput for InputSession {
-    fn answer(&mut self, request: &PromptRequest) -> Result<PromptResponse, InitError> {
-        if let Some(answer) = request.automatic_response() {
-            return Ok(answer.clone());
-        }
-        self.prompts += 1;
-        self.input.answer(request)
-    }
-}
-impl AsMut<dyn PromptInput> for InputSession {
-    fn as_mut(&mut self) -> &mut (dyn PromptInput + 'static) {
-        self
-    }
 }
 
 pub(super) struct TerminalInput;

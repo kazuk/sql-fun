@@ -4,7 +4,9 @@
 //! re-export it from `step.rs`, then register it in the appropriate ordered list
 //! factory here. For a new nested branch, define its list factory here and have
 //! the containing step await a `Conversation` built from that list using the same
-//! shared state. Keep behavior in the step module and composition in this module;
+//! shared state and the supplied entry direction. Automatic steps return the
+//! supplied direction as their completion; accepted interactive answers return Next.
+//! Keep behavior in the step module and composition in this module;
 //! the generic conversation runner does not need to change.
 //!
 //! To retire a step, remove its registrations here and its module declaration,
@@ -16,8 +18,8 @@ use super::{
     InitializationState,
     conversation::Conversation,
     step::{
-        ConfirmHomeStep, ConfirmInstallStep, ConnectionStep, DatasourceSelectionStep, EditHomeStep,
-        EngineSelectionStep, EngineSteps, HomeDirectoryStep, HomeStep, InitStep,
+        ConfirmHomeStep, ConfirmInstallStep, ConnectionStep, DatasourceSelectionStep, Direction,
+        EditHomeStep, EngineSelectionStep, EngineSteps, HomeDirectoryStep, HomeStep, InitStep,
         PostgresSourceStep, PostgresSteps, SelectionStep, SourceDetails, SqliteStep,
         StepCompletion, VersionsStep,
     },
@@ -48,12 +50,11 @@ pub(super) async fn collect(
 ) -> Result<StepCompletion, anyhow::Error> {
     let mut conversation = conversation(state.args.assume_yes());
     loop {
-        let completion = conversation.run(state).await?;
+        let completion = conversation.run(state, Direction::forward()).await?;
         if !completion.is_back() {
             return Ok(completion);
         }
         // Only the root absorbs Back at the first visible question.
-        state.backward = false;
     }
 }
 

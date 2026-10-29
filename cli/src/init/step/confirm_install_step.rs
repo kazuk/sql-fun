@@ -1,10 +1,14 @@
-use super::{InitStep, PromptInput, StepCompletion, StepFuture};
+use super::{Direction, InitStep, StepCompletion, StepFuture};
 use crate::init::{InitializationState, prompt::PromptRequest};
 
 /// Final authorization is deliberately unselected on every entry.
 pub(in crate::init) struct ConfirmInstallStep;
 impl InitStep for ConfirmInstallStep {
-    fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a> {
+    fn prompt<'a>(
+        &'a mut self,
+        state: &'a mut InitializationState<'_>,
+        _direction: Direction,
+    ) -> StepFuture<'a> {
         Box::pin(async move {
             state.prepare_plans()?;
             state.validate_complete()?;

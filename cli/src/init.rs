@@ -18,7 +18,7 @@ use self::{
     error::InitError,
     home::Initialization,
     postgres::PostgresSetup,
-    step::{InputSession, PromptInput, TerminalInput},
+    step::{PromptInput, TerminalInput},
 };
 
 use std::{path::Path, process::ExitCode};
@@ -69,8 +69,7 @@ struct InitializationState<'a> {
     selection: Option<SetupSelection>,
     versions: Option<Vec<PostgresVersion>>,
     plans: Vec<EngineSetup>,
-    input: InputSession,
-    backward: bool,
+    input: Box<dyn PromptInput>,
     source: Option<bool>,
     connection: Option<String>,
 }
@@ -91,8 +90,7 @@ impl<'a> InitializationState<'a> {
             selection: None,
             versions: None,
             plans: Vec::new(),
-            input: InputSession::new(TerminalInput),
-            backward: false,
+            input: Box::new(TerminalInput),
             source: None,
             connection: None,
         }
@@ -226,7 +224,7 @@ impl InitializationState<'_> {
     }
     #[cfg(test)]
     fn set_input(&mut self, input: impl PromptInput + 'static) {
-        self.input = InputSession::new(input);
+        self.input = Box::new(input);
     }
     #[cfg(test)]
     const fn set_metadata_requested(&mut self, requested: bool) {

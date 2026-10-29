@@ -1,7 +1,7 @@
 use super::Initialization;
 use crate::init::{
     prompt::PromptRequest,
-    step::{HomeStep, InitStep},
+    step::{Direction, HomeStep, InitStep},
     test_helpers::{Answer, HomeFixture, Script, common_args, state},
 };
 
@@ -42,7 +42,10 @@ async fn invalid_text_is_retained_without_changing_the_original_suggestion() {
             Answer::confirm("Use", true),
         ],
     );
-    HomeStep.prompt(&mut state).await.unwrap();
+    HomeStep
+        .prompt(&mut state, Direction::forward())
+        .await
+        .unwrap();
     fixture.assert_preserved();
     assert_eq!(state.home.home(), home);
     script.assert_finished();
@@ -62,7 +65,10 @@ async fn invalid_cli_home_returns_to_editor_interactively() {
             Answer::confirm("Use", true),
         ],
     );
-    HomeStep.prompt(&mut state).await.unwrap();
+    HomeStep
+        .prompt(&mut state, Direction::forward())
+        .await
+        .unwrap();
     fixture.assert_preserved();
     assert!(!home.exists());
     script.assert_finished();
@@ -80,7 +86,7 @@ async fn invalid_cli_home_is_an_error_under_yes() {
     Script::install(&mut state, vec![]);
     assert!(
         HomeStep
-            .prompt(&mut state)
+            .prompt(&mut state, Direction::forward())
             .await
             .unwrap_err()
             .to_string()
@@ -110,7 +116,7 @@ async fn an_environment_candidate_does_not_satisfy_yes() {
     Script::install(&mut state, vec![]);
     assert!(
         HomeStep
-            .prompt(&mut state)
+            .prompt(&mut state, Direction::forward())
             .await
             .unwrap_err()
             .to_string()

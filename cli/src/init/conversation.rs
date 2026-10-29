@@ -1,12 +1,11 @@
 use super::{
     InitializationState,
     error::InitError,
-    step::{InitStep, StepCompletion},
+    step::{Direction, InitStep, StepCompletion},
 };
 
-/// Traverses only the configured vector. Nested engines share traversal direction
-/// and input activity, so re-entry reaches the preceding visible prompt without
-/// knowing which steps contain questions or child conversations.
+/// Traverses the configured vector and returns navigation past either edge to
+/// the containing conversation. Nested entry direction is always explicit.
 pub(super) struct Conversation(Vec<Box<dyn InitStep>>);
 
 impl Conversation {
@@ -17,15 +16,15 @@ impl Conversation {
     pub(super) async fn run(
         &mut self,
         state: &mut InitializationState<'_>,
+        mut direction: Direction,
     ) -> Result<StepCompletion, anyhow::Error> {
-        let mut cursor = if state.backward {
+        let mut cursor = if direction.is_backward() {
             self.0.len().saturating_sub(1)
         } else {
             0
         };
         while cursor < self.0.len() {
-            let prompts = state.input.prompts();
-            let completion = match self.0[cursor].prompt(state).await {
+            let completion = match self.0[cursor].prompt(state, direction).await {
                 Ok(completion) => completion,
                 Err(error) => {
                     if let Some(prompt_error) = error.downcast_ref::<InitError>()
@@ -41,20 +40,17 @@ impl Conversation {
                 return Ok(completion);
             }
             if completion.is_back() {
-                state.backward = true;
-            } else if state.input.prompts() != prompts {
-                state.backward = false;
-            }
-            if state.backward {
+                direction = Direction::backward();
                 if cursor == 0 {
                     return Ok(StepCompletion::back());
                 }
                 cursor -= 1;
             } else {
+                direction = Direction::forward();
                 cursor += 1;
             }
         }
-        Ok(StepCompletion::next())
+        Ok(direction.completion())
     }
 }
 

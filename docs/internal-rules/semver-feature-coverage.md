@@ -128,9 +128,10 @@ diagnostics and limits, without an impact. Invalid command syntax uses argparse
 exit 2.
 
 `next_coverage` records internal current-source preparation state and is not an
-adoptable baseline. The explicit resource producer generates the complete
-current
-publishable set for #360, including never-published crates. Adoption grants
+adoptable baseline. The `check-semver --candidate-output` option archives the
+complete current publishable set, including never-published crates, reusing
+comparison JSON and
+generating only missing current configured selections. Adoption grants
 released
 status only after #360 validates and installs those resources. Missing/corrupt
 baseline input fails; it never bootstraps from the candidate.
@@ -236,11 +237,12 @@ during implementation remain validation evidence, rather than recurring CI
 tests.
 Normal contributor commands and prerequisites remain unchanged.
 
-Issue #360 owns ongoing candidate generation/validation, stable
-adoption/advancement
-and snapshot non-advancement. #361 owns release CI wiring. This implementation
-does not enforce release-intent metadata, implement release transactions,
-optimize caches or expand the installed product CLI.
+Ongoing candidate generation, archive validation and stable/snapshot adoption
+follow the [repository integration contract](semver-repository-integration.md#explicit-adoption).
+The initial #358 baseline already exists; no initialization path is provided.
+Issue #361 owns release CI wiring, and #329 owns release-side selection and
+orchestration. The feature lifecycle itself does not implement release
+transactions, optimize caches or expand the installed product CLI.
 
 Repository source selection, package production and intent enforcement are
 documented in [repository integration](semver-repository-integration.md).

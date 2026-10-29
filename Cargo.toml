@@ -42,13 +42,13 @@ keywords = ["postgresql", "sqlite", "sql", "semantic-validation", "schema-valida
 baseline = "v0.1.0-baseline"
 
 [workspace.metadata.next-release]
-sql-fun = "patch"
-sql-fun-cli = "patch"
-sql-fun-server = "patch"
-sql-fun-server-api = "patch"
-sql-fun-core = "patch"
-sql-fun-client = "patch"
-sql-fun-sqlast = "patch"
+sql-fun = "minor"
+sql-fun-cli = "major"
+sql-fun-server = "major"
+sql-fun-server-api = "major"
+sql-fun-core = "major"
+sql-fun-client = "major"
+sql-fun-sqlast = "major"
 sql-fun-codegen = "patch"
 sql-fun-collector = "patch"
 

@@ -59,23 +59,59 @@ existing stable release version materializer exactly once in scratch. It does
 not change version calculation or interpret project release tags. Its existing
 stable-current-version requirement (#364) remains in force.
 
-For #360, the internal producer is independently callable with Python 3.12:
+The same validation invocation can save the current-source APIs as a candidate:
+
+```sh
+.local/bin/check-semver --repository "$PWD" --revision FULL_COMMIT_SHA \
+  --toolchain stable --target x86_64-unknown-linux-gnu \
+  --candidate-output /absolute/new/semver_baseline.tar.gz
+```
+
+The output must be new and outside the selected repository; its parent must
+exist. Candidate output requires explicit commit mode. Successful validation
+archives the schema-2 descriptor and current rustdoc JSON, reusing outputs from
+that execution. Only missing current configured selections, including
+never-released crates, require additional generation. Binary-only packages keep
+inventory/mappings without API JSON. Source packaging and version materialization
+run once through the existing path. Failed analysis, denied intent or missing
+candidate coverage emits no final archive. Existing outputs are never replaced.
+
+The archive contains `baseline.json` and `rustdoc/`, not source packages or
+analyzer reports. Tar member metadata and gzip timestamps are normalized.
+Candidate generation does not advance released coverage. There is no separate
+candidate producer or initial-baseline creation mode; the approved #358 baseline
+must already exist. Missing/corrupt state fails without bootstrapping.
+
+### Explicit adoption
+
+The internal release adapter uses Python 3.12 and explicit paths/classification:
 
 ```sh
 uv run --no-project --no-config --python 3.12 \
-  .local/sbin/prepare-semver-baseline --repository "$PWD" \
-  --revision FULL_COMMIT_SHA --toolchain stable \
-  --target x86_64-unknown-linux-gnu --output /absolute/new-output
+  .local/sbin/adopt-semver-baseline \
+  --candidate /absolute/selected/semver_baseline.tar.gz \
+  --active "$PWD/.local/semver_baseline.tar.gz" --release-kind stable
 ```
 
-The output must be new and outside the selected repository. It contains a
-schema-2 `baseline.json` and generated rustdoc JSON, not source packages. It
-retains the complete current publishable inventory and product selections,
-including never-published crates. Current version materialization and packaging
-remain internal preparation steps. The explicit producer does not require an
-existing baseline or read released
-intent obligations. Resource generation occurs once for a candidate; #360 owns
-validation, archive creation and stable adoption.
+Stable adoption validates the existing active archive and selected committed
+candidate, requires matching targets, and atomically replaces the active archive
+with the selected bytes. Repeating adoption yields the same state. Validation
+failure leaves the active file intact. A stable Major release may remove old
+coverage; inventories need not grow monotonically. Snapshot/prerelease kinds
+are explicit no-ops, preserving active bytes and modification time without
+opening the candidate. Unknown or omitted classification fails.
+
+The archive reader rejects unsupported schemas, malformed resources, inconsistent
+identities/mappings, corrupt digests, missing JSON, duplicate archive members,
+absolute/escaping paths, links and special files. Adoption builds no APIs and
+runs no analyzers. It has no initialization operation.
+
+Issue #361 owns candidate upload and CI gating. #329 selects/downloads the candidate
+through the existing exact-SHA CI-run contract and calls this operation. Actions
+metadata remains the provenance trust boundary. #259/#330 own transaction
+completion and the explicit active-baseline back-commit during stable release
+preparation; this local operation neither publishes nor queries releases.
+The candidate is internal CI data and never a GitHub Release asset.
 
 The active baseline uses the same generated-resource format. Validation reads
 its saved APIs and coverage metadata without Cargo metadata, dependency builds
@@ -113,9 +149,8 @@ Exit 0 means all checked crates fit their intent; other outcomes exit 1. Invalid
 CLI syntax exits 2. `crates` contains declared/required levels, outcomes and
 configuration/kind evidence. The existing detailed comparison evidence,
 exclusions and limitations are preserved. The temporary local report omits
-`next_coverage` because those package paths expire; the explicit snapshot
-producer
-retains complete generated resources and metadata for #360.
+`next_coverage` because those package paths expire; the candidate-output option
+retains complete generated resources and metadata in the archive.
 
 The existing corrected analyzer, uv/Python 3.12, Cargo/rustup, Bash, Git, jq,
 Taplo
@@ -134,6 +169,10 @@ contracts through `test-release-publication`: real baseline extraction/replay
 and Git/Cargo source membership. They retain all assertions without running
 archive I/O and subprocess setup under nextest's unit-test time budget. The
 lightweight comparator and intent contracts remain in xbuild's nextest suite.
+Candidate/archive contracts and the release-version materialization test were
+removed because no recurring developer or CI execution budget was allocated.
+Candidate production, adoption and replay were validated manually against the
+real repository for #360; this feature adds no maintained test execution.
 
 `check-test-flow --step=semver` is opt-in. It uses the active installed Rust
 toolchain and its host target, and the repository's checked-in product mappings;
@@ -151,4 +190,5 @@ source packaging still uses temporary files to avoid changing release versions
 in the developer checkout. Record tool versions, source,
 target, cache conditions and runner resources with developer/CI measurements.
 Default enablement requires a separate maintainer decision. Required CI wiring,
-baseline adoption and performance cache optimization remain separate work.
+release-side adoption wiring and performance cache optimization remain separate
+work.

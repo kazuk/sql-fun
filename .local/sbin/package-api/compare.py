@@ -254,7 +254,7 @@ def current_api(side, target, toolchain, context, scratch):
 
 def compare(request, wrapper, semver, scratch):
     require(isinstance(request, dict), "comparison request must be an object")
-    require(set(request) - {"cargo_context"} == {"old", "new", "target", "toolchain"}, "invalid request fields")
+    require(set(request) - {"cargo_context", "resource_output"} == {"old", "new", "target", "toolchain"}, "invalid request fields")
     require(isinstance(request["target"], str) and re.fullmatch(r"[\w-]+", request["target"]), "explicit target triple required")
     require(isinstance(request["toolchain"], str) and request["toolchain"], "explicit toolchain required")
     context = explicit_path(request.get("cargo_context", str(Path.cwd())))
@@ -272,6 +272,9 @@ def compare(request, wrapper, semver, scratch):
         diff, findings = analyze(artifacts, coverage, wrapper, semver, scratch, env)
     except AnalysisError as error:
         raise AnalysisError(f'{error}\nActual producer: {json.dumps(producer)}') from error
+    if 'resource_output' in request:
+        from resources import retain_resource
+        retain_resource(Path(request['resource_output']), artifacts['new'], coverage['new'], producer)
     removed = sorted(set(coverage["old"]["feature_inventory"]) - set(coverage["new"]["feature_inventory"]))
     impact = "patch"
     if diff["added"] or findings["minor"]:

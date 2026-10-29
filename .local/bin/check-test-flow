@@ -380,8 +380,8 @@ function run_typos() {
 }
 
 function run_version_materialization() {
+  # Unbudgeted materialization test removed in 83b2c46b; recover from Git history.
   echo "== Verify release version materialization"
-  "${GIT_ROOT}/.local/bin/test-materialize-release-versions"
   "${GIT_ROOT}/.local/bin/test-release-publication"
   "${GIT_ROOT}/.local/bin/test-release-preparation"
   "${GIT_ROOT}/.local/bin/test-pages-prototype"

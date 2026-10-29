@@ -130,19 +130,20 @@ class Baselines(unittest.TestCase):
         retained = self.root / 'retained'
         probe = self.resources['packages']['probe']['selections'][0]
         retain_resource(retained / '0', self.source / probe['rustdoc'], probe['coverage'], probe['producer'])
-        import resources
-        actual = resources.current_api
         generated = []
 
-        def current(side, target, toolchain, context, scratch):
-            if 'rustdoc' in side:
-                return actual(side, target, toolchain, context, scratch)
+        def generate(side, paths, scratch, target, host, env, context):
+            # Exercise current_api's scratch contract; no real compiler is needed.
+            scratch.mkdir()
             name = Path(side['package']).name
             generated.append(name)
             resource = self.resources['packages'][name]['selections'][0]
-            return self.source / resource['rustdoc'], resource['coverage'], resource['producer'], {}
+            artifact = scratch / 'api.json'
+            artifact.write_bytes((self.source / resource['rustdoc']).read_bytes())
+            return artifact, resource['coverage']
 
-        with mock.patch('resources.current_api', side_effect=current):
+        with mock.patch('compare.generate', side_effect=generate), \
+             mock.patch('compare.producer_environment', return_value=({}, probe['producer'])):
             result = produce_resources(self.descriptor, self.root / 'complete', 'stable', self.root, retained)
         self.assertEqual(generated, ['new'])
         state, _ = read_baseline(result)

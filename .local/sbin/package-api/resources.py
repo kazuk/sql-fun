@@ -116,8 +116,10 @@ def produce_resources(descriptor, output, toolchain, context, retained=None):
                     side = available.get((name, features))
                     if side is None:
                         side = resolve_dependencies(selection(name, features, packages), state['target'], toolchain, context)
+                    selection_scratch = scratch / f'{name}-{index}'
+                    selection_scratch.mkdir()
                     artifact, coverage, producer, _ = current_api(side, state['target'], toolchain, context,
-                                                                 scratch / f'{name}-{index}')
+                                                                 selection_scratch)
                     relative = f'rustdoc/{name}/{index}.json'
                     destination = output / relative
                     destination.parent.mkdir(parents=True, exist_ok=True)

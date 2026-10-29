@@ -155,9 +155,10 @@ impl CastInfoRead for SchemaCatalog {
         let target = self.domain_base(target_type)?;
         if source != *source_type || target != *target_type {
             let cast = self.get_implicit_cast(&source, &target)?;
-            // Domain reduction is coercion, not original type identity; retain
-            // an existing base-to-target preferred conversion when present.
-            let context = if cast.is_no_conversion() {
+            // Preference belongs to the declared target, not a domain base.
+            // Reducing only the source retains the builtin target preference.
+            // Domain coercion also cannot establish original type identity.
+            let context = if target != *target_type || cast.is_no_conversion() {
                 CastContext::implicit()
             } else {
                 cast.context()
@@ -249,6 +250,45 @@ mod test_domain_casts {
         context::{CastInfoRead, ParseContext},
         sem::PgBuiltInType,
     };
+
+    #[rstest::rstest]
+    fn preferred_conversion_credit_belongs_to_the_original_target(
+        #[values(false, true)] source_domain: bool,
+        #[values(false, true)] target_domain: bool,
+        #[values(false, true)] frozen: bool,
+    ) {
+        let mut base = crate::test_helpers::TestParseContext::default();
+        base.setup_type(PgBuiltInType::int4());
+        base.setup_type(PgBuiltInType::int8());
+        base.set_get_implicit_cast_result(
+            &PgBuiltInType::int4(),
+            &PgBuiltInType::int8(),
+            Some(crate::sem::CastDefinition::new(
+                crate::sem::CastContext::implicit_preferred(),
+            )),
+        );
+        let mut context =
+            crate::test_helpers::schema_layer(std::path::Path::new("domains.sql"), &base.freeze());
+        let source = if source_domain {
+            test_helpers::domain(&mut context, "source", Some(&PgBuiltInType::int4()))
+        } else {
+            PgBuiltInType::int4()
+        };
+        let target = if target_domain {
+            let domain = test_helpers::domain(&mut context, "target", Some(&PgBuiltInType::int8()));
+            test_helpers::domain(&mut context, "nested_target", Some(&domain))
+        } else {
+            PgBuiltInType::int8()
+        };
+        let cast = if frozen {
+            context.freeze().get_implicit_cast(&source, &target)
+        } else {
+            context.get_implicit_cast(&source, &target)
+        }
+        .unwrap();
+        assert_eq!(cast.context().is_implicit_preferred(), !target_domain);
+        assert!(cast.context().is_implicit());
+    }
 
     #[rstest::rstest]
     fn domains_use_explicit_base_conversion_without_implicit_credit(

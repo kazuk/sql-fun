@@ -322,5 +322,59 @@
         }
       ]
     }
+  },
+  {
+    "name": "domain_operators::preferred_builtin_target",
+    "sql": "SELECT public.domain_preferred(1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::preferred_builtin_from_domain",
+    "sql": "SELECT public.domain_preferred(1::public.distinct_number) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::preferred_domain_exact",
+    "sql": "SELECT public.domain_preferred(1::public.preferred_float) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

@@ -119,7 +119,10 @@ second cast service.
 Schema catalog implicit coercion reduces source and target domain layers using
 `TypeReference::domain_base_type`, without rewriting the original references.
 A domain coercion remains a conversion even when its bases are identical;
-`NoConversion` describes original identity. Operator ranking first preserves
+`NoConversion` describes original identity. Preferred-conversion credit belongs
+to the original target: source-domain reduction retains a preferred builtin
+target, while target-domain reduction receives ordinary implicit credit.
+Operator ranking first preserves
 complete original exact signatures, then scores domain inputs as their bases.
 The same `OverloadRank::operator_argument` facts feed direct and deferred
 operator selection. Domain/unknown literals try the exact domain signature

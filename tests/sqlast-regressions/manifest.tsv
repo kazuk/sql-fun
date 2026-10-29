@@ -67,5 +67,5 @@ between	project	between.sql	81	17,18
 membership	project	membership.sql	41	17,18
 membership-comparisons	builtin	-	4	17,18
 declaration-collations	project	declaration-collations.sql	39	17,18
-domain-operators	project	domain-operators.sql	18	17,18
+domain-operators	project	domain-operators.sql	21	17,18
 domain-operators-default	default	-	4	17,18

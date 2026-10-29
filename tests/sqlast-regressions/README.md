@@ -60,8 +60,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1094 inputs for PostgreSQL 17 and 1100 for
-PostgreSQL 18 (2194 total). These count positive contract inputs separately from
+manifest totals are 1097 inputs for PostgreSQL 17 and 1103 for
+PostgreSQL 18 (2200 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -205,7 +205,8 @@ These cases run in both source and installed checks.
 
 Issue #799 adds `domain-operators` and `domain-operators-default` on PostgreSQL
 17/18 through both maintained paths. They cover source-domain/base comparisons,
-nested domains, implicit coercion to/from domains, domains over arrays,
+nested domains, implicit coercion to/from domains, preferred builtin versus
+domain overloads, domains over arrays,
 distinctness, membership,
 parameters, unknown literals and invalid comparisons, plus shipped
 `information_schema.sql_identifier` comparisons with `name` and `text`.

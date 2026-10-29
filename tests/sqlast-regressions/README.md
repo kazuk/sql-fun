@@ -210,7 +210,8 @@ distinctness, membership,
 parameters, unknown literals and invalid comparisons, plus shipped
 `information_schema.sql_identifier` comparisons with `name` and `text`.
 The shared cast repair restores bundled-schema initialization and all 1,802
-cases temporarily ignored by #856 and #861; the temporary inventory and bypass are removed.
+cases temporarily ignored by #856 and #861; the temporary inventory and bypass
+are removed.
 Rust tests retain identity/coercion distinctions, inherited/frozen catalog behavior,
 exact/domain-only operator signatures, base-type operator ranking and correlated
 constraints. Custom operator DDL is not supported by the schema loader; controlled
@@ -220,7 +221,8 @@ operator competition remains at the Rust binding/inference boundary.
 
 Issue #822 declaration contracts live in `declaration-collations.json`, selected
 with the explicit `declaration-collations.sql` project schema on PostgreSQL 17/18.
-These cases run in both maintained execution paths. Their expectations check record-column COLLATE diagnostics,
+These cases run in both maintained execution paths. Their expectations check
+record-column COLLATE diagnostics,
 scalar/array/domain/enum/composite/table-row types, quoted and qualified names,
 lookup precedence, and exact result metadata. DDL inputs exercise accepted and
 rejected table, composite and domain declarations, plus rejected add-column

@@ -1,10 +1,10 @@
 use crate::{
     context::ParseContext,
     sem::{AstAndContextPair, ColumnDefinition, ColumnName, Nullable},
-    syn::{ColumnDef, ListOpt, Opt},
+    syn::{ColumnDef, Opt},
 };
 
-use super::{AnalysisError, ColumnCollection, FullName, SemAst, TypeReference};
+use super::{AnalysisError, ColumnCollection, FullName, TypeReference};
 
 /// collection for composite type field
 #[derive(Debug, Default, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -21,6 +21,12 @@ impl CompositeFieldCollection {
                 ty.rename_relation(old, new);
             }
         }
+    }
+
+    pub(crate) fn declarations_can_apply(&self) -> bool {
+        self.0
+            .iter()
+            .all(CompositeFieldDefinition::declaration_can_apply)
     }
 
     pub fn push(&mut self, item: CompositeFieldDefinition) {
@@ -58,6 +64,10 @@ pub struct CreateCompositeType {
 }
 
 impl CreateCompositeType {
+    pub(crate) fn declarations_can_apply(&self) -> bool {
+        self.fields.declarations_can_apply()
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,
@@ -133,25 +143,9 @@ impl CreateCompositeType {
     where
         TParseContext: ParseContext,
     {
-        let Some(typevar) = syn.get_typevar().as_inner() else {
-            AnalysisError::raise_unexpected_none("composite_type_stmt.typevar")?
-        };
-        let Some(coldeflist) = syn.get_coldeflist().map(|v| v.as_column_def()) else {
-            AnalysisError::raise_unexpected_none("composite_type.coldeflist")?
-        };
-        let mut fields = CompositeFieldCollection::default();
-        for coldef in coldeflist {
-            fields.push(CompositeFieldDefinition::try_from(&coldef)?);
-        }
-
-        let name = FullName::try_from(typevar)?;
-        let comp_def = Self::new(&name, &fields);
-        let result_context = context.apply_create_comp_type(&comp_def)?;
-
-        Ok(AstAndContextPair::new(
-            SemAst::CreateCompType(comp_def),
-            result_context,
-        ))
+        use crate::ast::TryFromWithTokens;
+        crate::ast::CompositeType::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
+            .resolve_and_apply(context)
     }
 }
 
@@ -159,10 +153,43 @@ impl CreateCompositeType {
 pub struct CompositeFieldDefinition {
     name: String,
     field_type: Option<TypeReference>,
+    #[serde(default)]
+    declaration_collation: crate::sem::DeclarationCollation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    requested_type: Option<Box<crate::sem::WithTypmod<TypeReference>>>,
     is_not_null: Option<Nullable>,
 }
 
 impl CompositeFieldDefinition {
+    /// Requested declaration type and modifiers, separate from canonical identity.
+    pub fn requested_type(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+        self.requested_type.as_deref()
+    }
+
+    pub(crate) fn retain_requested_type(&mut self, value: &crate::sem::WithTypmod<TypeReference>) {
+        self.requested_type = Some(Box::new(value.clone()));
+    }
+
+    /// Completed explicit field collation validation.
+    pub const fn declaration_collation(&self) -> &crate::sem::DeclarationCollation {
+        &self.declaration_collation
+    }
+
+    pub(crate) fn validate_collation(
+        &mut self,
+        context: &mut impl ParseContext,
+        lookup: Option<&crate::sem::CatalogNameLookup>,
+    ) -> Result<(), AnalysisError> {
+        self.declaration_collation =
+            crate::sem::DeclarationCollation::validate(context, self.field_type.as_ref(), lookup);
+        self.declaration_collation
+            .report(context, self.field_type.as_ref())
+    }
+
+    const fn declaration_can_apply(&self) -> bool {
+        self.field_type.is_some() && self.declaration_collation.can_apply()
+    }
+
     pub fn new(
         name: &str,
         field_type: &Option<TypeReference>,
@@ -171,6 +198,8 @@ impl CompositeFieldDefinition {
         Self {
             name: name.to_string(),
             field_type: field_type.clone(),
+            declaration_collation: crate::sem::DeclarationCollation::default(),
+            requested_type: None,
             is_not_null: *is_not_null,
         }
     }
@@ -198,6 +227,8 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
         Ok(Self {
             name,
             field_type: Some(type_ref),
+            declaration_collation: crate::sem::DeclarationCollation::default(),
+            requested_type: None,
             is_not_null: Some(value.get_is_not_null()),
         })
     }

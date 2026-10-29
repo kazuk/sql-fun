@@ -360,6 +360,11 @@ where
             AnalysisError::raise_register_dynamic_type(create_comp_type)?;
             AnalysisError::never()
         };
+        if self.dialect() == crate::ast::Dialect::postgres()
+            && !create_comp_type.declarations_can_apply()
+        {
+            return Ok(self);
+        }
         let name = self.apply_default_schema(name)?;
         if !self.permits_type_creation(&name)? {
             return Ok(self);
@@ -373,6 +378,11 @@ where
 
     /// apply `create domain` to current schema
     fn apply_create_domain(mut self, create_domain: &CreateDomain) -> Result<Self, AnalysisError> {
+        if self.dialect() == crate::ast::Dialect::postgres()
+            && !create_domain.declarations_can_apply()
+        {
+            return Ok(self);
+        }
         let name = self.apply_default_schema(create_domain.name())?;
         if !self.permits_type_creation(&name)? {
             return Ok(self);
@@ -419,6 +429,11 @@ where
 
     /// apply `create table` statement to current schema
     fn apply_create_table(mut self, create_table: &CreateTable) -> Result<Self, AnalysisError> {
+        if self.dialect() == crate::ast::Dialect::postgres()
+            && !create_table.declarations_can_apply()
+        {
+            return Ok(self);
+        }
         let name = self.creation_name(create_table.name().full_name(), create_table.temporary())?;
         if !self.permits_relation_creation(
             &name,

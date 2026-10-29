@@ -1333,6 +1333,19 @@
                     "Ambiguous"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "description": "The catalog does not establish whether the declared type supports collations.",
+                  "type": "object",
+                  "properties": {
+                    "UndefinedCapability": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "UndefinedCapability"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -5140,6 +5153,19 @@
                   },
                   "required": [
                     "Ambiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The catalog does not establish whether the declared type supports collations.",
+                  "type": "object",
+                  "properties": {
+                    "UndefinedCapability": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "UndefinedCapability"
                   ],
                   "additionalProperties": false
                 }

@@ -212,14 +212,16 @@ existing shared domain/base implicit-cast bug tracked in
 [#799](https://github.com/kazuk/sql-fun/issues/799). Catalog initialization fails
 before cases in default/project-schema groups can execute. The
 [scope decision for #856](https://github.com/kazuk/sql-fun/pull/856#issuecomment-6487912563)
-authorizes temporarily ignoring only those blocked cases.
+authorizes temporarily ignoring only those blocked cases. The maintainer-approved
+scope of [#861](https://github.com/kazuk/sql-fun/pull/861) also covers its 39
+declaration-collation cases per version, which encounter the same setup failure.
 
 `temporary-ignores.tsv` records each affected fixture, case name, PostgreSQL
-version and #799 reference. It covers 862 cases per version, across 48 groups
+version and #799 reference. It covers 901 cases per version, across 49 groups
 per version. Their SQL, complete expectations and manifest counts remain intact.
 The shared runner emits a JUnit skipped testcase and a console SKIP with #799
 for every suppression. It reports executed and ignored counts separately:
-171/177 cases still execute on PostgreSQL 17/18 (348 executed, 1724 ignored).
+171/177 cases still execute on PostgreSQL 17/18 (348 executed, 1802 ignored).
 
 The temporary helper rejects duplicate/stale entries and incomplete group
 inventories: a new case is never implicitly ignored. Entire groups are blocked
@@ -227,3 +229,25 @@ by setup, so partial group suppression is not supported. This mechanism does
 not change product CLI input formats, comparison semantics or schema selection.
 When fixing #799, remove every entry and the temporary helper/integration, then
 make all preserved cases pass in source and installed-distribution checks.
+
+## Declaration collations
+
+Issue #822 declaration contracts live in `declaration-collations.json`, selected
+with the explicit `declaration-collations.sql` project schema on PostgreSQL 17/18.
+These cases are temporarily ignored under #799 in both maintained execution
+paths; remove their ignore entries when #799 is resolved. Their preserved
+expectations check record-column COLLATE diagnostics,
+scalar/array/domain/enum/composite/table-row types, quoted and qualified names,
+lookup precedence, and exact result metadata. DDL inputs exercise accepted and
+rejected table, composite and domain declarations, plus rejected add-column
+groups. Valid schema DDL supplies subsequent query metadata. Focused Rust tests
+retain applicability,
+undefined-capability and ambiguity outcomes, requested types/modifiers, rejected
+DDL atomicity, public composite-analysis entry-point coverage and recovery.
+PostgreSQL ADD COLUMN application and ALTER COLUMN TYPE remain tracked by #528
+and #529 respectively; declaration validation does not implement those operations.
+
+The query-analysis API analyzes each input statement in an independent context,
+and `sql-fun test` expects one result per case. Catalog transitions and
+whole-statement atomicity therefore remain Rust schema-chain assertions; these
+CLI cases do not claim cross-statement mutation coverage.

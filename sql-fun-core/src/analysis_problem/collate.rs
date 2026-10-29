@@ -8,6 +8,8 @@ pub enum CollateProblem {
     OperandType(TypeReference),
     /// More than one definition remains after name visibility is applied.
     Ambiguous(String),
+    /// The catalog does not establish whether the declared type supports collations.
+    UndefinedCapability(TypeReference),
 }
 
 impl CollateProblem {
@@ -23,8 +25,15 @@ impl CollateProblem {
         Self::Ambiguous(name.to_owned())
     }
 
+    /// Report unavailable capability without claiming the type is non-collatable.
+    #[must_use]
+    pub fn undefined_capability(ty: impl Into<TypeReference>) -> Self {
+        Self::UndefinedCapability(ty.into())
+    }
+
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::UndefinedCapability(_) => "collate_capability_undefined",
             Self::OperandType(_) => "collate_operand_type",
             Self::Ambiguous(_) => "collation_name_ambiguous",
         }
@@ -38,6 +47,9 @@ impl CollateProblem {
 impl DiagnosticMessage for CollateProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::UndefinedCapability(ty) => {
+                format!("collation applicability cannot be established for type {ty}")
+            }
             Self::OperandType(ty) => format!("collations are not supported by type {ty}"),
             Self::Ambiguous(name) => format!("collation name is ambiguous: {name}"),
         }

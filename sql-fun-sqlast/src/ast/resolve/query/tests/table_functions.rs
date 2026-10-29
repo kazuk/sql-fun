@@ -190,7 +190,7 @@ fn composite_member_nullability_survives_serialization(
 #[case::too_many_aliases("SELECT 1 FROM pair_fun() r(a,b,c)", "table_function_too_many_aliases")]
 #[case::unknown_collation(
     r#"SELECT 1 FROM record_fun('') r(a text COLLATE missing)"#,
-    "table_function_collation_not_found"
+    "collation_not_found"
 )]
 #[case::named_missing(
     "SELECT 1 FROM record_fun(src => '') r",

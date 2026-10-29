@@ -91,7 +91,10 @@ fn dependent_file_reports_named_missing_domain_base_before_its_provider()
     let provider = load_schema(dependent.base_context(), EXTENSION_A)?;
     assert!(provider.problems().is_empty());
     assert_type_exists(&provider, "a.state");
-    assert_type_exists(&provider, "b.state_alias");
+    // Rejected DDL is not published or retroactively repaired by a later file.
+    let rejected = FullName::with_schema("b", "state_alias");
+    assert!(dependent.get_type(&rejected).is_none());
+    assert!(provider.get_type(&rejected).is_none());
     assert_missing_domain_base(dependent.problems(), "b.state_alias", "a.state");
     Ok(())
 }

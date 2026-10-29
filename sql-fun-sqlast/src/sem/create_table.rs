@@ -29,6 +29,10 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn declarations_can_apply(&self) -> bool {
+        self.0.iter().all(ColumnDefinition::declaration_can_apply)
+    }
+
     fn rename_expressions(
         &mut self,
         visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
@@ -300,6 +304,11 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    /// Whether all analyzed column declarations permit catalog application.
+    pub(crate) fn declarations_can_apply(&self) -> bool {
+        self.columns.declarations_can_apply()
+    }
+
     pub(crate) fn rename_expressions(
         &mut self,
         old: &TableName,
@@ -772,7 +781,7 @@ mod test_analyze_create_table {
         true
     )]
     fn test_analyze_create_table(
-        mut test_context: TestParseContext,
+        test_context: TestParseContext,
         sqlite_syn: SqliteSynBuilder,
         source_span: SourcePathWithSpan,
         #[case] sql: &str,
@@ -781,11 +790,8 @@ mod test_analyze_create_table {
         #[case] temporary: bool,
     ) -> TestResult {
         let sem_builder = sem_builder();
-        // FIXME: PostgreSQL specific config require in SQLite tests
-        test_context.set_get_search_path_result(&[
-            SchemaName::from("public"),
-            SchemaName::from("pg_catalog"),
-        ]);
+        let mut test_context = test_context.with_dialect(crate::ast::Dialect::sqlite());
+        test_context.set_get_search_path_result(&[SchemaName::from("main")]);
 
         let stmt = sqlite_syn.parse_as_stmt(sql);
 
@@ -809,7 +815,7 @@ mod test_analyze_create_table {
         assert_eq!(create_table.temporary(), temporary);
 
         let lookup_name = if temporary {
-            TableName::from(FullName::with_schema("pg_temp", table_name))
+            TableName::from(FullName::with_schema("temp", table_name))
         } else {
             sem_builder.table_name(table_name)
         };

@@ -61,8 +61,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 948 inputs for PostgreSQL 17 and 954 for
-PostgreSQL 18 (1902 total). These count positive contract inputs separately from
+manifest totals are 1029 inputs for PostgreSQL 17 and 1035 for
+PostgreSQL 18 (2064 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -210,11 +210,11 @@ before cases in default/project-schema groups can execute. The
 authorizes temporarily ignoring only those blocked cases.
 
 `temporary-ignores.tsv` records each affected fixture, case name, PostgreSQL
-version and #799 reference. It covers 781 cases per version, across 47 groups
+version and #799 reference. It covers 862 cases per version, across 48 groups
 per version. Their SQL, complete expectations and manifest counts remain intact.
 The shared runner emits a JUnit skipped testcase and a console SKIP with #799
 for every suppression. It reports executed and ignored counts separately:
-167/173 cases still execute on PostgreSQL 17/18 (340 executed, 1562 ignored).
+167/173 cases still execute on PostgreSQL 17/18 (340 executed, 1724 ignored).
 
 The temporary helper rejects duplicate/stale entries and incomplete group
 inventories: a new case is never implicitly ignored. Entire groups are blocked

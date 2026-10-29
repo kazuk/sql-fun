@@ -826,3 +826,32 @@ mod canonical_type_tests {
         assert_ne!(scalar.to_string(), array.to_string());
     }
 }
+
+impl TypeReference {
+    /// Resolve domain layers without erasing array element or source identity.
+    /// Missing domain bases and cycles cannot establish coercion eligibility.
+    pub(crate) fn domain_base_type(
+        &self,
+        context: &impl crate::context::BaseParseContext,
+    ) -> Option<Self> {
+        let mut base = self.clone();
+        let mut seen = std::collections::HashSet::new();
+        loop {
+            if base.is_dynamic() || base.is_array() == Some(true) {
+                return Some(base);
+            }
+            if !seen.insert(base.clone()) {
+                return None;
+            }
+            let Some(definition) = context.get_type_impl(base.full_name()) else {
+                // Ordinary names may be handled by cast lookup; a declared
+                // domain, however, must reference an existing base definition.
+                return if base == *self { Some(base) } else { None };
+            };
+            if !definition.is_domain() {
+                return Some(base);
+            }
+            base = definition.domain_base()?.clone();
+        }
+    }
+}

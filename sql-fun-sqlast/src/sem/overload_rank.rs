@@ -3,13 +3,59 @@ use crate::sem::{CastContext, TypeReference};
 
 /// Compare exact-match counts before considering preferred conversions.
 /// This uses existing cast preferences; category/unknown resolution is separate.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct OverloadRank {
+    original_exact: bool,
     exact: usize,
     preferred: usize,
 }
 
+impl Default for OverloadRank {
+    fn default() -> Self {
+        Self {
+            original_exact: true,
+            exact: 0,
+            preferred: 0,
+        }
+    }
+}
+
 impl OverloadRank {
+    // Original exact signatures win first. Only subsequent operator ranking
+    // treats domain inputs as their bases; cast eligibility stays separate.
+    pub(crate) fn operator_argument(
+        catalog: &impl BaseParseContext,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<Self> {
+        source.implicit_match_context(target, catalog)?;
+        // Eligibility above permits original identity even for an unresolved
+        // domain definition; such an identity needs no base-derived evidence.
+        let base = source
+            .domain_base_type(catalog)
+            .unwrap_or_else(|| source.clone());
+        let cast = base.implicit_match_context(target, catalog);
+        let mut rank = cast.map(Self::from).unwrap_or_default();
+        rank.original_exact = source == target;
+        Some(rank)
+    }
+
+    // An inferred array signature can rank its possible concrete element
+    // assignments, but never becomes an original exact operator declaration.
+    pub(crate) const fn instantiated_operator(self) -> Self {
+        Self {
+            original_exact: false,
+            ..self
+        }
+    }
+
+    pub(crate) fn substituted_operator_argument() -> Self {
+        Self {
+            original_exact: false,
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn argument(
         catalog: &impl BaseParseContext,
         source: Option<&TypeReference>,
@@ -43,6 +89,7 @@ impl OverloadRank {
 impl From<CastContext> for OverloadRank {
     fn from(context: CastContext) -> Self {
         Self {
+            original_exact: true,
             exact: usize::from(context.is_no_conversion()),
             preferred: usize::from(context.is_implicit_preferred()),
         }
@@ -54,6 +101,7 @@ impl std::ops::Add for OverloadRank {
 
     fn add(self, right: Self) -> Self {
         Self {
+            original_exact: self.original_exact && right.original_exact,
             exact: self.exact + right.exact,
             preferred: self.preferred + right.preferred,
         }

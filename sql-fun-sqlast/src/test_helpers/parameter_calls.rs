@@ -2,7 +2,7 @@ use crate::sem::parameter_resolution::Signature;
 use crate::sem::{PgBuiltInType, TypeReference};
 use crate::test_helpers::TestParseContext;
 
-pub(super) fn comparison() -> (TestParseContext, Vec<Signature>) {
+pub(crate) fn comparison() -> (TestParseContext, Vec<Signature>) {
     let mut context = TestParseContext::default();
     let mut signatures = Vec::new();
     for ty in [
@@ -22,7 +22,7 @@ pub(super) fn comparison() -> (TestParseContext, Vec<Signature>) {
     (context, signatures)
 }
 
-pub(super) fn numeric_array_comparison(array_cast: bool) -> (TestParseContext, Vec<Signature>) {
+pub(crate) fn numeric_array_comparison(array_cast: bool) -> (TestParseContext, Vec<Signature>) {
     let (mut context, signatures) = comparison();
     let source = PgBuiltInType::int4();
     let target = PgBuiltInType::int8();

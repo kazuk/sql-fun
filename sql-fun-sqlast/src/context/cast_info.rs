@@ -51,6 +51,9 @@ pub trait CastInfoRead {
         target_type: &TypeReference,
     ) -> Option<CastDefinition>;
 
-    /// list implicit castable types from `source_type`
+    /// List finite implicit targets derived from `source_type`.
+    /// Domain sources include their base-derived targets. Domain declarations
+    /// are not discovered as speculative targets; callers check SQL-established
+    /// target domains with `get_implicit_cast` instead.
     fn get_implicit_castable(&self, source_type: &TypeReference) -> HashSet<TypeReference>;
 }

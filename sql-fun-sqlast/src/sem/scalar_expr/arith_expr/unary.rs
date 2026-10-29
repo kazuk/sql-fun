@@ -1,3 +1,4 @@
+use crate::sem::overload_rank::OverloadRank;
 use crate::sem::{
     AnalysisError, AnalysisProblem, CastContext, OperatorDefinition, OperatorName, SemScalarExpr,
     TypeReference, UnaryOperatorDefinition,
@@ -5,12 +6,16 @@ use crate::sem::{
 
 struct UnaryCastCandidate {
     arg: CastContext,
-    priority: i32,
+    priority: OverloadRank,
     operator: UnaryOperatorDefinition,
 }
 
 impl UnaryCastCandidate {
-    const fn new(arg: CastContext, priority: i32, operator: UnaryOperatorDefinition) -> Self {
+    const fn new(
+        arg: CastContext,
+        priority: OverloadRank,
+        operator: UnaryOperatorDefinition,
+    ) -> Self {
         Self {
             arg,
             priority,
@@ -28,8 +33,10 @@ impl UnaryCastCandidate {
     {
         let mut candidates = Vec::new();
         for overload in overloads {
-            if let Some(arg_cast) = context.get_implicit_cast(arg_type, overload.arg_type()) {
-                let priority = arg_cast.context().overload_priority_score();
+            if let Some(arg_cast) = context.get_implicit_cast(arg_type, overload.arg_type())
+                && let Some(priority) =
+                    OverloadRank::operator_argument(context, arg_type, overload.arg_type())
+            {
                 candidates.push(Self::new(arg_cast.context(), priority, overload.clone()));
             }
         }
@@ -54,6 +61,41 @@ impl UnaryCastCandidate {
             .into_iter()
             .filter(|v| v.priority == priority)
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod test_domain_unary {
+    use super::UnaryCastCandidate;
+    use crate::sem::{PgBuiltInType, UnaryOperatorDefinition};
+    use crate::test_helpers::domain_casts;
+
+    #[rstest::rstest]
+    fn domain_unary_operator_uses_shared_ranking(#[values(false, true)] exact_domain: bool) {
+        let mut context = domain_casts::context();
+        let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let mut overloads = vec![
+            UnaryOperatorDefinition::new(&PgBuiltInType::int4(), &PgBuiltInType::bool(), true),
+            UnaryOperatorDefinition::new(&PgBuiltInType::int8(), &PgBuiltInType::int8(), true),
+        ];
+        if exact_domain {
+            overloads.push(UnaryOperatorDefinition::new(
+                &domain,
+                &PgBuiltInType::text(),
+                true,
+            ));
+        }
+        let candidates = UnaryCastCandidate::enumerate_from_context(&context, &overloads, &domain);
+        let best = UnaryCastCandidate::filter_best_candidate(candidates);
+        assert_eq!(best.len(), 1);
+        assert_eq!(
+            best[0].operator.get_return_type(),
+            &if exact_domain {
+                PgBuiltInType::text()
+            } else {
+                PgBuiltInType::bool()
+            }
+        );
     }
 }
 

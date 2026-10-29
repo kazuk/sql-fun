@@ -222,7 +222,13 @@ impl DistinctExpr {
             return Ok(DistinctComparison::deferred(left, right, binding));
         }
 
-        let (left, right) = SemScalarExpr::comparison_literal_operands(context, left, right);
+        let overloads = if let Some(definition) = context.get_operator_op(&name, true, true) {
+            definition.binary_overloads()
+        } else {
+            None
+        };
+        let (left, right) =
+            SemScalarExpr::comparison_literal_operands(context, overloads, left, right);
         let mut equality = ArithExpr::build_op(context, &name, Some(left), Some(right))?.0;
         equality.set_operator_binding(binding);
         if let Some(ty) = equality.get_type() {

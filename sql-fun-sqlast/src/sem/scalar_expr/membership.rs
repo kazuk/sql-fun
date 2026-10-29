@@ -140,8 +140,13 @@ impl MembershipComparison {
         name: &OperatorName,
         mut parameters: Option<&mut ParameterResolution>,
     ) -> Result<Self, AnalysisError> {
-        let (mut left, mut right) = if operator.is_some() {
-            SemScalarExpr::comparison_literal_operands(context, left.clone(), right.clone())
+        let (mut left, mut right) = if let Some(operator) = operator {
+            SemScalarExpr::comparison_literal_operands(
+                context,
+                operator.candidates.as_deref(),
+                left.clone(),
+                right.clone(),
+            )
         } else {
             (left.clone(), right.clone())
         };

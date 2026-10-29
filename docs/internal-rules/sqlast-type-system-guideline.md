@@ -116,6 +116,20 @@ PostgreSQL-visible candidate selection and rejection behavior when changing it.
 Keep these rules in the existing matching implementation rather than adding a
 second cast service.
 
+Schema catalog implicit coercion reduces source and target domain layers using
+`TypeReference::domain_base_type`, without rewriting the original references.
+A domain coercion remains a conversion even when its bases are identical;
+`NoConversion` describes original identity. Preferred-conversion credit belongs
+to the original target: source-domain reduction retains a preferred builtin
+target, while target-domain reduction receives ordinary implicit credit.
+Operator ranking first preserves
+complete original exact signatures, then scores domain inputs as their bases.
+The same `OverloadRank::operator_argument` facts feed direct and deferred
+operator selection. Domain/unknown literals try the exact domain signature
+before the base signature. Cast eligibility and target enumeration share the
+catalog owner; declared source enumeration still does not discover domains to
+expand bounded parameter defaults.
+
 [`cast.rs`](../../sql-fun-sqlast/src/sem/cast.rs) distinguishes identity,
 implicit, assignment, and explicit conversions. A catalog cast's existence
 does not make it legal in every expression position. Check the required

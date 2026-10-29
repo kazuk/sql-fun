@@ -27,7 +27,7 @@ impl ArithExpr {
         end: &SemScalarExpr,
         negated: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        Self::bound_comparisons(context, (value, start), (value, end), negated)
+        Self::bound_comparisons(context, (value, start), (value, end), negated, false)
     }
 
     pub(crate) fn ordinary_between(
@@ -37,10 +37,7 @@ impl ArithExpr {
         end: &SemScalarExpr,
         negated: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let lower =
-            SemScalarExpr::comparison_literal_operands(context, value.clone(), start.clone());
-        let upper = SemScalarExpr::comparison_literal_operands(context, value.clone(), end.clone());
-        Self::bound_comparisons(context, (&lower.0, &lower.1), (&upper.0, &upper.1), negated)
+        Self::bound_comparisons(context, (value, start), (value, end), negated, true)
     }
 
     fn bound_comparisons(
@@ -48,10 +45,23 @@ impl ArithExpr {
         lower_inputs: (&SemScalarExpr, &SemScalarExpr),
         upper_inputs: (&SemScalarExpr, &SemScalarExpr),
         negated: bool,
+        coerce_literals: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let (lower, upper) = if negated { ("<", ">") } else { (">=", "<=") };
-        let lower = Self::between_comparison(context, lower, lower_inputs.0, lower_inputs.1)?;
-        let upper = Self::between_comparison(context, upper, upper_inputs.0, upper_inputs.1)?;
+        let lower = Self::between_comparison(
+            context,
+            lower,
+            lower_inputs.0,
+            lower_inputs.1,
+            coerce_literals,
+        )?;
+        let upper = Self::between_comparison(
+            context,
+            upper,
+            upper_inputs.0,
+            upper_inputs.1,
+            coerce_literals,
+        )?;
         Ok(if negated {
             SemScalarExpr::logical_or(&[lower, upper])
         } else {
@@ -64,11 +74,26 @@ impl ArithExpr {
         name: &str,
         left: &SemScalarExpr,
         right: &SemScalarExpr,
+        coerce_literals: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let name = OperatorName::from_parts(None, name);
         let binding = ResolvedOperator::resolve(context, &name, true, true);
-        let (mut expression, _) =
-            Self::build_op(context, &name, Some(left.clone()), Some(right.clone()))?;
+        let (left, right) = if coerce_literals {
+            let overloads = if let Some(definition) = context.get_operator_op(&name, true, true) {
+                definition.binary_overloads()
+            } else {
+                None
+            };
+            SemScalarExpr::comparison_literal_operands(
+                context,
+                overloads,
+                left.clone(),
+                right.clone(),
+            )
+        } else {
+            (left.clone(), right.clone())
+        };
+        let (mut expression, _) = Self::build_op(context, &name, Some(left), Some(right))?;
         expression.set_operator_binding(binding);
         Ok(expression)
     }

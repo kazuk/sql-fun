@@ -49,11 +49,13 @@ impl BinaryCastCandidate {
                     right_type.implicit_match_context(instantiated.right_arg_type(), context)
             {
                 let priority = Self::argument_rank(
-                    left_cast,
+                    context,
+                    left_type,
                     overload.left_arg_type(),
                     instantiated.left_arg_type(),
                 ) + Self::argument_rank(
-                    right_cast,
+                    context,
+                    right_type,
                     overload.right_arg_type(),
                     instantiated.right_arg_type(),
                 );
@@ -85,7 +87,16 @@ impl BinaryCastCandidate {
         let mut inference = SimpleInferContext::default();
         for (declared, actual) in inputs {
             if !declared.is_dynamic() {
-                inference.push_input_param(declared, actual, context).ok()?;
+                // Only array placeholders unwrap a domain container. An
+                // anyelement input must retain a domain element's identity.
+                let actual = if declared.is_any_array() {
+                    actual.domain_base_type(context)?
+                } else {
+                    actual.clone()
+                };
+                inference
+                    .push_input_param(declared, &actual, context)
+                    .ok()?;
             }
         }
         let substitution = inference.get_inference_result().ok()?;
@@ -106,16 +117,18 @@ impl BinaryCastCandidate {
     }
 
     fn argument_rank(
-        cast: CastContext,
+        context: &impl ParseContext,
+        source: &TypeReference,
         declared: &TypeReference,
         instantiated: &TypeReference,
     ) -> OverloadRank {
         // Substituting anyarray with an operand type establishes applicability,
         // but must not earn the exact-match credit of a concrete declaration.
         if declared == instantiated {
-            OverloadRank::from(cast)
+            OverloadRank::operator_argument(context, source, instantiated)
+                .expect("applicable operator argument")
         } else {
-            OverloadRank::default()
+            OverloadRank::substituted_operator_argument()
         }
     }
 
@@ -206,7 +219,7 @@ mod tests {
         BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition, PgBuiltInType,
         TypeReference,
     };
-    use crate::test_helpers::TestParseContext;
+    use crate::test_helpers::{TestParseContext, domain_casts};
 
     #[rstest::rstest]
     #[case::same_array("_oid", "_oid", true)]
@@ -287,6 +300,92 @@ mod tests {
         let best = BinaryCastCandidate::resolve(&mut context, &operator, &array, &array)?;
         assert_eq!(best.len(), 2);
         assert!(context.has_reported_problem("binary_operator_overload_ambiguous"));
+        Ok(())
+    }
+
+    #[test]
+    fn polymorphic_array_element_keeps_domain_identity() {
+        let mut context = domain_casts::context();
+        let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let array = domain.array_type();
+        let anyarray = crate::sem::TypeReference::from_master_type_name("anyarray");
+        let element = crate::sem::TypeReference::from_master_type_name("anyelement");
+        let overload =
+            crate::sem::BinaryOperatorDefinition::new(&anyarray, &element, &element, true);
+        let instantiated =
+            BinaryCastCandidate::instantiate_array_overload(&context, &overload, &array, &domain)
+                .unwrap();
+        assert_eq!(instantiated.left_arg_type(), &array);
+        assert_eq!(instantiated.right_arg_type(), &domain);
+        assert_eq!(instantiated.get_return_type(), &domain);
+    }
+
+    #[test]
+    fn partial_domain_identity_does_not_earn_base_match_credit() -> testresult::TestResult {
+        let mut context = domain_casts::context();
+        let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let overloads = [
+            crate::sem::BinaryOperatorDefinition::new(
+                &domain,
+                &PgBuiltInType::int8(),
+                &PgBuiltInType::text(),
+                true,
+            ),
+            crate::sem::BinaryOperatorDefinition::new(
+                &PgBuiltInType::int8(),
+                &PgBuiltInType::int4(),
+                &PgBuiltInType::bool(),
+                true,
+            ),
+        ];
+        let best = BinaryCastCandidate::resolve(
+            &mut context,
+            &OperatorDefinition::binary(&overloads),
+            &domain,
+            &PgBuiltInType::int4(),
+        )?;
+        assert_eq!(best.len(), 1);
+        assert_eq!(best[0].operator().get_return_type(), &PgBuiltInType::bool());
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::domain_exact(true, "text")]
+    #[case::base_best_match(false, "bool")]
+    fn domain_matching_preserves_exact_signatures_before_base_ranking(
+        #[case] domain_right: bool,
+        #[case] expected: &str,
+        #[values(false, true)] reversed: bool,
+    ) -> testresult::TestResult {
+        let mut context = domain_casts::context();
+        let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let mut overloads = domain_casts::operators(&domain);
+        if reversed {
+            overloads.reverse();
+        }
+        let right = if domain_right {
+            domain.clone()
+        } else {
+            PgBuiltInType::int4()
+        };
+        let best = BinaryCastCandidate::resolve(
+            &mut context,
+            &OperatorDefinition::binary(&overloads),
+            &domain,
+            &right,
+        )?;
+        assert_eq!(best.len(), 1);
+        assert_eq!(
+            best[0].operator().get_return_type(),
+            &crate::sem::TypeReference::from_master_type_name(expected)
+        );
+        if domain_right {
+            assert!(best[0].left.is_no_conversion());
+            assert!(best[0].right.is_no_conversion());
+        } else {
+            assert!(best[0].left.is_implicit());
+            assert!(best[0].right.is_no_conversion());
+        }
         Ok(())
     }
 }

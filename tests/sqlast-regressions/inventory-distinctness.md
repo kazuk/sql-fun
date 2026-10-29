@@ -34,6 +34,7 @@ only with bare NULL. PostgreSQL 18 additionally confirmed:
 No live database is required by the regression suite. Oracle SQL is development
 evidence; the analyzer does not evaluate predicate values.
 
-The maintainer excluded shared domain and named-composite matching fixes from
-this PR. Their failing probes are tracked in [#799](https://github.com/kazuk/sql-fun/issues/799), rather than changing the
-shared matcher or making the new fixtures claim unsupported coverage.
+Shared source-domain/base matching is covered by the #799 `domain-operators`
+fixtures, including both distinctness predicates. Named-composite applicability
+for generic `record` remains separately tracked in
+[#804](https://github.com/kazuk/sql-fun/issues/804).

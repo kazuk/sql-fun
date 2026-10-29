@@ -906,7 +906,7 @@ impl Signature {
                 Some(&declared_inputs[index]),
             )
         } else {
-            OverloadRank::argument(catalog, Some(source), Some(&self.inputs[index]))
+            OverloadRank::operator_argument(catalog, source, &self.inputs[index])
         }
     }
 

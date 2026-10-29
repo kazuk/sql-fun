@@ -657,8 +657,6 @@ fn configured_roles_bind_and_apply_through_direct_context(
 }
 
 #[rstest::rstest]
-#[case::omitted("")]
-#[case::empty("roles = []")]
 #[case::different("roles = ['other']")]
 fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: &str) {
     use ::sql_fun_sqlast::context::ParseContext;

@@ -16,11 +16,44 @@ pub struct CreateDomain {
     owner: Option<crate::sem::OwnerSpecification>,
     type_ref: TypeReference,
     base_type: Option<TypeReference>,
+    #[serde(default)]
+    declaration_collation: crate::sem::DeclarationCollation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    requested_base: Option<Box<crate::sem::WithTypmod<TypeReference>>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     category: Option<crate::sem::TypeCategory>,
 }
 
 impl CreateDomain {
+    /// Requested declaration type and modifiers, separate from canonical identity.
+    pub fn requested_base(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+        self.requested_base.as_deref()
+    }
+
+    pub(crate) fn retain_requested_type(&mut self, value: &crate::sem::WithTypmod<TypeReference>) {
+        self.requested_base = Some(Box::new(value.clone()));
+    }
+
+    /// Completed explicit base-type collation validation.
+    pub const fn declaration_collation(&self) -> &crate::sem::DeclarationCollation {
+        &self.declaration_collation
+    }
+
+    pub(crate) fn validate_collation(
+        &mut self,
+        context: &mut impl ParseContext,
+        lookup: Option<&crate::sem::CatalogNameLookup>,
+    ) -> Result<(), AnalysisError> {
+        self.declaration_collation =
+            crate::sem::DeclarationCollation::validate(context, self.base_type.as_ref(), lookup);
+        self.declaration_collation
+            .report(context, self.base_type.as_ref())
+    }
+
+    pub(crate) const fn declarations_can_apply(&self) -> bool {
+        self.base_type.is_some() && self.declaration_collation.can_apply()
+    }
+
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,
@@ -48,6 +81,8 @@ impl CreateDomain {
             category: None,
             type_ref: type_ref.clone(),
             base_type: base_type.clone(),
+            declaration_collation: crate::sem::DeclarationCollation::default(),
+            requested_base: None,
         }
     }
     pub(crate) const fn category(&self) -> Option<crate::sem::TypeCategory> {

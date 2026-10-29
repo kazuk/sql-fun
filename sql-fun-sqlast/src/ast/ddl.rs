@@ -288,9 +288,7 @@ impl super::AlterCommand {
             Self::Constraint(constraint) => Self::resolve_constraint(context, table, constraint),
             Self::Cluster(name) => Self::resolve_cluster(context, table, name),
             Self::Rename(name) => Self::resolve_rename(context, name),
-            Self::AddColumn(column) if context.dialect() == Dialect::sqlite() => {
-                Self::resolve_add_column(context, table, column)
-            }
+            Self::AddColumn(column) => Self::resolve_add_column(context, table, column),
             Self::AlterColumn(name, column) if context.dialect() == Dialect::sqlite() => {
                 Self::resolve_alter_column(context, table, name, column)
             }
@@ -1009,6 +1007,20 @@ impl super::Column {
         table: &TableName,
     ) -> Result<ColumnDefinition, AnalysisError> {
         let name = ColumnName::from(self.name.as_str());
+        let type_ref = self.resolve_type(context, table, &name)?;
+        let mut column =
+            ColumnDefinition::new(&Some(name.clone()), type_ref.as_ref(), self.not_null, &[]);
+        self.resolve_declaration(context, &mut column)?;
+        self.resolve_constraints(context, table, &name, &mut column)?;
+        Ok(column)
+    }
+
+    fn resolve_type(
+        &self,
+        context: &mut impl ParseContext,
+        table: &TableName,
+        name: &ColumnName,
+    ) -> Result<Option<TypeReference>, AnalysisError> {
         let type_ref = if let Some(ty) = &self.type_name {
             let type_name = ty.name.full_name()?;
             if let Some(ty) = context.get_type(&type_name) {
@@ -1030,20 +1042,46 @@ impl super::Column {
                 }
             } else {
                 context.report_analysis_problem(AnalysisProblem::column_type_not_found(
-                    table, &name, &type_name,
+                    table, name, &type_name,
                 ))?;
                 None
             }
         } else {
             None
         };
-        let mut column =
-            ColumnDefinition::new(&Some(name.clone()), type_ref.as_ref(), self.not_null, &[]);
+        Ok(type_ref)
+    }
+
+    fn resolve_declaration(
+        &self,
+        context: &mut impl ParseContext,
+        column: &mut ColumnDefinition,
+    ) -> Result<(), AnalysisError> {
+        if context.dialect() == Dialect::postgres() {
+            if let Some(type_name) = &self.type_name {
+                column.retain_requested_type(&type_name.declaration_type(column.get_type())?);
+            }
+            let lookup = self
+                .collation
+                .optional_full_name()?
+                .map(|name| context.lookup_collation(&name));
+            column.validate_collation(context, lookup.as_ref())?;
+        }
+        Ok(())
+    }
+
+    fn resolve_constraints(
+        &self,
+        context: &mut impl ParseContext,
+        table: &TableName,
+        name: &ColumnName,
+        column: &mut ColumnDefinition,
+    ) -> Result<(), AnalysisError> {
         for constraint in &self.constraints {
             if constraint.constraint.is_unique_key() && constraint.extras.deferrable {
                 todo!("deferrable unique-key catalog representation");
             }
-            let constraint = constraint.constraint.resolve(context, table, &name)?;
+            let constraint = constraint.constraint.resolve(context, table, name)?;
             if let Some(nullability) = constraint.as_nullability() {
                 column.set_not_null(Some(nullability.is_not_null()));
             }
@@ -1052,7 +1090,7 @@ impl super::Column {
                     column.set_default(default.expr());
                 }
             } else if let Some(fk) = constraint.as_foreign_key()
-                && let Some(col_type) = &type_ref
+                && let Some(col_type) = column.get_type()
                 && let Some(pk_table) = fk.primary_key_table()
                 && let Some(pk_type) = fk.primary_key_column_type()
                 && col_type != pk_type
@@ -1060,7 +1098,7 @@ impl super::Column {
                 context.report_analysis_problem(
                     AnalysisProblem::foreign_key_column_type_mismatch(
                         table,
-                        &name,
+                        name,
                         col_type,
                         pk_table,
                         fk.primary_key_column(),
@@ -1070,7 +1108,7 @@ impl super::Column {
             }
             column.push_constraint(constraint);
         }
-        Ok(column)
+        Ok(())
     }
 }
 
@@ -1874,14 +1912,16 @@ impl CompositeType {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<CreateCompositeType, AnalysisError> {
+        let name = self.name.full_name()?;
+        let table = TableName::from(name.clone());
         let mut fields = CompositeFieldCollection::default();
         for field in &self.fields {
-            fields.push(field.resolve(context)?);
+            fields.push(field.resolve(context, &table)?);
         }
-        Ok(CreateCompositeType::new(&self.name.full_name()?, &fields))
+        Ok(CreateCompositeType::new(&name, &fields))
     }
 
-    pub(super) fn resolve_and_apply<TContext: ParseContext>(
+    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
@@ -1911,14 +1951,29 @@ impl CompositeField {
 
     fn resolve(
         &self,
-        _context: &mut impl ParseContext,
+        context: &mut impl ParseContext,
+        composite: &TableName,
     ) -> Result<CompositeFieldDefinition, AnalysisError> {
-        let type_ref = self.type_name.reference()?;
-        Ok(CompositeFieldDefinition::new(
-            &self.name,
-            &Some(type_ref),
-            &Some(self.is_not_null),
-        ))
+        let requested = self.type_name.reference()?;
+        let type_ref = context.canonicalize_type_ref(&requested);
+        if type_ref.is_none() {
+            context.report_analysis_problem(AnalysisProblem::column_type_not_found(
+                composite,
+                &ColumnName::from(self.name.as_str()),
+                requested.full_name(),
+            ))?;
+        }
+        let mut field =
+            CompositeFieldDefinition::new(&self.name, &type_ref, &Some(self.is_not_null));
+        field.retain_requested_type(&self.type_name.declaration_type(type_ref.as_ref())?);
+        let lookup = self
+            .collation
+            .as_ref()
+            .map(Name::full_name)
+            .transpose()?
+            .map(|name| context.lookup_collation(&name));
+        field.validate_collation(context, lookup.as_ref())?;
+        Ok(field)
     }
 }
 
@@ -1945,8 +2000,16 @@ mod test_composite_field_resolution {
             &IVec::default(),
         )
         .unwrap();
+        let mut context = TestParseContext::default();
+        context.setup_type(PgBuiltInType::int4());
         let field = composite.fields[0]
-            .resolve(&mut TestParseContext::default())
+            .resolve(
+                &mut context,
+                &crate::sem::TableName::from(crate::sem::FullName::with_schema(
+                    "public",
+                    "array_value",
+                )),
+            )
             .unwrap();
         assert_eq!(field.name(), "items");
         assert_eq!(
@@ -2009,6 +2072,12 @@ impl Domain {
             None
         };
         domain.set_category(category);
+        domain.retain_requested_type(&self.base.declaration_type(domain.base_type())?);
+        let lookup = self
+            .collation
+            .optional_full_name()?
+            .map(|name| context.lookup_collation(&name));
+        domain.validate_collation(context, lookup.as_ref())?;
         Ok(domain)
     }
 

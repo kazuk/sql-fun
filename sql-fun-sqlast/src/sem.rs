@@ -28,6 +28,7 @@ mod create_view;
 mod cte;
 mod cursor_info;
 mod data_source;
+mod declaration_collation;
 mod def_elem;
 mod delete_statement;
 mod drop_dependency_behavior;
@@ -56,6 +57,7 @@ mod select_statement;
 mod top_level_statement;
 pub(crate) mod traversal;
 mod wildcard_expansion;
+pub use self::declaration_collation::DeclarationCollation;
 pub use self::query_metadata::QueryMetadata;
 pub use self::with_typmod::WithTypmod;
 

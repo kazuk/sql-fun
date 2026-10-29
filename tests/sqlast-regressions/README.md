@@ -227,3 +227,20 @@ by setup, so partial group suppression is not supported. This mechanism does
 not change product CLI input formats, comparison semantics or schema selection.
 When fixing #799, remove every entry and the temporary helper/integration, then
 make all preserved cases pass in source and installed-distribution checks.
+Issue #822 declaration contracts live in `declaration-collations.json`, selected
+with the explicit `declaration-collations.sql` project schema on PostgreSQL 17/18.
+The shared source and installed paths check record-column COLLATE diagnostics,
+scalar/array/domain/enum/composite/table-row types, quoted and qualified names,
+lookup precedence, and exact result metadata. DDL inputs exercise accepted and
+rejected table, composite and domain declarations, plus rejected add-column
+groups. Valid schema DDL supplies subsequent query metadata. Focused Rust tests
+retain applicability,
+undefined-capability and ambiguity outcomes, requested types/modifiers, rejected
+DDL atomicity, public composite-analysis entry-point coverage and recovery.
+PostgreSQL ADD COLUMN application and ALTER COLUMN TYPE remain tracked by #528
+and #529 respectively; declaration validation does not implement those operations.
+
+The query-analysis API analyzes each input statement in an independent context,
+and `sql-fun test` expects one result per case. Catalog transitions and
+whole-statement atomicity therefore remain Rust schema-chain assertions; these
+CLI cases do not claim cross-statement mutation coverage.

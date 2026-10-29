@@ -29,6 +29,10 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn declarations_can_apply(&self) -> bool {
+        self.0.iter().all(ColumnDefinition::declaration_can_apply)
+    }
+
     fn rename_expressions(
         &mut self,
         visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
@@ -300,6 +304,11 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    /// Whether all analyzed column declarations permit catalog application.
+    pub(crate) fn declarations_can_apply(&self) -> bool {
+        self.columns.declarations_can_apply()
+    }
+
     pub(crate) fn rename_expressions(
         &mut self,
         old: &TableName,

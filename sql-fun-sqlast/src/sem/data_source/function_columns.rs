@@ -21,6 +21,7 @@ struct RecordColumn {
     requested_type: crate::sem::WithTypmod<TypeReference>,
     resolved_type: Option<TypeReference>,
     collation: Option<CatalogNameLookup>,
+    validation: crate::sem::DeclarationCollation,
 }
 
 impl TableFunctionOutput {
@@ -60,14 +61,12 @@ impl TableFunctionOutput {
             )?;
         }
         let collation = collation.map(|name| context.lookup_collation(name));
-        if let Some(collation) = &collation
-            && collation.resolved_name().is_none()
-        {
-            self.report(
-                context,
-                TableFunctionProblem::collation_not_found(&collation.requested().to_string()),
-            )?;
-        }
+        let validation = crate::sem::DeclarationCollation::validate(
+            context,
+            resolved_type.as_ref(),
+            collation.as_ref(),
+        );
+        validation.report(context, resolved_type.as_ref())?;
         self.columns.push(&ColumnDefinition::new(
             &Some(name.clone()),
             resolved_type.as_ref(),
@@ -79,6 +78,7 @@ impl TableFunctionOutput {
             requested_type: declaration,
             resolved_type,
             collation,
+            validation,
         });
         Ok(())
     }

@@ -1,0 +1,616 @@
+[
+  {
+    "name": "text",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value text COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "varchar_typmod",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value varchar(12) COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "varchar",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "integer",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value integer COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "text_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value text[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "integer_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value integer[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_domain",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_nested COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_nested",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_domain_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_nested[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_nested",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "integer_domain",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_integer COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_integer",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "integer_domain_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_integer[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_integer",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "enum",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_enum COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_enum",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "enum_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_enum[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_enum",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "composite",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_composite COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_composite",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "composite_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_composite[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_composite",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "row",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_row COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_row",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "row_array",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.collation_row[] COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_row",
+            "is_array": true
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_text",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value text COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_integer",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value integer COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown_type",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.missing_type_822 COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "table_function_type_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown_type_and_collation",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.missing_type_822 COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "table_function_type_not_found"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_collation",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value text COLLATE pg_catalog.\"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted_field",
+    "sql": "SELECT \"Mixed.Field\" AS value FROM json_to_record('{}'::json) AS r(\"Mixed.Field\" text COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted_composite",
+    "sql": "SELECT value FROM json_to_record('{}'::json) AS r(value public.\"composite.with.dot\" COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "composite.with.dot",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ddl_text",
+    "sql": "SELECT scalar AS value FROM collation_columns",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ddl_array",
+    "sql": "SELECT items AS value FROM collation_columns",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ddl_domain",
+    "sql": "SELECT nested AS value FROM collation_columns",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "public",
+            "local_name": "collation_nested",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ddl_composite",
+    "sql": "SELECT (NULL::public.\"composite.with.dot\").\"Mixed.Field\" AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "varchar",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ddl_table_accepted",
+    "sql": "CREATE TABLE public.new_declaration(value text COLLATE pg_catalog.\"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_table_non_collatable",
+    "sql": "CREATE TABLE public.new_declaration(value integer COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_table_missing_collation",
+    "sql": "CREATE TABLE public.new_declaration(value integer COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_table_missing_type",
+    "sql": "CREATE TABLE public.new_declaration(value public.missing_type_822 COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "column_type_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_composite_accepted",
+    "sql": "CREATE TYPE public.new_declaration AS (value text COLLATE pg_catalog.\"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_composite_non_collatable",
+    "sql": "CREATE TYPE public.new_declaration AS (value integer COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_composite_missing_collation",
+    "sql": "CREATE TYPE public.new_declaration AS (value integer COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_composite_missing_type",
+    "sql": "CREATE TYPE public.new_declaration AS (value public.missing_type_822 COLLATE public.missing_822)",
+    "expected": {
+      "diagnostics": [
+        "column_type_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_domain_accepted",
+    "sql": "CREATE DOMAIN public.new_declaration AS text COLLATE pg_catalog.\"C\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_domain_non_collatable",
+    "sql": "CREATE DOMAIN public.new_declaration AS integer COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_domain_missing_collation",
+    "sql": "CREATE DOMAIN public.new_declaration AS integer COLLATE public.missing_822",
+    "expected": {
+      "diagnostics": [
+        "collation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_domain_missing_type",
+    "sql": "CREATE DOMAIN public.new_declaration AS public.missing_type_822 COLLATE public.missing_822",
+    "expected": {
+      "diagnostics": [
+        "SF000001"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "ddl_rejected_add_column_group",
+    "sql": "ALTER TABLE public.collation_row ADD COLUMN ok text, ADD COLUMN bad integer COLLATE \"C\"",
+    "expected": {
+      "diagnostics": [
+        "collate_operand_type"
+      ],
+      "columns": []
+    }
+  }
+]

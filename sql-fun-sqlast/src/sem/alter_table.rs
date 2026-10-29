@@ -109,7 +109,9 @@ impl AlterTable {
             table: table.clone(),
             commands: commands.to_vec(),
             source_span: source_span.clone(),
-            applicable: true,
+            applicable: commands
+                .iter()
+                .all(AlterObjSubCommand::declaration_can_apply),
             resolved_target: None,
         }
     }
@@ -388,6 +390,15 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
+    fn declaration_can_apply(&self) -> bool {
+        match self {
+            Self::AddColumn(column) | Self::AlterColumn(_, column) => {
+                column.declaration_can_apply()
+            }
+            _ => true,
+        }
+    }
+
     const fn rename_destination(&self) -> Option<&TableName> {
         if let Self::RenameTo(name) = self {
             Some(name)

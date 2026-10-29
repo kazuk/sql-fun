@@ -12,8 +12,8 @@ use crate::{
     ast::{
         Alias, Call, CallKind, CteBody, Delete, DerivedTable, Dialect, Expr, FromGroup, FromItem,
         Grouping, Insert, Into, Join, JoinKind, Lock, Merge, Name, Order, Query, QueryBody,
-        Relation, Select, SetOperation, SetQuery, TableFunctions, Target, TypeName, TypedColumn,
-        Update, Window, With,
+        Relation, Select, SetOperation, SetQuery, TableFunctions, Target, TypedColumn, Update,
+        Window, With,
     },
     context::ParseContext,
     sem::{
@@ -1119,20 +1119,5 @@ impl Into {
             &self.relation.name.full_name()?,
             &self.relation.persistence,
         ))
-    }
-}
-
-impl TypeName {
-    fn modifier_arguments(&self) -> Result<Vec<String>, AnalysisError> {
-        use crate::ast::deparse::{SqlEmit, SqlWriter};
-        let mut arguments = Vec::new();
-        for modifier in &self.modifiers {
-            let mut writer = SqlWriter::new(Dialect::postgres());
-            modifier
-                .emit(&mut writer)
-                .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
-            arguments.push(writer.into_sql());
-        }
-        Ok(arguments)
     }
 }

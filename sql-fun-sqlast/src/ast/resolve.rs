@@ -27,6 +27,14 @@ use crate::{
 };
 
 impl Name {
+    pub(in crate::ast) fn optional_full_name(&self) -> Result<Option<FullName>, AnalysisError> {
+        if self.0.is_empty() {
+            Ok(None)
+        } else {
+            self.full_name().map(Some)
+        }
+    }
+
     pub(in crate::ast) fn star_qualifier(&self) -> Result<Option<AliasName>, AnalysisError> {
         match self.0.as_slice() {
             [] => Ok(None),
@@ -1029,5 +1037,34 @@ impl Collate {
         let value =
             CollateExpr::resolve(context, &argument, &self.name.full_name()?, &self.location)?;
         Ok(SemScalarExpr::collate(value))
+    }
+}
+
+impl TypeName {
+    pub(in crate::ast) fn declaration_type(
+        &self,
+        resolved: Option<&TypeReference>,
+    ) -> Result<crate::sem::WithTypmod<TypeReference>, AnalysisError> {
+        let mut declaration =
+            crate::sem::WithTypmod::new(&self.reference()?, &self.modifier_arguments()?);
+        if let Some(resolved) = resolved {
+            declaration.interpret_postgres(resolved);
+        }
+        Ok(declaration)
+    }
+}
+
+impl TypeName {
+    pub(in crate::ast) fn modifier_arguments(&self) -> Result<Vec<String>, AnalysisError> {
+        use crate::ast::deparse::{SqlEmit, SqlWriter};
+        let mut arguments = Vec::new();
+        for modifier in &self.modifiers {
+            let mut writer = SqlWriter::new(Dialect::postgres());
+            modifier
+                .emit(&mut writer)
+                .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
+            arguments.push(writer.into_sql());
+        }
+        Ok(arguments)
     }
 }

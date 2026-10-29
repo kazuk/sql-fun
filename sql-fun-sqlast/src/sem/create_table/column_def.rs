@@ -24,6 +24,15 @@ pub struct ColumnDefinition {
     constraints: Vec<ColumnConstraint>,
     #[serde(default, skip_serializing_if = "ColumnAttributes::is_empty")]
     attributes: ColumnAttributes,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    declaration: Option<Box<ColumnDeclaration>>,
+}
+
+// Keep declaration-only metadata out of the inline size of every column binding.
+#[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+struct ColumnDeclaration {
+    requested_type: Option<crate::sem::WithTypmod<TypeReference>>,
+    collation: crate::sem::DeclarationCollation,
 }
 
 /// Persistent PostgreSQL per-column planning attributes.
@@ -40,6 +49,48 @@ impl ColumnAttributes {
 }
 
 impl ColumnDefinition {
+    /// Requested declaration type and modifiers, separate from canonical identity.
+    pub fn requested_type(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+        self.declaration.as_ref()?.requested_type.as_ref()
+    }
+
+    pub(crate) fn retain_requested_type(&mut self, value: &crate::sem::WithTypmod<TypeReference>) {
+        let declaration = self.declaration.get_or_insert_default();
+        declaration.requested_type = Some(value.clone());
+    }
+
+    /// Retained explicit declaration collation analysis.
+    pub fn declaration_collation(&self) -> &crate::sem::DeclarationCollation {
+        if let Some(declaration) = &self.declaration {
+            &declaration.collation
+        } else {
+            crate::sem::DeclarationCollation::omitted()
+        }
+    }
+
+    pub(crate) fn validate_collation(
+        &mut self,
+        context: &mut impl ParseContext,
+        lookup: Option<&crate::sem::CatalogNameLookup>,
+    ) -> Result<(), AnalysisError> {
+        let declaration = self.declaration.get_or_insert_default();
+        declaration.collation =
+            crate::sem::DeclarationCollation::validate(context, self.type_ref.as_ref(), lookup);
+        declaration
+            .collation
+            .report(context, self.type_ref.as_ref())
+    }
+
+    pub(crate) fn declaration_can_apply(&self) -> bool {
+        let Some(declaration) = &self.declaration else {
+            return true;
+        };
+        // An absent type is not itself a failed declaration (SQLite permits
+        // typeless columns, and query-derived columns may remain unknown).
+        let type_resolved = declaration.requested_type.is_none() || self.type_ref.is_some();
+        type_resolved && declaration.collation.can_apply()
+    }
+
     pub(super) fn rename_expressions(
         &mut self,
         visitor: &mut crate::sem::traversal::RelationRenamer<'_>,
@@ -143,6 +194,7 @@ impl Clone for ColumnDefinition {
             default: self.default.clone(),
             constraints: self.constraints.clone(),
             attributes: self.attributes.clone(),
+            declaration: self.declaration.clone(),
         }
     }
 }
@@ -183,6 +235,7 @@ impl ColumnDefinition {
             default: Default::default(),
             constraints: constraints.to_vec(),
             attributes: ColumnAttributes::default(),
+            declaration: None,
         }
     }
 

@@ -289,3 +289,35 @@ does not prove real catalog completeness; retain integration coverage where
 that is the contract. Process-local caching does not share setup across
 nextest's independent test processes. Documenting heavy setup cost alone does
 not establish that a particular test needs it.
+
+## Explicit declaration collations
+
+`DeclarationCollation` consumes a normally resolved type and a completed
+`CatalogNameLookup`; it never resolves a type or discovers additional metadata.
+Record-returning function columns, table/add-column declarations, composite
+attributes and domain bases share this operation. Semantic declarations retain
+requested types/modifiers separately from canonical type identities, and retain
+collation lookup failures as well as the applicability outcome.
+
+A missing type takes diagnostic precedence over collation lookup failure; a
+missing or ambiguous collation takes precedence over capability validation.
+Failed lookup must not manufacture a non-collatable-type diagnostic. A true
+capability permits explicit COLLATE; false reports `collate_operand_type`.
+An undefined capability reports recoverable `collate_capability_undefined` and
+retains an indeterminate outcome. It is neither evidence of non-collatability
+nor permission to publish an unvalidated declaration. A null fact alone does
+not distinguish a PostgreSQL shell from another incomplete catalog reference.
+Omitted COLLATE does not select a collation or request capability validation.
+
+DDL application consumes retained declaration applicability before catalog
+mutation, independently of diagnostic reporting or rendering. Invalid table,
+composite and domain declarations publish no definitions; invalid add-column
+groups leave the table unchanged. Query declarations preserve known result
+columns even when collation validation fails.
+
+Successful PostgreSQL ADD COLUMN application remains tracked by
+[#528](https://github.com/kazuk/sql-fun/issues/528); sharing declaration validation
+does not implement that operation. ALTER COLUMN TYPE COLLATE retains syntax but
+its semantic operation remains owned by
+[#529](https://github.com/kazuk/sql-fun/issues/529). Expression COLLATE has its own
+validation lifecycle; this declaration policy does not change it or SQLite.

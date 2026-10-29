@@ -4,6 +4,7 @@
 pub(crate) mod between;
 pub(crate) mod collate;
 pub(crate) mod conflict_masters;
+pub(crate) mod declaration_collation;
 pub(crate) mod foreign_keys;
 pub(crate) mod membership;
 pub(crate) mod ownership;

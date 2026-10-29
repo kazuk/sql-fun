@@ -14,10 +14,11 @@ array of self-contained cases with `name`, `sql` and `expected` fields. Keep
 each
 SQL input and its expectation in the same object when adding, deleting or
 reordering cases. Names preserve original Rust case identities and must be
-nonempty and unique within the fixture. The runner validates object fields and
-case counts, then projects cases to temporary SQL and expectation arrays for the
-existing CLI input contract. CLI/JUnit identities retain the fixture basename
-and array index; each group log also maps those indices to case names.
+nonempty and unique within the fixture. The runner validates manifest case
+counts and passes fixture files directly to `sql-fun test`. The CLI validates
+case objects and names before analysis.
+Console/JUnit identities include the fixture path and case name; SQL diagnostic
+context also includes the array index.
 Expectations use the existing `sql-fun test` contract: complete diagnostic sets
 and exact ordered columns, including absent types and unknown nullability.
 
@@ -78,7 +79,7 @@ and wall-clock seconds measured with Bash `time` around the actual `sql-fun
 test`
 command. The final summary aggregates those command durations and reports total
 executed cases and cases/second. Build, server startup, catalog preparation,
-fixture projection, report processing/upload and negative controls are excluded
+report processing/upload and negative controls are excluded
 from this timing. These values provide a baseline in source and installed CI
 logs; timing variation does not affect success and no performance threshold is
 enforced.

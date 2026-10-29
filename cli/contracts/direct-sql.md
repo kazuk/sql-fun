@@ -15,7 +15,7 @@ Test diagnostic sets and result-column contracts without executing SQL
 ## Required input and explicit schema levels
 
 ```scrut
-$ sql-fun test query.sql 2>&1 | head -1
+$ sql-fun test 2>&1 | head -1
 error: the following required arguments were not provided:
 ```
 
@@ -39,5 +39,77 @@ $ echo '{"queries":["SELECT 1"]}' > "$TMPDIR/one.json" && \
 > sql-fun test "$TMPDIR/one.json#$.queries" \
 > --expect "$TMPDIR/expected.json" 2>&1
 Error: expectation count 0 does not match SQL input count 1
+[1]
+```
+
+## Named case inputs are validated before connection
+
+These commands run with no runtime tools. Invalid content must fail before a
+server is started or schema initialization accesses metadata. No report is
+invented for invalid input, including a malformed later case.
+
+```scrut
+$ echo '[]' > "$TMPDIR/cases.json" && \
+> sql-fun test "$TMPDIR/cases.json" 2>&1
+Error: test case array must not be empty
+[1]
+```
+
+```scrut
+$ cat > "$TMPDIR/cases.json" <<'JSON'
+> [
+>   {"name":"same","sql":"SELECT 1","expected":[]},
+>   {"name":"same","sql":"SELECT 2","expected":[]}
+> ]
+> JSON
+> sql-fun test "$TMPDIR/cases.json" > "$TMPDIR/duplicate.log" 2>&1
+[1]
+```
+
+```scrut
+$ sed "s|$TMPDIR|TMP|g" "$TMPDIR/duplicate.log"
+Error: duplicate test case name "same" at TMP/cases.json[1]
+```
+
+```scrut
+$ cat > "$TMPDIR/cases.json" <<'JSON'
+> [
+>   {"name":"valid","sql":"SELECT 1","expected":[]},
+>   {"name":"invalid","sql":"SELECT 2","expected":{}}
+> ]
+> JSON
+> sql-fun test "$TMPDIR/cases.json" --junit-xml "$TMPDIR/invalid.xml" \
+> > "$TMPDIR/invalid.log" 2>&1
+[1]
+```
+
+```scrut
+$ head -1 "$TMPDIR/invalid.log" | sed "s|$TMPDIR|TMP|g"
+Error: invalid expected contract for TMP/cases.json[1]::invalid
+```
+
+```scrut
+$ test ! -e "$TMPDIR/invalid.xml"
+```
+
+```scrut
+$ echo '{"cases":[]}' > "$TMPDIR/cases.json" && \
+> sql-fun test "$TMPDIR/cases.json#$.missing" > "$TMPDIR/selector.log" 2>&1
+[1]
+```
+
+```scrut
+$ head -1 "$TMPDIR/selector.log" | sed "s|$TMPDIR|TMP|g"
+Error: selector TMP/cases.json#$.missing must match exactly one node
+```
+
+An explicit `--expect` keeps the legacy SQL string contract and rejects case
+objects instead of silently ignoring the external expectations.
+
+```scrut
+$ echo '{"cases":[{"name":"a","sql":"SELECT 1","expected":[]}]}' \
+> > "$TMPDIR/cases.json" && \
+> sql-fun test "$TMPDIR/cases.json#$.cases" --expect "$TMPDIR/expected.json" 2>&1
+Error: SQL array elements must be strings
 [1]
 ```

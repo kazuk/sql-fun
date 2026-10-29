@@ -227,6 +227,9 @@ by setup, so partial group suppression is not supported. This mechanism does
 not change product CLI input formats, comparison semantics or schema selection.
 When fixing #799, remove every entry and the temporary helper/integration, then
 make all preserved cases pass in source and installed-distribution checks.
+
+## Declaration collations
+
 Issue #822 declaration contracts live in `declaration-collations.json`, selected
 with the explicit `declaration-collations.sql` project schema on PostgreSQL 17/18.
 The shared source and installed paths check record-column COLLATE diagnostics,

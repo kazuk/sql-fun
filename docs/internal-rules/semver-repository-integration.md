@@ -1,7 +1,7 @@
 # Repository release-intent integration
 
 `check-semver` implements #359 for maintainers validating local changes and for
-future CI adapters. It reuses the #357 comparator and #358 feature lifecycle;
+the normal-CI adapter. It reuses the #357 comparator and #358 feature lifecycle;
 see [policy](semver-release-intent.md), [coverage](semver-feature-coverage.md),
 and [package comparison](package-api-comparator.md).
 
@@ -192,3 +192,39 @@ target, cache conditions and runner resources with developer/CI measurements.
 Default enablement requires a separate maintainer decision. Required CI wiring,
 release-side adoption wiring and performance cache optimization remain separate
 work.
+
+## Authoritative normal CI
+
+The `semver` job in `.github/workflows/build-test.yml` runs the standalone
+validator in commit mode with the checked-out full revision, the digest-pinned
+builder image's installed `stable` toolchain and explicit
+`x86_64-unknown-linux-gnu` target. It requires corrected
+`cargo-semver-checks 0.51.0-sqlfun.1` and uses the locked public-api dependency.
+Compiler identities and available disk space are recorded in the job log;
+the Actions container setup records the image digest. No runtime toolchain
+update is performed.
+
+Successful validation uploads `sql-fun-semver-baseline`, containing
+`semver_baseline.tar.gz`, retained for 30 days. The output is produced once by
+that validation invocation outside the checkout. Validation failure prevents
+upload; missing output or upload failure fails the job. Missing/corrupt active
+baseline state fails through the existing validator without initialization.
+The `build` aggregate depends on `semver` and retains its existing behavior.
+Required-check activation is a separate maintainer rollout decision after PR
+review and merge readiness. The intended policy is to require `semver`
+individually alongside the existing checks, without requiring `build`. Do not
+activate the new requirement before that decision: branches without the job
+cannot satisfy it.
+
+PR checkout analyzes the synthetic merge commit, which may differ from the
+run's recorded head SHA. Release selection uses the exact recorded target SHA
+and the repository's up-to-date PR/tree-equivalence contract described in the
+[workflow guideline](workflow-design-guideline.md). Issue #329 owns selecting
+and downloading this artifact through the existing successful normal-CI run
+selector. Missing or expired artifacts require correcting CI evidence for that
+revision; they do not authorize selecting an older candidate. The archive is
+internal CI data, never a GitHub Release asset. Upload does not adopt the
+candidate or advance the active baseline.
+
+This CI gate does not enable SemVer in the default local test flow or change
+local contributor prerequisites.

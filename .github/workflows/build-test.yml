@@ -894,9 +894,40 @@ jobs:
             ${{ runner.temp }}/sql-fun-postgres/18/**
           if-no-files-found: error
 
+  semver:
+    needs: pr-freshness
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate release intent and generate baseline candidate
+        run: |
+          export SQL_FUN_HOME="$GITHUB_WORKSPACE/sql-fun-home"
+          test "$(cargo semver-checks --version)" = 'cargo-semver-checks 0.51.0-sqlfun.1'
+          rustc +stable -Vv
+          cargo +stable -V
+          rustdoc +stable -V
+          df -h . "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/semver-candidate"
+          .local/bin/check-semver --repository "$GITHUB_WORKSPACE" \
+            --revision "$(git rev-parse HEAD)" \
+            --toolchain stable --target x86_64-unknown-linux-gnu \
+            --candidate-output "$RUNNER_TEMP/semver-candidate/semver_baseline.tar.gz" \
+            | tee "$RUNNER_TEMP/semver-report.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-semver-baseline
+          path: ${{ runner.temp }}/semver-candidate/semver_baseline.tar.gz
+          retention-days: 30
+          if-no-files-found: error
+
   build:
     runs-on: ubuntu-24.04
     needs:
+      - semver
       - workspace
       - workspace-all-features
       - msrv

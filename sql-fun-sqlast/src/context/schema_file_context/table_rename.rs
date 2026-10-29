@@ -1,14 +1,14 @@
 //! Stage dependent metadata before committing one catalog identity transition.
-use super::{SchemaCatalog, SchemaFileContext};
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     context::{
-        FunctionInfoRead, IndexInfoRead, ObjectInfoRead, OwnershipInfoRead, SequenceInfoRead,
-        TableInfoRead, TypeInfoRead, ViewInfoRead,
+        FunctionInfoRead, IndexInfoRead, ObjectInfoRead, OwnershipInfoRead, ParseContext,
+        SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
     sem::{
         AlterTable, AnalysisError, CreateFunction, CreateIndex, CreateRule, CreateSequence,
-        CreateTable, CreateTrigger, FullName, OverloadVariant, ParseContext, RuleIdentity,
-        RuleReferences, TableName, TriggerIdentity, TriggerReferences, TypeDefinition, ViewLike,
+        CreateTable, CreateTrigger, FullName, OverloadVariant, RuleIdentity, RuleReferences,
+        TableName, TriggerIdentity, TriggerReferences, TypeDefinition, ViewLike,
     },
 };
 

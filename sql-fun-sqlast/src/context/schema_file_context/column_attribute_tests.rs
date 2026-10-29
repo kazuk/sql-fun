@@ -1,7 +1,9 @@
 //! SQL-to-semantics and catalog-chain regressions; no external server is required.
-use crate::context::BaseParseContext;
-use crate::sem::{ColumnName, ParseContext};
-use crate::syn::{ListOpt, Opt};
+use crate::{
+    context::{BaseParseContext, ParseContext},
+    sem::ColumnName,
+    syn::{ListOpt, Opt},
+};
 
 #[rstest::rstest]
 #[case::zero("0", Some(0), true)]
@@ -487,7 +489,7 @@ fn legacy_column_json_shape_remains_readable() -> testresult::TestResult {
 mod test_helpers {
     // pg_query 6 uses PostgreSQL 17 grammar. Seed the supported semantic catalog
     // mode directly so PostgreSQL 18 virtual-column restrictions are exercised.
-    pub(super) fn virtual_column_context() -> crate::sem::SchemaFileContext {
+    pub(super) fn virtual_column_context() -> crate::context::SchemaFileContext {
         use crate::{
             context::TableInfoWrite,
             sem::{
@@ -519,13 +521,12 @@ mod test_helpers {
         context
     }
 
-    use crate::context::BaseParseContext;
     use crate::{
-        context::MutSourcePathWithSpan,
-        sem::{
-            AnalysisError, AstAndContextPair, ColumnDefinition, ColumnName, FrozenBaseContext,
-            ParseContext, SchemaFileContext, TableName,
+        context::{
+            BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext,
+            SchemaFileContext,
         },
+        sem::{AnalysisError, AstAndContextPair, ColumnDefinition, ColumnName, TableName},
     };
     pub(super) fn table_name() -> TableName {
         TableName::from(crate::sem::FullName::with_schema("public", "t"))

@@ -4,7 +4,6 @@ use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{PgBuiltInType, TypeReference},
 };
-
 use std::collections::BTreeMap;
 
 #[test]
@@ -489,9 +488,8 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
-            context::BaseContext,
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
             parse_statements,
-            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::{Path, PathBuf};
 

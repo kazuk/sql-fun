@@ -12,12 +12,11 @@ use ::sql_fun_server_api::{
         ParameterDescribe, QueryKind, ResultSetColumn, StatementByteRange, TextSpan, TypeReference,
     },
 };
-use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     ast::{Dialect, Statement},
-    context::{ParameterTypeHintWrite, ParseContext},
+    context::{BaseParseContext, ParameterTypeHintWrite, ParseContext, SchemaFileContext},
     parse_statements,
-    sem::{AnalysisProblem, QueryMetadata, SchemaFileContext, TypeReference as SqlType},
+    sem::{AnalysisProblem, QueryMetadata, TypeReference as SqlType},
 };
 use std::path::{Path, PathBuf};
 

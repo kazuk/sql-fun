@@ -8,7 +8,7 @@ use crate::{
 };
 
 impl TestParseContext {
-    pub(crate) fn set_conflict_masters(&mut self, masters: &crate::sem::ConflictMasters) {
+    pub(crate) fn set_conflict_masters(&mut self, masters: &crate::context::ConflictMasters) {
         self.masters = Some(masters.clone());
     }
 

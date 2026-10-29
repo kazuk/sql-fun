@@ -1,4 +1,4 @@
-use super::{SchemaCatalog, SchemaFileContext};
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     context::{
         OwnershipInfoRead, RoleInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,

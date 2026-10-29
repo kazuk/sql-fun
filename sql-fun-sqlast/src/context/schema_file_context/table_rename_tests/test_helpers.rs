@@ -1,8 +1,9 @@
-use crate::context::BaseParseContext;
-use crate::test_helpers::{ownership::apply_ownership_sql, source_span};
 use crate::{
-    context::MutSourcePathWithSpan,
-    sem::{AnalysisError, FrozenBaseContext, FullName, ParseContext, SchemaFileContext},
+    context::{
+        BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
+    },
+    sem::{AnalysisError, FullName},
+    test_helpers::{ownership::apply_ownership_sql, source_span},
 };
 
 pub(super) fn context() -> SchemaFileContext {

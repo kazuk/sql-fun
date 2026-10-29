@@ -1,11 +1,9 @@
-use crate::context::BaseParseContext;
 use crate::{
     AstAndContextPair,
     ast::Dialect,
+    context::{BaseParseContext, SchemaFileContext},
     parse_statements,
-    sem::{
-        CastContext, CastDefinition, ParseContext, SchemaFileContext, SchemaName, TypeReference,
-    },
+    sem::{CastContext, CastDefinition, ParseContext, SchemaName, TypeReference},
     test_helpers::TestParseContext,
 };
 

@@ -30,7 +30,7 @@ type LoadedCasts = (TrieMap<TrieMap<CastDefinition>>, HashSet<FullName>);
 impl PgBuiltinCasts {
     pub(super) fn load<P: AsRef<Path>>(
         path: P,
-        masters: &crate::sem::ConflictMasters,
+        masters: &crate::context::ConflictMasters,
     ) -> Result<LoadedCasts, AnalysisError> {
         let casts: CastMap = super::deserialize_from_path(path)?;
 
@@ -267,15 +267,13 @@ impl super::BaseContext {
 
 #[cfg(test)]
 mod test_builtin_cast_identity {
-    use std::path::{Path, PathBuf};
-
+    use crate::{
+        context::{BaseContext, CastInfoRead, FrozenBaseContext, SchemaFileContext},
+        sem::{FullName, TypeReference},
+    };
     use ::clap::Parser;
     use ::sql_fun_core::SqlFunArgs;
-
-    use crate::{
-        context::{BaseContext, CastInfoRead},
-        sem::{FrozenBaseContext, FullName, SchemaFileContext, TypeReference},
-    };
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn keeps_array_and_schema_identity_and_cast_context() {

@@ -5,7 +5,7 @@ use crate::{
     sem::{CastContext, CastDefinition, TypeReference},
 };
 
-use super::SchemaCatalog;
+use crate::context::schema_file_context::SchemaCatalog;
 
 impl CastInfoRead for SchemaCatalog {
     fn get_assignment_cast(
@@ -213,8 +213,8 @@ impl SchemaCatalog {
 #[cfg(test)]
 mod test_domain_casts {
     use crate::{
-        context::CastInfoRead,
-        sem::{ParseContext, PgBuiltInType},
+        context::{CastInfoRead, ParseContext},
+        sem::PgBuiltInType,
     };
 
     #[rstest::rstest]
@@ -285,10 +285,9 @@ mod test_domain_casts {
 
     mod test_helpers {
         use crate::{
-            context::TypeInfoWrite,
+            context::{ParseContext, SchemaFileContext, TypeInfoWrite},
             sem::{
-                CastContext, CastDefinition, CreateDomain, FullName, ParseContext, PgBuiltInType,
-                SchemaFileContext, TypeReference,
+                CastContext, CastDefinition, CreateDomain, FullName, PgBuiltInType, TypeReference,
             },
         };
 
@@ -330,8 +329,8 @@ mod test_domain_casts {
 #[cfg(test)]
 mod test_cast_layers {
     use crate::{
-        context::CastInfoRead,
-        sem::{CastContext, ParseContext},
+        context::{CastInfoRead, ParseContext},
+        sem::CastContext,
     };
     use std::collections::HashSet;
 
@@ -441,11 +440,12 @@ mod test_cast_layers {
     }
 
     mod test_helpers {
-        use crate::TrieMap;
-        use crate::sem::{
-            CastContext, CastDefinition, FullName, ParseContext, SchemaFileContext, TypeReference,
+        use crate::{
+            TrieMap,
+            context::{ParseContext, SchemaFileContext},
+            sem::{CastContext, CastDefinition, FullName, TypeReference},
+            test_helpers::TestParseContext,
         };
-        use crate::test_helpers::TestParseContext;
         use std::path::Path;
 
         pub(super) fn named_type(name: &str) -> TypeReference {

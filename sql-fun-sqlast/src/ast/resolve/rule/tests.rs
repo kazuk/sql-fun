@@ -605,15 +605,15 @@ fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::context::BaseParseContext;
-    use crate::context::ParseContext;
-    use crate::sem::{
-        AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode,
-        FrozenBaseContext, FullName, PgBuiltInType, SchemaFileContext, SchemaName, SemAst,
-        TableName,
+    use crate::{
+        ast::Dialect,
+        context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
+        sem::{
+            AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, FullName,
+            PgBuiltInType, SchemaName, SemAst, TableName,
+        },
+        test_helpers::TestParseContext,
     };
-    use crate::test_helpers::TestParseContext;
 
     pub(super) fn catalog_version(version: &str) -> TestParseContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({

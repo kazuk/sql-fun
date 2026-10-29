@@ -35,7 +35,6 @@ mod drop_rule;
 mod drop_trigger;
 mod error;
 mod from_clause;
-mod frozen_base_context;
 mod insert_statement;
 mod merge_statement;
 mod names;
@@ -51,7 +50,6 @@ mod query;
 mod query_metadata;
 mod resolution;
 mod scalar_expr;
-mod schema_file_context;
 pub(crate) mod search_path;
 mod select_statement;
 mod top_level_statement;
@@ -100,8 +98,6 @@ pub use self::merge_statement::{
     MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
     ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
 };
-
-pub(crate) use self::conflict_masters::ConflictMasters;
 
 pub use self::drop_dependency_behavior::DropDependencyBehavior;
 pub use self::drop_trigger::DropTrigger;
@@ -166,7 +162,6 @@ pub use self::{
     },
     error::AnalysisError,
     from_clause::FromClause,
-    frozen_base_context::FrozenBaseContext,
     insert_statement::{
         InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
         InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
@@ -200,7 +195,6 @@ pub use self::{
         SubQueryColumnRef, SystemColumnRef, TableColumnRef, TruthTestExpr, TypeCastExpr,
         WholeRowExpr,
     },
-    schema_file_context::SchemaFileContext,
     select_statement::{ResultColumnCollection, SelectStatement},
     type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult},
     update_statement::{
@@ -225,11 +219,9 @@ pub(crate) use self::{
     select_statement::{ResultColumn, SelectStatementNode},
     update_statement::{UpdateDestination, UpdatePredicate},
 };
-use crate::context::ParseContext;
-
-use crate::StringSpan;
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::Cmd};
+use crate::{StringSpan, context::ParseContext};
 
 use std::{
     fmt::Debug,

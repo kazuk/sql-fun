@@ -32,14 +32,13 @@ fn table_sample_retains_explicit_unimplemented_marker() {
 
 mod test_helpers {
     pub(super) mod heavy {
-        use std::path::PathBuf;
-
         use ::sql_fun_sqlast::{
             PostgresDialect, SqlFunArgs,
-            context::BaseContext,
-            sem::{AnalysisError, FrozenBaseContext, SchemaFileContext, SelectStatement},
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
+            sem::{AnalysisError, SelectStatement},
             syn::{ListOpt, Opt},
         };
+        use std::path::PathBuf;
 
         /// Loads builtin JSON catalogs for each invocation to check the public
         /// analysis boundary. Initialization is repeated; no cache is shared.

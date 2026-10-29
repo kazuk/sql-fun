@@ -507,9 +507,10 @@ Malformed or unresolved names return an error and preserve the complete previous
 setup. Successful setup replaces all previous hints, including when passed an
 empty slice or only `None` entries.
 
-Create an independent `SchemaFileContext` over the shared frozen catalog for
-each query. If reusing a mutable context, explicitly install the next query's
-hints, including an empty setup for unhinted queries. Nested queries and realized
+Create an independent `sql_fun_sqlast::context::SchemaFileContext` over the
+shared `sql_fun_sqlast::context::FrozenBaseContext` catalog for each query. If
+reusing a mutable context, explicitly install the next query's hints, including
+an empty setup for unhinted queries. Nested queries and realized
 CTEs share that query's finalized parameter order and hints. Hints assign SQL
 types during name resolution; incompatible uses still produce semantic
 diagnostics. They do not insert casts or change executable SQL. The accepted

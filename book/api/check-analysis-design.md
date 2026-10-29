@@ -366,7 +366,7 @@ implementation and reference documentation cover the behavior.
 | --- | --- |
 | `sql-fun-server-api/src/initialize_schema.rs` | Implemented initialization request/response; PostgreSQL-only dialect/version enums |
 | `sql-fun-server-api/src/payloads/analyze_query.rs` | Query input and result shapes |
-| `sql-fun-sqlast` | `FrozenBaseContext`, layered schema loading, recoverable schema problems |
+| `sql-fun-sqlast` | `context::FrozenBaseContext`, layered schema loading, recoverable schema problems |
 | `sql-fun-core` | Shared `ResolvedCteCatalog` and its serialization |
 | `sql-fun-codegen` | `QueryRequirements::extract` |
 | `sql-fun-server/src/cte_realization.rs` | `realize_cte_catalog` produces a common AST and `OrderedBindings`; it is server-internal |

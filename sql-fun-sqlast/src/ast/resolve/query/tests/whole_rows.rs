@@ -458,13 +458,15 @@ fn scalar_source_fields_do_not_make_a_composite(#[case] sql: &str, #[case] code:
 }
 
 mod test_helpers {
-    use crate::ast::{Dialect, StatementNode};
-    use crate::context::ParseContext;
-    use crate::sem::{
-        FullName, FunctionParam, OverloadVariant, PgBuiltInType, SelectStatement, SemScalarExpr,
-        TypeReference,
+    use crate::{
+        ast::{Dialect, StatementNode},
+        context::ParseContext,
+        sem::{
+            FullName, FunctionParam, OverloadVariant, PgBuiltInType, SelectStatement,
+            SemScalarExpr, TypeReference,
+        },
+        test_helpers::TestParseContext,
     };
-    use crate::test_helpers::TestParseContext;
 
     pub(super) fn assert_problem(context: &TestParseContext, code: &str) {
         for problem in context.reported_problems() {
@@ -500,16 +502,16 @@ mod test_helpers {
             .expression()
             .unwrap()
     }
-    pub(super) fn view_query(sql: &str) -> (SelectStatement, crate::sem::SchemaFileContext) {
+    pub(super) fn view_query(sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
         schema_query("CREATE VIEW v AS SELECT 1 AS n", sql)
     }
-    pub(super) fn alias_query(sql: &str) -> (SelectStatement, crate::sem::SchemaFileContext) {
+    pub(super) fn alias_query(sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
         schema_query(
             "CREATE VIEW v AS SELECT 1 AS n; CREATE TABLE t(n integer NOT NULL); CREATE VIEW w AS SELECT 1 AS n, 'a'::text AS label; CREATE VIEW nested AS SELECT identity_v(v.*) AS payload FROM v",
             sql,
         )
     }
-    pub(super) fn assert_catalog_view_field(context: &crate::sem::SchemaFileContext) {
+    pub(super) fn assert_catalog_view_field(context: &crate::context::SchemaFileContext) {
         let ty = TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
         let columns = ty.row_columns(context).unwrap();
         assert!(
@@ -528,7 +530,7 @@ mod test_helpers {
                 .is_none()
         );
     }
-    fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, crate::sem::SchemaFileContext) {
+    fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
         use crate::context::BaseParseContext;
         let mut base = super::super::super::test_helpers::catalog();
         let nominal =
@@ -551,7 +553,7 @@ mod test_helpers {
         );
         let args = base.get_args().clone();
         let metadata = base.metadata().clone();
-        let mut context = crate::sem::SchemaFileContext::new(
+        let mut context = crate::context::SchemaFileContext::new(
             std::path::Path::new("whole_rows.sql"),
             &base.freeze(),
             &args,

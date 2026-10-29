@@ -1,14 +1,12 @@
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{TableInfoRead, TableInfoWrite},
+    TrieMap,
+    context::{ParseContext, TableInfoRead, TableInfoWrite},
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, ParseContext, TableName,
+        AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, TableName,
         search_path::expand_relation_search_path,
     },
 };
-
-use crate::TrieMap;
-
-use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct TableDefinitionCollection(TrieMap<CreateTable>, Vec<FullName>);
@@ -157,10 +155,9 @@ impl TableInfoWrite for SchemaFileContext {
 
 #[cfg(test)]
 mod test_drop_catalog_key {
-    use crate::context::BaseParseContext;
     use crate::{
-        context::{TableInfoRead, TableInfoWrite},
-        sem::{DropTable, FullName, ParseContext, TableName},
+        context::{BaseParseContext, ParseContext, TableInfoRead, TableInfoWrite},
+        sem::{DropTable, FullName, TableName},
     };
 
     #[rstest::rstest]
@@ -204,9 +201,9 @@ mod test_drop_catalog_key {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            AnalysisError, CreateTable, CreateTableMode, FullName, ParseContext, SchemaFileContext,
-            SchemaName, TableName,
+        use crate::{
+            context::{ParseContext, SchemaFileContext},
+            sem::{AnalysisError, CreateTable, CreateTableMode, FullName, SchemaName, TableName},
         };
 
         pub(super) fn unqualified_tables() -> Result<SchemaFileContext, AnalysisError> {

@@ -22,9 +22,7 @@ use std::sync::Arc;
 ///
 /// ```
 /// use std::path::Path;
-/// use ::sql_fun_sqlast::context::BaseParseContext;
-/// use ::sql_fun_sqlast::sem::{FrozenBaseContext, SchemaFileContext};
-/// use ::sql_fun_sqlast::context::ParseContext;
+/// use ::sql_fun_sqlast::context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext};
 ///
 /// fn next_layer(builder: SchemaFileContext, args: &::sql_fun_core::SqlFunArgs, metadata: &::sql_fun_core::SqlFunMetadata) {
 ///     let frozen = builder.freeze();
@@ -40,8 +38,7 @@ use std::sync::Arc;
 /// Frozen handles expose no parsing mutators, even when owned uniquely:
 ///
 /// ```compile_fail
-/// use ::sql_fun_sqlast::sem::FrozenBaseContext;
-/// use ::sql_fun_sqlast::context::ParseContext;
+/// use ::sql_fun_sqlast::context::{FrozenBaseContext, ParseContext};
 ///
 /// fn mutate_frozen(mut frozen: FrozenBaseContext) {
 ///     frozen.set_search_path(&[]);
@@ -51,7 +48,7 @@ use std::sync::Arc;
 /// Their inner storage is private and cannot be extracted:
 ///
 /// ```compile_fail
-/// use ::sql_fun_sqlast::sem::FrozenBaseContext;
+/// use ::sql_fun_sqlast::context::FrozenBaseContext;
 ///
 /// fn extract_storage(frozen: FrozenBaseContext) {
 ///     let _inner = frozen.0;
@@ -87,10 +84,9 @@ impl From<BaseContext> for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_frozen_root {
-    use crate::context::BaseParseContext;
     use crate::{
-        context::{GetSourcePathWithSpanOpt, SearchPathRead},
-        sem::{FrozenBaseContext, FullName},
+        context::{BaseParseContext, FrozenBaseContext, GetSourcePathWithSpanOpt, SearchPathRead},
+        sem::FullName,
     };
 
     #[test]
@@ -123,8 +119,7 @@ mod test_frozen_root {
     }
 
     mod test_helpers {
-        use crate::context::BaseContext;
-        use crate::sem::FrozenBaseContext;
+        use crate::context::{BaseContext, FrozenBaseContext};
         use ::sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
         use std::path::Path;
 
@@ -488,7 +483,7 @@ macro_rules! forward_catalog_reads {
 }
 
 forward_catalog_reads!(FrozenBaseContext, catalog);
-forward_catalog_reads!(crate::sem::SchemaFileContext, catalog);
+forward_catalog_reads!(crate::context::SchemaFileContext, catalog);
 forward_catalog_reads!(crate::ParsedSchemaDump, base_context);
 
 impl crate::context::TypeInfoRead for FrozenBaseContext {
@@ -511,8 +506,10 @@ impl crate::context::TypeInfoRead for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_type_lookup_cost {
-    use crate::context::BaseParseContext;
-    use crate::sem::{FullName, ParseContext};
+    use crate::{
+        context::{BaseParseContext, ParseContext},
+        sem::FullName,
+    };
     use std::{path::Path, sync::atomic::Ordering};
 
     #[rstest::rstest]
@@ -534,10 +531,10 @@ mod test_type_lookup_cost {
     }
 
     mod test_helpers {
-        use crate::test_helpers::TestParseContext;
         use crate::{
-            context::TypeInfoRead,
-            sem::{FrozenBaseContext, FullName, ParseContext, TypeDefinition, TypeReference},
+            context::{FrozenBaseContext, ParseContext, TypeInfoRead},
+            sem::{FullName, TypeDefinition, TypeReference},
+            test_helpers::TestParseContext,
         };
         use std::sync::{
             Arc,

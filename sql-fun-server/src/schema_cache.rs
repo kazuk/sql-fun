@@ -5,8 +5,8 @@ use crate::{cache::Cache, file_hash_cache::FileHashCache};
 use ::sql_fun_core::{Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
 use ::sql_fun_sqlast::{
     ParseDumpFileError, PostgresDialect, SqlFileSnapshot,
-    context::BaseContext,
-    sem::{AnalysisProblem, FrozenBaseContext},
+    context::{BaseContext, FrozenBaseContext},
+    sem::AnalysisProblem,
 };
 use std::{
     collections::HashMap,

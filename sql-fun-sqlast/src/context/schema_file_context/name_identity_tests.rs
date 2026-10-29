@@ -1,5 +1,5 @@
 //! Catalog identity across quoted component boundaries and frozen layers.
-use crate::sem::{FullName, ParseContext};
+use crate::{context::ParseContext, sem::FullName};
 
 #[rstest::rstest]
 #[case::tables("table")]
@@ -80,15 +80,11 @@ fn comment_targets_preserve_quoted_names_and_function_signatures() -> testresult
 }
 
 mod test_helpers {
-    use crate::ast::{Dialect, StatementNode, TryFromWithTokens};
-    use crate::context::BaseParseContext;
-    use crate::test_helpers::{SynBuilder, TestParseContext};
     use crate::{
-        context::MutSourcePathWithSpan,
-        sem::{
-            AnalysisError, ColumnName, FullName, ParseContext, PgBuiltInType, SchemaFileContext,
-            SchemaName,
-        },
+        ast::{Dialect, StatementNode, TryFromWithTokens},
+        context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
+        sem::{AnalysisError, ColumnName, FullName, PgBuiltInType, SchemaName},
+        test_helpers::{SynBuilder, TestParseContext},
     };
 
     pub(super) fn context() -> SchemaFileContext {

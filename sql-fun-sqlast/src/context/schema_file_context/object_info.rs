@@ -1,7 +1,6 @@
-use super::{SchemaCatalog, SchemaFileContext};
-use crate::context::BaseParseContext;
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{ExtensionInfoRead, ObjectInfoRead},
+    context::{BaseParseContext, ExtensionInfoRead, ObjectInfoRead},
     sem::{FullName, Kind},
 };
 

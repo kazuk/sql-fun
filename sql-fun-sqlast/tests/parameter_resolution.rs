@@ -53,8 +53,7 @@ mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             SqlFunArgs,
-            context::BaseContext,
-            sem::{FrozenBaseContext, SchemaFileContext},
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
         };
         use std::path::PathBuf;
 
@@ -155,8 +154,8 @@ fn parser_adapter_retains_the_same_constraints() -> Result<(), Box<dyn std::erro
 #[test]
 fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::{
-        context::CastInfoRead,
-        sem::{FullName, SchemaFileContext, TypeReference},
+        context::{CastInfoRead, SchemaFileContext},
+        sem::{FullName, TypeReference},
     };
     let definition = parse_statements(
         "create type public.mood as enum ('happy')",

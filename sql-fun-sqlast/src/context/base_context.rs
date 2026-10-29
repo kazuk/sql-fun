@@ -29,7 +29,7 @@ use serde::de::DeserializeOwned;
 /// Builtin schema information initialized from the selected metadata.
 #[derive(Debug)]
 pub struct BaseContext {
-    configured_roles: crate::sem::ownership::ConfiguredRoles,
+    configured_roles: crate::context::ownership::ConfiguredRoles,
     context_args: SqlFunArgs,
     metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
@@ -40,7 +40,7 @@ pub struct BaseContext {
     right_unary_operators: TrieMap<OperatorDefinition>,
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
-    masters: crate::sem::ConflictMasters,
+    masters: crate::context::ConflictMasters,
 }
 
 #[derive(serde::Deserialize)]
@@ -197,9 +197,9 @@ impl BaseContext {
         let right_unary_operators =
             PgBuiltinOperators::load_right_unary(paths.right_unary_operators()?)?;
         let masters = if crate::ast::Dialect::from(metadata) == crate::ast::Dialect::sqlite() {
-            crate::sem::ConflictMasters::sqlite()
+            crate::context::ConflictMasters::sqlite()
         } else {
-            crate::sem::ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
+            crate::context::ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
         };
 
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;

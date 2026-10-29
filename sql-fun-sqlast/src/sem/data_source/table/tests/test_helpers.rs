@@ -1,9 +1,8 @@
-use crate::ast::Dialect;
-use crate::context::BaseParseContext;
-use crate::test_helpers::{TestParseContext, source_span};
 use crate::{
-    context::MutSourcePathWithSpan,
-    sem::{ParseContext, SchemaFileContext, SchemaName, SelectStatement, TypeReference},
+    ast::Dialect,
+    context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
+    sem::{ParseContext, SchemaName, SelectStatement, TypeReference},
+    test_helpers::{TestParseContext, source_span},
 };
 
 /// Uses only six explicit builtin types and small local DDL, without a shipped catalog.

@@ -1,6 +1,5 @@
-use crate::context::ParseContext;
 use crate::{
-    context::TriggerInfoRead,
+    context::{ParseContext, TriggerInfoRead},
     sem::{FullName, TriggerIdentity},
 };
 
@@ -150,9 +149,10 @@ fn attached_schema_order_matches_bundled_sqlite(
 }
 
 mod test_helpers {
-    use crate::context::BaseParseContext;
-    use crate::sem::{FrozenBaseContext, SchemaFileContext};
-    use crate::sem::{FullName, SchemaName, TableName, TriggerIdentity, ViewName};
+    use crate::{
+        context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
+        sem::{FullName, SchemaName, TableName, TriggerIdentity, ViewName},
+    };
     pub(super) const CREATE_AUDIT: &str =
         "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view BEGIN SELECT 1; END";
     pub(super) fn identity() -> TriggerIdentity {
@@ -203,10 +203,8 @@ mod test_helpers {
             .len()
     }
     pub(super) mod heavy {
-        use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
-        use super::{SchemaName, layer};
-        use crate::context::BaseContext;
-        use crate::context::ParseContext;
+        use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, SchemaName, apply, layer};
+        use crate::context::{BaseContext, ParseContext};
 
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.

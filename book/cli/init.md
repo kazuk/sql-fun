@@ -120,8 +120,14 @@ subsequent check/server commands with the same home (normally `~/.sql-fun`).
 
 A complete compatible installation is preserved on rerun. An incomplete or
 incompatible installation is an error: move the affected version directory
-aside before retrying. `--yes` does not overwrite metadata. Only one initializer
-may install a given version at a time.
+aside before retrying. `--yes` does not overwrite metadata. Concurrent initializers
+preserve the first complete compatible installation published for that version.
+Readers see the version directory only after its metadata has been validated.
+
+A hard crash can leave a `<version>.installing.<unique>` staging directory under
+`<chosen-home>/postgres/`. After confirming its initializer is no longer running,
+you can remove that leftover directory before retrying. Other staging directories
+are not cleaned up automatically.
 
 Versions are installed independently. If a later version fails, completed
 versions remain usable and the command reports failure. Correct the reported

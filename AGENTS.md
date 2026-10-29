@@ -35,6 +35,28 @@ You can build and run tests using the `check-test-flow` script.
   corresponding job has finished on the final PR head and its result has been
   verified.
 
+## Regression Test Execution Budget
+
+- Creating and running tests to verify an implementation does **not** authorize
+  committing them as permanently maintained tests or adding them to the default
+  `check-test-flow` or CI execution paths.
+- Adding regression tests **other than those needed to guarantee product
+  functionality** to the default `check-test-flow` or CI requires **explicit
+  maintainer approval of the recurring execution budget** beforehand. The
+  approval must cover the intended execution path and its developer and CI
+  computational costs. An implementation task, passing tests, or an existing
+  test runner does not imply that approval.
+- Tests used for development or one-time acceptance may be executed separately
+  without making them recurring checks. Decide independently whether to retain
+  such tests and whether to schedule them for regular execution.
+- Permanently retained tests must verify stable contracts, not incidental
+  current repository settings. Normal operational changes, such as updates to
+  release intent, must not require rewriting test expectations unless the tested
+  contract itself changes.
+- If no ongoing execution budget is approved, do not silently enroll the test
+  in existing suites or CI. Remove temporary tests before merge unless their
+  retention and execution ownership have been explicitly agreed.
+
 ## SQLAST Regression Tests
 
 - When modifying `sql-fun-sqlast`, prefer `sql-fun test` fixtures against the

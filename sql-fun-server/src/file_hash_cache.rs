@@ -198,6 +198,9 @@ mod tests {
         );
     }
 
+    // Removed invalidation_prevents_late_population after a CI timeout.
+    // Deletion commit: 10662b811d43b06eafb708282639329322b3378a; recover from its parent.
+
     // Removed native_notification_invalidates_in_place_change; restore from df446be6c1d950353fbd7f79916f79c68bfd396d.
     #[test]
     fn inode_replacement_invalidates_without_notification() {

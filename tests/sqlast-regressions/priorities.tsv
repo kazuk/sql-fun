@@ -31,7 +31,7 @@ medium	distinctness-17
 medium	distinctness-18
 medium	domain-operators-17
 medium	domain-operators-18
-medium	minmax-metadata-18
+medium	minmax-metadata-17
 medium	output-names-17
 medium	output-names-18
 medium	parameter-bindings-17
@@ -95,7 +95,7 @@ light	metadata-overloads-17
 light	metadata-overloads-18
 light	minmax-diagnostics-17
 light	minmax-diagnostics-18
-light	minmax-metadata-17
+light	minmax-metadata-18
 light	pilot-17
 light	pilot-18
 light	project-roles-omitted-17

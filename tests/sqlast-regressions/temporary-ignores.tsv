@@ -1,0 +1,783 @@
+# Temporary ignores authorized in PR #856; remove every entry when #799 is fixed.
+# fixture	case-name	versions	issue
+case-common-types	case_common_types::array_else_domain	17,18	#799
+case-common-types	case_common_types::array_else_base	17,18	#799
+case-common-types	case_common_types::scalar_domain	17,18	#799
+case-common-types	case_common_types::unknown_array	17,18	#799
+case-common-types	case_common_types::domain_over_array	17,18	#799
+case-common-types	case_common_types::simple	17,18	#799
+case-common-types	case_common_types::multiple	17,18	#799
+case-common-types	case_common_types::identical_domain	17,18	#799
+case-common-types	case_common_types::identical_array	17,18	#799
+case-common-types	case_common_types::unknown_string	17,18	#799
+case-common-types	case_common_types::all_unknown	17,18	#799
+case-common-types	case_common_types::omitted_else	17,18	#799
+case-common-types	case_common_types::nested	17,18	#799
+case-common-types	case_common_types::parent_function	17,18	#799
+case-common-types	case_common_types::incompatible_results	17,18	#799
+schema-composites	ast::resolve::query::tests::array_subquery::named_composite_elements_keep_nominal_identity::named	17,18	#799
+schema-composites	ast::resolve::query::tests::array_subquery::named_composite_elements_keep_nominal_identity::named_pair	17,18	#799
+schema-composites	ast::resolve::query::tests::array_subquery::deferred_star_checks_final_output_width::one	17,18	#799
+schema-composites	ast::resolve::query::tests::array_subquery::deferred_star_checks_final_output_width::two	17,18	#799
+schema-composites	ast::resolve::query::tests::array_subquery::deferred_star_preserves_enclosing_result_link	17,18	#799
+schema-composites	ast::resolve::query::tests::array_subquery::nested_deferred_arrays_finish_after_each_projection_expands	17,18	#799
+schema-enums	enum_column_keeps_qualified_identity	17,18	#799
+schema-enums	same_label_enums_keep_distinct_result_types	17,18	#799
+schema-enums	enum_function_result_keeps_identity	17,18	#799
+schema-delete	delete::resolves_delete::plain	17,18	#799
+schema-delete	delete::resolves_delete::star	17,18	#799
+schema-delete	delete::resolves_delete::only	17,18	#799
+schema-delete	delete::resolves_delete::alias	17,18	#799
+schema-delete	delete::resolves_delete::using	17,18	#799
+schema-delete	delete::resolves_delete::target_star	17,18	#799
+schema-delete	delete::resolves_delete::source_star	17,18	#799
+schema-delete	delete::resolves_delete::with	17,18	#799
+schema-delete	delete::resolves_delete::correlated	17,18	#799
+schema-delete	delete::resolves_delete::cte_shadow	17,18	#799
+schema-delete	delete::reports_invalid_delete::alias_hidden	17,18	#799
+schema-delete	delete::reports_invalid_delete::ambiguous	17,18	#799
+schema-delete	delete::reports_invalid_delete::duplicate_alias	17,18	#799
+schema-delete	delete::reports_invalid_delete::missing_column	17,18	#799
+schema-delete	delete::reports_invalid_delete::predicate	17,18	#799
+schema-delete	delete::reports_invalid_delete::using_correlation	17,18	#799
+schema-delete	delete::reports_invalid_delete::cte_aliases	17,18	#799
+schema-delete	output_names::returning_delete	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::identity	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::smallint	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::bigint	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::string_io	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::identifier	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::timestamp	17,18	#799
+schema-domains-builtin	domain_casts::explicit_cast_retains_domain_binding::null	17,18	#799
+schema-domains-builtin	domain_casts::invalid_cast_keeps_target_lookup_and_argument::invalid	17,18	#799
+schema-domains-builtin	domain_casts::invalid_cast_keeps_target_lookup_and_argument::invalid_array	17,18	#799
+schema-domains-builtin	domain_casts::invalid_cast_keeps_target_lookup_and_argument::missing	17,18	#799
+schema-domains-default-tie	type_metadata_regressions::omitted_defaults_do_not_resolve_an_equal_input_tie	17,18	#799
+schema-domains-defaults	type_metadata_regressions::omitted_defaults_do_not_contribute_matches::preferred	17,18	#799
+schema-domains-defaults	type_metadata_regressions::omitted_defaults_do_not_contribute_matches::exact	17,18	#799
+schema-domains-defaults	type_metadata_regressions::omitted_defaults_do_not_contribute_matches::parameter	17,18	#799
+schema-domains-equal-ranks	type_metadata_regressions::equal_function_ranks_remain_ambiguous::concrete	17,18	#799
+schema-domains-equal-ranks	type_metadata_regressions::equal_function_ranks_remain_ambiguous::parameter	17,18	#799
+schema-domains-extra-arguments	type_metadata_regressions::extra_arguments_do_not_create_a_false_exact_match	17,18	#799
+schema-domains-order-forward	type_metadata_regressions::function_choice_is_independent_of_catalog_order::left::forward	17,18	#799
+schema-domains-order-forward	type_metadata_regressions::function_choice_is_independent_of_catalog_order::right::forward	17,18	#799
+schema-domains-order-reverse	type_metadata_regressions::function_choice_is_independent_of_catalog_order::left::reverse	17,18	#799
+schema-domains-order-reverse	type_metadata_regressions::function_choice_is_independent_of_catalog_order::right::reverse	17,18	#799
+schema-domains-out-parameters	type_metadata_regressions::output_parameters_do_not_contribute_input_matches::concrete	17,18	#799
+schema-domains-out-parameters	type_metadata_regressions::output_parameters_do_not_contribute_input_matches::parameter	17,18	#799
+schema-domains-project	domain_casts::explicit_cast_retains_domain_binding::source_domain	17,18	#799
+schema-domains-project	domain_casts::explicit_cast_retains_domain_binding::same_domain	17,18	#799
+schema-domains-project	domain_casts::explicit_cast_retains_domain_binding::nested	17,18	#799
+schema-domains-project	domain_casts::explicit_cast_retains_domain_binding::empty_array	17,18	#799
+schema-domains-project	domain_casts::explicit_cast_retains_domain_binding::array_domain	17,18	#799
+schema-domains-project	domain_casts::explicit_cast_retains_domain_binding::domain_elements	17,18	#799
+schema-domains-project	type_metadata_regressions::expression_results_retain_qualified_domain_identity::cast	17,18	#799
+schema-domains-project	type_metadata_regressions::expression_results_retain_qualified_domain_identity::case_result	17,18	#799
+schema-domains-project	type_metadata_regressions::expression_results_retain_qualified_domain_identity::coalesce	17,18	#799
+schema-domains-project	type_metadata_regressions::parameter_cast_accepts_the_qualified_domain_reference	17,18	#799
+schema-domains-project	domain_casts::parameter_cast_preserves_admissible_inputs_and_domain_output	17,18	#799
+schema-domains-variadic-precedence	type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::concrete	17,18	#799
+schema-domains-variadic-precedence	type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::parameter	17,18	#799
+schema-domains-variadic-precedence-reverse	type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::concrete::reverse	17,18	#799
+schema-domains-variadic-precedence-reverse	type_metadata_regressions::ordinary_signature_precedes_identical_variadic_expansion::parameter::reverse	17,18	#799
+schema-domains-variadic	type_metadata_regressions::expanded_variadic_arguments_count_individually::exact	17,18	#799
+schema-domains-variadic	type_metadata_regressions::expanded_variadic_arguments_count_individually::preferred	17,18	#799
+schema-domains-variadic	type_metadata_regressions::expanded_variadic_arguments_count_individually::parameter	17,18	#799
+schema-expressions-array-catalog-shape	arrays::ordinary_array_equality_retains_binding_and_types::catalog_shape	17,18	#799
+schema-expressions-composite-array	arrays::declared_composite_array_fields_use_shipped_catalog_types	17,18	#799
+schema-expressions-record-ambiguity	arrays::record_overloads_preserve_postgres_ambiguity::scalar	17,18	#799
+schema-expressions-record-ambiguity	arrays::record_overloads_preserve_postgres_ambiguity::array	17,18	#799
+schema-expressions-record-array	arrays::anonymous_records_do_not_implicitly_become_named_composites::array	17,18	#799
+schema-expressions-record-overloads	arrays::competing_record_overloads_select_postgres_candidate::anonymous	17,18	#799
+schema-expressions-record-overloads	arrays::competing_record_overloads_select_postgres_candidate::named	17,18	#799
+schema-expressions-record-overloads	arrays::competing_record_overloads_select_postgres_candidate::anonymous_array	17,18	#799
+schema-expressions-record-overloads	arrays::competing_record_overloads_select_postgres_candidate::named_array	17,18	#799
+schema-expressions-record-overloads	arrays::competing_record_overloads_select_postgres_candidate::constructed_named_array	17,18	#799
+schema-expressions-record-overloads	arrays::competing_record_overloads_select_postgres_candidate::anonymous_polymorphic	17,18	#799
+schema-expressions-record-scalar	arrays::anonymous_records_do_not_implicitly_become_named_composites::scalar	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::domain	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::domain_base	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::domain_unknown	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::array_domain	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::array_of_domains	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::enum_values	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::composite	17,18	#799
+schema-expressions	arrays::schema_types_and_bindings_survive_frozen_contexts::nullable_column	17,18	#799
+schema-expressions	case_parameters::schema_result_types_survive_inference::domain	17,18	#799
+schema-expressions	case_parameters::schema_result_types_survive_inference::domain_base	17,18	#799
+schema-expressions	case_parameters::schema_result_types_survive_inference::domain_unknown	17,18	#799
+schema-expressions	case_parameters::schema_result_types_survive_inference::enum_values	17,18	#799
+schema-expressions	coalesce_parameters::catalog_types_survive_inference::same_domain	17,18	#799
+schema-expressions	coalesce_parameters::catalog_types_survive_inference::domain_base	17,18	#799
+schema-expressions	coalesce_parameters::catalog_types_survive_inference::domain_unknown	17,18	#799
+schema-expressions	coalesce_parameters::catalog_types_survive_inference::enum_values	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::domain	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::array_domain	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::array_domain_nested	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::domain_base	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::domain_array	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::domain_unknown	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::enum_values	17,18	#799
+schema-expressions	min_max::schema_types_preserve_common_type_rules::composite	17,18	#799
+schema-expressions	domain_array_common_type::array::base_first	17,18	#799
+schema-expressions	domain_array_common_type::array::identical	17,18	#799
+schema-expressions	domain_array_common_type::array::unknown_last	17,18	#799
+schema-expressions	domain_array_common_type::array::unknown_first	17,18	#799
+schema-expressions	domain_array_common_type::array::domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::array::nested_domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::array::scalar_domain_base	17,18	#799
+schema-expressions	domain_array_common_type::array::nested_domain_elements	17,18	#799
+schema-expressions	domain_array_common_type::array::numeric_promotion	17,18	#799
+schema-expressions	domain_array_common_type::greatest::base_first	17,18	#799
+schema-expressions	domain_array_common_type::greatest::identical	17,18	#799
+schema-expressions	domain_array_common_type::greatest::unknown_last	17,18	#799
+schema-expressions	domain_array_common_type::greatest::unknown_first	17,18	#799
+schema-expressions	domain_array_common_type::greatest::domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::greatest::nested_domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::greatest::scalar_domain_base	17,18	#799
+schema-expressions	domain_array_common_type::greatest::nested_domain_elements	17,18	#799
+schema-expressions	domain_array_common_type::greatest::numeric_promotion	17,18	#799
+schema-expressions	domain_array_common_type::least::domain_first	17,18	#799
+schema-expressions	domain_array_common_type::least::base_first	17,18	#799
+schema-expressions	domain_array_common_type::least::identical	17,18	#799
+schema-expressions	domain_array_common_type::least::unknown_last	17,18	#799
+schema-expressions	domain_array_common_type::least::unknown_first	17,18	#799
+schema-expressions	domain_array_common_type::least::domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::least::nested_domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::least::scalar_domain_base	17,18	#799
+schema-expressions	domain_array_common_type::least::nested_domain_elements	17,18	#799
+schema-expressions	domain_array_common_type::least::numeric_promotion	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::domain_first	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::base_first	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::identical	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::unknown_last	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::unknown_first	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::nested_domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::scalar_domain_base	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::nested_domain_elements	17,18	#799
+schema-expressions	domain_array_common_type::coalesce::numeric_promotion	17,18	#799
+schema-expressions	domain_array_common_type::case::domain_first	17,18	#799
+schema-expressions	domain_array_common_type::case::base_first	17,18	#799
+schema-expressions	domain_array_common_type::case::identical	17,18	#799
+schema-expressions	domain_array_common_type::case::unknown_last	17,18	#799
+schema-expressions	domain_array_common_type::case::unknown_first	17,18	#799
+schema-expressions	domain_array_common_type::case::domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::case::nested_domain_over_array	17,18	#799
+schema-expressions	domain_array_common_type::case::scalar_domain_base	17,18	#799
+schema-expressions	domain_array_common_type::case::nested_domain_elements	17,18	#799
+schema-expressions	domain_array_common_type::case::numeric_promotion	17,18	#799
+schema-insert	insert::resolves_insert_semantics::values	17,18	#799
+schema-insert	insert::resolves_insert_semantics::partial	17,18	#799
+schema-insert	insert::resolves_insert_semantics::named	17,18	#799
+schema-insert	insert::resolves_insert_semantics::defaults	17,18	#799
+schema-insert	insert::resolves_insert_semantics::default_cell	17,18	#799
+schema-insert	insert::resolves_insert_semantics::multi_row	17,18	#799
+schema-insert	insert::resolves_insert_semantics::select	17,18	#799
+schema-insert	insert::resolves_insert_semantics::select_star	17,18	#799
+schema-insert	insert::resolves_insert_semantics::join_star	17,18	#799
+schema-insert	insert::resolves_insert_semantics::using_star	17,18	#799
+schema-insert	insert::resolves_insert_semantics::derived_star	17,18	#799
+schema-insert	insert::resolves_insert_semantics::cte_star	17,18	#799
+schema-insert	insert::resolves_insert_semantics::compound	17,18	#799
+schema-insert	insert::resolves_insert_semantics::cte_source	17,18	#799
+schema-insert	insert::resolves_insert_semantics::no_returning	17,18	#799
+schema-insert	insert::resolves_insert_semantics::alias	17,18	#799
+schema-insert	insert::resolves_insert_semantics::nothing	17,18	#799
+schema-insert	insert::reports_invalid_insert::arity	17,18	#799
+schema-insert	insert::reports_invalid_insert::duplicate	17,18	#799
+schema-insert	insert::reports_invalid_insert::types	17,18	#799
+schema-insert	insert::reports_invalid_insert::explicit_partial	17,18	#799
+schema-insert	insert::reports_invalid_insert::branch_arity	17,18	#799
+schema-insert	insert::reports_invalid_insert::conflicting_parameter	17,18	#799
+schema-insert	insert::reports_invalid_insert::cte_alias_arity	17,18	#799
+schema-insert	insert::reports_invalid_insert::alias_scope	17,18	#799
+schema-insert	insert::reports_invalid_insert::source_scope	17,18	#799
+schema-insert	insert::validates_generated_destinations::always	17,18	#799
+schema-insert	insert::validates_generated_destinations::default_value	17,18	#799
+schema-insert	insert::validates_generated_destinations::system	17,18	#799
+schema-insert	insert::validates_generated_destinations::user	17,18	#799
+schema-insert	insert::validates_generated_destinations::generated	17,18	#799
+schema-insert	insert::validates_generated_destinations::generated_default	17,18	#799
+schema-insert	output_names::returning_insert	17,18	#799
+schema-join	schema_context_chain::full_join_star_publishes_ordered_view_columns	17,18	#799
+schema-merge	merge::resolves_merge::on_bindings	17,18	#799
+schema-merge	merge::resolves_merge::update	17,18	#799
+schema-merge	merge::resolves_merge::insert	17,18	#799
+schema-merge	merge::resolves_merge::defaults	17,18	#799
+schema-merge	merge::resolves_merge::delete	17,18	#799
+schema-merge	merge::resolves_merge::nothing	17,18	#799
+schema-merge	merge::resolves_merge::by_source	17,18	#799
+schema-merge	merge::resolves_merge::returning	17,18	#799
+schema-merge	merge::resolves_merge::star	17,18	#799
+schema-merge	merge::resolves_merge::qualified_star	17,18	#799
+schema-merge	merge::resolves_merge::correlated_update	17,18	#799
+schema-merge	merge::resolves_merge::correlated_insert	17,18	#799
+schema-merge	merge::resolves_merge::returning_subquery	17,18	#799
+schema-merge	merge::resolves_merge::row_assignment	17,18	#799
+schema-merge	merge::resolves_merge::using_cte	17,18	#799
+schema-merge	merge::resolves_merge::using_query	17,18	#799
+schema-merge	merge::rejects_invalid_merge::target_in_insert	17,18	#799
+schema-merge	merge::rejects_invalid_merge::nested_target_in_insert	17,18	#799
+schema-merge	merge::rejects_invalid_merge::source_by_source	17,18	#799
+schema-merge	merge::rejects_invalid_merge::nested_source_by_source	17,18	#799
+schema-merge	merge::rejects_invalid_merge::target_in_source	17,18	#799
+schema-merge	merge::rejects_invalid_merge::hidden_alias	17,18	#799
+schema-merge	merge::rejects_invalid_merge::unreachable	17,18	#799
+schema-merge	merge::rejects_invalid_merge::nonboolean	17,18	#799
+schema-merge	merge::rejects_invalid_merge::action_in_on	17,18	#799
+schema-merge	merge::rejects_invalid_merge::action_in_when	17,18	#799
+schema-merge	merge::rejects_invalid_merge::action_in_assignment	17,18	#799
+schema-merge	merge::rejects_invalid_merge::missing_target	17,18	#799
+schema-merge	merge::rejects_invalid_merge::missing_column	17,18	#799
+schema-merge	merge::rejects_invalid_merge::recursive	17,18	#799
+schema-merge	merge::rejects_invalid_merge::cte_unreadable	17,18	#799
+schema-qualified	qualified_columns::binds_canonical_table_identity::schema	17,18	#799
+schema-qualified	qualified_columns::binds_canonical_table_identity::aliased_other_occurrence	17,18	#799
+schema-qualified	qualified_columns::binds_canonical_table_identity::quoted	17,18	#799
+schema-qualified	qualified_columns::same_named_relations_keep_distinct_qualified_bindings	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::alias	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::same_alias	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::absent_from	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::wrong_schema	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::cte	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::derived	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::join_alias	17,18	#799
+schema-qualified	qualified_columns::retains_failed_qualified_lookup::duplicate_source	17,18	#799
+schema-qualified	qualified_columns::preserves_source_type_and_nullability::view	17,18	#799
+schema-qualified	qualified_columns::preserves_source_type_and_nullability::left_join	17,18	#799
+schema-qualified	qualified_columns::preserves_source_type_and_nullability::right_join	17,18	#799
+schema-qualified	qualified_columns::preserves_source_type_and_nullability::full_join	17,18	#799
+schema-qualified	qualified_columns::preserves_source_type_and_nullability::inner_join	17,18	#799
+schema-qualified	qualified_columns::correlated_references_obey_relation_visibility::correlation	17,18	#799
+schema-qualified	qualified_columns::correlated_references_obey_relation_visibility::local_alias_does_not_mask	17,18	#799
+schema-qualified	qualified_columns::correlated_references_obey_relation_visibility::hidden_local_relation	17,18	#799
+schema-qualified	qualified_columns::correlated_references_obey_relation_visibility::missing_column	17,18	#799
+schema-qualified	qualified_columns::dml_consumes_the_same_qualified_bindings::insert	17,18	#799
+schema-qualified	qualified_columns::dml_consumes_the_same_qualified_bindings::update	17,18	#799
+schema-qualified	qualified_columns::dml_consumes_the_same_qualified_bindings::delete	17,18	#799
+schema-qualified	qualified_columns::missing_column_retains_the_selected_relation	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::qualified	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::unqualified	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::star	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::qualified_star	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::subquery	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::cte	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_unqualified	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_star	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_outer_definition	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_partial_alias	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_implicit_alias	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::named_arguments	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_named_arguments	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::parameter	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_ordinality	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::resolves_declared_record_fields::collation	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::preserves_declared_returns_and_positional_aliases::scalar	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::preserves_declared_returns_and_positional_aliases::composite	17,18	#799
+schema-table-functions	ast::resolve::query::tests::table_functions::preserves_declared_returns_and_positional_aliases::out	17,18	#799
+schema-update	update::resolves_update::literal	17,18	#799
+schema-update	update::resolves_update::only	17,18	#799
+schema-update	update::resolves_update::default	17,18	#799
+schema-update	update::resolves_update::alias	17,18	#799
+schema-update	update::resolves_update::simultaneous	17,18	#799
+schema-update	update::resolves_update::row	17,18	#799
+schema-update	update::resolves_update::row_query	17,18	#799
+schema-update	update::resolves_update::from	17,18	#799
+schema-update	update::resolves_update::target_star	17,18	#799
+schema-update	update::resolves_update::source_star	17,18	#799
+schema-update	update::resolves_update::cte	17,18	#799
+schema-update	update::resolves_update::subquery	17,18	#799
+schema-update	update::reports_invalid_update::duplicate	17,18	#799
+schema-update	update::reports_invalid_update::type_mismatch	17,18	#799
+schema-update	update::reports_invalid_update::alias_hidden	17,18	#799
+schema-update	update::reports_invalid_update::ambiguous	17,18	#799
+schema-update	update::reports_invalid_update::predicate	17,18	#799
+schema-update	update::reports_invalid_update::cte_default	17,18	#799
+schema-update	update::reports_invalid_update::subquery_default	17,18	#799
+schema-update	update::reports_invalid_update::row_subquery_default	17,18	#799
+schema-update	update::reports_invalid_update::returning_default	17,18	#799
+schema-update	update::reports_invalid_update::parameter_conflict	17,18	#799
+schema-update	update::reports_invalid_update::cte_aliases	17,18	#799
+schema-update	update::validates_destination_rules::identity_value	17,18	#799
+schema-update	update::validates_destination_rules::identity_default	17,18	#799
+schema-update	update::validates_destination_rules::generated_value	17,18	#799
+schema-update	update::validates_destination_rules::generated_default	17,18	#799
+schema-update	update::validates_destination_rules::element_default	17,18	#799
+schema-update	update::validates_destination_rules::array_element	17,18	#799
+schema-update	update::validates_destination_rules::multiple_elements	17,18	#799
+schema-update	update::validates_destination_rules::overlap	17,18	#799
+schema-update	output_names::returning_update	17,18	#799
+schema-views-assignments	view_default_rewrite::identity_insert	17,18	#799
+schema-views-assignments	view_default_rewrite::generated_insert	17,18	#799
+schema-views-assignments	view_default_rewrite::identity_update	17,18	#799
+schema-views-assignments	view_default_rewrite::generated_update	17,18	#799
+schema-views-assignments	view_default_rewrite::by_default_update	17,18	#799
+schema-views-assignments	view_cast_lineage::same_type	17,18	#799
+schema-views-assignments	view_cast_lineage::different_type	17,18	#799
+schema-views-assignments	view_cast_lineage::star_then_cast	17,18	#799
+schema-views-assignments	view_cast_lineage::typmod	17,18	#799
+schema-views-assignments	duplicate_projection_assignments::explicit_insert	17,18	#799
+schema-views-assignments	duplicate_projection_assignments::implicit_insert	17,18	#799
+schema-views-assignments	duplicate_projection_assignments::first_implicit	17,18	#799
+schema-views-assignments	duplicate_projection_assignments::default_values	17,18	#799
+schema-views-assignments	duplicate_projection_assignments::duplicate_update	17,18	#799
+schema-views-assignments	duplicate_projection_assignments::subscripts	17,18	#799
+schema-views-assignments	writable_columns_preserve_effective_constraints::identity_assignment	17,18	#799
+schema-views-assignments	writable_columns_preserve_effective_constraints::generated_assignment	17,18	#799
+schema-views-automatic	automatic_view_query::insert	17,18	#799
+schema-views-automatic	automatic_view_query::default_values	17,18	#799
+schema-views-automatic	automatic_view_query::update	17,18	#799
+schema-views-automatic	automatic_view_query::computed_insert	17,18	#799
+schema-views-automatic	automatic_view_query::computed_default	17,18	#799
+schema-views-automatic	automatic_view_query::computed_update	17,18	#799
+schema-views-automatic	automatic_view_query::nested_insert	17,18	#799
+schema-views-automatic	automatic_view_query::nested_update	17,18	#799
+schema-views-automatic	automatic_view_query::conflict	17,18	#799
+schema-views-automatic	automatic_view_query::nested_conflict	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::missing_alter	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::table_alter	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::default	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::replace	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::rename	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::type_change	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::duplicate_view	17,18	#799
+schema-views-diagnostics	invalid_view_declarations_are_structured::alter	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::insert_cte	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::update_cte	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::insert_typo	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::update_typo	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::insert_read_only	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::update_read_only	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::insert_column	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::update_column	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::create_rule	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::drop_rule	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::create_trigger	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::drop_trigger	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::view_default	17,18	#799
+schema-views-diagnostics	semantic_problems_allow_subsequent_statements::view_rule_state	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::insert_trigger::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::insert_trigger::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::insert_trigger::returning	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::update_trigger::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::update_trigger::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::both_triggers::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::both_triggers::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::both_triggers::returning	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::insert_rule::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::insert_rule::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::insert_rule::returning	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::update_rule::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::update_rule::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::rule_returning::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::rule_returning::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::rule_returning::returning	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::conditional_rule::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::conditional_rule::update	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::additional_rule::insert	17,18	#799
+schema-views-mechanisms	independent_write_mechanisms::additional_rule::update	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional::insert	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional::returning	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional::conflict	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional::update	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional::insert	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional::returning	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional::conflict	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional::update	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_update::insert	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_update::returning	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_update::conflict	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_update::update	17,18	#799
+schema-views-precedence	automatic_rule_precedence::instead::insert	17,18	#799
+schema-views-precedence	automatic_rule_precedence::instead::returning	17,18	#799
+schema-views-precedence	automatic_rule_precedence::instead::conflict	17,18	#799
+schema-views-precedence	automatic_rule_precedence::instead::update	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional_trigger::insert	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional_trigger::returning	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional_trigger::conflict	17,18	#799
+schema-views-precedence	automatic_rule_precedence::conditional_trigger::update	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_trigger::insert	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_trigger::returning	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_trigger::conflict	17,18	#799
+schema-views-precedence	automatic_rule_precedence::additional_trigger::update	17,18	#799
+schema-views-special	materialized_views_are_not_write_destinations::insert	17,18	#799
+schema-views-special	materialized_views_are_not_write_destinations::update	17,18	#799
+schema-views-special	materialized_views_are_not_write_destinations::select	17,18	#799
+schema-views-special	materialized_views_are_not_write_destinations::star	17,18	#799
+schema-views-special	from_column_aliases_preserve_source_identity::insert	17,18	#799
+schema-views-special	from_column_aliases_preserve_source_identity::update	17,18	#799
+schema-views-special	from_column_aliases_preserve_source_identity::nested	17,18	#799
+schema-views-special	from_column_aliases_preserve_source_identity::cast	17,18	#799
+view-conflict-rules	instead_action::conflict	17,18	#799
+view-conflict-rules	conditional_action_trigger::conflict	17,18	#799
+view-conflict-rules	mixed_rules::conflict	17,18	#799
+view-conflict-rules	update_nothing_instead::conflict	17,18	#799
+view-conflict-rules	update_nothing_trigger::conflict	17,18	#799
+view-conflict-rules	also_nothing_trigger::conflict	17,18	#799
+parameter-bindings	parameter_binding::native_plain	17,18	#799
+parameter-bindings	parameter_binding::named_plain	17,18	#799
+parameter-bindings	parameter_binding::hinted_plain	17,18	#799
+parameter-bindings	parameter_binding::native_record	17,18	#799
+parameter-bindings	parameter_binding::named_record	17,18	#799
+parameter-bindings	parameter_binding::hinted_record	17,18	#799
+parameter-bindings	parameter_binding::unrestricted	17,18	#799
+parameter-bindings	parameter_binding::conflicting	17,18	#799
+parameter-bindings	parameter_binding::array_index	17,18	#799
+parameter-bindings	parameter_binding::hinted_array_index	17,18	#799
+parameter-bindings	parameter_binding::incompatible_hint	17,18	#799
+parameter-bindings	parameter_binding::repeated_hint	17,18	#799
+parameter-bindings	parameter_binding::later	17,18	#799
+truth-tests	kind::TRUE IS TRUE	17,18	#799
+truth-tests	kind::FALSE IS TRUE	17,18	#799
+truth-tests	kind::NULL IS TRUE	17,18	#799
+truth-tests	kind::NULL::boolean IS TRUE	17,18	#799
+truth-tests	column::nullable IS TRUE	17,18	#799
+truth-tests	column::required IS TRUE	17,18	#799
+truth-tests	parameter::TRUE	17,18	#799
+truth-tests	kind::TRUE IS NOT TRUE	17,18	#799
+truth-tests	kind::FALSE IS NOT TRUE	17,18	#799
+truth-tests	kind::NULL IS NOT TRUE	17,18	#799
+truth-tests	kind::NULL::boolean IS NOT TRUE	17,18	#799
+truth-tests	column::nullable IS NOT TRUE	17,18	#799
+truth-tests	column::required IS NOT TRUE	17,18	#799
+truth-tests	parameter::NOT TRUE	17,18	#799
+truth-tests	kind::TRUE IS FALSE	17,18	#799
+truth-tests	kind::FALSE IS FALSE	17,18	#799
+truth-tests	kind::NULL IS FALSE	17,18	#799
+truth-tests	kind::NULL::boolean IS FALSE	17,18	#799
+truth-tests	column::nullable IS FALSE	17,18	#799
+truth-tests	column::required IS FALSE	17,18	#799
+truth-tests	parameter::FALSE	17,18	#799
+truth-tests	kind::TRUE IS NOT FALSE	17,18	#799
+truth-tests	kind::FALSE IS NOT FALSE	17,18	#799
+truth-tests	kind::NULL IS NOT FALSE	17,18	#799
+truth-tests	kind::NULL::boolean IS NOT FALSE	17,18	#799
+truth-tests	column::nullable IS NOT FALSE	17,18	#799
+truth-tests	column::required IS NOT FALSE	17,18	#799
+truth-tests	parameter::NOT FALSE	17,18	#799
+truth-tests	kind::TRUE IS UNKNOWN	17,18	#799
+truth-tests	kind::FALSE IS UNKNOWN	17,18	#799
+truth-tests	kind::NULL IS UNKNOWN	17,18	#799
+truth-tests	kind::NULL::boolean IS UNKNOWN	17,18	#799
+truth-tests	column::nullable IS UNKNOWN	17,18	#799
+truth-tests	column::required IS UNKNOWN	17,18	#799
+truth-tests	parameter::UNKNOWN	17,18	#799
+truth-tests	kind::TRUE IS NOT UNKNOWN	17,18	#799
+truth-tests	kind::FALSE IS NOT UNKNOWN	17,18	#799
+truth-tests	kind::NULL IS NOT UNKNOWN	17,18	#799
+truth-tests	kind::NULL::boolean IS NOT UNKNOWN	17,18	#799
+truth-tests	column::nullable IS NOT UNKNOWN	17,18	#799
+truth-tests	column::required IS NOT UNKNOWN	17,18	#799
+truth-tests	parameter::NOT UNKNOWN	17,18	#799
+truth-tests	boolean_input::spelling_00	17,18	#799
+truth-tests	boolean_input::spelling_01	17,18	#799
+truth-tests	boolean_input::spelling_02	17,18	#799
+truth-tests	boolean_input::spelling_03	17,18	#799
+truth-tests	boolean_input::spelling_04	17,18	#799
+truth-tests	boolean_input::spelling_05	17,18	#799
+truth-tests	boolean_input::spelling_06	17,18	#799
+truth-tests	boolean_input::spelling_07	17,18	#799
+truth-tests	boolean_input::spelling_08	17,18	#799
+truth-tests	boolean_input::spelling_09	17,18	#799
+truth-tests	boolean_input::spelling_10	17,18	#799
+truth-tests	boolean_input::spelling_11	17,18	#799
+truth-tests	boolean_input::spelling_12	17,18	#799
+truth-tests	boolean_input::spelling_13	17,18	#799
+truth-tests	boolean_input::spelling_14	17,18	#799
+truth-tests	boolean_input::spelling_15	17,18	#799
+truth-tests	boolean_input::spelling_16	17,18	#799
+truth-tests	boolean_input::spelling_17	17,18	#799
+truth-tests	boolean_input::spelling_18	17,18	#799
+truth-tests	boolean_input::spelling_19	17,18	#799
+truth-tests	invalid::integer	17,18	#799
+truth-tests	invalid_deferred::integer	17,18	#799
+truth-tests	invalid::typed_text	17,18	#799
+truth-tests	invalid_deferred::typed_text	17,18	#799
+truth-tests	invalid::invalid	17,18	#799
+truth-tests	invalid_deferred::invalid	17,18	#799
+truth-tests	invalid::ambiguous	17,18	#799
+truth-tests	invalid_deferred::ambiguous	17,18	#799
+truth-tests	invalid::empty	17,18	#799
+truth-tests	invalid_deferred::empty	17,18	#799
+truth-tests	invalid::invalid_nested	17,18	#799
+truth-tests	invalid_deferred::invalid_nested	17,18	#799
+truth-tests	parameter::nested	17,18	#799
+truth-tests	parameter::case_operand	17,18	#799
+truth-tests	parameter::coalesce_operand	17,18	#799
+truth-tests	parameter::case_result	17,18	#799
+truth-tests	parameter::case_condition	17,18	#799
+truth-tests	parameter::coalesce_result	17,18	#799
+truth-tests	parameter::joint_coalesce	17,18	#799
+truth-tests	parameter::joint_case	17,18	#799
+truth-tests	binding::missing	17,18	#799
+truth-tests	binding::ambiguous	17,18	#799
+truth-tests	domain	17,18	#799
+truth-tests	cte	17,18	#799
+truth-tests	derived	17,18	#799
+truth-tests	continues_after_invalid	17,18	#799
+truth-tests	unnamed::TRUE	17,18	#799
+truth-tests	unnamed::NOT TRUE	17,18	#799
+truth-tests	unnamed::FALSE	17,18	#799
+truth-tests	unnamed::NOT FALSE	17,18	#799
+truth-tests	unnamed::UNKNOWN	17,18	#799
+truth-tests	unnamed::NOT UNKNOWN	17,18	#799
+truth-tests	invalid::typed_text_not_false	17,18	#799
+truth-tests	invalid::literal_unknown	17,18	#799
+truth-tests	parameter::repeated	17,18	#799
+truth-tests	parameter::cast_first	17,18	#799
+truth-tests	parameter::cast_last	17,18	#799
+truth-tests	parameter::conflict_first	17,18	#799
+truth-tests	parameter::conflict_last	17,18	#799
+between-symmetric	positive::forward	17,18	#799
+between-symmetric	positive::reverse	17,18	#799
+between-symmetric	positive::equal	17,18	#799
+between-symmetric	positive::outside	17,18	#799
+between-symmetric	positive::mixed	17,18	#799
+between-symmetric	positive::text	17,18	#799
+between-symmetric	positive::null_0_NULL	17,18	#799
+between-symmetric	positive::null_0_NULL::int	17,18	#799
+between-symmetric	positive::null_1_NULL	17,18	#799
+between-symmetric	positive::null_1_NULL::int	17,18	#799
+between-symmetric	positive::null_2_NULL	17,18	#799
+between-symmetric	positive::null_2_NULL::int	17,18	#799
+between-symmetric	positive::column_required	17,18	#799
+between-symmetric	positive::column_nullable	17,18	#799
+between-symmetric	positive::column_v.required	17,18	#799
+between-symmetric	positive::cast_parameter_0	17,18	#799
+between-symmetric	positive::cast_parameter_1	17,18	#799
+between-symmetric	positive::cast_parameter_2	17,18	#799
+between-symmetric	positive::deferred	17,18	#799
+between-symmetric	positive::repeated	17,18	#799
+between-symmetric	positive::nested	17,18	#799
+between-symmetric	positive::incompatible	17,18	#799
+between-symmetric	positive::missing	17,18	#799
+between-symmetric	positive::ambiguous	17,18	#799
+between-symmetric	positive::where	17,18	#799
+between-symmetric	negative::forward	17,18	#799
+between-symmetric	negative::reverse	17,18	#799
+between-symmetric	negative::equal	17,18	#799
+between-symmetric	negative::outside	17,18	#799
+between-symmetric	negative::mixed	17,18	#799
+between-symmetric	negative::text	17,18	#799
+between-symmetric	negative::null_0_NULL	17,18	#799
+between-symmetric	negative::null_0_NULL::int	17,18	#799
+between-symmetric	negative::null_1_NULL	17,18	#799
+between-symmetric	negative::null_1_NULL::int	17,18	#799
+between-symmetric	negative::null_2_NULL	17,18	#799
+between-symmetric	negative::null_2_NULL::int	17,18	#799
+between-symmetric	negative::column_required	17,18	#799
+between-symmetric	negative::column_nullable	17,18	#799
+between-symmetric	negative::column_v.required	17,18	#799
+between-symmetric	negative::cast_parameter_0	17,18	#799
+between-symmetric	negative::cast_parameter_1	17,18	#799
+between-symmetric	negative::cast_parameter_2	17,18	#799
+between-symmetric	negative::deferred	17,18	#799
+between-symmetric	negative::repeated	17,18	#799
+between-symmetric	negative::nested	17,18	#799
+between-symmetric	negative::incompatible	17,18	#799
+between-symmetric	negative::missing	17,18	#799
+between-symmetric	negative::ambiguous	17,18	#799
+between-symmetric	negative::where	17,18	#799
+between-symmetric	positive::hinted	17,18	#799
+between-symmetric	positive::conflicting	17,18	#799
+between-symmetric	negative::hinted	17,18	#799
+between-symmetric	negative::conflicting	17,18	#799
+between-symmetric	later_independent_input	17,18	#799
+distinctness	DISTINCT::1::1	17,18	#799
+distinctness	DISTINCT::1::2	17,18	#799
+distinctness	DISTINCT::NULL::1	17,18	#799
+distinctness	DISTINCT::1::NULL	17,18	#799
+distinctness	DISTINCT::NULL::NULL	17,18	#799
+distinctness	DISTINCT::NULL::int::1	17,18	#799
+distinctness	DISTINCT::NULL::int::NULL::int	17,18	#799
+distinctness	DISTINCT::1::1::bigint	17,18	#799
+distinctness	DISTINCT::'1'::1	17,18	#799
+distinctness	DISTINCT::'a'::'b'	17,18	#799
+distinctness	DISTINCT::ARRAY[1,NULL]::ARRAY[1,NULL]	17,18	#799
+distinctness	DISTINCT::ROW(1,NULL)::ROW(1,NULL)	17,18	#799
+distinctness	DISTINCT::ROW(NULL,NULL)::NULL	17,18	#799
+distinctness	DISTINCT::ROW()::ROW()	17,18	#799
+distinctness	DISTINCT::column::nullable	17,18	#799
+distinctness	DISTINCT::json_bare_null	17,18	#799
+distinctness	DISTINCT::case	17,18	#799
+distinctness	DISTINCT::nested	17,18	#799
+distinctness	NOT DISTINCT::1::1	17,18	#799
+distinctness	NOT DISTINCT::1::2	17,18	#799
+distinctness	NOT DISTINCT::NULL::1	17,18	#799
+distinctness	NOT DISTINCT::1::NULL	17,18	#799
+distinctness	NOT DISTINCT::NULL::NULL	17,18	#799
+distinctness	NOT DISTINCT::NULL::int::1	17,18	#799
+distinctness	NOT DISTINCT::NULL::int::NULL::int	17,18	#799
+distinctness	NOT DISTINCT::1::1::bigint	17,18	#799
+distinctness	NOT DISTINCT::'1'::1	17,18	#799
+distinctness	NOT DISTINCT::'a'::'b'	17,18	#799
+distinctness	NOT DISTINCT::ARRAY[1,NULL]::ARRAY[1,NULL]	17,18	#799
+distinctness	NOT DISTINCT::ROW(1,NULL)::ROW(1,NULL)	17,18	#799
+distinctness	NOT DISTINCT::ROW(NULL,NULL)::NULL	17,18	#799
+distinctness	NOT DISTINCT::ROW()::ROW()	17,18	#799
+distinctness	NOT DISTINCT::column::nullable	17,18	#799
+distinctness	NOT DISTINCT::json_bare_null	17,18	#799
+distinctness	NOT DISTINCT::case	17,18	#799
+distinctness	NOT DISTINCT::nested	17,18	#799
+distinctness	incompatible::DISTINCT::1	17,18	#799
+distinctness	incompatible::DISTINCT::'1'::json	17,18	#799
+distinctness	arity::DISTINCT	17,18	#799
+distinctness	parameter::$1 IS DISTINCT FROM 1	17,18	#799
+distinctness	parameter::$1 IS DISTINCT FROM NULL	17,18	#799
+distinctness	parameter::$1 IS DISTINCT FROM $2	17,18	#799
+distinctness	hinted::DISTINCT	17,18	#799
+distinctness	incompatible::NOT DISTINCT::1	17,18	#799
+distinctness	incompatible::NOT DISTINCT::'1'::json	17,18	#799
+distinctness	arity::NOT DISTINCT	17,18	#799
+distinctness	parameter::$1 IS NOT DISTINCT FROM 1	17,18	#799
+distinctness	parameter::$1 IS NOT DISTINCT FROM NULL	17,18	#799
+distinctness	parameter::$1 IS NOT DISTINCT FROM $2	17,18	#799
+distinctness	hinted::NOT DISTINCT	17,18	#799
+distinctness	output_name	17,18	#799
+distinctness	output_name_negated	17,18	#799
+distinctness	derived	17,18	#799
+distinctness	binding_missing	17,18	#799
+distinctness	grouped	17,18	#799
+bounded-parameter-inference	DISTINCT::unhinted_defaults	17,18	#799
+bounded-parameter-inference	DISTINCT::scalar	17,18	#799
+bounded-parameter-inference	DISTINCT::binary	17,18	#799
+bounded-parameter-inference	DISTINCT::uuid	17,18	#799
+bounded-parameter-inference	DISTINCT::array_context	17,18	#799
+bounded-parameter-inference	DISTINCT::custom_array_typed_null	17,18	#799
+bounded-parameter-inference	DISTINCT::composite_hint	17,18	#799
+bounded-parameter-inference	DISTINCT::enum_hint	17,18	#799
+bounded-parameter-inference	DISTINCT::domain_hint	17,18	#799
+bounded-parameter-inference	DISTINCT::binary_context	17,18	#799
+bounded-parameter-inference	DISTINCT::uuid_context	17,18	#799
+bounded-parameter-inference	DISTINCT::custom_array_context	17,18	#799
+bounded-parameter-inference	DISTINCT::repeated_binary_false	17,18	#799
+bounded-parameter-inference	DISTINCT::repeated_binary_true	17,18	#799
+bounded-parameter-inference	DISTINCT::repeated_custom_array	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::unhinted_defaults	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::scalar	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::binary	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::uuid	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::array_context	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::custom_array_typed_null	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::composite_hint	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::enum_hint	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::domain_hint	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::binary_context	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::uuid_context	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::custom_array_context	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::repeated_binary_false	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::repeated_binary_true	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::repeated_custom_array	17,18	#799
+bounded-parameter-inference	DISTINCT::repeated_uuid_false	17,18	#799
+bounded-parameter-inference	DISTINCT::repeated_uuid_true	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::repeated_uuid_false	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::repeated_uuid_true	17,18	#799
+bounded-parameter-inference	DISTINCT::unsupported::($1)[1]	17,18	#799
+bounded-parameter-inference	DISTINCT::unsupported::($1).id	17,18	#799
+bounded-parameter-inference	DISTINCT::age_context::False	17,18	#799
+bounded-parameter-inference	DISTINCT::late_array_elements::False	17,18	#799
+bounded-parameter-inference	DISTINCT::age_context::True	17,18	#799
+bounded-parameter-inference	DISTINCT::late_array_elements::True	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::unsupported::($1)[1]	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::unsupported::($1).id	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::age_context::False	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::late_array_elements::False	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::age_context::True	17,18	#799
+bounded-parameter-inference	NOT DISTINCT::late_array_elements::True	17,18	#799
+bounded-parameter-inference	recovery_after_unsupported	17,18	#799
+bounded-parameter-inference	returning_context_before_unsupported	17,18	#799
+bounded-parameter-inference	returning_emits_unsupported_once	17,18	#799
+table-renames	table_rename::new_name	17,18	#799
+table-renames	table_rename::preserved_view	17,18	#799
+table-renames	table_rename::old_name_reused	17,18	#799
+table-renames	table_rename::repeated_rename	17,18	#799
+project-roles	folded	17,18	#799
+project-roles	quoted	17,18	#799
+project-roles	escaped-quote	17,18	#799
+project-roles	unicode	17,18	#799
+project-roles	dot	17,18	#799
+project-roles	quoted-keyword	17,18	#799
+project-roles	symbolic-session	17,18	#799
+project-roles	missing	17,18	#799
+project-roles	case-mismatch	17,18	#799
+project-roles	current_role	17,18	#799
+project-roles	current_user	17,18	#799
+project-roles-empty	empty-inventory	17,18	#799
+project-roles-omitted	omitted-inventory	17,18	#799
+collate	literal	17,18	#799
+collate	typed_null	17,18	#799
+collate	bare_null	17,18	#799
+collate	qualified	17,18	#799
+collate	nested	17,18	#799
+collate	required_name	17,18	#799
+collate	nullable_name	17,18	#799
+collate	alias	17,18	#799
+collate	missing	17,18	#799
+collate	missing_inner	17,18	#799
+collate	missing_schema	17,18	#799
+collate	quoted_case	17,18	#799
+collate	integer	17,18	#799
+collate	boolean	17,18	#799
+collate	array_text	17,18	#799
+collate	array_integer	17,18	#799
+collate	derived	17,18	#799
+collate	cte	17,18	#799
+collate	coalesce	17,18	#799
+collate	parameter_cast	17,18	#799
+collate	parameter_late	17,18	#799
+collate	recovery	17,18	#799
+collate	domain_text	17,18	#799
+collate	domain_integer	17,18	#799
+collate	order	17,18	#799
+collate	order_missing	17,18	#799
+collate	group	17,18	#799
+collate	where	17,18	#799
+collate	parameter_hint	17,18	#799
+collate	parameter_invalid_hint	17,18	#799
+collate	grouping_qualified_argument	17,18	#799
+collate	grouping_qualified_key	17,18	#799
+collate	grouping_nested_qualification	17,18	#799
+collate	grouping_distinct_collations	17,18	#799
+membership	list	17,18	#799
+membership	not-list	17,18	#799
+membership	single	17,18	#799
+membership	not-single	17,18	#799
+membership	numeric	17,18	#799
+membership	unknown-string	17,18	#799
+membership	text	17,18	#799
+membership	boolean	17,18	#799
+membership	array	17,18	#799
+membership	row-list	17,18	#799
+membership	row-not-list	17,18	#799
+membership	query	17,18	#799
+membership	not-query	17,18	#799
+membership	empty-query	17,18	#799
+membership	negative-empty-query	17,18	#799
+membership	row-query	17,18	#799
+membership	negative-row-query	17,18	#799
+membership	correlated	17,18	#799
+membership	null-left	17,18	#799
+membership	null-right	17,18	#799
+membership	negative-null	17,18	#799
+membership	match-and-null	17,18	#799
+membership	nullable-query	17,18	#799
+membership	null-empty-query	17,18	#799
+membership	row-null	17,18	#799
+membership	nullable-column	17,18	#799
+membership	parameter-list	17,18	#799
+membership	parameter-query	17,18	#799
+membership	parameter-query-output	17,18	#799
+membership	parameter-row	17,18	#799
+membership	query-width	17,18	#799
+membership	row-width	17,18	#799
+membership	incompatible	17,18	#799
+membership	query-null-is-text	17,18	#799
+membership	common-type	17,18	#799
+membership	list-predicate	17,18	#799
+membership	query-predicate	17,18	#799
+membership	list-variable	17,18	#799
+membership	nested-local-variable	17,18	#799
+membership	nested-record-list	17,18	#799
+membership	nested-record-query	17,18	#799

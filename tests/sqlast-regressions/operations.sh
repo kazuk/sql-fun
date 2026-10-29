@@ -31,6 +31,7 @@ run_group() {
       >"$reports/$fixture-$version.log" 2>&1;
   } 2>"$runtime/test-seconds" || status=$?
   elapsed=$(<"$runtime/test-seconds")
+  printf '%s\t%s\n' "$fixture-$version" "$elapsed" >> "$reports/timings.tsv"
   test_seconds=$(jq -n --argjson total "$test_seconds" --argjson elapsed "$elapsed" '($total + $elapsed) * 1000 | round / 1000')
   cat "$reports/$fixture-$version.log"
   if (( status != 0 )); then group_failed=1; fi

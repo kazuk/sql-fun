@@ -362,38 +362,46 @@ def trial(groups, count, estimates, reports, base_env):
     return summary
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", required=True, nargs="+", type=int)
-    parser.add_argument("--repetitions", required=True, type=int)
-    parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
+def validate_environment(parser, groups):
     for executable in ("bash", "jq"):
         if not shutil.which(executable):
             parser.error(f"Required experiment tool is unavailable: {executable}")
-    if not args.workers or args.workers[0] != 1 or len(set(args.workers)) != len(args.workers) or any(n not in (1, 2, 4, 8) for n in args.workers) or args.repetitions < 1:
-        parser.error("Select a unique worker sequence starting with 1, followed by 2/4/8, and positive repetitions")
     for key in ("SQL_FUN_HOME", "SQL_FUN_BIN", "SQL_FUN_TEST_SERVER_BIN"):
         if key not in os.environ or not Path(os.environ[key]).is_absolute():
             parser.error(f"{key} must explicitly select an absolute path")
     for key in ("SQL_FUN_BIN", "SQL_FUN_TEST_SERVER_BIN"):
         if not os.access(os.environ[key], os.X_OK):
             parser.error(f"Not executable: {os.environ[key]}")
-    groups = inventory()
     for version in {g["version"] for g in groups}:
         catalog = Path(os.environ["SQL_FUN_HOME"]) / "postgres" / version / "metadata.json"
         if json.loads(catalog.read_text())["server_version_num"] // 10000 != int(version):
             parser.error(f"Catalog version mismatch: {catalog}")
-    args.output = args.output.resolve()
-    args.output.mkdir(parents=True, exist_ok=False)
-    write_json(args.output / "inventory.json", groups)
-    write_json(args.output / "environment.json", dict(cpu_count=os.cpu_count(), affinity=sorted(os.sched_getaffinity(0)),
+
+
+def record_environment(output, groups):
+    write_json(output / "inventory.json", groups)
+    write_json(output / "environment.json", dict(cpu_count=os.cpu_count(), affinity=sorted(os.sched_getaffinity(0)),
                uname=list(os.uname()), memory=Path('/proc/meminfo').read_text(),
                revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=SUITE, text=True).strip(),
                runner=os.environ.get("RUNNER_NAME"), runner_environment=os.environ.get("RUNNER_ENVIRONMENT"),
                cgroup_limits={name: (Path('/sys/fs/cgroup') / name).read_text().strip()
                               for name in ('cpu.max', 'memory.max') if (Path('/sys/fs/cgroup') / name).is_file()},
                selections={k: os.environ[k] for k in ("SQL_FUN_HOME", "SQL_FUN_BIN", "SQL_FUN_TEST_SERVER_BIN")}))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workers", required=True, nargs="+", type=int)
+    parser.add_argument("--repetitions", required=True, type=int)
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args()
+    if not args.workers or args.workers[0] != 1 or len(set(args.workers)) != len(args.workers) or any(n not in (1, 2, 4, 8) for n in args.workers) or args.repetitions < 1:
+        parser.error("Select a unique worker sequence starting with 1, followed by 2/4/8, and positive repetitions")
+    groups = inventory()
+    validate_environment(parser, groups)
+    args.output = args.output.resolve()
+    args.output.mkdir(parents=True, exist_ok=False)
+    record_environment(args.output, groups)
     # Calibration is separate so every compared configuration, including all
     # serial repeats, uses the same longest-estimated-duration-first queue.
     calibration = trial(groups, 1, {}, args.output / "estimate-baseline", os.environ)
@@ -425,8 +433,10 @@ def main():
     return 0
 
 
+def interrupted(signum, _frame):
+    raise KeyboardInterrupt(f"Interrupted by signal {signum}")
+
+
 if __name__ == "__main__":
-    def interrupted(signum, _frame):
-        raise KeyboardInterrupt(f"Interrupted by signal {signum}")
     signal.signal(signal.SIGTERM, interrupted)
     raise SystemExit(main())

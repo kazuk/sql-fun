@@ -10,6 +10,8 @@ from unittest.mock import Mock, patch
 import xml.etree.ElementTree as ET
 
 import experiment as subject
+import run_once
+import scheduling
 
 
 class ReportContracts(unittest.TestCase):
@@ -163,6 +165,108 @@ done
         self.assertEqual(claims.count(groups[0]["id"]), 1)
         self.assertTrue(any(w.get("problem") or w["exit"] != 0 for w in workers))
         self.assertNotIn(groups[0]["id"], [c["id"] for w in workers for c in w["completions"]])
+
+
+class PriorityContracts(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name)
+        self.groups = [dict(id=f"group-{n:03}") for n in range(140)]
+        self.durations = {group["id"]: float(n) for n, group in enumerate(self.groups)}
+        self.timings = self.path / "timings.tsv"
+        self.output = self.path / "priorities.tsv"
+
+    def generate(self, durations=None):
+        data = self.durations if durations is None else durations
+        self.timings.write_text("".join(f"{name}\t{value}\n" for name, value in data.items()))
+        scheduling.generate(self.timings, self.output, self.groups)
+
+    def test_tiers_cover_inventory_and_sort_names(self):
+        self.generate()
+        priorities = scheduling.read_priorities(self.output, self.groups)
+        self.assertEqual([sum(value == tier for value in priorities.values()) for tier in (3, 2, 1)], [10, 65, 65])
+        self.assertEqual([name for name, value in priorities.items() if value == 3], [f"group-{n:03}" for n in range(130, 140)])
+        self.assertNotIn("139.0", self.output.read_text())
+
+    def test_intra_tier_timing_changes_do_not_change_file(self):
+        self.generate()
+        previous = self.output.read_bytes()
+        modified = dict(self.durations)
+        modified['group-138'], modified['group-139'] = modified['group-139'], modified['group-138']
+        self.generate(modified)
+        self.assertEqual(self.output.read_bytes(), previous)
+        modified['group-129'], modified['group-130'] = modified['group-130'], modified['group-129']
+        self.generate(modified)
+        self.assertNotEqual(self.output.read_bytes(), previous)
+
+    def test_tied_timings_and_odd_or_small_inventories(self):
+        for count in (1, 9, 10, 11, 13, 139, 140, 141):
+            groups = self.groups[:count] if count <= 140 else self.groups + [dict(id='group-140')]
+            rows = scheduling.classify(groups[::-1], {g['id']: 1 for g in groups})
+            self.assertEqual([name for _, name in rows], sorted(g['id'] for g in groups))
+            self.assertEqual(len(rows), count)
+            heavy, medium, light = scheduling.tier_sizes(count)
+            self.assertEqual(heavy, min(10, count))
+            self.assertIn(medium - light, (0, 1))
+
+    def test_incomplete_or_invalid_timings_preserve_existing_file(self):
+        self.generate()
+        previous = self.output.read_bytes()
+        for data in ({}, {**self.durations, 'unknown': 1}, {**self.durations, 'group-000': float('nan')}, {**self.durations, 'group-000': -1}):
+            with self.subTest(data_size=len(data)), self.assertRaises(ValueError):
+                self.generate(data)
+            self.assertEqual(self.output.read_bytes(), previous)
+        self.timings.write_text('group-000\t1\ngroup-000\t2\n')
+        with self.assertRaises(ValueError):
+            scheduling.generate(self.timings, self.output, self.groups)
+
+    def test_missing_duplicate_unknown_and_misordered_priorities_fail(self):
+        self.generate()
+        valid = self.output.read_text()
+        variants = [valid.replace('heavy\tgroup-130\n', ''),
+                    valid.replace('group-130', 'group-131'),
+                    valid.replace('group-130', 'unknown'),
+                    valid.replace('heavy\tgroup-130', 'invalid\tgroup-130'),
+                    valid.replace('heavy\tgroup-130', 'medium\tgroup-130'),
+                    valid.replace('heavy\tgroup-130\nheavy\tgroup-131', 'heavy\tgroup-131\nheavy\tgroup-130')]
+        for content in variants:
+            with self.subTest(content=content[:60]), self.assertRaises(ValueError):
+                self.output.write_text(content)
+                scheduling.read_priorities(self.output, self.groups)
+
+    def test_ci_runner_executes_once_without_calibration(self):
+        self.generate()
+        reports = self.path / 'reports'
+        with patch.object(subject, 'inventory', return_value=self.groups[::-1]), \
+             patch.object(subject, 'validate_environment'), \
+             patch.object(subject, 'record_environment'), \
+             patch.object(subject, 'trial', return_value={'ok': True}) as trial:
+            args = ['--workers', '2', '--priorities', str(self.output), '--output', str(reports)]
+            self.assertEqual(run_once.main(args), 0)
+            trial.assert_called_once()
+            groups, workers, weights, _, _ = trial.call_args.args
+            self.assertEqual(workers, 2)
+            self.assertEqual([g['id'] for g in groups], sorted(g['id'] for g in self.groups))
+            self.assertEqual(set(weights.values()), {1, 2, 3})
+            trial.reset_mock(return_value=True)
+            trial.return_value = {'ok': False}
+            self.assertEqual(run_once.main(args), 1)
+            trial.assert_called_once()
+            self.output.unlink()
+            trial.reset_mock()
+            with self.assertRaises(FileNotFoundError):
+                run_once.main(args)
+            trial.assert_not_called()
+
+    def test_ci_preflight_only_validates_committed_file(self):
+        self.generate()
+        previous = self.output.read_bytes()
+        with patch.object(subject, 'inventory', return_value=self.groups), \
+             patch.object(scheduling, 'generate') as generate:
+            scheduling.main(['--check', str(self.output)])
+            generate.assert_not_called()
+        self.assertEqual(self.output.read_bytes(), previous)
 
 
 if __name__ == "__main__":

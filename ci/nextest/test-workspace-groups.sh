@@ -119,6 +119,10 @@ done
 # Cargo metadata is allowed; any compilation/check/archive invocation is rejected.
 source .local/sbin/workspace-verification
 function cargo() {
+  if [[ "$WORKSPACE_PHASE" == all && "$*" == 'build --locked --workspace --exclude sql-fun --all-targets --all-features' ]]; then
+    echo build-local >> "$scratch/order"
+    return 0
+  fi
   if [[ "$*" != 'metadata --locked --no-deps --format-version 1' ]]; then
     echo unexpected-cargo >> "$scratch/order"
     return 97
@@ -126,21 +130,26 @@ function cargo() {
   jq -n --arg directory "$scratch/target" '{target_directory: $directory}'
 }
 function uv() {
-  [[ "$*" == "run --no-project --no-config --python 3.12 python -B $GIT_ROOT/tests/sqlast-regressions/test_experiment.py" ]] || return 96
-  echo contracts >> "$scratch/order"
-  [[ "$failed" != contracts ]]
+  local prefix="run --no-project --no-config --python 3.12 python -B $GIT_ROOT/tests/sqlast-regressions"
+  case "$*" in
+    "$prefix/test_experiment.py")
+      echo contracts >> "$scratch/order"
+      [[ "$failed" != contracts ]]
+      ;;
+    "$prefix/run_once.py --workers 2 --priorities $GIT_ROOT/tests/sqlast-regressions/priorities.tsv --output $scratch/target/sqlast-regressions")
+      [[ "$SQL_FUN_BIN" == /explicit/cli && "$SQL_FUN_TEST_SERVER_BIN" == /explicit/server ]] || return 96
+      [[ "$SQL_FUN_HOME" == "$GIT_ROOT/sql-fun-home" ]] || return 96
+      echo regressions >> "$scratch/order"
+      [[ "$failed" != regressions ]]
+      ;;
+    "$prefix/scheduling.py --timings $scratch/target/sqlast-regressions/timings.tsv --output $GIT_ROOT/tests/sqlast-regressions/priorities.tsv")
+      [[ "$WORKSPACE_PHASE" == all && -s "$scratch/target/sqlast-regressions/timings.tsv" ]] || return 96
+      echo generation >> "$scratch/order"
+      [[ "$failed" != generation ]]
+      ;;
+    *) echo unexpected-uv >> "$scratch/order"; return 96 ;;
+  esac
 }
-mkdir -p "$scratch/root/tests/sqlast-regressions"
-cat > "$scratch/root/tests/sqlast-regressions/run.sh" <<'RUNNER'
-#!/usr/bin/env bash
-set -euo pipefail
-[[ "$SQL_FUN_BIN" == /explicit/cli && "$SQL_FUN_TEST_SERVER_BIN" == /explicit/server ]]
-[[ "$SQL_FUN_HOME" == "$GIT_ROOT/sql-fun-home" ]]
-[[ "$SQL_FUN_REGRESSION_REPORT_DIR" == "$scratch/target/sqlast-regressions" ]]
-echo regressions >> "$scratch/order"
-[[ "$failed" != regressions ]]
-RUNNER
-chmod +x "$scratch/root/tests/sqlast-regressions/run.sh"
 export scratch failed
 for failed in none contracts regressions; do
   : > "$scratch/order"
@@ -168,6 +177,36 @@ for missing in SQL_FUN_BIN SQL_FUN_TEST_SERVER_BIN; do
   ) > "$scratch/missing" 2>&1 && status=0 || status=$?
   [[ "$status" != 0 && ! -s "$scratch/order" ]]
 done
+# Local verification generates classifications only after a successful serial run.
+mkdir -p "$scratch/root/tests/sqlast-regressions"
+cat > "$scratch/root/tests/sqlast-regressions/run.sh" <<'RUNNER'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$SQL_FUN_BIN" == /explicit/cli && "$SQL_FUN_TEST_SERVER_BIN" == /explicit/server ]]
+echo serial >> "$scratch/order"
+[[ "$failed" != serial ]]
+mkdir -p "$SQL_FUN_REGRESSION_REPORT_DIR"
+echo timing > "$SQL_FUN_REGRESSION_REPORT_DIR/timings.tsv"
+RUNNER
+chmod +x "$scratch/root/tests/sqlast-regressions/run.sh"
+for failed in none contracts serial generation; do
+  : > "$scratch/order"
+  set +e
+  (set -e
+    export GIT_ROOT="$scratch/root"
+    WORKSPACE_PHASE=all
+    SQL_FUN_BIN=/explicit/cli
+    SQL_FUN_TEST_SERVER_BIN=/explicit/server
+    run_sqlast_regressions
+  ) > "$scratch/local-route" 2>&1
+  status=$?
+  set -e
+  expected=$'build-local\ncontracts'
+  [[ "$failed" == contracts ]] || expected+=$'\nserial'
+  [[ "$failed" == contracts || "$failed" == serial ]] || expected+=$'\ngeneration'
+  [[ "$(cat "$scratch/order")" == "$expected" ]]
+  if [[ "$failed" == none ]]; then [[ "$status" == 0 ]]; else [[ "$status" != 0 ]]; fi
+done
 # Check the actual workflow consumers and execute its aggregate-gate command.
 function workflow_job() {
   awk -v name="$1" '
@@ -184,6 +223,8 @@ for prefix in workspace workspace-all-features; do
   [[ "$rust_job" == *'--workspace-phase=rust-test'* ]]
   [[ "$sqlast_job" == *"needs: [$prefix-cli-build, $prefix-server-build]"* ]]
   [[ "$sqlast_job" != *nextest* && "$sqlast_job" == *'--workspace-phase=sqlast-test'* ]]
+  before_download=${sqlast_job%%actions/download-artifact@v7*}
+  [[ "$before_download" == *'scheduling.py --check tests/sqlast-regressions/priorities.tsv'* ]]
 done
 gate=$(workflow_job build)
 [[ "$gate" == *'if: ${{ always() }}'* ]]

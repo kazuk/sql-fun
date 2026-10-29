@@ -12,6 +12,7 @@ source "$suite/operations.sh"
 reports=${SQL_FUN_REGRESSION_REPORT_DIR:?SQL_FUN_REGRESSION_REPORT_DIR must select the report directory}
 mkdir -p "$reports"
 reports=$(cd -- "$reports" && pwd)
+: > "$reports/timings.tsv"
 runtime=$(mktemp -d /tmp/sql-fun-regressions.XXXXXXXX)
 export USER="${runtime##*/}"
 export SQL_FUN_SERVER="$SQL_FUN_TEST_SERVER_BIN"

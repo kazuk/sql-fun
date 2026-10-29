@@ -46,26 +46,16 @@ impl Initialization {
         self.confirmed == Some(true)
     }
 
-    /// Returns false only for an edited path whose creation should be retried.
-    pub(super) fn create_directory(&self) -> Result<bool, InitError> {
+    /// Called only after execution has been explicitly authorized.
+    pub(super) fn create_directory(&self) -> Result<(), InitError> {
         let existed = self.home.exists();
-        match std::fs::create_dir_all(&self.home) {
-            Ok(()) => {
-                if existed {
-                    Notice::home_exists(&self.home).show();
-                } else {
-                    Notice::home_created(&self.home).show();
-                }
-                Ok(true)
-            }
-            Err(error) => {
-                if self.supplied_home {
-                    return InitError::io(error);
-                }
-                Notice::home_create_failed(&self.home, error).show();
-                Ok(false)
-            }
+        std::fs::create_dir_all(&self.home).or_else(InitError::io)?;
+        if existed {
+            Notice::home_exists(&self.home).show();
+        } else {
+            Notice::home_created(&self.home).show();
         }
+        Ok(())
     }
 
     fn needs_editing(&mut self) -> Result<bool, InitError> {
@@ -111,10 +101,12 @@ impl Initialization {
             };
             match Self::edited_path(text) {
                 Ok(path) => {
+                    if self.home != path {
+                        self.confirmed = None;
+                    }
                     self.home = path;
-                    self.home_input.clear();
+                    text.clone_into(&mut self.home_input);
                     self.supplied_home = false;
-                    self.confirmed = None;
                     return Ok(());
                 }
                 Err(error) => {
@@ -158,6 +150,7 @@ impl Initialization {
             let request = PromptRequest::confirm(
                 format!(include_str!("confirm_home.txt"), path = self.home.display()).trim_end(),
             )
+            .with_initial_confirmation(self.confirmed)
             .with_automatic(automatic);
             if let Some(confirmed) = input.answer(&request)?.confirmation() {
                 self.confirmed = Some(confirmed);

@@ -18,7 +18,7 @@ use self::{
     error::InitError,
     home::Initialization,
     postgres::PostgresSetup,
-    step::{PromptInput, TerminalInput},
+    step::{InputSession, PromptInput, TerminalInput},
 };
 
 use std::{path::Path, process::ExitCode};
@@ -50,8 +50,10 @@ pub async fn initialize(
     let mut state = InitializationState::new(args, init_args, metadata_file_from_cli);
     let completion = flow::collect(&mut state).await?;
     if completion.is_cancelled() {
+        println!("Initialization cancelled.");
         return Ok(ExitCode::FAILURE);
     }
+    state.home.create_directory()?;
     for plan in &state.plans {
         plan.install(state.home.home()).await?;
     }
@@ -66,9 +68,11 @@ struct InitializationState<'a> {
     home: Initialization,
     selection: Option<SetupSelection>,
     versions: Option<Vec<PostgresVersion>>,
-    existing_server: bool,
     plans: Vec<EngineSetup>,
-    input: Box<dyn PromptInput>,
+    input: InputSession,
+    backward: bool,
+    source: Option<bool>,
+    connection: Option<String>,
 }
 
 impl<'a> InitializationState<'a> {
@@ -86,15 +90,20 @@ impl<'a> InitializationState<'a> {
             home,
             selection: None,
             versions: None,
-            existing_server: args.database_url().is_some(),
             plans: Vec::new(),
-            input: Box::new(TerminalInput),
+            input: InputSession::new(TerminalInput),
+            backward: false,
+            source: None,
+            connection: None,
         }
     }
 }
 
 impl InitializationState<'_> {
     fn load_selection(&mut self) -> Result<(), anyhow::Error> {
+        if self.selection.is_some() {
+            return Ok(());
+        }
         self.selection = Some(SetupSelection::load(
             self.common,
             &self.args,
@@ -108,28 +117,108 @@ impl InitializationState<'_> {
             .expect("selected setup")
             .check_choices(&self.args)
     }
+    fn discard_unselected_postgres(&mut self) {
+        if !self.selection.as_ref().expect("selection").has_postgres() {
+            self.source = None;
+            self.connection = None;
+            self.versions = None;
+        }
+    }
     fn choose_engines(&mut self) -> Result<(), InitError> {
         self.selection
             .as_mut()
             .expect("loaded selection")
-            .choose_engines(&self.args, self.input.as_mut())
+            .choose_engines(&self.args, self.input.as_mut())?;
+        self.discard_unselected_postgres();
+        Ok(())
     }
     fn choose_datasources(&mut self) -> Result<(), anyhow::Error> {
+        let previous = self
+            .selection
+            .as_ref()
+            .expect("selection")
+            .postgres_datasources();
         self.selection
             .as_mut()
             .expect("loaded selection")
-            .choose_datasources(&self.args, self.input.as_mut())
+            .choose_datasources(&self.args, self.input.as_mut())?;
+        self.discard_unselected_postgres();
+        if self
+            .selection
+            .as_ref()
+            .expect("selection")
+            .postgres_datasources()
+            != previous
+        {
+            self.versions = None;
+        }
+        Ok(())
     }
     fn choose_postgres_source(&mut self) -> Result<(), InitError> {
-        self.existing_server = PostgresSetup::choose_source(&mut self.args, self.input.as_mut())?;
+        let selected = PostgresSetup::choose_source(&self.args, self.source, self.input.as_mut())?;
+        if self.source.is_some_and(|previous| previous != selected) {
+            self.connection = None;
+            self.versions = None;
+        }
+        self.source = Some(selected);
         Ok(())
     }
     fn choose_connection(&mut self) -> Result<(), InitError> {
-        PostgresSetup::choose_connection(&mut self.args, self.input.as_mut())
+        let connection = PostgresSetup::choose_connection(
+            &self.args,
+            self.connection.as_deref(),
+            self.input.as_mut(),
+        )?;
+        if self
+            .connection
+            .as_ref()
+            .is_some_and(|previous| previous != &connection)
+        {
+            self.versions = None;
+        }
+        self.connection = Some(connection);
+        Ok(())
+    }
+    fn uses_existing_server(&self) -> bool {
+        self.source.unwrap_or(self.args.database_url().is_some())
+    }
+    fn effective_args(&self) -> InitializeArgs {
+        let mut args = self.args.clone();
+        if self.uses_existing_server() {
+            if let Some(connection) = &self.connection {
+                args.set_database_url(connection);
+            }
+        } else if self.source == Some(false) {
+            args.select_docker();
+        }
+        args
     }
     async fn choose_versions(&mut self) -> Result<(), anyhow::Error> {
-        self.versions =
-            Some(PostgresSetup::choose_versions(&self.args, self.input.as_mut()).await?);
+        self.versions = Some(
+            PostgresSetup::choose_versions(
+                &self.effective_args(),
+                self.versions.as_deref(),
+                self.input.as_mut(),
+            )
+            .await?,
+        );
+        Ok(())
+    }
+    fn prepare_plans(&mut self) -> Result<(), anyhow::Error> {
+        self.plans.clear();
+        let engines = self
+            .selection
+            .as_ref()
+            .expect("selected setup")
+            .engines
+            .clone();
+        for engine in engines {
+            if engine == "postgres" {
+                self.prepare_postgres()?;
+            } else {
+                self.prepare_sqlite();
+            }
+        }
         Ok(())
     }
     fn prepare_sqlite(&mut self) {
@@ -137,7 +226,7 @@ impl InitializationState<'_> {
     }
     #[cfg(test)]
     fn set_input(&mut self, input: impl PromptInput + 'static) {
-        self.input = Box::new(input);
+        self.input = InputSession::new(input);
     }
     #[cfg(test)]
     const fn set_metadata_requested(&mut self, requested: bool) {
@@ -145,8 +234,8 @@ impl InitializationState<'_> {
     }
     fn validate_complete(&self) -> Result<(), anyhow::Error> {
         anyhow::ensure!(
-            self.home.home().is_dir(),
-            "initialization home was not prepared"
+            self.home.confirmed(),
+            "initialization home was not confirmed"
         );
         let selection = self
             .selection
@@ -163,7 +252,7 @@ impl InitializationState<'_> {
         let selection = self.selection.as_ref().expect("selected setup");
         let setup = PostgresSetup::from_choices(
             self.common,
-            &self.args,
+            &self.effective_args(),
             self.versions.as_ref().expect("explicit version choice"),
             selection.metadata.as_ref(),
             &selection.datasource_names,
@@ -199,6 +288,28 @@ impl SetupSelection {
         })
     }
 
+    fn has_postgres(&self) -> bool {
+        self.engines.iter().any(|engine| engine == "postgres")
+    }
+
+    fn postgres_datasources(&self) -> Vec<String> {
+        let Some(metadata) = &self.metadata else {
+            return Vec::new();
+        };
+        let mut names = self
+            .datasource_names
+            .iter()
+            .filter(|name| {
+                metadata
+                    .engine(name)
+                    .is_ok_and(|engine| engine == "PostgreSQL")
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
     fn uses_datasources(&self, args: &InitializeArgs) -> bool {
         args.engines().is_none()
             && (args.datasources().is_some()
@@ -218,9 +329,10 @@ impl SetupSelection {
                 self.add_engine(engine);
             }
         } else {
-            self.engines = choice::select_with(
+            self.engines = choice::select_retained(
                 "Choose engines for development support",
                 &["postgres".to_owned(), "sqlite".to_owned()],
+                &self.engines,
                 |request| input.answer(request),
             )?;
         }
@@ -239,12 +351,15 @@ impl SetupSelection {
         let names = if let Some(names) = args.datasources() {
             names.to_vec()
         } else {
-            choice::select_with(
+            choice::select_retained(
                 "Choose datasources to initialize",
                 &metadata.names(),
+                &self.datasource_names,
                 |request| input.answer(request),
             )?
         };
+        self.engines.clear();
+        self.datasource_names.clear();
         for name in names {
             self.add_datasource(&name)?;
         }
@@ -278,7 +393,7 @@ impl SetupSelection {
     }
 
     fn check_choices(&self, args: &InitializeArgs) -> Result<(), anyhow::Error> {
-        if self.engines.contains(&"postgres".to_owned()) {
+        if self.has_postgres() {
             PostgresSetup::check_choices(args)?;
         } else {
             anyhow::ensure!(

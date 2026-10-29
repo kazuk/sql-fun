@@ -8,7 +8,7 @@ impl InitStep for SelectionStep {
         Box::pin(async move {
             state.load_selection()?;
             let completion = Conversation::new(flow::selection(state)).run(state).await?;
-            if !completion.is_cancelled() {
+            if !completion.is_cancelled() && !completion.is_back() {
                 state.check_selection()?;
             }
             Ok(completion)

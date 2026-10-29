@@ -46,6 +46,84 @@ def owned():
     return set(run("docker", "ps", "-aq", "--filter", "label=io.sql-fun.extraction=owned").stdout.split())
 
 
+class InitTerminal:
+    """Exercise the installed CLI with a controlling terminal and fresh-output waits."""
+
+    def __init__(self, binary, project, home, arguments=(), tools=False, metadata=None, common=()):
+        self.master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
+        env = dict(os.environ, SQL_FUN_HOME=str(home), TERM="xterm")
+        env.pop("SQL_FUN_DATASOURCE", None)
+        env.pop("SQL_FUN_METADATA_FILE", None)
+        if metadata is not None:
+            env["SQL_FUN_METADATA_FILE"] = str(metadata)
+        if not tools:
+            env["PATH"] = str(project / "no-tools")
+
+        def terminal_session():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        self.process = subprocess.Popen([binary, *common, "init", *arguments], cwd=project, env=env,
+                                        stdin=slave, stdout=slave, stderr=slave,
+                                        preexec_fn=terminal_session)
+        os.close(slave)
+        self.transcript = bytearray()
+
+    def rendered(self, since=0):
+        return re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", self.transcript[since:])
+
+    def wait(self, marker, since=0):
+        deadline = time.monotonic() + 15
+        while marker.encode() not in self.rendered(since):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AssertionError(f"terminal did not reach {marker!r}: {self.transcript!r}")
+            ready, _, _ = select.select([self.master], [], [], min(remaining, 1))
+            if ready:
+                try:
+                    chunk = os.read(self.master, 65536)
+                except OSError as error:
+                    if error.errno == errno.EIO:
+                        raise AssertionError(f"terminal exited before {marker!r}: {self.transcript!r}") from error
+                    raise
+                assert chunk, f"terminal closed before {marker!r}"
+                self.transcript.extend(chunk)
+
+    def prompt(self, marker, since=0):
+        self.wait(marker, since)
+        self.wait("Ctrl+C: cancel.", since)
+
+    def send(self, keys, next_prompt):
+        start = len(self.transcript)
+        os.write(self.master, keys)
+        self.prompt(next_prompt, start)
+        return start
+
+    def finish(self, keys, status):
+        os.write(self.master, keys)
+        assert self.process.wait(timeout=30) == status
+        while select.select([self.master], [], [], 0)[0]:
+            try:
+                chunk = os.read(self.master, 65536)
+            except OSError as error:
+                if error.errno == errno.EIO:
+                    break
+                raise
+            if not chunk:
+                break
+            self.transcript.extend(chunk)
+        if status == 1:
+            assert b"Initialization cancelled." in self.rendered()
+            assert b"Error:" not in self.rendered() and b"Caused by:" not in self.rendered()
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+            self.process.wait(timeout=5)
+        os.close(self.master)
+
+
 def validate_interactive_init(binary, destination, fixture, declarations, ambient_metadata=False):
     """Bare init must not inspect project contents or ambient metadata paths."""
     project = destination / f"interactive-init-{fixture}"
@@ -53,73 +131,238 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
     manifest = project / "Cargo.toml"
     manifest.write_text(declarations)
     home = project / "chosen-home"
-    env = dict(os.environ, SQL_FUN_HOME=str(home), TERM="xterm", PATH=str(project / "no-tools"))
-    env.pop("SQL_FUN_DATASOURCE", None)
-    env.pop("SQL_FUN_METADATA_FILE", None)
-    if ambient_metadata:
-        env["SQL_FUN_METADATA_FILE"] = str(manifest)
-    master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
-
-    def terminal_session():
-        os.setsid()
-        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-
-    process = subprocess.Popen([binary, "init"],
-                               cwd=project, env=env, stdin=slave, stdout=slave,
-                               stderr=slave, preexec_fn=terminal_session)
-    os.close(slave)
-    transcript = bytearray()
-
-    def rendered(since=0):
-        return re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", transcript[since:])
-
-    def wait_for(marker, since=0):
-        deadline = time.monotonic() + 15
-        while marker.encode() not in rendered(since):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise AssertionError(f"terminal did not reach {marker!r}: {transcript!r}")
-            ready, _, _ = select.select([master], [], [], min(remaining, 1))
-            if ready:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        raise AssertionError(f"terminal exited before {marker!r}: {transcript!r}") from error
-                    raise
-                if not chunk:
-                    raise AssertionError(f"terminal closed before {marker!r}: {transcript!r}")
-                transcript.extend(chunk)
-
+    terminal = InitTerminal(binary, project, home, metadata=manifest if ambient_metadata else None)
     try:
-        wait_for("Initialize sql-fun development support?")
-        os.write(master, b"y\r")
-        wait_for("sql-fun home directory (SQL_FUN_HOME)?")
-        assert b"Choose engines" not in rendered(), "home choice must appear first"
-        os.write(master, b"\r")  # Explicitly accept the SQL_FUN_HOME suggestion.
-        wait_for(f"Use {home}")
-        assert not home.exists(), "home must not be created before path confirmation"
-        os.write(master, b"y\r")  # Confirm the resolved absolute home path.
-        wait_for("Space to select, Enter to confirm.")
-        wait_for("[ ] postgres")
-        wait_for("[ ] sqlite")
-        assert b"Choose datasources" not in rendered(), "bare init must not inspect project metadata"
-        start = len(transcript)
-        os.write(master, b"\r")
-        wait_for("Select at least one option explicitly.", start)
-        wait_for("Space to select, Enter to confirm.", start)
-        os.write(master, b"\x1b[B \r")  # Move to SQLite, select, and confirm.
-        wait_for("SQLite development-support setup is still under development.")
-        assert process.wait(timeout=15) == 0
+        terminal.prompt("sql-fun home directory (SQL_FUN_HOME)?")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose engines")
+        assert not home.exists(), "home must not be created during questions"
+        terminal.wait("[ ] postgres")
+        terminal.wait("[ ] sqlite")
+        assert b"Choose datasources" not in terminal.rendered(), "bare init must not inspect project metadata"
+        terminal.send(b"\r", "Select at least one option explicitly.")
+        terminal.send(b"\x1b[B \r", "Initialize sql-fun development support?")
+        assert not home.exists(), "home must not be created before final Ok"
+        terminal.send(b"\r", "Choose exactly one action explicitly")
+        terminal.finish(b" \r", 0)
         assert home.is_dir() and not (home / "postgres").exists()
         assert manifest.read_text() == declarations, "init must not rewrite project metadata"
     finally:
-        if process.poll() is None:
-            process.terminate()
-            process.wait(timeout=5)
-        os.close(master)
-    print(f"Interactive init ({fixture}): no project inspection, home choice and explicit engine selection passed", flush=True)
+        terminal.close()
+    print(f"Interactive init ({fixture}): explicit choices and final authorization passed", flush=True)
+
+
+def home_snapshot(home):
+    if not home.exists():
+        return None
+    snapshot = {}
+    for path in home.rglob("*"):
+        if path.is_symlink():
+            entry = ("symlink", os.readlink(path))
+        elif path.is_file():
+            entry = ("file", hashlib.sha256(path.read_bytes()).hexdigest())
+        else:
+            entry = ("directory", None)
+        snapshot[str(path.relative_to(home))] = entry
+    return snapshot
+
+
+def validate_init_navigation(binary, destination, existing=False):
+    project = destination / ("navigation-existing" if existing else "navigation-new")
+    project.mkdir()
+    home = project / "chosen-home"
+    if existing:
+        home.mkdir()
+        (home / "user-file").write_bytes(b"preserve this data")
+        (home / "metadata.json").write_text('{"user": "preserve this too"}')
+    before = home_snapshot(home)
+    terminal = InitTerminal(binary, project, home)
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose engines")
+        terminal.send(b" \x1b[B \r", "builtin source")
+        terminal.send(b" \r", "versions to initialize")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        for question in ["versions to initialize", "builtin source", "Choose engines", f"Use {home}", "home directory", "home directory", "home directory"]:
+            terminal.send(b"\x1b", question)
+            assert home_snapshot(home) == before
+        # Every ordinary answer is restored; Enter alone reconfirms it.
+        for question in [f"Use {home}", "Choose engines", "builtin source", "versions to initialize", "Initialize sql-fun development support?"]:
+            terminal.send(b"\r", question)
+        start = terminal.send(b"\r", "Choose exactly one action explicitly")
+        assert b"[ ] Ok" in terminal.rendered(start) and b"[ ] Cancel" in terminal.rendered(start)
+        assert home_snapshot(home) == before
+        # Change engines to SQLite, proving obsolete PostgreSQL plans cannot provision.
+        terminal.send(b"\x1b", "versions to initialize")
+        terminal.send(b"\x1b", "builtin source")
+        terminal.send(b"\x1b", "Choose engines")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        terminal.finish(b" \r", 0)
+        assert home.is_dir() and not (home / "postgres").exists()
+        if existing:
+            assert home_snapshot(home) == before
+    finally:
+        terminal.close()
+    print(f"Init navigation (existing={existing}): retained inputs, nested Back, first Esc, edit and Ok passed", flush=True)
+
+
+def validate_init_cancellation(binary, destination, existing=False):
+    for boundary in ("home", "confirmation", "engines", "source", "connection", "versions", "final", "cancel"):
+        project = destination / f"cancel-{boundary}-{existing}"
+        project.mkdir()
+        home = project / "chosen-home"
+        if existing:
+            home.mkdir()
+            (home / "user-file").write_bytes(b"preserve existing content")
+        before = home_snapshot(home)
+        terminal = InitTerminal(binary, project, home)
+        try:
+            terminal.prompt("home directory")
+            if boundary != "home":
+                terminal.send(b"\r", f"Use {home}")
+            if boundary not in ("home", "confirmation"):
+                terminal.send(b"y\r", "Choose engines")
+            if boundary in ("source", "connection", "versions", "final", "cancel"):
+                terminal.send(b" \r", "builtin source")
+            if boundary == "connection":
+                terminal.send(b"\x1b[B \r", "libpq connection string")
+            if boundary in ("versions", "final", "cancel"):
+                terminal.send(b" \r", "versions to initialize")
+            if boundary in ("final", "cancel"):
+                terminal.send(b" \r", "Initialize sql-fun development support?")
+            if boundary == "cancel":
+                terminal.send(b"\r", "Choose exactly one action explicitly")
+                terminal.finish(b"\x1b[B \r", 1)
+            else:
+                terminal.finish(b"\x03", 1)
+            assert home_snapshot(home) == before, f"{boundary}: cancellation changed filesystem"
+        finally:
+            terminal.close()
+    print("Init cancellation: Ctrl+C at each question and explicit final Cancel preserve filesystem", flush=True)
+
+
+def validate_supplied_init_navigation(binary, destination):
+    project = destination / "navigation-supplied"
+    project.mkdir()
+    home = project / "chosen-home"
+    terminal = InitTerminal(binary, project, home, ["--sql-fun-home", str(home),
+                            "--engines", "postgres,sqlite", "--docker", "--engine-versions", "17,18"])
+    try:
+        terminal.prompt(f"Use {home}")
+        terminal.send(b"y\r", "Initialize sql-fun development support?")
+        # Entire nonprompt nested branches must not trap backward traversal.
+        terminal.send(b"\x1b", f"Use {home}")
+        terminal.send(b"\x1b", f"Use {home}")
+        terminal.send(b"\r", "Initialize sql-fun development support?")
+        terminal.send(b"\r", "Choose exactly one action explicitly")
+        terminal.finish(b"\x1b[B \r", 1)
+        assert not home.exists()
+    finally:
+        terminal.close()
+    print("Init supplied choices: Back skips automatic nested branches and retains explicit parameters", flush=True)
+
+
+def validate_datasource_init_navigation(binary, destination):
+    project = destination / "navigation-datasources"
+    project.mkdir()
+    manifest = project / "Cargo.toml"
+    declarations = ("[package.metadata.database.local]\nengine = 'sqlite'\n"
+                    "[package.metadata.database.pg]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '17'\n")
+    manifest.write_text(declarations)
+    home = project / "chosen-home"
+    terminal = InitTerminal(binary, project, home, common=["--metadata-file", str(manifest)])
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose datasources")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        terminal.send(b"\x1b", "Choose datasources")
+        terminal.send(b"\r", "Initialize sql-fun development support?")
+        terminal.send(b"\x1b", "Choose datasources")
+        terminal.send(b" \x1b[B \r", "builtin source")
+        terminal.send(b" \r", "versions to initialize")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        terminal.send(b"\x1b", "versions to initialize")
+        terminal.send(b"\x1b", "builtin source")
+        terminal.send(b"\x1b", "Choose datasources")
+        terminal.send(b" \x1b[B \r", "Initialize sql-fun development support?")
+        terminal.finish(b"\x1b[B \r", 1)
+        assert not home.exists()
+        assert manifest.read_text() == declarations
+    finally:
+        terminal.close()
+    print("Init datasources: explicit project selection, retained answers and branch changes passed", flush=True)
+
+
+def validate_init_unchanged_install(binary, destination):
+    """Final execution must use exactly the retained engine/version settings."""
+    project = destination / "unchanged-install"
+    project.mkdir()
+    home = project / "chosen-home"
+    for major in IMAGES:
+        shutil.copytree(destination / major, home / "postgres" / major)
+    before = home_snapshot(home)
+    terminal = InitTerminal(binary, project, home)
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose engines")
+        terminal.send(b" \x1b[B \r", "builtin source")
+        terminal.send(b" \r", "versions to initialize")
+        terminal.send(b" \x1b[B \r", "Initialize sql-fun development support?")
+        for question in ["versions to initialize", "builtin source", "Choose engines", f"Use {home}", "home directory", "home directory"]:
+            terminal.send(b"\x1b", question)
+            assert home_snapshot(home) == before
+        for question in [f"Use {home}", "Choose engines", "builtin source", "versions to initialize", "Initialize sql-fun development support?"]:
+            terminal.send(b"\r", question)
+        terminal.send(b"\r", "Choose exactly one action explicitly")
+        assert home_snapshot(home) == before
+        terminal.finish(b" \r", 0)
+        for major in IMAGES:
+            assert f"PostgreSQL {major}: already initialized".encode() in terminal.rendered()
+        assert b"SQLite development-support setup" in terminal.rendered()
+        assert home_snapshot(home) == before
+    finally:
+        terminal.close()
+    print("Init unchanged re-entry: final execution retains both engines and all selected PostgreSQL versions", flush=True)
+
+
+def validate_server_init_navigation(binary, destination, connection, major):
+    project = destination / f"server-navigation-{major}"
+    project.mkdir()
+    home = project / "chosen-home"
+    terminal = InitTerminal(binary, project, home, tools=True)
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose engines")
+        terminal.send(b" \r", "builtin source")
+        terminal.send(b"\x1b[B \r", "libpq connection string")
+        terminal.send(connection.encode() + b"\r", "connected PostgreSQL version")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        terminal.send(b"\x1b", "connected PostgreSQL version")
+        terminal.send(b"\x1b", "libpq connection string")
+        # The retained connection is editable, and reconfirmation preserves the version.
+        terminal.send(b"\r", "connected PostgreSQL version")
+        terminal.send(b"\r", "Initialize sql-fun development support?")
+        terminal.send(b"\x1b", "connected PostgreSQL version")
+        terminal.send(b"\x1b", "libpq connection string")
+        suffix = ("&" if connection.startswith(("postgresql://", "postgres://")) else " ") + "application_name=sql_fun_init"
+        terminal.send(b"\x1b[F" + suffix.encode() + b"\r", "connected PostgreSQL version")
+        terminal.send(b"\r", "Select at least one option explicitly")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        terminal.send(b"\x1b", "connected PostgreSQL version")
+        terminal.send(b"\x1b", "libpq connection string")
+        terminal.send(b"\x1b", "builtin source")
+        # Switch from server to Docker; version must now be unselected.
+        terminal.send(b" \x1b[B \r", "versions to initialize")
+        terminal.send(b"\r", "Select at least one option explicitly")
+        assert not home.exists()
+        terminal.finish(b"\x03", 1)
+    finally:
+        terminal.close()
+    print(f"Init PostgreSQL {major}: connection re-entry, retained version and source invalidation passed", flush=True)
 
 
 def validate_masters(directory):
@@ -319,6 +562,7 @@ def validate(binary, major, image, destination, host, bind):
         port = ports["5432/tcp"][0]["HostPort"]
         connection_env = dict(os.environ, SQL_FUN_DATABASE_URL=f"postgresql://postgres:{password}@{host}:{port}/postgres?sslmode=disable",
                               DOCKER_HOST="unix:///nonexistent-sql-fun-test.sock")
+        validate_server_init_navigation(binary, destination, connection_env["SQL_FUN_DATABASE_URL"], major)
         # Type I/O functions with cstring signatures are SQL-callable with unknown literals.
         result = run("psql", "-X", "-qAtw", "--dbname", connection_env["SQL_FUN_DATABASE_URL"],
                      "--set=ON_ERROR_STOP=1", data=b"SELECT boolin('true'), int4in('42'), int4out(42);\n")
@@ -445,9 +689,16 @@ def main():
                               "[package.metadata.database.private]\nengine = 'PostgreSQL'\n")
     validate_interactive_init(args.binary, destination, "malformed", "not valid TOML [")
     validate_interactive_init(args.binary, destination, "ambient", "not valid TOML [", True)
+    validate_init_navigation(args.binary, destination)
+    validate_init_navigation(args.binary, destination, existing=True)
+    validate_init_cancellation(args.binary, destination)
+    validate_init_cancellation(args.binary, destination, existing=True)
+    validate_supplied_init_navigation(args.binary, destination)
+    validate_datasource_init_navigation(args.binary, destination)
     before = owned()
     for major, image in IMAGES.items():
         validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)
+    validate_init_unchanged_install(args.binary, destination)
     init_home = destination / "initialized-docker"
     run(args.binary, "init", "--yes", "--docker", "--sql-fun-home", str(init_home),
         "--engines", "postgres", "--engine-versions", ",".join(IMAGES),

@@ -215,3 +215,54 @@ async fn incomplete_child_stops_its_containing_parent_step(#[case] error: bool) 
     assert_eq!(*log.borrow(), ["accepted child"]);
     assert_eq!(state.plans.len(), 1, "accepted state is not rolled back");
 }
+
+struct QuestionStep(&'static str);
+impl InitStep for QuestionStep {
+    fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a> {
+        Box::pin(async move {
+            state
+                .input
+                .as_mut()
+                .answer(&crate::init::prompt::PromptRequest::confirm(self.0))?;
+            Ok(StepCompletion::next())
+        })
+    }
+}
+
+#[tokio::test]
+async fn back_crosses_nested_vectors_and_nonprompt_steps_without_question_dispatch() {
+    use crate::init::test_helpers::{Answer, Script};
+
+    let common = common_args();
+    let mut state = state(&common, &[]);
+    let script = Script::install(
+        &mut state,
+        vec![
+            Answer::confirm("first", true),
+            Answer::confirm("child", true),
+            Answer::confirm("inserted", true),
+            Answer::cancelled("last"),
+            Answer::cancelled("inserted"),
+            Answer::cancelled("child"),
+            Answer::confirm("first", true),
+            Answer::confirm("child", true),
+            Answer::confirm("inserted", true),
+            Answer::confirm("last", true),
+        ],
+    );
+    let log = Rc::new(RefCell::new(vec![]));
+    let child = Conversation::new(vec![
+        Box::new(QuestionStep("child")),
+        Box::new(QuestionStep("inserted")),
+    ]);
+    let mut parent = Conversation::new(vec![
+        Box::new(QuestionStep("first")),
+        Box::new(RecordStep("nonprompt", log.clone())),
+        Box::new(NestedStep(child)),
+        Box::new(QuestionStep("last")),
+    ]);
+    let completion = parent.run(&mut state).await.unwrap();
+    assert!(!completion.is_back() && !completion.is_cancelled());
+    assert_eq!(log.borrow().len(), 3);
+    script.assert_finished();
+}

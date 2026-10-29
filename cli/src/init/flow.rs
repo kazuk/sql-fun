@@ -30,12 +30,14 @@ pub(super) fn conversation(yes: bool) -> Conversation {
             Box::new(SelectionStep),
             Box::new(EngineSteps),
             Box::new(HomeStep),
+            Box::new(ConfirmInstallStep),
         ]
     } else {
         vec![
             Box::new(HomeStep),
             Box::new(SelectionStep),
             Box::new(EngineSteps),
+            Box::new(ConfirmInstallStep),
         ]
     };
     Conversation::new(steps)
@@ -44,15 +46,19 @@ pub(super) fn conversation(yes: bool) -> Conversation {
 pub(super) async fn collect(
     state: &mut InitializationState<'_>,
 ) -> Result<StepCompletion, anyhow::Error> {
-    let completion = conversation(state.args.assume_yes()).run(state).await?;
-    if !completion.is_cancelled() {
-        state.validate_complete()?;
+    let mut conversation = conversation(state.args.assume_yes());
+    loop {
+        let completion = conversation.run(state).await?;
+        if !completion.is_back() {
+            return Ok(completion);
+        }
+        // Only the root absorbs Back at the first visible question.
+        state.backward = false;
     }
-    Ok(completion)
 }
 
 pub(super) fn home() -> Vec<Box<dyn InitStep>> {
-    vec![Box::new(ConfirmInstallStep), Box::new(HomeDirectoryStep)]
+    vec![Box::new(HomeDirectoryStep)]
 }
 
 pub(super) fn home_directory(edit: bool) -> Vec<Box<dyn InitStep>> {
@@ -93,7 +99,7 @@ pub(super) fn postgres() -> Vec<Box<dyn InitStep>> {
 }
 
 pub(super) fn source_details(state: &InitializationState<'_>) -> Vec<Box<dyn InitStep>> {
-    if state.existing_server {
+    if state.uses_existing_server() {
         vec![Box::new(ConnectionStep), Box::new(VersionsStep)]
     } else {
         vec![Box::new(VersionsStep)]

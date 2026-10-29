@@ -34,6 +34,29 @@ Declining returns to path editing. A supplied `--sql-fun-home` skips this
 confirmation under `--yes`; `SQL_FUN_HOME` alone does not satisfy `--yes`.
 Application schemas and migrations remain managed by your own tools.
 
+## Reviewing answers and confirming setup
+
+Press **Esc** to return to the preceding question. At the first question, Esc
+leaves the wizard open. Previous answers are restored for editing; press Enter
+to reconfirm an unchanged answer. Changing a selection clears affected dependent
+answers. For example, switching PostgreSQL sources clears the source-specific
+connection and version choices, and changing a connection requires confirming
+the server version again. Unrelated answers remain available.
+
+After all answers have been validated, explicitly select **Ok** or **Cancel**
+with Space, then press Enter. Neither action is selected initially or when you
+return to this confirmation. Enter alone does not start setup or cancel it.
+Esc from this confirmation returns to the preceding question.
+
+The question phase may read explicitly selected configuration and connect to a
+selected PostgreSQL server to validate its version. It does not create the home
+directory or install metadata. Home creation and engine provisioning begin only
+after explicit final Ok. Press **Ctrl+C** at a question, or select final Cancel,
+to leave without changing files. Cancellation prints a short message and exits
+with status 1. Existing user data is never deleted as cancellation cleanup.
+Installation errors after Ok may leave a created home and completed engine
+versions in place; cancellation before Ok and installation failure are distinct.
+
 ## Automatic setup
 
 `--yes` completes setup without prompts only when all required choices are

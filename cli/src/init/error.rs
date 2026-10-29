@@ -9,6 +9,17 @@ pub enum InitError {
 }
 
 impl InitError {
+    pub(super) const fn navigation(&self) -> Option<super::step::StepCompletion> {
+        match self {
+            Self::Prompt(inquire::InquireError::OperationCanceled) => {
+                Some(super::step::StepCompletion::back())
+            }
+            Self::Prompt(inquire::InquireError::OperationInterrupted) => {
+                Some(super::step::StepCompletion::cancelled())
+            }
+            _ => None,
+        }
+    }
     #[track_caller]
     pub const fn io<T>(error: std::io::Error) -> Result<T, Self> {
         Err(Self::Io(error))

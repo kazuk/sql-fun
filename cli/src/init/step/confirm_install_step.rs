@@ -1,26 +1,31 @@
-use super::{InitStep, StepCompletion, StepFuture};
-use crate::init::InitializationState;
-use crate::init::prompt::{PromptRequest, PromptResponse};
+use super::{InitStep, PromptInput, StepCompletion, StepFuture};
+use crate::init::{InitializationState, prompt::PromptRequest};
 
+/// Final authorization is deliberately unselected on every entry.
 pub(in crate::init) struct ConfirmInstallStep;
 impl InitStep for ConfirmInstallStep {
     fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a> {
         Box::pin(async move {
+            state.prepare_plans()?;
+            state.validate_complete()?;
+            if state.args.assume_yes() {
+                return Ok(StepCompletion::next());
+            }
             loop {
-                let automatic = if state.args.assume_yes() {
-                    Some(PromptResponse::confirm(true))
-                } else {
-                    None
-                };
-                let request =
-                    PromptRequest::confirm(include_str!("../confirm_install.txt").trim_end())
-                        .with_automatic(automatic);
-                if let Some(confirmed) = state.input.answer(&request)?.confirmation() {
-                    return Ok(if confirmed {
-                        StepCompletion::next()
-                    } else {
-                        StepCompletion::cancelled()
-                    });
+                let request = PromptRequest::multi_select(
+                    "Initialize sql-fun development support?",
+                    &["Ok".to_owned(), "Cancel".to_owned()],
+                    &[],
+                );
+                let answer = state.input.answer(&request)?;
+                if let Some(indices) = answer.selected_indices() {
+                    if indices == [0] {
+                        return Ok(StepCompletion::next());
+                    }
+                    if indices == [1] {
+                        return Ok(StepCompletion::cancelled());
+                    }
+                    eprintln!("Choose exactly one action explicitly: Ok or Cancel.");
                 }
             }
         })

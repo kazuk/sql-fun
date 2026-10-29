@@ -74,7 +74,7 @@ mod test_prompt_response_values {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Input {
-    Confirm,
+    Confirm(Option<bool>),
     Text(TextInput),
     MultiSelect(Selection),
 }
@@ -91,9 +91,26 @@ struct Selection {
     defaults: Vec<usize>,
 }
 
+impl Selection {
+    fn retain(&mut self, retained: &[String]) {
+        self.defaults = self
+            .options
+            .iter()
+            .enumerate()
+            .filter_map(|(index, option)| {
+                if retained.contains(option) {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .collect();
+    }
+}
+
 impl Input {
     const fn confirm() -> Self {
-        Self::Confirm
+        Self::Confirm(None)
     }
 
     fn text(default: &str) -> Self {
@@ -110,6 +127,18 @@ impl Input {
         })
     }
 
+    const fn set_initial_confirmation(&mut self, confirmed: Option<bool>) {
+        if let Self::Confirm(default) = self {
+            *default = confirmed;
+        }
+    }
+
+    fn retain_selection(&mut self, retained: &[String]) {
+        if let Self::MultiSelect(selection) = self {
+            selection.retain(retained);
+        }
+    }
+
     fn set_initial_text(&mut self, initial: &str) {
         if let Self::Text(input) = self {
             initial.clone_into(&mut input.initial);
@@ -118,23 +147,27 @@ impl Input {
 
     fn run(&self, title: &str) -> Result<PromptResponse, InitError> {
         match self {
-            Self::Confirm => Self::run_confirm(title),
+            Self::Confirm(default) => Self::run_confirm(title, *default),
             Self::Text(input) => Self::run_text(title, input),
             Self::MultiSelect(selection) => Self::run_multi_select(title, selection),
         }
     }
 
-    fn run_confirm(title: &str) -> Result<PromptResponse, InitError> {
+    fn run_confirm(title: &str, default: Option<bool>) -> Result<PromptResponse, InitError> {
+        let mut prompt = inquire::Confirm::new(title)
+            .with_help_message("Enter to confirm. Esc: Back; Ctrl+C: cancel.");
+        if let Some(default) = default {
+            prompt = prompt.with_default(default);
+        }
         Ok(PromptResponse::confirm(
-            inquire::Confirm::new(title)
-                .prompt()
-                .or_else(InitError::prompt)?,
+            prompt.prompt().or_else(InitError::prompt)?,
         ))
     }
 
     fn run_text(title: &str, input: &TextInput) -> Result<PromptResponse, InitError> {
         Ok(PromptResponse::text(
             &inquire::Text::new(title)
+                .with_help_message("Enter to confirm. Esc: Back; Ctrl+C: cancel.")
                 .with_default(&input.default)
                 .with_initial_value(&input.initial)
                 .prompt()
@@ -145,7 +178,7 @@ impl Input {
     fn run_multi_select(title: &str, selection: &Selection) -> Result<PromptResponse, InitError> {
         Ok(PromptResponse::multi_select(
             &inquire::MultiSelect::new(title, selection.options.clone())
-                .with_help_message("Use arrows to move, Space to select, Enter to confirm.")
+                .with_help_message("Use arrows to move, Space to select, Enter to confirm. Esc: Back; Ctrl+C: cancel.")
                 .with_default(&selection.defaults)
                 .raw_prompt()
                 .or_else(InitError::prompt)?
@@ -183,6 +216,16 @@ impl PromptRequest {
             input: Input::text(default),
             automatic: None,
         }
+    }
+
+    pub fn with_retained_selection(mut self, retained: &[String]) -> Self {
+        self.input.retain_selection(retained);
+        self
+    }
+
+    pub const fn with_initial_confirmation(mut self, confirmed: Option<bool>) -> Self {
+        self.input.set_initial_confirmation(confirmed);
+        self
     }
 
     pub fn with_initial_text(mut self, initial: &str) -> Self {

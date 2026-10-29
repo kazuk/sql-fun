@@ -11,10 +11,10 @@ impl InitStep for HomeDirectoryStep {
                 let completion = Conversation::new(flow::home_directory(edit))
                     .run(state)
                     .await?;
-                if completion.is_cancelled() {
+                if completion.is_cancelled() || completion.is_back() {
                     return Ok(completion);
                 }
-                if state.home.confirmed() && state.home.create_directory()? {
+                if state.home.confirmed() {
                     return Ok(StepCompletion::next());
                 }
                 edit = true;

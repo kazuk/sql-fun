@@ -56,9 +56,16 @@ pub(super) trait InitStep {
 pub(super) enum StepCompletion {
     Next,
     Cancelled,
+    Back,
 }
 
 impl StepCompletion {
+    pub(super) const fn back() -> Self {
+        Self::Back
+    }
+    pub(super) const fn is_back(self) -> bool {
+        matches!(self, Self::Back)
+    }
     pub(super) const fn next() -> Self {
         Self::Next
     }
@@ -73,6 +80,36 @@ impl StepCompletion {
 /// The terminal boundary can be scripted without replacing conversation logic.
 pub(super) trait PromptInput {
     fn answer(&mut self, request: &PromptRequest) -> Result<PromptResponse, InitError>;
+}
+
+pub(super) struct InputSession {
+    input: Box<dyn PromptInput>,
+    prompts: usize,
+}
+impl InputSession {
+    pub(super) fn new(input: impl PromptInput + 'static) -> Self {
+        Self {
+            input: Box::new(input),
+            prompts: 0,
+        }
+    }
+    pub(super) const fn prompts(&self) -> usize {
+        self.prompts
+    }
+}
+impl PromptInput for InputSession {
+    fn answer(&mut self, request: &PromptRequest) -> Result<PromptResponse, InitError> {
+        if let Some(answer) = request.automatic_response() {
+            return Ok(answer.clone());
+        }
+        self.prompts += 1;
+        self.input.answer(request)
+    }
+}
+impl AsMut<dyn PromptInput> for InputSession {
+    fn as_mut(&mut self) -> &mut (dyn PromptInput + 'static) {
+        self
+    }
 }
 
 pub(super) struct TerminalInput;

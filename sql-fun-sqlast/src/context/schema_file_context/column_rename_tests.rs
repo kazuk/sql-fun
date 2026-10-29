@@ -353,6 +353,7 @@ fn row_type_projections_and_explicit_column_aliases_remain_usable() -> testresul
         "CREATE TABLE holder(value public.t)",
         "CREATE VIEW v AS SELECT q.a FROM t AS q(a)",
         "CREATE VIEW row_v AS SELECT (value).a AS field FROM holder",
+        "CREATE VIEW anonymous_v AS SELECT (ROW(1)).f1 AS value",
         "CREATE VIEW whole_v AS SELECT (q.*) IS NULL AS empty FROM t AS q(a)",
         "CREATE VIEW whole_field_v AS SELECT (q.*).a FROM t AS q(a)",
         "ALTER TABLE t RENAME a TO c",

@@ -199,3 +199,33 @@ fn sqlite_membership_does_not_impose_operand_affinity() -> testresult::TestResul
     ])));
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::list("SELECT NULL IN (1, TRUE)")]
+#[case::negative_list("SELECT NULL NOT IN (1, TRUE)")]
+fn heterogeneous_comparisons_retain_independent_coercions(
+    #[case] sql: &str,
+) -> testresult::TestResult {
+    let (query, context) = query(sql, context())?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let predicate = expression(&query).as_membership().unwrap();
+    assert_eq!(predicate.comparisons().len(), 2);
+    for (comparison, ty) in predicate
+        .comparisons()
+        .iter()
+        .zip([PgBuiltInType::int4(), PgBuiltInType::bool()])
+    {
+        assert_eq!(comparison.left().get_type(), Some(ty.clone()));
+        assert_eq!(comparison.right().get_type(), Some(ty));
+        assert!(
+            comparison
+                .expression()
+                .unwrap()
+                .operator_binding()
+                .unwrap()
+                .resolution()
+                .is_resolved()
+        );
+    }
+    Ok(())
+}

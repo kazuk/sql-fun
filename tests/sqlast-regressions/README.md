@@ -61,8 +61,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1029 inputs for PostgreSQL 17 and 1035 for
-PostgreSQL 18 (2064 total). These count positive contract inputs separately from
+manifest totals are 1033 inputs for PostgreSQL 17 and 1039 for
+PostgreSQL 18 (2072 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -199,6 +199,11 @@ shape/type diagnostics. `membership.json` runs against PostgreSQL 17/18 through
 both source and installed checks. Focused Rust tests retain operator/column
 bindings, operand retention, SQLite semantics and correlated parameter domains.
 
+`membership-comparisons.json` checks heterogeneous IN/NOT IN lists at the builtin
+schema level. An unknown NULL is coerced independently for each comparison when
+no scalar-array common type exists; incompatible comparisons still report errors.
+These cases run in both source and installed checks independently of #799.
+
 ## Temporary catalog-setup ignores for #799
 
 The shipped `information_schema` contains IN subqueries comparing the
@@ -214,7 +219,7 @@ version and #799 reference. It covers 862 cases per version, across 48 groups
 per version. Their SQL, complete expectations and manifest counts remain intact.
 The shared runner emits a JUnit skipped testcase and a console SKIP with #799
 for every suppression. It reports executed and ignored counts separately:
-167/173 cases still execute on PostgreSQL 17/18 (340 executed, 1724 ignored).
+171/177 cases still execute on PostgreSQL 17/18 (348 executed, 1724 ignored).
 
 The temporary helper rejects duplicate/stale entries and incomplete group
 inventories: a new case is never implicitly ignored. Entire groups are blocked

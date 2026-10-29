@@ -1,0 +1,70 @@
+[
+  {
+    "name": "in-heterogeneous-null",
+    "sql": "SELECT NULL IN (1, TRUE) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "in-incompatible-comparisons",
+    "sql": "SELECT 1 IN (1, TRUE) AS result",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-in-heterogeneous-null",
+    "sql": "SELECT NULL NOT IN (1, TRUE) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-in-incompatible-comparisons",
+    "sql": "SELECT 1 NOT IN (1, TRUE) AS result",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

@@ -614,7 +614,8 @@
     "sql": "SELECT 1 IN (true,false) AS result",
     "expected": {
       "diagnostics": [
-        "membership_common_type"
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
       ],
       "columns": [
         {

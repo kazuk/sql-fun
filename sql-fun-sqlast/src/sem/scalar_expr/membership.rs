@@ -432,12 +432,12 @@ impl MembershipExpr {
             }
             let types: Option<Vec<_>> = inputs.iter().map(MinMaxExpr::input_type).collect();
             if let Some(types) = types {
-                match MinMaxExpr::select_common_type(context, &types) {
-                    Ok(ty) if !ty.is_record() => target = Some(ty),
-                    Ok(_) => {}
-                    Err(problem) => {
-                        return self.fail(context, MembershipProblem::common_type(problem));
-                    }
+                // A scalar-array common type is optional. PostgreSQL falls back
+                // to independent comparisons when the list has no common type.
+                if let Ok(ty) = MinMaxExpr::select_common_type(context, &types)
+                    && !ty.is_record()
+                {
+                    target = Some(ty);
                 }
             } else if let Some(parameters) = parameters.as_deref_mut() {
                 let common = parameters.membership_common(context, &inputs)?;

@@ -1415,19 +1415,6 @@
                     "ComparisonResult"
                   ],
                   "additionalProperties": false
-                },
-                {
-                  "description": "No common type exists for a scalar membership list.",
-                  "type": "object",
-                  "properties": {
-                    "CommonType": {
-                      "$ref": "#/$defs/MinMaxProblem"
-                    }
-                  },
-                  "required": [
-                    "CommonType"
-                  ],
-                  "additionalProperties": false
                 }
               ]
             },
@@ -1449,78 +1436,6 @@
               "required": [
                 "expected",
                 "actual"
-              ]
-            },
-            "MinMaxProblem": {
-              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
-              "oneOf": [
-                {
-                  "description": "No operand was supplied.",
-                  "type": "string",
-                  "const": "Empty"
-                },
-                {
-                  "description": "Two operand types cannot be coerced to the selected common type.",
-                  "type": "object",
-                  "properties": {
-                    "Incompatible": {
-                      "type": "array",
-                      "prefixItems": [
-                        {
-                          "$ref": "#/$defs/TypeReference"
-                        },
-                        {
-                          "$ref": "#/$defs/TypeReference"
-                        }
-                      ],
-                      "minItems": 2,
-                      "maxItems": 2
-                    }
-                  },
-                  "required": [
-                    "Incompatible"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "Required type-category metadata is unavailable.",
-                  "type": "object",
-                  "properties": {
-                    "MissingTypeFacts": {
-                      "$ref": "#/$defs/TypeReference"
-                    }
-                  },
-                  "required": [
-                    "MissingTypeFacts"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "Comparison metadata is unavailable for the result type.",
-                  "type": "object",
-                  "properties": {
-                    "MissingComparisonFacts": {
-                      "$ref": "#/$defs/TypeReference"
-                    }
-                  },
-                  "required": [
-                    "MissingComparisonFacts"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "The result type has no `PostgreSQL` comparison implementation.",
-                  "type": "object",
-                  "properties": {
-                    "NotOrdered": {
-                      "$ref": "#/$defs/TypeReference"
-                    }
-                  },
-                  "required": [
-                    "NotOrdered"
-                  ],
-                  "additionalProperties": false
-                }
               ]
             },
             "IndexProblem": {
@@ -1770,6 +1685,78 @@
                   },
                   "required": [
                     "ResetValue"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "MinMaxProblem": {
+              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
+              "oneOf": [
+                {
+                  "description": "No operand was supplied.",
+                  "type": "string",
+                  "const": "Empty"
+                },
+                {
+                  "description": "Two operand types cannot be coerced to the selected common type.",
+                  "type": "object",
+                  "properties": {
+                    "Incompatible": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Incompatible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Required type-category metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTypeFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingTypeFacts"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Comparison metadata is unavailable for the result type.",
+                  "type": "object",
+                  "properties": {
+                    "MissingComparisonFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingComparisonFacts"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The result type has no `PostgreSQL` comparison implementation.",
+                  "type": "object",
+                  "properties": {
+                    "NotOrdered": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "NotOrdered"
                   ],
                   "additionalProperties": false
                 }
@@ -5237,19 +5224,6 @@
                     "ComparisonResult"
                   ],
                   "additionalProperties": false
-                },
-                {
-                  "description": "No common type exists for a scalar membership list.",
-                  "type": "object",
-                  "properties": {
-                    "CommonType": {
-                      "$ref": "#/$defs/MinMaxProblem"
-                    }
-                  },
-                  "required": [
-                    "CommonType"
-                  ],
-                  "additionalProperties": false
                 }
               ]
             },
@@ -5271,78 +5245,6 @@
               "required": [
                 "expected",
                 "actual"
-              ]
-            },
-            "MinMaxProblem": {
-              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
-              "oneOf": [
-                {
-                  "description": "No operand was supplied.",
-                  "type": "string",
-                  "const": "Empty"
-                },
-                {
-                  "description": "Two operand types cannot be coerced to the selected common type.",
-                  "type": "object",
-                  "properties": {
-                    "Incompatible": {
-                      "type": "array",
-                      "prefixItems": [
-                        {
-                          "$ref": "#/$defs/TypeReference"
-                        },
-                        {
-                          "$ref": "#/$defs/TypeReference"
-                        }
-                      ],
-                      "minItems": 2,
-                      "maxItems": 2
-                    }
-                  },
-                  "required": [
-                    "Incompatible"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "Required type-category metadata is unavailable.",
-                  "type": "object",
-                  "properties": {
-                    "MissingTypeFacts": {
-                      "$ref": "#/$defs/TypeReference"
-                    }
-                  },
-                  "required": [
-                    "MissingTypeFacts"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "Comparison metadata is unavailable for the result type.",
-                  "type": "object",
-                  "properties": {
-                    "MissingComparisonFacts": {
-                      "$ref": "#/$defs/TypeReference"
-                    }
-                  },
-                  "required": [
-                    "MissingComparisonFacts"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "The result type has no `PostgreSQL` comparison implementation.",
-                  "type": "object",
-                  "properties": {
-                    "NotOrdered": {
-                      "$ref": "#/$defs/TypeReference"
-                    }
-                  },
-                  "required": [
-                    "NotOrdered"
-                  ],
-                  "additionalProperties": false
-                }
               ]
             },
             "IndexProblem": {
@@ -5592,6 +5494,78 @@
                   },
                   "required": [
                     "ResetValue"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "MinMaxProblem": {
+              "description": "A `PostgreSQL` GREATEST/LEAST type-resolution failure.",
+              "oneOf": [
+                {
+                  "description": "No operand was supplied.",
+                  "type": "string",
+                  "const": "Empty"
+                },
+                {
+                  "description": "Two operand types cannot be coerced to the selected common type.",
+                  "type": "object",
+                  "properties": {
+                    "Incompatible": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Incompatible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Required type-category metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTypeFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingTypeFacts"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Comparison metadata is unavailable for the result type.",
+                  "type": "object",
+                  "properties": {
+                    "MissingComparisonFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingComparisonFacts"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "The result type has no `PostgreSQL` comparison implementation.",
+                  "type": "object",
+                  "properties": {
+                    "NotOrdered": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "NotOrdered"
                   ],
                   "additionalProperties": false
                 }

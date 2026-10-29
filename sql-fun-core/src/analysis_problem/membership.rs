@@ -1,4 +1,4 @@
-use super::{DiagnosticMessage, DiagnosticMetadata, MinMaxProblem, TypeReference};
+use super::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
 
 /// Invalid shape or comparison in an IN/NOT IN predicate.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -8,8 +8,6 @@ pub enum MembershipProblem {
     Width(MembershipWidth),
     /// A selected comparison does not return boolean.
     ComparisonResult(TypeReference),
-    /// No common type exists for a scalar membership list.
-    CommonType(MinMaxProblem),
 }
 
 /// Expected and actual membership operand widths.
@@ -29,16 +27,10 @@ impl MembershipProblem {
     pub fn comparison_result(ty: impl Into<TypeReference>) -> Self {
         Self::ComparisonResult(ty.into())
     }
-    /// Record common-type selection failure.
-    #[must_use]
-    pub const fn common_type(problem: MinMaxProblem) -> Self {
-        Self::CommonType(problem)
-    }
     pub(super) const fn code(&self) -> &'static str {
         match self {
             Self::Width(_) => "membership_width",
             Self::ComparisonResult(_) => "membership_comparison_result",
-            Self::CommonType(_) => "membership_common_type",
         }
     }
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
@@ -55,7 +47,6 @@ impl DiagnosticMessage for MembershipProblem {
             Self::ComparisonResult(ty) => {
                 format!("membership comparison must return boolean, not {ty}")
             }
-            Self::CommonType(problem) => problem.diagnostic_message(),
         }
     }
 }

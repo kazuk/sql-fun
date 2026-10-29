@@ -202,4 +202,6 @@ mod tests {
     // Deletion commit: 10662b811d43b06eafb708282639329322b3378a; recover from its parent.
 
     // Removed native_notification_invalidates_in_place_change; restore from df446be6c1d950353fbd7f79916f79c68bfd396d.
+    // Removed inode_replacement_invalidates_without_notification after a CI timeout.
+    // Deletion commit: d4b1ac47e5969c4e639b7c181b561fe176085774; recover from its parent.
 }

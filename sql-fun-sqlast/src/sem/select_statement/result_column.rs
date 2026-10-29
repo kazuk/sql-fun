@@ -21,6 +21,8 @@ pub struct ResultColumn {
     explicit_name: crate::sem::source_flag::SourceFlag,
     #[serde(skip)]
     expanded: crate::sem::source_flag::SourceFlag,
+    #[serde(skip)]
+    join_sensitive_star: crate::sem::source_flag::SourceFlag,
     col_name: Option<ColumnName>,
     col_type: Option<TypeReference>,
     is_not_null: Option<bool>,
@@ -61,6 +63,7 @@ impl ResultColumn {
         Self {
             explicit_name: crate::sem::source_flag::SourceFlag::new(false),
             expanded: crate::sem::source_flag::SourceFlag::new(false),
+            join_sensitive_star: crate::sem::source_flag::SourceFlag::new(false),
             expression: None,
             star_expansion: None,
             col_name: col_name.clone(),
@@ -491,12 +494,15 @@ impl ResultColumnCollection {
         let pending = self.has_pending_stars();
         for (index, column) in self.0.iter_mut().enumerate() {
             if let Some(expression) = &mut column.expression {
+                if column.join_sensitive_star.get() {
+                    visitor.join_sensitive_star();
+                }
                 visitor.projection(
                     &mut column.col_name,
                     column.explicit_name.get(),
                     column.expanded.get(),
                     expression,
-                );
+                )?;
                 expression.walk(visitor)?;
                 if let Some(star) = &mut column.star_expansion {
                     *star = star.with_expression(expression.as_ref().clone());
@@ -522,6 +528,11 @@ impl ResultColumnCollection {
 }
 
 impl ResultColumnCollection {
+    pub(crate) fn mark_join_sensitive_star_since(&mut self, start: usize) {
+        for column in &mut self.0[start..] {
+            column.join_sensitive_star = crate::sem::source_flag::SourceFlag::new(true);
+        }
+    }
     pub(crate) fn push_expanded(&mut self, name: &ColumnName, expression: SemScalarExpr) {
         self.push_expression(name, expression);
         self.0.last_mut().expect("inserted expansion").expanded =

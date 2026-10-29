@@ -860,9 +860,13 @@ supports `IF EXISTS` for an absent table. SQLite accepts same-name renames and
 uses case-insensitive identifier lookup. With the `sqlite` feature, unaliased
 outputs that directly reference the renamed source column follow it; a rename
 that makes retained view or trigger references ambiguous or invalid is rejected
-atomically. SQLite expression-text output names, such as `a+1`, are not rebuilt.
-Changes to the number of wildcard outputs caused by renamed `NATURAL JOIN`
-columns are not reconstructed; these view shapes remain unsupported.
+atomically. SQLite support remains incomplete: renames that require updating
+expression-derived implicit output names, such as `a+1`
+([#867](https://github.com/kazuk/sql-fun/issues/867)), or reconstructing wildcard
+outputs after `NATURAL JOIN` column matching changes
+([#868](https://github.com/kazuk/sql-fun/issues/868)), stop with an explicit
+unimplemented-operation panic (`todo!()`). These SQLite-only paths do not affect
+PostgreSQL column renames.
 
 Propagation covers dependencies already retained by semantic analysis. Table-level
 `CREATE TABLE` foreign-key retention

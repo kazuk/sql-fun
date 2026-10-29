@@ -68,13 +68,15 @@ pub(crate) trait SemanticVisitor {
     fn relation(&mut self, _name: Option<&str>, _alias: &str, _columns: &[String]) {}
     fn derived(&mut self, _alias: &str, _columns: &[String]) {}
     fn output(&mut self, _name: &str, _value: &mut SemScalarExpr) {}
+    fn join_sensitive_star(&mut self) {}
     fn projection(
         &mut self,
         _name: &mut Option<crate::sem::ColumnName>,
         _explicit: bool,
         _expanded: bool,
         _value: &mut SemScalarExpr,
-    ) {
+    ) -> Result<(), AnalysisError> {
+        Ok(())
     }
     fn result_name(
         &mut self,

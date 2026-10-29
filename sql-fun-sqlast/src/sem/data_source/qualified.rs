@@ -18,6 +18,9 @@ pub(crate) struct QualifiedSource<'a> {
 }
 
 impl<'a> QualifiedSource<'a> {
+    pub(super) fn is_joined(&self) -> bool {
+        self.source.is_joined()
+    }
     pub(super) const fn with_projection_ordinal(mut self, ordinal: usize) -> Self {
         self.projection_ordinal = Some(ordinal);
         self

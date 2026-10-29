@@ -103,6 +103,7 @@ struct RenameNamespaces<'a, C> {
     outputs: HashMap<FullName, Vec<ColumnName>>,
     scopes: Vec<Vec<NamespaceSource>>,
     joins: Vec<(usize, usize)>,
+    natural_projection_changes: Vec<bool>,
     affected: bool,
     ctes: Vec<HashMap<String, SourceColumns>>,
     source_outputs: Vec<Vec<ColumnName>>,
@@ -121,6 +122,50 @@ struct NamespaceSource {
     unqualified: bool,
 }
 impl NamespaceSource {
+    fn original_columns(sources: &[Self]) -> Vec<ColumnName> {
+        sources
+            .iter()
+            .filter(|source| source.unqualified)
+            .flat_map(|source| source.original.iter().cloned())
+            .collect()
+    }
+    fn natural_pairs(left: &[ColumnName], right: &[ColumnName]) -> Vec<(usize, usize)> {
+        left.iter()
+            .enumerate()
+            .flat_map(|(left_index, left)| {
+                right
+                    .iter()
+                    .enumerate()
+                    .filter_map(move |(right_index, right)| {
+                        if left.as_str().eq_ignore_ascii_case(right.as_str()) {
+                            Some((left_index, right_index))
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .collect()
+    }
+    fn original_join(
+        left: &[Self],
+        right: &[Self],
+        using: &[ColumnName],
+        natural: bool,
+    ) -> (Vec<ColumnName>, Vec<(usize, usize)>) {
+        let mut columns = Self::original_columns(left);
+        let right = Self::original_columns(right);
+        let pairs = Self::natural_pairs(&columns, &right);
+        let using = if natural {
+            pairs
+                .iter()
+                .map(|(index, _)| columns[*index].clone())
+                .collect()
+        } else {
+            using.to_vec()
+        };
+        columns.extend(right.into_iter().filter(|name| !using.contains(name)));
+        (columns, pairs)
+    }
     fn visible_columns(sources: &[Self]) -> Vec<ColumnName> {
         sources
             .iter()
@@ -143,11 +188,37 @@ impl<'a, C: ParseContext> RenameNamespaces<'a, C> {
             outputs,
             scopes: Vec::new(),
             joins: Vec::new(),
+            natural_projection_changes: Vec::new(),
             affected: false,
             ctes: Vec::new(),
             problems: Vec::new(),
             source_outputs: Vec::new(),
             validate,
+        }
+    }
+    fn install_join(
+        &mut self,
+        start: usize,
+        original: Vec<ColumnName>,
+        columns: Vec<ColumnName>,
+        alias: Option<&AliasSpec>,
+    ) {
+        let Some(scope) = self.scopes.last_mut() else {
+            return;
+        };
+        for source in &mut scope[start..] {
+            source.unqualified = false;
+        }
+        if let Some(alias) = alias {
+            scope.truncate(start);
+            self.add_source(alias, &original, &columns);
+        } else {
+            scope.push(NamespaceSource {
+                alias: String::new(),
+                columns,
+                original,
+                unqualified: true,
+            });
         }
     }
     fn add_source(&mut self, alias: &AliasSpec, original: &[ColumnName], columns: &[ColumnName]) {
@@ -165,18 +236,39 @@ impl<C: ParseContext> SemanticVisitor for RenameNamespaces<'_, C> {
     fn source_outputs(&mut self, columns: &[ColumnName]) {
         self.source_outputs.push(columns.to_vec());
     }
+    fn join_sensitive_star(&mut self) {
+        if self.context.dialect() == crate::ast::Dialect::sqlite()
+            && self.natural_projection_changes.last() == Some(&true)
+        {
+            todo!("SQLite NATURAL JOIN wildcard reconstruction (#868)");
+        }
+    }
     fn projection(
         &mut self,
         name: &mut Option<ColumnName>,
         explicit: bool,
         expanded: bool,
         value: &mut SemScalarExpr,
-    ) {
+    ) -> Result<(), AnalysisError> {
+        if self.context.dialect() == crate::ast::Dialect::sqlite()
+            && !explicit
+            && !expanded
+            && value.namespace_reference().is_none()
+        {
+            let mut probe = OutputReferenceChanges {
+                rename: self.rename,
+                changed: false,
+            };
+            value.clone().walk(&mut probe)?;
+            if probe.changed {
+                todo!("SQLite implicit expression-derived output names (#867)");
+            }
+        }
         if !expanded {
-            return;
+            return Ok(());
         }
         let Some((alias, column, _)) = value.namespace_reference() else {
-            return;
+            return Ok(());
         };
         let destination = self.scopes.iter().rev().find_map(|scope| {
             scope.iter().find_map(|source| {
@@ -196,6 +288,7 @@ impl<C: ParseContext> SemanticVisitor for RenameNamespaces<'_, C> {
                 *name = Some(destination);
             }
         }
+        Ok(())
     }
     fn result_name(
         &mut self,
@@ -232,13 +325,17 @@ impl<C: ParseContext> SemanticVisitor for RenameNamespaces<'_, C> {
         let Some(scope) = self.scopes.last_mut() else {
             return;
         };
-        let mut original = scope[start..]
-            .iter()
-            .filter(|source| source.unqualified)
-            .flat_map(|source| source.original.iter().cloned())
-            .collect::<Vec<_>>();
+        let (original, original_pairs) =
+            NamespaceSource::original_join(&scope[start..split], &scope[split..], using, natural);
         let mut left = NamespaceSource::visible_columns(&scope[start..split]);
         let right = NamespaceSource::visible_columns(&scope[split..]);
+        let current_pairs = NamespaceSource::natural_pairs(&left, &right);
+        if natural
+            && original_pairs != current_pairs
+            && let Some(changed) = self.natural_projection_changes.last_mut()
+        {
+            *changed = true;
+        }
         let using = if natural {
             left.iter()
                 .filter(|name| right.contains(name))
@@ -256,27 +353,16 @@ impl<C: ParseContext> SemanticVisitor for RenameNamespaces<'_, C> {
             }
         }
         left.extend(right.into_iter().filter(|name| !using.contains(name)));
-        for source in &mut scope[start..] {
-            source.unqualified = false;
-        }
-        if let Some(alias) = alias {
-            scope.truncate(start);
-            self.add_source(alias, &original, &left);
-        } else {
-            scope.push(NamespaceSource {
-                alias: String::new(),
-                columns: left,
-                original: std::mem::take(&mut original),
-                unqualified: true,
-            });
-        }
+        self.install_join(start, original, left, alias);
     }
 
     fn enter_query(&mut self) {
+        self.natural_projection_changes.push(false);
         self.scopes.push(Vec::new());
         self.ctes.push(HashMap::new());
     }
     fn leave_query(&mut self) {
+        self.natural_projection_changes.pop();
         self.scopes.pop();
         self.ctes.pop();
     }
@@ -384,6 +470,20 @@ impl<C: ParseContext> SemanticVisitor for RenameNamespaces<'_, C> {
                     column.as_str(),
                 )));
         }
+        Ok(())
+    }
+}
+
+struct OutputReferenceChanges<'a> {
+    rename: &'a ColumnRename,
+    changed: bool,
+}
+impl SemanticVisitor for OutputReferenceChanges<'_> {
+    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        let original = value.namespace_reference().map(|(_, name, _)| name.clone());
+        value.rename_bound_column(self.rename);
+        let current = value.namespace_reference().map(|(_, name, _)| name.clone());
+        self.changed |= original != current;
         Ok(())
     }
 }

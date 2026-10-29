@@ -633,3 +633,81 @@ fn expression_index_inference_uses_consistent_copied_column_constraints() -> tes
     );
     Ok(())
 }
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case("CREATE VIEW v AS SELECT a IS NULL FROM t")]
+#[case("CREATE VIEW v AS SELECT * FROM (SELECT a IS NULL FROM t)")]
+#[should_panic(expected = "SQLite implicit expression-derived output names (#867)")]
+fn sqlite_unfinished_implicit_expression_names_stop_explicitly(#[case] view: &str) {
+    use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
+    let context = sqlite_schema(&["CREATE TABLE t(a)", view]).unwrap();
+    let _ = sqlite(context, "ALTER TABLE t RENAME a TO c");
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::introduce("CREATE TABLE u(c)", "CREATE VIEW v AS SELECT * FROM t NATURAL JOIN u")]
+#[case::remove("CREATE TABLE u(a)", "CREATE VIEW v AS SELECT * FROM t NATURAL JOIN u")]
+#[case::joined_alias(
+    "CREATE TABLE u(c)",
+    "CREATE VIEW v AS SELECT j.* FROM (t NATURAL JOIN u) AS j"
+)]
+#[should_panic(expected = "SQLite NATURAL JOIN wildcard reconstruction (#868)")]
+fn sqlite_unfinished_natural_star_shapes_stop_explicitly(#[case] other: &str, #[case] view: &str) {
+    use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
+    let context = sqlite_schema(&["CREATE TABLE t(a)", other, view]).unwrap();
+    let _ = sqlite(context, "ALTER TABLE t RENAME a TO c");
+}
+
+#[rstest::rstest]
+#[case::expression("CREATE VIEW v AS SELECT a IS NULL FROM t")]
+#[case::natural_star("CREATE VIEW v AS SELECT * FROM t NATURAL JOIN u")]
+fn postgres_does_not_enter_sqlite_unfinished_paths(#[case] view: &str) -> testresult::TestResult {
+    let context = schema(&[
+        "CREATE TABLE t(a integer)",
+        "CREATE TABLE u(c integer)",
+        view,
+    ])?;
+    let outputs = context
+        .get_view_impl(&name("v"))
+        .unwrap()
+        .result_columns()
+        .names();
+    let result = apply_ownership_sql(context, "ALTER TABLE t RENAME a TO c")?;
+    assert!(result.ast().alter_table_statement().unwrap().can_apply());
+    assert!(result.context().problems().is_empty());
+    assert_eq!(
+        result
+            .context()
+            .get_view_impl(&name("v"))
+            .unwrap()
+            .result_columns()
+            .names(),
+        outputs
+    );
+    assert!(
+        result
+            .context()
+            .get_table_impl(&name("t"))
+            .unwrap()
+            .has_column(&ColumnName::from("c"))
+    );
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::explicit_output("CREATE VIEW v AS SELECT a IS NULL AS fixed FROM t")]
+#[case::derived_alias("CREATE VIEW v AS WITH q(a) AS (SELECT a FROM t) SELECT a IS NULL FROM q")]
+#[case::qualified_star("CREATE VIEW v AS SELECT t.* FROM t NATURAL JOIN u")]
+#[case::stable_natural("CREATE VIEW v AS SELECT * FROM t AS x NATURAL JOIN t AS y")]
+#[case::unrelated_expression("CREATE VIEW v AS SELECT c IS NULL FROM u")]
+fn sqlite_correct_outputs_remain_supported(#[case] view: &str) -> testresult::TestResult {
+    use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
+    let context = sqlite_schema(&["CREATE TABLE t(a)", "CREATE TABLE u(c)", view])?;
+    let result = sqlite(context, "ALTER TABLE t RENAME a TO c")?;
+    assert!(result.ast().alter_table_statement().unwrap().can_apply());
+    assert!(result.context().problems().is_empty());
+    Ok(())
+}

@@ -451,7 +451,11 @@ impl Target {
                 QueryProblem::reference_not_found("star source"),
             ))?;
         }
+        let start = results.len();
         projection.append_results(context, scope, results, self.location, None)?;
+        if relation.is_none() && qualifier.is_none() {
+            results.mark_join_sensitive_star_since(start);
+        }
         Ok(())
     }
 }

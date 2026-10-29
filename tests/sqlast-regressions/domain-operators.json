@@ -1,0 +1,326 @@
+[
+  {
+    "name": "domain_operators::left",
+    "sql": "SELECT d = 1 AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::right",
+    "sql": "SELECT 1 = d AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::required",
+    "sql": "SELECT required = 1 AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::nested",
+    "sql": "SELECT nested = 1 AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::widening",
+    "sql": "SELECT d = 1::bigint AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::both_domains",
+    "sql": "SELECT d = nested AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::literal",
+    "sql": "SELECT 1::public.distinct_number = 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::array_domain",
+    "sql": "SELECT ARRAY[1]::public.number_array = ARRAY[1] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::distinct",
+    "sql": "SELECT d IS DISTINCT FROM 1 AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::not_distinct",
+    "sql": "SELECT d IS NOT DISTINCT FROM 1 AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::typed_null",
+    "sql": "SELECT NULL::public.distinct_number = 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::in_list",
+    "sql": "SELECT d IN (1,2) AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::in_subquery",
+    "sql": "SELECT d IN (SELECT 1) AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::invalid_comparison",
+    "sql": "SELECT d = true AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::parameter",
+    "sql": "SELECT d = $1::integer AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::unknown_literal",
+    "sql": "SELECT d = '1' AS result FROM distinct_values",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::base_to_domain_function",
+    "sql": "SELECT public.domain_only(1,1) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::domain_array_elements",
+    "sql": "SELECT ARRAY[1::public.distinct_number] = ARRAY[1::public.distinct_number] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  }
+]

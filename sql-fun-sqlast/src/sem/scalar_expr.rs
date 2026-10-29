@@ -1276,6 +1276,7 @@ impl SemScalarExpr {
     // peer supplies the comparison target; two literals use string comparison.
     pub(crate) fn comparison_literal_operands(
         context: &impl ParseContext,
+        overloads: Option<&[crate::sem::BinaryOperatorDefinition]>,
         left: Self,
         right: Self,
     ) -> (Self, Self) {
@@ -1294,15 +1295,79 @@ impl SemScalarExpr {
             left.get_type()
         };
         let left = if left_unknown && let Some(ty) = left_target {
-            Self::wrap_implicit_cast(&crate::sem::MinMaxExpr::base_type(context, &ty), &left)
+            Self::wrap_implicit_cast(
+                &Self::comparison_literal_target(context, overloads, &ty),
+                &left,
+            )
         } else {
             left
         };
         let right = if right_unknown && let Some(ty) = right_target {
-            Self::wrap_implicit_cast(&crate::sem::MinMaxExpr::base_type(context, &ty), &right)
+            Self::wrap_implicit_cast(
+                &Self::comparison_literal_target(context, overloads, &ty),
+                &right,
+            )
         } else {
             right
         };
         (left, right)
+    }
+
+    fn comparison_literal_target(
+        context: &impl ParseContext,
+        overloads: Option<&[crate::sem::BinaryOperatorDefinition]>,
+        known: &TypeReference,
+    ) -> TypeReference {
+        // PostgreSQL tries (domain, domain) before reducing a domain paired
+        // with an unknown literal to its base. Retain the original signature.
+        if overloads.is_some_and(|overloads| {
+            overloads.iter().any(|candidate| {
+                candidate.left_arg_type() == known && candidate.right_arg_type() == known
+            })
+        }) {
+            known.clone()
+        } else {
+            crate::sem::MinMaxExpr::base_type(context, known)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_domain_comparison_literals {
+    use crate::sem::{PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+    use crate::test_helpers::domain_casts;
+
+    #[rstest::rstest]
+    fn unknown_literal_checks_domain_exact_signature_before_base(
+        #[values(false, true)] domain_overload: bool,
+        #[values(false, true)] domain_left: bool,
+    ) {
+        let mut context = domain_casts::context();
+        let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let mut operators = domain_casts::operators(&domain);
+        if !domain_overload {
+            operators.remove(0);
+        }
+        let known = SemScalarExpr::wrap_implicit_cast(
+            &domain,
+            &SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),
+        );
+        let unknown = SemScalarExpr::new_const(ScalarConstExpr::string("1"));
+        let (left, right) = if domain_left {
+            (known, unknown)
+        } else {
+            (unknown, known)
+        };
+        let (left, right) =
+            SemScalarExpr::comparison_literal_operands(&context, Some(&operators), left, right);
+        let literal = if domain_left { right } else { left };
+        assert_eq!(
+            literal.get_type(),
+            Some(if domain_overload {
+                domain
+            } else {
+                PgBuiltInType::int4()
+            })
+        );
     }
 }

@@ -228,3 +228,88 @@ fn sql_context_resolves_expression_results_before_the_unsupported_boundary() {
     assert!(context.reported_problems().is_empty());
     assert_eq!(graph.domain(right).single_type(), Some(custom));
 }
+
+#[rstest::rstest]
+#[case::domain_exact(true, "text")]
+#[case::base_best_match(false, "bool")]
+fn domain_operator_ranking_survives_deferred_correlated_constraints(
+    #[case] domain_right: bool,
+    #[case] result_type: &str,
+    #[values(false, true)] intermediate_solve: bool,
+) {
+    let mut context = crate::test_helpers::domain_casts::context();
+    let domain = crate::test_helpers::domain_casts::domain(
+        &mut context,
+        "amount",
+        Some(&PgBuiltInType::int4()),
+    );
+    let overloads = crate::test_helpers::domain_casts::operators(&domain);
+    let signatures = crate::sem::OperatorDefinition::binary(&overloads).parameter_signatures();
+    let mut graph = ConstraintGraph::default();
+    let left = graph.parameter(1);
+    let right = graph.parameter(2);
+    let result = graph.node(&InputTypeConstraint::any());
+    graph.restrict(left, &InputTypeConstraint::exact(&domain));
+    graph.call(
+        &context,
+        &[left, right, result],
+        &signatures,
+        "domain comparison",
+    );
+    if intermediate_solve {
+        graph.solve().unwrap();
+    }
+    let right_type = if domain_right {
+        domain.clone()
+    } else {
+        PgBuiltInType::int4()
+    };
+    graph.restrict(right, &InputTypeConstraint::exact(&right_type));
+    graph.solve().unwrap();
+    assert_eq!(
+        graph.domain(result).single_type(),
+        Some(TypeReference::from_master_type_name(result_type))
+    );
+    let constraints = ParameterConstraints::from_graph(&graph);
+    drop(context);
+    assert!(constraints.allows(&BTreeMap::from([(1, domain), (2, right_type)])));
+    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+}
+
+#[test]
+fn exact_domain_over_array_precedes_an_instantiated_array_operator() {
+    let mut context = crate::test_helpers::domain_casts::context();
+    let domain = crate::test_helpers::domain_casts::domain(
+        &mut context,
+        "amounts",
+        Some(&PgBuiltInType::int4().array_type()),
+    );
+    let anyarray = TypeReference::from_master_type_name("anyarray");
+    let signatures = [
+        crate::sem::parameter_resolution::Signature::new(
+            &[domain.clone(), domain.clone()],
+            &PgBuiltInType::text(),
+        ),
+        crate::sem::parameter_resolution::Signature::new(
+            &[anyarray.clone(), anyarray],
+            &PgBuiltInType::bool(),
+        ),
+    ];
+    let mut graph = ConstraintGraph::default();
+    let left = graph.parameter(1);
+    let right = graph.parameter(2);
+    graph.restrict(left, &InputTypeConstraint::exact(&domain));
+    graph.restrict(right, &InputTypeConstraint::exact(&domain));
+    let result = graph.node(&InputTypeConstraint::any());
+    graph.call(
+        &context,
+        &[left, right, result],
+        &signatures,
+        "domain array comparison",
+    );
+    graph.solve().unwrap();
+    assert_eq!(
+        graph.domain(result).single_type(),
+        Some(PgBuiltInType::text())
+    );
+}

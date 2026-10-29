@@ -1,0 +1,74 @@
+[
+  {
+    "name": "domain_operators::identifier_name_left",
+    "sql": "SELECT 'x'::information_schema.sql_identifier = 'x'::name AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::identifier_name_right",
+    "sql": "SELECT 'x'::name = 'x'::information_schema.sql_identifier AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::identifier_text_left",
+    "sql": "SELECT 'x'::information_schema.sql_identifier = 'x'::text AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_operators::identifier_text_right",
+    "sql": "SELECT 'x'::text = 'x'::information_schema.sql_identifier AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

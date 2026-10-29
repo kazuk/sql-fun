@@ -48,8 +48,6 @@ total=0
 failed=0
 groups=0
 test_seconds=0
-ignored_total=0
-source "$suite/temporary-ignores.sh"
 # Bash time emits decimal seconds independent of the caller's numeric locale.
 export LC_ALL=C
 TIMEFORMAT='%3R'
@@ -91,11 +89,6 @@ METADATA
     if [[ -f "$suite/$fixture.metadata.toml" ]]; then
       cat "$suite/$fixture.metadata.toml" >>"$metadata"
     fi
-    if ignore_catalog_group "$fixture" "$version" "$file" "$count"; then
-      ignored_total=$((ignored_total + count))
-      groups=$((groups + 1))
-      continue
-    fi
     args=(--term-color never --metadata-file "$metadata" --datasource regression)
     if [[ "$schema" != - ]]; then args+=(--schema-file "$suite/$schema"); fi
     echo "== $fixture PostgreSQL $version ($level), expected $count cases; catalog $SQL_FUN_HOME/postgres/$version"
@@ -130,10 +123,7 @@ METADATA
     groups=$((groups + 1))
   done
 done <"$suite/manifest.tsv"
-if (( ${#temporary_ignores[@]} != 0 )); then
-  echo "Unused temporary ignores (stale fixture/case/version): ${!temporary_ignores[*]}" >&2
-  exit 1
-fi
+
 for fixture_file in "$suite"/*.json; do
   fixture_name=${fixture_file##*/}
   fixture_name=${fixture_name%.json}
@@ -189,5 +179,5 @@ for version in "${!checked_versions[@]}"; do
 done
 rate=$(jq -n --argjson cases "$total" --argjson seconds "$test_seconds" \
   'if $seconds > 0 then $cases / $seconds * 1000 | round / 1000 else 0 end')
-echo "SQLAST regressions: $total executed cases, $ignored_total temporarily ignored (#799), in $groups groups; failure=$failed; test-command-total=${test_seconds}s; cases/second=$rate"
+echo "SQLAST regressions: $total executed cases, in $groups groups; failure=$failed; test-command-total=${test_seconds}s; cases/second=$rate"
 exit "$failed"

@@ -157,7 +157,8 @@ impl ArrayCastRanks {
             .filter_map(|target| {
                 Some((
                     target.clone(),
-                    OverloadRank::argument(context, Some(source), Some(&target))?,
+                    OverloadRank::argument(context, Some(source), Some(&target))?
+                        .instantiated_operator(),
                 ))
             })
             .collect();
@@ -269,9 +270,9 @@ impl RankedSignatures {
         result: &TypeReference,
         mut sources: HashMap<TypeReference, OverloadRank>,
     ) {
-        sources
-            .entry(target.clone())
-            .or_insert_with(|| OverloadRank::from(crate::sem::CastContext::no_conversion()));
+        sources.entry(target.clone()).or_insert_with(|| {
+            OverloadRank::from(crate::sem::CastContext::no_conversion()).instantiated_operator()
+        });
         self.0.push(RankedSignature {
             signature: Signature::new(&[target.clone(), target.clone()], result),
             sources: vec![sources.clone(), sources],

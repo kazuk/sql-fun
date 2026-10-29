@@ -27,6 +27,23 @@ impl super::ArithExpr {
     where
         TParseContext: crate::sem::ParseContext,
     {
+        // Ordinary operators need the domain/unknown exact-match phase too.
+        // Other literal policies remain with their existing semantic consumers.
+        let has_domain = [&lexpr, &rexpr].into_iter().any(|operand| {
+            operand
+                .get_type()
+                .is_some_and(|ty| ty.domain_base_type(context).is_some_and(|base| base != ty))
+        });
+        let (lexpr, rexpr) = if has_domain {
+            SemScalarExpr::comparison_literal_operands(
+                context,
+                operator_def.binary_overloads(),
+                lexpr,
+                rexpr,
+            )
+        } else {
+            (lexpr, rexpr)
+        };
         let resolved_bin_op = Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
         resolved_bin_op.into_call_site_expr(context, name)
     }

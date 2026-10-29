@@ -55,16 +55,23 @@ impl PostgresSetup {
     }
 
     pub(super) fn choose_source(
-        args: &mut InitializeArgs,
+        args: &InitializeArgs,
+        retained: Option<bool>,
         input: &mut dyn PromptInput,
     ) -> Result<bool, InitError> {
         if args.docker() || args.database_url().is_some() {
             return Ok(args.database_url().is_some());
         }
         loop {
-            let selected = choice::select_with(
+            let retained = match retained {
+                Some(true) => vec!["Existing PostgreSQL server".to_owned()],
+                Some(false) => vec!["Docker".to_owned()],
+                None => vec![],
+            };
+            let selected = choice::select_retained(
                 "Choose the PostgreSQL builtin source",
                 &["Docker".to_owned(), "Existing PostgreSQL server".to_owned()],
+                &retained,
                 |request| input.answer(request),
             )?;
             if selected.len() != 1 {
@@ -74,40 +81,48 @@ impl PostgresSetup {
             if selected[0] == "Existing PostgreSQL server" {
                 return Ok(true);
             }
-            args.select_docker();
             return Ok(false);
         }
     }
 
     pub(super) fn choose_connection(
-        args: &mut InitializeArgs,
+        args: &InitializeArgs,
+        retained: Option<&str>,
         input: &mut dyn PromptInput,
-    ) -> Result<(), InitError> {
-        if args.database_url().is_some() {
-            return Ok(());
+    ) -> Result<String, InitError> {
+        if let Some(connection) = args.database_url() {
+            return Ok(connection.to_owned());
         }
         loop {
-            let answer = input.answer(&PromptRequest::text(
-                "PostgreSQL libpq connection string (prefer a password file)",
-                "",
-            ))?;
+            let answer = input.answer(
+                &PromptRequest::text(
+                    "PostgreSQL libpq connection string (prefer a password file)",
+                    "",
+                )
+                .with_initial_text(retained.unwrap_or("")),
+            )?;
             let Some(connection) = answer.text_input() else {
                 continue;
             };
             if connection.trim().is_empty() {
                 continue;
             }
-            args.set_database_url(connection);
-            return Ok(());
+            return Ok(connection.to_owned());
         }
     }
 
     pub(super) async fn choose_versions(
         args: &InitializeArgs,
+        retained: Option<&[PostgresVersion]>,
         input: &mut dyn PromptInput,
     ) -> Result<Vec<PostgresVersion>, anyhow::Error> {
+        let retained = retained
+            .into_iter()
+            .flatten()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
         // Explicit values are validated before connecting or provisioning.
-        let mut versions = if let Some(requested) = args.requested_versions() {
+        let versions = if let Some(requested) = args.requested_versions() {
             Some(
                 PostgresVersionInventory::builtin()
                     .select(requested)
@@ -116,44 +131,36 @@ impl PostgresSetup {
         } else {
             None
         };
-        if let Some(connection) = args.database_url() {
+        let (title, options) = if let Some(connection) = args.database_url() {
             let detected =
                 crate::extract::detect_server(connection, args.timeout_seconds()).await?;
-            if let Some(selected) = &versions {
+            if let Some(selected) = versions {
                 anyhow::ensure!(
-                    selected == &[detected],
+                    selected == [detected],
                     "selected versions must match connected PostgreSQL {detected}"
                 );
-            } else {
-                let selected = choice::select_with(
-                    "Choose the connected PostgreSQL version to initialize",
-                    &[detected.to_string()],
-                    |request| input.answer(request),
-                )?;
-                versions = Some(
-                    PostgresVersionInventory::builtin()
-                        .select(&selected)
-                        .map_err(anyhow::Error::msg)?,
-                );
+                return Ok(selected);
             }
-        } else if versions.is_none() {
+            (
+                "Choose the connected PostgreSQL version to initialize",
+                vec![detected.to_string()],
+            )
+        } else {
+            if let Some(selected) = versions {
+                return Ok(selected);
+            }
             let options = PostgresVersionInventory::builtin()
                 .targets()
                 .into_iter()
                 .map(|version| version.to_string())
                 .collect::<Vec<_>>();
-            let selected = choice::select_with(
-                "Choose PostgreSQL versions to initialize",
-                &options,
-                |request| input.answer(request),
-            )?;
-            versions = Some(
-                PostgresVersionInventory::builtin()
-                    .select(&selected)
-                    .map_err(anyhow::Error::msg)?,
-            );
-        }
-        Ok(versions.expect("explicit version choice"))
+            ("Choose PostgreSQL versions to initialize", options)
+        };
+        let selected =
+            choice::select_retained(title, &options, &retained, |request| input.answer(request))?;
+        PostgresVersionInventory::builtin()
+            .select(&selected)
+            .map_err(anyhow::Error::msg)
     }
 
     fn validate_version(&self, configured: &str) -> Result<(), anyhow::Error> {

@@ -48,6 +48,14 @@ impl Answer {
             expected_request: None,
         }
     }
+    pub(super) fn interrupted(title: &str) -> Self {
+        Self {
+            title: title.to_owned(),
+            response: InitError::prompt(inquire::InquireError::OperationInterrupted),
+            home: None,
+            expected_request: None,
+        }
+    }
     pub(super) fn cancelled(title: &str) -> Self {
         Self {
             title: title.to_owned(),
@@ -125,34 +133,6 @@ impl HomeFixture {
             std::fs::read_to_string(self.0.path().join("blocked")).unwrap(),
             "existing content"
         );
-    }
-}
-
-pub(super) fn fail_first_home_creation(
-    state: &mut InitializationState<'_>,
-    script: &Script,
-    home: &Path,
-) {
-    state.set_input(CreationRace {
-        script: script.clone(),
-        home: home.to_path_buf(),
-        failed: false,
-    });
-}
-
-struct CreationRace {
-    script: Script,
-    home: PathBuf,
-    failed: bool,
-}
-impl PromptInput for CreationRace {
-    fn answer(&mut self, request: &PromptRequest) -> Result<PromptResponse, InitError> {
-        let answer = self.script.answer(request)?;
-        if !self.failed && request.title().starts_with("Use ") {
-            std::fs::write(&self.home, "concurrent file").unwrap();
-            self.failed = true;
-        }
-        Ok(answer)
     }
 }
 

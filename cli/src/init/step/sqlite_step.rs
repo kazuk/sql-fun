@@ -1,12 +1,16 @@
-use super::{InitStep, StepCompletion, StepFuture};
+use super::{Direction, InitStep, StepFuture};
 use crate::init::InitializationState;
 
 pub(in crate::init) struct SqliteStep;
 impl InitStep for SqliteStep {
-    fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a> {
+    fn prompt<'a>(
+        &'a mut self,
+        state: &'a mut InitializationState<'_>,
+        direction: Direction,
+    ) -> StepFuture<'a> {
         Box::pin(async move {
-            state.prepare_sqlite();
-            Ok(StepCompletion::next())
+            let _ = state;
+            Ok(direction.completion())
         })
     }
 }

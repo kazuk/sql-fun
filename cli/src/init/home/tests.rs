@@ -1,8 +1,8 @@
 use super::Initialization;
 use crate::init::{
     prompt::PromptRequest,
-    step::{HomeStep, InitStep},
-    test_helpers::{Answer, HomeFixture, Script, common_args, fail_first_home_creation, state},
+    step::{Direction, HomeStep, InitStep},
+    test_helpers::{Answer, HomeFixture, Script, common_args, state},
 };
 
 #[rstest::rstest]
@@ -35,7 +35,6 @@ async fn invalid_text_is_retained_without_changing_the_original_suggestion() {
     let script = Script::install(
         &mut state,
         vec![
-            Answer::confirm("Initialize", true),
             Answer::confirm("Use", false),
             Answer::text("home directory", blocked.to_str().unwrap()).expecting(request.clone()),
             Answer::text("home directory", home.to_str().unwrap())
@@ -43,7 +42,10 @@ async fn invalid_text_is_retained_without_changing_the_original_suggestion() {
             Answer::confirm("Use", true),
         ],
     );
-    HomeStep.prompt(&mut state).await.unwrap();
+    HomeStep
+        .prompt(&mut state, Direction::forward())
+        .await
+        .unwrap();
     fixture.assert_preserved();
     assert_eq!(state.home.home(), home);
     script.assert_finished();
@@ -59,14 +61,16 @@ async fn invalid_cli_home_returns_to_editor_interactively() {
     let script = Script::install(
         &mut state,
         vec![
-            Answer::confirm("Initialize", true),
             Answer::text("home directory", home.to_str().unwrap()),
             Answer::confirm("Use", true),
         ],
     );
-    HomeStep.prompt(&mut state).await.unwrap();
+    HomeStep
+        .prompt(&mut state, Direction::forward())
+        .await
+        .unwrap();
     fixture.assert_preserved();
-    assert!(home.is_dir());
+    assert!(!home.exists());
     script.assert_finished();
 }
 
@@ -82,7 +86,7 @@ async fn invalid_cli_home_is_an_error_under_yes() {
     Script::install(&mut state, vec![]);
     assert!(
         HomeStep
-            .prompt(&mut state)
+            .prompt(&mut state, Direction::forward())
             .await
             .unwrap_err()
             .to_string()
@@ -91,22 +95,15 @@ async fn invalid_cli_home_is_an_error_under_yes() {
     fixture.assert_preserved();
 }
 
-#[tokio::test]
-async fn explicitly_confirmed_cli_path_creation_failure_is_not_retried() {
+#[test]
+fn creation_failure_after_authorization_is_an_error() {
     let common = common_args();
     let fixture = HomeFixture::new();
     let home = fixture.blocked_home().join("home");
-    let mut state = state(&common, &["--sql-fun-home", home.to_str().unwrap()]);
-    let script = Script::install(
-        &mut state,
-        vec![
-            Answer::confirm("Initialize", true),
-            Answer::confirm("Use", true),
-        ],
-    );
-    assert!(HomeStep.prompt(&mut state).await.is_err());
+    let state = state(&common, &["--sql-fun-home", home.to_str().unwrap()]);
+    assert!(state.home.create_directory().is_err());
     assert!(!home.exists());
-    script.assert_finished();
+    fixture.assert_preserved();
 }
 
 #[tokio::test]
@@ -119,33 +116,11 @@ async fn an_environment_candidate_does_not_satisfy_yes() {
     Script::install(&mut state, vec![]);
     assert!(
         HomeStep
-            .prompt(&mut state)
+            .prompt(&mut state, Direction::forward())
             .await
             .unwrap_err()
             .to_string()
             .contains("--sql-fun-home")
     );
     assert!(!home.exists());
-}
-
-#[tokio::test]
-async fn edited_path_creation_failure_returns_to_editor() {
-    let common = common_args();
-    let fixture = HomeFixture::new();
-    let home = fixture.home();
-    let mut state = state(&common, &[]);
-    let script = Script::install(
-        &mut state,
-        vec![
-            Answer::confirm("Initialize", true),
-            Answer::text("home directory", home.to_str().unwrap()),
-            Answer::confirm("Use", true),
-            Answer::text("home directory", fixture.existing_home().to_str().unwrap()),
-            Answer::confirm("Use", true),
-        ],
-    );
-    fail_first_home_creation(&mut state, &script, &home);
-    HomeStep.prompt(&mut state).await.unwrap();
-    assert_eq!(state.home.home(), fixture.existing_home());
-    script.assert_finished();
 }

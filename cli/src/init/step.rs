@@ -49,16 +49,59 @@ pub(super) type StepFuture<'a> =
 /// A step changes the shared state only through accepted inputs. Ordering is
 /// owned by the code assembling the conversation, never by the step or engine.
 pub(super) trait InitStep {
-    fn prompt<'a>(&'a mut self, state: &'a mut InitializationState<'_>) -> StepFuture<'a>;
+    fn prompt<'a>(
+        &'a mut self,
+        state: &'a mut InitializationState<'_>,
+        direction: Direction,
+    ) -> StepFuture<'a>;
+}
+
+/// The edge at which a conversation is entered, also passed to automatic steps.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Direction {
+    Forward,
+    Backward,
+}
+impl Direction {
+    pub(super) const fn forward() -> Self {
+        Self::Forward
+    }
+    pub(super) const fn backward() -> Self {
+        Self::Backward
+    }
+    pub(super) const fn is_backward(self) -> bool {
+        matches!(self, Self::Backward)
+    }
+    pub(super) const fn completion(self) -> StepCompletion {
+        match self {
+            Self::Forward => StepCompletion::next(),
+            Self::Backward => StepCompletion::back(),
+        }
+    }
+    /// Accepted interactive answers advance; automatic steps preserve entry direction.
+    pub(super) const fn completed(self, automatic: bool) -> StepCompletion {
+        if automatic {
+            self.completion()
+        } else {
+            StepCompletion::next()
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum StepCompletion {
     Next,
     Cancelled,
+    Back,
 }
 
 impl StepCompletion {
+    pub(super) const fn back() -> Self {
+        Self::Back
+    }
+    pub(super) const fn is_back(self) -> bool {
+        matches!(self, Self::Back)
+    }
     pub(super) const fn next() -> Self {
         Self::Next
     }

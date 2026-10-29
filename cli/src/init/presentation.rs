@@ -55,7 +55,6 @@ pub enum Notice {
     HomeDescription,
     HomeExists(PathBuf),
     HomeCreated(PathBuf),
-    HomeCreateFailed(PathBuf, std::io::Error),
     InvalidHome(HomePathError),
 }
 
@@ -72,10 +71,6 @@ impl Notice {
         Self::HomeCreated(path.to_path_buf())
     }
 
-    pub fn home_create_failed(path: &Path, error: std::io::Error) -> Self {
-        Self::HomeCreateFailed(path.to_path_buf(), error)
-    }
-
     pub const fn invalid_home(error: HomePathError) -> Self {
         Self::InvalidHome(error)
     }
@@ -85,7 +80,6 @@ impl Notice {
             Self::HomeDescription => Self::show_home_description(),
             Self::HomeExists(path) => Self::show_home_exists(path),
             Self::HomeCreated(path) => Self::show_home_created(path),
-            Self::HomeCreateFailed(path, error) => Self::show_home_create_failed(path, error),
             Self::InvalidHome(error) => Self::show_invalid_home(error),
         }
     }
@@ -100,14 +94,6 @@ impl Notice {
 
     fn show_home_created(path: &Path) {
         eprint!(include_str!("home_created.txt"), path = path.display());
-    }
-
-    fn show_home_create_failed(path: &Path, error: &std::io::Error) {
-        eprint!(
-            include_str!("home_create_failed.txt"),
-            path = path.display(),
-            error = error
-        );
     }
 
     fn show_invalid_home(error: &HomePathError) {

@@ -346,7 +346,7 @@ fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresul
         .find_map(crate::sem::ColumnConstraint::as_foreign_key)
         .unwrap();
     assert_eq!(
-        fk.primary_key_table().full_name(),
+        fk.primary_key_table().unwrap().full_name(),
         &test_helpers::name("after_name")
     );
     assert_eq!(

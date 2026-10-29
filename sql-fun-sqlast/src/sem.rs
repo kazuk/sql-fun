@@ -34,6 +34,7 @@ mod drop_dependency_behavior;
 mod drop_rule;
 mod drop_trigger;
 mod error;
+mod foreign_key_target;
 mod from_clause;
 mod insert_statement;
 mod merge_statement;
@@ -75,6 +76,7 @@ pub use self::create_trigger::{
 };
 pub(crate) use self::data_source::{ProjectionColumn, WildcardProjection};
 pub use self::drop_rule::DropRule;
+pub(crate) use self::foreign_key_target::ForeignKeyTarget;
 pub use self::view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption};
 pub use self::view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport};
 pub(crate) use self::wildcard_expansion::{

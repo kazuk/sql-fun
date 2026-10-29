@@ -74,6 +74,15 @@ impl Constraint {
     pub(crate) fn foreign(value: &ForeignKeyConstraint) -> Self {
         Self::Foreign(value.clone())
     }
+    /// Inspect the analyzed foreign-key constraint, including its target binding.
+    pub const fn as_foreign_key(&self) -> Option<&ForeignKeyConstraint> {
+        if let Self::Foreign(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
     /// get constraint name
     #[must_use]
     pub fn name(&self) -> &str {

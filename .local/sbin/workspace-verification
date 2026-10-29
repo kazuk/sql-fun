@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Sourced by check-test-flow and its offline contracts. Execution-only phases
+# adopt artifacts from the current CI run; they must never compile replacements.
+function run_archived_workspace_tests() {
+  : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for archived tests}"
+  if [[ "${SQL_FUN_CI_TEST_GROUPS:-}" == "a b" ]]; then
+    source "$GIT_ROOT/.local/sbin/workspace-test-groups"
+    run_workspace_test_groups
+  else
+    run_workspace_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst" \
+      ${NEXTEST_EXTRA} --no-tests pass
+  fi
+}
+
+function run_workspace() {
+  require_command jq
+  echo "== Workspace verification"
+  case "$WORKSPACE_PHASE" in
+    sqlast-test)
+      run_sqlast_regressions
+      ;;
+    rust-test)
+      require_command cargo-nextest
+      run_archived_workspace_tests
+      ;;
+    test)
+      : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for archived verification}"
+      require_command cargo-nextest
+      : "${SQL_FUN_BIN:?SQL_FUN_BIN is required for archived verification}"
+      : "${SQL_FUN_TEST_SERVER_BIN:?SQL_FUN_TEST_SERVER_BIN is required for archived verification}"
+      if [[ "${SQL_FUN_CI_TEST_GROUPS:-}" == "a b" ]]; then
+        source "$GIT_ROOT/.local/sbin/workspace-test-groups"
+        run_grouped_workspace_verification
+      else
+        run_archived_workspace_tests
+        run_sqlast_regressions
+      fi
+      ;;
+    *)
+      require_command cargo-nextest
+      bash "$GIT_ROOT/ci/nextest/test-workspace-groups.sh"
+      run_workspace_build_checks
+      if [[ "$WORKSPACE_PHASE" == "build" ]]; then
+        : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"
+        mkdir -p "$SQL_FUN_CI_ARTIFACT_DIR"
+        if [[ -n "${SQL_FUN_CI_TEST_GROUP:-}" ]]; then
+          source "$GIT_ROOT/.local/sbin/workspace-test-groups"
+          workspace_test_group_packages "$SQL_FUN_CI_TEST_GROUP" >/dev/null
+          build_workspace_test_group "$SQL_FUN_CI_TEST_GROUP"
+        else
+          cargo nextest archive --locked --workspace --exclude sql-fun "${FEATURES[@]}" \
+            --timings --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst"
+        fi
+      else
+        run_workspace_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+        run_sqlast_regressions
+      fi
+      ;;
+  esac
+}
+
+# Shared offline SQL contracts are part of local and CI workspace verification.
+function run_sqlast_regressions() {
+  require_command jq
+  case "$WORKSPACE_PHASE" in
+    test|sqlast-test)
+      : "${SQL_FUN_BIN:?SQL_FUN_BIN is required for archived regressions}"
+      : "${SQL_FUN_TEST_SERVER_BIN:?SQL_FUN_TEST_SERVER_BIN is required for archived regressions}"
+      ;;
+    *)
+      # Match nextest selection to reuse its unified dependency artifacts locally.
+      cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
+      ;;
+  esac
+  local target_dir
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  local binary_dir="${target_dir}/debug"
+  SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
+    SQL_FUN_BIN="${SQL_FUN_BIN:-${binary_dir}/sql-fun}" \
+    SQL_FUN_TEST_SERVER_BIN="${SQL_FUN_TEST_SERVER_BIN:-${binary_dir}/sql-fun-server}" \
+    SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
+    "${GIT_ROOT}/tests/sqlast-regressions/run.sh"
+}

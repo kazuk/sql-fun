@@ -202,7 +202,7 @@ jobs:
           if-no-files-found: error
 
   workspace:
-    needs: [workspace-tests-build, workspace-cli-build, workspace-server-build]
+    needs: workspace-tests-build
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -219,38 +219,20 @@ jobs:
         with:
           name: workspace-nextest-b
           path: ${{ runner.temp }}/workspace-ci
-      - uses: actions/download-artifact@v7
-        with:
-          name: workspace-cli
-          path: ${{ runner.temp }}/workspace-cli
-      - uses: actions/download-artifact@v7
-        with:
-          name: workspace-server
-          path: ${{ runner.temp }}/workspace-server
-      - name: Run archived default-feature tests and SQLAST regressions
+      - name: Run archived default-feature Rust tests
         env:
           SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
           SQL_FUN_CI_TEST_GROUPS: a b
-          SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
-          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
         run: |
           export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
-          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
-          .local/bin/check-test-flow --step=workspace --workspace-phase=test --nextest-extra="
+          .local/bin/check-test-flow --step=workspace --workspace-phase=rust-test --nextest-extra="
             --show-progress none"
       - name: Disk usage after tests
         if: ${{ always() }}
         run: |
           df -h . /github/home
           df -i . /github/home
-          du -sh target ${{ runner.temp }}/workspace-ci ${{ runner.temp }}/workspace-cli ${{ runner.temp }}/workspace-server || true
-      - name: Upload SQLAST regression evidence
-        uses: actions/upload-artifact@v7
-        if: ${{ always() }}
-        with:
-          name: sqlast-regressions-source
-          path: target/sqlast-regressions/
-          if-no-files-found: warn
+          du -sh target ${{ runner.temp }}/workspace-ci || true
       - name: Upload nextest JUnit report (a)
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
@@ -282,6 +264,42 @@ jobs:
           name: nextest tests (default features, group b)
           path: target/nextest/ci-b/junit.xml
           reporter: java-junit
+
+  workspace-sqlast-regressions:
+    needs: [workspace-cli-build, workspace-server-build]
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-cli
+          path: ${{ runner.temp }}/workspace-cli
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-server
+          path: ${{ runner.temp }}/workspace-server
+      - name: Run default-feature SQLAST regressions
+        env:
+          SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
+        run: |
+          export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
+          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
+          .local/bin/check-test-flow --step=workspace --workspace-phase=sqlast-test
+      - name: Disk usage after regressions
+        if: ${{ always() }}
+        run: |
+          df -h . /github/home
+          df -i . /github/home
+          du -sh target ${{ runner.temp }}/workspace-cli ${{ runner.temp }}/workspace-server || true
+      - name: Upload SQLAST regression evidence
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-source
+          path: target/sqlast-regressions/
+          if-no-files-found: warn
 
   workspace-all-features-tests-build:
     needs: pr-freshness
@@ -437,7 +455,7 @@ jobs:
           if-no-files-found: error
 
   workspace-all-features:
-    needs: [workspace-all-features-tests-build, workspace-all-features-cli-build, workspace-all-features-server-build]
+    needs: workspace-all-features-tests-build
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -450,38 +468,20 @@ jobs:
         with:
           name: workspace-all-features-nextest-b
           path: ${{ runner.temp }}/workspace-ci
-      - uses: actions/download-artifact@v7
-        with:
-          name: workspace-all-features-cli
-          path: ${{ runner.temp }}/workspace-cli
-      - uses: actions/download-artifact@v7
-        with:
-          name: workspace-all-features-server
-          path: ${{ runner.temp }}/workspace-server
-      - name: Run archived all-features tests and SQLAST regressions
+      - name: Run archived all-features Rust tests
         env:
           SQL_FUN_CI_ARTIFACT_DIR: ${{ runner.temp }}/workspace-ci
           SQL_FUN_CI_TEST_GROUPS: a b
-          SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
-          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
         run: |
           export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
-          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
-          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=rust-test --nextest-extra="
             --show-progress none"
       - name: Disk usage after tests
         if: ${{ always() }}
         run: |
           df -h . /github/home
           df -i . /github/home
-          du -sh target ${{ runner.temp }}/workspace-ci ${{ runner.temp }}/workspace-cli ${{ runner.temp }}/workspace-server || true
-      - name: Upload SQLAST regression evidence
-        uses: actions/upload-artifact@v7
-        if: ${{ always() }}
-        with:
-          name: sqlast-regressions-source-all-features
-          path: target/sqlast-regressions/
-          if-no-files-found: warn
+          du -sh target ${{ runner.temp }}/workspace-ci || true
       - name: Upload nextest JUnit report (a)
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
@@ -513,6 +513,42 @@ jobs:
           name: nextest tests (all features, group b)
           path: target/nextest/ci-b/junit.xml
           reporter: java-junit
+
+  workspace-all-features-sqlast-regressions:
+    needs: [workspace-all-features-cli-build, workspace-all-features-server-build]
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-cli
+          path: ${{ runner.temp }}/workspace-cli
+      - uses: actions/download-artifact@v7
+        with:
+          name: workspace-all-features-server
+          path: ${{ runner.temp }}/workspace-server
+      - name: Run all-features SQLAST regressions
+        env:
+          SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
+        run: |
+          export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
+          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
+          .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=sqlast-test
+      - name: Disk usage after regressions
+        if: ${{ always() }}
+        run: |
+          df -h . /github/home
+          df -i . /github/home
+          du -sh target ${{ runner.temp }}/workspace-cli ${{ runner.temp }}/workspace-server || true
+      - name: Upload SQLAST regression evidence
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-source-all-features
+          path: target/sqlast-regressions/
+          if-no-files-found: warn
 
   msrv:
     needs: pr-freshness
@@ -925,11 +961,14 @@ jobs:
           if-no-files-found: error
 
   build:
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     needs:
       - semver
       - workspace
+      - workspace-sqlast-regressions
       - workspace-all-features
+      - workspace-all-features-sqlast-regressions
       - msrv
       - fmt
       - lint
@@ -941,5 +980,7 @@ jobs:
       - install-validation
       - postgres-extraction
     steps:
-      - name: Complete
-        run: true
+      - name: Require every dependency to succeed
+        env:
+          NEEDS_RESULTS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<< "$NEEDS_RESULTS"

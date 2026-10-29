@@ -1,14 +1,9 @@
 //! Direct SQL commands exercise the real authenticated client and server.
-#[allow(
-    dead_code,
-    reason = "shared API fixtures include helpers for other integration targets"
-)]
-#[path = "../api_helpers.rs"]
-mod api_helpers;
 mod test_helpers;
-use self::{
-    api_helpers::{heavy, schema::SchemaFixture},
-    test_helpers::Suite,
+
+use self::test_helpers::{
+    Suite,
+    api::{heavy, schema::SchemaFixture},
 };
 
 #[tokio::test]

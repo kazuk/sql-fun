@@ -1,4 +1,6 @@
 //! Generic setup dispatch and initialization followed by normal `PostgreSQL` bootstrap.
+mod test_helpers;
+
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -17,8 +19,7 @@ impl InitializedProject {
         self.directory.path().join("home")
     }
     fn command(&self) -> Command {
-        let mut command =
-            Command::new(std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"));
+        let mut command = Command::new(test_helpers::cli_executable());
         command
             .current_dir(self.directory.path())
             .env_remove("SQL_FUN_DATABASE_URL")

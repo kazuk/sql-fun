@@ -51,9 +51,7 @@ impl ApiServer {
     }
 
     fn cli_command(&self) -> ::tokio::process::Command {
-        let mut command = ::tokio::process::Command::new(
-            std::env::var("SQL_FUN_BIN").expect("SQL_FUN_BIN must be set"),
-        );
+        let mut command = ::tokio::process::Command::new(super::executable::cli_executable());
         command
             .env("USER", self.0.user())
             .env("SQL_FUN_SERVER", self.0.executable())

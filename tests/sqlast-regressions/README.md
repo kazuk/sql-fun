@@ -8,6 +8,15 @@ step) and installed verification (`postgres-extraction`, after initialization
 and catalog comparison).
 No regression SQL is executed against PostgreSQL.
 
+Source CI runs this suite in dedicated default-feature and all-features jobs,
+using the corresponding CLI/server build artifacts. They do not wait for the
+nextest builds or Rust tests. Internally, `check-test-flow --step=workspace`
+selects `--workspace-phase=rust-test` for archived Rust tests and
+`--workspace-phase=sqlast-test` for regressions with explicit `SQL_FUN_BIN` and
+`SQL_FUN_TEST_SERVER_BIN` inputs. Both execution phases reuse artifacts without
+compilation. The existing combined `--workspace-phase=test` route and normal
+local full-check behavior remain supported.
+
 `manifest.tsv` explicitly selects each fixture, schema level, optional project
 schema, expected case count and PostgreSQL versions. Each JSON fixture is an
 array of self-contained cases with `name`, `sql` and `expected` fields. Keep

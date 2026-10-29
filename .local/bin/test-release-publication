@@ -126,7 +126,7 @@ awk '/Default steps:/,/Optional steps/' "$fixture/flow-help" > "$fixture/default
 # Exercise dispatch without repeating expensive analyzer/tool builds.
 mkdir -p "$fixture/flow/.local/bin" "$fixture/flow/.local/sbin" "$fixture/flow/sql-fun-server-api/src/payloads" "$fixture/flow/sql-fun-client/src/payloads"
 cp "$scripts/check-test-flow" "$fixture/flow/.local/bin/"
-cp "$repo_root/.local/sbin/workspace-nextest" "$fixture/flow/.local/sbin/"
+cp "$repo_root/.local/sbin/"{workspace-nextest,workspace-verification} "$fixture/flow/.local/sbin/"
 printf 'server source\n' > "$fixture/flow/sql-fun-server-api/src/payloads.rs"
 printf 'local client edits\n' > "$fixture/flow/sql-fun-client/src/payloads.rs"
 git -C "$fixture/flow" init -q

@@ -412,7 +412,7 @@ mod test_column_constraint_trait_for_column_constraint {
         let c = ForeignKeyColumnConstraint::new(
             &sem_builder.table_name("table_one"),
             &sem_builder.column_name("column_one"),
-            &sem_builder.table_name("pk_table"),
+            None,
             &sem_builder.column_name("pk_col"),
             None,
             None,

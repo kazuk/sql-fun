@@ -840,13 +840,9 @@ impl super::ForeignReference {
         keys: &[ColumnName],
     ) -> Result<Constraint, AnalysisError> {
         let target = TableName::from(self.table.full_name()?);
-        if context.get_table(&target).is_none() {
-            context.report_analysis_problem(AnalysisProblem::relation_not_found(&target))?;
-        }
-        let target_keys = if self.columns.is_empty() {
-            context
-                .get_table(&target)
-                .map(|table| table.primary_key_columns().into_iter().cloned().collect())
+        let binding = crate::sem::ForeignKeyTarget::resolve_relation(context, &target)?;
+        let explicit_columns = if self.columns.is_empty() {
+            None
         } else {
             Some(
                 self.columns
@@ -855,15 +851,12 @@ impl super::ForeignReference {
                     .collect::<Vec<_>>(),
             )
         };
-        if let Some(keys) = &target_keys {
-            for key in keys {
-                super::AlterCommand::missing_column(context, &target, key)?;
-            }
-        }
+        let target_keys =
+            binding.referenced_columns(context, &target, explicit_columns.as_deref())?;
         Ok(Constraint::foreign(&ForeignKeyConstraint::new(
             name,
-            table,
-            &target,
+            Some(table),
+            binding.relation(),
             keys,
             &target_keys,
         )))
@@ -1060,6 +1053,7 @@ impl super::Column {
                 }
             } else if let Some(fk) = constraint.as_foreign_key()
                 && let Some(col_type) = &type_ref
+                && let Some(pk_table) = fk.primary_key_table()
                 && let Some(pk_type) = fk.primary_key_column_type()
                 && col_type != pk_type
             {
@@ -1068,7 +1062,7 @@ impl super::Column {
                         table,
                         &name,
                         col_type,
-                        fk.primary_key_table(),
+                        pk_table,
                         fk.primary_key_column(),
                         pk_type,
                     ),
@@ -1187,25 +1181,13 @@ impl super::ForeignReference {
             return AnalysisError::raise_unexpected_input("foreign key target column count != 1");
         };
         let target_column = ColumnName::from(target_column.as_str());
-        let target_type = if let Some(target_table) = context.get_table(&target) {
-            if let Some(column) = target_table.get_column_def(&target_column) {
-                column.get_type_cloned()
-            } else {
-                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
-                    &target,
-                    &target_column,
-                ))?;
-                None
-            }
-        } else {
-            context.report_analysis_problem(AnalysisProblem::table_not_found(&target))?;
-            None
-        };
+        let (binding, target_type) =
+            crate::sem::ForeignKeyTarget::resolve_column(context, &target, &target_column)?;
         Ok(ColumnConstraint::foreign_key(
             ForeignKeyColumnConstraint::new(
                 table,
                 column,
-                &target,
+                binding.relation(),
                 &target_column,
                 target_type.as_ref(),
                 self.match_type.as_ref(),

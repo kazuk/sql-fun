@@ -1,7 +1,10 @@
+#[cfg(feature = "sqlite")]
+use crate::sem::AnalysisProblem;
+
 use crate::{
     sem::{
-        AnalysisError, AnalysisProblem, ColumnConstraint, ColumnConstraintKind,
-        ColumnConstraintTrait, ColumnName, ParseContext, TableName, TypeReference, Validity,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
+        ForeignKeyTarget, ParseContext, TableName, TypeReference, Validity,
     },
     syn::{ConstrType, ListOpt, Opt},
 };
@@ -148,7 +151,7 @@ impl Deferrability {
 pub struct ForeignKeyColumnConstraint {
     table_name: TableName,
     column_name: ColumnName,
-    primary_key_table: TableName,
+    primary_key_table: ForeignKeyTarget,
     primary_key_column: ColumnName,
     primary_key_column_type: Option<TypeReference>,
     match_type: Option<ForeignKeyMatchType>,
@@ -161,15 +164,17 @@ pub struct ForeignKeyColumnConstraint {
 impl ForeignKeyColumnConstraint {
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.table_name.rename_reference(old, new);
-        self.primary_key_table.rename_reference(old, new);
+        self.primary_key_table.rename_relation(old, new);
     }
 
-    /// create instance
+    /// Create a constraint with a canonical target, or `None` for unresolved lookup.
+    ///
+    /// The caller supplies a completed lookup result, never an unqualified SQL name.
     #[expect(clippy::too_many_arguments)]
     pub fn new(
         table_name: &TableName,
         column_name: &ColumnName,
-        primary_key_table: &TableName,
+        primary_key_table: Option<&TableName>,
         primary_key_column: &ColumnName,
         primary_key_column_type: Option<&TypeReference>,
         match_type: Option<&ForeignKeyMatchType>,
@@ -181,7 +186,7 @@ impl ForeignKeyColumnConstraint {
         Self {
             table_name: table_name.clone(),
             column_name: column_name.clone(),
-            primary_key_table: primary_key_table.clone(),
+            primary_key_table: ForeignKeyTarget::new(primary_key_table),
             primary_key_column: primary_key_column.clone(),
             primary_key_column_type: primary_key_column_type.cloned(),
             match_type: match_type.cloned(),
@@ -192,9 +197,11 @@ impl ForeignKeyColumnConstraint {
         }
     }
 
-    /// get primary key table name
-    pub const fn primary_key_table(&self) -> &TableName {
-        &self.primary_key_table
+    /// Canonical referenced relation, or `None` after failed target lookup.
+    ///
+    /// Later search-path changes do not alter this retained binding.
+    pub const fn primary_key_table(&self) -> Option<&TableName> {
+        self.primary_key_table.relation()
     }
 
     /// get primary key column name
@@ -265,22 +272,11 @@ impl ForeignKeyColumnConstraint {
         }
         let primary_key_column = ColumnName::try_from(&pkattr[0])?;
 
-        let primary_key_column_type = if let Some(pk_table) = context.get_table(&primary_key_table)
-        {
-            if let Some(pk_col_def) = pk_table.get_column_def(&primary_key_column) {
-                pk_col_def.get_type()
-            } else {
-                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
-                    &primary_key_table,
-                    &primary_key_column,
-                ))?;
-                None
-            }
-        } else {
-            context
-                .report_analysis_problem(AnalysisProblem::table_not_found(&primary_key_table))?;
-            None
-        };
+        let (target, primary_key_column_type) = ForeignKeyTarget::resolve_column(
+            &mut context,
+            &primary_key_table,
+            &primary_key_column,
+        )?;
 
         let del_action = ForeignKeyAction::try_from_delete_postgres_constraint(syn)?;
         let upd_action = ForeignKeyAction::try_from_update_postgres_constraint(syn)?;
@@ -291,9 +287,9 @@ impl ForeignKeyColumnConstraint {
             Self::new(
                 table_name,
                 column_name,
-                &primary_key_table,
+                target.relation(),
                 &primary_key_column,
-                primary_key_column_type,
+                primary_key_column_type.as_ref(),
                 fk_match_type.as_ref(),
                 del_action,
                 upd_action,
@@ -302,6 +298,51 @@ impl ForeignKeyColumnConstraint {
             ),
             context,
         ))
+    }
+}
+
+#[cfg(test)]
+mod test_analyze_constraint {
+    use crate::{
+        sem::{ColumnName, ForeignKeyColumnConstraint, PgBuiltInType},
+        test_helpers::foreign_keys as fk,
+    };
+
+    #[rstest::rstest]
+    #[case::resolved("parent", true)]
+    #[case::missing("absent", false)]
+    fn direct_analysis_retains_completed_lookup(
+        #[case] target: &str,
+        #[case] resolved: bool,
+    ) -> testresult::TestResult {
+        let context = fk::parents();
+        let syntax = fk::postgres_constraint(&format!(
+            "ALTER TABLE a.child ADD FOREIGN KEY(id) REFERENCES {target}(id) ON UPDATE CASCADE"
+        ));
+        let (constraint, mut context) = ForeignKeyColumnConstraint::analyze_constraint(
+            context,
+            &fk::name("a", "child"),
+            &ColumnName::from("id"),
+            &syntax,
+        )?;
+        let expected = if resolved {
+            Some(fk::name("a", "parent"))
+        } else {
+            None
+        };
+        assert_eq!(constraint.primary_key_table(), expected.as_ref());
+        if resolved {
+            assert_eq!(
+                constraint.primary_key_column_type(),
+                Some(&PgBuiltInType::int4())
+            );
+            assert!(context.problems().is_empty(), "{:?}", context.problems());
+        } else {
+            assert_eq!(context.problems()[0].code(), "table_not_found");
+        }
+        fk::reversed_path(&mut context);
+        assert_eq!(constraint.primary_key_table(), expected.as_ref());
+        Ok(())
     }
 }
 
@@ -347,19 +388,8 @@ impl ForeignKeyColumnConstraint {
         let pk_column = ColumnName::from(pk_columns[0].column_name());
         let pk_table = TableName::try_from(clause.table_name())?;
 
-        let pk_column_type = if let Some(pk_table_def) = context.get_table(&pk_table) {
-            if let Some(pk_col_def) = pk_table_def.get_column_def(&pk_column) {
-                pk_col_def.get_type()
-            } else {
-                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
-                    &pk_table, &pk_column,
-                ))?;
-                None
-            }
-        } else {
-            context.report_analysis_problem(AnalysisProblem::table_not_found(&pk_table))?;
-            None
-        };
+        let (target, pk_column_type) =
+            ForeignKeyTarget::resolve_column(&mut context, &pk_table, &pk_column)?;
         let deferrability = syn
             .defer_clause()
             .as_ref()
@@ -368,9 +398,9 @@ impl ForeignKeyColumnConstraint {
         let fk = Self::new(
             table_name,
             column_name,
-            &pk_table,
+            target.relation(),
             &pk_column,
-            pk_column_type,
+            pk_column_type.as_ref(),
             None,
             del_action,
             upd_action,
@@ -379,6 +409,44 @@ impl ForeignKeyColumnConstraint {
         );
 
         Ok((ColumnConstraint::foreign_key(fk), context))
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+mod test_analyze_constraint_sqlite {
+    use crate::{
+        sem::{ColumnName, ForeignKeyColumnConstraint, FullName},
+        test_helpers::{SqliteSynBuilder, foreign_keys as fk},
+    };
+
+    #[test]
+    fn direct_sqlite_analysis_retains_the_canonical_target() -> testresult::TestResult {
+        let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE Parent(id PRIMARY KEY)");
+        let syntax = SqliteSynBuilder.parse_as_stmt("CREATE TABLE child(id REFERENCES PARENT(id))");
+        let table = syntax.as_create_table().unwrap();
+        let body = table.body().as_columns_and_constraint().unwrap();
+        let crate::syn::sqlite::ColumnConstraint::ForeignKey(constraint) =
+            body.columns()[0].constraints()[0].constraint()
+        else {
+            panic!("foreign-key syntax");
+        };
+        let (result, context) = ForeignKeyColumnConstraint::analyze_constraint_sqlite(
+            context,
+            &fk::name("main", "child"),
+            &ColumnName::from("id"),
+            constraint,
+        )?;
+        assert_eq!(
+            result
+                .as_foreign_key()
+                .unwrap()
+                .primary_key_table()
+                .unwrap()
+                .full_name(),
+            &FullName::with_schema("main", "parent")
+        );
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        Ok(())
     }
 }
 

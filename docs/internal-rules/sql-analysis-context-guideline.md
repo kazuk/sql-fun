@@ -88,6 +88,14 @@ the resulting semantic bindings and explicit failure/ambiguity outcomes,
 not merely successful traversal or retained syntax. See the
 [name-resolution completion clarification in #463](https://github.com/kazuk/sql-fun/issues/463#issuecomment-6226367685).
 
+Foreign-key semantic constraints retain only the canonical referenced relation
+identity selected at analysis time, or an explicit unresolved result. Original
+SQL spelling belongs to the syntax AST/source information. Later dependency
+updates consume the retained binding without resolving it against a changed
+search path. A missing referenced column does not erase a successfully resolved
+relation binding. Current serialization preserves these completed outcomes;
+there is no legacy-payload reconstruction of a binding.
+
 ## Semantic errors and DDL application
 
 **Successful semantic analysis does not imply that a DDL statement can be

@@ -835,7 +835,15 @@ impl ResolvedOperator {
         left: bool,
         right: bool,
     ) -> Self {
-        if let Some(operator) = context.get_operator_op(name, left, right) {
+        Self::from_definition(context, name, context.get_operator_op(name, left, right))
+    }
+    /// Complete name binding from an already performed catalog lookup.
+    pub(crate) fn from_definition(
+        context: &impl crate::sem::ParseContext,
+        name: &OperatorName,
+        operator: Option<&crate::sem::OperatorDefinition>,
+    ) -> Self {
+        if let Some(operator) = operator {
             Self {
                 name: name.clone(),
                 resolution: QueryNameResolution::operator(name),

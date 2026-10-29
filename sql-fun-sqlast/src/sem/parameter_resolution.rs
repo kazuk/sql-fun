@@ -258,13 +258,16 @@ impl ParameterResolution {
         }
         node
     }
-    pub(crate) fn distinct_result(
+    fn predicate_result(
         &mut self,
         comparisons: &[SemScalarExpr],
         require_boolean: bool,
         types: &InputTypeConstraint,
+        existing: Option<usize>,
+        operation: &str,
     ) -> usize {
-        let output = self.graph.node(types);
+        let output = existing.unwrap_or_else(|| self.graph.node(types));
+        self.graph.restrict(output, types);
         if require_boolean {
             let boolean = InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool());
             for comparison in comparisons {
@@ -275,11 +278,28 @@ impl ParameterResolution {
                         boolean.clone(),
                         boolean.clone(),
                     ])],
-                    "distinctness",
+                    operation,
                 );
             }
         }
         output
+    }
+    pub(crate) fn membership_result(
+        &mut self,
+        comparisons: &[SemScalarExpr],
+        require_boolean: bool,
+        types: &InputTypeConstraint,
+        existing: Option<usize>,
+    ) -> usize {
+        self.predicate_result(comparisons, require_boolean, types, existing, "membership")
+    }
+    pub(crate) fn distinct_result(
+        &mut self,
+        comparisons: &[SemScalarExpr],
+        require_boolean: bool,
+        types: &InputTypeConstraint,
+    ) -> usize {
+        self.predicate_result(comparisons, require_boolean, types, None, "distinctness")
     }
 
     pub(crate) fn truth_test(
@@ -681,6 +701,22 @@ impl ParameterResolution {
         Ok((node, domain))
     }
 
+    pub(crate) fn membership_common(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        arguments: &[SemScalarExpr],
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let (node, domain) = self.common_type(context, "IN", arguments, false)?;
+        Ok(SemScalarExpr::constrained(&ConstrainedExpr::new(
+            node,
+            "membership common type",
+            arguments,
+            &domain,
+            None,
+            "",
+        )))
+    }
+
     pub(crate) fn array_query_result(
         &mut self,
         fallback: &InputTypeConstraint,
@@ -903,6 +939,12 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
         expression.resolve_between(self.context)
     }
 
+    fn membership(&mut self, value: &mut crate::sem::MembershipExpr) -> Result<(), AnalysisError> {
+        if value.expand_pending_stars(self.context)? {
+            value.walk(self)?;
+        }
+        Ok(())
+    }
     fn array_subquery(
         &mut self,
         value: &mut crate::sem::ArraySubqueryExpr,
@@ -1118,6 +1160,13 @@ impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
     }
 }
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
+    fn membership(&mut self, value: &mut crate::sem::MembershipExpr) -> Result<(), AnalysisError> {
+        if value.expand_pending_stars(self.context)? {
+            self.expanded_arrays = true;
+            value.walk(self)?;
+        }
+        Ok(())
+    }
     fn array_subquery(
         &mut self,
         value: &mut crate::sem::ArraySubqueryExpr,

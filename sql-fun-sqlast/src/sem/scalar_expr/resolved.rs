@@ -82,6 +82,11 @@ impl SemScalarExpr {
         Self::Boolean(BooleanExpr::new(BooleanExprBody::or(values)))
     }
     pub(crate) fn logical_not(value: &Self) -> Self {
+        if let Some(membership) = value.as_membership()
+            && let Some(value) = membership.sqlite_negation()
+        {
+            return Self::membership(value);
+        }
         Self::Boolean(BooleanExpr::new(BooleanExprBody::not(value)))
     }
     pub(crate) fn null_test(value: &Self, negated: bool) -> Self {

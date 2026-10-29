@@ -572,6 +572,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid membership predicate.",
+                  "type": "object",
+                  "properties": {
+                    "Membership": {
+                      "$ref": "#/$defs/MembershipProblem"
+                    }
+                  },
+                  "required": [
+                    "Membership"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -1372,6 +1385,57 @@
               "required": [
                 "left",
                 "right"
+              ]
+            },
+            "MembershipProblem": {
+              "description": "Invalid shape or comparison in an IN/NOT IN predicate.",
+              "oneOf": [
+                {
+                  "description": "The operands have incompatible widths.",
+                  "type": "object",
+                  "properties": {
+                    "Width": {
+                      "$ref": "#/$defs/MembershipWidth"
+                    }
+                  },
+                  "required": [
+                    "Width"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A selected comparison does not return boolean.",
+                  "type": "object",
+                  "properties": {
+                    "ComparisonResult": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "ComparisonResult"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "MembershipWidth": {
+              "description": "Expected and actual membership operand widths.",
+              "type": "object",
+              "properties": {
+                "expected": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "expected",
+                "actual"
               ]
             },
             "IndexProblem": {
@@ -4317,6 +4381,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid membership predicate.",
+                  "type": "object",
+                  "properties": {
+                    "Membership": {
+                      "$ref": "#/$defs/MembershipProblem"
+                    }
+                  },
+                  "required": [
+                    "Membership"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -5117,6 +5194,57 @@
               "required": [
                 "left",
                 "right"
+              ]
+            },
+            "MembershipProblem": {
+              "description": "Invalid shape or comparison in an IN/NOT IN predicate.",
+              "oneOf": [
+                {
+                  "description": "The operands have incompatible widths.",
+                  "type": "object",
+                  "properties": {
+                    "Width": {
+                      "$ref": "#/$defs/MembershipWidth"
+                    }
+                  },
+                  "required": [
+                    "Width"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A selected comparison does not return boolean.",
+                  "type": "object",
+                  "properties": {
+                    "ComparisonResult": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "ComparisonResult"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "MembershipWidth": {
+              "description": "Expected and actual membership operand widths.",
+              "type": "object",
+              "properties": {
+                "expected": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "expected",
+                "actual"
               ]
             },
             "IndexProblem": {

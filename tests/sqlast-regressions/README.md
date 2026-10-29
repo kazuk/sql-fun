@@ -48,7 +48,8 @@ The original #757 migration covered builtin-only cases. The #764 follow-up
 adds default/project-schema consumers.
 [#761](https://github.com/kazuk/sql-fun/pull/761)
 resolved the earlier catalog-initialization problem. No catalog substitution or
-diagnostic suppression is used.
+diagnostic suppression is used. The separate #799 domain/base defect currently
+blocks setup for the groups described below.
 
 `default` loads the actual installation's bundled `schema.sql`. `project` adds
 the explicitly selected schema dump; passing `--schema-file` with `default`
@@ -60,8 +61,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 694 inputs for PostgreSQL 17 and 700 for
-PostgreSQL 18 (1394 total). These count positive contract inputs separately from
+manifest totals are 1033 inputs for PostgreSQL 17 and 1039 for
+PostgreSQL 18 (2072 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -191,3 +192,38 @@ Nullability retains the shared comparisons' conservative policy; these are
 static analysis checks, not predicate evaluation. Rust retains comparison
 bindings, serialized public builders, independent operand compatibility and
 correlated parameter domains. SQLite semantics remain tracked in #855.
+
+Membership fixtures for #500 cover list and subquery IN/NOT IN, rows, implicit
+coercions, NULL inputs, correlated references, parameter-dependent outputs, and
+shape/type diagnostics. `membership.json` runs against PostgreSQL 17/18 through
+both source and installed checks. Focused Rust tests retain operator/column
+bindings, operand retention, SQLite semantics and correlated parameter domains.
+
+`membership-comparisons.json` checks heterogeneous IN/NOT IN lists at the builtin
+schema level. An unknown NULL is coerced independently for each comparison when
+no scalar-array common type exists; incompatible comparisons still report errors.
+These cases run in both source and installed checks independently of #799.
+
+## Temporary catalog-setup ignores for #799
+
+The shipped `information_schema` contains IN subqueries comparing the
+`sql_identifier` domain with `name`/`text`. Membership analysis exposes the
+existing shared domain/base implicit-cast bug tracked in
+[#799](https://github.com/kazuk/sql-fun/issues/799). Catalog initialization fails
+before cases in default/project-schema groups can execute. The
+[scope decision for #856](https://github.com/kazuk/sql-fun/pull/856#issuecomment-6487912563)
+authorizes temporarily ignoring only those blocked cases.
+
+`temporary-ignores.tsv` records each affected fixture, case name, PostgreSQL
+version and #799 reference. It covers 862 cases per version, across 48 groups
+per version. Their SQL, complete expectations and manifest counts remain intact.
+The shared runner emits a JUnit skipped testcase and a console SKIP with #799
+for every suppression. It reports executed and ignored counts separately:
+171/177 cases still execute on PostgreSQL 17/18 (348 executed, 1724 ignored).
+
+The temporary helper rejects duplicate/stale entries and incomplete group
+inventories: a new case is never implicitly ignored. Entire groups are blocked
+by setup, so partial group suppression is not supported. This mechanism does
+not change product CLI input formats, comparison semantics or schema selection.
+When fixing #799, remove every entry and the temporary helper/integration, then
+make all preserved cases pass in source and installed-distribution checks.

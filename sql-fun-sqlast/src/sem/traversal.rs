@@ -41,6 +41,9 @@ pub(crate) trait SemanticVisitor {
     ) -> Result<(), AnalysisError> {
         Ok(())
     }
+    fn membership(&mut self, _value: &mut crate::sem::MembershipExpr) -> Result<(), AnalysisError> {
+        Ok(())
+    }
     fn subscript(&mut self, _value: &SemScalarExpr) {}
     // UPDATE/DELETE finalize subquery projections before surrounding uses.
     // INSERT SELECT instead receives destination assignment context.

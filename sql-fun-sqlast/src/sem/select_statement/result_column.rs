@@ -178,6 +178,14 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn membership_operands(&self) -> Vec<SemScalarExpr> {
+        self.0
+            .iter()
+            .filter_map(ResultColumn::expression)
+            .cloned()
+            .collect()
+    }
+
     pub(crate) fn cloned_suffix(&self, first: usize) -> Vec<ResultColumn> {
         self.0[first..].to_vec()
     }

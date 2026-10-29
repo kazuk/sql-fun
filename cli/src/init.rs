@@ -3,7 +3,7 @@ mod conversation;
 mod error;
 mod flow;
 mod home;
-mod install;
+pub(crate) mod install;
 mod postgres;
 mod presentation;
 mod prompt;

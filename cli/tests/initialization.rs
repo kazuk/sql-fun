@@ -179,6 +179,7 @@ fn initialization_preserves_and_loads_an_existing_valid_generation() {
         String::from_utf8_lossy(&result.stderr)
     );
     project.assert_installed_catalog("17");
+    assert!(!project.home().join("postgres/.17.init.lock").exists());
 }
 
 #[test]
@@ -194,7 +195,7 @@ fn initialization_rejects_incomplete_existing_metadata() {
 }
 
 #[test]
-fn initialization_rejects_a_concurrent_writer_for_the_same_version() {
+fn initialization_ignores_a_historical_lock_for_the_same_version() {
     let project = InitializedProject::new();
     project.install_fixture("17");
     let lock = std::fs::File::options()
@@ -206,8 +207,13 @@ fn initialization_rejects_a_concurrent_writer_for_the_same_version() {
         .unwrap();
     lock.try_lock().unwrap();
     let result = project.init(&["--engine-versions", "17"]);
-    assert!(!result.status.success());
-    assert!(String::from_utf8_lossy(&result.stderr).contains("another initialization owns"));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    project.assert_installed_catalog("17");
+    assert!(project.home().join("postgres/.17.init.lock").is_file());
 }
 
 #[test]

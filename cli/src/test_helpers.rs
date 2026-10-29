@@ -1,5 +1,6 @@
 pub(crate) mod direct_sql;
 pub(crate) mod heavy;
+pub(crate) mod installation;
 
 use tokio::io::{AsyncWrite, AsyncWriteExt, DuplexStream};
 

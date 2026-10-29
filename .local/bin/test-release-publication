@@ -15,6 +15,8 @@ export GITHUB_REPOSITORY=fixture/repository
 uv run --no-project --no-config --python 3.12 "$repo_root/tests/package-api/test_lifecycle.py"
 uv run --no-project --no-config --python 3.12 "$repo_root/tests/package-api/test_source.py"
 
+# Unbudgeted candidate/archive tests removed in 83b2c46b; recover from Git history.
+
 expect_failure() {
   if "$@" > "$fixture/stdout" 2> "$fixture/stderr"; then
     echo "unexpected success: $*" >&2

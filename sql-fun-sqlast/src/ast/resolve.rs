@@ -421,6 +421,13 @@ impl OperatorExpr {
         }
         let left = Expr::resolve_optional(&self.left, context, scope)?;
         let right = Expr::resolve_optional(&self.right, context, scope)?;
+        if let Some(negated) = self.kind.membership_negated(&self.name) {
+            let left = left.expect("IN left operand");
+            let values = right.expect("IN right operand").into_list_values()?;
+            return Ok(SemScalarExpr::membership(crate::sem::MembershipExpr::list(
+                context, &left, &values, negated,
+            )?));
+        }
         if let Some(negated) = self.distinctness(context) {
             let (Some(left), Some(right)) = (left, right) else {
                 return AnalysisError::raise_unexpected_input("distinctness operands");
@@ -473,6 +480,13 @@ impl OperatorExpr {
 }
 
 impl OperatorKind {
+    fn membership_negated(&self, name: &Name) -> Option<bool> {
+        match self {
+            Self::In => Some(name.0.as_slice() == ["<>"]),
+            Self::NotIn => Some(true),
+            _ => None,
+        }
+    }
     const fn distinctness(&self) -> Option<bool> {
         match self {
             Self::Distinct => Some(false),
@@ -809,12 +823,26 @@ impl Subquery {
                 identity, detail,
             )))?;
         }
+        if self.kind.is_membership(&self.operator) {
+            let test = self
+                .test
+                .as_ref()
+                .expect("IN test operand")
+                .resolve_in(context, scope)?;
+            let query = self.query.resolve_in(context, Some(scope))?;
+            return Ok(SemScalarExpr::membership(
+                crate::sem::MembershipExpr::query(context, &test, &query)?,
+            ));
+        }
         let query = self.query.resolve_in(context, Some(scope))?;
         self.kind.resolve(context, &query)
     }
 }
 
 impl SubqueryKind {
+    fn is_membership(&self, operator: &Name) -> bool {
+        matches!(self, Self::Any) && (operator.0.is_empty() || operator.0.as_slice() == ["="])
+    }
     fn resolve(
         &self,
         context: &mut impl ParseContext,

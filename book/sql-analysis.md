@@ -882,3 +882,18 @@ using the collation.
 Analysis retains nested annotations and unresolved names. It does not yet derive
 collations across expressions or check precedence and collation conflicts among
 function/operator inputs, query boundaries or ordering expressions.
+
+## Membership predicates
+
+`IN` and `NOT IN` analyze scalar and row operands with a value list or a
+subquery. PostgreSQL resolves comparison operators and implicit conversions
+using the selected catalog. A scalar subquery membership requires one output
+column; a row operand requires the same number of query output columns.
+Incompatible widths and comparison types produce analysis diagnostics.
+
+PostgreSQL predicates return boolean; SQLite predicates return integer. NULL
+inputs can produce NULL results. `NOT IN` does not turn a NULL comparison into
+true. Result nullability is conservative: analysis does not execute a query to
+determine whether its result is empty or whether another list item will match.
+Membership participates in the existing parameter analysis; no additional hints
+are required by this syntax.

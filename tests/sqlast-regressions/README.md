@@ -191,3 +191,9 @@ Nullability retains the shared comparisons' conservative policy; these are
 static analysis checks, not predicate evaluation. Rust retains comparison
 bindings, serialized public builders, independent operand compatibility and
 correlated parameter domains. SQLite semantics remain tracked in #855.
+
+Membership fixtures for #500 cover list and subquery IN/NOT IN, rows, implicit
+coercions, NULL inputs, correlated references, parameter-dependent outputs, and
+shape/type diagnostics. `membership.json` runs against PostgreSQL 17/18 through
+both source and installed checks. Focused Rust tests retain operator/column
+bindings, operand retention, SQLite semantics and correlated parameter domains.

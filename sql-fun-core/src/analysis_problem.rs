@@ -8,6 +8,7 @@ mod delete;
 mod distinct;
 mod index;
 mod insert;
+mod membership;
 mod message;
 mod min_max;
 mod name_resolution;
@@ -32,6 +33,7 @@ pub use self::delete::{
 pub use self::distinct::DistinctProblem;
 pub use self::index::{IndexProblem, IndexProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
+pub use self::membership::MembershipProblem;
 pub use self::min_max::MinMaxProblem;
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, FunctionNotFound, NameResolution};
 pub use self::overload_resolution::OverloadResolution;
@@ -80,6 +82,8 @@ pub enum AnalysisProblem {
     Collate(CollateProblem),
     /// Invalid null-safe distinctness predicate.
     Distinct(DistinctProblem),
+    /// Invalid membership predicate.
+    Membership(MembershipProblem),
     /// Invalid index alteration or a statistics warning.
     Index(IndexProblem),
     /// An ALTER COLUMN binding or attribute is invalid.
@@ -366,6 +370,12 @@ impl AnalysisProblem {
             _ => None,
         }
     }
+    /// Invalid membership predicate.
+    #[must_use]
+    pub const fn membership(problem: MembershipProblem) -> Self {
+        Self::Membership(problem)
+    }
+
     /// Construct a distinctness diagnostic.
     #[must_use]
     pub const fn distinct(problem: DistinctProblem) -> Self {
@@ -436,6 +446,7 @@ impl AnalysisProblem {
             Self::TruthTest(problem) => problem.code(),
             Self::Collate(problem) => problem.code(),
             Self::Distinct(problem) => problem.code(),
+            Self::Membership(problem) => problem.code(),
             Self::ParameterConstraint(_) => "parameter_constraint",
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -506,6 +517,7 @@ impl AnalysisProblem {
             Self::TruthTest(problem) => problem.render_metadata(),
             Self::Collate(problem) => problem.render_metadata(),
             Self::Distinct(problem) => problem.render_metadata(),
+            Self::Membership(problem) => problem.render_metadata(),
             Self::ParameterConstraint(problem) => problem.render_metadata(),
             Self::NameResolution(problem) => return problem.render_metadata(),
             _ => return None,
@@ -529,6 +541,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::TruthTest(problem) => problem.diagnostic_message(),
             Self::Collate(problem) => problem.diagnostic_message(),
             Self::Distinct(problem) => problem.diagnostic_message(),
+            Self::Membership(problem) => problem.diagnostic_message(),
             Self::Index(problem) => problem.diagnostic_message(),
             Self::AlterColumn(problem) => problem.diagnostic_message(),
             Self::MinMax(problem) => problem.diagnostic_message(),

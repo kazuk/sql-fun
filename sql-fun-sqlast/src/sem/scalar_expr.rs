@@ -16,6 +16,7 @@ mod exists;
 mod func_call;
 pub(crate) mod grouping;
 mod indirect;
+mod membership;
 mod min_max;
 mod named_arg;
 mod param_ref;
@@ -46,6 +47,7 @@ pub use self::{
     func_call::{FuncCallArgs, FuncCallExpr, FunctionBinding},
     grouping::{GroupingArgument, GroupingExpr},
     indirect::{ArraySubscript, ArraySubscripts, IndirectionExpr},
+    membership::{MembershipComparison, MembershipExpr},
     min_max::MinMaxExpr,
     named_arg::NamedArgExpr,
     param_ref::ParamRef,
@@ -155,6 +157,8 @@ pub enum SemScalarExpr {
     TruthTest(TruthTestExpr),
     /// Null-safe distinctness, retaining its analyzed comparison.
     Distinct(DistinctExpr),
+    /// IN/NOT IN with analyzed operands and comparison bindings.
+    Membership(Box<MembershipExpr>),
     /// sub-query expression
     SubLink(SubLinkExpr),
     /// EXISTS predicate retaining its analyzed query.
@@ -208,6 +212,7 @@ impl SemScalarExpr {
             Self::FuncCall(value) => value.rename_relation(old, new),
             Self::TypeCast(value) => value.rename_relation(old, new),
             Self::ImplicitCast(value) => value.rename_relation(old, new),
+            Self::Membership(value) => value.rename_relation(old, new),
             _ => {}
         }
     }
@@ -241,6 +246,7 @@ impl SemScalarExpr {
             Self::Case(value) => value.canonicalize_grouping_key(),
             Self::TruthTest(value) => value.canonicalize_grouping_key(),
             Self::Distinct(value) => value.canonicalize_grouping_key(),
+            Self::Membership(value) => value.canonicalize_grouping_key(),
             Self::Coalesce(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
@@ -471,6 +477,7 @@ impl SemScalarExpr {
             Self::Case(value) => value.node(),
             Self::TruthTest(value) => value.node(),
             Self::Distinct(value) => value.node(),
+            Self::Membership(value) => value.node(),
             Self::Coalesce(value) => value.node(),
             Self::Collate(value) => value.argument().constraint_node(),
             _ => None,
@@ -591,6 +598,7 @@ impl SemScalarExpr {
             Self::NullTest(_null_test_expr) => Self::builtin_boolean_type(),
             Self::TruthTest(value) => value.get_type(),
             Self::Distinct(value) => value.get_type(),
+            Self::Membership(value) => value.get_type(),
             Self::SubLink(sub_link_expr) => sub_link_expr.get_type(),
             Self::Exists(value) => value.get_type(),
             Self::ArraySubquery(value) => value.get_type(),
@@ -627,6 +635,7 @@ impl SemScalarExpr {
             Self::NullTest(null_test_expr) => null_test_expr.is_not_null(),
             Self::TruthTest(value) => value.is_not_null(),
             Self::Distinct(value) => value.is_not_null(),
+            Self::Membership(value) => value.is_not_null(),
             Self::SubLink(sub_link_expr) => sub_link_expr.is_not_null(),
             Self::Exists(value) => value.is_not_null(),
             Self::ArraySubquery(value) => value.is_not_null(),
@@ -679,6 +688,7 @@ impl SemScalarExpr {
             | Self::Constrained(_)
             | Self::Exists(_)
             | Self::ArraySubquery(_)
+            | Self::Membership(_)
             | Self::Distinct(_)
             | Self::TruthTest(_)
             | Self::Grouping(_)
@@ -708,7 +718,7 @@ impl SemScalarExpr {
             Self::Case(_case_expr) => String::new(),
             Self::Boolean(_boolean_expr) => String::new(),
             Self::NullTest(_null_test_expr) => String::new(),
-            Self::TruthTest(_) | Self::Distinct(_) => String::new(),
+            Self::TruthTest(_) | Self::Distinct(_) | Self::Membership(_) => String::new(),
             Self::SubLink(query) => query.output_name(),
             Self::Exists(_) => String::new(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.join_key_name().unwrap_or("").to_owned(),
@@ -1044,6 +1054,7 @@ impl SemScalarExpr {
             Self::NullTest(v) => v.walk(visitor)?,
             Self::TruthTest(value) => value.walk(visitor)?,
             Self::Distinct(value) => value.walk(visitor)?,
+            Self::Membership(value) => value.walk(visitor)?,
             Self::SubLink(v) => v.walk(visitor)?,
             Self::Exists(value) => value.walk(visitor)?,
             Self::ArraySubquery(value) => value.walk(visitor)?,
@@ -1120,6 +1131,7 @@ impl SemScalarExpr {
             Self::Case(value) => value.apply_constraints(constraints),
             Self::TruthTest(value) => value.apply_constraints(constraints),
             Self::Distinct(value) => value.apply_constraints(constraints),
+            Self::Membership(value) => value.apply_constraints(constraints),
             Self::Coalesce(value) => value.apply_constraints(constraints),
             _ => {}
         }
@@ -1137,6 +1149,10 @@ impl SemScalarExpr {
             Self::TypeCast(value) => value.collect_constraints(parameters, context)?,
             Self::Boolean(value) => value.collect_constraints(parameters, context),
             Self::NullTest(value) => value.collect_constraints(parameters),
+            Self::Membership(value) => {
+                value.collect_constraints(parameters, context)?;
+                None
+            }
             Self::Distinct(value) => {
                 value.collect_constraints(parameters, context)?;
                 None
@@ -1187,6 +1203,26 @@ impl SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// Membership predicate, including analyzed list or query operands.
+    pub fn as_membership(&self) -> Option<&MembershipExpr> {
+        match self {
+            Self::Membership(value) => Some(value),
+            _ => None,
+        }
+    }
+    pub(crate) fn membership(value: MembershipExpr) -> Self {
+        Self::Membership(Box::new(value))
+    }
+    pub(crate) const fn is_membership_row(&self) -> bool {
+        matches!(self, Self::Row(_) | Self::List(_))
+    }
+    pub(crate) fn membership_fields(&self) -> &[Self] {
+        match self {
+            Self::Row(value) => &value.0,
+            Self::List(value) => &value.0,
+            _ => std::slice::from_ref(self),
+        }
+    }
     pub(crate) fn requires_argument_type(&self) -> bool {
         self.get_type().is_none() && !self.as_const().is_some_and(ScalarConstExpr::is_null)
     }

@@ -419,9 +419,13 @@ impl FunctionInfoRead for BaseContext {
 
 impl OperatorInfoRead for BaseContext {
     fn operator_result_is_not_null(&self, name: &OperatorName) -> Option<bool> {
-        // The shipped equality implementations return a boolean for non-null
+        // The shipped equality/inequality implementations return a boolean for non-null
         // operands. This guarantee does not extend to arbitrary SQL functions.
-        if *name == OperatorName::from_parts(None, "=")
+        if [
+            OperatorName::from_parts(None, "="),
+            OperatorName::from_parts(None, "<>"),
+        ]
+        .contains(name)
             && self.get_operator_op(name, true, true).is_some()
         {
             Some(true)

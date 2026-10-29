@@ -1,3 +1,6 @@
+#[path = "test_helpers.rs"]
+pub mod executable;
+
 #[allow(dead_code)]
 #[path = "../../sql-fun-client/tests/test_helpers/schema.rs"]
 pub mod schema;

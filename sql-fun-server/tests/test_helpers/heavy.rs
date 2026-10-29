@@ -6,9 +6,14 @@ use std::{
 const WAIT: Duration = Duration::from_secs(15);
 
 fn command() -> Command {
-    let mut command = Command::new(
-        std::env::var("SQL_FUN_TEST_SERVER_BIN").expect("SQL_FUN_TEST_SERVER_BIN must be set"),
-    );
+    // Nextest supplies the relocated executable from this package's archive.
+    let executable = if let Some(binary) = std::env::var_os("NEXTEST_BIN_EXE_sql_fun_server") {
+        binary
+    } else {
+        std::env::var_os("SQL_FUN_TEST_SERVER_BIN")
+            .expect("nextest server binary or SQL_FUN_TEST_SERVER_BIN must be set")
+    };
+    let mut command = Command::new(executable);
     command
         .env_remove("SQL_FUN_SERVER_IDLE_TIMEOUT")
         .env_remove("REQUEST_LENGTH_LIMIT")

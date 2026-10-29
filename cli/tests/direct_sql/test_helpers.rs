@@ -1,3 +1,10 @@
+#[allow(
+    dead_code,
+    reason = "shared API fixtures include helpers for other integration targets"
+)]
+#[path = "../api_helpers.rs"]
+pub(super) mod api;
+
 use std::path::{Path, PathBuf};
 
 /// Owns only suite input and output files; does not parse a catalog or start services.

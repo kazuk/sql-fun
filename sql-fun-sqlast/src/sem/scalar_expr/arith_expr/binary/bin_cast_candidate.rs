@@ -219,7 +219,7 @@ mod tests {
         BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition, PgBuiltInType,
         TypeReference,
     };
-    use crate::test_helpers::TestParseContext;
+    use crate::test_helpers::{TestParseContext, domain_casts};
 
     #[rstest::rstest]
     #[case::same_array("_oid", "_oid", true)]
@@ -302,13 +302,6 @@ mod tests {
         assert!(context.has_reported_problem("binary_operator_overload_ambiguous"));
         Ok(())
     }
-}
-
-#[cfg(test)]
-mod test_domain_operators {
-    use super::BinaryCastCandidate;
-    use crate::sem::{OperatorDefinition, PgBuiltInType};
-    use crate::test_helpers::domain_casts;
 
     #[test]
     fn polymorphic_array_element_keeps_domain_identity() {

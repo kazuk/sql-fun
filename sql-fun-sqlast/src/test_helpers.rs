@@ -9,6 +9,7 @@ pub(crate) mod domain_casts;
 pub(crate) mod foreign_keys;
 pub(crate) mod membership;
 pub(crate) mod ownership;
+pub(crate) mod parameter_calls;
 mod syn_builder;
 mod test_parse_context;
 

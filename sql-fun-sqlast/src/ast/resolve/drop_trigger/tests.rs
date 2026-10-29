@@ -1,6 +1,5 @@
-use crate::context::ParseContext;
 use crate::{
-    context::TriggerInfoRead,
+    context::{ParseContext, TriggerInfoRead},
     sem::{FullName, TriggerIdentity},
 };
 
@@ -150,9 +149,10 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
 }
 
 mod test_helpers {
-    use crate::context::BaseParseContext;
-    use crate::sem::{FrozenBaseContext, SchemaFileContext};
-    use crate::sem::{FullName, TableName, TriggerIdentity, ViewName};
+    use crate::{
+        context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
+        sem::{FullName, TableName, TriggerIdentity, ViewName},
+    };
     pub(super) const CREATE_AUDIT: &str = "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()";
     pub(super) fn identity() -> TriggerIdentity {
         TriggerIdentity::postgres(
@@ -206,8 +206,7 @@ mod test_helpers {
     }
     pub(super) mod heavy {
         use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
-        use crate::ParseContext;
-        use crate::context::BaseContext;
+        use crate::{ParseContext, context::BaseContext};
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.
         pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {

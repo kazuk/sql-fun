@@ -5,18 +5,15 @@
 //! entry point from parser output into this crate's SQLite syntax and semantic
 //! analysis layers.
 
-use std::{ops::Range, path::Path};
-
-use ::sql_fun_core::IVec;
-use ::turso_parser::{error::Error as TursoError, lexer::Token, parser::Parser as TursoParser};
-
-use crate::syn::sqlite::Cmd;
-
 use crate::{
     AstAndContextPair, ParseDumpFileError, ParsedSchemaDump, StringSpan,
-    context::ParseContext,
-    sem::{AnalysisError, FrozenBaseContext, SchemaFileContext, SemAst},
+    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
+    sem::{AnalysisError, SemAst},
+    syn::sqlite::Cmd,
 };
+use ::sql_fun_core::IVec;
+use ::turso_parser::{error::Error as TursoError, lexer::Token, parser::Parser as TursoParser};
+use std::{ops::Range, path::Path};
 
 /// dialect for SQLite
 pub struct SqliteDialect;
@@ -299,7 +296,7 @@ mod test_schema_content_hash {
     mod test_helpers {
         use crate::context::ParseContext;
 
-        pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
+        pub(super) fn base_with_public_schema() -> crate::context::FrozenBaseContext {
             use crate::sem::SchemaName;
             let mut base = crate::test_helpers::TestParseContext::default()
                 .with_dialect(crate::ast::Dialect::sqlite());

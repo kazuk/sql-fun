@@ -212,7 +212,7 @@ fn array_item_reads_agree_across_context_layers(
     let reference =
         TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), is_array);
     assert_eq!(root.get_array_item_type(&reference), expected);
-    let builtin = ::sql_fun_sqlast::sem::FrozenBaseContext::from(root);
+    let builtin = ::sql_fun_sqlast::context::FrozenBaseContext::from(root);
     assert_eq!(builtin.get_array_item_type(&reference), expected);
 
     let dump = load_schema(&builtin, "CREATE TABLE public.items (id integer);")?;
@@ -723,11 +723,9 @@ fn absent_index_traverses_schema_layers_to_builtin_root() -> Result<(), Box<dyn 
 
 mod test_helpers {
     pub(super) mod heavy {
-        use std::path::Path;
-
-        use ::sql_fun_sqlast::{PostgresDialect, sem::FrozenBaseContext};
-
         use super::builtin_root;
+        use ::sql_fun_sqlast::{PostgresDialect, context::FrozenBaseContext};
+        use std::path::Path;
 
         /// Load real builtin type/function metadata for index absence and DDL
         /// resolution tests. Every call reloads metadata, without sharing across
@@ -759,19 +757,19 @@ mod test_helpers {
         }
     }
 
-    use std::path::Path;
-
     use ::clap::Parser;
-    use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParsedSchemaDump, PostgresDialect, SqlFunArgs,
-        context::BaseContext,
-        context::{ParseContext, ViewInfoRead},
+        context::{
+            BaseContext, BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext,
+            ViewInfoRead,
+        },
         sem::{
-            AnalysisProblem, ColumnName, FrozenBaseContext, FullName, SchemaFileContext,
-            SchemaName, TableName, TypeReference, ViewLike, problem::NameResolution,
+            AnalysisProblem, ColumnName, FullName, SchemaName, TableName, TypeReference, ViewLike,
+            problem::NameResolution,
         },
     };
+    use std::path::Path;
 
     pub(super) const EXTENSION_A: &str = "CREATE SCHEMA a; CREATE TYPE a.state AS ENUM ('ready'); CREATE DOMAIN a.label AS text; \
          CREATE TYPE a.pair AS (key integer, value text); \

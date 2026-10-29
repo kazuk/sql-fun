@@ -1,11 +1,9 @@
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{FunctionInfoRead, FunctionInfoWrite},
-    sem::{AnalysisError, CreateFunction, FullName, FunctionOverloadCollection, ParseContext},
+    TrieMap,
+    context::{FunctionInfoRead, FunctionInfoWrite, ParseContext},
+    sem::{AnalysisError, CreateFunction, FullName, FunctionOverloadCollection},
 };
-
-use crate::TrieMap;
-
-use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct FunctionDefinitionCollection(TrieMap<Vec<CreateFunction>>, Vec<FullName>);

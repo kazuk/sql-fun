@@ -16,32 +16,26 @@ mod table_rename_tests;
 mod type_info;
 mod view_info;
 
-use std::path::{Path, PathBuf};
-
-use sql_fun_core::SqlFunArgs;
-
 use self::{
     func_info::FunctionDefinitionCollection, sequence_info::SequenceInfoCollection,
     table_info::TableDefinitionCollection, type_info::TypeDefinitionCollection,
     view_info::ViewInformationCollection,
 };
-
-use crate::context::BaseParseContext;
 use crate::{
     StringSpan, TrieMap,
     context::{
-        DiagnosticContext, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
-        OperatorInfoRead, ParseContext, SearchPathRead, SourceAccessService, TableInfoRead,
-        ViewInfoRead,
+        BaseParseContext, DiagnosticContext, FrozenBaseContext, GetSourcePathWithSpanOpt,
+        IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead, ParseContext, SearchPathRead,
+        SourceAccessService, TableInfoRead, ViewInfoRead,
     },
     sem::{
         AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
-        CreateSchema, FrozenBaseContext, FullName, ImplicitChange, ObjectKind, OperatorDefinition,
-        OperatorName, SchemaName, SemScalarExpr, TypeReference,
+        CreateSchema, FullName, ImplicitChange, ObjectKind, OperatorDefinition, OperatorName,
+        SchemaName, SemScalarExpr, SourcePathWithSpan, TypeReference,
     },
 };
-
-use super::SourcePathWithSpan;
+use ::sql_fun_core::SqlFunArgs;
+use std::path::{Path, PathBuf};
 
 /// Mutable schema layer built over an immutable base.
 ///
@@ -69,8 +63,8 @@ pub(super) struct SchemaCatalog {
     renamed_tables: std::collections::HashSet<FullName>,
     renamed_types: std::collections::HashSet<FullName>,
     rules: std::collections::HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
-    ownership: crate::sem::ownership::OwnershipCatalog,
-    configured_roles: crate::sem::ownership::ConfiguredRoles,
+    ownership: crate::context::ownership::OwnershipCatalog,
+    configured_roles: crate::context::ownership::ConfiguredRoles,
     base: FrozenBaseContext,
     triggers:
         std::collections::HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
@@ -113,7 +107,7 @@ impl SchemaFileContext {
     ///
     /// ```compile_fail
     /// use std::path::Path;
-    /// use ::sql_fun_sqlast::sem::SchemaFileContext;
+    /// use ::sql_fun_sqlast::context::SchemaFileContext;
     ///
     /// fn mutable_base(builder: SchemaFileContext, args: &::sql_fun_core::SqlFunArgs, metadata: &::sql_fun_core::SqlFunMetadata) {
     ///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &builder, args, metadata);
@@ -227,12 +221,11 @@ impl MutSourcePathWithSpan for SchemaFileContext {
 
 #[cfg(test)]
 mod test_schema_file_context {
-    use std::path::Path;
-
     use crate::{
-        sem::ParseContext,
+        context::ParseContext,
         test_helpers::{TestParseContext, test_context},
     };
+    use std::path::Path;
 
     #[rstest::rstest]
     fn test_new(test_context: TestParseContext) {
@@ -382,8 +375,8 @@ mod test_index_lookup {
     #[test]
     fn quoted_names_do_not_alias_or_shadow_other_indexes() -> testresult::TestResult {
         use crate::{
-            context::IndexInfoRead,
-            sem::{FullName, ParseContext, TableName},
+            context::{IndexInfoRead, ParseContext},
+            sem::{FullName, TableName},
         };
         let left = index("a.b", "parent_table", "c");
         let right = index("a", "other_table", "b.c");
@@ -434,11 +427,11 @@ mod test_index_lookup {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            CreateIndex, FullName, IndexElementCollection, ParseContext, SchemaFileContext,
-            SchemaName, TableName,
+        use crate::{
+            context::{ParseContext, SchemaFileContext},
+            sem::{CreateIndex, FullName, IndexElementCollection, SchemaName, TableName},
+            test_helpers::TestParseContext,
         };
-        use crate::test_helpers::TestParseContext;
         use std::path::Path;
 
         pub(super) fn index(schema: &str, table: &str, name: &str) -> CreateIndex {
@@ -527,17 +520,20 @@ mod test_operator_layers {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            BinaryOperatorDefinition, OperatorDefinition, ParseContext, PgBuiltInType,
-            SchemaFileContext, TypeReference, UnaryOperatorDefinition,
+        use crate::{
+            context::{ParseContext, SchemaFileContext},
+            sem::{
+                BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, TypeReference,
+                UnaryOperatorDefinition,
+            },
+            test_helpers::TestParseContext,
         };
-        use crate::test_helpers::TestParseContext;
         use std::path::Path;
 
         pub(super) fn operator_layer(
             has_left: bool,
             has_right: bool,
-        ) -> crate::sem::FrozenBaseContext {
+        ) -> crate::context::FrozenBaseContext {
             let root = TestParseContext::default().freeze();
             let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
             register(
@@ -633,11 +629,11 @@ impl DiagnosticContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_diagnostic_context {
-    use crate::StringSpan;
-    use crate::test_helpers::TestParseContext;
     use crate::{
-        context::DiagnosticContext,
-        sem::{AnalysisProblem, FullName, ParseContext},
+        StringSpan,
+        context::{DiagnosticContext, ParseContext},
+        sem::{AnalysisProblem, FullName},
+        test_helpers::TestParseContext,
     };
     use std::path::Path;
 
@@ -995,8 +991,7 @@ impl ParseContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_extension_record {
-    use crate::sem::{CreateExtension, ParseContext};
-    use crate::test_helpers::TestParseContext;
+    use crate::{context::ParseContext, sem::CreateExtension, test_helpers::TestParseContext};
     use std::path::Path;
 
     #[test]
@@ -1023,11 +1018,13 @@ mod test_extension_record {
 
 #[cfg(test)]
 mod test_freeze {
-    use crate::StringSpan;
-    use crate::context::BaseParseContext;
     use crate::{
-        context::{GetSourcePathWithSpanOpt, SearchPathRead, TableInfoWrite},
-        sem::{ColumnName, ParseContext, SchemaName},
+        StringSpan,
+        context::{
+            BaseParseContext, GetSourcePathWithSpanOpt, ParseContext, SearchPathRead,
+            TableInfoWrite,
+        },
+        sem::{ColumnName, SchemaName},
     };
     use std::path::Path;
 
@@ -1092,14 +1089,14 @@ mod test_freeze {
     }
 
     mod test_helpers {
-        use crate::test_helpers::{TestParseContext, source_span};
         use crate::{
-            context::SourceAccessService,
+            context::{FrozenBaseContext, ParseContext, SchemaFileContext, SourceAccessService},
             sem::{
                 AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint,
-                CreateTable, CreateTableMode, FrozenBaseContext, FullName, ParseContext,
-                PgBuiltInType, PrimaryKeyConstraint, SchemaFileContext, SchemaName, TableName,
+                CreateTable, CreateTableMode, FullName, PgBuiltInType, PrimaryKeyConstraint,
+                SchemaName, TableName,
             },
+            test_helpers::{TestParseContext, source_span},
         };
         use std::rc::{Rc, Weak};
 
@@ -1169,10 +1166,9 @@ mod test_freeze {
 
 #[cfg(test)]
 mod test_search_path {
-    use crate::context::BaseParseContext;
     use crate::{
-        context::SearchPathRead,
-        sem::{FullName, ParseContext, SchemaName},
+        context::{BaseParseContext, ParseContext, SearchPathRead},
+        sem::{FullName, SchemaName},
     };
     use std::path::Path;
 
@@ -1284,11 +1280,14 @@ mod test_search_path {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            FrozenBaseContext, FullName, FunctionOverloadCollection, OverloadVariant, ParseContext,
-            SchemaName, TypeDefinition, TypeReference,
+        use crate::{
+            context::{FrozenBaseContext, ParseContext},
+            sem::{
+                FullName, FunctionOverloadCollection, OverloadVariant, SchemaName, TypeDefinition,
+                TypeReference,
+            },
+            test_helpers::TestParseContext,
         };
-        use crate::test_helpers::TestParseContext;
 
         pub(super) fn search_path(schemas: &[&str]) -> Vec<SchemaName> {
             let mut names = Vec::new();

@@ -1,11 +1,9 @@
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{SequenceInfoRead, SequenceInfoWrite},
-    sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, FullName, ParseContext},
+    TrieMap,
+    context::{ParseContext, SequenceInfoRead, SequenceInfoWrite},
+    sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, FullName},
 };
-
-use crate::TrieMap;
-
-use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct SequenceInfoCollection(TrieMap<CreateSequence>);

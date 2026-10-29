@@ -1,6 +1,5 @@
-use crate::context::ParseContext;
 use crate::{
-    context::RuleInfoRead,
+    context::{ParseContext, RuleInfoRead},
     sem::{FullName, RuleIdentity},
 };
 
@@ -147,9 +146,10 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
 }
 
 mod test_helpers {
-    use crate::context::BaseParseContext;
-    use crate::sem::{FrozenBaseContext, SchemaFileContext};
-    use crate::sem::{FullName, RuleIdentity, TableName, ViewName};
+    use crate::{
+        context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
+        sem::{FullName, RuleIdentity, TableName, ViewName},
+    };
     pub(super) const CREATE_AUDIT: &str =
         "CREATE RULE audit AS ON INSERT TO item_view DO INSTEAD NOTHING";
     pub(super) fn identity() -> RuleIdentity {
@@ -201,8 +201,7 @@ mod test_helpers {
     }
     pub(super) mod heavy {
         use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
-        use crate::context::BaseContext;
-        use crate::context::ParseContext;
+        use crate::context::{BaseContext, ParseContext};
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.
         pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {

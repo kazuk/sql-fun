@@ -213,7 +213,7 @@ fn sqlite_row_images_do_not_expose_database_qualified_relations() -> testresult:
 
 mod test_helpers {
     pub(super) fn assert_problem_code(
-        context: &::sql_fun_sqlast::sem::SchemaFileContext,
+        context: &::sql_fun_sqlast::context::SchemaFileContext,
         code: &str,
     ) {
         for problem in context.problems() {
@@ -228,9 +228,8 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
-            context::BaseContext,
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
             parse_statements,
-            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::Path;
 

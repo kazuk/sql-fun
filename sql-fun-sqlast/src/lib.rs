@@ -35,13 +35,12 @@ pub use self::sql_file::SqlFileSnapshot;
 #[cfg(feature = "sqlite")]
 pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
 
-use std::{io::SeekFrom, path::Path, string::String as StdString};
-
 use crate::{
-    context::ParseContext,
-    sem::{FrozenBaseContext, SchemaFileContext, SemAst},
+    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
+    sem::SemAst,
     syn::ParseResult,
 };
+use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 pub use self::{
     parse_statements::{ParseStatementError, parse_statements},
@@ -233,9 +232,8 @@ mod test_schema_content_hash {
     }
 
     mod test_helpers {
-        pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
-            use crate::context::ParseContext;
-            use crate::sem::SchemaName;
+        pub(super) fn base_with_public_schema() -> crate::context::FrozenBaseContext {
+            use crate::{context::ParseContext, sem::SchemaName};
 
             let mut base = crate::test_helpers::TestParseContext::default();
             base.set_get_search_path_result(&[SchemaName::from("public")]);

@@ -1,17 +1,21 @@
-//! Shared catalog interfaces and services for SQL analysis.
+//! Catalog contexts, shared interfaces, and services for SQL analysis.
 
 mod base_context;
 mod base_parse_context;
 mod cast_info;
 mod conflict_info;
+mod conflict_masters;
 mod cursor_bindings;
 mod diagnostic;
+mod frozen_base_context;
 mod function_info;
 mod index_info;
 mod object_info;
 mod operator_info;
+pub(crate) mod ownership;
 mod ownership_info;
 mod rule_info;
+mod schema_file_context;
 mod search_path;
 mod sequence_info;
 mod source;
@@ -25,14 +29,17 @@ pub use self::base_context::{BaseContext, PgBuiltInFunctions, PgBuiltinCasts, Pg
 pub use self::base_parse_context::BaseParseContext;
 pub use self::cast_info::CastInfoRead;
 pub use self::conflict_info::ConflictInfoRead;
+pub(crate) use self::conflict_masters::ConflictMasters;
 pub(crate) use self::cursor_bindings::CursorBindings;
 pub use self::diagnostic::DiagnosticContext;
+pub use self::frozen_base_context::FrozenBaseContext;
 pub use self::function_info::{FunctionInfoRead, FunctionInfoWrite};
 pub use self::index_info::IndexInfoRead;
 pub use self::object_info::{ExtensionInfoRead, ObjectInfoRead};
 pub use self::operator_info::OperatorInfoRead;
 pub use self::ownership_info::{OwnershipInfoRead, RoleInfoRead};
 pub use self::rule_info::{RuleInfoRead, RuleInfoWrite};
+pub use self::schema_file_context::SchemaFileContext;
 pub use self::search_path::SearchPathRead;
 pub use self::sequence_info::{SequenceInfoRead, SequenceInfoWrite};
 pub use self::source::{
@@ -56,9 +63,9 @@ use crate::{
     sem::{
         AliasSpec, AlterIndex, AlterOwner, AnalysisError, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, DataSource, FrozenBaseContext, FullName, Kind,
-        OwnedObjectDefinition, Role, SchemaName, SemScalarExpr, TableName, VariableSet,
-        problem::CreationProblem, type_system::ArgumentBindingCollection,
+        CreateTable, CursorInfo, DataSource, FullName, Kind, OwnedObjectDefinition, Role,
+        SchemaName, SemScalarExpr, TableName, VariableSet, problem::CreationProblem,
+        type_system::ArgumentBindingCollection,
     },
 };
 
@@ -326,7 +333,7 @@ where
     /// Freezing consumes the builder; it cannot be reused afterwards:
     ///
     /// ```compile_fail
-    /// use ::sql_fun_sqlast::{context::ParseContext, sem::SchemaFileContext};
+    /// use ::sql_fun_sqlast::context::{ParseContext, SchemaFileContext};
     ///
     /// fn reuse_builder(mut builder: SchemaFileContext) {
     ///     let _frozen = builder.freeze();

@@ -457,12 +457,14 @@ mod test_build_op_all {
     }
 
     mod test_helpers {
-        use crate::context::BaseParseContext;
-        use crate::sem::{
-            CreateDomain, ParseContext, PgBuiltInType, SchemaFileContext, SchemaName,
-            TypeDefinition, TypeReference,
+        use crate::{
+            context::{BaseParseContext, SchemaFileContext},
+            sem::{
+                CreateDomain, ParseContext, PgBuiltInType, SchemaName, TypeDefinition,
+                TypeReference,
+            },
+            test_helpers::TestParseContext,
         };
-        use crate::test_helpers::TestParseContext;
 
         pub(super) fn context() -> TestParseContext {
             let mut context =

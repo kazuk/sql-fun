@@ -2,6 +2,7 @@
 //! test helper types
 
 pub(crate) mod collate;
+pub(crate) mod conflict_masters;
 pub(crate) mod ownership;
 mod syn_builder;
 mod test_parse_context;
@@ -196,9 +197,14 @@ pub fn small_stack_regression(stack_size: usize, operation: impl FnOnce() + Send
 /// The supplied base contributes catalog data only.
 pub(crate) fn schema_layer(
     path: &std::path::Path,
-    base: &crate::sem::FrozenBaseContext,
-) -> crate::sem::SchemaFileContext {
+    base: &crate::context::FrozenBaseContext,
+) -> crate::context::SchemaFileContext {
     use crate::context::BaseParseContext;
     let environment = TestParseContext::default();
-    crate::sem::SchemaFileContext::new(path, base, environment.get_args(), environment.metadata())
+    crate::context::SchemaFileContext::new(
+        path,
+        base,
+        environment.get_args(),
+        environment.metadata(),
+    )
 }

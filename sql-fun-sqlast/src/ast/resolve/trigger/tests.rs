@@ -631,14 +631,16 @@ fn postgres_cte_lookup_preserves_quoted_case(
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::context::BaseParseContext;
-    use crate::sem::{
-        AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode,
-        FrozenBaseContext, FullName, FunctionOverloadCollection, OverloadVariant, PgBuiltInType,
-        SchemaFileContext, SchemaName, TableName, TypeReference,
+    use crate::{
+        ast::Dialect,
+        context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
+        sem::{
+            AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, FullName,
+            FunctionOverloadCollection, OverloadVariant, PgBuiltInType, SchemaName, TableName,
+            TypeReference,
+        },
+        test_helpers::TestParseContext,
     };
-    use crate::test_helpers::TestParseContext;
 
     pub(super) fn bound_sources(
         query: &mut crate::sem::SelectStatement,

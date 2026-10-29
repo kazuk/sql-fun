@@ -3,11 +3,9 @@ mod test_helpers;
 
 #[cfg(feature = "sqlite")]
 use crate::context::ViewInfoRead;
-
-use crate::test_helpers::ownership::apply_ownership_sql;
 use crate::{
-    context::{GetSourcePathWithSpan, ObjectInfoRead, TableInfoRead, TypeInfoRead},
-    sem::ParseContext,
+    context::{GetSourcePathWithSpan, ObjectInfoRead, ParseContext, TableInfoRead, TypeInfoRead},
+    test_helpers::ownership::apply_ownership_sql,
 };
 
 #[rstest::rstest]
@@ -230,7 +228,7 @@ fn indexes_sequences_and_view_sources_follow_the_renamed_table() -> testresult::
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> testresult::TestResult {
-    use test_helpers::apply_sqlite;
+    use self::test_helpers::apply_sqlite;
     let context = apply_sqlite(
         test_helpers::sqlite_context(),
         "CREATE TABLE Before_Name(id INTEGER)",

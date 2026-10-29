@@ -1,11 +1,9 @@
 //! `PostgreSQL` common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::{
-    context::TypeInfoRead,
+    context::{ParseContext, TypeInfoRead},
     sem::{PgBuiltInType, TypeReference},
 };
-
 use std::collections::BTreeMap;
 
 #[rstest::rstest]
@@ -290,9 +288,8 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
-            context::BaseContext,
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
             parse_statements,
-            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::{Path, PathBuf};
 

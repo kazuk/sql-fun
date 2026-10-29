@@ -11,18 +11,15 @@ use self::test_helpers::{
 use self::test_helpers::{is_sqlite_syntax, load_sqlite};
 
 mod test_helpers {
-    use std::path::Path;
-
     use ::clap::Parser;
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
-    use ::sql_fun_sqlast::context::BaseParseContext;
     use ::sql_fun_sqlast::{
         ParseDumpFileError, ParsedSchemaDump, PostgresDialect,
-        context::BaseContext,
-        context::GetSourcePathWithSpanOpt,
-        sem::{AnalysisProblem, FrozenBaseContext, FullName, TableName, problem::NameResolution},
+        context::{BaseContext, BaseParseContext, FrozenBaseContext, GetSourcePathWithSpanOpt},
+        sem::{AnalysisProblem, FullName, TableName, problem::NameResolution},
     };
     use ::tempfile::NamedTempFile;
+    use std::path::Path;
 
     #[cfg(feature = "sqlite")]
     use ::sql_fun_sqlast::SqliteDialect;

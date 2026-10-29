@@ -1,9 +1,7 @@
 //! Existing type consumers retain catalog identity and extracted cast preference.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::context::BaseParseContext;
-use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::{
-    context::CastInfoRead,
+    context::{BaseParseContext, CastInfoRead, ParseContext},
     sem::{ColumnName, FullName, PgBuiltInType, TypeReference, ViewName},
 };
 
@@ -271,9 +269,8 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
-            context::BaseContext,
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
             parse_statements,
-            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::{Path, PathBuf};
 

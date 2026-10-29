@@ -1,15 +1,12 @@
-use crate::context::BaseParseContext;
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{TypeInfoRead, TypeInfoWrite},
+    TrieMap,
+    context::{BaseParseContext, TypeInfoRead, TypeInfoWrite},
     sem::{
         CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
         TypeReference,
     },
 };
-
-use crate::TrieMap;
-
-use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
     fn type_references(&self) -> Vec<TypeReference> {

@@ -29,9 +29,9 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Default)]
 pub struct TestParseContext {
     rules: HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
-    ownership: crate::sem::ownership::OwnershipCatalog,
+    ownership: crate::context::ownership::OwnershipCatalog,
     triggers: HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
-    masters: Option<crate::sem::ConflictMasters>,
+    masters: Option<crate::context::ConflictMasters>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
     expected_conflict_target: Option<TableName>,
@@ -668,12 +668,12 @@ impl ParseContext for TestParseContext {
         self.parameter_constraints = constraints.clone();
     }
 
-    fn freeze(mut self) -> crate::sem::FrozenBaseContext {
+    fn freeze(mut self) -> crate::context::FrozenBaseContext {
         self.problems.clear();
         self.parameter_constraints = crate::sem::ParameterConstraints::default();
         self.parameter_type_hints = Default::default();
         self.report_failure_after = None;
-        crate::sem::FrozenBaseContext::new(self)
+        crate::context::FrozenBaseContext::new(self)
     }
 
     fn set_search_path(&mut self, search_path: &[SchemaName]) {

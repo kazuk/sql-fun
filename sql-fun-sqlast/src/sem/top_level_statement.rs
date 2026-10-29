@@ -173,17 +173,14 @@ impl SemAst {
 mod tests {
     use crate::{
         AstAndContextPair, PostgresDialect,
-        context::BaseContext,
-        context::MutSourcePathWithSpan,
-        sem::{FrozenBaseContext, SchemaFileContext, SourcePathWithSpan},
+        context::{BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext},
+        sem::SourcePathWithSpan,
         test_helpers::source_span,
         tests::context_args,
     };
-
-    use std::path::Path;
-
     use ::sql_fun_core::SqlFunArgs;
     use ::testresult::TestResult;
+    use std::path::Path;
 
     #[rstest::rstest]
     #[case(r#"create table users ( id bigserial not null primary key, name varchar )"#)]

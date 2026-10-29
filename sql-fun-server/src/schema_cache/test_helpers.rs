@@ -270,11 +270,11 @@ impl SuspendedRoot {
 impl SchemaProject {
     pub(crate) fn analysis_context_over(
         &self,
-        base: &::sql_fun_sqlast::sem::FrozenBaseContext,
+        base: &::sql_fun_sqlast::context::FrozenBaseContext,
         datasource: &str,
-    ) -> ::sql_fun_sqlast::sem::SchemaFileContext {
+    ) -> ::sql_fun_sqlast::context::SchemaFileContext {
         let (args, metadata) = self.analysis_inputs(datasource);
-        ::sql_fun_sqlast::sem::SchemaFileContext::new(
+        ::sql_fun_sqlast::context::SchemaFileContext::new(
             &self.home().join("query.sql"),
             base,
             &args,
@@ -287,12 +287,12 @@ impl SchemaProject {
     pub(crate) fn analysis_context(
         &self,
         datasource: &str,
-    ) -> ::sql_fun_sqlast::sem::SchemaFileContext {
+    ) -> ::sql_fun_sqlast::context::SchemaFileContext {
         let (args, metadata) = self.analysis_inputs(datasource);
         let base = ::sql_fun_sqlast::context::BaseContext::new(&args, &metadata).unwrap();
-        ::sql_fun_sqlast::sem::SchemaFileContext::new(
+        ::sql_fun_sqlast::context::SchemaFileContext::new(
             &self.home().join("query.sql"),
-            &::sql_fun_sqlast::sem::FrozenBaseContext::from(base),
+            &::sql_fun_sqlast::context::FrozenBaseContext::from(base),
             &args,
             &metadata,
         )
@@ -328,9 +328,9 @@ impl SchemaProject {
     }
 
     pub(super) fn apply_sql(
-        context: ::sql_fun_sqlast::sem::SchemaFileContext,
+        context: ::sql_fun_sqlast::context::SchemaFileContext,
         sql: &str,
-    ) -> ::sql_fun_sqlast::AstAndContextPair<::sql_fun_sqlast::sem::SchemaFileContext> {
+    ) -> ::sql_fun_sqlast::AstAndContextPair<::sql_fun_sqlast::context::SchemaFileContext> {
         use ::sql_fun_sqlast::{
             context::MutSourcePathWithSpan,
             sem::{SemAst, SourcePathWithSpan},

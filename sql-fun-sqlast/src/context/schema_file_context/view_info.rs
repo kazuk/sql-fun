@@ -1,15 +1,12 @@
+use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{ViewInfoRead, ViewInfoWrite},
+    TrieMap,
+    context::{ParseContext, ViewInfoRead, ViewInfoWrite},
     sem::{
-        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, FullName,
-        ParseContext, ViewLike,
+        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, FullName, ViewLike,
     },
     syn::ObjectType,
 };
-
-use crate::TrieMap;
-
-use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct ViewInformationCollection(TrieMap<ViewLike>, Vec<FullName>);

@@ -1,13 +1,11 @@
 //! View-write semantics using the maintained sql-fun-home catalogs.
 //! All cases run in the standard workspace flow.
 use ::sql_fun_sqlast::context::RuleInfoRead;
-use sql_fun_core::analysis_problem::InsertProblemKind;
-use sql_fun_core::analysis_problem::UpdateProblemKind;
-use sql_fun_sqlast::context::BaseParseContext;
-use sql_fun_sqlast::context::ParseContext;
-use sql_fun_sqlast::sem::RuleIdentity;
-use sql_fun_sqlast::sem::ViewName;
-use sql_fun_sqlast::sem::ViewWriteEvaluation;
+use sql_fun_core::analysis_problem::{InsertProblemKind, UpdateProblemKind};
+use sql_fun_sqlast::{
+    context::{BaseParseContext, ParseContext},
+    sem::{RuleIdentity, ViewName, ViewWriteEvaluation},
+};
 
 mod test_helpers {
     pub mod heavy {
@@ -15,8 +13,8 @@ mod test_helpers {
         use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
         use ::sql_fun_sqlast::{
             ParsedSchemaDump, PostgresDialect,
-            context::BaseContext,
-            sem::{FrozenBaseContext, SchemaFileContext, SemAst},
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
+            sem::SemAst,
         };
         use sql_fun_sqlast::context::ParseContext;
         use std::path::Path;

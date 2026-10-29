@@ -1,7 +1,9 @@
 //! COALESCE inference through the public semantic-analysis boundary.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::context::ParseContext;
-use ::sql_fun_sqlast::sem::{PgBuiltInType, TypeReference};
+use ::sql_fun_sqlast::{
+    context::ParseContext,
+    sem::{PgBuiltInType, TypeReference},
+};
 use std::collections::BTreeMap;
 
 // Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
@@ -135,9 +137,8 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
-            context::BaseContext,
+            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
             parse_statements,
-            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::{Path, PathBuf};
 

@@ -1,7 +1,9 @@
 //! Domain coercions retain nominal results through the public analysis boundary.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::context::ParseContext;
-use ::sql_fun_sqlast::sem::{PgBuiltInType, TypeReference};
+use ::sql_fun_sqlast::{
+    context::ParseContext,
+    sem::{PgBuiltInType, TypeReference},
+};
 use std::collections::BTreeMap;
 
 #[rstest::rstest]
@@ -147,10 +149,8 @@ mod test_helpers {
         use ::sql_fun_sqlast::{
             AstAndContextPair,
             ast::Dialect,
-            context::BaseContext,
-            context::ParseContext,
+            context::{BaseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
             parse_statements,
-            sem::{FrozenBaseContext, SchemaFileContext},
         };
         use std::path::{Path, PathBuf};
 

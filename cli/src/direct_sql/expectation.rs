@@ -112,7 +112,7 @@ impl Expectation {
             Ok(vec![Self::parse(value)?])
         }
     }
-    fn parse(value: Value) -> Result<Self, ::anyhow::Error> {
+    pub(super) fn parse(value: Value) -> Result<Self, ::anyhow::Error> {
         if value.is_array() {
             Ok(Self {
                 diagnostics: ::serde_json::from_value(value)?,

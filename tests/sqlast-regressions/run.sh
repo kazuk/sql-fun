@@ -43,11 +43,6 @@ for ((attempt = 0; attempt < 200; attempt++)); do
 done
 test -s "$runtime/sql-fun-server.pid" || { echo 'Server readiness timed out' >&2; exit 1; }
 
-# Keep fixture cases together on disk; adapt only at the existing CLI boundary.
-project_cases() {
-  jq '{sql: map(.sql), expected: map(.expected)}' "$1" >"$2"
-}
-
 # Every manifest row is explicit. Counts guard against accidental omission/empty runs.
 total=0
 failed=0
@@ -68,19 +63,12 @@ while IFS=$'\t' read -r fixture level schema count versions; do
   [[ -z "${selected_fixtures[$fixture]+x}" ]] || { echo "Duplicate fixture: $fixture" >&2; exit 1; }
   selected_fixtures["$fixture"]=1
   file="$suite/$fixture.json"
-  if ! jq -e --argjson count "$count" '
-    type == "array" and length == $count and
-    all(.[]; type == "object" and
-      (.name | type == "string" and length > 0) and
-      (.sql | type == "string" and length > 0) and
-      (.expected | type == "object")) and
-    (map(.name) | unique | length) == $count
-  ' "$file" >/dev/null; then
-    echo "Invalid cases in $file: expected $count objects with unique nonempty names, SQL strings and expectation objects" >&2
+  # Case shape, names and expectations are validated by the product CLI.
+  # The manifest owns the independently declared expected suite size.
+  if ! jq -e --argjson count "$count" 'type == "array" and length == $count' "$file" >/dev/null; then
+    echo "Invalid case count in $file: expected $count" >&2
     exit 1
   fi
-  projected="$runtime/$fixture.json"
-  project_cases "$file" "$projected"
   IFS=, read -ra selected_versions <<< "$versions"
   for version in "${selected_versions[@]}"; do
     [[ "$version" == 17 || "$version" == 18 ]] || exit 1
@@ -104,15 +92,13 @@ METADATA
     args=(--term-color never --metadata-file "$metadata" --datasource regression)
     if [[ "$schema" != - ]]; then args+=(--schema-file "$suite/$schema"); fi
     echo "== $fixture PostgreSQL $version ($level), expected $count cases; catalog $SQL_FUN_HOME/postgres/$version"
-    jq -r 'to_entries[] | "  [\(.key)] \(.value.name)"' "$file" \
-      >"$reports/$fixture-$version.log"
     rm -f "$reports/$fixture-$version.xml"
     status=0
     group_failed=0
     # Measure only the product invocation; parsing reports and setup are outside.
-    { time "$SQL_FUN_BIN" "${args[@]}" test "$projected#$.sql" --expect "$projected#$.expected" \
+    { time "$SQL_FUN_BIN" "${args[@]}" test "$file" \
         --schema-level "$level" --junit-xml "$reports/$fixture-$version.xml" \
-        >>"$reports/$fixture-$version.log" 2>&1;
+        >"$reports/$fixture-$version.log" 2>&1;
     } 2>"$runtime/test-seconds" || status=$?
     elapsed=$(<"$runtime/test-seconds")
     test_seconds=$(jq -n --argjson total "$test_seconds" --argjson elapsed "$elapsed" '($total + $elapsed) * 1000 | round / 1000')
@@ -150,10 +136,10 @@ done
 # Keep expected-failure XML apart from positive JUnit reports consumed by CI.
 mkdir -p "$reports/controls"
 jq '. + [.[0]] |
+    .[2].name = "independent-later-pass" |
     .[0].expected.columns[0].name = "intentionally_wrong" |
     .[1].expected.diagnostics = ["intentionally_missing"]' \
   "$suite/pilot.json" >"$runtime/negative-cases.json"
-project_cases "$runtime/negative-cases.json" "$runtime/negative.json"
 for version in "${!checked_versions[@]}"; do
   control="$reports/controls/negative-$version"
   rm -f "$control.xml"
@@ -161,16 +147,15 @@ for version in "${!checked_versions[@]}"; do
   echo "The next 2 FAIL results are intentional; exit 1 and a later PASS are required."
   status=0
   "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
-    --datasource regression test "$runtime/negative.json#$.sql" \
-    --expect "$runtime/negative.json#$.expected" --schema-level builtin \
+    --datasource regression test "$runtime/negative-cases.json" --schema-level builtin \
     --junit-xml "$control.xml" >"$control.log" 2>&1 || status=$?
   cat "$control.log"
   [[ "$status" == 1 ]] || { echo "Negative control returned $status, expected 1" >&2; exit 1; }
   for evidence in 'tests="3" failures="2" errors="0"' '<testcase' ; do
     grep -F "$evidence" "$control.xml" >/dev/null
   done
-  for evidence in "FAIL $runtime/negative.json#$.sql[0]" \
-    "FAIL $runtime/negative.json#$.sql[1]" "PASS $runtime/negative.json#$.sql[2]" \
+  for evidence in "FAIL $runtime/negative-cases.json::$(jq -r '.[0].name' "$runtime/negative-cases.json")" \
+    "FAIL $runtime/negative-cases.json::$(jq -r '.[1].name' "$runtime/negative-cases.json")" "PASS $runtime/negative-cases.json::independent-later-pass" \
     '  column 0:' '    expected:' '    actual:' '    missing:' '    unexpected:' \
     '3 cases: 1 passed, 2 failed or errored'; do
     grep -Fx "$evidence" "$control.log" >/dev/null
@@ -178,14 +163,12 @@ for version in "${!checked_versions[@]}"; do
   # Invalid selection is a command error, never a successful empty test run.
   status=0
   "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
-    --datasource regression test "$runtime/pilot.json#$.nonexistent" \
-    --expect "$runtime/pilot.json#$.expected" --schema-level builtin \
+    --datasource regression test "$suite/pilot.json#$.nonexistent" --schema-level builtin \
     >"$reports/controls/invalid-$version.log" 2>&1 || status=$?
   [[ "$status" != 0 ]] || { echo 'Invalid selection unexpectedly succeeded' >&2; exit 1; }
   status=0
   "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
-    --datasource nonexistent test "$runtime/pilot.json#$.sql" \
-    --expect "$runtime/pilot.json#$.expected" --schema-level builtin \
+    --datasource nonexistent test "$suite/pilot.json" --schema-level builtin \
     >"$reports/controls/datasource-$version.log" 2>&1 || status=$?
   [[ "$status" == 1 ]] || { echo "Missing datasource returned $status, expected 1" >&2; exit 1; }
   if grep -q '^PASS ' "$reports/controls/datasource-$version.log"; then

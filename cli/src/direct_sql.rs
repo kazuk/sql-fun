@@ -2,8 +2,9 @@ mod expectation;
 mod input;
 mod report;
 mod results;
+mod test_input;
 
-use self::{expectation::Expectation, input::SqlInputs, report::Case};
+use self::{expectation::Expectation, input::SqlInputs, report::Case, test_input::TestInputs};
 use crate::analysis::{initialization, prepare_diagnostics, prepare_tokens, request_typed};
 use std::{path::PathBuf, process::ExitCode, time::Instant};
 
@@ -25,16 +26,18 @@ pub struct AnalyzeArgs {
 pub struct TestArgs {
     #[command(flatten)]
     input: InputArgs,
-    /// Structured expectation file, optionally followed by `#JSONPath`.
+    /// Legacy SQL expectations, optionally followed by `#JSONPath`.
+    /// Without this option, INPUT is a JSON/TOML/YAML named case array,
+    /// optionally followed by `#JSONPath`.
     #[arg(long)]
-    expect: String,
+    expect: Option<String>,
     /// Write one `JUnit` testcase per selected SQL input to this file.
     #[arg(long)]
     junit_xml: Option<PathBuf>,
 }
 #[derive(Debug, Clone, clap::Args)]
 struct InputArgs {
-    /// SQL filename, or JSON/TOML/YAML filename followed by `#JSONPath`.
+    /// Input filename or structured selection (`filename#JSONPath`).
     input: String,
     /// Cumulative schema prefix to load. Excluded SQL files are never accessed.
     #[arg(long, value_enum, default_value = "project")]
@@ -49,9 +52,14 @@ impl AnalyzeArgs {
 }
 impl TestArgs {
     pub(crate) async fn execute(&self, args: &SqlFunArgs) -> Result<ExitCode, ::anyhow::Error> {
-        let inputs = SqlInputs::load(&self.input.input)?;
-        let expectations = Expectation::load(&self.expect, &inputs)?;
-        let cases = execute(args, self.input.schema_level, &inputs, Some(&expectations)).await;
+        let inputs = TestInputs::load(&self.input.input, self.expect.as_deref())?;
+        let cases = execute(
+            args,
+            self.input.schema_level,
+            inputs.sql(),
+            Some(inputs.expectations()),
+        )
+        .await;
         finish(&cases, self.junit_xml.as_deref(), true)
     }
 }
@@ -156,7 +164,7 @@ async fn execute_session(
                     writeln!(
                         std::io::stderr().lock(),
                         "{} (statement {statement})\n{}",
-                        inputs.identity(index),
+                        inputs.diagnostic_identity(index),
                         prepared.render(diagnostic, &renderer)?
                     )?;
                 }

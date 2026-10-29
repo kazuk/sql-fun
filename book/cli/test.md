@@ -2,9 +2,64 @@
 
 `sql-fun test` checks diagnostic-code sets and statically analyzed result columns.
 It supports both SQLAST regressions and application query-interface tests without
-executing queries or connecting to a live database. It uses the same input syntax,
-explicit datasource selection, schema levels, and server prerequisites as
+executing queries or connecting to a live database. It uses the same explicit
+datasource selection, schema levels, and server prerequisites as
 [`sql-fun analyze`](analyze.md), and never creates or validates Rust query lockfiles.
+Its legacy SQL-source form also uses the same input syntax as `analyze`.
+
+## Named case arrays
+
+Pass a JSON, TOML, or YAML case array without `--expect` to keep each SQL input
+and its expected contract together:
+
+```sh
+sql-fun --metadata-file Cargo.toml --datasource app \
+  test cases.json --junit-xml target/sql-fun-test/junit.xml
+```
+
+For example, `cases.json` can assert a literal's result columns:
+
+```json
+[
+  {
+    "name": "select-literal",
+    "sql": "SELECT 1 AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]
+```
+
+The document root must be a nonempty case array. An optional `#JSONPath` can
+select an array inside a structured document, for example
+`'cases.toml#$.tests'`; it must match exactly one node. Each case requires a
+nonempty string `name`, a string `sql`, and an `expected` contract using the
+[expectation rules below](#expectations), including diagnostic-array shorthand.
+Names must be unique within the selected array, using exact, case-sensitive
+comparison. Names are preserved without trimming. Unknown fields and malformed
+cases are input errors. All cases are validated before analysis or server
+connection begins. SQL text retains its existing semantics: zero or multiple
+statement results fail the assertion.
+
+Without `--expect`, only the case-array form is accepted. With `--expect`, the
+input is a legacy SQL source and the separate expectation source is required;
+case objects are not accepted as SQL strings.
+
+## SQL sources with separate expectations
+
+The existing SQL-source interface remains available:
 
 ```sh
 sql-fun --metadata-file Cargo.toml --datasource app \
@@ -98,8 +153,11 @@ nullability. It does not verify database contents or execute query effects.
 
 ## Reports and exit status
 
-Console output identifies each input by source/selector and array index, shows
-assertion differences or execution errors, and prints a final case count.
+Console output identifies named cases as `<source-or-selector>::<case-name>`.
+SQL diagnostic context also includes the case's zero-based array index, for
+example `cases.json[0]::select-literal`. Legacy SQL sources retain their
+source/selector and array-index identities. Output shows assertion differences
+or execution errors and prints a final case count.
 Independent cases continue after assertion failures and attributable API errors.
 
 `--junit-xml <PATH>` writes one testcase per selected SQL input, creates parent
@@ -107,11 +165,12 @@ directories, and produces a complete report even when cases fail. Matching cases
 pass; diagnostic, column, and statement-result-count mismatches are `failure`
 elements. Attributable setup/API/transport/internal failures are `error` elements.
 Invalid input before cases can be enumerated is a command-level error and does not
-create invented testcases. Testcase identities depend on the supplied source,
-selector, and array index. XML 1.0-disallowed characters in report text are replaced
-with the Unicode replacement character. The report supports JUnit consumers such
-as the repository's existing GitHub Actions test reporter. No report file is
-accessed when the option is absent.
+create invented testcases. Named JUnit testcase identities use the supplied
+source/selector and case name; legacy testcase identities retain the supplied
+source, selector, and array index. XML 1.0-disallowed characters in report text
+are replaced with the Unicode replacement character. The report supports JUnit
+consumers such as the repository's existing GitHub Actions test reporter. No
+report file is accessed when the option is absent.
 
 Exit status is 0 only when every case passes, 1 for assertion or execution errors
 (including report-write failure), and 2 for invalid CLI usage. Producing a JUnit

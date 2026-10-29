@@ -7,6 +7,7 @@ pub(super) struct SqlInputs {
     source: String,
     queries: Vec<String>,
     array: bool,
+    names: Vec<String>,
 }
 impl SqlInputs {
     pub(super) fn load(reference: &str) -> Result<Self, ::anyhow::Error> {
@@ -25,7 +26,20 @@ impl SqlInputs {
             source: reference.to_owned(),
             queries,
             array,
+            names: Vec::new(),
         })
+    }
+    pub(super) fn named(reference: &str) -> Self {
+        Self {
+            source: reference.to_owned(),
+            queries: Vec::new(),
+            array: true,
+            names: Vec::new(),
+        }
+    }
+    pub(super) fn push_named(&mut self, name: &str, sql: &str) {
+        self.names.push(name.to_owned());
+        self.queries.push(sql.to_owned());
     }
     fn selected_queries(value: &Value) -> Result<(Vec<String>, bool), ::anyhow::Error> {
         if let Some(sql) = value.as_str() {
@@ -53,11 +67,66 @@ impl SqlInputs {
         &self.queries
     }
     pub(super) fn identity(&self, index: usize) -> String {
-        if self.array {
+        if let Some(name) = self.names.get(index) {
+            format!("{}::{name}", self.source)
+        } else if self.array {
             format!("{}[{index}]", self.source)
         } else {
             self.source.clone()
         }
+    }
+    pub(super) fn diagnostic_identity(&self, index: usize) -> String {
+        if let Some(name) = self.names.get(index) {
+            format!("{}[{index}]::{name}", self.source)
+        } else {
+            self.identity(index)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SqlInputs;
+
+    #[rstest::rstest]
+    #[case::scalar(r#""SELECT 1""#, true)]
+    #[case::array(r#"["SELECT 1", "SELECT 2"]"#, true)]
+    #[case::empty("[]", false)]
+    #[case::mixed(r#"["SELECT 1", 2]"#, false)]
+    #[case::object("{}", false)]
+    fn selected_input_contract(#[case] value: &str, #[case] valid: bool) {
+        assert_eq!(
+            SqlInputs::selected_queries(&::serde_json::from_str(value).unwrap()).is_ok(),
+            valid
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_selection {
+    use super::SqlInputs;
+    use crate::test_helpers::direct_sql::StructuredFile;
+    #[rstest::rstest]
+    fn formats_preserve_scalar_and_array_identity(
+        #[values("json", "toml", "yaml")] format: &str,
+    ) -> ::testresult::TestResult {
+        let file = StructuredFile::sql(format)?;
+        let array = SqlInputs::load(&file.selection("$.queries"))?;
+        assert!(array.is_array());
+        assert_eq!(array.queries(), ["SELECT 1", "SELECT 2"]);
+        let scalar = SqlInputs::load(&file.selection("$.scalar"))?;
+        assert!(!scalar.is_array());
+        assert_eq!(scalar.queries(), ["SELECT 3"]);
+        Ok(())
+    }
+    #[rstest::rstest]
+    #[case::absent("$.absent")]
+    #[case::multiple("$.queries[*]")]
+    #[case::invalid("$[")]
+    fn invalid_selectors_are_not_flattened(#[case] selector: &str) -> ::testresult::TestResult {
+        let file = StructuredFile::sql("json")?;
+        assert!(SqlInputs::load(&file.selection(selector)).is_err());
+        Ok(())
     }
 }
 
@@ -90,52 +159,5 @@ pub(super) fn load_value(reference: &str) -> Result<Value, ::anyhow::Error> {
             .clone())
     } else {
         Ok(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::SqlInputs;
-
-    #[rstest::rstest]
-    #[case::scalar(r#""SELECT 1""#, true)]
-    #[case::array(r#"["SELECT 1", "SELECT 2"]"#, true)]
-    #[case::empty("[]", false)]
-    #[case::mixed(r#"["SELECT 1", 2]"#, false)]
-    #[case::object("{}", false)]
-    fn selected_input_contract(#[case] value: &str, #[case] valid: bool) {
-        assert_eq!(
-            SqlInputs::selected_queries(&::serde_json::from_str(value).unwrap()).is_ok(),
-            valid
-        );
-    }
-}
-
-#[cfg(test)]
-mod test_helpers;
-#[cfg(test)]
-mod test_selection {
-    use super::{SqlInputs, test_helpers::StructuredFile};
-    #[rstest::rstest]
-    fn formats_preserve_scalar_and_array_identity(
-        #[values("json", "toml", "yaml")] format: &str,
-    ) -> ::testresult::TestResult {
-        let file = StructuredFile::new(format)?;
-        let array = SqlInputs::load(&file.selection("$.queries"))?;
-        assert!(array.is_array());
-        assert_eq!(array.queries(), ["SELECT 1", "SELECT 2"]);
-        let scalar = SqlInputs::load(&file.selection("$.scalar"))?;
-        assert!(!scalar.is_array());
-        assert_eq!(scalar.queries(), ["SELECT 3"]);
-        Ok(())
-    }
-    #[rstest::rstest]
-    #[case::absent("$.absent")]
-    #[case::multiple("$.queries[*]")]
-    #[case::invalid("$[")]
-    fn invalid_selectors_are_not_flattened(#[case] selector: &str) -> ::testresult::TestResult {
-        let file = StructuredFile::new("json")?;
-        assert!(SqlInputs::load(&file.selection(selector)).is_err());
-        Ok(())
     }
 }

@@ -166,55 +166,6 @@ fn deferred_star_validates_final_query_width(
     Ok(())
 }
 
-#[rstest::rstest]
-fn custom_comparison_nullability_is_conservative(
-    #[values(true, false)] strict: bool,
-) -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
-    context.setup_type(PgBuiltInType::int4());
-    context.setup_binary("=", "int4", "int4", "bool", strict);
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate = SemScalarExpr::membership(super::MembershipExpr::list(
-        &mut context,
-        &value,
-        std::slice::from_ref(&value),
-        false,
-    )?);
-    assert_eq!(predicate.is_not_null(), None);
-    Ok(())
-}
-
-#[test]
-fn non_boolean_comparison_is_rejected_and_retained() -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
-    context.setup_type(PgBuiltInType::int4());
-    context.setup_binary("=", "int4", "int4", "int4", true);
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate =
-        super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
-    assert!(context.has_reported_problem("membership_comparison_result"));
-    assert_eq!(predicate.types().admissible_types(), Some(&[][..]));
-    assert!(predicate.binding().unwrap().resolution().is_resolved());
-    assert_eq!(
-        predicate.comparisons()[0].expression().unwrap().get_type(),
-        Some(PgBuiltInType::int4())
-    );
-    Ok(())
-}
-
-#[test]
-fn missing_comparison_retains_failed_binding() -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
-    context.setup_type(PgBuiltInType::int4());
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate =
-        super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
-    assert!(context.has_reported_problem("undefined_operator"));
-    assert!(!predicate.binding().unwrap().resolution().is_resolved());
-    assert_eq!(predicate.comparisons().len(), 1);
-    Ok(())
-}
-
 #[test]
 fn rejection_does_not_stop_following_statement() -> testresult::TestResult {
     let mut context = context();

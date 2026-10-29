@@ -3,9 +3,10 @@ use crate::sem::parameter_resolution::ParameterResolution;
 use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::sem::traversal::SemanticVisitor;
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr, OperatorName,
-    ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SelectStatement,
-    SemScalarExpr, TypeReference, problem::MembershipProblem,
+    AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
+    MinMaxExpr, OperatorDefinition, OperatorName, ParameterConstraints, ParseContext,
+    PgBuiltInType, ResolvedOperator, SelectStatement, SemScalarExpr, TypeReference,
+    problem::MembershipProblem,
 };
 
 /// An analyzed IN/NOT IN predicate. Operands retain their bindings independently
@@ -15,13 +16,34 @@ pub struct MembershipExpr {
     left: SemScalarExpr,
     right: MembershipOperands,
     negated: bool,
-    binding: Option<ResolvedOperator>,
+    binding: Option<MembershipOperator>,
     comparisons: Vec<MembershipComparison>,
     types: InputTypeConstraint,
     invalid: bool,
     comparison_not_null: Option<bool>,
     #[serde(skip)]
     node: Option<usize>,
+}
+
+// Keep processing-specific candidate storage on membership, without changing
+// the shared operator binding model or repeating lookup in later visitors.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+struct MembershipOperator {
+    binding: ResolvedOperator,
+    candidates: Option<Vec<BinaryOperatorDefinition>>,
+}
+impl MembershipOperator {
+    fn resolve(context: &impl ParseContext, name: &OperatorName) -> Self {
+        let definition = context.get_operator_op(name, true, true);
+        let candidates = match definition {
+            Some(OperatorDefinition::Binary(candidates)) => Some(candidates.clone()),
+            _ => None,
+        };
+        Self {
+            binding: ResolvedOperator::from_definition(context, name, definition),
+            candidates,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -114,18 +136,19 @@ impl MembershipComparison {
         context: &mut impl ParseContext,
         left: &SemScalarExpr,
         right: &SemScalarExpr,
-        binding: Option<&ResolvedOperator>,
+        operator: Option<&MembershipOperator>,
         name: &OperatorName,
         mut parameters: Option<&mut ParameterResolution>,
     ) -> Result<Self, AnalysisError> {
-        let (mut left, mut right) = if binding.is_some() {
+        let (mut left, mut right) = if operator.is_some() {
             SemScalarExpr::comparison_literal_operands(context, left.clone(), right.clone())
         } else {
             (left.clone(), right.clone())
         };
-        let expression = if let Some(binding) = binding {
+        let expression = if let Some(operator) = operator {
+            let binding = &operator.binding;
             if !binding.resolution().is_resolved() {
-                Some(Self::bound(context, name, binding, &left, &right)?)
+                Some(Self::bound(context, name, operator, &left, &right)?)
             } else if let Some(parameters) = parameters.as_mut() {
                 // A literal paired with an unresolved parameter gets its SQL
                 // target from the comparison, not the literal's display type.
@@ -145,12 +168,12 @@ impl MembershipComparison {
                     result.retain_operator_binding(binding);
                     Some(result)
                 } else {
-                    Some(Self::bound(context, name, binding, &left, &right)?)
+                    Some(Self::bound(context, name, operator, &left, &right)?)
                 }
             } else if left.requires_argument_type() || right.requires_argument_type() {
                 None
             } else {
-                Some(Self::bound(context, name, binding, &left, &right)?)
+                Some(Self::bound(context, name, operator, &left, &right)?)
             }
         } else {
             parameters.map(|parameters| {
@@ -175,13 +198,29 @@ impl MembershipComparison {
     fn bound(
         context: &mut impl ParseContext,
         name: &OperatorName,
-        binding: &ResolvedOperator,
+        operator: &MembershipOperator,
         left: &SemScalarExpr,
         right: &SemScalarExpr,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let mut value =
-            ArithExpr::build_op(context, name, Some(left.clone()), Some(right.clone()))?.0;
-        value.set_operator_binding(binding.clone());
+        let mut value = if let Some(candidates) = &operator.candidates {
+            ArithExpr::build_binary_op_resolved(
+                context,
+                name,
+                left.clone(),
+                right.clone(),
+                OperatorDefinition::binary(candidates),
+            )?
+            .0
+        } else {
+            super::arith_expr::UndefinedOperatorCallSite::undefined_operator_resolved(
+                context,
+                name,
+                Some(left.clone()),
+                Some(right.clone()),
+            )?
+            .0
+        };
+        value.set_operator_binding(operator.binding.clone());
         Ok(value)
     }
     fn inputs_not_null(&self) -> bool {
@@ -231,7 +270,7 @@ impl MembershipExpr {
     ) -> Self {
         let name = OperatorName::from_parts(None, if negated { "<>" } else { "=" });
         let binding = if context.dialect() == Dialect::postgres() {
-            Some(ResolvedOperator::resolve_comparison(context, &name))
+            Some(MembershipOperator::resolve(context, &name))
         } else {
             None
         };
@@ -303,7 +342,10 @@ impl MembershipExpr {
     }
     /// Completed operator-name lookup, absent for SQLite's builtin comparison.
     pub const fn binding(&self) -> Option<&ResolvedOperator> {
-        self.binding.as_ref()
+        match &self.binding {
+            Some(operator) => Some(&operator.binding),
+            None => None,
+        }
     }
     /// Scalar comparisons, ordered by RHS operand and row-field position.
     pub fn comparisons(&self) -> &[MembershipComparison] {
@@ -478,7 +520,7 @@ impl MembershipExpr {
         if self
             .binding
             .as_ref()
-            .is_some_and(|binding| !binding.resolution().is_resolved())
+            .is_some_and(|operator| !operator.binding.resolution().is_resolved())
             || (self.binding.is_some()
                 && comparison
                     .expression
@@ -551,10 +593,96 @@ impl MembershipExpr {
         self.node = None;
         self.comparisons.clear();
         if let Some(binding) = &mut self.binding {
-            binding.canonicalize_grouping_key();
+            binding.binding.canonicalize_grouping_key();
+            binding.candidates = None;
         }
     }
 }
+#[cfg(test)]
+mod construction_tests {
+    use crate::sem::{PgBuiltInType, SemScalarExpr};
+
+    #[rstest::rstest]
+    fn custom_comparison_nullability_is_conservative(
+        #[values(true, false)] strict: bool,
+    ) -> testresult::TestResult {
+        let mut context = crate::test_helpers::TestParseContext::default();
+        context.setup_type(PgBuiltInType::int4());
+        context.setup_binary("=", "int4", "int4", "bool", strict);
+        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let predicate = SemScalarExpr::membership(super::MembershipExpr::list(
+            &mut context,
+            &value,
+            std::slice::from_ref(&value),
+            false,
+        )?);
+        assert_eq!(predicate.is_not_null(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn non_boolean_comparison_is_rejected_and_retained() -> testresult::TestResult {
+        let mut context = crate::test_helpers::TestParseContext::default();
+        context.setup_type(PgBuiltInType::int4());
+        context.setup_binary("=", "int4", "int4", "int4", true);
+        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let predicate =
+            super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
+        assert!(context.has_reported_problem("membership_comparison_result"));
+        assert_eq!(predicate.types().admissible_types(), Some(&[][..]));
+        assert!(predicate.binding().unwrap().resolution().is_resolved());
+        assert_eq!(
+            predicate.comparisons()[0].expression().unwrap().get_type(),
+            Some(PgBuiltInType::int4())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn missing_comparison_retains_failed_binding() -> testresult::TestResult {
+        let mut context = crate::test_helpers::TestParseContext::default();
+        context.setup_type(PgBuiltInType::int4());
+        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let predicate =
+            super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
+        assert!(context.has_reported_problem("undefined_operator"));
+        assert!(!predicate.binding().unwrap().resolution().is_resolved());
+        assert_eq!(predicate.comparisons().len(), 1);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn preserves_operator_candidates_after_catalog_changes(
+        #[values(true, false)] remove: bool,
+    ) -> testresult::TestResult {
+        let mut context = crate::test_helpers::TestParseContext::default();
+        context.setup_type(PgBuiltInType::int4());
+        context.setup_binary("=", "int4", "int4", "bool", true);
+        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let mut predicate =
+            super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
+        if remove {
+            context.set_get_operator_op_result(
+                &crate::sem::OperatorName::from_parts(None, "="),
+                true,
+                true,
+                None,
+            );
+        } else {
+            context.setup_binary("=", "int4", "int4", "int4", true);
+        }
+        predicate.analyze(&mut context, None)?;
+        assert_eq!(
+            predicate.comparisons()[0].expression().unwrap().get_type(),
+            Some(PgBuiltInType::bool())
+        );
+        assert!(predicate.binding().unwrap().resolution().is_resolved());
+        assert!(!context.has_reported_problem("membership_comparison_result"));
+        assert!(!context.has_reported_problem("undefined_operator"));
+        Ok(())
+    }
+}
+
 impl SemScalarExprNode for MembershipExpr {
     fn get_type(&self) -> Option<TypeReference> {
         self.types.single_type()

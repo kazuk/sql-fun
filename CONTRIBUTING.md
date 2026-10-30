@@ -260,6 +260,13 @@ The script runs the workspace checks, tests, formatting, linting, documentation
 build, dependency checks, API spec generation, and typo checks. After all other
 steps pass, it updates the repository graph index with `graphify update .`.
 
+A successful local workspace regression pass also refreshes the tracked
+`tests/sqlast-regressions/priorities.tsv`. Include any generated changes in your
+pull request. CI validates and consumes those committed priority tiers to start
+two workers directly, without a serial calibration run. See the
+[regression suite README](tests/sqlast-regressions/README.md#committed-ci-scheduling)
+for the classification and report contract.
+
 The `doc` step builds the documentation and explicitly runs
 `cargo test --doc -p sql-fun-sqlast` with both default features and
 `--all-features`, regardless of the script's feature flag. This executes the

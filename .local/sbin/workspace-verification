@@ -72,12 +72,27 @@ function run_sqlast_regressions() {
       cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
       ;;
   esac
+  require_command uv
+  uv run --no-project --no-config --python 3.12 python -B "$GIT_ROOT/tests/sqlast-regressions/test_parallel_runner.py" || return $?
   local target_dir
   target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
   local binary_dir="${target_dir}/debug"
-  SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
-    SQL_FUN_BIN="${SQL_FUN_BIN:-${binary_dir}/sql-fun}" \
-    SQL_FUN_TEST_SERVER_BIN="${SQL_FUN_TEST_SERVER_BIN:-${binary_dir}/sql-fun-server}" \
-    SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
-    "${GIT_ROOT}/tests/sqlast-regressions/run.sh"
+  local suite="$GIT_ROOT/tests/sqlast-regressions"
+  case "$WORKSPACE_PHASE" in
+    test|sqlast-test)
+      SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
+        SQL_FUN_BIN="$SQL_FUN_BIN" SQL_FUN_TEST_SERVER_BIN="$SQL_FUN_TEST_SERVER_BIN" \
+        uv run --no-project --no-config --python 3.12 python -B "$suite/run_once.py" \
+        --priorities "$suite/priorities.tsv" --output "$target_dir/sqlast-regressions"
+      ;;
+    *)
+      SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
+        SQL_FUN_BIN="${SQL_FUN_BIN:-${binary_dir}/sql-fun}" \
+        SQL_FUN_TEST_SERVER_BIN="${SQL_FUN_TEST_SERVER_BIN:-${binary_dir}/sql-fun-server}" \
+        SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
+        "$suite/run.sh" || return $?
+      uv run --no-project --no-config --python 3.12 python -B "$suite/scheduling.py" \
+        --timings "$target_dir/sqlast-regressions/timings.tsv" --output "$suite/priorities.tsv"
+      ;;
+  esac
 }

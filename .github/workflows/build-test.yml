@@ -271,6 +271,10 @@ jobs:
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+      - name: Validate committed regression priorities before downloading binaries
+        run: |
+          uv run --no-project --no-config --python 3.12 python -B \
+            tests/sqlast-regressions/scheduling.py --check tests/sqlast-regressions/priorities.tsv
       - uses: actions/download-artifact@v7
         with:
           name: workspace-cli
@@ -279,7 +283,7 @@ jobs:
         with:
           name: workspace-server
           path: ${{ runner.temp }}/workspace-server
-      - name: Run default-feature SQLAST regressions
+      - name: Run default-feature SQLAST regressions with two tier-prioritized workers
         env:
           SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
           SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server
@@ -520,6 +524,10 @@ jobs:
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+      - name: Validate committed regression priorities before downloading binaries
+        run: |
+          uv run --no-project --no-config --python 3.12 python -B \
+            tests/sqlast-regressions/scheduling.py --check tests/sqlast-regressions/priorities.tsv
       - uses: actions/download-artifact@v7
         with:
           name: workspace-all-features-cli
@@ -528,7 +536,7 @@ jobs:
         with:
           name: workspace-all-features-server
           path: ${{ runner.temp }}/workspace-server
-      - name: Run all-features SQLAST regressions
+      - name: Run all-features SQLAST regressions with two tier-prioritized workers
         env:
           SQL_FUN_BIN: ${{ runner.temp }}/workspace-cli/sql-fun
           SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/workspace-server/sql-fun-server

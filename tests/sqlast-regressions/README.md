@@ -17,6 +17,35 @@ selects `--workspace-phase=rust-test` for archived Rust tests and
 compilation. The existing combined `--workspace-phase=test` route and normal
 local full-check behavior remain supported.
 
+## Committed CI scheduling
+
+The local workspace check runs the suite serially and records full CLI command
+wall times in `target/sqlast-regressions/timings.tsv`. After every group and the
+negative controls succeed, `check-test-flow` regenerates `priorities.tsv`.
+Include changes to that tracked file with the PR; the existing check command
+also covers newly added groups. Failed or incomplete runs do not replace it.
+
+The file contains only a priority tier and fixture/version group name. The ten
+longest measured groups are `heavy`; the remaining groups are divided nearly
+in half into `medium` and `light` (the extra group goes to medium for odd sizes).
+For inventories smaller than ten, every group is heavy. Duration ties are
+resolved by group name. Each tier is name-sorted: changes in timing order inside
+a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
+in the committed file. The current 140 groups are split 10/65/65.
+
+CI's archived execution phases validate that the committed tiers exactly cover
+the manifest, without duplicates or unknown groups, and have canonical ordering
+and sizes. They then run one shared-server suite with **two workers**, consuming
+heavy, medium and light in order. There is no calibration, duration estimation,
+or priority regeneration in CI. Missing or stale classification is an error.
+Default and all-features jobs retain independent binary producers and gates.
+
+CI evidence is retained under fresh `run-*` subdirectories in
+`target/sqlast-regressions/`, including the selected priorities, environment,
+original inventory, worker reports, combined XML, claims, summaries and server
+logs. Repeating an execution phase preserves earlier evidence. The direct
+`run.sh` entry point used for installed-distribution validation remains serial.
+
 `manifest.tsv` explicitly selects each fixture, schema level, optional project
 schema, expected case count and PostgreSQL versions. Each JSON fixture is an
 array of self-contained cases with `name`, `sql` and `expected` fields. Keep
@@ -254,3 +283,27 @@ The six cases per version check new names, fixed PostgreSQL view outputs,
 repeated renames, old-name reuse, quoted names and explicit aliases. Rust
 schema-chain tests retain analyzed applicability, bindings, failure atomicity,
 source history, layer isolation, FK identities and SQLite oracle comparisons.
+
+## Parallel CI execution
+
+CI runs one shared-server suite using the committed schedule described above.
+Each persistent shell worker claims the next fixture/version group when idle
+and opens independent CLI connections. Worker metadata and reports are isolated.
+The coordinator owns a fresh server and discovery namespace, checks server
+identity throughout execution, disables automatic server relaunch, and reaps
+its workers and their children. Failed groups are not retried. A group that
+exceeds the 1800-second worker protocol deadline fails the run.
+
+After the full suite, the same server revisits conflicting project schemas and
+omitted/empty/populated role selections to check cache isolation. Existing
+negative controls run once per selected version. Those reports are separate
+from the positive-suite combined JUnit.
+
+Reports retain the expected group and named-case inventory, selected binaries,
+source revision, worker XML/logs, claims, completion records, combined XML,
+summaries and server logs. Exact group/case identities, worker exits, completion
+records, report presence, XML counters and outcomes all contribute to failure.
+Missing cases never become fabricated passes or skips. Aggregation preserves
+failure/error/skipped details; offline contracts cover skipped preservation
+because the current CLI has no skipped-case producer. The standard workspace
+check maintains these fast queue, report and scheduling contracts.

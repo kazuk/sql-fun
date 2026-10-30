@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Opt-in shared-server regression experiment; standard library only."""
-import argparse
+"""Shared-server regression execution and exact-result reconciliation."""
 import collections
 import concurrent.futures
 import copy
 import json
-import math
 import os
 from pathlib import Path
 import queue
@@ -13,7 +11,6 @@ import re
 import select
 import signal
 import shutil
-import statistics
 import subprocess
 import tempfile
 import threading
@@ -58,12 +55,12 @@ def inventory(suite=SUITE):
     return groups
 
 
-def ordered_tasks(groups, estimates):
-    if estimates and set(estimates) != {g["id"] for g in groups}:
-        raise ValueError("Duration estimates do not cover the exact inventory")
-    if any(not isinstance(v, (float, int)) or not math.isfinite(v) or v < 0 for v in estimates.values()):
-        raise ValueError("Invalid duration estimate")
-    return sorted(groups, key=lambda g: -estimates.get(g["id"], 0))
+def ordered_tasks(groups, priorities):
+    if set(priorities) != {group["id"] for group in groups}:
+        raise ValueError("Priorities do not cover the exact inventory")
+    if any(value not in (1, 2, 3) for value in priorities.values()):
+        raise ValueError("Invalid priority tier")
+    return sorted(groups, key=lambda group: (-priorities[group["id"]], group["id"]))
 
 
 def aggregate(groups, workers, directory):
@@ -145,9 +142,9 @@ def aggregate(groups, workers, directory):
 def stop(process):
     # A shell worker owns its CLI children in a separate process group. Never
     # signal a previously reaped group again: its numeric ID may be reused.
-    if getattr(process, "_experiment_stopped", False):
+    if getattr(process, "_regression_stopped", False):
         return
-    process._experiment_stopped = True
+    process._regression_stopped = True
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
@@ -159,9 +156,6 @@ class Server:
     def __init__(self, env, runtime, reports):
         self.env, self.runtime, self.reports = env, runtime, reports
         self.process = None
-        self.samples = []
-        self.done = threading.Event()
-        self.problem = None
 
     def verify(self):
         if self.process.poll() is not None:
@@ -169,24 +163,7 @@ class Server:
         if (self.runtime / "sql-fun-server.pid").read_bytes() != self.registration:
             raise RuntimeError("Owned server registration changed")
 
-    def sample(self):
-        while not self.done.is_set():
-            try:
-                self.verify()
-                status = Path(f"/proc/{self.process.pid}/status").read_text()
-                values = {k: v.strip() for k, v in (line.split(":", 1) for line in status.splitlines())}
-                # /proc stat fields after comm: state=3, utime=14, stime=15.
-                fields = Path(f"/proc/{self.process.pid}/stat").read_text().rsplit(")", 1)[1].split()
-                self.samples.append(dict(seconds=time.monotonic() - self.started,
-                                         cpu_seconds=(int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK"),
-                                         rss=values.get("VmRSS"), peak_rss=values.get("VmHWM"), threads=values.get("Threads")))
-            except (OSError, ValueError, RuntimeError) as error:
-                self.problem = str(error)
-                return
-            self.done.wait(0.25)
-
     def __enter__(self):
-        self.started = time.monotonic()
         self.log = (self.reports / "server.log").open("w")
         self.process = subprocess.Popen([self.env["SQL_FUN_TEST_SERVER_BIN"]], env=self.env,
                                         stdin=subprocess.DEVNULL, stdout=self.log, stderr=subprocess.STDOUT,
@@ -206,8 +183,6 @@ class Server:
                     if registered_pid != self.process.pid:
                         raise RuntimeError("Registration is not the owned server")
                     self.verify()
-                    self.thread = threading.Thread(target=self.sample)
-                    self.thread.start()
                     return self
                 time.sleep(0.05)
             raise RuntimeError("Server readiness timed out")
@@ -217,11 +192,8 @@ class Server:
             raise
 
     def __exit__(self, *_):
-        self.done.set()
-        self.thread.join()
         stop(self.process)
         self.log.close()
-        write_json(self.reports / "server-resources.json", self.samples)
 
 
 def run_workers(tasks, count, env, runtime, directory, server):
@@ -310,23 +282,23 @@ run_controls
                        env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
 
 
-def trial(groups, count, estimates, reports, base_env):
+def run_suite(groups, count, priorities, reports, base_env):
     began = time.monotonic()
     reports.mkdir()
     summary = dict(workers=count, problems=[])
-    with tempfile.TemporaryDirectory(prefix="sql-fun-experiment.", dir="/tmp") as temp:
+    with tempfile.TemporaryDirectory(prefix="sql-fun-regressions.", dir="/tmp") as temp:
         runtime = Path(temp)
         env = {k: v for k, v in base_env.items() if k not in CLEARED}
         env.update(USER=runtime.name, SQL_FUN_SERVER=base_env["SQL_FUN_TEST_SERVER_BIN"], LC_ALL="C")
         # Refuse client auto-relaunch if the owned server dies. No extra server is
-        # allowed to make an apparently successful shared-server measurement.
+        # allowed to make an apparently successful shared-server run.
         env["SQL_FUN_SERVER_COMMAND"] = "exit 97"
         try:
             with Server(env, runtime, reports) as server:
                 summary["server_pid"] = server.process.pid
                 summary["namespace"] = runtime.name
                 positive_started = time.monotonic()
-                workers = run_workers(ordered_tasks(groups, estimates), count, env, runtime, reports, server)
+                workers = run_workers(ordered_tasks(groups, priorities), count, env, runtime, reports, server)
                 summary["positive_seconds"] = time.monotonic() - positive_started
                 summary["worker_results"] = workers
                 summary.update(aggregate(groups, workers, reports))
@@ -340,7 +312,7 @@ def trial(groups, count, estimates, reports, base_env):
                     "project-roles", "project-roles-empty", "project-roles-omitted")]
                 revisit_reports = reports / "isolation-revisit"
                 revisit_reports.mkdir()
-                revisited = run_workers(ordered_tasks(revisit, {g["id"]: estimates.get(g["id"], 0) for g in revisit}),
+                revisited = run_workers(ordered_tasks(revisit, {g["id"]: priorities[g["id"]] for g in revisit}),
                                         count, env, runtime, revisit_reports, server)
                 isolation = aggregate(revisit, revisited, revisit_reports)
                 write_json(revisit_reports / "summary.json", isolation)
@@ -348,15 +320,10 @@ def trial(groups, count, estimates, reports, base_env):
                 summary["problems"].extend(isolation["problems"])
                 run_controls(env, runtime, reports, sorted({g["version"] for g in groups}))
                 server.verify()
-                if server.problem:
-                    summary["problems"].append(server.problem)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             summary["problems"].append(str(error))
     summary["wall_seconds"] = time.monotonic() - began
     summary["ok"] = not summary["problems"]
-    summary["command_seconds"] = sum(c["seconds"] for w in summary.get("worker_results", []) for c in w["completions"])
-    if "positive_seconds" in summary and "outcomes" in summary:
-        summary["cases_per_second"] = summary["outcomes"]["tests"] / summary["positive_seconds"]
     write_json(reports / "summary.json", summary)
     print(f"{reports.name}: workers={count} wall={summary['wall_seconds']:.3f}s ok={summary['ok']}", flush=True)
     return summary
@@ -365,7 +332,7 @@ def trial(groups, count, estimates, reports, base_env):
 def validate_environment(parser, groups):
     for executable in ("bash", "jq"):
         if not shutil.which(executable):
-            parser.error(f"Required experiment tool is unavailable: {executable}")
+            parser.error(f"Required regression tool is unavailable: {executable}")
     for key in ("SQL_FUN_HOME", "SQL_FUN_BIN", "SQL_FUN_TEST_SERVER_BIN"):
         if key not in os.environ or not Path(os.environ[key]).is_absolute():
             parser.error(f"{key} must explicitly select an absolute path")
@@ -380,63 +347,10 @@ def validate_environment(parser, groups):
 
 def record_environment(output, groups):
     write_json(output / "inventory.json", groups)
-    write_json(output / "environment.json", dict(cpu_count=os.cpu_count(), affinity=sorted(os.sched_getaffinity(0)),
-               uname=list(os.uname()), memory=Path('/proc/meminfo').read_text(),
-               revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=SUITE, text=True).strip(),
-               runner=os.environ.get("RUNNER_NAME"), runner_environment=os.environ.get("RUNNER_ENVIRONMENT"),
-               cgroup_limits={name: (Path('/sys/fs/cgroup') / name).read_text().strip()
-                              for name in ('cpu.max', 'memory.max') if (Path('/sys/fs/cgroup') / name).is_file()},
-               selections={k: os.environ[k] for k in ("SQL_FUN_HOME", "SQL_FUN_BIN", "SQL_FUN_TEST_SERVER_BIN")}))
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", required=True, nargs="+", type=int)
-    parser.add_argument("--repetitions", required=True, type=int)
-    parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
-    if not args.workers or args.workers[0] != 1 or len(set(args.workers)) != len(args.workers) or any(n not in (1, 2, 4, 8) for n in args.workers) or args.repetitions < 1:
-        parser.error("Select a unique worker sequence starting with 1, followed by 2/4/8, and positive repetitions")
-    groups = inventory()
-    validate_environment(parser, groups)
-    args.output = args.output.resolve()
-    args.output.mkdir(parents=True, exist_ok=False)
-    record_environment(args.output, groups)
-    # Calibration is separate so every compared configuration, including all
-    # serial repeats, uses the same longest-estimated-duration-first queue.
-    calibration = trial(groups, 1, {}, args.output / "estimate-baseline", os.environ)
-    write_json(args.output / "calibration.json", calibration)
-    if not calibration["ok"]:
-        return 1
-    estimates = {c["id"]: c["seconds"] for w in calibration["worker_results"] for c in w["completions"]}
-    write_json(args.output / "estimates.json", dict(source="estimate-baseline", seconds=estimates))
-    results = []
-    for repetition in range(args.repetitions):
-        order = args.workers[repetition % len(args.workers):] + args.workers[:repetition % len(args.workers)]
-        for count in order:
-            result = trial(groups, count, estimates, args.output / f"repeat-{repetition + 1}-workers-{count}", os.environ)
-            results.append(result)
-            write_json(args.output / "results.json", results)
-            if not result["ok"]:
-                return 1
-    comparison = {}
-    baseline = statistics.median(r["wall_seconds"] for r in results if r["workers"] == 1)
-    positive_baseline = statistics.median(r["positive_seconds"] for r in results if r["workers"] == 1)
-    for count in args.workers:
-        samples = [r["wall_seconds"] for r in results if r["workers"] == count]
-        positive = [r["positive_seconds"] for r in results if r["workers"] == count]
-        comparison[count] = dict(samples=samples, median=statistics.median(samples), minimum=min(samples), maximum=max(samples),
-                                 speedup=baseline / statistics.median(samples), positive_samples=positive,
-                                 positive_median=statistics.median(positive), positive_speedup=positive_baseline / statistics.median(positive))
-    write_json(args.output / "comparison.json", comparison)
-    print(json.dumps(comparison, indent=2))
-    return 0
+    write_json(output / "environment.json", dict(
+        revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=SUITE, text=True).strip(),
+        selections={key: os.environ[key] for key in ("SQL_FUN_HOME", "SQL_FUN_BIN", "SQL_FUN_TEST_SERVER_BIN")}))
 
 
 def interrupted(signum, _frame):
     raise KeyboardInterrupt(f"Interrupted by signal {signum}")
-
-
-if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, interrupted)
-    raise SystemExit(main())

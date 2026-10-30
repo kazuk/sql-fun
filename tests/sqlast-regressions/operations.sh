@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Internal operations shared by serial and experimental regression execution.
+# Internal operations shared by serial and parallel regression execution.
 # Callers select suite/runtime/reports, binaries, and a server namespace.
 write_metadata() {
   metadata="$runtime/metadata-$version.toml"

@@ -132,11 +132,11 @@ function cargo() {
 function uv() {
   local prefix="run --no-project --no-config --python 3.12 python -B $GIT_ROOT/tests/sqlast-regressions"
   case "$*" in
-    "$prefix/test_experiment.py")
+    "$prefix/test_parallel_runner.py")
       echo contracts >> "$scratch/order"
       [[ "$failed" != contracts ]]
       ;;
-    "$prefix/run_once.py --workers 2 --priorities $GIT_ROOT/tests/sqlast-regressions/priorities.tsv --output $scratch/target/sqlast-regressions")
+    "$prefix/run_once.py --priorities $GIT_ROOT/tests/sqlast-regressions/priorities.tsv --output $scratch/target/sqlast-regressions")
       [[ "$SQL_FUN_BIN" == /explicit/cli && "$SQL_FUN_TEST_SERVER_BIN" == /explicit/server ]] || return 96
       [[ "$SQL_FUN_HOME" == "$GIT_ROOT/sql-fun-home" ]] || return 96
       echo regressions >> "$scratch/order"

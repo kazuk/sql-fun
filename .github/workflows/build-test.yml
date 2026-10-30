@@ -13,12 +13,6 @@ on:
       - reopened
   merge_group:
   workflow_dispatch:
-    inputs:
-      regression-benchmark:
-        description: Run the opt-in shared-server regression benchmark (1/2/4/8 workers, three trials each)
-        type: boolean
-        required: false
-        default: false
 
 concurrency:
   group: build-test-${{ github.event.pull_request.number || github.ref }}
@@ -998,39 +992,3 @@ jobs:
         env:
           NEEDS_RESULTS: ${{ toJSON(needs) }}
         run: jq -e 'all(.[]; .result == "success")' <<< "$NEEDS_RESULTS"
-
-  regression-benchmark:
-    if: github.event_name == 'workflow_dispatch' && inputs.regression-benchmark
-    needs: [workspace-cli-build, workspace-server-build]
-    runs-on: ubuntu-24.04
-    container: *ci-builder-container
-    # Calibration plus 12 measured trials must also fit when sharing does not scale.
-    timeout-minutes: 240
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v7
-        with:
-          name: workspace-cli
-          path: ${{ runner.temp }}/benchmark-cli
-      - uses: actions/download-artifact@v7
-        with:
-          name: workspace-server
-          path: ${{ runner.temp }}/benchmark-server
-      - name: Benchmark the selected run's default-feature binaries
-        env:
-          SQL_FUN_BIN: ${{ runner.temp }}/benchmark-cli/sql-fun
-          SQL_FUN_TEST_SERVER_BIN: ${{ runner.temp }}/benchmark-server/sql-fun-server
-        run: |
-          export SQL_FUN_HOME="$(git rev-parse --show-toplevel)/sql-fun-home"
-          chmod +x "$SQL_FUN_BIN" "$SQL_FUN_TEST_SERVER_BIN"
-          python3 -B tests/sqlast-regressions/test_experiment.py
-          python3 -B tests/sqlast-regressions/experiment.py \
-            --workers 1 2 4 8 --repetitions 3 \
-            --output "$RUNNER_TEMP/regression-benchmark"
-      - uses: actions/upload-artifact@v7
-        if: ${{ always() }}
-        with:
-          name: regression-benchmark
-          path: ${{ runner.temp }}/regression-benchmark/
-          if-no-files-found: error
-          retention-days: 30

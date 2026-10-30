@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 import tempfile
 
-import experiment
+import parallel_runner
 
 TIERS = ("heavy", "medium", "light")
 
@@ -77,12 +77,12 @@ def main(argv=None):
     if args.check:
         if args.output:
             parser.error("--check does not generate an output file")
-        read_priorities(args.check, experiment.inventory())
+        read_priorities(args.check, parallel_runner.inventory())
         print(f"Regression priorities validated: {args.check}")
     else:
         if not args.output:
             parser.error("--timings requires --output")
-        generate(args.timings, args.output, experiment.inventory())
+        generate(args.timings, args.output, parallel_runner.inventory())
 
 
 if __name__ == "__main__":

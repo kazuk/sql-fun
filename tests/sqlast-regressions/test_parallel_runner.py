@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 import xml.etree.ElementTree as ET
 
-import experiment as subject
+import parallel_runner as subject
 import run_once
 import scheduling
 
@@ -109,9 +109,9 @@ class ServerIdentityContracts(unittest.TestCase):
 
 
 class QueueContracts(unittest.TestCase):
-    def test_estimate_order_and_ties(self):
-        groups = [dict(id=ident) for ident in ("short", "long-a", "long-b")]
-        self.assertEqual([g["id"] for g in subject.ordered_tasks(groups, {"short": 1, "long-a": 9, "long-b": 9})], ["long-a", "long-b", "short"])
+    def test_priority_order_and_name_ties(self):
+        groups = [dict(id=ident) for ident in ("short", "long-b", "long-a")]
+        self.assertEqual([g["id"] for g in subject.ordered_tasks(groups, {"short": 1, "long-a": 3, "long-b": 3})], ["long-a", "long-b", "short"])
         with self.assertRaises(ValueError):
             subject.ordered_tasks(groups, {"short": 1})
 
@@ -235,29 +235,29 @@ class PriorityContracts(unittest.TestCase):
                 self.output.write_text(content)
                 scheduling.read_priorities(self.output, self.groups)
 
-    def test_ci_runner_executes_once_without_calibration(self):
+    def test_ci_runner_executes_single_suite(self):
         self.generate()
         reports = self.path / 'reports'
         with patch.object(subject, 'inventory', return_value=self.groups[::-1]), \
              patch.object(subject, 'validate_environment'), \
              patch.object(subject, 'record_environment'), \
-             patch.object(subject, 'trial', return_value={'ok': True}) as trial:
-            args = ['--workers', '2', '--priorities', str(self.output), '--output', str(reports)]
+             patch.object(subject, 'run_suite', return_value={'ok': True}) as run_suite:
+            args = ['--priorities', str(self.output), '--output', str(reports)]
             self.assertEqual(run_once.main(args), 0)
-            trial.assert_called_once()
-            groups, workers, weights, _, _ = trial.call_args.args
+            run_suite.assert_called_once()
+            groups, workers, weights, _, _ = run_suite.call_args.args
             self.assertEqual(workers, 2)
             self.assertEqual([g['id'] for g in groups], sorted(g['id'] for g in self.groups))
             self.assertEqual(set(weights.values()), {1, 2, 3})
-            trial.reset_mock(return_value=True)
-            trial.return_value = {'ok': False}
+            run_suite.reset_mock(return_value=True)
+            run_suite.return_value = {'ok': False}
             self.assertEqual(run_once.main(args), 1)
-            trial.assert_called_once()
+            run_suite.assert_called_once()
             self.output.unlink()
-            trial.reset_mock()
+            run_suite.reset_mock()
             with self.assertRaises(FileNotFoundError):
                 run_once.main(args)
-            trial.assert_not_called()
+            run_suite.assert_not_called()
 
     def test_ci_preflight_only_validates_committed_file(self):
         self.generate()

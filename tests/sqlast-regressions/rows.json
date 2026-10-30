@@ -1,0 +1,550 @@
+[
+  {
+    "name": "rows::empty",
+    "sql": "SELECT ROW()",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::single",
+    "sql": "SELECT ROW(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::null_fields",
+    "sql": "SELECT ROW(NULL,NULL)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::implicit",
+    "sql": "SELECT (1,2)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nested",
+    "sql": "SELECT ROW(1,ROW(true,NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::alias",
+    "sql": "SELECT ROW(1,2) AS payload",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "payload",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::field_order",
+    "sql": "SELECT (ROW(true,1::bigint,2)).*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f1",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "f2",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "f3",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::member_names",
+    "sql": "SELECT (ROW(1, true)).f1, (ROW(1, true)).f2",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f1",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "f2",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nullable_member",
+    "sql": "SELECT (ROW(1,NULL::text)).f2 AS label",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nested_member",
+    "sql": "SELECT ((ROW(1,ROW(true,2))).f2).f1 AS flag",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "flag",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::source_star",
+    "sql": "SELECT ROW(items.*,3) FROM items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::expanded_source_fields",
+    "sql": "SELECT (ROW(items.*)).* FROM items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f1",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "f2",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::nested_source_fields",
+    "sql": "SELECT ROW(ROW(items.*),3) FROM items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::named_cast",
+    "sql": "SELECT ROW(1,2)::pair",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "public",
+            "local_name": "pair",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::record_cast",
+    "sql": "SELECT ROW(1,2)::record",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "record",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::record_function",
+    "sql": "SELECT to_json(ROW(1,true))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "to_json",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "json",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::array_consumer",
+    "sql": "SELECT ARRAY[ROW(1,true)]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::coalesce_consumer",
+    "sql": "SELECT COALESCE(ROW(1,2),ROW(3,4)) AS value",
+    "expected": {
+      "diagnostics": [
+        "unreachable_coalesce_argument"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::null_predicates",
+    "sql": "SELECT ROW(NULL,NULL) IS NULL AS all_null, ROW(1,NULL) IS NOT NULL AS all_not_null",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "all_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "all_not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::scalar_subquery",
+    "sql": "SELECT (SELECT ROW(1,true))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::cast_field",
+    "sql": "SELECT (ROW(1,2)::pair).left_value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "left_value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::missing_field",
+    "sql": "SELECT (ROW(1,2)).missing AS result",
+    "expected": {
+      "diagnostics": [
+        "composite_type_field_not_found"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::missing_element",
+    "sql": "SELECT ROW(missing,2)",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "row",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::invalid_scalar_function",
+    "sql": "SELECT abs(ROW(1,2))",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "abs",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::record_cast_fields",
+    "sql": "SELECT (ROW(1,true)::record).*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f1",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "f2",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::named_cast_coercions",
+    "sql": "SELECT ROW(1,true)::wide_pair",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "public",
+            "local_name": "wide_pair",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::named_cast_null",
+    "sql": "SELECT ROW(NULL,2)::pair",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "public",
+            "local_name": "pair",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::named_cast_nested",
+    "sql": "SELECT ROW(ROW(1,NULL),true)::nested_pair",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_pair",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::named_cast_width",
+    "sql": "SELECT ROW(1)::pair",
+    "expected": {
+      "diagnostics": [
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "public",
+            "local_name": "pair",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::text_cast",
+    "sql": "SELECT ROW(1,true)::text",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "row",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

@@ -196,9 +196,7 @@ impl Expr {
             )?)),
             Self::Parenthesized(items) => match items.as_slice() {
                 [expression] => expression.resolve_in(context, scope),
-                _ => Ok(SemScalarExpr::list(&Self::resolve_list(
-                    items, context, scope,
-                )?)),
+                _ => Self::resolve_row(items, context, scope),
             },
             Self::Indirection(indirection) => indirection.resolve(context, scope),
             Self::SqlValue(value) => value.resolve(),
@@ -641,7 +639,7 @@ impl Cast {
             target
         };
         let expected = MinMaxExpr::base_type(context, &target);
-        let argument = if context.dialect() == Dialect::postgres()
+        let mut argument = if context.dialect() == Dialect::postgres()
             && resolution.is_resolved()
             && expected.is_array() == Some(true)
         {
@@ -659,10 +657,9 @@ impl Cast {
             } else {
                 context.canonicalize_type_ref(&source).unwrap_or(source)
             };
-            // A row constructor can be explicitly assigned a named row identity
-            // positionally, without a pg_cast entry for its anonymous type.
-            let exact_row_constructor = argument.accepts_exact_row_identity(context, &target);
-            if !exact_row_constructor && context.get_explicit_cast(&source, &target).is_none() {
+            // Coerce row fields positionally without a pg_cast entry for the anonymous row.
+            let row_cast = argument.coerce_row_cast(context, &target);
+            if !row_cast && context.get_explicit_cast(&source, &target).is_none() {
                 context.report_analysis_problem(AnalysisProblem::explicit_cast_not_defined(
                     &source, &target,
                 ))?;

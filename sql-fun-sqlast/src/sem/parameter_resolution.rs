@@ -338,6 +338,19 @@ impl ParameterResolution {
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
         self.common_type(context, "COALESCE", arguments, false)
     }
+    pub(crate) fn row_field(&mut self, field: &SemScalarExpr) -> SemScalarExpr {
+        let source = self.input(field);
+        let result = self.operation(
+            "row field",
+            &[],
+            &InputTypeConstraint::any(),
+            field.is_not_null(),
+        );
+        self.graph
+            .equal(source, result.constraint_node().expect("operation node"));
+        result
+    }
+
     pub(crate) fn member_access(&mut self, base: &SemScalarExpr, member: &str) -> SemScalarExpr {
         let source = self.input(base);
         let result = self.operation(

@@ -80,6 +80,14 @@ impl ColumnCollection {
         Self(columns)
     }
 
+    /// Ordered field targets, only when every declaration has a resolved type.
+    pub(crate) fn field_types(&self) -> Option<Vec<crate::sem::TypeReference>> {
+        self.0
+            .iter()
+            .map(ColumnDefinition::get_type_cloned)
+            .collect()
+    }
+
     pub(crate) fn matches_type_structure_with(
         &self,
         other: &Self,

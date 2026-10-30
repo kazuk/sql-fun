@@ -179,6 +179,10 @@ impl SemScalarExpr {
         &self,
         context: &impl ParseContext,
     ) -> Option<ColumnCollection> {
+        // A generic record cast preserves a constructor's anonymous field shape.
+        if let Some(row) = self.row_constructor() {
+            return row.get_type().row_columns(context);
+        }
         // A scalar table-function source also retains projection fields. Its
         // scalar type must not become a composite merely because fields exist.
         let columns = self.get_type()?.row_columns(context)?;

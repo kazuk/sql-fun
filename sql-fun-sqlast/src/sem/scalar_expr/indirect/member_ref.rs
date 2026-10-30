@@ -49,6 +49,16 @@ impl MemberRef {
         }
     }
 
+    pub(super) fn row_projection_name(&self) -> &str {
+        if self.base.row_constructor().is_some()
+            || self.base.constructor_projection_name() == Some("row")
+        {
+            &self.member
+        } else {
+            ""
+        }
+    }
+
     /// Base expression whose composite field is accessed.
     pub const fn base(&self) -> &SemScalarExpr {
         &self.base
@@ -132,6 +142,13 @@ impl MemberRef {
 }
 
 impl MemberRef {
+    pub(super) fn row_constructor(&self) -> Option<&crate::sem::scalar_expr::RowExpr> {
+        self.base
+            .row_constructor()?
+            .field(&self.member)?
+            .row_constructor()
+    }
+
     pub(super) fn set_member_type(&mut self, ty: &Option<TypeReference>) {
         self.member_type.clone_from(ty);
     }
@@ -140,6 +157,14 @@ impl MemberRef {
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
     ) -> Option<SemScalarExpr> {
+        if let Some(row) = self.base.row_constructor()
+            && let Some(field) = row.field(&self.member)
+            && field.constraint_node().is_some()
+        {
+            let mut result = parameters.row_field(field);
+            result.retain_indirection(&IndirectionExpr::MemberRef(Box::new(self.clone())));
+            return Some(result);
+        }
         if self.base.constraint_node().is_none() && !self.base.needs_type_inference() {
             return None;
         }

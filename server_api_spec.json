@@ -2559,6 +2559,11 @@
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
                 {
+                  "description": "An internal list or dialect-specific row value cannot be projected as a scalar.",
+                  "type": "string",
+                  "const": "ScalarProjectionRequired"
+                },
+                {
                   "description": "Database-name metadata is required for column reference.",
                   "type": "object",
                   "properties": {
@@ -6380,6 +6385,11 @@
             "QueryProblem": {
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
+                {
+                  "description": "An internal list or dialect-specific row value cannot be projected as a scalar.",
+                  "type": "string",
+                  "const": "ScalarProjectionRequired"
+                },
                 {
                   "description": "Database-name metadata is required for column reference.",
                   "type": "object",

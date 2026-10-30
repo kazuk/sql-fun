@@ -7,6 +7,8 @@ use ::sql_fun_sqlast::{
 use std::collections::BTreeMap;
 
 // Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+// Removed the nested case after a parallel timeout; restore from
+// 70868a945c783c48ce8f36b598a456066a6aa568.
 #[rstest::rstest]
 #[case::then_parameter("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
 #[case::else_parameter("SELECT CASE WHEN true THEN 1 ELSE $1 END")]

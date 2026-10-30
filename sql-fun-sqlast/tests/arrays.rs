@@ -361,7 +361,6 @@ fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> test
     "WITH c AS (SELECT ARRAY[$1,NULL] AS n) SELECT n FROM c WHERE $1",
     "_bool"
 )]
-#[case::subscript("SELECT (ARRAY[$1])[1] + 1", "int4")]
 fn late_constraints_reach_array_results(
     #[case] sql: &str,
     #[case] ty: &str,

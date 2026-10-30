@@ -128,7 +128,7 @@ mod test_ansi_rendering {
             crate::test_helpers::heavy::tokenize_sql(source, SqlDialect::PostgreSQL).await?;
         let output = renderer.render(&problem, &tokens)?;
         assert!(output.contains("\x1b[34mcreate"));
-        assert!(output.contains("SF000001"));
+        assert!(output.contains("domain_base_type_not_found"));
         Ok(())
     }
 }
@@ -342,7 +342,7 @@ mod test_rendering {
         let args = SqlFunArgs::try_parse_from(["sql-fun", "--term-color", "never"])?;
         let mut session = crate::test_helpers::heavy::DiagnosticSession::new().await?;
         let output = render_diagnostic(session.client(), &received, &args).await?;
-        assert!(output.contains("SF000001"));
+        assert!(output.contains("domain_base_type_not_found"));
         assert!(output.contains("domain base type not found: missing"));
         assert!(output.contains("base type name"));
         assert!(output.contains("missing"));

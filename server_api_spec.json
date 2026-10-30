@@ -2819,7 +2819,7 @@
               "description": "Name resolution problems",
               "oneOf": [
                 {
-                  "title": "Domain base type not found : SF00001",
+                  "title": "Domain base type not found : `domain_base_type_not_found`",
                   "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- `PostgreSQL` extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
@@ -2833,7 +2833,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "title": "Function not found : SF00002",
+                  "title": "Function not found : `function_not_found`",
                   "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- `PostgreSQL` extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
@@ -6646,7 +6646,7 @@
               "description": "Name resolution problems",
               "oneOf": [
                 {
-                  "title": "Domain base type not found : SF00001",
+                  "title": "Domain base type not found : `domain_base_type_not_found`",
                   "description": "Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)\n\n## Situation\n\n```SQL\nCREATE DOMAIN name AS base_type;\n```\n\n- `base_type` not found in schema semantic analysis context.\n\n## Why\n\n- Typo in `base_type`.\n- `PostgreSQL` extension not enabled in context.\n- When `base_type` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {
@@ -6660,7 +6660,7 @@
                   "additionalProperties": false
                 },
                 {
-                  "title": "Function not found : SF00002",
+                  "title": "Function not found : `function_not_found`",
                   "description": "## Situation\n\n Function or procedure not found.\n\n```SQL\n-- calling scalar function\nSELECT function_name();\n\n-- calling set of function\nSELECT * from function_name()\n```\n\n- `function_name` not found in schema semantic analysis context.\n\n## Why\n\n- Type in `function_name`\n- `PostgreSQL` extension not enabled in context.\n- When `function_name` defined in schema\n  - Schema not specified.\n  - Schema not in search path.",
                   "type": "object",
                   "properties": {

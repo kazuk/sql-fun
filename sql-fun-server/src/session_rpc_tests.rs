@@ -328,7 +328,7 @@ async fn retained_statement_ranges_are_not_misreported_as_file_positions() {
     connection.authenticate().await;
     let response = connection.rpc("initialize_schema_context", &request).await;
     let problem = &response["result"]["problems"]["items"][0];
-    assert_eq!(problem["code"], "SF000001");
+    assert_eq!(problem["code"], "domain_base_type_not_found");
     assert!(problem["statement_span"].is_null());
     assert!(problem["probrem_span"].is_null());
     let range = &problem["statement_relative_span"];

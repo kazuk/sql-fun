@@ -240,7 +240,7 @@ mod test_retained_diagnostic {
     #[test]
     fn retains_byte_offsets_without_inventing_line_or_statement_positions() {
         let problem = AnalysisProbrem::new(
-            "SF000001",
+            "domain_base_type_not_found",
             super::DiagnosticSeverity::error(),
             std::path::Path::new("schema.sql"),
             Some(StatementByteRange::new(9, 7)),
@@ -249,7 +249,7 @@ mod test_retained_diagnostic {
         assert_eq!(
             value,
             ::serde_json::json!({
-                "code":"SF000001", "severity":"error", "file_path":"schema.sql", "statement_span":null,
+                "code":"domain_base_type_not_found", "severity":"error", "file_path":"schema.sql", "statement_span":null,
                 "probrem_span":null,
                 "statement_relative_span":{"offset":9,"length":7}
             })

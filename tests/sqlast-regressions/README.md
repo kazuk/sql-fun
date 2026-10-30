@@ -263,7 +263,9 @@ with the explicit `declaration-collations.sql` project schema on PostgreSQL 17/1
 These cases run in both maintained execution paths. Their expectations check
 record-column COLLATE diagnostics,
 scalar/array/domain/enum/composite/table-row types, quoted and qualified names,
-lookup precedence, and exact result metadata. DDL inputs exercise accepted and
+lookup precedence, and exact result metadata. The missing domain base-type and
+function cases also verify the descriptive diagnostic IDs from #878.
+DDL inputs exercise accepted and
 rejected table, composite and domain declarations, plus rejected add-column
 groups. Valid schema DDL supplies subsequent query metadata. Focused Rust tests
 retain applicability,

@@ -260,7 +260,7 @@ async fn explicit_output_shape_survives_schema_additions_and_unreferenced_drops(
 )]
 #[case::missing_function(
     "/* 日本語 */ SELECT *, missing_wildcard_function(1) FROM picked",
-    "SF00002"
+    "function_not_found"
 )]
 #[tokio::test(flavor = "multi_thread")]
 async fn imported_cte_reparse_preserves_typed_diagnostic_coordinates(

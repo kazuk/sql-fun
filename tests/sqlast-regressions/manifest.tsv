@@ -66,7 +66,7 @@ collate	project	collate.sql	34	17,18
 between	project	between.sql	81	17,18
 membership	project	membership.sql	41	17,18
 membership-comparisons	builtin	-	4	17,18
-declaration-collations	project	declaration-collations.sql	39	17,18
+declaration-collations	project	declaration-collations.sql	40	17,18
 domain-operators	project	domain-operators.sql	21	17,18
 domain-operators-default	default	-	4	17,18
 column-renames	project	column-renames.sql	6	17,18

@@ -44,6 +44,7 @@ impl ConstrainedExpr {
         }
     }
     pub(crate) fn retain_indirection(&mut self, value: &crate::sem::IndirectionExpr) {
+        self.name = value.projection_name().to_owned();
         self.indirection = Some(Box::new(value.clone()));
     }
     /// Structured array or composite access retained during parameter inference.

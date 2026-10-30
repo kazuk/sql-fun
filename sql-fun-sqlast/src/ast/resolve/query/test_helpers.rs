@@ -24,6 +24,7 @@ pub(super) fn catalog() -> TestParseContext {
         PgBuiltInType::bool(),
         PgBuiltInType::text(),
         PgBuiltInType::numeric(),
+        TypeReference::from_master_type_name("record"),
         TypeReference::from_master_type_name("interval"),
         TypeReference::from_master_type_name("date"),
     ] {

@@ -407,6 +407,7 @@ impl Target {
             return results.append_composite_star(context, base);
         }
         let expression = self.expression.resolve_in(context, scope)?;
+        expression.validate_scalar_value(context)?;
         let name = self
             .alias
             .clone()

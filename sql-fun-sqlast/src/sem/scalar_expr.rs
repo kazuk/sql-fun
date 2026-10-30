@@ -68,6 +68,7 @@ trait SemScalarExprNode {
     fn is_not_null(&self) -> Option<bool>;
 }
 
+/// Internal argument container; it has no scalar type, nullability or output name.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ListExpr(Vec<SemScalarExpr>);
 
@@ -78,6 +79,41 @@ pub struct RowExpr(Vec<SemScalarExpr>);
 impl RowExpr {
     pub(crate) fn new(fields: &[SemScalarExpr]) -> Self {
         Self(fields.to_vec())
+    }
+
+    /// Fields in SQL constructor order.
+    pub fn fields(&self) -> &[SemScalarExpr] {
+        &self.0
+    }
+
+    pub(super) fn field(&self, name: &str) -> Option<&SemScalarExpr> {
+        let index = name
+            .strip_prefix('f')?
+            .parse::<usize>()
+            .ok()?
+            .checked_sub(1)?;
+        if name != format!("f{}", index + 1) {
+            return None;
+        }
+        self.0.get(index)
+    }
+
+    fn coerced_for_cast(
+        &self,
+        context: &impl ParseContext,
+        target: &TypeReference,
+    ) -> Option<Self> {
+        let targets = target.row_columns(context)?.field_types()?;
+        if self.0.len() != targets.len() {
+            return None;
+        }
+        let fields: Option<Vec<_>> = self
+            .0
+            .iter()
+            .zip(targets)
+            .map(|(value, target)| value.coerced_row_field(context, &target))
+            .collect();
+        Some(Self::new(&fields?))
     }
 
     fn get_type(&self) -> TypeReference {
@@ -110,6 +146,60 @@ impl RowExpr {
     }
 }
 
+#[cfg(test)]
+mod row_cast_tests {
+    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::{
+        CastContext, CastDefinition, ColumnCollection, ColumnDefinition, PgBuiltInType,
+        TypeDefinition, TypeReference,
+    };
+    use crate::test_helpers::TestParseContext;
+
+    #[test]
+    fn field_casts_retain_target_types_and_nullability() {
+        let mut context = TestParseContext::default();
+        context.set_get_implicit_cast_result(
+            &PgBuiltInType::int4(),
+            &PgBuiltInType::int8(),
+            Some(CastDefinition::new(CastContext::explicit())),
+        );
+        let target = TypeReference::dynamic(&TypeDefinition::implicit_composite(
+            &ColumnCollection::new(vec![
+                ColumnDefinition::new(&None, Some(&PgBuiltInType::int8()), None, &[]),
+                ColumnDefinition::new(&None, Some(&PgBuiltInType::int4()), None, &[]),
+            ]),
+        ));
+        let mut value = SemScalarExpr::row(&[
+            SemScalarExpr::literal(&ScalarConstExpr::new_integer(1)),
+            ScalarConstExpr::null(),
+        ]);
+        assert!(value.coerce_row_cast(&context, &target));
+        let fields = value.as_row().unwrap().fields();
+        assert_eq!(fields[0].get_type(), Some(PgBuiltInType::int8()));
+        assert_eq!(fields[0].is_not_null(), Some(true));
+        assert_eq!(fields[1].get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(fields[1].is_not_null(), Some(false));
+    }
+
+    #[test]
+    fn rejected_row_cast_preserves_original_fields() {
+        let context = TestParseContext::default();
+        let mut value =
+            SemScalarExpr::row(&[SemScalarExpr::literal(&ScalarConstExpr::new_integer(1))]);
+        let original = value.clone();
+        let target = TypeReference::dynamic(&TypeDefinition::implicit_composite(
+            &ColumnCollection::new(vec![ColumnDefinition::new(
+                &None,
+                Some(&PgBuiltInType::bool()),
+                None,
+                &[],
+            )]),
+        ));
+        assert!(!value.coerce_row_cast(&context, &target));
+        assert_eq!(value, original);
+    }
+}
+
 impl ListExpr {
     pub const fn len(&self) -> usize {
         self.0.len()
@@ -121,6 +211,23 @@ impl ListExpr {
 
     pub fn into_inner(self) -> Vec<SemScalarExpr> {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod list_contract_tests {
+    use super::{ScalarConstExpr, SemScalarExpr};
+
+    #[test]
+    fn internal_lists_have_no_scalar_metadata_and_retain_their_arguments() {
+        let element = SemScalarExpr::literal(&ScalarConstExpr::new_integer(1));
+        let list = SemScalarExpr::list(std::slice::from_ref(&element));
+        assert!(!list.is_membership_row());
+        assert_eq!(list.get_type(), None);
+        assert_eq!(list.is_not_null(), None);
+        assert_eq!(list.get_column_def(), None);
+        assert_eq!(list.get_column_name(), "");
+        assert_eq!(list.into_list_values().unwrap(), vec![element]);
     }
 }
 
@@ -347,25 +454,49 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn accepts_exact_row_identity(
-        &self,
+    pub(crate) fn coerce_row_cast(
+        &mut self,
         context: &impl crate::sem::ParseContext,
         target: &TypeReference,
     ) -> bool {
-        if !self.is_row_constructor() {
+        let Self::Row(row) = self else {
             return false;
+        };
+        let record = TypeReference::from_master_type_name("record");
+        if *target == record {
+            return true;
         }
-        let Some(source) = self.get_type() else {
-            return false;
+        let Some(coerced) = row.coerced_for_cast(context, target) else {
+            // Generic record I/O casts (for example to text) use the existing cast service.
+            return context.get_explicit_cast(&record, target).is_some();
         };
-        let Some(source_columns) = source.row_columns(context) else {
-            return false;
-        };
-        let Some(target_columns) = target.row_columns(context) else {
-            return false;
-        };
-        source_columns.matches_type_structure_with(&target_columns, PartialEq::eq)
+        *row = coerced;
+        true
     }
+
+    fn coerced_row_field(
+        &self,
+        context: &impl ParseContext,
+        target: &TypeReference,
+    ) -> Option<Self> {
+        let mut value = self.clone();
+        let row_cast = value.coerce_row_cast(context, target);
+        if let Some(source) = value.get_type() {
+            if source == *target {
+                return Some(value);
+            }
+            let convertible = if source.is_dynamic() {
+                source.implicit_match_context(target, context).is_some()
+            } else {
+                context.get_explicit_cast(&source, target).is_some()
+            };
+            if !row_cast && !convertible {
+                return None;
+            }
+        }
+        Some(Self::explicit_cast(&value, target))
+    }
+
     const fn is_row_constructor(&self) -> bool {
         matches!(self, Self::Row(_))
     }
@@ -667,7 +798,7 @@ impl SemScalarExpr {
             Self::MergeAction => Some(PgBuiltInType::text()),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.get_type(),
-            Self::List(_list) => todo!(),
+            Self::List(_) => None,
         }
     }
 
@@ -703,7 +834,7 @@ impl SemScalarExpr {
             Self::Grouping(_) | Self::MergeAction => Some(true),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.is_not_null(),
-            Self::List(_list) => todo!(),
+            Self::List(_) => None,
         }
     }
 }
@@ -742,15 +873,18 @@ impl SemScalarExpr {
             | Self::TruthTest(_)
             | Self::Grouping(_)
             | Self::MergeAction
-            | Self::WholeRow(_) => None,
+            | Self::WholeRow(_)
+            | Self::Row(_)
+            | Self::List(_) => None,
             _ => todo!("not implemented {self:?}"),
         }
     }
 
-    pub(super) fn array_projection_name(&self) -> Option<&'static str> {
+    pub(super) fn constructor_projection_name(&self) -> Option<&'static str> {
         match self {
             Self::Array(_) | Self::ArraySubquery(_) => Some("array"),
-            Self::TypeCast(value) => value.array_projection_name(),
+            Self::Row(_) => Some("row"),
+            Self::TypeCast(value) => value.constructor_projection_name(),
             _ => None,
         }
     }
@@ -763,7 +897,10 @@ impl SemScalarExpr {
             Self::ColumnRef(cr) => cr.get_column_name().to_string(),
             Self::FuncCall(call) => call.name().local_name(),
             Self::Arith(_arith_expr) => String::new(),
-            Self::TypeCast(value) => value.array_projection_name().unwrap_or_default().to_owned(),
+            Self::TypeCast(value) => value
+                .constructor_projection_name()
+                .unwrap_or_default()
+                .to_owned(),
             Self::Case(_case_expr) => String::new(),
             Self::Boolean(_boolean_expr) => String::new(),
             Self::NullTest(_null_test_expr) => String::new(),
@@ -771,7 +908,7 @@ impl SemScalarExpr {
             Self::SubLink(query) => query.output_name(),
             Self::Exists(_) => String::new(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.join_key_name().unwrap_or("").to_owned(),
-            Self::Row(_) => String::new(),
+            Self::Row(_) => "row".to_owned(),
             Self::WholeRow(row) => row.qualifier().name().as_str().to_owned(),
             Self::MinMax(value) => value.operation().to_owned(),
             Self::Collate(value) => value.argument().get_column_name(),
@@ -779,13 +916,13 @@ impl SemScalarExpr {
             Self::Param(_) => String::new(),
             Self::Constrained(value) => value.name().to_owned(),
             Self::NamedArg(named_arg_expr) => named_arg_expr.value().get_column_name(),
-            Self::Indirection(_indirection_expr) => String::new(),
-            Self::ImplicitCast(_implicit_cast_expr) => todo!(),
+            Self::Indirection(value) => value.projection_name().to_owned(),
+            Self::ImplicitCast(value) => value.projection_operand().0.get_column_name(),
             Self::Array(_) | Self::ArraySubquery(_) => "array".to_owned(),
             Self::Grouping(_) => "grouping".to_owned(),
             Self::MergeAction => "merge_action".to_owned(),
             Self::Unexpected(_node) => todo!(),
-            Self::List(_list) => todo!(),
+            Self::List(_) => String::new(),
         }
     }
 }
@@ -1252,6 +1389,39 @@ impl SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// Ordered analyzed fields of an anonymous SQL row constructor.
+    pub const fn as_row(&self) -> Option<&RowExpr> {
+        if let Self::Row(row) = self {
+            Some(row)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn row_constructor(&self) -> Option<&RowExpr> {
+        match self {
+            Self::Row(value) => Some(value),
+            Self::Indirection(value) => value.row_constructor(),
+            Self::TypeCast(value) => value.record_operand()?.row_constructor(),
+            Self::Constrained(value) => value.indirection()?.row_constructor(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn validate_scalar_value(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if matches!(self, Self::List(_))
+            || (context.dialect() == crate::ast::Dialect::sqlite() && self.as_row().is_some())
+        {
+            context.report_analysis_problem(AnalysisProblem::query(
+                crate::sem::QueryProblem::scalar_value_required(),
+            ))?;
+        }
+        Ok(())
+    }
+
     /// Membership predicate, including analyzed list or query operands.
     pub fn as_membership(&self) -> Option<&MembershipExpr> {
         match self {
@@ -1263,12 +1433,11 @@ impl SemScalarExpr {
         Self::Membership(Box::new(value))
     }
     pub(crate) const fn is_membership_row(&self) -> bool {
-        matches!(self, Self::Row(_) | Self::List(_))
+        matches!(self, Self::Row(_))
     }
     pub(crate) fn membership_fields(&self) -> &[Self] {
         match self {
             Self::Row(value) => &value.0,
-            Self::List(value) => &value.0,
             _ => std::slice::from_ref(self),
         }
     }

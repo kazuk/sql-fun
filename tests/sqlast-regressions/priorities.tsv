@@ -72,6 +72,7 @@ medium	schema-update-18
 medium	schema-views-diagnostics-17
 medium	schema-views-diagnostics-18
 medium	schema-views-precedence-17
+medium	schema-views-precedence-18
 medium	table-renames-17
 medium	table-renames-18
 light	arrays-diagnostics-17
@@ -99,6 +100,8 @@ light	pilot-17
 light	pilot-18
 light	project-roles-omitted-17
 light	project-roles-omitted-18
+light	rows-17
+light	rows-18
 light	schema-delete-17
 light	schema-delete-18
 light	schema-domains-builtin-17
@@ -133,7 +136,6 @@ light	schema-views-automatic-17
 light	schema-views-automatic-18
 light	schema-views-mechanisms-17
 light	schema-views-mechanisms-18
-light	schema-views-precedence-18
 light	schema-views-special-17
 light	schema-views-special-18
 light	vectors-18

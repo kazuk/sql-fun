@@ -70,3 +70,4 @@ declaration-collations	project	declaration-collations.sql	40	17,18
 domain-operators	project	domain-operators.sql	21	17,18
 domain-operators-default	default	-	4	17,18
 column-renames	project	column-renames.sql	6	17,18
+rows	project	rows.sql	30	17,18

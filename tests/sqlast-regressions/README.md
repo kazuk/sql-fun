@@ -31,7 +31,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 140 groups are split 10/65/65.
+in the committed file. The current 142 groups are split 10/66/66.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -98,8 +98,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1104 inputs for PostgreSQL 17 and 1110 for
-PostgreSQL 18 (2214 total). These count positive contract inputs separately from
+manifest totals are 1133 inputs for PostgreSQL 17 and 1139 for
+PostgreSQL 18 (2272 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -309,3 +309,17 @@ Missing cases never become fabricated passes or skips. Aggregation preserves
 failure/error/skipped details; offline contracts cover skipped preservation
 because the current CLI has no skipped-case producer. The standard workspace
 check maintains these fast queue, report and scheduling contracts.
+
+Issue #486 row-constructor contracts live in `rows.json`, selected with
+`rows.sql` for PostgreSQL 17/18 in both source and installed checks. The cases
+cover empty/single/implicit/nested rows, ordered member/star projection, field
+nullability, aliases, source stars, named/generic record casts (including field
+coercions and nested casts), function/array and COALESCE consumers, and invalid
+members/arguments. COALESCE and named
+composite members retain their existing conservative nullability policy.
+Rust tests retain ordered semantic fields, serialization, parameter-field
+relationships and internal-list contracts; SQLite tests use the embedded oracle
+for scalar grouping, invalid row projection/scalar operands, and legal row
+membership and IS comparisons. Existing UPDATE tests cover
+legal SQLite tuple assignments. Bare relation-name whole-row binding remains
+[#614](https://github.com/kazuk/sql-fun/issues/614); nested explicit rows use the existing qualified-star expansion.

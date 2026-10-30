@@ -10,15 +10,18 @@ use crate::{
 #[test]
 fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
 -> Result<(), Box<dyn std::error::Error>> {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = test_helpers::context();
     for statement in parse_statements(
         "CREATE TABLE items(id integer NOT NULL, label text); CREATE TABLE sources(id integer, label text)",
         Dialect::postgres(),
     ) {
-        context = statement?.analyze(context)?.into_context();
+        context = statement?
+            .analyze(context, &mut cache_context)?
+            .into_context();
     }
     let statement = parse_statements("WITH d(removed,label) AS (DELETE FROM items AS i USING sources AS s WHERE i.id=s.id AND i.id=$1 RETURNING i.id,s.label) SELECT removed,label FROM d", Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(context)?;
+    let analyzed = statement.analyze(context, &mut cache_context)?;
     assert!(
         analyzed.context().reported_problems().is_empty(),
         "{:?}",

@@ -7,6 +7,7 @@ use super::test_helpers::SchemaProject;
 
 #[tokio::test]
 async fn new_analysis_uses_selected_environment_over_shared_normalized_catalog() {
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     let project = SchemaProject::new();
     let service = project.service();
     let dump = project.schema("dump.sql", "CREATE TABLE app_table (id int4);");
@@ -25,7 +26,7 @@ async fn new_analysis_uses_selected_environment_over_shared_normalized_catalog()
     .next()
     .unwrap()
     .unwrap()
-    .analyze(context)
+    .analyze(context, &mut cache_context)
     .unwrap();
     assert_eq!(query.context().metadata().name(), "products");
     assert!(query.context().problems().is_empty());

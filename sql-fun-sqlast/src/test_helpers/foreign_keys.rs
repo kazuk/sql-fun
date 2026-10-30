@@ -142,11 +142,12 @@ pub(crate) fn sqlite_context() -> SchemaFileContext {
 
 #[cfg(feature = "sqlite")]
 pub(crate) fn apply_sqlite(context: SchemaFileContext, sql: &str) -> SchemaFileContext {
+    let mut cache_context = crate::CacheContext::new();
     crate::parse_statements(sql, crate::ast::Dialect::sqlite())
         .next()
         .unwrap()
         .expect("SQLite SQL")
-        .analyze(context)
+        .analyze(context, &mut cache_context)
         .expect("SQLite analysis")
         .into_context()
 }

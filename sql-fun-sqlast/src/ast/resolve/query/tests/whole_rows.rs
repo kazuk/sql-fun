@@ -532,6 +532,7 @@ mod test_helpers {
     }
     fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
         use crate::context::BaseParseContext;
+        let mut cache_context = crate::CacheContext::new();
         let mut base = super::super::super::test_helpers::catalog();
         let nominal =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
@@ -567,7 +568,11 @@ mod test_helpers {
             ),
         );
         for statement in crate::parse_statements(ddl, Dialect::postgres()) {
-            context = statement.unwrap().analyze(context).unwrap().into_context();
+            context = statement
+                .unwrap()
+                .analyze(context, &mut cache_context)
+                .unwrap()
+                .into_context();
         }
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         // Exercise actual view application: a stub that only stores a ViewLike
@@ -589,6 +594,7 @@ mod test_helpers {
         (query, context)
     }
     pub(super) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
+        let mut cache_context = crate::CacheContext::new();
         let mut context = super::super::super::test_helpers::catalog();
         for ddl in [
             "CREATE TABLE pg_catalog.pg_attribute(n integer)",
@@ -598,7 +604,7 @@ mod test_helpers {
                 .next()
                 .unwrap()
                 .unwrap()
-                .analyze(context)
+                .analyze(context, &mut cache_context)
                 .unwrap()
                 .into_context();
         }

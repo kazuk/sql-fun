@@ -65,6 +65,7 @@ fn aliased_merged_projection_retains_visible_reference() {
 
 #[test]
 fn next_analysis_resets_previous_groups() {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = source_namespace_statement("SELECT * FROM a.t");
     assert_eq!(
         analyzed
@@ -78,7 +79,9 @@ fn next_analysis_resets_previous_groups() {
         .next()
         .unwrap()
         .unwrap();
-    let next = statement.analyze(analyzed.into_context()).unwrap();
+    let next = statement
+        .analyze(analyzed.into_context(), &mut cache_context)
+        .unwrap();
     assert!(
         next.context()
             .analysis_state()
@@ -347,12 +350,15 @@ fn duplicate_base_aliases_keep_physical_column_ordinals(#[case] sql: &str) {
 #[case::table("SELECT j.*, $1::int4 AS parameter FROM a.mixed j(x,x)")]
 #[case::function("SELECT j.*, $1::int4 AS parameter FROM mixed_fun() j(x,x)")]
 fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
+    let mut cache_context = crate::CacheContext::new();
     let original = source_namespace_statement(sql);
     let mut statement = crate::parse_statements(sql, crate::ast::Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
-    let analyzed = statement.analyze(original.into_context()).unwrap();
+    let analyzed = statement
+        .analyze(original.into_context(), &mut cache_context)
+        .unwrap();
     statement
         .rewrite_wildcards(analyzed.context().analysis_state().wildcard_expansions())
         .unwrap();
@@ -363,7 +369,9 @@ fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
         .next()
         .unwrap()
         .unwrap();
-    let rewritten = reparsed.analyze(analyzed.into_context()).unwrap();
+    let rewritten = reparsed
+        .analyze(analyzed.into_context(), &mut cache_context)
+        .unwrap();
     assert!(
         rewritten.context().reported_problems().is_empty(),
         "{:?}: {output}",

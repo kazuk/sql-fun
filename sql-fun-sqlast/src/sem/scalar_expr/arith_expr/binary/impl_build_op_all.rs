@@ -399,6 +399,7 @@ mod test_build_op_all {
         #[case] right_type: &str,
         #[case] failure: Option<&str>,
     ) -> testresult::TestResult {
+        let mut cache_context = crate::CacheContext::new();
         let context = test_helpers::schema()?;
         let analyzed = crate::parse_statements(
             &format!("SELECT {expression}"),
@@ -406,7 +407,7 @@ mod test_build_op_all {
         )
         .next()
         .unwrap()?
-        .analyze(context)?;
+        .analyze(context, &mut cache_context)?;
         let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
         let column = select.result_columns().get_column_at(0).unwrap();
         let value = column.expression().unwrap();
@@ -505,6 +506,7 @@ mod test_build_op_all {
         }
 
         pub(super) fn schema() -> testresult::TestResult<SchemaFileContext> {
+            let mut cache_context = crate::CacheContext::new();
             let base = context();
             let args = base.get_args().clone();
             let metadata = base.metadata().clone();
@@ -519,7 +521,9 @@ mod test_build_op_all {
                 "CREATE DOMAIN amount AS integer; CREATE DOMAIN amount_array AS integer[]; CREATE DOMAIN amount_array_chain AS amount_array; CREATE DOMAIN amount_array_deep AS amount_array_chain;",
                 crate::ast::Dialect::postgres(),
             ) {
-                context = statement?.analyze(context)?.into_context();
+                context = statement?
+                    .analyze(context, &mut cache_context)?
+                    .into_context();
             }
             assert!(context.problems().is_empty(), "{:?}", context.problems());
             Ok(context)

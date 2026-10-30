@@ -197,13 +197,17 @@ fn synthetic_identity_function_consumes_array_subquery_result() {
 
 #[test]
 fn invalid_array_query_does_not_stop_following_statement() {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = super::super::test_helpers::catalog();
     let mut results = Vec::new();
     for statement in crate::parse_statements(
         "SELECT ARRAY(SELECT 1,2); SELECT ARRAY(SELECT 1)",
         Dialect::postgres(),
     ) {
-        let analyzed = statement.unwrap().analyze(context).unwrap();
+        let analyzed = statement
+            .unwrap()
+            .analyze(context, &mut cache_context)
+            .unwrap();
         results.push(analyzed.ast().clone().into_select_statemtnt().unwrap());
         context = analyzed.into_context();
     }

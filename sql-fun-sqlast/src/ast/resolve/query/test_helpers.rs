@@ -119,11 +119,15 @@ pub(super) fn output_type(query: &SelectStatement, name: &str) -> Option<TypeRef
 
 /// Small explicitly selected table for grouping placement checks in DML.
 pub(super) fn grouping_table_context() -> TestParseContext {
+    let mut cache_context = crate::CacheContext::new();
     crate::parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
-        .analyze(catalog().with_dialect(Dialect::postgres()))
+        .analyze(
+            catalog().with_dialect(Dialect::postgres()),
+            &mut cache_context,
+        )
         .unwrap()
         .into_context()
 }
@@ -133,6 +137,7 @@ pub(super) fn column_scope_query(
     sql: &str,
     dialect: Dialect,
 ) -> (SelectStatement, TestParseContext) {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = catalog().with_dialect(dialect);
     for ddl in [
         "CREATE TABLE outer_items(id integer)",
@@ -143,7 +148,7 @@ pub(super) fn column_scope_query(
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context)
+            .analyze(context, &mut cache_context)
             .unwrap()
             .into_context();
     }
@@ -167,6 +172,7 @@ pub(super) fn source_namespace_statement_at_version(
     sql: &str,
     version: &str,
 ) -> AstAndContextPair<TestParseContext> {
+    let mut cache_context = crate::CacheContext::new();
     let dialect = Dialect::postgres();
     let metadata = ::serde_json::from_value(::serde_json::json!({
         "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["a", "public"]
@@ -195,7 +201,11 @@ CREATE TABLE "a.b"."t.x"(id integer NOT NULL);
 CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
 "#;
     for statement in crate::parse_statements(schema, dialect) {
-        context = statement.unwrap().analyze(context).unwrap().into_context();
+        context = statement
+            .unwrap()
+            .analyze(context, &mut cache_context)
+            .unwrap()
+            .into_context();
     }
     let mixed = crate::sem::FullName::with_schema("a", "mixed");
     context.set_get_type_impl_result(
@@ -240,12 +250,13 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
         .next()
         .unwrap()
         .unwrap()
-        .analyze(context)
+        .analyze(context, &mut cache_context)
         .unwrap()
 }
 
 /// Analyze using only the signatures/types needed by record-output tests.
 pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, TestParseContext) {
+    let mut cache_context = crate::CacheContext::new();
     let dialect = Dialect::postgres();
     let mut context = catalog();
     for name in [
@@ -329,7 +340,7 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         .next()
         .unwrap()
         .unwrap()
-        .analyze(context)
+        .analyze(context, &mut cache_context)
         .unwrap()
         .into_context();
     let row_name = crate::sem::FullName::with_schema("public", "row_item");

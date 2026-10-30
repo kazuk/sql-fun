@@ -101,6 +101,7 @@ pub(super) fn analyze(
     concrete_parameters: &str,
     reversed: bool,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = context();
     let polymorphic = format!(
         "CREATE FUNCTION f({polymorphic_parameters}) RETURNS text LANGUAGE sql AS 'SELECT NULL::text'"
@@ -120,13 +121,15 @@ pub(super) fn analyze(
         functions[0], functions[1],
     );
     for statement in parse_statements(&schema, Dialect::postgres()) {
-        context = statement?.analyze(context)?.into_context();
+        context = statement?
+            .analyze(context, &mut cache_context)?
+            .into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(parse_statements(query, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(context)?)
+        .analyze(context, &mut cache_context)?)
 }
 
 pub(super) fn analyze_vector(
@@ -134,36 +137,40 @@ pub(super) fn analyze_vector(
     parameters: &str,
     result: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = context();
     let definition =
         format!("CREATE FUNCTION vf({parameters}) RETURNS {result} LANGUAGE sql AS ''");
     context = parse_statements(&definition, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(context)?
+        .analyze(context, &mut cache_context)?
         .into_context();
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(parse_statements(query, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(context)?)
+        .analyze(context, &mut cache_context)?)
 }
 
 /// A format-like builtin signature in the small explicit catalog.
 pub(super) fn analyze_variadic_any(
     query: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = context();
     for statement in parse_statements(
         r#"CREATE FUNCTION format(text) RETURNS text LANGUAGE internal AS 'text_format';
            CREATE FUNCTION format(text, VARIADIC "any") RETURNS text LANGUAGE internal AS 'text_format';"#,
         Dialect::postgres(),
     ) {
-        context = statement?.analyze(context)?.into_context();
+        context = statement?
+            .analyze(context, &mut cache_context)?
+            .into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(parse_statements(query, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(context)?)
+        .analyze(context, &mut cache_context)?)
 }

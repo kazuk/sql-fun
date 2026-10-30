@@ -46,6 +46,10 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
             .is_some_and(|options| options.expand_asterisk() == Some(true))
     }
 
+    pub(super) const fn cache_context(&mut self) -> &mut ::sql_fun_sqlast::CacheContext {
+        &mut self.state.cache_context
+    }
+
     pub(super) fn collection_count(&self) -> usize {
         self.state.collections.len()
     }

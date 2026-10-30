@@ -160,6 +160,7 @@ mod test_helpers {
             version: &str,
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",
@@ -188,7 +189,9 @@ mod test_helpers {
                 ",
                 Dialect::postgres(),
             ) {
-                context = statement?.analyze(context)?.into_context();
+                context = statement?
+                    .analyze(context, &mut cache_context)?
+                    .into_context();
             }
             assert!(context.problems().is_empty(), "{:?}", context.problems());
             base = context.freeze();
@@ -196,7 +199,7 @@ mod test_helpers {
             Ok(parse_statements(sql, Dialect::postgres())
                 .next()
                 .unwrap()?
-                .analyze(context)?)
+                .analyze(context, &mut cache_context)?)
         }
     }
 }

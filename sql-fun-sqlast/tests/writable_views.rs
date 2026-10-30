@@ -138,6 +138,7 @@ mod test_helpers {
                 base: &FrozenBaseContext,
                 sql: &str,
             ) -> Result<FrozenBaseContext, String> {
+                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
                 let mut context = SchemaFileContext::new(
                     Path::new("layer.sql"),
                     base,
@@ -150,7 +151,7 @@ mod test_helpers {
                 ) {
                     context = statement
                         .map_err(|error| error.to_string())?
-                        .analyze(context)
+                        .analyze(context, &mut cache_context)
                         .map_err(|error| error.to_string())?
                         .into_context();
                 }
@@ -202,6 +203,7 @@ mod test_helpers {
             }
             pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
                 use sql_fun_sqlast::context::ViewInfoWrite;
+                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
 
                 let SemAst::CreateView(view) =
                     self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
@@ -228,7 +230,7 @@ mod test_helpers {
                 .unwrap()
                 .map_err(|error| error.to_string())?;
                 Ok(statement
-                    .analyze(context)
+                    .analyze(context, &mut cache_context)
                     .map_err(|error| error.to_string())?
                     .into_context()
                     .freeze())
@@ -245,6 +247,7 @@ mod test_helpers {
                 base: &FrozenBaseContext,
                 sql: &str,
             ) -> Result<SchemaFileContext, String> {
+                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
                 let mut context = SchemaFileContext::new(
                     Path::new("query.sql"),
                     base,
@@ -258,13 +261,14 @@ mod test_helpers {
                     let statement = statement.map_err(|error| error.to_string())?;
                     context.set_statement_span(*statement.span());
                     context = statement
-                        .analyze(context)
+                        .analyze(context, &mut cache_context)
                         .map_err(|error| error.to_string())?
                         .into_context();
                 }
                 Ok(context)
             }
             pub fn analyze(&self, sql: &str) -> Result<SemAst, String> {
+                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
                 let context = SchemaFileContext::new(
                     Path::new("query.sql"),
                     self.context(),
@@ -279,7 +283,7 @@ mod test_helpers {
                 .unwrap()
                 .map_err(|error| error.to_string())?;
                 let result = statement
-                    .analyze(context)
+                    .analyze(context, &mut cache_context)
                     .map_err(|error| error.to_string())?;
                 let ast = result.ast().clone();
                 let context = result.into_context();

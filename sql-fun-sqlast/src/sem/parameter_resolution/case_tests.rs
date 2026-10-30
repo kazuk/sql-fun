@@ -13,10 +13,11 @@ use std::collections::BTreeMap;
 #[case::multiple_arms("SELECT CASE WHEN $1 THEN 1 WHEN false THEN 2 ELSE 3 END")]
 #[case::repeated_condition("SELECT CASE WHEN $1 THEN 1 WHEN $1 THEN 2 ELSE 3 END")]
 fn searched_conditions_require_boolean(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -36,10 +37,11 @@ fn searched_conditions_require_boolean(#[case] sql: &str) -> testresult::TestRes
 #[case::unconstrained_predicate("SELECT CASE WHEN $1 IS NULL THEN 1 ELSE 2 END")]
 #[case::outer_parameter("SELECT $1 IS NULL, CASE WHEN $1 IS NULL THEN 1 ELSE 2 END")]
 fn null_test_does_not_choose_an_input_type(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -57,10 +59,11 @@ fn null_test_does_not_choose_an_input_type(#[case] sql: &str) -> testresult::Tes
 #[case::when_operand("SELECT CASE 1 WHEN $1 THEN 2 ELSE 3 END")]
 #[case::typed_result("SELECT CASE 1 WHEN 1 THEN $1::integer ELSE 3 END")]
 fn simple_case_keeps_the_resolved_comparison(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -100,10 +103,11 @@ fn simple_case_keeps_the_resolved_comparison(#[case] sql: &str) -> testresult::T
 #[case::mixed_results("SELECT CASE WHEN $1 THEN 1 ELSE true END")]
 #[case::contradictory("SELECT CASE WHEN $1 THEN $1 ELSE 1 END")]
 fn failures_retain_case_and_allow_next_statement(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -136,7 +140,7 @@ fn failures_retain_case_and_allow_next_statement(#[case] sql: &str) -> testresul
     let next = parse_statements("SELECT 1", Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(analyzed.into_context())?;
+        .analyze(analyzed.into_context(), &mut cache_context)?;
     assert!(
         next.context()
             .parameter_constraints()
@@ -150,10 +154,11 @@ fn failures_retain_case_and_allow_next_statement(#[case] sql: &str) -> testresul
 #[case::integer_condition("SELECT CASE WHEN 1 THEN ?1 ELSE 2 END")]
 #[case::selector("SELECT CASE ?1 WHEN 1 THEN 2 ELSE 3 END")]
 fn sqlite_does_not_use_postgres_condition_constraints(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::sqlite())
         .next()
         .unwrap()?
-        .analyze(test_helpers::sqlite_context())?;
+        .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -256,10 +261,11 @@ fn known_results_use_ordered_common_types(
     #[case] expected: &str,
     #[case] not_null: bool,
 ) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -284,10 +290,11 @@ fn known_results_use_ordered_common_types(
 fn incompatible_known_results_keep_specific_diagnostic(
     #[case] sql: &str,
 ) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     let problems = analyzed.context().problems();
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert_eq!(problems[0].code(), "incompatible_case_values");
@@ -298,7 +305,7 @@ fn incompatible_known_results_keep_specific_diagnostic(
     let next = parse_statements("SELECT 1", Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(analyzed.into_context())?;
+        .analyze(analyzed.into_context(), &mut cache_context)?;
     assert!(
         next.context()
             .parameter_constraints()

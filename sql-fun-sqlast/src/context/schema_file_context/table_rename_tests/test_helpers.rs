@@ -83,9 +83,10 @@ pub(super) fn apply_sqlite(
     context: SchemaFileContext,
     sql: &str,
 ) -> Result<crate::AstAndContextPair<SchemaFileContext>, AnalysisError> {
+    let mut cache_context = crate::CacheContext::new();
     crate::parse_statements(sql, crate::ast::Dialect::sqlite())
         .next()
         .unwrap()
         .expect("valid SQLite SQL")
-        .analyze(context)
+        .analyze(context, &mut cache_context)
 }

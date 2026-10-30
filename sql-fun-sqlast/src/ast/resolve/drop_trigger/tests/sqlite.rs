@@ -177,11 +177,12 @@ mod test_helpers {
         mut context: SchemaFileContext,
         sql: &str,
     ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
+        let mut cache_context = crate::CacheContext::new();
         crate::context::MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
             &crate::test_helpers::source_span(),
         );
-        statement(sql).analyze(context)
+        statement(sql).analyze(context, &mut cache_context)
     }
     pub(super) fn table_trigger_count(context: &FrozenBaseContext, schema: &str) -> usize {
         let target = FullName::with_schema(schema, "items");

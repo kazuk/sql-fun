@@ -312,13 +312,14 @@ mod test_helpers {
             schema: &str,
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
             let base = catalog(schema)?;
             let (args, selected) = environment()?;
             let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
             Ok(parse_statements(sql, Dialect::postgres())
                 .next()
                 .unwrap()?
-                .analyze(context)?)
+                .analyze(context, &mut cache_context)?)
         }
     }
 }

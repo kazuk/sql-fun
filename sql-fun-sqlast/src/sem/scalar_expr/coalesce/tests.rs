@@ -13,10 +13,11 @@ use std::collections::BTreeMap;
 #[case::unreachable_mixed("SELECT COALESCE(1,$1,true)")]
 #[case::contradictory("SELECT COALESCE($1,1) WHERE $1")]
 fn failures_retain_operands_and_allow_next_statement(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -49,7 +50,7 @@ fn failures_retain_operands_and_allow_next_statement(#[case] sql: &str) -> testr
     let next = parse_statements("SELECT 1", Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(analyzed.into_context())?;
+        .analyze(analyzed.into_context(), &mut cache_context)?;
     assert!(
         next.context()
             .parameter_constraints()
@@ -60,10 +61,11 @@ fn failures_retain_operands_and_allow_next_statement(#[case] sql: &str) -> testr
 
 #[test]
 fn an_unreachable_parameter_still_constrains_the_result() -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements("SELECT COALESCE(1,$1)", Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -96,10 +98,11 @@ fn an_unreachable_parameter_still_constrains_the_result() -> testresult::TestRes
 #[case::case_insensitive("SELECT coalesce(?1,1)")]
 #[case::null("SELECT COALESCE(?1,NULL)")]
 fn sqlite_does_not_impose_postgres_common_types(#[case] sql: &str) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::sqlite())
         .next()
         .unwrap()?
-        .analyze(test_helpers::sqlite_context())?;
+        .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -146,10 +149,11 @@ fn sqlite_does_not_impose_postgres_common_types(#[case] sql: &str) -> testresult
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_requires_two_arguments_without_losing_the_expression() -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements("SELECT COALESCE(?1)", Dialect::sqlite())
         .next()
         .unwrap()?
-        .analyze(test_helpers::sqlite_context())?;
+        .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -183,10 +187,11 @@ fn untyped_operands_retain_the_semantic_expression(
     #[case] sql: &str,
     #[case] count: usize,
 ) -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let coalesce = query
         .result_columns()
@@ -210,10 +215,11 @@ fn untyped_operands_retain_the_semantic_expression(
 
 #[test]
 fn incompatible_concrete_operands_retain_a_failed_type_domain() -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let analyzed = parse_statements("SELECT COALESCE(1,true)", Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(test_helpers::context())?;
+        .analyze(test_helpers::context(), &mut cache_context)?;
     let failure = analyzed
         .context()
         .problems()

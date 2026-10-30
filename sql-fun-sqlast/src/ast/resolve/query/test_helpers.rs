@@ -95,7 +95,7 @@ pub(super) fn resolve(
     catalog.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut catalog, None);
     let query = if infer {
-        catalog.infer_query_parameter_types(query)
+        catalog.infer_query_parameter_types(query, &mut crate::CacheContext::new())
     } else {
         query
     };
@@ -234,7 +234,7 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
             .unwrap()
             .unwrap()
             .node
-            .resolve(&mut context)
+            .resolve(&mut context, &mut crate::CacheContext::new())
             .unwrap()
             .into_select_statemtnt()
             .unwrap();
@@ -368,7 +368,7 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
     context.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut context, None);
     let query = if infer {
-        context.infer_query_parameter_types(query)
+        context.infer_query_parameter_types(query, &mut crate::CacheContext::new())
     } else {
         query
     };

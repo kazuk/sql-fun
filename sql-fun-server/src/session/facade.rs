@@ -46,8 +46,15 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
             .is_some_and(|options| options.expand_asterisk() == Some(true))
     }
 
-    pub(super) const fn cache_context(&mut self) -> &mut ::sql_fun_sqlast::CacheContext {
-        &mut self.state.cache_context
+    /// Borrow the cache associated with an already validated schema registration.
+    pub(super) fn cache_context(
+        &mut self,
+        handle: &ContextHandle,
+    ) -> &mut ::sql_fun_sqlast::CacheContext {
+        self.state
+            .cache_contexts
+            .entry(handle.clone())
+            .or_insert_with(::sql_fun_sqlast::CacheContext::new)
     }
 
     pub(super) fn collection_count(&self) -> usize {

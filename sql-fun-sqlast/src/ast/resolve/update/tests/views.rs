@@ -24,7 +24,7 @@ fn respects_update_capabilities(
         .unwrap()
         .unwrap()
         .node
-        .resolve(&mut context)
+        .resolve(&mut context, &mut crate::CacheContext::new())
         .unwrap()
         .into_select_statemtnt()
         .unwrap();
@@ -45,7 +45,7 @@ fn respects_update_capabilities(
         .unwrap()
         .unwrap()
         .node
-        .resolve(&mut context);
+        .resolve(&mut context, &mut crate::CacheContext::new());
     assert_eq!(
         context.reported_problem_count() == 0,
         valid,

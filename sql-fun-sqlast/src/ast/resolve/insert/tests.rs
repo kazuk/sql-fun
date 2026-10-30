@@ -101,7 +101,10 @@ fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
         .next()
         .unwrap()
         .unwrap();
-    let result = statement.node.resolve(&mut context).unwrap();
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert!(result.as_insert().is_some());
     assert_eq!(
         context.reported_problem_count(),
@@ -237,7 +240,9 @@ fn fails_without_fabricated_bindings(#[case] sql: &str, #[case] fatal: bool) {
         .unwrap()
         .unwrap();
     let mut context = test_helpers::catalog(Dialect::postgres());
-    let result = statement.node.resolve(&mut context);
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new());
     if fatal {
         assert!(result.is_err());
     } else {
@@ -318,7 +323,10 @@ fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
         .next()
         .unwrap()
         .unwrap();
-    statement.node.resolve(&mut context).unwrap();
+    statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert!(
         context
             .parameter_constraints()
@@ -438,7 +446,10 @@ fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] a
         .next()
         .unwrap()
         .unwrap();
-    let result = statement.node.resolve(&mut context).unwrap();
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert_eq!(
         context.reported_problem_count() == 0,
         accepted,
@@ -606,7 +617,7 @@ fn preserves_modifier_positions_and_looks_up_both_names() {
     .unwrap()
     .unwrap()
     .node
-    .resolve(&mut context)
+    .resolve(&mut context, &mut crate::CacheContext::new())
     .unwrap();
     assert_eq!(context.reported_problem_count(), 0);
     assert_eq!(
@@ -631,7 +642,7 @@ fn retains_failed_inner_collation_even_when_outer_collation_is_bound() {
     let result = crate::parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT ((label COLLATE absent579) COLLATE "C") DO NOTHING"#,
         dialect,
-    ).next().unwrap().unwrap().node.resolve(&mut context).unwrap();
+    ).next().unwrap().unwrap().node.resolve(&mut context, &mut crate::CacheContext::new()).unwrap();
     let conflict = &result.as_insert().unwrap().conflicts()[0];
     assert_eq!(
         conflict.modifiers()[0].collation_references(),
@@ -694,7 +705,10 @@ fn resolves_named_constraint_identity(
     .next()
     .unwrap()
     .unwrap();
-    let result = statement.node.resolve(&mut context).unwrap();
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -713,7 +727,7 @@ fn resolves_named_constraint_identity(
         .unwrap()
         .unwrap()
         .node
-        .resolve(&mut context)
+        .resolve(&mut context, &mut crate::CacheContext::new())
         .unwrap();
     let nullability = returning
         .as_insert()
@@ -769,7 +783,10 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
     .next()
     .unwrap()
     .unwrap();
-    let result = statement.node.resolve(&mut context).unwrap();
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -910,7 +927,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(&mut context)
+            .resolve(&mut context, &mut crate::CacheContext::new())
             .unwrap();
         (statement, context, lookup)
     }
@@ -922,7 +939,7 @@ mod test_helpers {
         let mut context = catalog(dialect);
         let result = statement
             .node
-            .resolve(&mut context)
+            .resolve(&mut context, &mut crate::CacheContext::new())
             .expect("semantic analysis");
         (result, context)
     }
@@ -932,6 +949,11 @@ mod test_helpers {
 fn nested_insert_cte_reports_a_query_problem() {
     let mut context = test_helpers::catalog(Dialect::postgres());
     let statement = crate::parse_statements("SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s", Dialect::postgres()).next().unwrap().unwrap();
-    assert!(statement.node.resolve(&mut context).is_ok());
+    assert!(
+        statement
+            .node
+            .resolve(&mut context, &mut crate::CacheContext::new())
+            .is_ok()
+    );
     assert!(context.reported_problem_count() > 0);
 }

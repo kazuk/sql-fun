@@ -589,7 +589,7 @@ mod test_helpers {
         };
         context.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut context, None);
-        let result = context.infer_query_parameter_types(result);
+        let result = context.infer_query_parameter_types(result, &mut crate::CacheContext::new());
         let query = context.finish_analysis(result).unwrap();
         (query, context)
     }
@@ -677,7 +677,7 @@ mod test_helpers {
         };
         context.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut context, None);
-        let result = context.infer_query_parameter_types(result);
+        let result = context.infer_query_parameter_types(result, &mut crate::CacheContext::new());
         let query = context.finish_analysis(result).unwrap();
         (query, context)
     }

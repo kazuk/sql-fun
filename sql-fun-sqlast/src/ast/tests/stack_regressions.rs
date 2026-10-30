@@ -54,7 +54,9 @@ mod test_helpers {
 
     pub(super) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
         let mut catalog = AnalysisFixture::context().with_dialect(dialect);
-        let result = syntax.resolve(&mut catalog).expect("normal query analysis");
+        let result = syntax
+            .resolve(&mut catalog, &mut crate::CacheContext::new())
+            .expect("normal query analysis");
         let column = result
             .get_result_column_def(&ColumnName::from("n"))
             .expect("named output column");

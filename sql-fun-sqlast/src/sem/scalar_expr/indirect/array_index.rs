@@ -136,7 +136,7 @@ impl ArrayIndex {
 impl ArrayIndex {
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> SemScalarExpr {
         let mut result = parameters.array_access(context, &self.array, &[&self.index], false);

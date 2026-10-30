@@ -313,7 +313,11 @@ fn rejects_invalid_grouping_through_diagnostic_policy() {
     };
     let mut context = super::test_helpers::catalog();
     context.reject_diagnostics_after(0);
-    assert!(query.resolve(&mut context).is_err());
+    assert!(
+        query
+            .resolve(&mut context, &mut crate::CacheContext::new())
+            .is_err()
+    );
     assert_eq!(context.reported_problem_count(), 0);
 }
 

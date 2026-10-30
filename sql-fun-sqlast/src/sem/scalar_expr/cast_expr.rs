@@ -159,7 +159,7 @@ impl ImplicitCastExpr {
 impl TypeCastExpr {
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
         if self.arg.constraint_node().is_none() {

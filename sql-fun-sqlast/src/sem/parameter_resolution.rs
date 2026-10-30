@@ -153,14 +153,23 @@ impl QueryScope {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct ParameterResolution {
+pub(crate) struct ParameterResolution<'cache> {
+    cache: &'cache mut crate::CacheContext,
     graph: ConstraintGraph,
     scopes: Vec<QueryScope>,
     completed: Outputs,
 }
 
-impl ParameterResolution {
+impl<'cache> ParameterResolution<'cache> {
+    pub(crate) fn new(cache: &'cache mut crate::CacheContext) -> Self {
+        Self {
+            cache,
+            graph: ConstraintGraph::default(),
+            scopes: Vec::new(),
+            completed: Outputs::default(),
+        }
+    }
+
     pub(crate) fn constraints(&self) -> ParameterConstraints {
         let mut constraints = ParameterConstraints::from_graph(&self.graph);
         constraints.set_outputs(&self.completed.constraints(&self.graph));
@@ -168,7 +177,7 @@ impl ParameterResolution {
     }
 
     fn solve(&mut self, context: &mut impl crate::sem::ParseContext) -> Result<(), AnalysisError> {
-        self.graph.prepare_projections(context);
+        self.graph.prepare_projections(context, self.cache);
         self.graph.report_projection_problems(context)?;
         if let Err(problem) = self.graph.solve() {
             crate::sem::ParseContext::report_analysis_problem(
@@ -191,7 +200,7 @@ impl ParameterResolution {
     }
 
     fn default_query_outputs(&mut self, context: &impl crate::sem::ParseContext) {
-        self.graph.prepare_projections(context);
+        self.graph.prepare_projections(context, self.cache);
         // UPDATE/DELETE subqueries resolve unknown projected parameters before
         // surrounding expressions or assignments constrain them. Keep solver failure
         // in the graph for the final diagnostic-producing solve.
@@ -251,9 +260,11 @@ impl ParameterResolution {
         {
             self.graph.restrict(
                 node,
-                &InputTypeConstraint::types(
-                    context.cast_sources(&crate::sem::PgBuiltInType::bool(), false),
-                ),
+                &InputTypeConstraint::types(self.cache.cast_sources(
+                    context,
+                    &crate::sem::PgBuiltInType::bool(),
+                    false,
+                )),
             );
         }
         node
@@ -460,7 +471,7 @@ impl ParameterResolution {
         if let Some(node) = value.constraint_node() {
             self.graph.restrict(
                 node,
-                &InputTypeConstraint::types(catalog.cast_sources(target, explicit)),
+                &InputTypeConstraint::types(self.cache.cast_sources(catalog, target, explicit)),
             );
         }
     }
@@ -490,7 +501,7 @@ impl ParameterResolution {
         }
         nodes.push(result.constraint_node().expect("operation has node"));
         self.graph
-            .call(catalog, &nodes, signatures, diagnostic_name);
+            .call(catalog, self.cache, &nodes, signatures, diagnostic_name);
         Ok(result)
     }
 
@@ -551,7 +562,7 @@ impl ParameterResolution {
             return Ok((node, InputTypeConstraint::any()));
         }
         for target in choices.clone() {
-            choices.extend(context.cast_sources(&target, false));
+            choices.extend(self.cache.cast_sources(context, &target, false));
         }
         let choices = InputTypeConstraint::types(choices);
         let mut nodes = Vec::new();
@@ -902,7 +913,7 @@ impl Signature {
         self.unrestricted_inputs.contains(&index)
     }
 
-    pub(super) fn cast_score(
+    pub(crate) fn cast_score(
         &self,
         catalog: &impl BaseParseContext,
         source: &TypeReference,
@@ -941,13 +952,13 @@ impl Signature {
     }
 }
 
-struct Collector<'a, C: crate::sem::ParseContext> {
+struct Collector<'context, 'cache, C: crate::sem::ParseContext> {
     dml_depth: usize,
-    parameters: ParameterResolution,
-    context: &'a mut C,
+    parameters: ParameterResolution<'cache>,
+    context: &'context mut C,
 }
 
-impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, C> {
+impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, '_, C> {
     fn enter_expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.resolve_between(self.context)
     }
@@ -1203,16 +1214,17 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Fin
     }
 }
 
-impl ParameterResolution {
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_query(
         query: &mut crate::sem::SelectStatement,
         context: &mut impl crate::sem::ParseContext,
+        cache: &'cache mut crate::CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             dml_depth: 0,
-            parameters: Self::default(),
+            parameters: Self::new(cache),
             context,
         };
         let mut expand_root = true;
@@ -1239,13 +1251,14 @@ impl ParameterResolution {
     pub(crate) fn infer_insert(
         insert: &mut crate::sem::InsertStatement,
         context: &mut impl crate::sem::ParseContext,
+        cache: &'cache mut crate::CacheContext,
         implicit_targets: bool,
     ) -> Result<(ParameterConstraints, bool), AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             dml_depth: 0,
-            parameters: Self::default(),
+            parameters: Self::new(cache),
             context,
         };
         let mut expand_source = true;
@@ -1280,12 +1293,13 @@ impl ParameterResolution {
     pub(crate) fn infer_update(
         update: &mut crate::sem::UpdateStatement,
         context: &mut impl crate::sem::ParseContext,
+        cache: &'cache mut crate::CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             dml_depth: 0,
-            parameters: Self::default(),
+            parameters: Self::new(cache),
             context,
         };
         loop {
@@ -1305,12 +1319,13 @@ impl ParameterResolution {
     pub(crate) fn infer_delete(
         delete: &mut crate::sem::DeleteStatement,
         context: &mut impl crate::sem::ParseContext,
+        cache: &'cache mut crate::CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             dml_depth: 0,
-            parameters: Self::default(),
+            parameters: Self::new(cache),
             context,
         };
         loop {
@@ -1330,12 +1345,13 @@ impl ParameterResolution {
     pub(crate) fn infer_merge(
         merge: &mut crate::sem::MergeStatement,
         context: &mut impl crate::sem::ParseContext,
+        cache: &'cache mut crate::CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             dml_depth: 0,
-            parameters: Self::default(),
+            parameters: Self::new(cache),
             context,
         };
         loop {
@@ -1355,12 +1371,13 @@ impl ParameterResolution {
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
         context: &mut impl crate::sem::ParseContext,
+        cache: &'cache mut crate::CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             dml_depth: 0,
-            parameters: Self::default(),
+            parameters: Self::new(cache),
             context,
         };
         loop {

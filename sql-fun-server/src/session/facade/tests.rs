@@ -15,6 +15,34 @@ use std::{
     },
 };
 
+#[tokio::test]
+async fn schema_registrations_own_separate_reusable_analysis_caches() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let schema = project.initialized_schema(&service).await;
+    let wrapper = SessionWrapper::new();
+    let first = wrapper.contexts.register(&schema).unwrap();
+    let second = wrapper.contexts.register(&schema).unwrap();
+    let mut state = SessionState::new(NonZeroUsize::new(2).unwrap());
+    {
+        let mut session = Session::new(&wrapper.contexts, &mut state);
+        // Complete both insertions before comparing borrows, so map growth
+        // cannot invalidate the addresses used in this ownership assertion.
+        session.cache_context(&first);
+        session.cache_context(&second);
+    }
+    assert_eq!(state.cache_contexts.len(), 2);
+    let first_cache = &state.cache_contexts[&first];
+    let second_cache = &state.cache_contexts[&second];
+    assert!(!std::ptr::eq(first_cache, second_cache));
+    let mut session = Session::new(&wrapper.contexts, &mut state);
+    let first_cache = std::ptr::from_ref(session.cache_context(&first));
+    // A new request facade retains the same session-owned cache for this handle.
+    let mut next = Session::new(&wrapper.contexts, &mut state);
+    assert!(std::ptr::eq(first_cache, next.cache_context(&first)));
+    assert_eq!(state.cache_contexts.len(), 2);
+}
+
 #[rstest::rstest]
 #[case::normal(false, false)]
 #[case::released(false, true)]

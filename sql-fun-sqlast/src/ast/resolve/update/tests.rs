@@ -64,7 +64,9 @@ fn rejects_invalid_structure(#[case] sql: &str, #[case] fatal: bool) {
         .next()
         .unwrap()
         .unwrap();
-    let result = statement.node.resolve(&mut context);
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new());
     if fatal {
         assert!(result.is_err());
     } else {
@@ -84,7 +86,10 @@ fn preserves_default_and_resets_parameters() {
             .next()
             .unwrap()
             .unwrap();
-        let result = statement.node.resolve(&mut context).unwrap();
+        let result = statement
+            .node
+            .resolve(&mut context, &mut crate::CacheContext::new())
+            .unwrap();
         if sql.ends_with("DEFAULT") {
             assert!(
                 result.as_update().unwrap().assignments()[0]
@@ -179,7 +184,10 @@ mod test_helpers {
             .next()
             .unwrap()
             .unwrap();
-        let result = statement.node.resolve(&mut context).unwrap();
+        let result = statement
+            .node
+            .resolve(&mut context, &mut crate::CacheContext::new())
+            .unwrap();
         (result, context)
     }
 }
@@ -257,7 +265,10 @@ fn unreferenced_update_cte_is_analyzed_in_one_inference_pass() {
     .unwrap()
     .unwrap();
     let before = crate::sem::parameter_resolution::inference_runs();
-    statement.node.resolve(&mut context).unwrap();
+    statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert_eq!(
         crate::sem::parameter_resolution::inference_runs(),
         before + 1

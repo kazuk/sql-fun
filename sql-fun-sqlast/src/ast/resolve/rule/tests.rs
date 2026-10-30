@@ -689,7 +689,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(context)
+            .resolve(context, &mut crate::CacheContext::new())
     }
     pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
         SchemaFileContext::new(
@@ -708,7 +708,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve_and_apply(context)?
+            .resolve_and_apply(context, &mut crate::CacheContext::new())?
             .into_context())
     }
 }

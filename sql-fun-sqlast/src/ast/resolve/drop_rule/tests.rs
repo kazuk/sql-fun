@@ -18,7 +18,9 @@ fn resolved_drop_does_not_apply_until_requested(
 ) -> testresult::TestResult {
     let parent = test_helpers::heavy::catalog()?;
     let mut child = test_helpers::layer(&parent);
-    let statement = test_helpers::statement(sql).node.resolve(&mut child)?;
+    let statement = test_helpers::statement(sql)
+        .node
+        .resolve(&mut child, &mut crate::CacheContext::new())?;
     let drop = statement.rule_drop().unwrap();
     assert!(drop.found());
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
@@ -86,7 +88,7 @@ fn invalid_drop_leaves_named_definitions_and_links_intact(
     assert!(
         test_helpers::statement(sql)
             .node
-            .resolve(&mut child)
+            .resolve(&mut child, &mut crate::CacheContext::new())
             .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert!(child.rule(&test_helpers::identity()).is_some());
@@ -259,7 +261,7 @@ fn cannot_drop_the_select_rule_required_by_a_view(
         "DROP RULE \"_RETURN\" ON public.item_view {behavior}"
     ))
     .node
-    .resolve(&mut child);
+    .resolve(&mut child, &mut crate::CacheContext::new());
     assert!(matches!(result?, crate::sem::SemAst::UnresolvedStatement));
     assert!(
         child

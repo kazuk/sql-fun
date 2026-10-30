@@ -79,7 +79,7 @@ impl SemAst {
         };
 
         let syntax = crate::ast::StatementNode::try_from_with_tokens(&statement, tokens)?;
-        syntax.resolve_and_apply(context)
+        syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
     }
 
     /// analyze [`Stmt`]
@@ -101,18 +101,18 @@ impl SemAst {
         match syn {
             Stmt::AlterTable(alter_table) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::AlterTable(alter_table))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::CreateTable(create_table_statement) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTable(
                     create_table_statement,
                 ))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::DropTable(drop_table_statement) => {
                 let syntax =
                     crate::ast::StatementNode::try_from(&Stmt::DropTable(drop_table_statement))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
@@ -130,15 +130,15 @@ impl SemAst {
             Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
             Stmt::CreateTrigger(trigger) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTrigger(trigger))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::DropTrigger(trigger) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::DropTrigger(trigger))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::CreateView(view) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateView(view))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
             Stmt::DropView(_drop_view) => todo!(),
@@ -148,19 +148,19 @@ impl SemAst {
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Select(select))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::Update(update) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Update(update))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::Delete(delete) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Delete(delete))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::Insert(insert) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Insert(insert))?;
-                syntax.resolve_and_apply(context)
+                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
             }
             Stmt::Pragma(_pragma_statement) => todo!(),
             Stmt::CreateDomain(_create_domain_statement) => todo!(),

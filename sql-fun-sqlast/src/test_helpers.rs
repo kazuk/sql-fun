@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! test helper types
 
+pub(crate) mod analysis_cache;
 pub(crate) mod column_rename;
 
 pub(crate) mod between;

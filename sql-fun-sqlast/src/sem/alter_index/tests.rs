@@ -498,7 +498,9 @@ mod test_helpers {
             let node = crate::syn::Node::from(raw.stmt.expect("statement").as_ref().clone());
             let syntax =
                 StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
-            context = syntax.resolve_and_apply(context)?.into_context();
+            context = syntax
+                .resolve_and_apply(context, &mut crate::CacheContext::new())?
+                .into_context();
         }
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         Ok(context)

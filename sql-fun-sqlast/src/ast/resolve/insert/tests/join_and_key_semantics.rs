@@ -98,7 +98,7 @@ mod test_helpers {
         .unwrap()
         .unwrap()
         .node
-        .resolve(&mut context)
+        .resolve(&mut context, &mut crate::CacheContext::new())
         .unwrap();
         (statement, context)
     }

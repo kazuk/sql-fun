@@ -1324,7 +1324,7 @@ impl SemScalarExpr {
     }
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<(), AnalysisError> {
         let replacement = match self {

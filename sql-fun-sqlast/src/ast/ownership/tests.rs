@@ -265,7 +265,7 @@ fn missing_roles_and_targets_are_explicit_and_never_apply() -> testresult::TestR
 fn resolution_does_not_apply_and_legacy_entry_point_shares_the_result() -> testresult::TestResult {
     let mut context = apply_ownership_sql(ownership_context(), "CREATE SCHEMA app")?.into_context();
     let statement = ownership_statement("ALTER SCHEMA app OWNER TO alice")?;
-    let semantics = statement.resolve(&mut context)?;
+    let semantics = statement.resolve(&mut context, &mut crate::CacheContext::new())?;
     assert!(
         semantics
             .ownership_change()
@@ -720,7 +720,8 @@ fn failure_to_accept_a_diagnostic_aborts_before_any_owner_update() -> testresult
         Some(&OwnerSpecification::session_user()),
     ));
     context.reject_diagnostics_after(0);
-    let result = ownership_statement("ALTER SCHEMA app OWNER TO missing")?.resolve(&mut context);
+    let result = ownership_statement("ALTER SCHEMA app OWNER TO missing")?
+        .resolve(&mut context, &mut crate::CacheContext::new());
     assert!(result.is_err());
     assert_eq!(
         context.ownership_definitions(ObjectKind::from(37), identity.name())[0].owner(),

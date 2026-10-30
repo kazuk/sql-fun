@@ -76,8 +76,10 @@ impl Statement {
     /// No SQL reparsing or catalog-file discovery occurs. This uses the same
     /// resolver and diagnostic reporting as the normal semantic-analysis path.
     ///
-    /// The caller retains and reuses `cache_context` across analyses. It is
-    /// currently empty and does not affect analysis behavior.
+    /// The caller retains and reuses `cache_context` across analyses against
+    /// the same immutable schema base. It memoizes calculation facts without
+    /// changing analysis results. The caller owns this association; the cache
+    /// performs no environment validation.
     ///
     /// # Panics
     ///
@@ -90,10 +92,10 @@ impl Statement {
     pub fn analyze<TContext: ParseContext>(
         &self,
         context: TContext,
-        _cache_context: &mut crate::CacheContext,
+        cache_context: &mut crate::CacheContext,
     ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError> {
         AnalysisError::check_dialect(self.dialect, context.dialect())?;
-        self.node.resolve_and_apply(context)
+        self.node.resolve_and_apply(context, cache_context)
     }
 
     /// Inspect an existing WITH clause without exposing mutable node storage.

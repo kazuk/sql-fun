@@ -675,7 +675,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(&mut context)
+            .resolve(&mut context, &mut crate::CacheContext::new())
             .unwrap();
         let query = statement.into_select_statemtnt().unwrap();
         let view_name = FullName::with_schema(schema, "item_view");
@@ -757,7 +757,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(context)
+            .resolve(context, &mut crate::CacheContext::new())
     }
     pub(super) fn apply(
         sql: &str,
@@ -768,7 +768,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve_and_apply(context)
+            .resolve_and_apply(context, &mut crate::CacheContext::new())
     }
     #[cfg(feature = "sqlite")]
     pub(super) fn sqlite_oracle() -> Result<::rusqlite::Connection, ::rusqlite::Error> {

@@ -150,7 +150,7 @@ impl ArraySlice {
 impl ArraySlice {
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> SemScalarExpr {
         let bounds: Vec<_> = self.lower.iter().chain(&self.upper).collect();

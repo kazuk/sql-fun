@@ -348,6 +348,6 @@ pub fn analyze_merge_statement<T: ParseContext>(
     use crate::ast::TryFromWithTokens;
     AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
     let syntax = crate::ast::Merge::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let merge = syntax.resolve(&mut context)?;
+    let merge = syntax.resolve(&mut context, &mut crate::CacheContext::new())?;
     Ok((crate::sem::SemAst::merge(&merge), context))
 }

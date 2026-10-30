@@ -195,7 +195,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(&mut context)
+            .resolve(&mut context, &mut crate::CacheContext::new())
             .unwrap();
         let query = view.into_select_statemtnt().unwrap();
         let name = FullName::with_schema("public", "writable_items");
@@ -271,7 +271,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(&mut context);
+            .resolve(&mut context, &mut crate::CacheContext::new());
         (result, context)
     }
 }

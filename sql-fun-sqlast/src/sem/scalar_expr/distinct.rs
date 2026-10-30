@@ -36,7 +36,7 @@ struct DeferredEquality {
 impl DeferredEquality {
     fn infer(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut operands = self.operands.clone();
@@ -95,7 +95,7 @@ impl DistinctComparison {
     }
     fn infer(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if let Self::Deferred(value) = self {
@@ -298,7 +298,7 @@ impl DistinctExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         self.comparison.infer(parameters, context)?;

@@ -296,7 +296,7 @@ impl ResultColumnCollection {
     pub(crate) fn grouping_expression(&self, index: usize) -> Option<&SemScalarExpr> {
         self.0.get(index)?.expression()
     }
-    pub(crate) fn default_returning_parameters(&self, parameters: &mut ParameterResolution) {
+    pub(crate) fn default_returning_parameters(&self, parameters: &mut ParameterResolution<'_>) {
         for column in &self.0 {
             if let Some(value) = &column.expression {
                 parameters.default_returning_parameter(value);

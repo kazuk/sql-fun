@@ -377,7 +377,11 @@ mod test_public_builders {
             ::serde_json::to_value(&decoded)?,
             ::serde_json::to_value(&original)?
         );
-        let constraints = ParameterResolution::infer_expression(&mut decoded, &mut context)?;
+        let constraints = ParameterResolution::infer_expression(
+            &mut decoded,
+            &mut context,
+            &mut crate::CacheContext::new(),
+        )?;
         assert_eq!(decoded.get_type(), Some(PgBuiltInType::bool()));
         let bindings = comparison_bindings(&decoded)?;
         let mut expected = vec![lower, upper];

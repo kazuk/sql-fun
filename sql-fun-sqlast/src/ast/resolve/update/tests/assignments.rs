@@ -8,7 +8,7 @@ fn synthetic_array_parameters_retain_assignment_compatibility() {
         .unwrap()
         .unwrap()
         .node
-        .resolve(&mut context);
+        .resolve(&mut context, &mut crate::CacheContext::new());
     assert!(result.is_ok(), "{result:?}");
     assert_eq!(context.reported_problem_count(), 0);
 }

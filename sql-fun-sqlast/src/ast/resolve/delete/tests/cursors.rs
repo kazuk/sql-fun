@@ -10,7 +10,7 @@ fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {
         .unwrap()
         .unwrap()
         .node
-        .resolve(context)
+        .resolve(context, &mut crate::CacheContext::new())
         .unwrap()
 }
 
@@ -186,7 +186,10 @@ fn retains_unsupported_procedural_cursor_parameter() {
         panic!("CURRENT OF")
     };
     cursor.parameter = 3;
-    let result = statement.node.resolve(&mut context).unwrap();
+    let result = statement
+        .node
+        .resolve(&mut context, &mut crate::CacheContext::new())
+        .unwrap();
     assert_eq!(
         result
             .as_delete()

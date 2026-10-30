@@ -155,7 +155,7 @@ impl MemberRef {
 
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
     ) -> Option<SemScalarExpr> {
         if let Some(row) = self.base.row_constructor()
             && let Some(field) = row.field(&self.member)

@@ -193,7 +193,7 @@ impl ArithExpr {
 impl BetweenExpr {
     fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
     ) {
         if self.left.constraint_node().is_some()
             || self.start.constraint_node().is_some()
@@ -206,7 +206,7 @@ impl BetweenExpr {
 impl ArithExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
         match self {

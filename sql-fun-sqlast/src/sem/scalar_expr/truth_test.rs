@@ -158,7 +158,7 @@ impl TruthTestExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &impl ParseContext,
     ) {
         let (node, types) = parameters.truth_test(context, &self.argument, &self.types);

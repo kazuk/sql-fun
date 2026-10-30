@@ -431,6 +431,7 @@ fn inference_uses_captured_function_and_operator_bindings() {
     let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
         &mut query,
         &mut catalog,
+        &mut crate::CacheContext::new(),
     )
     .unwrap();
     catalog.finish_analysis(Ok(())).unwrap();

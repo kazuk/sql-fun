@@ -748,7 +748,7 @@ impl CaseWhen {
 impl CaseExpr {
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<(), AnalysisError> {
         if self.types.is_none()

@@ -22,6 +22,7 @@ struct RankedSignature {
 impl RankedSignature {
     fn prepare(
         context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
         signature: &Signature,
         candidates: &HashSet<TypeReference>,
     ) -> Self {
@@ -30,7 +31,7 @@ impl RankedSignature {
                 if signature.accepts_any_type(index) {
                     HashMap::new()
                 } else {
-                    Self::ranks(context, signature, index, candidates.iter().cloned())
+                    Self::ranks(context, cache, signature, index, candidates.iter().cloned())
                 }
             })
             .collect();
@@ -42,6 +43,7 @@ impl RankedSignature {
 
     fn ranks(
         context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
         signature: &Signature,
         index: usize,
         sources: impl Iterator<Item = TypeReference>,
@@ -50,7 +52,7 @@ impl RankedSignature {
             .filter_map(|source| {
                 Some((
                     source.clone(),
-                    signature.cast_score(context, &source, index)?,
+                    cache.argument_rank(context, signature, index, &source)?,
                 ))
             })
             .collect()
@@ -90,11 +92,17 @@ impl RankedSignature {
         })
     }
 
-    fn retain_sources(&mut self, context: &impl ParseContext, sources: &HashSet<TypeReference>) {
+    fn retain_sources(
+        &mut self,
+        context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
+        sources: &HashSet<TypeReference>,
+    ) {
         for index in 0..self.sources.len() {
             if !self.signature.accepts_any_type(index) {
                 self.sources[index].extend(Self::ranks(
                     context,
+                    cache,
                     &self.signature,
                     index,
                     sources.iter().cloned(),
@@ -252,9 +260,14 @@ impl RankedSignatures {
         )
     }
 
-    fn retain_sources(&mut self, context: &impl ParseContext, sources: &HashSet<TypeReference>) {
+    fn retain_sources(
+        &mut self,
+        context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
+        sources: &HashSet<TypeReference>,
+    ) {
         for entry in &mut self.0 {
-            entry.retain_sources(context, sources);
+            entry.retain_sources(context, cache, sources);
         }
     }
 
@@ -306,6 +319,7 @@ struct CallFacts {
 impl CallFacts {
     fn prepare(
         context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
         signatures: &[Signature],
         inputs: &[InputTypeConstraint],
     ) -> Self {
@@ -329,7 +343,7 @@ impl CallFacts {
             .collect();
         let concrete = declarations
             .into_iter()
-            .map(|signature| RankedSignature::prepare(context, signature, &candidates))
+            .map(|signature| RankedSignature::prepare(context, cache, signature, &candidates))
             .collect();
         let arrays = signatures
             .iter()
@@ -349,6 +363,7 @@ impl CallFacts {
         }
         facts.retain(
             context,
+            cache,
             inputs
                 .iter()
                 .filter_map(InputTypeConstraint::admissible_types)
@@ -366,6 +381,7 @@ impl CallFacts {
     fn retain<'a>(
         &mut self,
         context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
         types: impl Iterator<Item = &'a TypeReference>,
     ) {
         let mut sources = HashSet::new();
@@ -376,7 +392,7 @@ impl CallFacts {
             sources.extend(context.declared_implicit_cast_sources(ty));
             self.retain_array_source(context, ty);
         }
-        self.concrete.retain_sources(context, &sources);
+        self.concrete.retain_sources(context, cache, &sources);
         for source in sources {
             self.retain_array_source(context, &source);
         }
@@ -486,6 +502,7 @@ mod call_facts_tests {
         }
         let facts = CallFacts::prepare(
             &context,
+            &mut crate::CacheContext::new(),
             &signatures,
             &[InputTypeConstraint::any(), InputTypeConstraint::any()],
         );
@@ -510,6 +527,7 @@ pub(super) struct CallConstraint {
 impl CallConstraint {
     pub(super) fn prepare(
         context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
         nodes: &[usize],
         signatures: &[Signature],
         inputs: &[InputTypeConstraint],
@@ -519,7 +537,7 @@ impl CallConstraint {
         Self {
             parameters: parameters.to_vec(),
             nodes: nodes.to_vec(),
-            facts: Arc::new(CallFacts::prepare(context, signatures, inputs)),
+            facts: Arc::new(CallFacts::prepare(context, cache, signatures, inputs)),
             operation: operation.to_owned(),
         }
     }
@@ -527,9 +545,10 @@ impl CallConstraint {
     pub(super) fn retain<'a>(
         &mut self,
         context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
         types: impl Iterator<Item = &'a TypeReference>,
     ) {
-        Arc::make_mut(&mut self.facts).retain(context, types);
+        Arc::make_mut(&mut self.facts).retain(context, cache, types);
     }
 
     pub(super) fn instantiate(&self, graph: &mut ConstraintGraph, defaults: bool) -> bool {
@@ -610,7 +629,13 @@ mod tests {
         let left = graph.parameter(1);
         let right = graph.parameter(2);
         let result = graph.node(&InputTypeConstraint::any());
-        graph.call(&context, &[left, right, result], &signatures, "comparison");
+        graph.call(
+            &context,
+            &mut crate::CacheContext::new(),
+            &[left, right, result],
+            &signatures,
+            "comparison",
+        );
         graph.solve().unwrap();
         assert_eq!(
             graph.domain(left),
@@ -646,7 +671,13 @@ mod tests {
         let left = graph.parameter(1);
         let right = graph.parameter(2);
         let result = graph.node(&InputTypeConstraint::any());
-        graph.call(&context, &[left, right, result], &signatures, "comparison");
+        graph.call(
+            &context,
+            &mut crate::CacheContext::new(),
+            &[left, right, result],
+            &signatures,
+            "comparison",
+        );
         if intermediate_solve {
             graph.solve().unwrap();
         }
@@ -678,6 +709,7 @@ mod tests {
         }
         graph.call(
             &context,
+            &mut crate::CacheContext::new(),
             &[left, right, result],
             &array_signatures,
             "array comparison",
@@ -709,6 +741,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
+            &mut crate::CacheContext::new(),
             &[left, right, result],
             &signatures,
             "custom comparison",
@@ -729,7 +762,13 @@ mod tests {
         let left = graph.parameter(1);
         let right = graph.parameter(2);
         let result = graph.node(&InputTypeConstraint::any());
-        graph.call(&context, &[left, right, result], &signatures, "comparison");
+        graph.call(
+            &context,
+            &mut crate::CacheContext::new(),
+            &[left, right, result],
+            &signatures,
+            "comparison",
+        );
         graph.solve().unwrap();
         let constraints = ParameterConstraints::from_graph(&graph);
         drop(context);
@@ -759,6 +798,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::exact(&date));
         graph.call(
             &context,
+            &mut crate::CacheContext::new(),
             &[input, result],
             &signatures,
             "result-constrained call",
@@ -778,7 +818,13 @@ mod tests {
         let left = graph.node(&InputTypeConstraint::any());
         let right = graph.node(&InputTypeConstraint::any());
         let result = graph.node(&InputTypeConstraint::any());
-        graph.call(&context, &[left, right, result], &signatures, "comparison");
+        graph.call(
+            &context,
+            &mut crate::CacheContext::new(),
+            &[left, right, result],
+            &signatures,
+            "comparison",
+        );
         graph.solve().unwrap();
         graph.report_inference_problems(&mut context).unwrap();
         assert_eq!(context.reported_problems().len(), 1);
@@ -798,10 +844,16 @@ mod tests {
         let left = graph.node(&InputTypeConstraint::any());
         let right = graph.node(&InputTypeConstraint::any());
         let result = graph.node(&InputTypeConstraint::any());
-        graph.call(&context, &[left, right, result], &signatures, "comparison");
+        graph.call(
+            &context,
+            &mut crate::CacheContext::new(),
+            &[left, right, result],
+            &signatures,
+            "comparison",
+        );
         let custom: TypeReference = "public.custom[]".parse().unwrap();
         graph.restrict(left, &InputTypeConstraint::exact(&custom));
-        graph.prepare_projections(&context);
+        graph.prepare_projections(&context, &mut crate::CacheContext::new());
         graph.solve().unwrap();
         graph.report_inference_problems(&mut context).unwrap();
         assert!(context.reported_problems().is_empty());
@@ -831,6 +883,7 @@ mod tests {
         graph.restrict(left, &InputTypeConstraint::exact(&domain));
         graph.call(
             &context,
+            &mut crate::CacheContext::new(),
             &[left, right, result],
             &signatures,
             "domain comparison",
@@ -882,6 +935,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
+            &mut crate::CacheContext::new(),
             &[left, right, result],
             &signatures,
             "domain array comparison",

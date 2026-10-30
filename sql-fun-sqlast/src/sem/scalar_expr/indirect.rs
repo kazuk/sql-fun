@@ -161,7 +161,7 @@ impl IndirectionExpr {
 impl IndirectionExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
     ) -> Option<SemScalarExpr> {
         match self {

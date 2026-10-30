@@ -13,11 +13,12 @@ impl Delete {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<DeleteStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|mut delete| {
             if context.parameter_inference_needed() {
-                let constraints = ParameterResolution::infer_delete(&mut delete, context)?;
+                let constraints = ParameterResolution::infer_delete(&mut delete, context, cache)?;
                 context.set_parameter_constraints(&constraints);
             }
             Ok(delete)

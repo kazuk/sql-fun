@@ -203,7 +203,7 @@ impl SelectStatement {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&mut context);
+        let outcome = syntax.resolve(&mut context, &mut crate::CacheContext::new());
         let query = outcome?;
         Ok(AstAndContextPair::new(SemAst::select(&query), context))
     }
@@ -272,7 +272,7 @@ impl SelectStatementNode {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&mut context);
+        let outcome = syntax.resolve(&mut context, &mut crate::CacheContext::new());
         let query = outcome?;
         Ok((query, context))
     }

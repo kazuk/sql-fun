@@ -86,9 +86,11 @@ function run_sqlast_regressions() {
         --priorities "$suite/priorities.tsv" --output "$target_dir/sqlast-regressions"
       ;;
     *)
+      # Local tests must use this worktree\'s binaries even when direnv
+      # supplied paths from another checkout. CI archived phases keep overrides.
       SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
-        SQL_FUN_BIN="${SQL_FUN_BIN:-${binary_dir}/sql-fun}" \
-        SQL_FUN_TEST_SERVER_BIN="${SQL_FUN_TEST_SERVER_BIN:-${binary_dir}/sql-fun-server}" \
+        SQL_FUN_BIN="${binary_dir}/sql-fun" \
+        SQL_FUN_TEST_SERVER_BIN="${binary_dir}/sql-fun-server" \
         SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
         "$suite/run.sh" || return $?
       uv run --no-project --no-config --python 3.12 python -B "$suite/scheduling.py" \

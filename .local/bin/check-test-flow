@@ -116,6 +116,13 @@ done
 
 cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
+# Local verification uses binaries built for this worktree, not paths inherited
+# from direnv in a different checkout. Split CI test phases supply artifacts.
+if [[ "$WORKSPACE_PHASE" != test && "$WORKSPACE_PHASE" != sqlast-test && "$WORKSPACE_PHASE" != rust-test ]]; then
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  export SQL_FUN_BIN="${target_dir}/debug/sql-fun"
+  export SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server"
+fi
 source "$GIT_ROOT/.local/sbin/workspace-nextest"
 source "$GIT_ROOT/.local/sbin/workspace-verification"
 

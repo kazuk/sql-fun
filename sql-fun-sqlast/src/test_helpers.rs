@@ -31,6 +31,11 @@ pub use self::{
     test_parse_context::{TestParseContext, test_context},
 };
 
+/// Create independent cache state for a test-owned analysis base.
+pub(crate) fn create_cache_context() -> crate::CacheContext {
+    crate::CacheContext::new()
+}
+
 #[cfg(feature = "sqlite")]
 #[expect(missing_docs)]
 mod sqlite_syn_builder {

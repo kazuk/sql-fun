@@ -502,7 +502,7 @@ mod call_facts_tests {
         }
         let facts = CallFacts::prepare(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &signatures,
             &[InputTypeConstraint::any(), InputTypeConstraint::any()],
         );
@@ -631,7 +631,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -673,7 +673,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -709,7 +709,7 @@ mod tests {
         }
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &array_signatures,
             "array comparison",
@@ -741,7 +741,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "custom comparison",
@@ -764,7 +764,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -798,7 +798,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::exact(&date));
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[input, result],
             &signatures,
             "result-constrained call",
@@ -820,7 +820,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -846,14 +846,14 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
         );
         let custom: TypeReference = "public.custom[]".parse().unwrap();
         graph.restrict(left, &InputTypeConstraint::exact(&custom));
-        graph.prepare_projections(&context, &mut crate::CacheContext::new());
+        graph.prepare_projections(&context, &mut crate::test_helpers::create_cache_context());
         graph.solve().unwrap();
         graph.report_inference_problems(&mut context).unwrap();
         assert!(context.reported_problems().is_empty());
@@ -883,7 +883,7 @@ mod tests {
         graph.restrict(left, &InputTypeConstraint::exact(&domain));
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "domain comparison",
@@ -935,7 +935,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
             &[left, right, result],
             &signatures,
             "domain array comparison",

@@ -47,7 +47,7 @@ pub(super) fn context(cast: Option<CastContext>) -> SchemaFileContext {
 }
 
 pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = context(None);
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
@@ -66,7 +66,7 @@ pub(super) fn query(
     sql: &str,
     context: SchemaFileContext,
 ) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = crate::parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?

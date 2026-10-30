@@ -210,6 +210,6 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(context, &mut crate::CacheContext::new())
+            .resolve(context, &mut crate::test_helpers::create_cache_context())
     }
 }

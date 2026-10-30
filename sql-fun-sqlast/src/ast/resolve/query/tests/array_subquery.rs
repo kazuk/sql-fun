@@ -197,7 +197,7 @@ fn synthetic_identity_function_consumes_array_subquery_result() {
 
 #[test]
 fn invalid_array_query_does_not_stop_following_statement() {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = super::super::test_helpers::catalog();
     let mut results = Vec::new();
     for statement in crate::parse_statements(

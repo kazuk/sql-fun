@@ -414,7 +414,7 @@ mod test_helpers {
             .unwrap()
             .unwrap()
             .node
-            .resolve(context, &mut crate::CacheContext::new())
+            .resolve(context, &mut crate::test_helpers::create_cache_context())
     }
     pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
         let mut context = catalog(dialect);
@@ -505,7 +505,10 @@ fn sqlite_delete_cte_reports_an_unsupported_operation() {
     assert!(
         statement
             .node
-            .resolve(&mut context, &mut crate::CacheContext::new())
+            .resolve(
+                &mut context,
+                &mut crate::test_helpers::create_cache_context()
+            )
             .is_ok()
     );
     assert!(context.reported_problems().iter().any(|problem| {

@@ -555,7 +555,7 @@ mod test_helpers {
                 &::sql_fun_core::IVec::default(),
             )?;
             context = syntax
-                .resolve_and_apply(context, &mut crate::CacheContext::new())?
+                .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
                 .into_context();
         }
         Ok(context)
@@ -580,7 +580,7 @@ mod test_helpers {
     ) -> Result<SchemaFileContext, AnalysisError> {
         let statement = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(sql);
         Ok(crate::ast::StatementNode::try_from(&statement)?
-            .resolve_and_apply(context, &mut crate::CacheContext::new())?
+            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
             .into_context())
     }
 }

@@ -345,7 +345,7 @@ mod comparison_knowledge_tests {
     #[test]
     fn absent_comparison_knowledge_does_not_eliminate_parameter_types() {
         let mut context = TestParseContext::default();
-        let mut cache = crate::CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let mut parameters = crate::sem::parameter_resolution::ParameterResolution::new(&mut cache);
         let arguments = [
             parameters.parameter(1, &crate::sem::InputTypeConstraint::any()),

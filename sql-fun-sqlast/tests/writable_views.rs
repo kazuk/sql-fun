@@ -8,6 +8,9 @@ use sql_fun_sqlast::{
 };
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub mod heavy {
         use ::clap::Parser;
         use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
@@ -138,7 +141,7 @@ mod test_helpers {
                 base: &FrozenBaseContext,
                 sql: &str,
             ) -> Result<FrozenBaseContext, String> {
-                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+                let mut cache_context = crate::test_helpers::create_cache_context();
                 let mut context = SchemaFileContext::new(
                     Path::new("layer.sql"),
                     base,
@@ -203,7 +206,7 @@ mod test_helpers {
             }
             pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
                 use sql_fun_sqlast::context::ViewInfoWrite;
-                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+                let mut cache_context = crate::test_helpers::create_cache_context();
 
                 let SemAst::CreateView(view) =
                     self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
@@ -247,7 +250,7 @@ mod test_helpers {
                 base: &FrozenBaseContext,
                 sql: &str,
             ) -> Result<SchemaFileContext, String> {
-                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+                let mut cache_context = crate::test_helpers::create_cache_context();
                 let mut context = SchemaFileContext::new(
                     Path::new("query.sql"),
                     base,
@@ -268,7 +271,7 @@ mod test_helpers {
                 Ok(context)
             }
             pub fn analyze(&self, sql: &str) -> Result<SemAst, String> {
-                let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+                let mut cache_context = crate::test_helpers::create_cache_context();
                 let context = SchemaFileContext::new(
                     Path::new("query.sql"),
                     self.context(),

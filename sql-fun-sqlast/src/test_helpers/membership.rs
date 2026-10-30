@@ -69,7 +69,7 @@ fn apply_schema(
     sql: &str,
     mut context: SchemaFileContext,
 ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
         &crate::StringSpan::new(0, sql.len()),
@@ -87,7 +87,7 @@ pub(crate) fn query(
     sql: &str,
     context: SchemaFileContext,
 ) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = crate::parse_statements(sql, context.dialect())
         .next()
         .unwrap()?

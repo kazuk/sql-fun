@@ -2120,7 +2120,10 @@ mod domain_tests {
             &IVec::default(),
         )?;
         let mut context = TestParseContext::default();
-        let domain = syntax.resolve(&mut context, &mut crate::CacheContext::new())?;
+        let domain = syntax.resolve(
+            &mut context,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         assert!(matches!(domain, SemAst::CreateDomain(_)));
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())

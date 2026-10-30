@@ -499,7 +499,7 @@ mod test_helpers {
             let syntax =
                 StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
             context = syntax
-                .resolve_and_apply(context, &mut crate::CacheContext::new())?
+                .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
                 .into_context();
         }
         assert!(context.problems().is_empty(), "{:?}", context.problems());

@@ -532,7 +532,7 @@ mod test_helpers {
     }
     fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
         use crate::context::BaseParseContext;
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let mut base = super::super::super::test_helpers::catalog();
         let nominal =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
@@ -589,12 +589,13 @@ mod test_helpers {
         };
         context.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut context, None);
-        let result = context.infer_query_parameter_types(result, &mut crate::CacheContext::new());
+        let result = context
+            .infer_query_parameter_types(result, &mut crate::test_helpers::create_cache_context());
         let query = context.finish_analysis(result).unwrap();
         (query, context)
     }
     pub(super) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let mut context = super::super::super::test_helpers::catalog();
         for ddl in [
             "CREATE TABLE pg_catalog.pg_attribute(n integer)",
@@ -677,7 +678,8 @@ mod test_helpers {
         };
         context.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut context, None);
-        let result = context.infer_query_parameter_types(result, &mut crate::CacheContext::new());
+        let result = context
+            .infer_query_parameter_types(result, &mut crate::test_helpers::create_cache_context());
         let query = context.finish_analysis(result).unwrap();
         (query, context)
     }

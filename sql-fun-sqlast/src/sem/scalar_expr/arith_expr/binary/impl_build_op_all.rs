@@ -399,7 +399,7 @@ mod test_build_op_all {
         #[case] right_type: &str,
         #[case] failure: Option<&str>,
     ) -> testresult::TestResult {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let context = test_helpers::schema()?;
         let analyzed = crate::parse_statements(
             &format!("SELECT {expression}"),
@@ -506,7 +506,7 @@ mod test_build_op_all {
         }
 
         pub(super) fn schema() -> testresult::TestResult<SchemaFileContext> {
-            let mut cache_context = crate::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let base = context();
             let args = base.get_args().clone();
             let metadata = base.metadata().clone();

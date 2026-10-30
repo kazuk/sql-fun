@@ -380,7 +380,7 @@ mod test_public_builders {
         let constraints = ParameterResolution::infer_expression(
             &mut decoded,
             &mut context,
-            &mut crate::CacheContext::new(),
+            &mut crate::test_helpers::create_cache_context(),
         )?;
         assert_eq!(decoded.get_type(), Some(PgBuiltInType::bool()));
         let bindings = comparison_bindings(&decoded)?;

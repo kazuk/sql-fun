@@ -78,7 +78,6 @@ impl CacheContext {
 
 #[cfg(test)]
 mod tests {
-    use super::CacheContext;
     use crate::context::{CastInfoRead, ParseContext};
     use crate::sem::parameter_resolution::Signature;
     use crate::sem::{PgBuiltInType, TypeReference};
@@ -88,7 +87,7 @@ mod tests {
     #[case::implicit(false)]
     #[case::explicit(true)]
     fn source_sets_are_reused_and_returned_independently(#[case] explicit: bool) {
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let context = domain_casts::context();
         let target = PgBuiltInType::int4();
         let expected = context.cast_sources(&target, explicit);
@@ -101,7 +100,7 @@ mod tests {
 
     #[test]
     fn source_keys_separate_targets_and_cast_selectors() {
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let context = domain_casts::context();
         let target = PgBuiltInType::int4();
         let implicit = cache.cast_sources(&context, &target, false);
@@ -118,7 +117,7 @@ mod tests {
 
     #[test]
     fn empty_source_sets_are_cached() {
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let mut context = domain_casts::context();
         let broken = domain_casts::domain(&mut context, "broken", None);
         assert!(cache.cast_sources(&context, &broken, true).is_empty());
@@ -130,7 +129,7 @@ mod tests {
     #[case::identity(PgBuiltInType::int4())]
     #[case::rejected(PgBuiltInType::bool())]
     fn argument_ranks_cache_success_and_rejection(#[case] source: TypeReference) {
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let context = domain_casts::context();
         let signature = Signature::new(&[PgBuiltInType::int4()], &PgBuiltInType::bool());
         let expected = signature.cast_score(&context, &source, 0);
@@ -147,7 +146,7 @@ mod tests {
 
     #[test]
     fn rank_keys_preserve_function_declarations_and_unrestricted_inputs() {
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let context = domain_casts::context();
         let target = PgBuiltInType::int4();
         let concrete = Signature::new_function(
@@ -190,7 +189,7 @@ mod tests {
 
     #[test]
     fn rank_keys_separate_argument_positions_and_sources() {
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let context = domain_casts::context();
         let signature = Signature::new(
             &[PgBuiltInType::int4(), PgBuiltInType::bool()],
@@ -226,7 +225,7 @@ mod tests {
         #[case] sql: &str,
     ) -> testresult::TestResult {
         let base = analysis_cache::base();
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let first = analysis_cache::analyze(sql, &base, &mut cache)?;
         let computations = (cache.cast_source_computations, cache.rank_computations);
         assert!(computations.0 + computations.1 > 0);
@@ -235,7 +234,8 @@ mod tests {
             (cache.cast_source_computations, cache.rank_computations),
             computations
         );
-        let independent = analysis_cache::analyze(sql, &base, &mut CacheContext::new())?;
+        let independent =
+            analysis_cache::analyze(sql, &base, &mut crate::test_helpers::create_cache_context())?;
         analysis_cache::assert_equivalent(&first, &repeated);
         analysis_cache::assert_equivalent(&first, &independent);
         Ok(())
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn failed_analysis_does_not_replay_diagnostics_or_constraints() -> testresult::TestResult {
         let base = analysis_cache::base();
-        let mut cache = CacheContext::new();
+        let mut cache = crate::test_helpers::create_cache_context();
         let rejected =
             analysis_cache::analyze("SELECT missing, $1::int4 AS result", &base, &mut cache)?;
         assert!(!rejected.context().problems().is_empty());
@@ -258,8 +258,11 @@ mod tests {
                 .parameter(1)
                 .is_none()
         );
-        let independent =
-            analysis_cache::analyze("SELECT 1 AS result", &base, &mut CacheContext::new())?;
+        let independent = analysis_cache::analyze(
+            "SELECT 1 AS result",
+            &base,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         analysis_cache::assert_equivalent(&valid, &independent);
         Ok(())
     }

@@ -129,7 +129,7 @@ mod test_helpers {
             &::sql_fun_core::IVec::default(),
         )?;
         Ok(statement
-            .resolve_and_apply(context, &mut crate::CacheContext::new())?
+            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
             .into_context())
     }
 

@@ -174,7 +174,7 @@ fn install_view(context: &mut TestParseContext, materialized: bool) {
         .unwrap()
         .unwrap()
         .node
-        .resolve(context, &mut crate::CacheContext::new())
+        .resolve(context, &mut crate::test_helpers::create_cache_context())
         .unwrap()
         .into_select_statemtnt()
         .unwrap();

@@ -75,7 +75,7 @@ mod test_helpers {
     use crate::test_helpers::TestParseContext;
 
     pub(super) fn analyze_keyed(definition: &str, returning: &str) -> (SemAst, TestParseContext) {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let dialect = Dialect::postgres();
         let mut context =
             crate::parse_statements(&format!("CREATE TABLE review579({definition})"), dialect)
@@ -98,7 +98,10 @@ mod test_helpers {
         .unwrap()
         .unwrap()
         .node
-        .resolve(&mut context, &mut crate::CacheContext::new())
+        .resolve(
+            &mut context,
+            &mut crate::test_helpers::create_cache_context(),
+        )
         .unwrap();
         (statement, context)
     }

@@ -123,7 +123,7 @@ mod test_statement_analyze {
     #[case::postgres(Dialect::postgres())]
     #[cfg_attr(feature = "sqlite", case::sqlite(Dialect::sqlite()))]
     fn analyzes_structurally_inserted_dependencies(#[case] dialect: Dialect) {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let mut base = statement(
             "with existing as (select id from leaf) select id from existing",
             dialect,
@@ -603,7 +603,7 @@ mod test_parameter_analysis {
         sql: &str,
         dialect: Dialect,
     ) -> Result<crate::AstAndContextPair<TestParseContext>, crate::sem::AnalysisError> {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         parse_statements(sql, dialect)
             .next()
             .unwrap()
@@ -677,7 +677,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn tied_best_overloads_are_not_accepted_as_a_type_range() {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let mut context = context();
         let int = PgBuiltInType::int4();
         let overloads = OperatorDefinition::binary(&[
@@ -754,7 +754,7 @@ mod test_parameter_analysis {
     }
     #[test]
     fn subsequent_analysis_replaces_context_constraints() {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let first = analyze("select $7 + 1 as n", Dialect::postgres()).unwrap();
         assert!(
             first
@@ -787,7 +787,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn parameter_state_restarts_after_parameter_free_analysis() {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let first = analyze("select $7 + 1", Dialect::postgres()).unwrap();
         let plain = parse_statements("select 1", Dialect::postgres())
             .next()
@@ -856,7 +856,7 @@ mod test_parameter_analysis {
     #[test]
     fn schema_loading_skips_parameter_inference() {
         use crate::{context::MutSourcePathWithSpan, sem::SchemaName};
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let before = crate::sem::parameter_resolution::inference_runs();
         let mut context = crate::test_helpers::schema_layer(
             std::path::Path::new("schema.sql"),
@@ -921,7 +921,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn diagnostic_sink_failure_still_aborts_parameter_analysis() {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let mut context = context();
         context.reject_diagnostics_after(0);
         let error = parse_statements("select $1 + 1, lower($1)", Dialect::postgres())
@@ -964,7 +964,7 @@ mod test_parameter_casts {
     #[case::boolean("select $1 as flag where $1")]
     #[case::not("select not $1 as flag")]
     fn boolean_context_constrains_input(#[case] sql: &str) {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let result = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
@@ -986,7 +986,7 @@ mod test_parameter_casts {
     #[case::projection("select cast(?1 as integer) as n")]
     #[case::cte("with x as (select cast(?1 as integer) as n) select n from x")]
     fn sqlite_casts_do_not_require_postgres_casts(#[case] sql: &str) {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.setup_type(crate::sem::TypeReference::from_full_name(
             crate::sem::FullName::from_local_name("integer"),

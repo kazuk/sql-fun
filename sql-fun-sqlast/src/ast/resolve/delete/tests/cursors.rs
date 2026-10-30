@@ -10,7 +10,7 @@ fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {
         .unwrap()
         .unwrap()
         .node
-        .resolve(context, &mut crate::CacheContext::new())
+        .resolve(context, &mut crate::test_helpers::create_cache_context())
         .unwrap()
 }
 
@@ -188,7 +188,10 @@ fn retains_unsupported_procedural_cursor_parameter() {
     cursor.parameter = 3;
     let result = statement
         .node
-        .resolve(&mut context, &mut crate::CacheContext::new())
+        .resolve(
+            &mut context,
+            &mut crate::test_helpers::create_cache_context(),
+        )
         .unwrap();
     assert_eq!(
         result

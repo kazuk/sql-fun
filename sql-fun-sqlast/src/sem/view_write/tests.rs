@@ -62,7 +62,7 @@ fn diagnostic_delivery_failure_is_propagated() {
 #[case::create_trigger("CREATE TRIGGER t BEFORE INSERT ON missing EXECUTE FUNCTION absent()")]
 #[case::drop_trigger("DROP TRIGGER t ON missing")]
 fn queued_diagnostic_delivery_failure_still_stops_analysis(#[case] sql: &str) {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = TestParseContext::default();
     context.reject_diagnostics_after(0);
     let statement = crate::parse_statements(sql, crate::ast::Dialect::postgres())

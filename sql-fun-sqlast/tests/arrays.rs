@@ -37,7 +37,7 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
     #[case] code: &str,
     #[case] count: usize,
 ) -> testresult::TestResult {
-    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // The CLI regression asserts diagnostic identities and result metadata;
     // this integration test keeps rendered diagnostics, array shape, and recovery.
     let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
@@ -485,6 +485,9 @@ fn invalid_array_equality_retains_failure(#[case] expression: &str) -> testresul
 }
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
@@ -500,7 +503,7 @@ mod test_helpers {
             sql: &str,
             definitions: &[&str],
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",

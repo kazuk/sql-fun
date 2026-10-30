@@ -20,7 +20,7 @@ fn resolved_drop_does_not_apply_until_requested(
     let mut child = test_helpers::layer(&parent);
     let statement = test_helpers::statement(sql)
         .node
-        .resolve(&mut child, &mut crate::CacheContext::new())?;
+        .resolve(&mut child, &mut crate::test_helpers::create_cache_context())?;
     let drop = statement.rule_drop().unwrap();
     assert!(drop.found());
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
@@ -88,7 +88,7 @@ fn invalid_drop_leaves_named_definitions_and_links_intact(
     assert!(
         test_helpers::statement(sql)
             .node
-            .resolve(&mut child, &mut crate::CacheContext::new())
+            .resolve(&mut child, &mut crate::test_helpers::create_cache_context())
             .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert!(child.rule(&test_helpers::identity()).is_some());
@@ -176,7 +176,7 @@ mod test_helpers {
         mut context: SchemaFileContext,
         sql: &str,
     ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
-        let mut cache_context = crate::CacheContext::new();
+        let mut cache_context = crate::test_helpers::create_cache_context();
         crate::context::MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
             &crate::test_helpers::source_span(),
@@ -261,7 +261,7 @@ fn cannot_drop_the_select_rule_required_by_a_view(
         "DROP RULE \"_RETURN\" ON public.item_view {behavior}"
     ))
     .node
-    .resolve(&mut child, &mut crate::CacheContext::new());
+    .resolve(&mut child, &mut crate::test_helpers::create_cache_context());
     assert!(matches!(result?, crate::sem::SemAst::UnresolvedStatement));
     assert!(
         child

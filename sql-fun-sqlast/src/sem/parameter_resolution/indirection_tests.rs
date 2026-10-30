@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 fn postgres_assignment_subscripts_are_legal(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // The fixture explicitly supplies numeric-to-int4 assignment coercion.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
     let analyzed = statement.analyze(test_helpers::context(), &mut cache_context)?;
@@ -39,7 +39,7 @@ fn parameterized_array_access_links_results(
     #[case] array_result: bool,
     #[case] column_index: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // Only int4 identity and numeric-to-int4 assignment are needed here.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
     let analyzed = statement.analyze(test_helpers::context(), &mut cache_context)?;
@@ -71,7 +71,7 @@ fn parameterized_array_access_links_results(
 fn underconstrained_array_access_preserves_structure(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // Assignment coercion constrains bounds without selecting a base type.
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
@@ -112,7 +112,7 @@ fn underconstrained_array_access_preserves_structure(
 fn invalid_parameterized_access_retains_conflicts(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // The fixture supplies numeric assignment but no boolean assignment to int4.
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
@@ -135,7 +135,7 @@ fn invalid_parameterized_access_retains_conflicts(
 fn surrounding_context_constrains_array_access(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // One integer addition signature and identity casts constrain the result.
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
@@ -171,7 +171,7 @@ fn composite_access_propagates_named_field_types(
     #[case] result: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::sem::{FullName, TypeReference};
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // SchemaFileContext supplies composite identity casts from the declared type.
     let definition = parse_statements(
         "create type public.point_value as (n integer)",
@@ -226,7 +226,7 @@ fn deferred_composite_accepts_owned_anonymous_definitions(
     use crate::sem::{
         ColumnCollection, ColumnDefinition, ColumnName, TypeDefinition, TypeReference,
     };
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // The result-context case needs only an int4 identity cast.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
     let analyzed = statement.analyze(test_helpers::context(), &mut cache_context)?;
@@ -263,7 +263,7 @@ fn nested_composite_and_table_fields_use_owned_definitions(
     #[case] frozen: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::sem::{FullName, TypeReference};
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // Production schema layers provide nested field definitions and row types.
     let context = test_helpers::schema(
         "create type public.inner_value as (n integer); create type public.outer_value as (v public.inner_value); create table public.table_value (v public.inner_value);",
@@ -315,7 +315,7 @@ fn deferred_member_access_retains_conflicts(
     #[case] sql: &str,
     #[case] diagnostic: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let context = test_helpers::schema("create type public.point_value as (n integer)", false)?;
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
@@ -352,7 +352,7 @@ fn nested_deferred_members_report_structured_errors(
     #[case] sql: &str,
     #[case] diagnostic: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // Declared nested types exercise deferred member resolution.
     let context = test_helpers::schema(
         "create type public.inner_value as (n integer); create type public.outer_value as (v public.inner_value);",
@@ -384,7 +384,7 @@ fn nested_deferred_members_report_structured_errors(
 fn owned_named_composites_preserve_nominal_identity() -> Result<(), Box<dyn std::error::Error>> {
     use crate::context::BaseParseContext;
     use crate::sem::{FullName, TypeReference};
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // Schema cast metadata distinguishes named composites with identical fields.
     let context = test_helpers::schema(
         "create type public.first_value as (n integer); create type public.second_value as (n integer);",
@@ -418,7 +418,7 @@ fn declared_composite_array_fields_retain_result_types(
     #[case] is_array: bool,
     #[values(false, true)] frozen: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let context = test_helpers::schema(
         "CREATE TYPE public.array_value AS (items integer[], scalar integer)",
         frozen,
@@ -448,7 +448,7 @@ fn declared_composite_array_fields_retain_result_types(
 fn declared_composite_scalar_field_rejects_subscripts(
     #[values(false, true)] frozen: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let context = test_helpers::schema(
         "CREATE TYPE public.array_value AS (items integer[], scalar integer)",
         frozen,
@@ -482,7 +482,7 @@ fn consecutive_subscript_result_matches_postgres(
     #[case] expression: &str,
     #[case] array_result: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
         .next()
         .unwrap()?
@@ -514,7 +514,7 @@ fn consecutive_subscripts_retain_all_parameter_domains(
     #[case] slice: bool,
     #[case] parameters: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
@@ -583,7 +583,7 @@ fn consecutive_subscripts_share_deferred_constraints(
     #[case] array_result: bool,
     #[case] text_element_cast: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
@@ -627,7 +627,7 @@ fn consecutive_subscripts_retain_structured_failures(
     #[case] sql: &str,
     #[case] diagnostic: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
@@ -664,7 +664,7 @@ fn consecutive_subscripts_retain_structured_failures(
 fn consecutive_assignment_subscripts_preserve_bound_constraints(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let context = test_helpers::schema("CREATE TABLE arrays (a integer[])", false)?;
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
@@ -688,7 +688,7 @@ fn consecutive_assignment_subscripts_preserve_bound_constraints(
 #[test]
 fn consecutive_subscripts_preserve_source_bounds_and_nested_access()
 -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements("SELECT ((NULL::integer[])[1:2])[:][2]", Dialect::postgres())
         .next()
         .unwrap()?
@@ -720,7 +720,7 @@ fn consecutive_subscripts_preserve_source_bounds_and_nested_access()
 
 #[test]
 fn consecutive_subscripts_preserve_member_boundary() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     // SQL-declared scalar fields exercise member resolution after a group.
     let context = test_helpers::schema("CREATE TYPE public.point_value AS (n integer)", false)?;
     let analyzed = parse_statements(

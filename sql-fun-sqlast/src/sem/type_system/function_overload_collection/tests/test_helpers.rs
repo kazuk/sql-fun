@@ -101,7 +101,7 @@ pub(super) fn analyze(
     concrete_parameters: &str,
     reversed: bool,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = context();
     let polymorphic = format!(
         "CREATE FUNCTION f({polymorphic_parameters}) RETURNS text LANGUAGE sql AS 'SELECT NULL::text'"
@@ -137,7 +137,7 @@ pub(super) fn analyze_vector(
     parameters: &str,
     result: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = context();
     let definition =
         format!("CREATE FUNCTION vf({parameters}) RETURNS {result} LANGUAGE sql AS ''");
@@ -157,7 +157,7 @@ pub(super) fn analyze_vector(
 pub(super) fn analyze_variadic_any(
     query: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = context();
     for statement in parse_statements(
         r#"CREATE FUNCTION format(text) RETURNS text LANGUAGE internal AS 'text_format';

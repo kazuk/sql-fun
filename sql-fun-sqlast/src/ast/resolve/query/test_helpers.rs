@@ -95,7 +95,7 @@ pub(super) fn resolve(
     catalog.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut catalog, None);
     let query = if infer {
-        catalog.infer_query_parameter_types(query, &mut crate::CacheContext::new())
+        catalog.infer_query_parameter_types(query, &mut crate::test_helpers::create_cache_context())
     } else {
         query
     };
@@ -120,7 +120,7 @@ pub(super) fn output_type(query: &SelectStatement, name: &str) -> Option<TypeRef
 
 /// Small explicitly selected table for grouping placement checks in DML.
 pub(super) fn grouping_table_context() -> TestParseContext {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     crate::parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
         .next()
         .unwrap()
@@ -138,7 +138,7 @@ pub(super) fn column_scope_query(
     sql: &str,
     dialect: Dialect,
 ) -> (SelectStatement, TestParseContext) {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = catalog().with_dialect(dialect);
     for ddl in [
         "CREATE TABLE outer_items(id integer)",
@@ -173,7 +173,7 @@ pub(super) fn source_namespace_statement_at_version(
     sql: &str,
     version: &str,
 ) -> AstAndContextPair<TestParseContext> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let dialect = Dialect::postgres();
     let metadata = ::serde_json::from_value(::serde_json::json!({
         "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["a", "public"]
@@ -234,7 +234,10 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
             .unwrap()
             .unwrap()
             .node
-            .resolve(&mut context, &mut crate::CacheContext::new())
+            .resolve(
+                &mut context,
+                &mut crate::test_helpers::create_cache_context(),
+            )
             .unwrap()
             .into_select_statemtnt()
             .unwrap();
@@ -257,7 +260,7 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
 
 /// Analyze using only the signatures/types needed by record-output tests.
 pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, TestParseContext) {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let dialect = Dialect::postgres();
     let mut context = catalog();
     for name in [
@@ -368,7 +371,7 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
     context.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut context, None);
     let query = if infer {
-        context.infer_query_parameter_types(query, &mut crate::CacheContext::new())
+        context.infer_query_parameter_types(query, &mut crate::test_helpers::create_cache_context())
     } else {
         query
     };

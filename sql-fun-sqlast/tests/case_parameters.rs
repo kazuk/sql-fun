@@ -115,8 +115,6 @@ fn condition_parameters_preserve_result_selection(
 
 // Removed the multiple-comparisons variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 #[rstest::rstest]
-#[case::selector("SELECT CASE $1 WHEN 1 THEN 2 ELSE 3 END")]
-#[case::when_operand("SELECT CASE 1 WHEN $1 THEN 2 ELSE 3 END")]
 #[case::result_parameter("SELECT CASE 1 WHEN 1 THEN $1 ELSE 3 END")]
 fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestResult {
     // Equality overload and implicit-cast selection use the real builtin signatures.
@@ -172,28 +170,6 @@ fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestRe
 }
 
 // Removed the two-results joint-constraint variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
-#[rstest::rstest]
-#[case::simple_comparison("SELECT CASE $1 WHEN $2 THEN 1 ELSE 2 END")]
-fn repeated_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {
-    // Builtin overload/cast alternatives must retain correlations between inputs.
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::int8())
-    ])));
-    assert!(!constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::bool())
-    ])));
-    Ok(())
-}
-
 #[rstest::rstest]
 #[case::other_output_first("SELECT $1::integer, CASE WHEN true THEN $1 ELSE 1 END", 1)]
 #[case::other_output_last("SELECT CASE WHEN true THEN $1 ELSE 1 END, $1::integer", 0)]

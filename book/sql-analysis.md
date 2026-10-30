@@ -4,6 +4,35 @@ This page is for application developers writing queries or investigating SQL
 analysis diagnostics. It describes supported forms and current limitations;
 installation and initial configuration are covered in [Installation](installation.md).
 
+## PostgreSQL row constructors
+
+`ROW(...)` and implicit rows such as `(1, true)` retain their fields in SQL
+order, including nested rows. PostgreSQL also permits `ROW()` and `ROW(1)`.
+Anonymous fields are named `f1`, `f2`, and so on:
+
+```sql
+SELECT (ROW(1, true)).f1, (ROW(1, true)).*
+```
+
+A row constructor produces one non-null row value even when some or all fields
+are NULL. For row-valued `IS NULL`/`IS NOT NULL`, PostgreSQL tests all fields;
+a mixed-null row can satisfy neither predicate. The constructor's implicit output
+name is `row`; use `AS` to choose another name. Field projection reports each
+field's own type and nullability. Anonymous row results have no named result
+type in the analysis API; project fields when you need individual result-column
+types.
+
+Qualified `ROW(t.*, 42)` expands the source fields before the final element.
+Use `ROW(ROW(t.*), 42)` to retain those fields as a nested row. Existing compatible
+named-row casts and record-accepting functions can consume row constructors.
+This support does not establish multi-column comparison operator support.
+
+SQLite uses different rules: `(value)` is scalar grouping and multi-element
+parentheses are row values. A row value cannot be projected as an ordinary
+scalar result or supplied to a scalar input such as `CAST((1, 2) AS TEXT)` or
+`COALESCE((1, 2), 3)`. Legal row membership tests and tuple UPDATE assignments
+keep their existing behavior.
+
 ## PostgreSQL range predicates
 
 Analysis supports `BETWEEN`, `NOT BETWEEN`, and their explicit `ASYMMETRIC`

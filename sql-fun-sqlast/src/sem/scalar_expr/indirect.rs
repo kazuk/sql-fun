@@ -26,6 +26,22 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
+    pub(super) fn row_constructor(&self) -> Option<&super::RowExpr> {
+        if let Self::MemberRef(value) = self {
+            value.row_constructor()
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn projection_name(&self) -> &str {
+        if let Self::MemberRef(value) = self {
+            value.row_projection_name()
+        } else {
+            ""
+        }
+    }
+
     pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
         if let Self::MemberRef(value) = self {
             value.rename_column(rename);

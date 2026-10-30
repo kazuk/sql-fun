@@ -13,8 +13,6 @@ medium	array-subqueries-17
 medium	array-subqueries-18
 medium	arrays-consumers-17
 medium	arrays-consumers-18
-medium	arrays-diagnostics-17
-medium	arrays-diagnostics-18
 medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	case-common-types-17
@@ -33,6 +31,8 @@ medium	distinctness-17
 medium	distinctness-18
 medium	domain-operators-17
 medium	domain-operators-18
+medium	minmax-metadata-17
+medium	minmax-metadata-18
 medium	output-names-17
 medium	output-names-18
 medium	parameter-bindings-17
@@ -71,9 +71,12 @@ medium	schema-update-17
 medium	schema-update-18
 medium	schema-views-diagnostics-17
 medium	schema-views-diagnostics-18
+medium	schema-views-precedence-17
 medium	schema-views-precedence-18
 medium	table-renames-17
 medium	table-renames-18
+light	arrays-diagnostics-17
+light	arrays-diagnostics-18
 light	arrays-metadata-17
 light	arrays-metadata-18
 light	arrays-names-17
@@ -93,12 +96,12 @@ light	metadata-overloads-17
 light	metadata-overloads-18
 light	minmax-diagnostics-17
 light	minmax-diagnostics-18
-light	minmax-metadata-17
-light	minmax-metadata-18
 light	pilot-17
 light	pilot-18
 light	project-roles-omitted-17
 light	project-roles-omitted-18
+light	rows-17
+light	rows-18
 light	schema-delete-17
 light	schema-delete-18
 light	schema-domains-builtin-17
@@ -133,7 +136,6 @@ light	schema-views-automatic-17
 light	schema-views-automatic-18
 light	schema-views-mechanisms-17
 light	schema-views-mechanisms-18
-light	schema-views-precedence-17
 light	schema-views-special-17
 light	schema-views-special-18
 light	vectors-18

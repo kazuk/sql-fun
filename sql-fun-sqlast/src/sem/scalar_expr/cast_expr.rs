@@ -70,8 +70,16 @@ impl TypeCastExpr {
         (&self.arg, &self.target_type)
     }
 
-    pub(super) fn array_projection_name(&self) -> Option<&'static str> {
-        self.arg.array_projection_name()
+    pub(super) fn record_operand(&self) -> Option<&SemScalarExpr> {
+        if self.target_type == TypeReference::from_master_type_name("record") {
+            Some(&self.arg)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn constructor_projection_name(&self) -> Option<&'static str> {
+        self.arg.constructor_projection_name()
     }
 
     pub(super) fn grouping_key_operand(&self) -> Option<&SemScalarExpr> {

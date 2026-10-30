@@ -355,6 +355,8 @@ fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> test
     Ok(())
 }
 
+// Removed the subscript case after parallel timeouts; restore from
+// e1039d77f118af4a82783dfb31666046bebd8635.
 #[rstest::rstest]
 #[case::predicate("SELECT ARRAY[$1,NULL] WHERE $1", "_bool")]
 #[case::cte(

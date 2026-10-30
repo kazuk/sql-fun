@@ -1,4 +1,4 @@
-# Function not found : SF00002
+# Function not found : `function_not_found`
 
 ## Situation
 

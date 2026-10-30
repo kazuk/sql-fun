@@ -1,4 +1,4 @@
-# Domain base type not found : SF00001
+# Domain base type not found : `domain_base_type_not_found`
 
 Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/current/sql-createdomain.html)
 

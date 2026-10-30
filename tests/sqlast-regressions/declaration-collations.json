@@ -598,7 +598,7 @@
     "sql": "CREATE DOMAIN public.new_declaration AS public.missing_type_822 COLLATE public.missing_822",
     "expected": {
       "diagnostics": [
-        "SF000001"
+        "domain_base_type_not_found"
       ],
       "columns": []
     }
@@ -611,6 +611,21 @@
         "collate_operand_type"
       ],
       "columns": []
+    }
+  },
+  {
+    "name": "missing_function_diagnostic_id",
+    "sql": "SELECT public.missing_function_878() AS result",
+    "expected": {
+      "diagnostics": [
+        "function_not_found"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
     }
   }
 ]

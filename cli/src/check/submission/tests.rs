@@ -513,7 +513,7 @@ async fn check_renders_all_diagnostics_for_incomplete_multistatement_query()
         4
     );
     for expected in [
-        "SF000001",
+        "domain_base_type_not_found",
         "unreachable_coalesce_argument",
         "parameter_constraint",
         "extension_not_found",

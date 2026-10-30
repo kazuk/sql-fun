@@ -42,7 +42,7 @@ impl DomainBaseTypeNameNotFound {
 }
 
 impl Problem for DomainBaseTypeNameNotFound {
-    const CODE: &'static str = "SF000001";
+    const CODE: &'static str = "domain_base_type_not_found";
 
     const MESSAGE: &'static str = "Domain base type not found";
     const SPAN_LABEL: &'static str = "base type name";
@@ -90,7 +90,7 @@ impl FunctionNotFound {
 }
 
 impl Problem for FunctionNotFound {
-    const CODE: &'static str = "SF00002";
+    const CODE: &'static str = "function_not_found";
     const MESSAGE: &'static str = "Function not found";
 
     const SPAN_LABEL: &'static str = "function name";

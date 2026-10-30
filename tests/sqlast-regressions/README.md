@@ -98,8 +98,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1103 inputs for PostgreSQL 17 and 1109 for
-PostgreSQL 18 (2212 total). These count positive contract inputs separately from
+manifest totals are 1104 inputs for PostgreSQL 17 and 1110 for
+PostgreSQL 18 (2214 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -263,7 +263,9 @@ with the explicit `declaration-collations.sql` project schema on PostgreSQL 17/1
 These cases run in both maintained execution paths. Their expectations check
 record-column COLLATE diagnostics,
 scalar/array/domain/enum/composite/table-row types, quoted and qualified names,
-lookup precedence, and exact result metadata. DDL inputs exercise accepted and
+lookup precedence, and exact result metadata. The missing domain base-type and
+function cases also verify the descriptive diagnostic IDs from #878.
+DDL inputs exercise accepted and
 rejected table, composite and domain declarations, plus rejected add-column
 groups. Valid schema DDL supplies subsequent query metadata. Focused Rust tests
 retain applicability,

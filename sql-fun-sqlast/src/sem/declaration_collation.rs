@@ -382,7 +382,7 @@ mod tests {
     )]
     #[case::domain(
         "CREATE DOMAIN public.rejected AS public.absent COLLATE public.missing",
-        "SF000001"
+        "domain_base_type_not_found"
     )]
     fn missing_type_is_primary_and_rejected_ddl_remains_inspectable(
         #[case] sql: &str,

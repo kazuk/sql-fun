@@ -914,7 +914,7 @@ mod test_transport {
         );
         let encoded = ::serde_json::to_string(&problem).unwrap();
         let restored: AnalysisProblem = ::serde_json::from_str(&encoded).unwrap();
-        assert_eq!(restored.code(), "SF000001");
+        assert_eq!(restored.code(), "domain_base_type_not_found");
         assert_eq!(restored.severity(), DiagnosticSeverity::Error);
         assert_eq!(
             restored.statement_relative_span(),

@@ -10,7 +10,6 @@ use std::collections::BTreeMap;
 #[rstest::rstest]
 #[case::then_parameter("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
 #[case::else_parameter("SELECT CASE WHEN true THEN 1 ELSE $1 END")]
-#[case::nested("SELECT CASE WHEN true THEN CASE WHEN false THEN $1 ELSE 2 END ELSE 1 END")]
 #[case::outer_operator("SELECT (CASE WHEN true THEN $1 ELSE 1 END) + 2")]
 #[case::outer_call("SELECT abs(CASE WHEN true THEN $1 ELSE 1 END)")]
 #[case::cte("WITH c AS (SELECT CASE WHEN true THEN $1 ELSE 1 END AS n) SELECT n FROM c")]

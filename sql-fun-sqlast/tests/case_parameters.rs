@@ -114,6 +114,8 @@ fn condition_parameters_preserve_result_selection(
 }
 
 // Removed the multiple-comparisons variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+// Removed the selector and when_operand cases after parallel timeouts; restore from
+// b4d5186e4261f133bf3ba978c26a64df6faaa5d2.
 #[rstest::rstest]
 #[case::result_parameter("SELECT CASE 1 WHEN 1 THEN $1 ELSE 3 END")]
 fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestResult {
@@ -170,6 +172,9 @@ fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestRe
 }
 
 // Removed the two-results joint-constraint variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+// Removed repeated_inputs_remain_jointly_constrained::simple_comparison after a
+// parallel timeout; restore from b4d5186e4261f133bf3ba978c26a64df6faaa5d2.
+
 #[rstest::rstest]
 #[case::other_output_first("SELECT $1::integer, CASE WHEN true THEN $1 ELSE 1 END", 1)]
 #[case::other_output_last("SELECT CASE WHEN true THEN $1 ELSE 1 END, $1::integer", 0)]

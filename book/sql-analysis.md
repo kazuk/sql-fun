@@ -29,7 +29,9 @@ This support does not establish multi-column comparison operator support.
 
 SQLite uses different rules: `(value)` is scalar grouping and multi-element
 parentheses are row values. A row value cannot be projected as an ordinary
-scalar result; legal tuple UPDATE assignments keep their existing behavior.
+scalar result or supplied to a scalar input such as `CAST((1, 2) AS TEXT)` or
+`COALESCE((1, 2), 3)`. Legal row membership tests and tuple UPDATE assignments
+keep their existing behavior.
 
 ## PostgreSQL range predicates
 

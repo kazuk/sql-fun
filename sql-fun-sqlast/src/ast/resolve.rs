@@ -157,6 +157,16 @@ impl Expr {
         context.finish_analysis(result)
     }
 
+    fn resolve_scalar_in(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let value = self.resolve_in(context, scope)?;
+        value.validate_scalar_value(context)?;
+        Ok(value)
+    }
+
     pub(in crate::ast) fn resolve_in(
         &self,
         context: &mut impl ParseContext,
@@ -240,7 +250,7 @@ impl Expr {
             {
                 continue;
             }
-            fields.push(item.resolve_in(context, scope)?);
+            fields.push(item.resolve_scalar_in(context, scope)?);
         }
         Ok(SemScalarExpr::row(&fields))
     }
@@ -300,6 +310,18 @@ impl Expr {
         Ok(values)
     }
 
+    fn resolve_scalar_list(
+        expressions: &[Self],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Vec<SemScalarExpr>, AnalysisError> {
+        let mut values = Vec::new();
+        for expression in expressions {
+            values.push(expression.resolve_scalar_in(context, scope)?);
+        }
+        Ok(values)
+    }
+
     pub(super) fn resolve_optional(
         expression: &Option<Self>,
         context: &mut impl ParseContext,
@@ -324,7 +346,7 @@ impl NamedArgument {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let value = self.argument.resolve_in(context, scope)?;
+        let value = self.argument.resolve_scalar_in(context, scope)?;
         Ok(SemScalarExpr::named_argument(
             &self.name,
             &value,
@@ -366,7 +388,7 @@ impl BooleanExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
+        let arguments = Expr::resolve_scalar_list(&self.arguments, context, scope)?;
         self.operator.resolve(&arguments)
     }
 }
@@ -377,7 +399,7 @@ impl TruthTest {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = self.argument.resolve_in(context, scope)?;
+        let argument = self.argument.resolve_scalar_in(context, scope)?;
         let value =
             crate::sem::TruthTestExpr::resolve(context, &argument, self.value, self.negated)?;
         Ok(SemScalarExpr::truth_test(&value))
@@ -390,7 +412,7 @@ impl NullTest {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = self.argument.resolve_in(context, scope)?;
+        let argument = self.argument.resolve_scalar_in(context, scope)?;
         Ok(SemScalarExpr::null_test(&argument, self.negated))
     }
 }
@@ -420,7 +442,7 @@ impl OperatorExpr {
                     .right
                     .as_ref()
                     .expect("unary argument")
-                    .resolve_in(context, scope);
+                    .resolve_scalar_in(context, scope);
             }
             if self.name.0.as_slice() == ["-"]
                 && let Some(right) = self.right.as_ref()
@@ -646,7 +668,7 @@ impl Cast {
             self.argument
                 .resolve_array_target(context, scope, Some(&expected))?
         } else {
-            self.argument.resolve_in(context, scope)?
+            self.argument.resolve_scalar_in(context, scope)?
         };
         if context.dialect() == Dialect::postgres()
             && let Some(source) = argument.get_type()
@@ -730,7 +752,7 @@ impl CallKind {
         match self {
             Self::Coalesce => call.resolve_coalesce(context, scope),
             Self::MinMax => {
-                let arguments = Expr::resolve_list(&call.arguments, context, scope)?;
+                let arguments = Expr::resolve_scalar_list(&call.arguments, context, scope)?;
                 MinMaxExpr::resolve(context, call.name.full_name()?.name().as_str(), &arguments)
             }
             Self::Ordinary => call.resolve_ordinary(context, scope),
@@ -762,7 +784,7 @@ impl Call {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
+        let arguments = Expr::resolve_scalar_list(&self.arguments, context, scope)?;
         CoalesceExpr::resolve(context, &arguments)
     }
 
@@ -771,7 +793,7 @@ impl Call {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
+        let arguments = Expr::resolve_scalar_list(&self.arguments, context, scope)?;
         if self.defers_function_signature() {
             return Ok(SemScalarExpr::function_call(
                 &self.resolve_supplied_call(context, &arguments)?,
@@ -793,13 +815,19 @@ impl Case {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let argument = Expr::resolve_optional(&self.argument, context, scope)?;
+        if let Some(value) = &argument {
+            value.validate_scalar_value(context)?;
+        }
         let mut arms = Vec::new();
         for arm in &self.arms {
-            let condition = arm.condition.resolve_in(context, scope)?;
-            let result = arm.result.resolve_in(context, scope)?;
+            let condition = arm.condition.resolve_scalar_in(context, scope)?;
+            let result = arm.result.resolve_scalar_in(context, scope)?;
             arms.push((condition, result));
         }
         let otherwise = Expr::resolve_optional(&self.otherwise, context, scope)?;
+        if let Some(value) = &otherwise {
+            value.validate_scalar_value(context)?;
+        }
         if let Some(expression) =
             CaseExpr::resolve_postgres_or_untyped(context, &argument, &arms, &otherwise)?
         {
@@ -1034,7 +1062,7 @@ impl Collate {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let argument = self.argument.resolve_in(context, scope)?;
+        let argument = self.argument.resolve_scalar_in(context, scope)?;
         let value =
             CollateExpr::resolve(context, &argument, &self.name.full_name()?, &self.location)?;
         Ok(SemScalarExpr::collate(value))

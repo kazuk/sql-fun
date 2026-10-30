@@ -2559,9 +2559,9 @@
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
                 {
-                  "description": "An internal list or dialect-specific row value cannot be projected as a scalar.",
+                  "description": "An internal list or dialect-specific row value cannot be consumed as a scalar.",
                   "type": "string",
-                  "const": "ScalarProjectionRequired"
+                  "const": "ScalarValueRequired"
                 },
                 {
                   "description": "Database-name metadata is required for column reference.",
@@ -6386,9 +6386,9 @@
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
                 {
-                  "description": "An internal list or dialect-specific row value cannot be projected as a scalar.",
+                  "description": "An internal list or dialect-specific row value cannot be consumed as a scalar.",
                   "type": "string",
-                  "const": "ScalarProjectionRequired"
+                  "const": "ScalarValueRequired"
                 },
                 {
                   "description": "Database-name metadata is required for column reference.",

@@ -317,6 +317,7 @@ members/arguments. COALESCE and named
 composite members retain their existing conservative nullability policy.
 Rust tests retain ordered semantic fields, serialization, parameter-field
 relationships and internal-list contracts; SQLite tests use the embedded oracle
-for scalar grouping and invalid row projection. Existing UPDATE tests cover
+for scalar grouping, invalid row projection/scalar operands, and legal row
+membership and IS comparisons. Existing UPDATE tests cover
 legal SQLite tuple assignments. Bare relation-name whole-row binding remains
 [#614](https://github.com/kazuk/sql-fun/issues/614); nested explicit rows use the existing qualified-star expansion.

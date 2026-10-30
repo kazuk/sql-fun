@@ -169,6 +169,12 @@ impl DistinctExpr {
         right: SemScalarExpr,
         negated: bool,
     ) -> Result<Self, AnalysisError> {
+        if context.dialect() == Dialect::sqlite()
+            && left.is_membership_row() != right.is_membership_row()
+        {
+            left.validate_scalar_value(context)?;
+            right.validate_scalar_value(context)?;
+        }
         let mut result = Self {
             comparison: DistinctComparison::rows(Vec::new()),
             negated,

@@ -105,6 +105,58 @@ fn sqlite_projection_keeps_scalar_grouping_and_rejects_rows(
     assert_eq!(context.reported_problem_count() > 0, invalid);
 }
 
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::nested_row("SELECT ((1,2),3) IN (SELECT 1,3)")]
+#[case::cast("SELECT CAST((1,2) AS TEXT)")]
+#[case::nested_cast("SELECT CAST(CAST((1,2) AS TEXT) AS TEXT)")]
+#[case::unary_plus("SELECT +(1,2)")]
+#[case::null_test("SELECT (1,2) IS NULL")]
+#[case::not("SELECT NOT (1,2)")]
+#[case::and("SELECT (1,2) AND 1")]
+#[case::truth_test("SELECT (1,2) IS TRUE")]
+#[case::collate("SELECT (1,2) COLLATE binary")]
+#[case::parameter("SELECT CAST((?1,2) AS TEXT)")]
+#[case::coalesce("SELECT coalesce((1,2), 3)")]
+#[case::case_result("SELECT CASE WHEN 1 THEN (1,2) ELSE 3 END")]
+#[case::case_condition("SELECT CASE WHEN (1,2) THEN 1 ELSE 3 END")]
+#[case::case_argument("SELECT CASE (1,2) WHEN 1 THEN 2 END")]
+#[case::case_default("SELECT CASE WHEN 1 THEN 2 ELSE (1,2) END")]
+fn sqlite_scalar_consumers_reject_row_operands(#[case] sql: &str) {
+    let oracle = rusqlite::Connection::open_in_memory().unwrap();
+    assert!(oracle.prepare(sql).is_err(), "{sql}");
+    let (_, context) = resolve(sql, Dialect::sqlite(), false).unwrap();
+    assert!(
+        context
+            .reported_problems()
+            .iter()
+            .any(|problem| problem.code() == "query_scalar_value_required"),
+        "{sql}: {:?}",
+        context.reported_problems()
+    );
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::membership("SELECT (1,2) IN (SELECT 1,2)")]
+#[case::is("SELECT (1,2) IS (1,2)")]
+fn sqlite_row_consumers_still_accept_row_operands(#[case] sql: &str) {
+    let oracle = rusqlite::Connection::open_in_memory().unwrap();
+    assert_eq!(
+        oracle
+            .query_row(sql, [], |row| row.get::<_, i32>(0))
+            .unwrap(),
+        1
+    );
+    let (_, context) = resolve(sql, Dialect::sqlite(), false).unwrap();
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:?}",
+        context.reported_problems()
+    );
+}
+
 #[test]
 fn every_row_field_retains_its_completed_binding() {
     let (query, context) = resolve(

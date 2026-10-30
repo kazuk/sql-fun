@@ -1408,7 +1408,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn validate_scalar_projection(
+    pub(crate) fn validate_scalar_value(
         &self,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
@@ -1416,7 +1416,7 @@ impl SemScalarExpr {
             || (context.dialect() == crate::ast::Dialect::sqlite() && self.as_row().is_some())
         {
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::QueryProblem::scalar_projection_required(),
+                crate::sem::QueryProblem::scalar_value_required(),
             ))?;
         }
         Ok(())

@@ -4,8 +4,8 @@ use super::DiagnosticMetadata;
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum QueryProblem {
-    /// An internal list or dialect-specific row value cannot be projected as a scalar.
-    ScalarProjectionRequired,
+    /// An internal list or dialect-specific row value cannot be consumed as a scalar.
+    ScalarValueRequired,
     /// Database-name metadata is required for column reference.
     ColumnDatabaseNameRequired(String),
     /// Cross-database column reference is not supported.
@@ -42,10 +42,10 @@ pub enum QueryProblem {
 }
 
 impl QueryProblem {
-    /// Reports a non-scalar projection target.
+    /// Reports a non-scalar expression operand.
     #[must_use]
-    pub const fn scalar_projection_required() -> Self {
-        Self::ScalarProjectionRequired
+    pub const fn scalar_value_required() -> Self {
+        Self::ScalarValueRequired
     }
 
     /// Database-name metadata is required for column reference.
@@ -132,7 +132,7 @@ impl QueryProblem {
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
-            Self::ScalarProjectionRequired => "query_scalar_projection_required",
+            Self::ScalarValueRequired => "query_scalar_value_required",
             Self::ColumnDatabaseNameRequired(_) => "column_database_name_required",
             Self::ColumnCrossDatabase(_) => "column_cross_database",
             Self::ColumnQualificationInvalid(_) => "column_qualification_invalid",
@@ -156,7 +156,7 @@ impl QueryProblem {
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         let message = match self {
-            Self::ScalarProjectionRequired => "projection requires a scalar value".to_owned(),
+            Self::ScalarValueRequired => "expression requires a scalar value".to_owned(),
             Self::ColumnDatabaseNameRequired(reference) => format!("database-name metadata is required for column reference: {reference}"),
             Self::ColumnCrossDatabase(reference) => format!("cross-database column reference is not supported: {reference}"),
             Self::ColumnQualificationInvalid(reference) => format!("column qualification is invalid for the selected dialect: {reference}"),

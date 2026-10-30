@@ -228,7 +228,7 @@ impl DiagnosticMessage for UpdateProblem {
 impl DiagnosticMessage for QueryProblem {
     fn diagnostic_message(&self) -> String {
         match self {
-            Self::ScalarProjectionRequired => "projection requires a scalar value".to_owned(),
+            Self::ScalarValueRequired => "expression requires a scalar value".to_owned(),
             Self::ColumnDatabaseNameRequired(reference) => format!("database-name metadata is required for column reference: {reference}"),
             Self::ColumnCrossDatabase(reference) => format!("cross-database column reference is not supported: {reference}"),
             Self::ColumnQualificationInvalid(reference) => format!("column qualification is invalid for the selected dialect: {reference}"),

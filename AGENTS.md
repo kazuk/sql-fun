@@ -312,6 +312,8 @@ directly:
 
 ## Issues
 
+- Do not modify GitHub issue or pull request metadata (labels, milestones,
+  assignees, etc.) unless explicitly instructed.
 - Before creating or updating issues or pull requests, read
   [docs/internal-rules/issue-pull-request-labels.md](docs/internal-rules/issue-pull-request-labels.md)
   and apply its label semantics.

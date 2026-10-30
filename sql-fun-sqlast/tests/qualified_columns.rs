@@ -239,6 +239,7 @@ mod test_helpers {
         pub(crate) fn analyze_sqlite(
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",
                 "--sql-fun-home",
@@ -269,7 +270,7 @@ mod test_helpers {
             Ok(parse_statements(sql, Dialect::sqlite())
                 .next()
                 .unwrap()?
-                .analyze(context)?)
+                .analyze(context, &mut cache_context)?)
         }
 
         /// Loads the shipped `PostgreSQL` builtin catalog per invocation. The public
@@ -278,6 +279,7 @@ mod test_helpers {
             sql: &str,
             database: Option<&str>,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
             let metadata = ::tempfile::NamedTempFile::new()?;
             let database = database
                 .map(|name| format!("database-name = {name:?}\n"))
@@ -324,7 +326,7 @@ CREATE VIEW a.v AS SELECT id FROM a.t;"#,
             Ok(parse_statements(sql, Dialect::postgres())
                 .next()
                 .unwrap()?
-                .analyze(context)?)
+                .analyze(context, &mut cache_context)?)
         }
     }
 }

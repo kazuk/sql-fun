@@ -63,7 +63,8 @@ async fn query_rpc_preserves_numbering_and_session_lifecycle() {
         )
         .await;
     let handle = &initialized["result"]["context_handle"];
-    let response = connection.rpc("analyze_query", &json!({"context_handle":handle, "query":{"Text":"SELECT $3::int4 AS third, $1::int4 AS first, $3::int4 AS again; SELECT 2 AS second"}})).await;
+    let request = json!({"context_handle":handle, "query":{"Text":"SELECT $3::int4 AS third, $1::int4 AS first, $3::int4 AS again; SELECT 2 AS second"}});
+    let response = connection.rpc("analyze_query", &request).await;
     let queries = &response["result"]["queries"];
     assert_eq!(queries["total_length"], 2, "{response}");
     let items = queries["items"].as_array().unwrap();
@@ -121,6 +122,22 @@ async fn query_rpc_preserves_numbering_and_session_lifecycle() {
         response["result"]["queries"]["items"][0]["complete"], true,
         "{response}"
     );
+    // Each RPC creates a fresh facade over the same connection-owned state.
+    let repeated = connection.rpc("analyze_query", &request).await;
+    let repeated_items = &repeated["result"]["queries"]["items"];
+    assert_eq!(repeated["result"]["queries"]["total_length"], 2);
+    for index in 0..2 {
+        assert_eq!(
+            repeated_items[index]["complete"], items[index]["complete"],
+            "{repeated}"
+        );
+        for collection in ["parameters", "result_columns", "probrems"] {
+            assert_eq!(
+                repeated_items[index][collection]["items"], items[index][collection]["items"],
+                "{repeated}"
+            );
+        }
+    }
     foreign.end_requests().await;
     foreign.finish().await.unwrap();
     connection.end_requests().await;

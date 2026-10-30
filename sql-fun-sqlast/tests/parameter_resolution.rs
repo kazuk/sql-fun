@@ -6,13 +6,14 @@ use std::collections::BTreeMap;
 #[test]
 fn real_postgres_catalog_preserves_numeric_source_types() -> Result<(), Box<dyn std::error::Error>>
 {
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     // The builtin catalog is part of this test: it verifies real operator/cast
     // metadata rather than only the lightweight unit-test definitions.
     let context = heavy::context()?;
     let statement = parse_statements("select $1 + 1 as total", Dialect::postgres())
         .next()
         .unwrap()?;
-    let analyzed = statement.analyze(context)?;
+    let analyzed = statement.analyze(context, &mut cache_context)?;
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int2())])));
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
@@ -104,8 +105,9 @@ mod test_helpers {
 fn real_catalog_contexts_produce_constraints(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(heavy::context()?)?;
+    let analyzed = statement.analyze(heavy::context()?, &mut cache_context)?;
     assert!(
         !analyzed
             .context()
@@ -157,13 +159,14 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
         context::{CastInfoRead, SchemaFileContext},
         sem::{FullName, TypeReference},
     };
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     let definition = parse_statements(
         "create type public.mood as enum ('happy')",
         Dialect::postgres(),
     )
     .next()
     .unwrap()?;
-    let defined = definition.analyze(heavy::context()?)?;
+    let defined = definition.analyze(heavy::context()?, &mut cache_context)?;
     let context = {
         let (args, selected) = heavy::environment()?;
         let analysis_base = &defined.into_context().freeze();
@@ -181,7 +184,7 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
     let statement = parse_statements("select $1::public.mood, $1::text", Dialect::postgres())
         .next()
         .unwrap()?;
-    let analyzed = statement.analyze(context)?;
+    let analyzed = statement.analyze(context, &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -203,8 +206,9 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
 fn nested_queries_retain_solved_parameter_domains(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(heavy::context()?)?;
+    let analyzed = statement.analyze(heavy::context()?, &mut cache_context)?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let serialized = ::serde_json::to_value(&query)?;
     let domains = test_helpers::serialized_parameter_domains(&serialized);
@@ -233,6 +237,7 @@ fn real_catalog_keeps_explicit_array_input_hints(
     #[case] expected: &str,
 ) -> testresult::TestResult {
     use ::sql_fun_sqlast::context::ParameterTypeHintWrite;
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     // This verifies the public hint API against actual polymorphic equality and
     // cast metadata; the CLI's named-placeholder lexer accepts identifier hints.
     let context = heavy::context()?;
@@ -242,14 +247,14 @@ fn real_catalog_keeps_explicit_array_input_hints(
     )
     .next()
     .unwrap()?
-    .analyze(context)?
+    .analyze(context, &mut cache_context)?
     .into_context();
     context.setup_typehinting(&[Some(hint)])?;
     let sql = format!("SELECT $1 IS DISTINCT FROM NULL::{hint}");
     let analyzed = parse_statements(&sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(context)?;
+        .analyze(context, &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -279,6 +284,7 @@ fn array_hints_resolve_expression_results_without_catalog_search(
     #[case] expected: &str,
 ) -> testresult::TestResult {
     use ::sql_fun_sqlast::context::ParameterTypeHintWrite;
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     // Real equality and array-cast declarations are needed for this public API path.
     let mut context = heavy::context()?;
     context.setup_typehinting(&[Some(hint), Some(hint)])?;
@@ -288,7 +294,7 @@ fn array_hints_resolve_expression_results_without_catalog_search(
     )
     .next()
     .unwrap()?
-    .analyze(context)?;
+    .analyze(context, &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -317,11 +323,12 @@ fn explicit_assignment_inspection_keeps_declared_cast_sources(
     #[case] sql: &str,
     #[case] source: &str,
 ) -> testresult::TestResult {
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     // Actual overload declarations and declared casts are the contract here.
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(heavy::context()?)?;
+        .analyze(heavy::context()?, &mut cache_context)?;
     assert!(
         analyzed
             .context()

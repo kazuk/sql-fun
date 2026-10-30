@@ -13,6 +13,7 @@ use ::sql_fun_server_api::{
     },
 };
 use ::sql_fun_sqlast::{
+    CacheContext,
     ast::{Dialect, Statement},
     context::{BaseParseContext, ParameterTypeHintWrite, ParseContext, SchemaFileContext},
     parse_statements,
@@ -350,8 +351,10 @@ impl QueryResult {
         schema: &InitializedSchema,
         mapping: &SourceMap,
         expand_asterisk: bool,
+        cache_context: &mut CacheContext,
     ) -> Self {
-        StatementAnalysis::new(statement, bindings, source, schema, mapping).run(expand_asterisk)
+        StatementAnalysis::new(statement, bindings, source, schema, mapping)
+            .run(expand_asterisk, cache_context)
     }
 }
 
@@ -381,7 +384,7 @@ impl<'a> StatementAnalysis<'a> {
         }
     }
 
-    fn run(&self, expand_asterisk: bool) -> QueryResult {
+    fn run(&self, expand_asterisk: bool, cache_context: &mut CacheContext) -> QueryResult {
         let base = self.schema.base_context();
         let mut result = QueryResult::for_statement(self.statement, self.mapping);
         let mut context =
@@ -407,7 +410,7 @@ impl<'a> StatementAnalysis<'a> {
             Err(error) => return self.output_failure(result, QueryAnalysisStage::parse(), &error),
         };
         let statement = output.as_ref().unwrap_or(self.statement);
-        match statement.analyze(context) {
+        match statement.analyze(context, cache_context) {
             Ok(pair) => self.complete(&mut result, pair, output.as_mut()),
             Err(error) => result.report(self, QueryAnalysisStage::analysis(), &error.to_string()),
         }
@@ -721,6 +724,7 @@ fn analyze(
     source: &QuerySource,
     schema: &InitializedSchema,
     expand_asterisk: bool,
+    cache_context: &mut CacheContext,
 ) -> Vec<QueryResult> {
     let dialect = Dialect::from(schema.base_context().metadata());
     let fail = |stage: QueryAnalysisStage, message: &str| {
@@ -756,6 +760,7 @@ fn analyze(
                                 schema,
                                 &mapping,
                                 expand_asterisk,
+                                cache_context,
                             )]
                         }
                         Err(error) => fail(QueryAnalysisStage::realization(), &error),
@@ -786,6 +791,7 @@ fn analyze(
                 schema,
                 &mapping,
                 expand_asterisk,
+                cache_context,
             ),
             Err(error) => QueryResult::parse_failure(&error, source, schema, &mapping),
         })
@@ -806,6 +812,7 @@ impl Session<'_, '_> {
             &source,
             schema,
             self.expand_asterisk(args.context_handle()),
+            self.cache_context(),
         );
         let mut handles = Vec::new();
         let response = (|| {

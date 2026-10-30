@@ -351,12 +351,13 @@ fn grouping_result_type_does_not_constrain_argument_type() {
 #[case::delete_where("DELETE FROM t WHERE GROUPING(a) IS NULL")]
 #[case::delete_returning("DELETE FROM t RETURNING GROUPING(a)")]
 fn rejects_grouping_outside_select(#[case] sql: &str) {
+    let mut cache_context = crate::CacheContext::new();
     let context = super::test_helpers::grouping_table_context();
     let analysis = crate::parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
-        .analyze(context)
+        .analyze(context, &mut cache_context)
         .unwrap();
     assert!(
         analysis

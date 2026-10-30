@@ -168,13 +168,14 @@ fn deferred_star_validates_final_query_width(
 
 #[test]
 fn rejection_does_not_stop_following_statement() -> testresult::TestResult {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = context();
     let mut statements = Vec::new();
     for statement in crate::parse_statements(
         "SELECT 1 IN (SELECT 1,2); SELECT 1 IN (1)",
         crate::ast::Dialect::postgres(),
     ) {
-        let analyzed = statement?.analyze(context)?;
+        let analyzed = statement?.analyze(context, &mut cache_context)?;
         statements.push(analyzed.ast().clone().into_select_statemtnt().unwrap());
         context = analyzed.into_context();
     }

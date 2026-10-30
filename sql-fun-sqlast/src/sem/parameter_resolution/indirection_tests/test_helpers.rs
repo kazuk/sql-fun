@@ -40,13 +40,16 @@ pub(super) fn schema(
     sql: &str,
     frozen: bool,
 ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = context();
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
         &StringSpan::new(0, sql.len()),
     ));
     for statement in crate::parse_statements(sql, crate::ast::Dialect::postgres()) {
-        context = statement?.analyze(context)?.into_context();
+        context = statement?
+            .analyze(context, &mut cache_context)?
+            .into_context();
     }
     if frozen {
         let args = context.get_args().clone();

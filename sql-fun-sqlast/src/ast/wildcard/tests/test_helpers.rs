@@ -56,7 +56,8 @@ impl ColumnDefinition {
 }
 
 pub(super) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
-    let pair = statement.analyze(catalog()).unwrap();
+    let mut cache_context = crate::CacheContext::new();
+    let pair = statement.analyze(catalog(), &mut cache_context).unwrap();
     assert!(
         pair.context().reported_problems().is_empty(),
         "{:?}",

@@ -76,6 +76,9 @@ impl Statement {
     /// No SQL reparsing or catalog-file discovery occurs. This uses the same
     /// resolver and diagnostic reporting as the normal semantic-analysis path.
     ///
+    /// The caller retains and reuses `cache_context` across analyses. It is
+    /// currently empty and does not affect analysis behavior.
+    ///
     /// # Panics
     ///
     /// CREATE TRIGGER analysis is not implemented yet (#602 / #555).
@@ -87,6 +90,7 @@ impl Statement {
     pub fn analyze<TContext: ParseContext>(
         &self,
         context: TContext,
+        _cache_context: &mut crate::CacheContext,
     ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError> {
         AnalysisError::check_dialect(self.dialect, context.dialect())?;
         self.node.resolve_and_apply(context)
@@ -117,6 +121,7 @@ mod test_statement_analyze {
     #[case::postgres(Dialect::postgres())]
     #[cfg_attr(feature = "sqlite", case::sqlite(Dialect::sqlite()))]
     fn analyzes_structurally_inserted_dependencies(#[case] dialect: Dialect) {
+        let mut cache_context = crate::CacheContext::new();
         let mut base = statement(
             "with existing as (select id from leaf) select id from existing",
             dialect,
@@ -129,7 +134,7 @@ mod test_statement_analyze {
         with.insert(1, &second).unwrap();
         let mut context = TestParseContext::default().with_dialect(dialect);
         context.setup_type(PgBuiltInType::int4());
-        let analyzed = base.analyze(context).unwrap();
+        let analyzed = base.analyze(context, &mut cache_context).unwrap();
         let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
         let column = query.result_columns().get_column_at(0).unwrap();
         assert_eq!(column.col_type(), &Some(PgBuiltInType::int4()));
@@ -596,11 +601,12 @@ mod test_parameter_analysis {
         sql: &str,
         dialect: Dialect,
     ) -> Result<crate::AstAndContextPair<TestParseContext>, crate::sem::AnalysisError> {
+        let mut cache_context = crate::CacheContext::new();
         parse_statements(sql, dialect)
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context().with_dialect(dialect))
+            .analyze(context().with_dialect(dialect), &mut cache_context)
     }
 
     #[rstest::rstest]
@@ -669,6 +675,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn tied_best_overloads_are_not_accepted_as_a_type_range() {
+        let mut cache_context = crate::CacheContext::new();
         let mut context = context();
         let int = PgBuiltInType::int4();
         let overloads = OperatorDefinition::binary(&[
@@ -685,7 +692,7 @@ mod test_parameter_analysis {
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context)
+            .analyze(context, &mut cache_context)
             .expect("ambiguity is recoverable");
         assert_eq!(analyzed.context().reported_problem_count(), 1);
         assert_eq!(
@@ -745,6 +752,7 @@ mod test_parameter_analysis {
     }
     #[test]
     fn subsequent_analysis_replaces_context_constraints() {
+        let mut cache_context = crate::CacheContext::new();
         let first = analyze("select $7 + 1 as n", Dialect::postgres()).unwrap();
         assert!(
             first
@@ -757,7 +765,7 @@ mod test_parameter_analysis {
             .next()
             .unwrap()
             .unwrap()
-            .analyze(first.into_context())
+            .analyze(first.into_context(), &mut cache_context)
             .unwrap();
         assert!(
             second
@@ -777,18 +785,19 @@ mod test_parameter_analysis {
 
     #[test]
     fn parameter_state_restarts_after_parameter_free_analysis() {
+        let mut cache_context = crate::CacheContext::new();
         let first = analyze("select $7 + 1", Dialect::postgres()).unwrap();
         let plain = parse_statements("select 1", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
-            .analyze(first.into_context())
+            .analyze(first.into_context(), &mut cache_context)
             .unwrap();
         let third = parse_statements("select $2 + 1", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
-            .analyze(plain.into_context())
+            .analyze(plain.into_context(), &mut cache_context)
             .unwrap();
         assert!(
             third
@@ -845,6 +854,7 @@ mod test_parameter_analysis {
     #[test]
     fn schema_loading_skips_parameter_inference() {
         use crate::{context::MutSourcePathWithSpan, sem::SchemaName};
+        let mut cache_context = crate::CacheContext::new();
         let before = crate::sem::parameter_resolution::inference_runs();
         let mut context = crate::test_helpers::schema_layer(
             std::path::Path::new("schema.sql"),
@@ -859,7 +869,10 @@ mod test_parameter_analysis {
         for statement in statements {
             let statement = statement.unwrap();
             context.set_statement_span(*statement.span());
-            context = statement.analyze(context).unwrap().into_context();
+            context = statement
+                .analyze(context, &mut cache_context)
+                .unwrap()
+                .into_context();
         }
         assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
         assert!(context.parameter_constraints().result_column(0).is_none());
@@ -906,13 +919,14 @@ mod test_parameter_analysis {
 
     #[test]
     fn diagnostic_sink_failure_still_aborts_parameter_analysis() {
+        let mut cache_context = crate::CacheContext::new();
         let mut context = context();
         context.reject_diagnostics_after(0);
         let error = parse_statements("select $1 + 1, lower($1)", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context)
+            .analyze(context, &mut cache_context)
             .err()
             .expect("diagnostic reporting must fail");
         assert_eq!(error.to_string(), "diagnostic sink rejected a problem");
@@ -948,11 +962,12 @@ mod test_parameter_casts {
     #[case::boolean("select $1 as flag where $1")]
     #[case::not("select not $1 as flag")]
     fn boolean_context_constrains_input(#[case] sql: &str) {
+        let mut cache_context = crate::CacheContext::new();
         let result = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
-            .analyze(TestParseContext::default())
+            .analyze(TestParseContext::default(), &mut cache_context)
             .unwrap();
         let input = result
             .context()
@@ -969,6 +984,7 @@ mod test_parameter_casts {
     #[case::projection("select cast(?1 as integer) as n")]
     #[case::cte("with x as (select cast(?1 as integer) as n) select n from x")]
     fn sqlite_casts_do_not_require_postgres_casts(#[case] sql: &str) {
+        let mut cache_context = crate::CacheContext::new();
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.setup_type(crate::sem::TypeReference::from_full_name(
             crate::sem::FullName::from_local_name("integer"),
@@ -977,7 +993,7 @@ mod test_parameter_casts {
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context)
+            .analyze(context, &mut cache_context)
             .unwrap();
         assert!(
             result

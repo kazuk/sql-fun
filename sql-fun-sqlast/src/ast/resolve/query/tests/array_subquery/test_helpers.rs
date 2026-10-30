@@ -2,6 +2,7 @@ use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
 
 /// Explicit small composite fixtures; no builtin catalog or live database.
 pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileContext> {
+    let mut cache_context = crate::CacheContext::new();
     let mut base = super::super::super::test_helpers::catalog();
     for name in ["singleton", "pair", "container"] {
         let ty = crate::sem::TypeReference::concrete_type_ref(
@@ -41,12 +42,16 @@ pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileC
         "CREATE TYPE singleton AS (n integer); CREATE TYPE pair AS (n integer, m integer); CREATE TYPE container AS (item singleton)",
         crate::ast::Dialect::postgres(),
     ) {
-        context = statement.unwrap().analyze(context).unwrap().into_context();
+        context = statement
+            .unwrap()
+            .analyze(context, &mut cache_context)
+            .unwrap()
+            .into_context();
     }
     crate::parse_statements(sql, crate::ast::Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
-        .analyze(context)
+        .analyze(context, &mut cache_context)
         .unwrap()
 }

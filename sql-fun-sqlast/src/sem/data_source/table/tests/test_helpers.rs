@@ -7,6 +7,7 @@ use crate::{
 
 /// Uses only six explicit builtin types and small local DDL, without a shipped catalog.
 pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFileContext) {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = TestParseContext::default().with_dialect(dialect);
     context.set_get_search_path_result(&[SchemaName::from("public")]);
     for ty in ["int4", "bool", "oid", "tid", "xid", "cid"] {
@@ -30,7 +31,7 @@ pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFi
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context)
+            .analyze(context, &mut cache_context)
             .unwrap()
             .into_context();
     }
@@ -38,7 +39,7 @@ pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFi
         .next()
         .unwrap()
         .unwrap()
-        .analyze(context)
+        .analyze(context, &mut cache_context)
         .unwrap();
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     (query, analyzed.into_context())

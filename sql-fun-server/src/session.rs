@@ -80,12 +80,14 @@ impl SessionWrapper {
 
 /// Lives inside the connection future, strictly shorter than its schema owners.
 struct SessionState<'ctx> {
+    cache_context: ::sql_fun_sqlast::CacheContext,
     collections: CollectionRegistry<'ctx>,
 }
 
 impl SessionState<'_> {
     fn new(page_limit: NonZeroUsize) -> Self {
         Self {
+            cache_context: ::sql_fun_sqlast::CacheContext::new(),
             collections: CollectionRegistry::new(page_limit),
         }
     }

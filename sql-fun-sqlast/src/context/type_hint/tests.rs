@@ -231,6 +231,7 @@ fn incompatible_use_reports_semantic_diagnostics() {
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_uses_its_type_spelling_and_catalog() {
+    let mut cache_context = crate::CacheContext::new();
     let mut base = crate::test_helpers::TestParseContext::default().with_dialect(Dialect::sqlite());
     base.set_get_search_path_result(&[SchemaName::from("main")]);
     let expected = TypeReference::concrete_type_ref(
@@ -246,7 +247,7 @@ fn sqlite_uses_its_type_spelling_and_catalog() {
         .next()
         .unwrap()
         .unwrap()
-        .analyze(base)
+        .analyze(base, &mut cache_context)
         .unwrap();
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     assert_eq!(
@@ -303,6 +304,7 @@ fn reusing_a_layer_with_empty_setup_restores_unhinted_inference() {
 #[case::unhinted(None)]
 #[case::hinted(Some("int4"))]
 fn operator_constraints_and_executable_sql_stay_consistent(#[case] hint: Option<&str>) {
+    let mut cache_context = crate::CacheContext::new();
     let mut context = context();
     context.setup_typehinting(&[hint]).unwrap();
     let statement = crate::parse_statements("SELECT $1 + 1, $1", context.dialect())
@@ -310,7 +312,7 @@ fn operator_constraints_and_executable_sql_stay_consistent(#[case] hint: Option<
         .unwrap()
         .unwrap();
     let sql = statement.deparse_sql(context.dialect()).unwrap();
-    let analyzed = statement.analyze(context).unwrap();
+    let analyzed = statement.analyze(context, &mut cache_context).unwrap();
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",

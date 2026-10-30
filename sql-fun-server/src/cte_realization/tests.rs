@@ -261,6 +261,7 @@ fn realized_query_analysis_ignores_parameter_hints(
     #[case] cte_parameter: &str,
     #[case] base_parameter: &str,
 ) {
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
     let project = crate::schema_cache::test_helpers::SchemaProject::new();
     let cte = format!("select ${{{cte_parameter}}} + 1 as n");
     let base = format!("select n, ${{{base_parameter}}} + 2 as m from chosen");
@@ -272,7 +273,7 @@ fn realized_query_analysis_ignores_parameter_hints(
     .unwrap();
     let analyzed = realized
         .statement()
-        .analyze(project.analysis_context("products"))
+        .analyze(project.analysis_context("products"), &mut cache_context)
         .unwrap();
     let inputs = analyzed.context().parameter_constraints();
     assert_eq!(
@@ -418,6 +419,7 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
         context::ParameterTypeHintWrite,
         sem::{FullName, PgBuiltInType, TypeReference},
     };
+    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
 
     let project = crate::schema_cache::test_helpers::SchemaProject::new();
     let realized = realize_cte_catalog(
@@ -446,7 +448,7 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
     .next()
     .unwrap()
     .unwrap()
-    .analyze(project.analysis_context("products"))
+    .analyze(project.analysis_context("products"), &mut cache_context)
     .unwrap()
     .into_context();
     let kind = TypeReference::concrete_type_ref(&FullName::with_schema("public", "kind"), false);
@@ -457,7 +459,10 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
         .statement()
         .deparse_sql(Dialect::postgres())
         .unwrap();
-    let analyzed = realized.statement().analyze(context).unwrap();
+    let analyzed = realized
+        .statement()
+        .analyze(context, &mut cache_context)
+        .unwrap();
     assert!(analyzed.context().problems().is_empty());
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     for (index, expected) in [PgBuiltInType::int4(), kind.clone(), PgBuiltInType::int4()]

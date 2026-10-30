@@ -15,6 +15,7 @@ pub mod engine_specific;
 pub mod sem;
 pub mod syn;
 
+mod cache_context;
 mod identifier;
 mod parse_statements;
 mod placeholdered_sql;
@@ -30,6 +31,7 @@ mod trie_map;
 
 use sql_fun_core::IVec;
 
+pub use self::cache_context::CacheContext;
 pub use self::sql_file::SqlFileSnapshot;
 
 #[cfg(feature = "sqlite")]

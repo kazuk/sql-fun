@@ -12,13 +12,16 @@ fn statement(sql: &str) -> Statement {
 
 #[test]
 fn public_statement_entry_point_analyzes_and_deparses_merge() {
+    let mut cache_context = crate::CacheContext::new();
     let source = statement(
         "MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel RETURNING t.id",
     );
     assert!(source.is_merge());
     assert_eq!(source.kind(), StatementKind::merge());
 
-    let analyzed = source.analyze(catalog(17)).expect("MERGE analysis");
+    let analyzed = source
+        .analyze(catalog(17), &mut cache_context)
+        .expect("MERGE analysis");
     assert!(analyzed.ast().as_merge().is_some());
     assert_eq!(analyzed.context().reported_problem_count(), 0);
 
@@ -32,10 +35,13 @@ fn public_statement_entry_point_analyzes_and_deparses_merge() {
 
 #[test]
 fn merge_cte_alias_is_visible_to_the_outer_query() {
+    let mut cache_context = crate::CacheContext::new();
     let source = statement(
         "WITH changed(renamed_id) AS (MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel RETURNING t.id) SELECT renamed_id FROM changed",
     );
-    let analyzed = source.analyze(catalog(17)).expect("MERGE CTE analysis");
+    let analyzed = source
+        .analyze(catalog(17), &mut cache_context)
+        .expect("MERGE CTE analysis");
     let query = analyzed
         .ast()
         .clone()
@@ -79,6 +85,7 @@ fn merge_cte_body_can_be_inserted_and_roundtripped() {
 
 #[test]
 fn merge_statement_with_clause_can_be_mutated_and_deparsed() {
+    let mut cache_context = crate::CacheContext::new();
     let mut merge = statement(
         "MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel",
     );
@@ -100,15 +107,16 @@ fn merge_statement_with_clause_can_be_mutated_and_deparsed() {
     let reparsed = statement(&rendered);
     assert!(reparsed.is_merge());
     assert_eq!(reparsed.with_clause().unwrap().len(), 1);
-    assert!(reparsed.analyze(catalog(17)).is_ok());
+    assert!(reparsed.analyze(catalog(17), &mut cache_context).is_ok());
 }
 
 #[test]
 fn nested_merge_cte_placement_is_rejected() {
+    let mut cache_context = crate::CacheContext::new();
     let source = statement(
         "SELECT * FROM (WITH changed AS (MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel RETURNING t.id) SELECT id FROM changed) AS nested",
     );
-    let result = source.analyze(catalog(17));
+    let result = source.analyze(catalog(17), &mut cache_context);
     assert!(match result {
         Err(_) => true,
         Ok(analyzed) => analyzed.context().reported_problem_count() > 0,
@@ -117,10 +125,11 @@ fn nested_merge_cte_placement_is_rejected() {
 
 #[test]
 fn returning_parameter_defaults_to_text_before_merge_action_assignment() {
+    let mut cache_context = crate::CacheContext::new();
     let source = statement(
         "MERGE INTO items AS t USING incoming AS s ON t.id = $2 WHEN MATCHED AND $3 THEN UPDATE SET id = $1 WHEN NOT MATCHED THEN INSERT (id) VALUES ($1) RETURNING $1 AS value",
     );
-    let result = source.analyze(catalog(17));
+    let result = source.analyze(catalog(17), &mut cache_context);
     assert!(match result {
         Err(_) => true,
         Ok(analyzed) => analyzed.context().reported_problem_count() > 0,
@@ -129,22 +138,24 @@ fn returning_parameter_defaults_to_text_before_merge_action_assignment() {
 
 #[test]
 fn postgres_18_merge_row_image_stars_expand_the_target_columns() {
+    let mut cache_context = crate::CacheContext::new();
     let source = statement(
         "MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel WHEN NOT MATCHED BY SOURCE THEN DELETE WHEN NOT MATCHED BY TARGET THEN INSERT (id, label) VALUES (s.sid, s.slabel) RETURNING old.*, new.*",
     );
     let analyzed = source
-        .analyze(catalog(18))
+        .analyze(catalog(18), &mut cache_context)
         .expect("MERGE row-image analysis");
     assert_eq!(analyzed.ast().as_merge().unwrap().result_columns().len(), 4);
 }
 
 #[test]
 fn cte_source_and_merge_actions_share_parameter_analysis() {
+    let mut cache_context = crate::CacheContext::new();
     let source = statement(
         "WITH input AS (SELECT $1::integer AS sid) MERGE INTO items t USING input s ON true WHEN MATCHED THEN UPDATE SET id=s.sid WHEN NOT MATCHED THEN INSERT(id) VALUES(s.sid) RETURNING t.id",
     );
     let before = crate::sem::parameter_resolution::inference_runs();
-    let analyzed = source.analyze(catalog(17)).unwrap();
+    let analyzed = source.analyze(catalog(17), &mut cache_context).unwrap();
     assert_eq!(analyzed.context().reported_problem_count(), 0);
     assert_eq!(
         crate::sem::parameter_resolution::inference_runs(),

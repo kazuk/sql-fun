@@ -69,6 +69,7 @@ fn infers_assignment_parameters(#[case] sql: &str) {
 )]
 #[case::implicit("INSERT INTO expanded_items SELECT ($1).*, $2 WHERE $1::public.pair IS NOT NULL")]
 fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
+    let mut cache_context = crate::CacheContext::new();
     let dialect = Dialect::postgres();
     let mut context = test_helpers::catalog(dialect);
     let pair_name = crate::sem::FullName::with_schema("public", "pair");
@@ -92,7 +93,10 @@ fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
     .next()
     .unwrap()
     .unwrap();
-    context = table_statement.analyze(context).unwrap().into_context();
+    context = table_statement
+        .analyze(context, &mut cache_context)
+        .unwrap()
+        .into_context();
     let statement = crate::parse_statements(sql, dialect)
         .next()
         .unwrap()
@@ -419,12 +423,13 @@ fn public_sqlite_entry_point_retains_returning_and_parameters() {
     false
 )]
 fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] accepted: bool) {
+    let mut cache_context = crate::CacheContext::new();
     let dialect = Dialect::postgres();
     let mut context = crate::parse_statements(index, dialect)
         .next()
         .unwrap()
         .unwrap()
-        .analyze(test_helpers::catalog(dialect))
+        .analyze(test_helpers::catalog(dialect), &mut cache_context)
         .unwrap()
         .into_context();
     assert_eq!(context.reported_problem_count(), 0);
@@ -672,13 +677,14 @@ fn resolves_named_constraint_identity(
     #[case] kind: &str,
     #[case] expected: crate::sem::InsertConstraintKind,
 ) {
+    let mut cache_context = crate::CacheContext::new();
     let dialect = Dialect::postgres();
     let ddl = format!("CREATE TABLE keyed(id int4, CONSTRAINT key473 {kind}(id))");
     let mut context = crate::parse_statements(&ddl, dialect)
         .next()
         .unwrap()
         .unwrap()
-        .analyze(test_helpers::catalog(dialect))
+        .analyze(test_helpers::catalog(dialect), &mut cache_context)
         .unwrap()
         .into_context();
     let statement = crate::parse_statements(
@@ -744,6 +750,7 @@ fn retains_failed_constraint_lookup_and_structured_problem() {
 
 #[test]
 fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
+    let mut cache_context = crate::CacheContext::new();
     let dialect = Dialect::postgres();
     let mut context = crate::parse_statements(
         "CREATE TABLE keyed(id int4, label text, UNIQUE(id), UNIQUE(label))",
@@ -752,7 +759,7 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
     .next()
     .unwrap()
     .unwrap()
-    .analyze(test_helpers::catalog(dialect))
+    .analyze(test_helpers::catalog(dialect), &mut cache_context)
     .unwrap()
     .into_context();
     let statement = crate::parse_statements(

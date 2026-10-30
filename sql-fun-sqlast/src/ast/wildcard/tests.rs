@@ -52,11 +52,16 @@ use crate::context::ParseContext;
 #[case::zero_width_returning("DELETE FROM empty RETURNING *, 1", 1)]
 
 fn rewrite_roundtrip_preserves_result_shape(#[case] sql: &str, #[case] expected: usize) {
-    let original = statement(sql).analyze(catalog()).unwrap();
+    let mut cache_context = crate::CacheContext::new();
+    let original = statement(sql)
+        .analyze(catalog(), &mut cache_context)
+        .unwrap();
     let (rewritten, count) = rewritten(sql);
     assert_eq!(count, expected);
     let emitted = rewritten.deparse_sql(Dialect::postgres()).unwrap();
-    let reparsed = statement(&emitted).analyze(catalog()).unwrap();
+    let reparsed = statement(&emitted)
+        .analyze(catalog(), &mut cache_context)
+        .unwrap();
     assert!(
         reparsed.context().reported_problems().is_empty(),
         "{emitted}: {:?}",
@@ -73,13 +78,16 @@ fn rewrite_roundtrip_preserves_result_shape(#[case] sql: &str, #[case] expected:
 #[case::alias("SELECT joined.* FROM (t FULL JOIN u USING (id)) joined", "joined")]
 #[case::duplicate("SELECT t.*, t.* FROM t", "AS")]
 fn resolved_join_expressions_remain_executable(#[case] sql: &str, #[case] expected: &str) {
+    let mut cache_context = crate::CacheContext::new();
     let (rewritten, _) = rewritten(sql);
     let emitted = rewritten.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
         emitted.to_uppercase().contains(&expected.to_uppercase()),
         "{emitted}"
     );
-    let pair = statement(&emitted).analyze(catalog()).unwrap();
+    let pair = statement(&emitted)
+        .analyze(catalog(), &mut cache_context)
+        .unwrap();
     assert!(
         pair.context().reported_problems().is_empty(),
         "{emitted}: {:?}",
@@ -190,13 +198,14 @@ fn empty_returning_is_rejected_without_edit() {
 #[case::new("DELETE FROM t RETURNING new.*", "new")]
 #[case::old("DELETE FROM t RETURNING old.*", "old")]
 fn returning_row_image_qualification_is_preserved(#[case] sql: &str, #[case] qualifier: &str) {
+    let mut cache_context = crate::CacheContext::new();
     let metadata = serde_json::from_value(serde_json::json!({
         "engine": "postgres", "dialect": "postgres", "version": "18", "search_path": ["public"]
     }))
     .unwrap();
     let context = || catalog().with_metadata(&metadata);
     let mut owner = statement(sql);
-    let analyzed = owner.analyze(context()).unwrap();
+    let analyzed = owner.analyze(context(), &mut cache_context).unwrap();
     assert!(analyzed.context().reported_problems().is_empty());
     owner
         .rewrite_wildcards(analyzed.context().analysis_state().wildcard_expansions())
@@ -206,7 +215,9 @@ fn returning_row_image_qualification_is_preserved(#[case] sql: &str, #[case] qua
         emitted.contains(&format!(r#""{qualifier}"."id""#)),
         "{emitted}"
     );
-    let pair = statement(&emitted).analyze(context()).unwrap();
+    let pair = statement(&emitted)
+        .analyze(context(), &mut cache_context)
+        .unwrap();
     assert!(
         pair.context().reported_problems().is_empty(),
         "{emitted}: {:?}",
@@ -226,8 +237,11 @@ fn returning_row_image_qualification_is_preserved(#[case] sql: &str, #[case] qua
     "SELECT r.* FROM ROWS FROM (rows_fun(), rows_fun()) WITH ORDINALITY r(x,x,y,y,n)"
 )]
 fn rows_from_expansion_keeps_duplicate_outputs_stable(#[case] sql: &str) {
+    let mut cache_context = crate::CacheContext::new();
     let mut owner = statement(sql);
-    let original = owner.analyze(test_helpers::rows_catalog()).unwrap();
+    let original = owner
+        .analyze(test_helpers::rows_catalog(), &mut cache_context)
+        .unwrap();
     assert!(
         original.context().reported_problems().is_empty(),
         "{:?}",
@@ -238,7 +252,7 @@ fn rows_from_expansion_keeps_duplicate_outputs_stable(#[case] sql: &str) {
         .unwrap();
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
     let rewritten = statement(&emitted)
-        .analyze(test_helpers::rows_catalog())
+        .analyze(test_helpers::rows_catalog(), &mut cache_context)
         .unwrap();
     assert!(
         rewritten.context().reported_problems().is_empty(),
@@ -253,6 +267,7 @@ fn rows_from_expansion_keeps_duplicate_outputs_stable(#[case] sql: &str) {
 #[test]
 fn target_location_synchronization_disambiguates_imported_statements() {
     use crate::ast::{CteDefinition, HaveWithClause};
+    let mut cache_context = crate::CacheContext::new();
     let mut owner = statement("SELECT * FROM t");
     let definition = CteDefinition::new("imported", &statement("SELECT * FROM u")).unwrap();
     owner
@@ -272,7 +287,7 @@ fn target_location_synchronization_disambiguates_imported_statements() {
     assert!(!emitted.contains('*'), "{emitted}");
     assert!(
         statement(&emitted)
-            .analyze(catalog())
+            .analyze(catalog(), &mut cache_context)
             .unwrap()
             .context()
             .reported_problems()
@@ -357,13 +372,14 @@ fn merge_returning_fixes_its_source_projection(
     #[case] sql: &str,
     #[values("17", "18")] version: &str,
 ) {
+    let mut cache_context = crate::CacheContext::new();
     let metadata = serde_json::from_value(serde_json::json!({
         "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
     }))
     .unwrap();
     let context = || test_helpers::rows_catalog().with_metadata(&metadata);
     let mut owner = statement(sql);
-    let original = owner.analyze(context()).unwrap();
+    let original = owner.analyze(context(), &mut cache_context).unwrap();
     assert!(
         original.context().reported_problems().is_empty(),
         "{:?}",
@@ -376,7 +392,9 @@ fn merge_returning_fixes_its_source_projection(
         1
     );
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
-    let rewritten = statement(&emitted).analyze(context()).unwrap();
+    let rewritten = statement(&emitted)
+        .analyze(context(), &mut cache_context)
+        .unwrap();
     assert!(
         rewritten.context().reported_problems().is_empty(),
         "{emitted}: {:?}",
@@ -389,6 +407,7 @@ fn merge_returning_fixes_its_source_projection(
 
 #[test]
 fn a_late_invalid_target_preserves_sources_and_allows_retry() {
+    let mut cache_context = crate::CacheContext::new();
     let groups = expansions(&statement("SELECT j.*, j.* FROM (t CROSS JOIN u) j"));
     let mut owner = statement("SELECT j.*, 1   FROM (t CROSS JOIN u) j");
     let before = owner.deparse_sql(Dialect::postgres()).unwrap();
@@ -404,7 +423,7 @@ fn a_late_invalid_target_preserves_sources_and_allows_retry() {
     let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
     assert!(
         statement(&emitted)
-            .analyze(catalog())
+            .analyze(catalog(), &mut cache_context)
             .unwrap()
             .context()
             .reported_problems()

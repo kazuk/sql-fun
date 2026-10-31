@@ -26,19 +26,6 @@ fn returning_row_images_use_configured_engine_version(
     }
 }
 
-#[test]
-fn parser_does_not_promise_postgres18_returning_output_aliases() {
-    assert!(
-        crate::parse_statements(
-            "DELETE FROM items RETURNING WITH (OLD AS o, NEW AS n) o.id,n.id",
-            Dialect::postgres()
-        )
-        .next()
-        .unwrap()
-        .is_err()
-    );
-}
-
 #[rstest::rstest]
 #[case::old_star("DELETE FROM items RETURNING old.*", 2)]
 #[case::new_star("DELETE FROM items RETURNING new.*", 2)]

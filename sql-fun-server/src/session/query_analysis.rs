@@ -312,6 +312,25 @@ impl QueryResult {
         if !error.is_syntax() {
             result.kind = Some(classify_kind(error.statement_kind()));
         }
+        let base = schema.base_context();
+        let mut context =
+            SchemaFileContext::new(&source.path, base, base.get_args(), base.metadata());
+        if matches!(error.report_engine_features(&mut context), Ok(true)) {
+            result.problems = context
+                .problems()
+                .iter()
+                .map(|problem| {
+                    diagnostic(
+                        problem,
+                        &source.path,
+                        Some(&mapping.original[original_start..original_end]),
+                        dialect,
+                        original_start,
+                    )
+                })
+                .collect();
+            return result;
+        }
         result.problems = vec![diagnostic(
             &AnalysisProblem::query_analysis(stage, &error.to_string()),
             &source.path,

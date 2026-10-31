@@ -132,7 +132,11 @@ impl TableConstraint {
         if !self.order.is_empty() {
             writer.list(&self.order, ", ")
         } else {
-            writer.names(&self.keys, ", ")
+            writer.names(&self.keys, ", ")?;
+            if self.extras.without_overlaps {
+                writer.sql(" WITHOUT OVERLAPS");
+            }
+            Ok(())
         }
     }
 
@@ -182,6 +186,15 @@ impl ColumnConstraint {
         column_context: bool,
     ) -> Result<(), DeparseError> {
         match self {
+            Self::Enforcement(enforced) => writer.sql(if *enforced {
+                "ENFORCED"
+            } else {
+                "NOT ENFORCED"
+            }),
+            Self::Nullability(true, _, _) if !column_context => {
+                writer.sql("NOT NULL ");
+                writer.names(&owner.keys, ", ")?;
+            }
             Self::Nullability(not_null, conflict, _validity) => {
                 Self::emit_nullability(*not_null, conflict.as_ref(), column_context, writer)?;
             }
@@ -463,6 +476,23 @@ impl ColumnConstraint {
 }
 
 impl ForeignReference {
+    fn emit_period_keys(
+        keys: &[String],
+        period: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        for (index, key) in keys.iter().enumerate() {
+            if index != 0 {
+                writer.sql(", ");
+            }
+            if period && index + 1 == keys.len() {
+                writer.sql("PERIOD ");
+            }
+            writer.ident(key)?;
+        }
+        Ok(())
+    }
+
     fn emit_with(
         &self,
         writer: &mut SqlWriter,
@@ -479,14 +509,14 @@ impl ForeignReference {
                     .invalid("FOREIGN KEY", "table foreign key requires at least one key");
             }
             writer.sql("FOREIGN KEY (");
-            writer.names(&owner.keys, ", ")?;
+            Self::emit_period_keys(&owner.keys, owner.extras.fk_with_period, writer)?;
             writer.sql(") ");
         }
         writer.sql("REFERENCES ");
         self.table.emit(writer)?;
         if !self.columns.is_empty() {
             writer.sql(" (");
-            writer.names(&self.columns, ", ")?;
+            Self::emit_period_keys(&self.columns, owner.extras.pk_with_period, writer)?;
             writer.sql(")");
         }
         if let Some(match_type) = &self.match_type {
@@ -576,6 +606,17 @@ impl ConstraintExtras {
         self.emit_index_options(writer, constraint)?;
         self.emit_predicate(writer, constraint)?;
         self.emit_validation_options(writer, constraint)?;
+        if constraint.is_nullability() && self.no_inherit {
+            writer.sql(" NO INHERIT");
+        }
+        if let Some(enforced) = self.enforced {
+            writer.postgres_only("constraint enforcement")?;
+            writer.sql(if enforced {
+                " ENFORCED"
+            } else {
+                " NOT ENFORCED"
+            });
+        }
         self.emit_deferrability(writer, constraint)
     }
 
@@ -656,7 +697,7 @@ impl ConstraintExtras {
         writer: &mut SqlWriter,
         constraint: &ColumnConstraint,
     ) -> Result<(), DeparseError> {
-        if self.no_inherit && !constraint.is_check() {
+        if self.no_inherit && !constraint.is_check() && !constraint.is_nullability() {
             return writer.invalid(
                 "NO INHERIT",
                 "NO INHERIT is valid only for CHECK constraints",
@@ -664,7 +705,10 @@ impl ConstraintExtras {
         }
         if self.skip_validation {
             writer.postgres_only("NOT VALID")?;
-            if !constraint.is_check() && !constraint.is_foreign_key() {
+            if !constraint.is_check()
+                && !constraint.is_foreign_key()
+                && !constraint.is_nullability()
+            {
                 return writer.invalid(
                     "NOT VALID",
                     "NOT VALID is valid only for CHECK and FOREIGN KEY constraints",
@@ -808,12 +852,6 @@ impl SqlEmit for IdentityColumnMode {
 
 impl SqlEmit for GeneratedColumnMode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-        if writer.is_postgres() && matches!(self, Self::Virtual) {
-            return writer.invalid(
-                "generated column",
-                "PostgreSQL generated columns must be STORED",
-            );
-        }
         writer.sql(match self {
             Self::Stored => "STORED",
             Self::Virtual => "VIRTUAL",
@@ -1153,7 +1191,7 @@ mod test_constraint_emit {
         r#"ON DELETE SET DEFAULT ("a")"#
     )]
     fn postgres_frontend_retains_on_delete_column_lists(#[case] sql: &str, #[case] expected: &str) {
-        crate::ast::deparse::tests::assert_postgres_structure(sql);
+        crate::test_helpers::assert_postgres_structure(sql);
         let first = crate::parse_statements(sql, Dialect::postgres())
             .next()
             .expect("one statement")
@@ -1214,9 +1252,39 @@ mod test_constraint_emit {
     }
 
     #[test]
-    fn rejects_virtual_generated_columns_for_postgres() {
-        let error = render(&GeneratedColumnMode::Virtual, Dialect::postgres()).unwrap_err();
-        assert!(error.is_invalid_syntax(), "{error}");
-        assert_eq!(error.node(), "generated column", "{error}");
+    fn emits_virtual_generated_columns_for_postgres() {
+        assert_eq!(
+            render(&GeneratedColumnMode::Virtual, Dialect::postgres()).unwrap(),
+            "VIRTUAL"
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_postgres18_constraint_syntax {
+    #[rstest::rstest]
+    #[case::virtual_column(
+        "CREATE TABLE t (id int, computed int GENERATED ALWAYS AS (id+1) VIRTUAL)"
+    )]
+    #[case::implicit_virtual_column(
+        "CREATE TABLE t (id int, computed int GENERATED ALWAYS AS (id+1))"
+    )]
+    #[case::temporal_primary(
+        "CREATE TABLE t (id int, valid_at daterange, PRIMARY KEY (id, valid_at WITHOUT OVERLAPS))"
+    )]
+    #[case::temporal_foreign(
+        "CREATE TABLE t (id int, valid_at daterange, FOREIGN KEY (id, PERIOD valid_at) REFERENCES p (id, PERIOD valid_at))"
+    )]
+    #[case::unenforced_table_check("CREATE TABLE t (id int, CHECK (id>0) NOT ENFORCED)")]
+    #[case::enforced_column_check("CREATE TABLE t (id int CHECK (id>0) ENFORCED)")]
+    #[case::table_not_null("CREATE TABLE t (id int, CONSTRAINT nn NOT NULL id)")]
+    #[case::column_not_null_no_inherit("CREATE TABLE t (id int NOT NULL NO INHERIT)")]
+    #[case::alter_enforced("ALTER TABLE t ALTER CONSTRAINT check_id ENFORCED")]
+    #[case::alter_not_enforced("ALTER TABLE t ALTER CONSTRAINT check_id NOT ENFORCED")]
+    #[case::alter_inherit("ALTER TABLE t ALTER CONSTRAINT check_id INHERIT")]
+    #[case::alter_no_inherit("ALTER TABLE t ALTER CONSTRAINT check_id NO INHERIT")]
+    #[case::domain_enforced("CREATE DOMAIN positive_int AS int CHECK (VALUE>0) ENFORCED")]
+    fn preserves_postgres18_attributes(#[case] sql: &str) {
+        crate::test_helpers::assert_postgres_structure(sql);
     }
 }

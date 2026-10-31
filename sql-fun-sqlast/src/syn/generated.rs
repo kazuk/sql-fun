@@ -144,7 +144,7 @@ mod node {
         #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
         #[allow(clippy::too_many_lines)]
         pub enum Node {
-            /// empty defalut variant
+            /// empty default variant
             None,
 
             /// `Alias`
@@ -321,6 +321,9 @@ mod node {
             /// `InferenceElem`
             InferenceElem(super::InferenceElem),
 
+            /// `ReturningExpr`
+            ReturningExpr(super::ReturningExpr),
+
             /// `TargetEntry`
             TargetEntry(super::TargetEntry),
 
@@ -432,9 +435,6 @@ mod node {
             /// `PartitionRangeDatum`
             PartitionRangeDatum(super::PartitionRangeDatum),
 
-            /// `SinglePartitionSpec`
-            SinglePartitionSpec(super::SinglePartitionSpec),
-
             /// `PartitionCmd`
             PartitionCmd(super::PartitionCmd),
 
@@ -485,6 +485,12 @@ mod node {
 
             /// `MergeWhenClause`
             MergeWhenClause(super::MergeWhenClause),
+
+            /// `ReturningOption`
+            ReturningOption(super::ReturningOption),
+
+            /// `ReturningClause`
+            ReturningClause(super::ReturningClause),
 
             /// `TriggerTransition`
             TriggerTransition(super::TriggerTransition),
@@ -570,11 +576,14 @@ mod node {
             /// `AlterTableStmt`
             AlterTableStmt(super::AlterTableStmt),
 
-            /// `ReplicaIdentityStmt`
-            ReplicaIdentityStmt(super::ReplicaIdentityStmt),
-
             /// `AlterTableCmd`
             AlterTableCmd(super::AlterTableCmd),
+
+            /// `AtalterConstraint`
+            AtalterConstraint(super::AtAlterConstraint),
+
+            /// `ReplicaIdentityStmt`
+            ReplicaIdentityStmt(super::ReplicaIdentityStmt),
 
             /// `AlterCollationStmt`
             AlterCollationStmt(super::AlterCollationStmt),
@@ -1648,6 +1657,18 @@ mod node {
             }
         }
 
+        impl From<super::ReturningExpr> for Node {
+            fn from(value: super::ReturningExpr) -> Self {
+                Self::ReturningExpr(value)
+            }
+        }
+
+        impl From<::pg_query::protobuf::ReturningExpr> for Node {
+            fn from(value: ::pg_query::protobuf::ReturningExpr) -> Self {
+                Self::ReturningExpr(super::ReturningExpr::from(value))
+            }
+        }
+
         impl From<super::TargetEntry> for Node {
             fn from(value: super::TargetEntry) -> Self {
                 Self::TargetEntry(value)
@@ -2092,18 +2113,6 @@ mod node {
             }
         }
 
-        impl From<super::SinglePartitionSpec> for Node {
-            fn from(value: super::SinglePartitionSpec) -> Self {
-                Self::SinglePartitionSpec(value)
-            }
-        }
-
-        impl From<::pg_query::protobuf::SinglePartitionSpec> for Node {
-            fn from(value: ::pg_query::protobuf::SinglePartitionSpec) -> Self {
-                Self::SinglePartitionSpec(super::SinglePartitionSpec::from(value))
-            }
-        }
-
         impl From<super::PartitionCmd> for Node {
             fn from(value: super::PartitionCmd) -> Self {
                 Self::PartitionCmd(value)
@@ -2305,6 +2314,30 @@ mod node {
         impl From<::pg_query::protobuf::MergeWhenClause> for Node {
             fn from(value: ::pg_query::protobuf::MergeWhenClause) -> Self {
                 Self::MergeWhenClause(super::MergeWhenClause::from(value))
+            }
+        }
+
+        impl From<super::ReturningOption> for Node {
+            fn from(value: super::ReturningOption) -> Self {
+                Self::ReturningOption(value)
+            }
+        }
+
+        impl From<::pg_query::protobuf::ReturningOption> for Node {
+            fn from(value: ::pg_query::protobuf::ReturningOption) -> Self {
+                Self::ReturningOption(super::ReturningOption::from(value))
+            }
+        }
+
+        impl From<super::ReturningClause> for Node {
+            fn from(value: super::ReturningClause) -> Self {
+                Self::ReturningClause(value)
+            }
+        }
+
+        impl From<::pg_query::protobuf::ReturningClause> for Node {
+            fn from(value: ::pg_query::protobuf::ReturningClause) -> Self {
+                Self::ReturningClause(super::ReturningClause::from(value))
             }
         }
 
@@ -2644,18 +2677,6 @@ mod node {
             }
         }
 
-        impl From<super::ReplicaIdentityStmt> for Node {
-            fn from(value: super::ReplicaIdentityStmt) -> Self {
-                Self::ReplicaIdentityStmt(value)
-            }
-        }
-
-        impl From<::pg_query::protobuf::ReplicaIdentityStmt> for Node {
-            fn from(value: ::pg_query::protobuf::ReplicaIdentityStmt) -> Self {
-                Self::ReplicaIdentityStmt(super::ReplicaIdentityStmt::from(value))
-            }
-        }
-
         impl From<super::AlterTableCmd> for Node {
             fn from(value: super::AlterTableCmd) -> Self {
                 Self::AlterTableCmd(value)
@@ -2665,6 +2686,30 @@ mod node {
         impl From<::pg_query::protobuf::AlterTableCmd> for Node {
             fn from(value: ::pg_query::protobuf::AlterTableCmd) -> Self {
                 Self::AlterTableCmd(super::AlterTableCmd::from(value))
+            }
+        }
+
+        impl From<super::AtAlterConstraint> for Node {
+            fn from(value: super::AtAlterConstraint) -> Self {
+                Self::AtalterConstraint(value)
+            }
+        }
+
+        impl From<::pg_query::protobuf::AtAlterConstraint> for Node {
+            fn from(value: ::pg_query::protobuf::AtAlterConstraint) -> Self {
+                Self::AtalterConstraint(super::AtAlterConstraint::from(value))
+            }
+        }
+
+        impl From<super::ReplicaIdentityStmt> for Node {
+            fn from(value: super::ReplicaIdentityStmt) -> Self {
+                Self::ReplicaIdentityStmt(value)
+            }
+        }
+
+        impl From<::pg_query::protobuf::ReplicaIdentityStmt> for Node {
+            fn from(value: ::pg_query::protobuf::ReplicaIdentityStmt) -> Self {
+                Self::ReplicaIdentityStmt(super::ReplicaIdentityStmt::from(value))
             }
         }
 
@@ -4295,6 +4340,8 @@ mod node {
 
                     S::InferenceElem(v) => Self::InferenceElem(v.into()),
 
+                    S::ReturningExpr(v) => Self::ReturningExpr(v.into()),
+
                     S::TargetEntry(v) => Self::TargetEntry(v.into()),
 
                     S::RangeTblRef(v) => Self::RangeTblRef(v.into()),
@@ -4369,8 +4416,6 @@ mod node {
 
                     S::PartitionRangeDatum(v) => Self::PartitionRangeDatum(v.into()),
 
-                    S::SinglePartitionSpec(v) => Self::SinglePartitionSpec(v.into()),
-
                     S::PartitionCmd(v) => Self::PartitionCmd(v.into()),
 
                     S::RangeTblEntry(v) => Self::RangeTblEntry(v.into()),
@@ -4404,6 +4449,10 @@ mod node {
                     S::CommonTableExpr(v) => Self::CommonTableExpr(v.into()),
 
                     S::MergeWhenClause(v) => Self::MergeWhenClause(v.into()),
+
+                    S::ReturningOption(v) => Self::ReturningOption(v.into()),
+
+                    S::ReturningClause(v) => Self::ReturningClause(v.into()),
 
                     S::TriggerTransition(v) => Self::TriggerTransition(v.into()),
 
@@ -4461,9 +4510,11 @@ mod node {
 
                     S::AlterTableStmt(v) => Self::AlterTableStmt(v.into()),
 
-                    S::ReplicaIdentityStmt(v) => Self::ReplicaIdentityStmt(v.into()),
-
                     S::AlterTableCmd(v) => Self::AlterTableCmd(v.into()),
+
+                    S::AtalterConstraint(v) => Self::AtalterConstraint(v.into()),
+
+                    S::ReplicaIdentityStmt(v) => Self::ReplicaIdentityStmt(v.into()),
 
                     S::AlterCollationStmt(v) => Self::AlterCollationStmt(v.into()),
 
@@ -5721,6 +5772,23 @@ mod node {
     }
 
     impl Node {
+        /// cast as `ReturningExpr`
+        #[must_use]
+        pub fn as_returning_expr(&self) -> ReturningExprOpt {
+            match self {
+                Self(self::inner::Node::ReturningExpr(v)) => ReturningExprOpt::from(v),
+                _ => ReturningExprOpt::none(),
+            }
+        }
+
+        /// test variant kind
+        #[must_use]
+        pub const fn is_returning_expr(&self) -> bool {
+            matches!(self, Self(self::inner::Node::ReturningExpr(_)))
+        }
+    }
+
+    impl Node {
         /// cast as `TargetEntry`
         #[must_use]
         pub fn as_target_entry(&self) -> TargetEntryOpt {
@@ -6350,23 +6418,6 @@ mod node {
     }
 
     impl Node {
-        /// cast as `SinglePartitionSpec`
-        #[must_use]
-        pub fn as_single_partition_spec(&self) -> SinglePartitionSpecOpt {
-            match self {
-                Self(self::inner::Node::SinglePartitionSpec(v)) => SinglePartitionSpecOpt::from(v),
-                _ => SinglePartitionSpecOpt::none(),
-            }
-        }
-
-        /// test variant kind
-        #[must_use]
-        pub const fn is_single_partition_spec(&self) -> bool {
-            matches!(self, Self(self::inner::Node::SinglePartitionSpec(_)))
-        }
-    }
-
-    impl Node {
         /// cast as `PartitionCmd`
         #[must_use]
         pub fn as_partition_cmd(&self) -> PartitionCmdOpt {
@@ -6652,6 +6703,40 @@ mod node {
         #[must_use]
         pub const fn is_merge_when_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::MergeWhenClause(_)))
+        }
+    }
+
+    impl Node {
+        /// cast as `ReturningOption`
+        #[must_use]
+        pub fn as_returning_option(&self) -> ReturningOptionOpt {
+            match self {
+                Self(self::inner::Node::ReturningOption(v)) => ReturningOptionOpt::from(v),
+                _ => ReturningOptionOpt::none(),
+            }
+        }
+
+        /// test variant kind
+        #[must_use]
+        pub const fn is_returning_option(&self) -> bool {
+            matches!(self, Self(self::inner::Node::ReturningOption(_)))
+        }
+    }
+
+    impl Node {
+        /// cast as `ReturningClause`
+        #[must_use]
+        pub fn as_returning_clause(&self) -> ReturningClauseOpt {
+            match self {
+                Self(self::inner::Node::ReturningClause(v)) => ReturningClauseOpt::from(v),
+                _ => ReturningClauseOpt::none(),
+            }
+        }
+
+        /// test variant kind
+        #[must_use]
+        pub const fn is_returning_clause(&self) -> bool {
+            matches!(self, Self(self::inner::Node::ReturningClause(_)))
         }
     }
 
@@ -7138,23 +7223,6 @@ mod node {
     }
 
     impl Node {
-        /// cast as `ReplicaIdentityStmt`
-        #[must_use]
-        pub fn as_replica_identity_stmt(&self) -> ReplicaIdentityStmtOpt {
-            match self {
-                Self(self::inner::Node::ReplicaIdentityStmt(v)) => ReplicaIdentityStmtOpt::from(v),
-                _ => ReplicaIdentityStmtOpt::none(),
-            }
-        }
-
-        /// test variant kind
-        #[must_use]
-        pub const fn is_replica_identity_stmt(&self) -> bool {
-            matches!(self, Self(self::inner::Node::ReplicaIdentityStmt(_)))
-        }
-    }
-
-    impl Node {
         /// cast as `AlterTableCmd`
         #[must_use]
         pub fn as_alter_table_cmd(&self) -> AlterTableCmdOpt {
@@ -7168,6 +7236,40 @@ mod node {
         #[must_use]
         pub const fn is_alter_table_cmd(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTableCmd(_)))
+        }
+    }
+
+    impl Node {
+        /// cast as `AtalterConstraint`
+        #[must_use]
+        pub fn as_atalter_constraint(&self) -> AtAlterConstraintOpt {
+            match self {
+                Self(self::inner::Node::AtalterConstraint(v)) => AtAlterConstraintOpt::from(v),
+                _ => AtAlterConstraintOpt::none(),
+            }
+        }
+
+        /// test variant kind
+        #[must_use]
+        pub const fn is_atalter_constraint(&self) -> bool {
+            matches!(self, Self(self::inner::Node::AtalterConstraint(_)))
+        }
+    }
+
+    impl Node {
+        /// cast as `ReplicaIdentityStmt`
+        #[must_use]
+        pub fn as_replica_identity_stmt(&self) -> ReplicaIdentityStmtOpt {
+            match self {
+                Self(self::inner::Node::ReplicaIdentityStmt(v)) => ReplicaIdentityStmtOpt::from(v),
+                _ => ReplicaIdentityStmtOpt::none(),
+            }
+        }
+
+        /// test variant kind
+        #[must_use]
+        pub const fn is_replica_identity_stmt(&self) -> bool {
+            matches!(self, Self(self::inner::Node::ReplicaIdentityStmt(_)))
         }
     }
 
@@ -9467,6 +9569,8 @@ mod node {
 
                 S::InferenceElem(v) => inner::Node::from(InferenceElem::from(v)),
 
+                S::ReturningExpr(v) => inner::Node::from(ReturningExpr::from(v)),
+
                 S::TargetEntry(v) => inner::Node::from(TargetEntry::from(v)),
 
                 S::RangeTblRef(v) => inner::Node::from(RangeTblRef::from(v)),
@@ -9541,8 +9645,6 @@ mod node {
 
                 S::PartitionRangeDatum(v) => inner::Node::from(PartitionRangeDatum::from(v)),
 
-                S::SinglePartitionSpec(v) => inner::Node::from(SinglePartitionSpec::from(v)),
-
                 S::PartitionCmd(v) => inner::Node::from(PartitionCmd::from(v)),
 
                 S::RangeTblEntry(v) => inner::Node::from(RangeTblEntry::from(v)),
@@ -9576,6 +9678,10 @@ mod node {
                 S::CommonTableExpr(v) => inner::Node::from(CommonTableExpr::from(v)),
 
                 S::MergeWhenClause(v) => inner::Node::from(MergeWhenClause::from(v)),
+
+                S::ReturningOption(v) => inner::Node::from(ReturningOption::from(v)),
+
+                S::ReturningClause(v) => inner::Node::from(ReturningClause::from(v)),
 
                 S::TriggerTransition(v) => inner::Node::from(TriggerTransition::from(v)),
 
@@ -9635,9 +9741,11 @@ mod node {
 
                 S::AlterTableStmt(v) => inner::Node::from(AlterTableStmt::from(v)),
 
-                S::ReplicaIdentityStmt(v) => inner::Node::from(ReplicaIdentityStmt::from(v)),
-
                 S::AlterTableCmd(v) => inner::Node::from(AlterTableCmd::from(v)),
+
+                S::AtalterConstraint(v) => inner::Node::from(AtAlterConstraint::from(v)),
+
+                S::ReplicaIdentityStmt(v) => inner::Node::from(ReplicaIdentityStmt::from(v)),
 
                 S::AlterCollationStmt(v) => inner::Node::from(AlterCollationStmt::from(v)),
 
@@ -10056,7 +10164,7 @@ mod a_const {
         #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
         #[allow(clippy::too_many_lines)]
         pub enum AConst {
-            /// empty defalut variant
+            /// empty default variant
             None,
 
             /// `Ival`
@@ -11980,8 +12088,11 @@ mod rte_kind {
         /// `RteResult`
         RteResult = 9,
 
+        /// `RteGroup`
+        RteGroup = 10,
+
         /// None
-        OptionNone = 10,
+        OptionNone = 11,
     }
 
     impl From<::pg_query::protobuf::RteKind> for RteKind {
@@ -12008,6 +12119,8 @@ mod rte_kind {
                 S::RteNamedtuplestore => Self::RteNamedtuplestore,
 
                 S::RteResult => Self::RteResult,
+
+                S::RteGroup => Self::RteGroup,
             }
         }
     }
@@ -12035,6 +12148,8 @@ mod rte_kind {
                 8 => Self::RteNamedtuplestore,
 
                 9 => Self::RteResult,
+
+                10 => Self::RteGroup,
 
                 _ => Self::OptionNone,
             }
@@ -12502,6 +12617,142 @@ mod cte_materialize {
 
 #[allow(unused_imports)]
 pub use cte_materialize::{CteMaterialize, CteMaterializeList, CteMaterializeOpt};
+
+// from enum def
+#[allow(dead_code)]
+mod returning_option_kind {
+    #[allow(unused_imports)]
+    use super::*;
+
+    /// list of `ReturningOptionKind`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningOptionKindList(Vec<ReturningOptionKind>);
+
+    impl From<Vec<::pg_query::protobuf::ReturningOptionKind>> for ReturningOptionKindList {
+        fn from(value: Vec<::pg_query::protobuf::ReturningOptionKind>) -> Self {
+            Self(value.into_iter().map(ReturningOptionKind::from).collect())
+        }
+    }
+
+    /// optional list of `ReturningOptionKind`
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningOptionKindOpt(Option<ReturningOptionKind>);
+
+    impl crate::syn::Opt<ReturningOptionKind> for ReturningOptionKindOpt {
+        fn as_inner(&self) -> Option<ReturningOptionKind> {
+            self.0
+        }
+    }
+
+    impl From<Option<ReturningOptionKind>> for ReturningOptionKindOpt {
+        fn from(value: Option<ReturningOptionKind>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<ReturningOptionKind> for ReturningOptionKindOpt {
+        fn from(value: ReturningOptionKind) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&ReturningOptionKindOpt> for ReturningOptionKindOpt {
+        fn from(value: &ReturningOptionKindOpt) -> Self {
+            *value
+        }
+    }
+
+    impl From<i32> for ReturningOptionKindOpt {
+        fn from(value: i32) -> Self {
+            Self(Some(ReturningOptionKind::from(value)))
+        }
+    }
+
+    impl From<&ReturningOptionKind> for ReturningOptionKindOpt {
+        fn from(value: &ReturningOptionKind) -> Self {
+            Self(Some(*value))
+        }
+    }
+
+    impl ReturningOptionKindOpt {
+        /// returns None variant
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::ReturningOptionKind>> for ReturningOptionKind {
+        fn from(value: Option<::pg_query::protobuf::ReturningOptionKind>) -> Self {
+            match value {
+                Some(v) => Self::from(v),
+                None => Self::OptionNone,
+            }
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::ReturningOptionKind>>> for ReturningOptionKind {
+        fn from(value: Option<Box<::pg_query::protobuf::ReturningOptionKind>>) -> Self {
+            match value {
+                Some(v) => Self::from(*v),
+                None => Self::OptionNone,
+            }
+        }
+    }
+
+    /// `ReturningOptionKind` enum
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub enum ReturningOptionKind {
+        /// `Undefined`
+        Undefined = 0,
+
+        /// `ReturningOptionOld`
+        ReturningOptionOld = 1,
+
+        /// `ReturningOptionNew`
+        ReturningOptionNew = 2,
+
+        /// None
+        OptionNone = 3,
+    }
+
+    impl From<::pg_query::protobuf::ReturningOptionKind> for ReturningOptionKind {
+        #[allow(clippy::too_many_lines)]
+        fn from(value: ::pg_query::protobuf::ReturningOptionKind) -> Self {
+            use ::pg_query::protobuf::ReturningOptionKind as S;
+            match value {
+                S::Undefined => Self::Undefined,
+
+                S::ReturningOptionOld => Self::ReturningOptionOld,
+
+                S::ReturningOptionNew => Self::ReturningOptionNew,
+            }
+        }
+    }
+
+    impl From<i32> for ReturningOptionKind {
+        #[allow(clippy::too_many_lines)]
+        fn from(value: i32) -> Self {
+            match value {
+                0 => Self::Undefined,
+
+                1 => Self::ReturningOptionOld,
+
+                2 => Self::ReturningOptionNew,
+
+                _ => Self::OptionNone,
+            }
+        }
+    }
+} // mod returning_option_kind
+
+#[allow(unused_imports)]
+pub use returning_option_kind::{
+    ReturningOptionKind, ReturningOptionKindList, ReturningOptionKindOpt,
+};
 
 // from enum def
 #[allow(dead_code)]
@@ -13682,185 +13933,182 @@ mod alter_table_type {
         /// `AtDropExpression`
         AtDropExpression = 8,
 
-        /// `AtCheckNotNull`
-        AtCheckNotNull = 9,
-
         /// `AtSetStatistics`
-        AtSetStatistics = 10,
+        AtSetStatistics = 9,
 
         /// `AtSetOptions`
-        AtSetOptions = 11,
+        AtSetOptions = 10,
 
         /// `AtResetOptions`
-        AtResetOptions = 12,
+        AtResetOptions = 11,
 
         /// `AtSetStorage`
-        AtSetStorage = 13,
+        AtSetStorage = 12,
 
         /// `AtSetCompression`
-        AtSetCompression = 14,
+        AtSetCompression = 13,
 
         /// `AtDropColumn`
-        AtDropColumn = 15,
+        AtDropColumn = 14,
 
         /// `AtAddIndex`
-        AtAddIndex = 16,
+        AtAddIndex = 15,
 
         /// `AtReAddIndex`
-        AtReAddIndex = 17,
+        AtReAddIndex = 16,
 
         /// `AtAddConstraint`
-        AtAddConstraint = 18,
+        AtAddConstraint = 17,
 
         /// `AtReAddConstraint`
-        AtReAddConstraint = 19,
+        AtReAddConstraint = 18,
 
         /// `AtReAddDomainConstraint`
-        AtReAddDomainConstraint = 20,
+        AtReAddDomainConstraint = 19,
 
         /// `AtAlterConstraint`
-        AtAlterConstraint = 21,
+        AtAlterConstraint = 20,
 
         /// `AtValidateConstraint`
-        AtValidateConstraint = 22,
+        AtValidateConstraint = 21,
 
         /// `AtAddIndexConstraint`
-        AtAddIndexConstraint = 23,
+        AtAddIndexConstraint = 22,
 
         /// `AtDropConstraint`
-        AtDropConstraint = 24,
+        AtDropConstraint = 23,
 
         /// `AtReAddComment`
-        AtReAddComment = 25,
+        AtReAddComment = 24,
 
         /// `AtAlterColumnType`
-        AtAlterColumnType = 26,
+        AtAlterColumnType = 25,
 
         /// `AtAlterColumnGenericOptions`
-        AtAlterColumnGenericOptions = 27,
+        AtAlterColumnGenericOptions = 26,
 
         /// `AtChangeOwner`
-        AtChangeOwner = 28,
+        AtChangeOwner = 27,
 
         /// `AtClusterOn`
-        AtClusterOn = 29,
+        AtClusterOn = 28,
 
         /// `AtDropCluster`
-        AtDropCluster = 30,
+        AtDropCluster = 29,
 
         /// `AtSetLogged`
-        AtSetLogged = 31,
+        AtSetLogged = 30,
 
         /// `AtSetUnLogged`
-        AtSetUnLogged = 32,
+        AtSetUnLogged = 31,
 
         /// `AtDropOids`
-        AtDropOids = 33,
+        AtDropOids = 32,
 
         /// `AtSetAccessMethod`
-        AtSetAccessMethod = 34,
+        AtSetAccessMethod = 33,
 
         /// `AtSetTableSpace`
-        AtSetTableSpace = 35,
+        AtSetTableSpace = 34,
 
         /// `AtSetRelOptions`
-        AtSetRelOptions = 36,
+        AtSetRelOptions = 35,
 
         /// `AtResetRelOptions`
-        AtResetRelOptions = 37,
+        AtResetRelOptions = 36,
 
         /// `AtReplaceRelOptions`
-        AtReplaceRelOptions = 38,
+        AtReplaceRelOptions = 37,
 
         /// `AtEnableTrig`
-        AtEnableTrig = 39,
+        AtEnableTrig = 38,
 
         /// `AtEnableAlwaysTrig`
-        AtEnableAlwaysTrig = 40,
+        AtEnableAlwaysTrig = 39,
 
         /// `AtEnableReplicaTrig`
-        AtEnableReplicaTrig = 41,
+        AtEnableReplicaTrig = 40,
 
         /// `AtDisableTrig`
-        AtDisableTrig = 42,
+        AtDisableTrig = 41,
 
         /// `AtEnableTrigAll`
-        AtEnableTrigAll = 43,
+        AtEnableTrigAll = 42,
 
         /// `AtDisableTrigAll`
-        AtDisableTrigAll = 44,
+        AtDisableTrigAll = 43,
 
         /// `AtEnableTrigUser`
-        AtEnableTrigUser = 45,
+        AtEnableTrigUser = 44,
 
         /// `AtDisableTrigUser`
-        AtDisableTrigUser = 46,
+        AtDisableTrigUser = 45,
 
         /// `AtEnableRule`
-        AtEnableRule = 47,
+        AtEnableRule = 46,
 
         /// `AtEnableAlwaysRule`
-        AtEnableAlwaysRule = 48,
+        AtEnableAlwaysRule = 47,
 
         /// `AtEnableReplicaRule`
-        AtEnableReplicaRule = 49,
+        AtEnableReplicaRule = 48,
 
         /// `AtDisableRule`
-        AtDisableRule = 50,
+        AtDisableRule = 49,
 
         /// `AtAddInherit`
-        AtAddInherit = 51,
+        AtAddInherit = 50,
 
         /// `AtDropInherit`
-        AtDropInherit = 52,
+        AtDropInherit = 51,
 
         /// `AtAddOf`
-        AtAddOf = 53,
+        AtAddOf = 52,
 
         /// `AtDropOf`
-        AtDropOf = 54,
+        AtDropOf = 53,
 
         /// `AtReplicaIdentity`
-        AtReplicaIdentity = 55,
+        AtReplicaIdentity = 54,
 
         /// `AtEnableRowSecurity`
-        AtEnableRowSecurity = 56,
+        AtEnableRowSecurity = 55,
 
         /// `AtDisableRowSecurity`
-        AtDisableRowSecurity = 57,
+        AtDisableRowSecurity = 56,
 
         /// `AtForceRowSecurity`
-        AtForceRowSecurity = 58,
+        AtForceRowSecurity = 57,
 
         /// `AtNoForceRowSecurity`
-        AtNoForceRowSecurity = 59,
+        AtNoForceRowSecurity = 58,
 
         /// `AtGenericOptions`
-        AtGenericOptions = 60,
+        AtGenericOptions = 59,
 
         /// `AtAttachPartition`
-        AtAttachPartition = 61,
+        AtAttachPartition = 60,
 
         /// `AtDetachPartition`
-        AtDetachPartition = 62,
+        AtDetachPartition = 61,
 
         /// `AtDetachPartitionFinalize`
-        AtDetachPartitionFinalize = 63,
+        AtDetachPartitionFinalize = 62,
 
         /// `AtAddIdentity`
-        AtAddIdentity = 64,
+        AtAddIdentity = 63,
 
         /// `AtSetIdentity`
-        AtSetIdentity = 65,
+        AtSetIdentity = 64,
 
         /// `AtDropIdentity`
-        AtDropIdentity = 66,
+        AtDropIdentity = 65,
 
         /// `AtReAddStatistics`
-        AtReAddStatistics = 67,
+        AtReAddStatistics = 66,
 
         /// None
-        OptionNone = 68,
+        OptionNone = 67,
     }
 
     impl From<::pg_query::protobuf::AlterTableType> for AlterTableType {
@@ -13885,8 +14133,6 @@ mod alter_table_type {
                 S::AtSetExpression => Self::AtSetExpression,
 
                 S::AtDropExpression => Self::AtDropExpression,
-
-                S::AtCheckNotNull => Self::AtCheckNotNull,
 
                 S::AtSetStatistics => Self::AtSetStatistics,
 
@@ -14029,123 +14275,121 @@ mod alter_table_type {
 
                 8 => Self::AtDropExpression,
 
-                9 => Self::AtCheckNotNull,
+                9 => Self::AtSetStatistics,
 
-                10 => Self::AtSetStatistics,
+                10 => Self::AtSetOptions,
 
-                11 => Self::AtSetOptions,
+                11 => Self::AtResetOptions,
 
-                12 => Self::AtResetOptions,
+                12 => Self::AtSetStorage,
 
-                13 => Self::AtSetStorage,
+                13 => Self::AtSetCompression,
 
-                14 => Self::AtSetCompression,
+                14 => Self::AtDropColumn,
 
-                15 => Self::AtDropColumn,
+                15 => Self::AtAddIndex,
 
-                16 => Self::AtAddIndex,
+                16 => Self::AtReAddIndex,
 
-                17 => Self::AtReAddIndex,
+                17 => Self::AtAddConstraint,
 
-                18 => Self::AtAddConstraint,
+                18 => Self::AtReAddConstraint,
 
-                19 => Self::AtReAddConstraint,
+                19 => Self::AtReAddDomainConstraint,
 
-                20 => Self::AtReAddDomainConstraint,
+                20 => Self::AtAlterConstraint,
 
-                21 => Self::AtAlterConstraint,
+                21 => Self::AtValidateConstraint,
 
-                22 => Self::AtValidateConstraint,
+                22 => Self::AtAddIndexConstraint,
 
-                23 => Self::AtAddIndexConstraint,
+                23 => Self::AtDropConstraint,
 
-                24 => Self::AtDropConstraint,
+                24 => Self::AtReAddComment,
 
-                25 => Self::AtReAddComment,
+                25 => Self::AtAlterColumnType,
 
-                26 => Self::AtAlterColumnType,
+                26 => Self::AtAlterColumnGenericOptions,
 
-                27 => Self::AtAlterColumnGenericOptions,
+                27 => Self::AtChangeOwner,
 
-                28 => Self::AtChangeOwner,
+                28 => Self::AtClusterOn,
 
-                29 => Self::AtClusterOn,
+                29 => Self::AtDropCluster,
 
-                30 => Self::AtDropCluster,
+                30 => Self::AtSetLogged,
 
-                31 => Self::AtSetLogged,
+                31 => Self::AtSetUnLogged,
 
-                32 => Self::AtSetUnLogged,
+                32 => Self::AtDropOids,
 
-                33 => Self::AtDropOids,
+                33 => Self::AtSetAccessMethod,
 
-                34 => Self::AtSetAccessMethod,
+                34 => Self::AtSetTableSpace,
 
-                35 => Self::AtSetTableSpace,
+                35 => Self::AtSetRelOptions,
 
-                36 => Self::AtSetRelOptions,
+                36 => Self::AtResetRelOptions,
 
-                37 => Self::AtResetRelOptions,
+                37 => Self::AtReplaceRelOptions,
 
-                38 => Self::AtReplaceRelOptions,
+                38 => Self::AtEnableTrig,
 
-                39 => Self::AtEnableTrig,
+                39 => Self::AtEnableAlwaysTrig,
 
-                40 => Self::AtEnableAlwaysTrig,
+                40 => Self::AtEnableReplicaTrig,
 
-                41 => Self::AtEnableReplicaTrig,
+                41 => Self::AtDisableTrig,
 
-                42 => Self::AtDisableTrig,
+                42 => Self::AtEnableTrigAll,
 
-                43 => Self::AtEnableTrigAll,
+                43 => Self::AtDisableTrigAll,
 
-                44 => Self::AtDisableTrigAll,
+                44 => Self::AtEnableTrigUser,
 
-                45 => Self::AtEnableTrigUser,
+                45 => Self::AtDisableTrigUser,
 
-                46 => Self::AtDisableTrigUser,
+                46 => Self::AtEnableRule,
 
-                47 => Self::AtEnableRule,
+                47 => Self::AtEnableAlwaysRule,
 
-                48 => Self::AtEnableAlwaysRule,
+                48 => Self::AtEnableReplicaRule,
 
-                49 => Self::AtEnableReplicaRule,
+                49 => Self::AtDisableRule,
 
-                50 => Self::AtDisableRule,
+                50 => Self::AtAddInherit,
 
-                51 => Self::AtAddInherit,
+                51 => Self::AtDropInherit,
 
-                52 => Self::AtDropInherit,
+                52 => Self::AtAddOf,
 
-                53 => Self::AtAddOf,
+                53 => Self::AtDropOf,
 
-                54 => Self::AtDropOf,
+                54 => Self::AtReplicaIdentity,
 
-                55 => Self::AtReplicaIdentity,
+                55 => Self::AtEnableRowSecurity,
 
-                56 => Self::AtEnableRowSecurity,
+                56 => Self::AtDisableRowSecurity,
 
-                57 => Self::AtDisableRowSecurity,
+                57 => Self::AtForceRowSecurity,
 
-                58 => Self::AtForceRowSecurity,
+                58 => Self::AtNoForceRowSecurity,
 
-                59 => Self::AtNoForceRowSecurity,
+                59 => Self::AtGenericOptions,
 
-                60 => Self::AtGenericOptions,
+                60 => Self::AtAttachPartition,
 
-                61 => Self::AtAttachPartition,
+                61 => Self::AtDetachPartition,
 
-                62 => Self::AtDetachPartition,
+                62 => Self::AtDetachPartitionFinalize,
 
-                63 => Self::AtDetachPartitionFinalize,
+                63 => Self::AtAddIdentity,
 
-                64 => Self::AtAddIdentity,
+                64 => Self::AtSetIdentity,
 
-                65 => Self::AtSetIdentity,
+                65 => Self::AtDropIdentity,
 
-                66 => Self::AtDropIdentity,
-
-                67 => Self::AtReAddStatistics,
+                66 => Self::AtReAddStatistics,
 
                 _ => Self::OptionNone,
             }
@@ -14592,8 +14836,14 @@ mod constr_type {
         /// `ConstrAttrImmediate`
         ConstrAttrImmediate = 14,
 
+        /// `ConstrAttrEnforced`
+        ConstrAttrEnforced = 15,
+
+        /// `ConstrAttrNotEnforced`
+        ConstrAttrNotEnforced = 16,
+
         /// None
-        OptionNone = 15,
+        OptionNone = 17,
     }
 
     impl From<::pg_query::protobuf::ConstrType> for ConstrType {
@@ -14630,6 +14880,10 @@ mod constr_type {
                 S::ConstrAttrDeferred => Self::ConstrAttrDeferred,
 
                 S::ConstrAttrImmediate => Self::ConstrAttrImmediate,
+
+                S::ConstrAttrEnforced => Self::ConstrAttrEnforced,
+
+                S::ConstrAttrNotEnforced => Self::ConstrAttrNotEnforced,
             }
         }
     }
@@ -14667,6 +14921,10 @@ mod constr_type {
                 13 => Self::ConstrAttrDeferred,
 
                 14 => Self::ConstrAttrImmediate,
+
+                15 => Self::ConstrAttrEnforced,
+
+                16 => Self::ConstrAttrNotEnforced,
 
                 _ => Self::OptionNone,
             }
@@ -16975,6 +17233,147 @@ pub use table_func_type::{TableFuncType, TableFuncTypeList, TableFuncTypeOpt};
 
 // from enum def
 #[allow(dead_code)]
+mod var_returning_type {
+    #[allow(unused_imports)]
+    use super::*;
+
+    /// list of `VarReturningType`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct VarReturningTypeList(Vec<VarReturningType>);
+
+    impl From<Vec<::pg_query::protobuf::VarReturningType>> for VarReturningTypeList {
+        fn from(value: Vec<::pg_query::protobuf::VarReturningType>) -> Self {
+            Self(value.into_iter().map(VarReturningType::from).collect())
+        }
+    }
+
+    /// optional list of `VarReturningType`
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct VarReturningTypeOpt(Option<VarReturningType>);
+
+    impl crate::syn::Opt<VarReturningType> for VarReturningTypeOpt {
+        fn as_inner(&self) -> Option<VarReturningType> {
+            self.0
+        }
+    }
+
+    impl From<Option<VarReturningType>> for VarReturningTypeOpt {
+        fn from(value: Option<VarReturningType>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<VarReturningType> for VarReturningTypeOpt {
+        fn from(value: VarReturningType) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&VarReturningTypeOpt> for VarReturningTypeOpt {
+        fn from(value: &VarReturningTypeOpt) -> Self {
+            *value
+        }
+    }
+
+    impl From<i32> for VarReturningTypeOpt {
+        fn from(value: i32) -> Self {
+            Self(Some(VarReturningType::from(value)))
+        }
+    }
+
+    impl From<&VarReturningType> for VarReturningTypeOpt {
+        fn from(value: &VarReturningType) -> Self {
+            Self(Some(*value))
+        }
+    }
+
+    impl VarReturningTypeOpt {
+        /// returns None variant
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::VarReturningType>> for VarReturningType {
+        fn from(value: Option<::pg_query::protobuf::VarReturningType>) -> Self {
+            match value {
+                Some(v) => Self::from(v),
+                None => Self::OptionNone,
+            }
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::VarReturningType>>> for VarReturningType {
+        fn from(value: Option<Box<::pg_query::protobuf::VarReturningType>>) -> Self {
+            match value {
+                Some(v) => Self::from(*v),
+                None => Self::OptionNone,
+            }
+        }
+    }
+
+    /// `VarReturningType` enum
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub enum VarReturningType {
+        /// `Undefined`
+        Undefined = 0,
+
+        /// `VarReturningDefault`
+        VarReturningDefault = 1,
+
+        /// `VarReturningOld`
+        VarReturningOld = 2,
+
+        /// `VarReturningNew`
+        VarReturningNew = 3,
+
+        /// None
+        OptionNone = 4,
+    }
+
+    impl From<::pg_query::protobuf::VarReturningType> for VarReturningType {
+        #[allow(clippy::too_many_lines)]
+        fn from(value: ::pg_query::protobuf::VarReturningType) -> Self {
+            use ::pg_query::protobuf::VarReturningType as S;
+            match value {
+                S::Undefined => Self::Undefined,
+
+                S::VarReturningDefault => Self::VarReturningDefault,
+
+                S::VarReturningOld => Self::VarReturningOld,
+
+                S::VarReturningNew => Self::VarReturningNew,
+            }
+        }
+    }
+
+    impl From<i32> for VarReturningType {
+        #[allow(clippy::too_many_lines)]
+        fn from(value: i32) -> Self {
+            match value {
+                0 => Self::Undefined,
+
+                1 => Self::VarReturningDefault,
+
+                2 => Self::VarReturningOld,
+
+                3 => Self::VarReturningNew,
+
+                _ => Self::OptionNone,
+            }
+        }
+    }
+} // mod var_returning_type
+
+#[allow(unused_imports)]
+pub use var_returning_type::{VarReturningType, VarReturningTypeList, VarReturningTypeOpt};
+
+// from enum def
+#[allow(dead_code)]
 mod param_kind {
     #[allow(unused_imports)]
     use super::*;
@@ -17733,168 +18132,6 @@ mod sub_link_type {
 
 #[allow(unused_imports)]
 pub use sub_link_type::{SubLinkType, SubLinkTypeList, SubLinkTypeOpt};
-
-// from enum def
-#[allow(dead_code)]
-mod row_compare_type {
-    #[allow(unused_imports)]
-    use super::*;
-
-    /// list of `RowCompareType`
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct RowCompareTypeList(Vec<RowCompareType>);
-
-    impl From<Vec<::pg_query::protobuf::RowCompareType>> for RowCompareTypeList {
-        fn from(value: Vec<::pg_query::protobuf::RowCompareType>) -> Self {
-            Self(value.into_iter().map(RowCompareType::from).collect())
-        }
-    }
-
-    /// optional list of `RowCompareType`
-    #[derive(Debug, Clone, Copy)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct RowCompareTypeOpt(Option<RowCompareType>);
-
-    impl crate::syn::Opt<RowCompareType> for RowCompareTypeOpt {
-        fn as_inner(&self) -> Option<RowCompareType> {
-            self.0
-        }
-    }
-
-    impl From<Option<RowCompareType>> for RowCompareTypeOpt {
-        fn from(value: Option<RowCompareType>) -> Self {
-            Self(value)
-        }
-    }
-
-    impl From<RowCompareType> for RowCompareTypeOpt {
-        fn from(value: RowCompareType) -> Self {
-            Self(Some(value))
-        }
-    }
-
-    impl From<&RowCompareTypeOpt> for RowCompareTypeOpt {
-        fn from(value: &RowCompareTypeOpt) -> Self {
-            *value
-        }
-    }
-
-    impl From<i32> for RowCompareTypeOpt {
-        fn from(value: i32) -> Self {
-            Self(Some(RowCompareType::from(value)))
-        }
-    }
-
-    impl From<&RowCompareType> for RowCompareTypeOpt {
-        fn from(value: &RowCompareType) -> Self {
-            Self(Some(*value))
-        }
-    }
-
-    impl RowCompareTypeOpt {
-        /// returns None variant
-        #[must_use]
-        pub const fn none() -> Self {
-            Self(None)
-        }
-    }
-
-    impl From<Option<::pg_query::protobuf::RowCompareType>> for RowCompareType {
-        fn from(value: Option<::pg_query::protobuf::RowCompareType>) -> Self {
-            match value {
-                Some(v) => Self::from(v),
-                None => Self::OptionNone,
-            }
-        }
-    }
-
-    impl From<Option<Box<::pg_query::protobuf::RowCompareType>>> for RowCompareType {
-        fn from(value: Option<Box<::pg_query::protobuf::RowCompareType>>) -> Self {
-            match value {
-                Some(v) => Self::from(*v),
-                None => Self::OptionNone,
-            }
-        }
-    }
-
-    /// `RowCompareType` enum
-    #[derive(Debug, Clone, Copy)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub enum RowCompareType {
-        /// `Undefined`
-        Undefined = 0,
-
-        /// `RowcompareLt`
-        RowcompareLt = 1,
-
-        /// `RowcompareLe`
-        RowcompareLe = 2,
-
-        /// `RowcompareEq`
-        RowcompareEq = 3,
-
-        /// `RowcompareGe`
-        RowcompareGe = 4,
-
-        /// `RowcompareGt`
-        RowcompareGt = 5,
-
-        /// `RowcompareNe`
-        RowcompareNe = 6,
-
-        /// None
-        OptionNone = 7,
-    }
-
-    impl From<::pg_query::protobuf::RowCompareType> for RowCompareType {
-        #[allow(clippy::too_many_lines)]
-        fn from(value: ::pg_query::protobuf::RowCompareType) -> Self {
-            use ::pg_query::protobuf::RowCompareType as S;
-            match value {
-                S::Undefined => Self::Undefined,
-
-                S::RowcompareLt => Self::RowcompareLt,
-
-                S::RowcompareLe => Self::RowcompareLe,
-
-                S::RowcompareEq => Self::RowcompareEq,
-
-                S::RowcompareGe => Self::RowcompareGe,
-
-                S::RowcompareGt => Self::RowcompareGt,
-
-                S::RowcompareNe => Self::RowcompareNe,
-            }
-        }
-    }
-
-    impl From<i32> for RowCompareType {
-        #[allow(clippy::too_many_lines)]
-        fn from(value: i32) -> Self {
-            match value {
-                0 => Self::Undefined,
-
-                1 => Self::RowcompareLt,
-
-                2 => Self::RowcompareLe,
-
-                3 => Self::RowcompareEq,
-
-                4 => Self::RowcompareGe,
-
-                5 => Self::RowcompareGt,
-
-                6 => Self::RowcompareNe,
-
-                _ => Self::OptionNone,
-            }
-        }
-    }
-} // mod row_compare_type
-
-#[allow(unused_imports)]
-pub use row_compare_type::{RowCompareType, RowCompareTypeList, RowCompareTypeOpt};
 
 // from enum def
 #[allow(dead_code)]
@@ -20376,17 +20613,20 @@ mod join_type {
         /// `JoinAnti`
         JoinAnti = 6,
 
+        /// `JoinRightSemi`
+        JoinRightSemi = 7,
+
         /// `JoinRightAnti`
-        JoinRightAnti = 7,
+        JoinRightAnti = 8,
 
         /// `JoinUniqueOuter`
-        JoinUniqueOuter = 8,
+        JoinUniqueOuter = 9,
 
         /// `JoinUniqueInner`
-        JoinUniqueInner = 9,
+        JoinUniqueInner = 10,
 
         /// None
-        OptionNone = 10,
+        OptionNone = 11,
     }
 
     impl From<::pg_query::protobuf::JoinType> for JoinType {
@@ -20407,6 +20647,8 @@ mod join_type {
                 S::JoinSemi => Self::JoinSemi,
 
                 S::JoinAnti => Self::JoinAnti,
+
+                S::JoinRightSemi => Self::JoinRightSemi,
 
                 S::JoinRightAnti => Self::JoinRightAnti,
 
@@ -20435,11 +20677,13 @@ mod join_type {
 
                 6 => Self::JoinAnti,
 
-                7 => Self::JoinRightAnti,
+                7 => Self::JoinRightSemi,
 
-                8 => Self::JoinUniqueOuter,
+                8 => Self::JoinRightAnti,
 
-                9 => Self::JoinUniqueInner,
+                9 => Self::JoinUniqueOuter,
+
+                10 => Self::JoinUniqueInner,
 
                 _ => Self::OptionNone,
             }
@@ -21749,6 +21993,189 @@ pub use lock_tuple_mode::{LockTupleMode, LockTupleModeList, LockTupleModeOpt};
 
 // from enum def
 #[allow(dead_code)]
+mod compare_type {
+    #[allow(unused_imports)]
+    use super::*;
+
+    /// list of `CompareType`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct CompareTypeList(Vec<CompareType>);
+
+    impl From<Vec<::pg_query::protobuf::CompareType>> for CompareTypeList {
+        fn from(value: Vec<::pg_query::protobuf::CompareType>) -> Self {
+            Self(value.into_iter().map(CompareType::from).collect())
+        }
+    }
+
+    /// optional list of `CompareType`
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct CompareTypeOpt(Option<CompareType>);
+
+    impl crate::syn::Opt<CompareType> for CompareTypeOpt {
+        fn as_inner(&self) -> Option<CompareType> {
+            self.0
+        }
+    }
+
+    impl From<Option<CompareType>> for CompareTypeOpt {
+        fn from(value: Option<CompareType>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<CompareType> for CompareTypeOpt {
+        fn from(value: CompareType) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&CompareTypeOpt> for CompareTypeOpt {
+        fn from(value: &CompareTypeOpt) -> Self {
+            *value
+        }
+    }
+
+    impl From<i32> for CompareTypeOpt {
+        fn from(value: i32) -> Self {
+            Self(Some(CompareType::from(value)))
+        }
+    }
+
+    impl From<&CompareType> for CompareTypeOpt {
+        fn from(value: &CompareType) -> Self {
+            Self(Some(*value))
+        }
+    }
+
+    impl CompareTypeOpt {
+        /// returns None variant
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::CompareType>> for CompareType {
+        fn from(value: Option<::pg_query::protobuf::CompareType>) -> Self {
+            match value {
+                Some(v) => Self::from(v),
+                None => Self::OptionNone,
+            }
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::CompareType>>> for CompareType {
+        fn from(value: Option<Box<::pg_query::protobuf::CompareType>>) -> Self {
+            match value {
+                Some(v) => Self::from(*v),
+                None => Self::OptionNone,
+            }
+        }
+    }
+
+    /// `CompareType` enum
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub enum CompareType {
+        /// `Undefined`
+        Undefined = 0,
+
+        /// `CompareInvalid`
+        CompareInvalid = 1,
+
+        /// `CompareLt`
+        CompareLt = 2,
+
+        /// `CompareLe`
+        CompareLe = 3,
+
+        /// `CompareEq`
+        CompareEq = 4,
+
+        /// `CompareGe`
+        CompareGe = 5,
+
+        /// `CompareGt`
+        CompareGt = 6,
+
+        /// `CompareNe`
+        CompareNe = 7,
+
+        /// `CompareOverlap`
+        CompareOverlap = 8,
+
+        /// `CompareContainedBy`
+        CompareContainedBy = 9,
+
+        /// None
+        OptionNone = 10,
+    }
+
+    impl From<::pg_query::protobuf::CompareType> for CompareType {
+        #[allow(clippy::too_many_lines)]
+        fn from(value: ::pg_query::protobuf::CompareType) -> Self {
+            use ::pg_query::protobuf::CompareType as S;
+            match value {
+                S::Undefined => Self::Undefined,
+
+                S::CompareInvalid => Self::CompareInvalid,
+
+                S::CompareLt => Self::CompareLt,
+
+                S::CompareLe => Self::CompareLe,
+
+                S::CompareEq => Self::CompareEq,
+
+                S::CompareGe => Self::CompareGe,
+
+                S::CompareGt => Self::CompareGt,
+
+                S::CompareNe => Self::CompareNe,
+
+                S::CompareOverlap => Self::CompareOverlap,
+
+                S::CompareContainedBy => Self::CompareContainedBy,
+            }
+        }
+    }
+
+    impl From<i32> for CompareType {
+        #[allow(clippy::too_many_lines)]
+        fn from(value: i32) -> Self {
+            match value {
+                0 => Self::Undefined,
+
+                1 => Self::CompareInvalid,
+
+                2 => Self::CompareLt,
+
+                3 => Self::CompareLe,
+
+                4 => Self::CompareEq,
+
+                5 => Self::CompareGe,
+
+                6 => Self::CompareGt,
+
+                7 => Self::CompareNe,
+
+                8 => Self::CompareOverlap,
+
+                9 => Self::CompareContainedBy,
+
+                _ => Self::OptionNone,
+            }
+        }
+    }
+} // mod compare_type
+
+#[allow(unused_imports)]
+pub use compare_type::{CompareType, CompareTypeList, CompareTypeOpt};
+
+// from enum def
+#[allow(dead_code)]
 mod keyword_kind {
     #[allow(unused_imports)]
     use super::*;
@@ -22487,1130 +22914,1139 @@ mod token {
         /// `EndP`
         EndP = 404,
 
+        /// `Enforced`
+        Enforced = 405,
+
         /// `EnumP`
-        EnumP = 405,
+        EnumP = 406,
 
         /// `ErrorP`
-        ErrorP = 406,
+        ErrorP = 407,
 
         /// `Escape`
-        Escape = 407,
+        Escape = 408,
 
         /// `Event`
-        Event = 408,
+        Event = 409,
 
         /// `Except`
-        Except = 409,
+        Except = 410,
 
         /// `Exclude`
-        Exclude = 410,
+        Exclude = 411,
 
         /// `Excluding`
-        Excluding = 411,
+        Excluding = 412,
 
         /// `Exclusive`
-        Exclusive = 412,
+        Exclusive = 413,
 
         /// `Execute`
-        Execute = 413,
+        Execute = 414,
 
         /// `Exists`
-        Exists = 414,
+        Exists = 415,
 
         /// `Explain`
-        Explain = 415,
+        Explain = 416,
 
         /// `Expression`
-        Expression = 416,
+        Expression = 417,
 
         /// `Extension`
-        Extension = 417,
+        Extension = 418,
 
         /// `External`
-        External = 418,
+        External = 419,
 
         /// `Extract`
-        Extract = 419,
+        Extract = 420,
 
         /// `FalseP`
-        FalseP = 420,
+        FalseP = 421,
 
         /// `Family`
-        Family = 421,
+        Family = 422,
 
         /// `Fetch`
-        Fetch = 422,
+        Fetch = 423,
 
         /// `Filter`
-        Filter = 423,
+        Filter = 424,
 
         /// `Finalize`
-        Finalize = 424,
+        Finalize = 425,
 
         /// `FirstP`
-        FirstP = 425,
+        FirstP = 426,
 
         /// `FloatP`
-        FloatP = 426,
+        FloatP = 427,
 
         /// `Following`
-        Following = 427,
+        Following = 428,
 
         /// `For`
-        For = 428,
+        For = 429,
 
         /// `Force`
-        Force = 429,
+        Force = 430,
 
         /// `Foreign`
-        Foreign = 430,
+        Foreign = 431,
 
         /// `Format`
-        Format = 431,
+        Format = 432,
 
         /// `Forward`
-        Forward = 432,
+        Forward = 433,
 
         /// `Freeze`
-        Freeze = 433,
+        Freeze = 434,
 
         /// `From`
-        From = 434,
+        From = 435,
 
         /// `Full`
-        Full = 435,
+        Full = 436,
 
         /// `Function`
-        Function = 436,
+        Function = 437,
 
         /// `Functions`
-        Functions = 437,
+        Functions = 438,
 
         /// `Generated`
-        Generated = 438,
+        Generated = 439,
 
         /// `Global`
-        Global = 439,
+        Global = 440,
 
         /// `Grant`
-        Grant = 440,
+        Grant = 441,
 
         /// `Granted`
-        Granted = 441,
+        Granted = 442,
 
         /// `Greatest`
-        Greatest = 442,
+        Greatest = 443,
 
         /// `GroupP`
-        GroupP = 443,
+        GroupP = 444,
 
         /// `Grouping`
-        Grouping = 444,
+        Grouping = 445,
 
         /// `Groups`
-        Groups = 445,
+        Groups = 446,
 
         /// `Handler`
-        Handler = 446,
+        Handler = 447,
 
         /// `Having`
-        Having = 447,
+        Having = 448,
 
         /// `HeaderP`
-        HeaderP = 448,
+        HeaderP = 449,
 
         /// `Hold`
-        Hold = 449,
+        Hold = 450,
 
         /// `HourP`
-        HourP = 450,
+        HourP = 451,
 
         /// `IdentityP`
-        IdentityP = 451,
+        IdentityP = 452,
 
         /// `IfP`
-        IfP = 452,
+        IfP = 453,
 
         /// `Ilike`
-        Ilike = 453,
+        Ilike = 454,
 
         /// `Immediate`
-        Immediate = 454,
+        Immediate = 455,
 
         /// `Immutable`
-        Immutable = 455,
+        Immutable = 456,
 
         /// `ImplicitP`
-        ImplicitP = 456,
+        ImplicitP = 457,
 
         /// `ImportP`
-        ImportP = 457,
+        ImportP = 458,
 
         /// `InP`
-        InP = 458,
+        InP = 459,
 
         /// `Include`
-        Include = 459,
+        Include = 460,
 
         /// `Including`
-        Including = 460,
+        Including = 461,
 
         /// `Increment`
-        Increment = 461,
+        Increment = 462,
 
         /// `Indent`
-        Indent = 462,
+        Indent = 463,
 
         /// `Index`
-        Index = 463,
+        Index = 464,
 
         /// `Indexes`
-        Indexes = 464,
+        Indexes = 465,
 
         /// `Inherit`
-        Inherit = 465,
+        Inherit = 466,
 
         /// `Inherits`
-        Inherits = 466,
+        Inherits = 467,
 
         /// `Initially`
-        Initially = 467,
+        Initially = 468,
 
         /// `InlineP`
-        InlineP = 468,
+        InlineP = 469,
 
         /// `InnerP`
-        InnerP = 469,
+        InnerP = 470,
 
         /// `Inout`
-        Inout = 470,
+        Inout = 471,
 
         /// `InputP`
-        InputP = 471,
+        InputP = 472,
 
         /// `Insensitive`
-        Insensitive = 472,
+        Insensitive = 473,
 
         /// `Insert`
-        Insert = 473,
+        Insert = 474,
 
         /// `Instead`
-        Instead = 474,
+        Instead = 475,
 
         /// `IntP`
-        IntP = 475,
+        IntP = 476,
 
         /// `Integer`
-        Integer = 476,
+        Integer = 477,
 
         /// `Intersect`
-        Intersect = 477,
+        Intersect = 478,
 
         /// `Interval`
-        Interval = 478,
+        Interval = 479,
 
         /// `Into`
-        Into = 479,
+        Into = 480,
 
         /// `Invoker`
-        Invoker = 480,
+        Invoker = 481,
 
         /// `Is`
-        Is = 481,
+        Is = 482,
 
         /// `Isnull`
-        Isnull = 482,
+        Isnull = 483,
 
         /// `Isolation`
-        Isolation = 483,
+        Isolation = 484,
 
         /// `Join`
-        Join = 484,
+        Join = 485,
 
         /// `Json`
-        Json = 485,
+        Json = 486,
 
         /// `JsonArray`
-        JsonArray = 486,
+        JsonArray = 487,
 
         /// `JsonArrayagg`
-        JsonArrayagg = 487,
+        JsonArrayagg = 488,
 
         /// `JsonExists`
-        JsonExists = 488,
+        JsonExists = 489,
 
         /// `JsonObject`
-        JsonObject = 489,
+        JsonObject = 490,
 
         /// `JsonObjectagg`
-        JsonObjectagg = 490,
+        JsonObjectagg = 491,
 
         /// `JsonQuery`
-        JsonQuery = 491,
+        JsonQuery = 492,
 
         /// `JsonScalar`
-        JsonScalar = 492,
+        JsonScalar = 493,
 
         /// `JsonSerialize`
-        JsonSerialize = 493,
+        JsonSerialize = 494,
 
         /// `JsonTable`
-        JsonTable = 494,
+        JsonTable = 495,
 
         /// `JsonValue`
-        JsonValue = 495,
+        JsonValue = 496,
 
         /// `Keep`
-        Keep = 496,
+        Keep = 497,
 
         /// `Key`
-        Key = 497,
+        Key = 498,
 
         /// `Keys`
-        Keys = 498,
+        Keys = 499,
 
         /// `Label`
-        Label = 499,
+        Label = 500,
 
         /// `Language`
-        Language = 500,
+        Language = 501,
 
         /// `LargeP`
-        LargeP = 501,
+        LargeP = 502,
 
         /// `LastP`
-        LastP = 502,
+        LastP = 503,
 
         /// `LateralP`
-        LateralP = 503,
+        LateralP = 504,
 
         /// `Leading`
-        Leading = 504,
+        Leading = 505,
 
         /// `Leakproof`
-        Leakproof = 505,
+        Leakproof = 506,
 
         /// `Least`
-        Least = 506,
+        Least = 507,
 
         /// `Left`
-        Left = 507,
+        Left = 508,
 
         /// `Level`
-        Level = 508,
+        Level = 509,
 
         /// `Like`
-        Like = 509,
+        Like = 510,
 
         /// `Limit`
-        Limit = 510,
+        Limit = 511,
 
         /// `Listen`
-        Listen = 511,
+        Listen = 512,
 
         /// `Load`
-        Load = 512,
+        Load = 513,
 
         /// `Local`
-        Local = 513,
+        Local = 514,
 
         /// `Localtime`
-        Localtime = 514,
+        Localtime = 515,
 
         /// `Localtimestamp`
-        Localtimestamp = 515,
+        Localtimestamp = 516,
 
         /// `Location`
-        Location = 516,
+        Location = 517,
 
         /// `LockP`
-        LockP = 517,
+        LockP = 518,
 
         /// `Locked`
-        Locked = 518,
+        Locked = 519,
 
         /// `Logged`
-        Logged = 519,
+        Logged = 520,
 
         /// `Mapping`
-        Mapping = 520,
+        Mapping = 521,
 
         /// `Match`
-        Match = 521,
+        Match = 522,
 
         /// `Matched`
-        Matched = 522,
+        Matched = 523,
 
         /// `Materialized`
-        Materialized = 523,
+        Materialized = 524,
 
         /// `Maxvalue`
-        Maxvalue = 524,
+        Maxvalue = 525,
 
         /// `Merge`
-        Merge = 525,
+        Merge = 526,
 
         /// `MergeAction`
-        MergeAction = 526,
+        MergeAction = 527,
 
         /// `Method`
-        Method = 527,
+        Method = 528,
 
         /// `MinuteP`
-        MinuteP = 528,
+        MinuteP = 529,
 
         /// `Minvalue`
-        Minvalue = 529,
+        Minvalue = 530,
 
         /// `Mode`
-        Mode = 530,
+        Mode = 531,
 
         /// `MonthP`
-        MonthP = 531,
+        MonthP = 532,
 
         /// `Move`
-        Move = 532,
+        Move = 533,
 
         /// `NameP`
-        NameP = 533,
+        NameP = 534,
 
         /// `Names`
-        Names = 534,
+        Names = 535,
 
         /// `National`
-        National = 535,
+        National = 536,
 
         /// `Natural`
-        Natural = 536,
+        Natural = 537,
 
         /// `Nchar`
-        Nchar = 537,
+        Nchar = 538,
 
         /// `Nested`
-        Nested = 538,
+        Nested = 539,
 
         /// `New`
-        New = 539,
+        New = 540,
 
         /// `Next`
-        Next = 540,
+        Next = 541,
 
         /// `Nfc`
-        Nfc = 541,
+        Nfc = 542,
 
         /// `Nfd`
-        Nfd = 542,
+        Nfd = 543,
 
         /// `Nfkc`
-        Nfkc = 543,
+        Nfkc = 544,
 
         /// `Nfkd`
-        Nfkd = 544,
+        Nfkd = 545,
 
         /// `No`
-        No = 545,
+        No = 546,
 
         /// `None`
-        None = 546,
+        None = 547,
 
         /// `Normalize`
-        Normalize = 547,
+        Normalize = 548,
 
         /// `Normalized`
-        Normalized = 548,
+        Normalized = 549,
 
         /// `Not`
-        Not = 549,
+        Not = 550,
 
         /// `Nothing`
-        Nothing = 550,
+        Nothing = 551,
 
         /// `Notify`
-        Notify = 551,
+        Notify = 552,
 
         /// `Notnull`
-        Notnull = 552,
+        Notnull = 553,
 
         /// `Nowait`
-        Nowait = 553,
+        Nowait = 554,
 
         /// `NullP`
-        NullP = 554,
+        NullP = 555,
 
         /// `Nullif`
-        Nullif = 555,
+        Nullif = 556,
 
         /// `NullsP`
-        NullsP = 556,
+        NullsP = 557,
 
         /// `Numeric`
-        Numeric = 557,
+        Numeric = 558,
 
         /// `ObjectP`
-        ObjectP = 558,
+        ObjectP = 559,
+
+        /// `ObjectsP`
+        ObjectsP = 560,
 
         /// `Of`
-        Of = 559,
+        Of = 561,
 
         /// `Off`
-        Off = 560,
+        Off = 562,
 
         /// `Offset`
-        Offset = 561,
+        Offset = 563,
 
         /// `Oids`
-        Oids = 562,
+        Oids = 564,
 
         /// `Old`
-        Old = 563,
+        Old = 565,
 
         /// `Omit`
-        Omit = 564,
+        Omit = 566,
 
         /// `On`
-        On = 565,
+        On = 567,
 
         /// `Only`
-        Only = 566,
+        Only = 568,
 
         /// `Operator`
-        Operator = 567,
+        Operator = 569,
 
         /// `Option`
-        Option = 568,
+        Option = 570,
 
         /// `Options`
-        Options = 569,
+        Options = 571,
 
         /// `Or`
-        Or = 570,
+        Or = 572,
 
         /// `Order`
-        Order = 571,
+        Order = 573,
 
         /// `Ordinality`
-        Ordinality = 572,
+        Ordinality = 574,
 
         /// `Others`
-        Others = 573,
+        Others = 575,
 
         /// `OutP`
-        OutP = 574,
+        OutP = 576,
 
         /// `OuterP`
-        OuterP = 575,
+        OuterP = 577,
 
         /// `Over`
-        Over = 576,
+        Over = 578,
 
         /// `Overlaps`
-        Overlaps = 577,
+        Overlaps = 579,
 
         /// `Overlay`
-        Overlay = 578,
+        Overlay = 580,
 
         /// `Overriding`
-        Overriding = 579,
+        Overriding = 581,
 
         /// `Owned`
-        Owned = 580,
+        Owned = 582,
 
         /// `Owner`
-        Owner = 581,
+        Owner = 583,
 
         /// `Parallel`
-        Parallel = 582,
+        Parallel = 584,
 
         /// `Parameter`
-        Parameter = 583,
+        Parameter = 585,
 
         /// `Parser`
-        Parser = 584,
+        Parser = 586,
 
         /// `Partial`
-        Partial = 585,
+        Partial = 587,
 
         /// `Partition`
-        Partition = 586,
+        Partition = 588,
 
         /// `Passing`
-        Passing = 587,
+        Passing = 589,
 
         /// `Password`
-        Password = 588,
+        Password = 590,
 
         /// `Path`
-        Path = 589,
+        Path = 591,
+
+        /// `Period`
+        Period = 592,
 
         /// `Placing`
-        Placing = 590,
+        Placing = 593,
 
         /// `Plan`
-        Plan = 591,
+        Plan = 594,
 
         /// `Plans`
-        Plans = 592,
+        Plans = 595,
 
         /// `Policy`
-        Policy = 593,
+        Policy = 596,
 
         /// `Position`
-        Position = 594,
+        Position = 597,
 
         /// `Preceding`
-        Preceding = 595,
+        Preceding = 598,
 
         /// `Precision`
-        Precision = 596,
+        Precision = 599,
 
         /// `Preserve`
-        Preserve = 597,
+        Preserve = 600,
 
         /// `Prepare`
-        Prepare = 598,
+        Prepare = 601,
 
         /// `Prepared`
-        Prepared = 599,
+        Prepared = 602,
 
         /// `Primary`
-        Primary = 600,
+        Primary = 603,
 
         /// `Prior`
-        Prior = 601,
+        Prior = 604,
 
         /// `Privileges`
-        Privileges = 602,
+        Privileges = 605,
 
         /// `Procedural`
-        Procedural = 603,
+        Procedural = 606,
 
         /// `Procedure`
-        Procedure = 604,
+        Procedure = 607,
 
         /// `Procedures`
-        Procedures = 605,
+        Procedures = 608,
 
         /// `Program`
-        Program = 606,
+        Program = 609,
 
         /// `Publication`
-        Publication = 607,
+        Publication = 610,
 
         /// `Quote`
-        Quote = 608,
+        Quote = 611,
 
         /// `Quotes`
-        Quotes = 609,
+        Quotes = 612,
 
         /// `Range`
-        Range = 610,
+        Range = 613,
 
         /// `Read`
-        Read = 611,
+        Read = 614,
 
         /// `Real`
-        Real = 612,
+        Real = 615,
 
         /// `Reassign`
-        Reassign = 613,
-
-        /// `Recheck`
-        Recheck = 614,
+        Reassign = 616,
 
         /// `Recursive`
-        Recursive = 615,
+        Recursive = 617,
 
         /// `RefP`
-        RefP = 616,
+        RefP = 618,
 
         /// `References`
-        References = 617,
+        References = 619,
 
         /// `Referencing`
-        Referencing = 618,
+        Referencing = 620,
 
         /// `Refresh`
-        Refresh = 619,
+        Refresh = 621,
 
         /// `Reindex`
-        Reindex = 620,
+        Reindex = 622,
 
         /// `RelativeP`
-        RelativeP = 621,
+        RelativeP = 623,
 
         /// `Release`
-        Release = 622,
+        Release = 624,
 
         /// `Rename`
-        Rename = 623,
+        Rename = 625,
 
         /// `Repeatable`
-        Repeatable = 624,
+        Repeatable = 626,
 
         /// `Replace`
-        Replace = 625,
+        Replace = 627,
 
         /// `Replica`
-        Replica = 626,
+        Replica = 628,
 
         /// `Reset`
-        Reset = 627,
+        Reset = 629,
 
         /// `Restart`
-        Restart = 628,
+        Restart = 630,
 
         /// `Restrict`
-        Restrict = 629,
+        Restrict = 631,
 
         /// `Return`
-        Return = 630,
+        Return = 632,
 
         /// `Returning`
-        Returning = 631,
+        Returning = 633,
 
         /// `Returns`
-        Returns = 632,
+        Returns = 634,
 
         /// `Revoke`
-        Revoke = 633,
+        Revoke = 635,
 
         /// `Right`
-        Right = 634,
+        Right = 636,
 
         /// `Role`
-        Role = 635,
+        Role = 637,
 
         /// `Rollback`
-        Rollback = 636,
+        Rollback = 638,
 
         /// `Rollup`
-        Rollup = 637,
+        Rollup = 639,
 
         /// `Routine`
-        Routine = 638,
+        Routine = 640,
 
         /// `Routines`
-        Routines = 639,
+        Routines = 641,
 
         /// `Row`
-        Row = 640,
+        Row = 642,
 
         /// `Rows`
-        Rows = 641,
+        Rows = 643,
 
         /// `Rule`
-        Rule = 642,
+        Rule = 644,
 
         /// `Savepoint`
-        Savepoint = 643,
+        Savepoint = 645,
 
         /// `Scalar`
-        Scalar = 644,
+        Scalar = 646,
 
         /// `Schema`
-        Schema = 645,
+        Schema = 647,
 
         /// `Schemas`
-        Schemas = 646,
+        Schemas = 648,
 
         /// `Scroll`
-        Scroll = 647,
+        Scroll = 649,
 
         /// `Search`
-        Search = 648,
+        Search = 650,
 
         /// `SecondP`
-        SecondP = 649,
+        SecondP = 651,
 
         /// `Security`
-        Security = 650,
+        Security = 652,
 
         /// `Select`
-        Select = 651,
+        Select = 653,
 
         /// `Sequence`
-        Sequence = 652,
+        Sequence = 654,
 
         /// `Sequences`
-        Sequences = 653,
+        Sequences = 655,
 
         /// `Serializable`
-        Serializable = 654,
+        Serializable = 656,
 
         /// `Server`
-        Server = 655,
+        Server = 657,
 
         /// `Session`
-        Session = 656,
+        Session = 658,
 
         /// `SessionUser`
-        SessionUser = 657,
+        SessionUser = 659,
 
         /// `Set`
-        Set = 658,
+        Set = 660,
 
         /// `Sets`
-        Sets = 659,
+        Sets = 661,
 
         /// `Setof`
-        Setof = 660,
+        Setof = 662,
 
         /// `Share`
-        Share = 661,
+        Share = 663,
 
         /// `Show`
-        Show = 662,
+        Show = 664,
 
         /// `Similar`
-        Similar = 663,
+        Similar = 665,
 
         /// `Simple`
-        Simple = 664,
+        Simple = 666,
 
         /// `Skip`
-        Skip = 665,
+        Skip = 667,
 
         /// `Smallint`
-        Smallint = 666,
+        Smallint = 668,
 
         /// `Snapshot`
-        Snapshot = 667,
+        Snapshot = 669,
 
         /// `Some`
-        Some = 668,
+        Some = 670,
 
         /// `Source`
-        Source = 669,
+        Source = 671,
 
         /// `SqlP`
-        SqlP = 670,
+        SqlP = 672,
 
         /// `Stable`
-        Stable = 671,
+        Stable = 673,
 
         /// `StandaloneP`
-        StandaloneP = 672,
+        StandaloneP = 674,
 
         /// `Start`
-        Start = 673,
+        Start = 675,
 
         /// `Statement`
-        Statement = 674,
+        Statement = 676,
 
         /// `Statistics`
-        Statistics = 675,
+        Statistics = 677,
 
         /// `Stdin`
-        Stdin = 676,
+        Stdin = 678,
 
         /// `Stdout`
-        Stdout = 677,
+        Stdout = 679,
 
         /// `Storage`
-        Storage = 678,
+        Storage = 680,
 
         /// `Stored`
-        Stored = 679,
+        Stored = 681,
 
         /// `StrictP`
-        StrictP = 680,
+        StrictP = 682,
 
         /// `StringP`
-        StringP = 681,
+        StringP = 683,
 
         /// `StripP`
-        StripP = 682,
+        StripP = 684,
 
         /// `Subscription`
-        Subscription = 683,
+        Subscription = 685,
 
         /// `Substring`
-        Substring = 684,
+        Substring = 686,
 
         /// `Support`
-        Support = 685,
+        Support = 687,
 
         /// `Symmetric`
-        Symmetric = 686,
+        Symmetric = 688,
 
         /// `Sysid`
-        Sysid = 687,
+        Sysid = 689,
 
         /// `SystemP`
-        SystemP = 688,
+        SystemP = 690,
 
         /// `SystemUser`
-        SystemUser = 689,
+        SystemUser = 691,
 
         /// `Table`
-        Table = 690,
+        Table = 692,
 
         /// `Tables`
-        Tables = 691,
+        Tables = 693,
 
         /// `Tablesample`
-        Tablesample = 692,
+        Tablesample = 694,
 
         /// `Tablespace`
-        Tablespace = 693,
+        Tablespace = 695,
 
         /// `Target`
-        Target = 694,
+        Target = 696,
 
         /// `Temp`
-        Temp = 695,
+        Temp = 697,
 
         /// `Template`
-        Template = 696,
+        Template = 698,
 
         /// `Temporary`
-        Temporary = 697,
+        Temporary = 699,
 
         /// `TextP`
-        TextP = 698,
+        TextP = 700,
 
         /// `Then`
-        Then = 699,
+        Then = 701,
 
         /// `Ties`
-        Ties = 700,
+        Ties = 702,
 
         /// `Time`
-        Time = 701,
+        Time = 703,
 
         /// `Timestamp`
-        Timestamp = 702,
+        Timestamp = 704,
 
         /// `To`
-        To = 703,
+        To = 705,
 
         /// `Trailing`
-        Trailing = 704,
+        Trailing = 706,
 
         /// `Transaction`
-        Transaction = 705,
+        Transaction = 707,
 
         /// `Transform`
-        Transform = 706,
+        Transform = 708,
 
         /// `Treat`
-        Treat = 707,
+        Treat = 709,
 
         /// `Trigger`
-        Trigger = 708,
+        Trigger = 710,
 
         /// `Trim`
-        Trim = 709,
+        Trim = 711,
 
         /// `TrueP`
-        TrueP = 710,
+        TrueP = 712,
 
         /// `Truncate`
-        Truncate = 711,
+        Truncate = 713,
 
         /// `Trusted`
-        Trusted = 712,
+        Trusted = 714,
 
         /// `TypeP`
-        TypeP = 713,
+        TypeP = 715,
 
         /// `TypesP`
-        TypesP = 714,
+        TypesP = 716,
 
         /// `Uescape`
-        Uescape = 715,
+        Uescape = 717,
 
         /// `Unbounded`
-        Unbounded = 716,
+        Unbounded = 718,
 
         /// `Unconditional`
-        Unconditional = 717,
+        Unconditional = 719,
 
         /// `Uncommitted`
-        Uncommitted = 718,
+        Uncommitted = 720,
 
         /// `Unencrypted`
-        Unencrypted = 719,
+        Unencrypted = 721,
 
         /// `Union`
-        Union = 720,
+        Union = 722,
 
         /// `Unique`
-        Unique = 721,
+        Unique = 723,
 
         /// `Unknown`
-        Unknown = 722,
+        Unknown = 724,
 
         /// `Unlisten`
-        Unlisten = 723,
+        Unlisten = 725,
 
         /// `Unlogged`
-        Unlogged = 724,
+        Unlogged = 726,
 
         /// `Until`
-        Until = 725,
+        Until = 727,
 
         /// `Update`
-        Update = 726,
+        Update = 728,
 
         /// `User`
-        User = 727,
+        User = 729,
 
         /// `Using`
-        Using = 728,
+        Using = 730,
 
         /// `Vacuum`
-        Vacuum = 729,
+        Vacuum = 731,
 
         /// `Valid`
-        Valid = 730,
+        Valid = 732,
 
         /// `Validate`
-        Validate = 731,
+        Validate = 733,
 
         /// `Validator`
-        Validator = 732,
+        Validator = 734,
 
         /// `ValueP`
-        ValueP = 733,
+        ValueP = 735,
 
         /// `Values`
-        Values = 734,
+        Values = 736,
 
         /// `Varchar`
-        Varchar = 735,
+        Varchar = 737,
 
         /// `Variadic`
-        Variadic = 736,
+        Variadic = 738,
 
         /// `Varying`
-        Varying = 737,
+        Varying = 739,
 
         /// `Verbose`
-        Verbose = 738,
+        Verbose = 740,
 
         /// `VersionP`
-        VersionP = 739,
+        VersionP = 741,
 
         /// `View`
-        View = 740,
+        View = 742,
 
         /// `Views`
-        Views = 741,
+        Views = 743,
+
+        /// `Virtual`
+        Virtual = 744,
 
         /// `Volatile`
-        Volatile = 742,
+        Volatile = 745,
 
         /// `When`
-        When = 743,
+        When = 746,
 
         /// `Where`
-        Where = 744,
+        Where = 747,
 
         /// `WhitespaceP`
-        WhitespaceP = 745,
+        WhitespaceP = 748,
 
         /// `Window`
-        Window = 746,
+        Window = 749,
 
         /// `With`
-        With = 747,
+        With = 750,
 
         /// `Within`
-        Within = 748,
+        Within = 751,
 
         /// `Without`
-        Without = 749,
+        Without = 752,
 
         /// `Work`
-        Work = 750,
+        Work = 753,
 
         /// `Wrapper`
-        Wrapper = 751,
+        Wrapper = 754,
 
         /// `Write`
-        Write = 752,
+        Write = 755,
 
         /// `XmlP`
-        XmlP = 753,
+        XmlP = 756,
 
         /// `Xmlattributes`
-        Xmlattributes = 754,
+        Xmlattributes = 757,
 
         /// `Xmlconcat`
-        Xmlconcat = 755,
+        Xmlconcat = 758,
 
         /// `Xmlelement`
-        Xmlelement = 756,
+        Xmlelement = 759,
 
         /// `Xmlexists`
-        Xmlexists = 757,
+        Xmlexists = 760,
 
         /// `Xmlforest`
-        Xmlforest = 758,
+        Xmlforest = 761,
 
         /// `Xmlnamespaces`
-        Xmlnamespaces = 759,
+        Xmlnamespaces = 762,
 
         /// `Xmlparse`
-        Xmlparse = 760,
+        Xmlparse = 763,
 
         /// `Xmlpi`
-        Xmlpi = 761,
+        Xmlpi = 764,
 
         /// `Xmlroot`
-        Xmlroot = 762,
+        Xmlroot = 765,
 
         /// `Xmlserialize`
-        Xmlserialize = 763,
+        Xmlserialize = 766,
 
         /// `Xmltable`
-        Xmltable = 764,
+        Xmltable = 767,
 
         /// `YearP`
-        YearP = 765,
+        YearP = 768,
 
         /// `YesP`
-        YesP = 766,
+        YesP = 769,
 
         /// `Zone`
-        Zone = 767,
+        Zone = 770,
 
         /// `FormatLa`
-        FormatLa = 768,
+        FormatLa = 771,
 
         /// `NotLa`
-        NotLa = 769,
+        NotLa = 772,
 
         /// `NullsLa`
-        NullsLa = 770,
+        NullsLa = 773,
 
         /// `WithLa`
-        WithLa = 771,
+        WithLa = 774,
 
         /// `WithoutLa`
-        WithoutLa = 772,
+        WithoutLa = 775,
 
         /// `ModeTypeName`
-        ModeTypeName = 773,
+        ModeTypeName = 776,
 
         /// `ModePlpgsqlExpr`
-        ModePlpgsqlExpr = 774,
+        ModePlpgsqlExpr = 777,
 
         /// `ModePlpgsqlAssign1`
-        ModePlpgsqlAssign1 = 775,
+        ModePlpgsqlAssign1 = 778,
 
         /// `ModePlpgsqlAssign2`
-        ModePlpgsqlAssign2 = 776,
+        ModePlpgsqlAssign2 = 779,
 
         /// `ModePlpgsqlAssign3`
-        ModePlpgsqlAssign3 = 777,
+        ModePlpgsqlAssign3 = 780,
 
         /// `Uminus`
-        Uminus = 778,
+        Uminus = 781,
 
         /// None
-        OptionNone = 779,
+        OptionNone = 782,
     }
 
     impl From<::pg_query::protobuf::Token> for Token {
@@ -23954,6 +24390,8 @@ mod token {
 
                 S::EndP => Self::EndP,
 
+                S::Enforced => Self::Enforced,
+
                 S::EnumP => Self::EnumP,
 
                 S::ErrorP => Self::ErrorP,
@@ -24262,6 +24700,8 @@ mod token {
 
                 S::ObjectP => Self::ObjectP,
 
+                S::ObjectsP => Self::ObjectsP,
+
                 S::Of => Self::Of,
 
                 S::Off => Self::Off,
@@ -24324,6 +24764,8 @@ mod token {
 
                 S::Path => Self::Path,
 
+                S::Period => Self::Period,
+
                 S::Placing => Self::Placing,
 
                 S::Plan => Self::Plan,
@@ -24371,8 +24813,6 @@ mod token {
                 S::Real => Self::Real,
 
                 S::Reassign => Self::Reassign,
-
-                S::Recheck => Self::Recheck,
 
                 S::Recursive => Self::Recursive,
 
@@ -24627,6 +25067,8 @@ mod token {
                 S::View => Self::View,
 
                 S::Views => Self::Views,
+
+                S::Virtual => Self::Virtual,
 
                 S::Volatile => Self::Volatile,
 
@@ -25045,753 +25487,759 @@ mod token {
 
                 404 => Self::EndP,
 
-                405 => Self::EnumP,
+                405 => Self::Enforced,
 
-                406 => Self::ErrorP,
+                406 => Self::EnumP,
 
-                407 => Self::Escape,
+                407 => Self::ErrorP,
 
-                408 => Self::Event,
+                408 => Self::Escape,
 
-                409 => Self::Except,
+                409 => Self::Event,
 
-                410 => Self::Exclude,
+                410 => Self::Except,
 
-                411 => Self::Excluding,
+                411 => Self::Exclude,
 
-                412 => Self::Exclusive,
+                412 => Self::Excluding,
 
-                413 => Self::Execute,
+                413 => Self::Exclusive,
 
-                414 => Self::Exists,
+                414 => Self::Execute,
 
-                415 => Self::Explain,
+                415 => Self::Exists,
 
-                416 => Self::Expression,
+                416 => Self::Explain,
 
-                417 => Self::Extension,
+                417 => Self::Expression,
 
-                418 => Self::External,
+                418 => Self::Extension,
 
-                419 => Self::Extract,
+                419 => Self::External,
 
-                420 => Self::FalseP,
+                420 => Self::Extract,
 
-                421 => Self::Family,
+                421 => Self::FalseP,
 
-                422 => Self::Fetch,
+                422 => Self::Family,
 
-                423 => Self::Filter,
+                423 => Self::Fetch,
 
-                424 => Self::Finalize,
+                424 => Self::Filter,
 
-                425 => Self::FirstP,
+                425 => Self::Finalize,
 
-                426 => Self::FloatP,
+                426 => Self::FirstP,
 
-                427 => Self::Following,
+                427 => Self::FloatP,
 
-                428 => Self::For,
+                428 => Self::Following,
 
-                429 => Self::Force,
+                429 => Self::For,
 
-                430 => Self::Foreign,
+                430 => Self::Force,
 
-                431 => Self::Format,
+                431 => Self::Foreign,
 
-                432 => Self::Forward,
+                432 => Self::Format,
 
-                433 => Self::Freeze,
+                433 => Self::Forward,
 
-                434 => Self::From,
+                434 => Self::Freeze,
 
-                435 => Self::Full,
+                435 => Self::From,
 
-                436 => Self::Function,
+                436 => Self::Full,
 
-                437 => Self::Functions,
+                437 => Self::Function,
 
-                438 => Self::Generated,
+                438 => Self::Functions,
 
-                439 => Self::Global,
+                439 => Self::Generated,
 
-                440 => Self::Grant,
+                440 => Self::Global,
 
-                441 => Self::Granted,
+                441 => Self::Grant,
 
-                442 => Self::Greatest,
+                442 => Self::Granted,
 
-                443 => Self::GroupP,
+                443 => Self::Greatest,
 
-                444 => Self::Grouping,
+                444 => Self::GroupP,
 
-                445 => Self::Groups,
+                445 => Self::Grouping,
 
-                446 => Self::Handler,
+                446 => Self::Groups,
 
-                447 => Self::Having,
+                447 => Self::Handler,
 
-                448 => Self::HeaderP,
+                448 => Self::Having,
 
-                449 => Self::Hold,
+                449 => Self::HeaderP,
 
-                450 => Self::HourP,
+                450 => Self::Hold,
 
-                451 => Self::IdentityP,
+                451 => Self::HourP,
 
-                452 => Self::IfP,
+                452 => Self::IdentityP,
 
-                453 => Self::Ilike,
+                453 => Self::IfP,
 
-                454 => Self::Immediate,
+                454 => Self::Ilike,
 
-                455 => Self::Immutable,
+                455 => Self::Immediate,
 
-                456 => Self::ImplicitP,
+                456 => Self::Immutable,
 
-                457 => Self::ImportP,
+                457 => Self::ImplicitP,
 
-                458 => Self::InP,
+                458 => Self::ImportP,
 
-                459 => Self::Include,
+                459 => Self::InP,
 
-                460 => Self::Including,
+                460 => Self::Include,
 
-                461 => Self::Increment,
+                461 => Self::Including,
 
-                462 => Self::Indent,
+                462 => Self::Increment,
 
-                463 => Self::Index,
+                463 => Self::Indent,
 
-                464 => Self::Indexes,
+                464 => Self::Index,
 
-                465 => Self::Inherit,
+                465 => Self::Indexes,
 
-                466 => Self::Inherits,
+                466 => Self::Inherit,
 
-                467 => Self::Initially,
+                467 => Self::Inherits,
 
-                468 => Self::InlineP,
+                468 => Self::Initially,
 
-                469 => Self::InnerP,
+                469 => Self::InlineP,
 
-                470 => Self::Inout,
+                470 => Self::InnerP,
 
-                471 => Self::InputP,
+                471 => Self::Inout,
 
-                472 => Self::Insensitive,
+                472 => Self::InputP,
 
-                473 => Self::Insert,
+                473 => Self::Insensitive,
 
-                474 => Self::Instead,
+                474 => Self::Insert,
 
-                475 => Self::IntP,
+                475 => Self::Instead,
 
-                476 => Self::Integer,
+                476 => Self::IntP,
 
-                477 => Self::Intersect,
+                477 => Self::Integer,
 
-                478 => Self::Interval,
+                478 => Self::Intersect,
 
-                479 => Self::Into,
+                479 => Self::Interval,
 
-                480 => Self::Invoker,
+                480 => Self::Into,
 
-                481 => Self::Is,
+                481 => Self::Invoker,
 
-                482 => Self::Isnull,
+                482 => Self::Is,
 
-                483 => Self::Isolation,
+                483 => Self::Isnull,
 
-                484 => Self::Join,
+                484 => Self::Isolation,
 
-                485 => Self::Json,
+                485 => Self::Join,
 
-                486 => Self::JsonArray,
+                486 => Self::Json,
 
-                487 => Self::JsonArrayagg,
+                487 => Self::JsonArray,
 
-                488 => Self::JsonExists,
+                488 => Self::JsonArrayagg,
 
-                489 => Self::JsonObject,
+                489 => Self::JsonExists,
 
-                490 => Self::JsonObjectagg,
+                490 => Self::JsonObject,
 
-                491 => Self::JsonQuery,
+                491 => Self::JsonObjectagg,
 
-                492 => Self::JsonScalar,
+                492 => Self::JsonQuery,
 
-                493 => Self::JsonSerialize,
+                493 => Self::JsonScalar,
 
-                494 => Self::JsonTable,
+                494 => Self::JsonSerialize,
 
-                495 => Self::JsonValue,
+                495 => Self::JsonTable,
 
-                496 => Self::Keep,
+                496 => Self::JsonValue,
 
-                497 => Self::Key,
+                497 => Self::Keep,
 
-                498 => Self::Keys,
+                498 => Self::Key,
 
-                499 => Self::Label,
+                499 => Self::Keys,
 
-                500 => Self::Language,
+                500 => Self::Label,
 
-                501 => Self::LargeP,
+                501 => Self::Language,
 
-                502 => Self::LastP,
+                502 => Self::LargeP,
 
-                503 => Self::LateralP,
+                503 => Self::LastP,
 
-                504 => Self::Leading,
+                504 => Self::LateralP,
 
-                505 => Self::Leakproof,
+                505 => Self::Leading,
 
-                506 => Self::Least,
+                506 => Self::Leakproof,
 
-                507 => Self::Left,
+                507 => Self::Least,
 
-                508 => Self::Level,
+                508 => Self::Left,
 
-                509 => Self::Like,
+                509 => Self::Level,
 
-                510 => Self::Limit,
+                510 => Self::Like,
 
-                511 => Self::Listen,
+                511 => Self::Limit,
 
-                512 => Self::Load,
+                512 => Self::Listen,
 
-                513 => Self::Local,
+                513 => Self::Load,
 
-                514 => Self::Localtime,
+                514 => Self::Local,
 
-                515 => Self::Localtimestamp,
+                515 => Self::Localtime,
 
-                516 => Self::Location,
+                516 => Self::Localtimestamp,
 
-                517 => Self::LockP,
+                517 => Self::Location,
 
-                518 => Self::Locked,
+                518 => Self::LockP,
 
-                519 => Self::Logged,
+                519 => Self::Locked,
 
-                520 => Self::Mapping,
+                520 => Self::Logged,
 
-                521 => Self::Match,
+                521 => Self::Mapping,
 
-                522 => Self::Matched,
+                522 => Self::Match,
 
-                523 => Self::Materialized,
+                523 => Self::Matched,
 
-                524 => Self::Maxvalue,
+                524 => Self::Materialized,
 
-                525 => Self::Merge,
+                525 => Self::Maxvalue,
 
-                526 => Self::MergeAction,
+                526 => Self::Merge,
 
-                527 => Self::Method,
+                527 => Self::MergeAction,
 
-                528 => Self::MinuteP,
+                528 => Self::Method,
 
-                529 => Self::Minvalue,
+                529 => Self::MinuteP,
 
-                530 => Self::Mode,
+                530 => Self::Minvalue,
 
-                531 => Self::MonthP,
+                531 => Self::Mode,
 
-                532 => Self::Move,
+                532 => Self::MonthP,
 
-                533 => Self::NameP,
+                533 => Self::Move,
 
-                534 => Self::Names,
+                534 => Self::NameP,
 
-                535 => Self::National,
+                535 => Self::Names,
 
-                536 => Self::Natural,
+                536 => Self::National,
 
-                537 => Self::Nchar,
+                537 => Self::Natural,
 
-                538 => Self::Nested,
+                538 => Self::Nchar,
 
-                539 => Self::New,
+                539 => Self::Nested,
 
-                540 => Self::Next,
+                540 => Self::New,
 
-                541 => Self::Nfc,
+                541 => Self::Next,
 
-                542 => Self::Nfd,
+                542 => Self::Nfc,
 
-                543 => Self::Nfkc,
+                543 => Self::Nfd,
 
-                544 => Self::Nfkd,
+                544 => Self::Nfkc,
 
-                545 => Self::No,
+                545 => Self::Nfkd,
 
-                546 => Self::None,
+                546 => Self::No,
 
-                547 => Self::Normalize,
+                547 => Self::None,
 
-                548 => Self::Normalized,
+                548 => Self::Normalize,
 
-                549 => Self::Not,
+                549 => Self::Normalized,
 
-                550 => Self::Nothing,
+                550 => Self::Not,
 
-                551 => Self::Notify,
+                551 => Self::Nothing,
 
-                552 => Self::Notnull,
+                552 => Self::Notify,
 
-                553 => Self::Nowait,
+                553 => Self::Notnull,
 
-                554 => Self::NullP,
+                554 => Self::Nowait,
 
-                555 => Self::Nullif,
+                555 => Self::NullP,
 
-                556 => Self::NullsP,
+                556 => Self::Nullif,
 
-                557 => Self::Numeric,
+                557 => Self::NullsP,
 
-                558 => Self::ObjectP,
+                558 => Self::Numeric,
 
-                559 => Self::Of,
+                559 => Self::ObjectP,
 
-                560 => Self::Off,
+                560 => Self::ObjectsP,
 
-                561 => Self::Offset,
+                561 => Self::Of,
 
-                562 => Self::Oids,
+                562 => Self::Off,
 
-                563 => Self::Old,
+                563 => Self::Offset,
 
-                564 => Self::Omit,
+                564 => Self::Oids,
 
-                565 => Self::On,
+                565 => Self::Old,
 
-                566 => Self::Only,
+                566 => Self::Omit,
 
-                567 => Self::Operator,
+                567 => Self::On,
 
-                568 => Self::Option,
+                568 => Self::Only,
 
-                569 => Self::Options,
+                569 => Self::Operator,
 
-                570 => Self::Or,
+                570 => Self::Option,
 
-                571 => Self::Order,
+                571 => Self::Options,
 
-                572 => Self::Ordinality,
+                572 => Self::Or,
 
-                573 => Self::Others,
+                573 => Self::Order,
 
-                574 => Self::OutP,
+                574 => Self::Ordinality,
 
-                575 => Self::OuterP,
+                575 => Self::Others,
 
-                576 => Self::Over,
+                576 => Self::OutP,
 
-                577 => Self::Overlaps,
+                577 => Self::OuterP,
 
-                578 => Self::Overlay,
+                578 => Self::Over,
 
-                579 => Self::Overriding,
+                579 => Self::Overlaps,
 
-                580 => Self::Owned,
+                580 => Self::Overlay,
 
-                581 => Self::Owner,
+                581 => Self::Overriding,
 
-                582 => Self::Parallel,
+                582 => Self::Owned,
 
-                583 => Self::Parameter,
+                583 => Self::Owner,
 
-                584 => Self::Parser,
+                584 => Self::Parallel,
 
-                585 => Self::Partial,
+                585 => Self::Parameter,
 
-                586 => Self::Partition,
+                586 => Self::Parser,
 
-                587 => Self::Passing,
+                587 => Self::Partial,
 
-                588 => Self::Password,
+                588 => Self::Partition,
 
-                589 => Self::Path,
+                589 => Self::Passing,
 
-                590 => Self::Placing,
+                590 => Self::Password,
 
-                591 => Self::Plan,
+                591 => Self::Path,
 
-                592 => Self::Plans,
+                592 => Self::Period,
 
-                593 => Self::Policy,
+                593 => Self::Placing,
 
-                594 => Self::Position,
+                594 => Self::Plan,
 
-                595 => Self::Preceding,
+                595 => Self::Plans,
 
-                596 => Self::Precision,
+                596 => Self::Policy,
 
-                597 => Self::Preserve,
+                597 => Self::Position,
 
-                598 => Self::Prepare,
+                598 => Self::Preceding,
 
-                599 => Self::Prepared,
+                599 => Self::Precision,
 
-                600 => Self::Primary,
+                600 => Self::Preserve,
 
-                601 => Self::Prior,
+                601 => Self::Prepare,
 
-                602 => Self::Privileges,
+                602 => Self::Prepared,
 
-                603 => Self::Procedural,
+                603 => Self::Primary,
 
-                604 => Self::Procedure,
+                604 => Self::Prior,
 
-                605 => Self::Procedures,
+                605 => Self::Privileges,
 
-                606 => Self::Program,
+                606 => Self::Procedural,
 
-                607 => Self::Publication,
+                607 => Self::Procedure,
 
-                608 => Self::Quote,
+                608 => Self::Procedures,
 
-                609 => Self::Quotes,
+                609 => Self::Program,
 
-                610 => Self::Range,
+                610 => Self::Publication,
 
-                611 => Self::Read,
+                611 => Self::Quote,
 
-                612 => Self::Real,
+                612 => Self::Quotes,
 
-                613 => Self::Reassign,
+                613 => Self::Range,
 
-                614 => Self::Recheck,
+                614 => Self::Read,
 
-                615 => Self::Recursive,
+                615 => Self::Real,
 
-                616 => Self::RefP,
+                616 => Self::Reassign,
 
-                617 => Self::References,
+                617 => Self::Recursive,
 
-                618 => Self::Referencing,
+                618 => Self::RefP,
 
-                619 => Self::Refresh,
+                619 => Self::References,
 
-                620 => Self::Reindex,
+                620 => Self::Referencing,
 
-                621 => Self::RelativeP,
+                621 => Self::Refresh,
 
-                622 => Self::Release,
+                622 => Self::Reindex,
 
-                623 => Self::Rename,
+                623 => Self::RelativeP,
 
-                624 => Self::Repeatable,
+                624 => Self::Release,
 
-                625 => Self::Replace,
+                625 => Self::Rename,
 
-                626 => Self::Replica,
+                626 => Self::Repeatable,
 
-                627 => Self::Reset,
+                627 => Self::Replace,
 
-                628 => Self::Restart,
+                628 => Self::Replica,
 
-                629 => Self::Restrict,
+                629 => Self::Reset,
 
-                630 => Self::Return,
+                630 => Self::Restart,
 
-                631 => Self::Returning,
+                631 => Self::Restrict,
 
-                632 => Self::Returns,
+                632 => Self::Return,
 
-                633 => Self::Revoke,
+                633 => Self::Returning,
 
-                634 => Self::Right,
+                634 => Self::Returns,
 
-                635 => Self::Role,
+                635 => Self::Revoke,
 
-                636 => Self::Rollback,
+                636 => Self::Right,
 
-                637 => Self::Rollup,
+                637 => Self::Role,
 
-                638 => Self::Routine,
+                638 => Self::Rollback,
 
-                639 => Self::Routines,
+                639 => Self::Rollup,
 
-                640 => Self::Row,
+                640 => Self::Routine,
 
-                641 => Self::Rows,
+                641 => Self::Routines,
 
-                642 => Self::Rule,
+                642 => Self::Row,
 
-                643 => Self::Savepoint,
+                643 => Self::Rows,
 
-                644 => Self::Scalar,
+                644 => Self::Rule,
 
-                645 => Self::Schema,
+                645 => Self::Savepoint,
 
-                646 => Self::Schemas,
+                646 => Self::Scalar,
 
-                647 => Self::Scroll,
+                647 => Self::Schema,
 
-                648 => Self::Search,
+                648 => Self::Schemas,
 
-                649 => Self::SecondP,
+                649 => Self::Scroll,
 
-                650 => Self::Security,
+                650 => Self::Search,
 
-                651 => Self::Select,
+                651 => Self::SecondP,
 
-                652 => Self::Sequence,
+                652 => Self::Security,
 
-                653 => Self::Sequences,
+                653 => Self::Select,
 
-                654 => Self::Serializable,
+                654 => Self::Sequence,
 
-                655 => Self::Server,
+                655 => Self::Sequences,
 
-                656 => Self::Session,
+                656 => Self::Serializable,
 
-                657 => Self::SessionUser,
+                657 => Self::Server,
 
-                658 => Self::Set,
+                658 => Self::Session,
 
-                659 => Self::Sets,
+                659 => Self::SessionUser,
 
-                660 => Self::Setof,
+                660 => Self::Set,
 
-                661 => Self::Share,
+                661 => Self::Sets,
 
-                662 => Self::Show,
+                662 => Self::Setof,
 
-                663 => Self::Similar,
+                663 => Self::Share,
 
-                664 => Self::Simple,
+                664 => Self::Show,
 
-                665 => Self::Skip,
+                665 => Self::Similar,
 
-                666 => Self::Smallint,
+                666 => Self::Simple,
 
-                667 => Self::Snapshot,
+                667 => Self::Skip,
 
-                668 => Self::Some,
+                668 => Self::Smallint,
 
-                669 => Self::Source,
+                669 => Self::Snapshot,
 
-                670 => Self::SqlP,
+                670 => Self::Some,
 
-                671 => Self::Stable,
+                671 => Self::Source,
 
-                672 => Self::StandaloneP,
+                672 => Self::SqlP,
 
-                673 => Self::Start,
+                673 => Self::Stable,
 
-                674 => Self::Statement,
+                674 => Self::StandaloneP,
 
-                675 => Self::Statistics,
+                675 => Self::Start,
 
-                676 => Self::Stdin,
+                676 => Self::Statement,
 
-                677 => Self::Stdout,
+                677 => Self::Statistics,
 
-                678 => Self::Storage,
+                678 => Self::Stdin,
 
-                679 => Self::Stored,
+                679 => Self::Stdout,
 
-                680 => Self::StrictP,
+                680 => Self::Storage,
 
-                681 => Self::StringP,
+                681 => Self::Stored,
 
-                682 => Self::StripP,
+                682 => Self::StrictP,
 
-                683 => Self::Subscription,
+                683 => Self::StringP,
 
-                684 => Self::Substring,
+                684 => Self::StripP,
 
-                685 => Self::Support,
+                685 => Self::Subscription,
 
-                686 => Self::Symmetric,
+                686 => Self::Substring,
 
-                687 => Self::Sysid,
+                687 => Self::Support,
 
-                688 => Self::SystemP,
+                688 => Self::Symmetric,
 
-                689 => Self::SystemUser,
+                689 => Self::Sysid,
 
-                690 => Self::Table,
+                690 => Self::SystemP,
 
-                691 => Self::Tables,
+                691 => Self::SystemUser,
 
-                692 => Self::Tablesample,
+                692 => Self::Table,
 
-                693 => Self::Tablespace,
+                693 => Self::Tables,
 
-                694 => Self::Target,
+                694 => Self::Tablesample,
 
-                695 => Self::Temp,
+                695 => Self::Tablespace,
 
-                696 => Self::Template,
+                696 => Self::Target,
 
-                697 => Self::Temporary,
+                697 => Self::Temp,
 
-                698 => Self::TextP,
+                698 => Self::Template,
 
-                699 => Self::Then,
+                699 => Self::Temporary,
 
-                700 => Self::Ties,
+                700 => Self::TextP,
 
-                701 => Self::Time,
+                701 => Self::Then,
 
-                702 => Self::Timestamp,
+                702 => Self::Ties,
 
-                703 => Self::To,
+                703 => Self::Time,
 
-                704 => Self::Trailing,
+                704 => Self::Timestamp,
 
-                705 => Self::Transaction,
+                705 => Self::To,
 
-                706 => Self::Transform,
+                706 => Self::Trailing,
 
-                707 => Self::Treat,
+                707 => Self::Transaction,
 
-                708 => Self::Trigger,
+                708 => Self::Transform,
 
-                709 => Self::Trim,
+                709 => Self::Treat,
 
-                710 => Self::TrueP,
+                710 => Self::Trigger,
 
-                711 => Self::Truncate,
+                711 => Self::Trim,
 
-                712 => Self::Trusted,
+                712 => Self::TrueP,
 
-                713 => Self::TypeP,
+                713 => Self::Truncate,
 
-                714 => Self::TypesP,
+                714 => Self::Trusted,
 
-                715 => Self::Uescape,
+                715 => Self::TypeP,
 
-                716 => Self::Unbounded,
+                716 => Self::TypesP,
 
-                717 => Self::Unconditional,
+                717 => Self::Uescape,
 
-                718 => Self::Uncommitted,
+                718 => Self::Unbounded,
 
-                719 => Self::Unencrypted,
+                719 => Self::Unconditional,
 
-                720 => Self::Union,
+                720 => Self::Uncommitted,
 
-                721 => Self::Unique,
+                721 => Self::Unencrypted,
 
-                722 => Self::Unknown,
+                722 => Self::Union,
 
-                723 => Self::Unlisten,
+                723 => Self::Unique,
 
-                724 => Self::Unlogged,
+                724 => Self::Unknown,
 
-                725 => Self::Until,
+                725 => Self::Unlisten,
 
-                726 => Self::Update,
+                726 => Self::Unlogged,
 
-                727 => Self::User,
+                727 => Self::Until,
 
-                728 => Self::Using,
+                728 => Self::Update,
 
-                729 => Self::Vacuum,
+                729 => Self::User,
 
-                730 => Self::Valid,
+                730 => Self::Using,
 
-                731 => Self::Validate,
+                731 => Self::Vacuum,
 
-                732 => Self::Validator,
+                732 => Self::Valid,
 
-                733 => Self::ValueP,
+                733 => Self::Validate,
 
-                734 => Self::Values,
+                734 => Self::Validator,
 
-                735 => Self::Varchar,
+                735 => Self::ValueP,
 
-                736 => Self::Variadic,
+                736 => Self::Values,
 
-                737 => Self::Varying,
+                737 => Self::Varchar,
 
-                738 => Self::Verbose,
+                738 => Self::Variadic,
 
-                739 => Self::VersionP,
+                739 => Self::Varying,
 
-                740 => Self::View,
+                740 => Self::Verbose,
 
-                741 => Self::Views,
+                741 => Self::VersionP,
 
-                742 => Self::Volatile,
+                742 => Self::View,
 
-                743 => Self::When,
+                743 => Self::Views,
 
-                744 => Self::Where,
+                744 => Self::Virtual,
 
-                745 => Self::WhitespaceP,
+                745 => Self::Volatile,
 
-                746 => Self::Window,
+                746 => Self::When,
 
-                747 => Self::With,
+                747 => Self::Where,
 
-                748 => Self::Within,
+                748 => Self::WhitespaceP,
 
-                749 => Self::Without,
+                749 => Self::Window,
 
-                750 => Self::Work,
+                750 => Self::With,
 
-                751 => Self::Wrapper,
+                751 => Self::Within,
 
-                752 => Self::Write,
+                752 => Self::Without,
 
-                753 => Self::XmlP,
+                753 => Self::Work,
 
-                754 => Self::Xmlattributes,
+                754 => Self::Wrapper,
 
-                755 => Self::Xmlconcat,
+                755 => Self::Write,
 
-                756 => Self::Xmlelement,
+                756 => Self::XmlP,
 
-                757 => Self::Xmlexists,
+                757 => Self::Xmlattributes,
 
-                758 => Self::Xmlforest,
+                758 => Self::Xmlconcat,
 
-                759 => Self::Xmlnamespaces,
+                759 => Self::Xmlelement,
 
-                760 => Self::Xmlparse,
+                760 => Self::Xmlexists,
 
-                761 => Self::Xmlpi,
+                761 => Self::Xmlforest,
 
-                762 => Self::Xmlroot,
+                762 => Self::Xmlnamespaces,
 
-                763 => Self::Xmlserialize,
+                763 => Self::Xmlparse,
 
-                764 => Self::Xmltable,
+                764 => Self::Xmlpi,
 
-                765 => Self::YearP,
+                765 => Self::Xmlroot,
 
-                766 => Self::YesP,
+                766 => Self::Xmlserialize,
 
-                767 => Self::Zone,
+                767 => Self::Xmltable,
 
-                768 => Self::FormatLa,
+                768 => Self::YearP,
 
-                769 => Self::NotLa,
+                769 => Self::YesP,
 
-                770 => Self::NullsLa,
+                770 => Self::Zone,
 
-                771 => Self::WithLa,
+                771 => Self::FormatLa,
 
-                772 => Self::WithoutLa,
+                772 => Self::NotLa,
 
-                773 => Self::ModeTypeName,
+                773 => Self::NullsLa,
 
-                774 => Self::ModePlpgsqlExpr,
+                774 => Self::WithLa,
 
-                775 => Self::ModePlpgsqlAssign1,
+                775 => Self::WithoutLa,
 
-                776 => Self::ModePlpgsqlAssign2,
+                776 => Self::ModeTypeName,
 
-                777 => Self::ModePlpgsqlAssign3,
+                777 => Self::ModePlpgsqlExpr,
 
-                778 => Self::Uminus,
+                778 => Self::ModePlpgsqlAssign1,
+
+                779 => Self::ModePlpgsqlAssign2,
+
+                780 => Self::ModePlpgsqlAssign3,
+
+                781 => Self::Uminus,
 
                 _ => Self::OptionNone,
             }
@@ -25982,7 +26430,7 @@ mod parse_result {
     impl ParseResult {
         /// get `version`
         #[must_use]
-        pub fn get_version(&self) -> i32 {
+        pub const fn get_version(&self) -> i32 {
             self.0.get_version()
         }
     }
@@ -26204,7 +26652,7 @@ mod scan_result {
     impl ScanResult {
         /// get `version`
         #[must_use]
-        pub fn get_version(&self) -> i32 {
+        pub const fn get_version(&self) -> i32 {
             self.0.get_version()
         }
     }
@@ -26413,7 +26861,7 @@ mod integer {
     impl Integer {
         /// get `ival`
         #[must_use]
-        pub fn get_ival(&self) -> i32 {
+        pub const fn get_ival(&self) -> i32 {
             self.0.get_ival()
         }
     }
@@ -26793,7 +27241,7 @@ mod boolean {
     impl Boolean {
         /// get `boolval`
         #[must_use]
-        pub fn get_boolval(&self) -> bool {
+        pub const fn get_boolval(&self) -> bool {
             self.0.get_boolval()
         }
     }
@@ -28308,7 +28756,7 @@ mod range_var {
     impl RangeVar {
         /// get `inh`
         #[must_use]
-        pub fn get_inh(&self) -> bool {
+        pub const fn get_inh(&self) -> bool {
             self.0.get_inh()
         }
     }
@@ -28359,7 +28807,7 @@ mod range_var {
     impl RangeVar {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -29073,7 +29521,7 @@ mod table_func {
     impl TableFunc {
         /// get `ordinalitycol`
         #[must_use]
-        pub fn get_ordinalitycol(&self) -> i32 {
+        pub const fn get_ordinalitycol(&self) -> i32 {
             self.0.get_ordinalitycol()
         }
     }
@@ -29089,7 +29537,7 @@ mod table_func {
     impl TableFunc {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -29274,7 +29722,7 @@ mod into_clause {
             table_space_name: std::string::String,
 
             /// `view_query`
-            view_query: NodeOpt,
+            view_query: QueryOpt,
 
             /// `skip_data`
             skip_data: bool,
@@ -29294,7 +29742,7 @@ mod into_clause {
 
                 let table_space_name = value.table_space_name;
 
-                let view_query = NodeOpt::from(value.view_query);
+                let view_query = QueryOpt::from(value.view_query);
 
                 let skip_data = value.skip_data;
 
@@ -29369,8 +29817,8 @@ mod into_clause {
         impl IntoClause {
             /// get `view_query`
             #[must_use]
-            pub fn get_view_query(&self) -> NodeOpt {
-                NodeOpt::from(&self.view_query)
+            pub fn get_view_query(&self) -> QueryOpt {
+                QueryOpt::from(&self.view_query)
             }
         }
 
@@ -29494,7 +29942,7 @@ mod into_clause {
     impl IntoClause {
         /// get `view_query`
         #[must_use]
-        pub fn get_view_query(&self) -> NodeOpt {
+        pub fn get_view_query(&self) -> QueryOpt {
             self.0.get_view_query()
         }
     }
@@ -29502,10 +29950,10 @@ mod into_clause {
     impl IntoClauseOpt {
         /// get `view_query`
         #[must_use]
-        pub fn get_view_query(&self) -> NodeOpt {
+        pub fn get_view_query(&self) -> QueryOpt {
             match &self.0 {
                 Some(v) => v.get_view_query(),
-                _ => NodeOpt::none(),
+                _ => QueryOpt::none(),
             }
         }
     }
@@ -29513,7 +29961,7 @@ mod into_clause {
     impl IntoClause {
         /// get `skip_data`
         #[must_use]
-        pub fn get_skip_data(&self) -> bool {
+        pub const fn get_skip_data(&self) -> bool {
             self.0.get_skip_data()
         }
     }
@@ -29703,6 +30151,9 @@ mod var {
             /// `varlevelsup`
             varlevelsup: u32,
 
+            /// `varreturningtype`
+            varreturningtype: VarReturningTypeOpt,
+
             /// `location`
             location: i32,
         }
@@ -29725,6 +30176,8 @@ mod var {
 
                 let varlevelsup = value.varlevelsup;
 
+                let varreturningtype = VarReturningTypeOpt::from(value.varreturningtype);
+
                 let location = value.location;
 
                 Self {
@@ -29743,6 +30196,8 @@ mod var {
                     varnullingrels,
 
                     varlevelsup,
+
+                    varreturningtype,
 
                     location,
                 }
@@ -29814,6 +30269,14 @@ mod var {
         }
 
         impl Var {
+            /// get `varreturningtype`
+            #[must_use]
+            pub fn get_varreturningtype(&self) -> VarReturningTypeOpt {
+                VarReturningTypeOpt::from(&self.varreturningtype)
+            }
+        }
+
+        impl Var {
             /// get `location`
             #[must_use]
             pub const fn get_location(&self) -> i32 {
@@ -29844,7 +30307,7 @@ mod var {
     impl Var {
         /// get `varno`
         #[must_use]
-        pub fn get_varno(&self) -> i32 {
+        pub const fn get_varno(&self) -> i32 {
             self.0.get_varno()
         }
     }
@@ -29860,7 +30323,7 @@ mod var {
     impl Var {
         /// get `varattno`
         #[must_use]
-        pub fn get_varattno(&self) -> i32 {
+        pub const fn get_varattno(&self) -> i32 {
             self.0.get_varattno()
         }
     }
@@ -29876,7 +30339,7 @@ mod var {
     impl Var {
         /// get `vartype`
         #[must_use]
-        pub fn get_vartype(&self) -> u32 {
+        pub const fn get_vartype(&self) -> u32 {
             self.0.get_vartype()
         }
     }
@@ -29892,7 +30355,7 @@ mod var {
     impl Var {
         /// get `vartypmod`
         #[must_use]
-        pub fn get_vartypmod(&self) -> i32 {
+        pub const fn get_vartypmod(&self) -> i32 {
             self.0.get_vartypmod()
         }
     }
@@ -29908,7 +30371,7 @@ mod var {
     impl Var {
         /// get `varcollid`
         #[must_use]
-        pub fn get_varcollid(&self) -> u32 {
+        pub const fn get_varcollid(&self) -> u32 {
             self.0.get_varcollid()
         }
     }
@@ -29940,7 +30403,7 @@ mod var {
     impl Var {
         /// get `varlevelsup`
         #[must_use]
-        pub fn get_varlevelsup(&self) -> u32 {
+        pub const fn get_varlevelsup(&self) -> u32 {
             self.0.get_varlevelsup()
         }
     }
@@ -29954,9 +30417,28 @@ mod var {
     }
 
     impl Var {
+        /// get `varreturningtype`
+        #[must_use]
+        pub fn get_varreturningtype(&self) -> VarReturningTypeOpt {
+            self.0.get_varreturningtype()
+        }
+    }
+
+    impl VarOpt {
+        /// get `varreturningtype`
+        #[must_use]
+        pub fn get_varreturningtype(&self) -> VarReturningTypeOpt {
+            match &self.0 {
+                Some(v) => v.get_varreturningtype(),
+                _ => VarReturningTypeOpt::none(),
+            }
+        }
+    }
+
+    impl Var {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -30276,7 +30758,7 @@ mod param {
     impl Param {
         /// get `paramid`
         #[must_use]
-        pub fn get_paramid(&self) -> i32 {
+        pub const fn get_paramid(&self) -> i32 {
             self.0.get_paramid()
         }
     }
@@ -30292,7 +30774,7 @@ mod param {
     impl Param {
         /// get `paramtype`
         #[must_use]
-        pub fn get_paramtype(&self) -> u32 {
+        pub const fn get_paramtype(&self) -> u32 {
             self.0.get_paramtype()
         }
     }
@@ -30308,7 +30790,7 @@ mod param {
     impl Param {
         /// get `paramtypmod`
         #[must_use]
-        pub fn get_paramtypmod(&self) -> i32 {
+        pub const fn get_paramtypmod(&self) -> i32 {
             self.0.get_paramtypmod()
         }
     }
@@ -30324,7 +30806,7 @@ mod param {
     impl Param {
         /// get `paramcollid`
         #[must_use]
-        pub fn get_paramcollid(&self) -> u32 {
+        pub const fn get_paramcollid(&self) -> u32 {
             self.0.get_paramcollid()
         }
     }
@@ -30340,7 +30822,7 @@ mod param {
     impl Param {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -30821,7 +31303,7 @@ mod aggref {
     impl Aggref {
         /// get `aggfnoid`
         #[must_use]
-        pub fn get_aggfnoid(&self) -> u32 {
+        pub const fn get_aggfnoid(&self) -> u32 {
             self.0.get_aggfnoid()
         }
     }
@@ -30837,7 +31319,7 @@ mod aggref {
     impl Aggref {
         /// get `aggtype`
         #[must_use]
-        pub fn get_aggtype(&self) -> u32 {
+        pub const fn get_aggtype(&self) -> u32 {
             self.0.get_aggtype()
         }
     }
@@ -30853,7 +31335,7 @@ mod aggref {
     impl Aggref {
         /// get `aggcollid`
         #[must_use]
-        pub fn get_aggcollid(&self) -> u32 {
+        pub const fn get_aggcollid(&self) -> u32 {
             self.0.get_aggcollid()
         }
     }
@@ -30869,7 +31351,7 @@ mod aggref {
     impl Aggref {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -30999,7 +31481,7 @@ mod aggref {
     impl Aggref {
         /// get `aggstar`
         #[must_use]
-        pub fn get_aggstar(&self) -> bool {
+        pub const fn get_aggstar(&self) -> bool {
             self.0.get_aggstar()
         }
     }
@@ -31015,7 +31497,7 @@ mod aggref {
     impl Aggref {
         /// get `aggvariadic`
         #[must_use]
-        pub fn get_aggvariadic(&self) -> bool {
+        pub const fn get_aggvariadic(&self) -> bool {
             self.0.get_aggvariadic()
         }
     }
@@ -31047,7 +31529,7 @@ mod aggref {
     impl Aggref {
         /// get `agglevelsup`
         #[must_use]
-        pub fn get_agglevelsup(&self) -> u32 {
+        pub const fn get_agglevelsup(&self) -> u32 {
             self.0.get_agglevelsup()
         }
     }
@@ -31082,7 +31564,7 @@ mod aggref {
     impl Aggref {
         /// get `aggno`
         #[must_use]
-        pub fn get_aggno(&self) -> i32 {
+        pub const fn get_aggno(&self) -> i32 {
             self.0.get_aggno()
         }
     }
@@ -31098,7 +31580,7 @@ mod aggref {
     impl Aggref {
         /// get `aggtransno`
         #[must_use]
-        pub fn get_aggtransno(&self) -> i32 {
+        pub const fn get_aggtransno(&self) -> i32 {
             self.0.get_aggtransno()
         }
     }
@@ -31114,7 +31596,7 @@ mod aggref {
     impl Aggref {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -31423,7 +31905,7 @@ mod grouping_func {
     impl GroupingFunc {
         /// get `agglevelsup`
         #[must_use]
-        pub fn get_agglevelsup(&self) -> u32 {
+        pub const fn get_agglevelsup(&self) -> u32 {
             self.0.get_agglevelsup()
         }
     }
@@ -31439,7 +31921,7 @@ mod grouping_func {
     impl GroupingFunc {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -31817,7 +32299,7 @@ mod window_func {
     impl WindowFunc {
         /// get `winfnoid`
         #[must_use]
-        pub fn get_winfnoid(&self) -> u32 {
+        pub const fn get_winfnoid(&self) -> u32 {
             self.0.get_winfnoid()
         }
     }
@@ -31833,7 +32315,7 @@ mod window_func {
     impl WindowFunc {
         /// get `wintype`
         #[must_use]
-        pub fn get_wintype(&self) -> u32 {
+        pub const fn get_wintype(&self) -> u32 {
             self.0.get_wintype()
         }
     }
@@ -31849,7 +32331,7 @@ mod window_func {
     impl WindowFunc {
         /// get `wincollid`
         #[must_use]
-        pub fn get_wincollid(&self) -> u32 {
+        pub const fn get_wincollid(&self) -> u32 {
             self.0.get_wincollid()
         }
     }
@@ -31865,7 +32347,7 @@ mod window_func {
     impl WindowFunc {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -31938,7 +32420,7 @@ mod window_func {
     impl WindowFunc {
         /// get `winref`
         #[must_use]
-        pub fn get_winref(&self) -> u32 {
+        pub const fn get_winref(&self) -> u32 {
             self.0.get_winref()
         }
     }
@@ -31954,7 +32436,7 @@ mod window_func {
     impl WindowFunc {
         /// get `winstar`
         #[must_use]
-        pub fn get_winstar(&self) -> bool {
+        pub const fn get_winstar(&self) -> bool {
             self.0.get_winstar()
         }
     }
@@ -31970,7 +32452,7 @@ mod window_func {
     impl WindowFunc {
         /// get `winagg`
         #[must_use]
-        pub fn get_winagg(&self) -> bool {
+        pub const fn get_winagg(&self) -> bool {
             self.0.get_winagg()
         }
     }
@@ -31986,7 +32468,7 @@ mod window_func {
     impl WindowFunc {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -32262,7 +32744,7 @@ mod window_func_run_condition {
     impl WindowFuncRunCondition {
         /// get `opno`
         #[must_use]
-        pub fn get_opno(&self) -> u32 {
+        pub const fn get_opno(&self) -> u32 {
             self.0.get_opno()
         }
     }
@@ -32278,7 +32760,7 @@ mod window_func_run_condition {
     impl WindowFuncRunCondition {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -32294,7 +32776,7 @@ mod window_func_run_condition {
     impl WindowFuncRunCondition {
         /// get `wfunc_left`
         #[must_use]
-        pub fn get_wfunc_left(&self) -> bool {
+        pub const fn get_wfunc_left(&self) -> bool {
             self.0.get_wfunc_left()
         }
     }
@@ -32572,7 +33054,7 @@ mod merge_support_func {
     impl MergeSupportFunc {
         /// get `msftype`
         #[must_use]
-        pub fn get_msftype(&self) -> u32 {
+        pub const fn get_msftype(&self) -> u32 {
             self.0.get_msftype()
         }
     }
@@ -32588,7 +33070,7 @@ mod merge_support_func {
     impl MergeSupportFunc {
         /// get `msfcollid`
         #[must_use]
-        pub fn get_msfcollid(&self) -> u32 {
+        pub const fn get_msfcollid(&self) -> u32 {
             self.0.get_msfcollid()
         }
     }
@@ -32604,7 +33086,7 @@ mod merge_support_func {
     impl MergeSupportFunc {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -32952,7 +33434,7 @@ mod subscripting_ref {
     impl SubscriptingRef {
         /// get `refcontainertype`
         #[must_use]
-        pub fn get_refcontainertype(&self) -> u32 {
+        pub const fn get_refcontainertype(&self) -> u32 {
             self.0.get_refcontainertype()
         }
     }
@@ -32968,7 +33450,7 @@ mod subscripting_ref {
     impl SubscriptingRef {
         /// get `refelemtype`
         #[must_use]
-        pub fn get_refelemtype(&self) -> u32 {
+        pub const fn get_refelemtype(&self) -> u32 {
             self.0.get_refelemtype()
         }
     }
@@ -32984,7 +33466,7 @@ mod subscripting_ref {
     impl SubscriptingRef {
         /// get `refrestype`
         #[must_use]
-        pub fn get_refrestype(&self) -> u32 {
+        pub const fn get_refrestype(&self) -> u32 {
             self.0.get_refrestype()
         }
     }
@@ -33000,7 +33482,7 @@ mod subscripting_ref {
     impl SubscriptingRef {
         /// get `reftypmod`
         #[must_use]
-        pub fn get_reftypmod(&self) -> i32 {
+        pub const fn get_reftypmod(&self) -> i32 {
             self.0.get_reftypmod()
         }
     }
@@ -33016,7 +33498,7 @@ mod subscripting_ref {
     impl SubscriptingRef {
         /// get `refcollid`
         #[must_use]
-        pub fn get_refcollid(&self) -> u32 {
+        pub const fn get_refcollid(&self) -> u32 {
             self.0.get_refcollid()
         }
     }
@@ -33440,7 +33922,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `funcid`
         #[must_use]
-        pub fn get_funcid(&self) -> u32 {
+        pub const fn get_funcid(&self) -> u32 {
             self.0.get_funcid()
         }
     }
@@ -33456,7 +33938,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `funcresulttype`
         #[must_use]
-        pub fn get_funcresulttype(&self) -> u32 {
+        pub const fn get_funcresulttype(&self) -> u32 {
             self.0.get_funcresulttype()
         }
     }
@@ -33472,7 +33954,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `funcretset`
         #[must_use]
-        pub fn get_funcretset(&self) -> bool {
+        pub const fn get_funcretset(&self) -> bool {
             self.0.get_funcretset()
         }
     }
@@ -33488,7 +33970,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `funcvariadic`
         #[must_use]
-        pub fn get_funcvariadic(&self) -> bool {
+        pub const fn get_funcvariadic(&self) -> bool {
             self.0.get_funcvariadic()
         }
     }
@@ -33523,7 +34005,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `funccollid`
         #[must_use]
-        pub fn get_funccollid(&self) -> u32 {
+        pub const fn get_funccollid(&self) -> u32 {
             self.0.get_funccollid()
         }
     }
@@ -33539,7 +34021,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -33574,7 +34056,7 @@ mod func_expr {
     impl FuncExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -33880,7 +34362,7 @@ mod named_arg_expr {
     impl NamedArgExpr {
         /// get `argnumber`
         #[must_use]
-        pub fn get_argnumber(&self) -> i32 {
+        pub const fn get_argnumber(&self) -> i32 {
             self.0.get_argnumber()
         }
     }
@@ -33896,7 +34378,7 @@ mod named_arg_expr {
     impl NamedArgExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -34214,7 +34696,7 @@ mod op_expr {
     impl OpExpr {
         /// get `opno`
         #[must_use]
-        pub fn get_opno(&self) -> u32 {
+        pub const fn get_opno(&self) -> u32 {
             self.0.get_opno()
         }
     }
@@ -34230,7 +34712,7 @@ mod op_expr {
     impl OpExpr {
         /// get `opresulttype`
         #[must_use]
-        pub fn get_opresulttype(&self) -> u32 {
+        pub const fn get_opresulttype(&self) -> u32 {
             self.0.get_opresulttype()
         }
     }
@@ -34246,7 +34728,7 @@ mod op_expr {
     impl OpExpr {
         /// get `opretset`
         #[must_use]
-        pub fn get_opretset(&self) -> bool {
+        pub const fn get_opretset(&self) -> bool {
             self.0.get_opretset()
         }
     }
@@ -34262,7 +34744,7 @@ mod op_expr {
     impl OpExpr {
         /// get `opcollid`
         #[must_use]
-        pub fn get_opcollid(&self) -> u32 {
+        pub const fn get_opcollid(&self) -> u32 {
             self.0.get_opcollid()
         }
     }
@@ -34278,7 +34760,7 @@ mod op_expr {
     impl OpExpr {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -34313,7 +34795,7 @@ mod op_expr {
     impl OpExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -34629,7 +35111,7 @@ mod distinct_expr {
     impl DistinctExpr {
         /// get `opno`
         #[must_use]
-        pub fn get_opno(&self) -> u32 {
+        pub const fn get_opno(&self) -> u32 {
             self.0.get_opno()
         }
     }
@@ -34645,7 +35127,7 @@ mod distinct_expr {
     impl DistinctExpr {
         /// get `opresulttype`
         #[must_use]
-        pub fn get_opresulttype(&self) -> u32 {
+        pub const fn get_opresulttype(&self) -> u32 {
             self.0.get_opresulttype()
         }
     }
@@ -34661,7 +35143,7 @@ mod distinct_expr {
     impl DistinctExpr {
         /// get `opretset`
         #[must_use]
-        pub fn get_opretset(&self) -> bool {
+        pub const fn get_opretset(&self) -> bool {
             self.0.get_opretset()
         }
     }
@@ -34677,7 +35159,7 @@ mod distinct_expr {
     impl DistinctExpr {
         /// get `opcollid`
         #[must_use]
-        pub fn get_opcollid(&self) -> u32 {
+        pub const fn get_opcollid(&self) -> u32 {
             self.0.get_opcollid()
         }
     }
@@ -34693,7 +35175,7 @@ mod distinct_expr {
     impl DistinctExpr {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -34728,7 +35210,7 @@ mod distinct_expr {
     impl DistinctExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -35046,7 +35528,7 @@ mod null_if_expr {
     impl NullIfExpr {
         /// get `opno`
         #[must_use]
-        pub fn get_opno(&self) -> u32 {
+        pub const fn get_opno(&self) -> u32 {
             self.0.get_opno()
         }
     }
@@ -35062,7 +35544,7 @@ mod null_if_expr {
     impl NullIfExpr {
         /// get `opresulttype`
         #[must_use]
-        pub fn get_opresulttype(&self) -> u32 {
+        pub const fn get_opresulttype(&self) -> u32 {
             self.0.get_opresulttype()
         }
     }
@@ -35078,7 +35560,7 @@ mod null_if_expr {
     impl NullIfExpr {
         /// get `opretset`
         #[must_use]
-        pub fn get_opretset(&self) -> bool {
+        pub const fn get_opretset(&self) -> bool {
             self.0.get_opretset()
         }
     }
@@ -35094,7 +35576,7 @@ mod null_if_expr {
     impl NullIfExpr {
         /// get `opcollid`
         #[must_use]
-        pub fn get_opcollid(&self) -> u32 {
+        pub const fn get_opcollid(&self) -> u32 {
             self.0.get_opcollid()
         }
     }
@@ -35110,7 +35592,7 @@ mod null_if_expr {
     impl NullIfExpr {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -35145,7 +35627,7 @@ mod null_if_expr {
     impl NullIfExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -35431,7 +35913,7 @@ mod scalar_array_op_expr {
     impl ScalarArrayOpExpr {
         /// get `opno`
         #[must_use]
-        pub fn get_opno(&self) -> u32 {
+        pub const fn get_opno(&self) -> u32 {
             self.0.get_opno()
         }
     }
@@ -35447,7 +35929,7 @@ mod scalar_array_op_expr {
     impl ScalarArrayOpExpr {
         /// get `use_or`
         #[must_use]
-        pub fn get_use_or(&self) -> bool {
+        pub const fn get_use_or(&self) -> bool {
             self.0.get_use_or()
         }
     }
@@ -35463,7 +35945,7 @@ mod scalar_array_op_expr {
     impl ScalarArrayOpExpr {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -35498,7 +35980,7 @@ mod scalar_array_op_expr {
     impl ScalarArrayOpExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -35794,7 +36276,7 @@ mod bool_expr {
     impl BoolExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -36114,7 +36596,7 @@ mod sub_link {
     impl SubLink {
         /// get `sub_link_id`
         #[must_use]
-        pub fn get_sub_link_id(&self) -> i32 {
+        pub const fn get_sub_link_id(&self) -> i32 {
             self.0.get_sub_link_id()
         }
     }
@@ -36187,7 +36669,7 @@ mod sub_link {
     impl SubLink {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -36695,7 +37177,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `plan_id`
         #[must_use]
-        pub fn get_plan_id(&self) -> i32 {
+        pub const fn get_plan_id(&self) -> i32 {
             self.0.get_plan_id()
         }
     }
@@ -36727,7 +37209,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `first_col_type`
         #[must_use]
-        pub fn get_first_col_type(&self) -> u32 {
+        pub const fn get_first_col_type(&self) -> u32 {
             self.0.get_first_col_type()
         }
     }
@@ -36743,7 +37225,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `first_col_typmod`
         #[must_use]
-        pub fn get_first_col_typmod(&self) -> i32 {
+        pub const fn get_first_col_typmod(&self) -> i32 {
             self.0.get_first_col_typmod()
         }
     }
@@ -36759,7 +37241,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `first_col_collation`
         #[must_use]
-        pub fn get_first_col_collation(&self) -> u32 {
+        pub const fn get_first_col_collation(&self) -> u32 {
             self.0.get_first_col_collation()
         }
     }
@@ -36775,7 +37257,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `use_hash_table`
         #[must_use]
-        pub fn get_use_hash_table(&self) -> bool {
+        pub const fn get_use_hash_table(&self) -> bool {
             self.0.get_use_hash_table()
         }
     }
@@ -36791,7 +37273,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `unknown_eq_false`
         #[must_use]
-        pub fn get_unknown_eq_false(&self) -> bool {
+        pub const fn get_unknown_eq_false(&self) -> bool {
             self.0.get_unknown_eq_false()
         }
     }
@@ -36807,7 +37289,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `parallel_safe`
         #[must_use]
-        pub fn get_parallel_safe(&self) -> bool {
+        pub const fn get_parallel_safe(&self) -> bool {
             self.0.get_parallel_safe()
         }
     }
@@ -36880,7 +37362,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `startup_cost`
         #[must_use]
-        pub fn get_startup_cost(&self) -> f64 {
+        pub const fn get_startup_cost(&self) -> f64 {
             self.0.get_startup_cost()
         }
     }
@@ -36896,7 +37378,7 @@ mod sub_plan {
     impl SubPlan {
         /// get `per_call_cost`
         #[must_use]
-        pub fn get_per_call_cost(&self) -> f64 {
+        pub const fn get_per_call_cost(&self) -> f64 {
             self.0.get_per_call_cost()
         }
     }
@@ -37428,7 +37910,7 @@ mod field_select {
     impl FieldSelect {
         /// get `fieldnum`
         #[must_use]
-        pub fn get_fieldnum(&self) -> i32 {
+        pub const fn get_fieldnum(&self) -> i32 {
             self.0.get_fieldnum()
         }
     }
@@ -37444,7 +37926,7 @@ mod field_select {
     impl FieldSelect {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -37460,7 +37942,7 @@ mod field_select {
     impl FieldSelect {
         /// get `resulttypmod`
         #[must_use]
-        pub fn get_resulttypmod(&self) -> i32 {
+        pub const fn get_resulttypmod(&self) -> i32 {
             self.0.get_resulttypmod()
         }
     }
@@ -37476,7 +37958,7 @@ mod field_select {
     impl FieldSelect {
         /// get `resultcollid`
         #[must_use]
-        pub fn get_resultcollid(&self) -> u32 {
+        pub const fn get_resultcollid(&self) -> u32 {
             self.0.get_resultcollid()
         }
     }
@@ -37804,7 +38286,7 @@ mod field_store {
     impl FieldStore {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -38124,7 +38606,7 @@ mod relabel_type {
     impl RelabelType {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -38140,7 +38622,7 @@ mod relabel_type {
     impl RelabelType {
         /// get `resulttypmod`
         #[must_use]
-        pub fn get_resulttypmod(&self) -> i32 {
+        pub const fn get_resulttypmod(&self) -> i32 {
             self.0.get_resulttypmod()
         }
     }
@@ -38156,7 +38638,7 @@ mod relabel_type {
     impl RelabelType {
         /// get `resultcollid`
         #[must_use]
-        pub fn get_resultcollid(&self) -> u32 {
+        pub const fn get_resultcollid(&self) -> u32 {
             self.0.get_resultcollid()
         }
     }
@@ -38191,7 +38673,7 @@ mod relabel_type {
     impl RelabelType {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -38496,7 +38978,7 @@ mod coerce_via_io {
     impl CoerceViaIo {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -38512,7 +38994,7 @@ mod coerce_via_io {
     impl CoerceViaIo {
         /// get `resultcollid`
         #[must_use]
-        pub fn get_resultcollid(&self) -> u32 {
+        pub const fn get_resultcollid(&self) -> u32 {
             self.0.get_resultcollid()
         }
     }
@@ -38547,7 +39029,7 @@ mod coerce_via_io {
     impl CoerceViaIo {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -38901,7 +39383,7 @@ mod array_coerce_expr {
     impl ArrayCoerceExpr {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -38917,7 +39399,7 @@ mod array_coerce_expr {
     impl ArrayCoerceExpr {
         /// get `resulttypmod`
         #[must_use]
-        pub fn get_resulttypmod(&self) -> i32 {
+        pub const fn get_resulttypmod(&self) -> i32 {
             self.0.get_resulttypmod()
         }
     }
@@ -38933,7 +39415,7 @@ mod array_coerce_expr {
     impl ArrayCoerceExpr {
         /// get `resultcollid`
         #[must_use]
-        pub fn get_resultcollid(&self) -> u32 {
+        pub const fn get_resultcollid(&self) -> u32 {
             self.0.get_resultcollid()
         }
     }
@@ -38968,7 +39450,7 @@ mod array_coerce_expr {
     impl ArrayCoerceExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -39260,7 +39742,7 @@ mod convert_rowtype_expr {
     impl ConvertRowtypeExpr {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -39295,7 +39777,7 @@ mod convert_rowtype_expr {
     impl ConvertRowtypeExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -39572,7 +40054,7 @@ mod collate_expr {
     impl CollateExpr {
         /// get `coll_oid`
         #[must_use]
-        pub fn get_coll_oid(&self) -> u32 {
+        pub const fn get_coll_oid(&self) -> u32 {
             self.0.get_coll_oid()
         }
     }
@@ -39588,7 +40070,7 @@ mod collate_expr {
     impl CollateExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -39889,7 +40371,7 @@ mod case_expr {
     impl CaseExpr {
         /// get `casetype`
         #[must_use]
-        pub fn get_casetype(&self) -> u32 {
+        pub const fn get_casetype(&self) -> u32 {
             self.0.get_casetype()
         }
     }
@@ -39905,7 +40387,7 @@ mod case_expr {
     impl CaseExpr {
         /// get `casecollid`
         #[must_use]
-        pub fn get_casecollid(&self) -> u32 {
+        pub const fn get_casecollid(&self) -> u32 {
             self.0.get_casecollid()
         }
     }
@@ -39978,7 +40460,7 @@ mod case_expr {
     impl CaseExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -40272,7 +40754,7 @@ mod case_when {
     impl CaseWhen {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -40528,7 +41010,7 @@ mod case_test_expr {
     impl CaseTestExpr {
         /// get `type_id`
         #[must_use]
-        pub fn get_type_id(&self) -> u32 {
+        pub const fn get_type_id(&self) -> u32 {
             self.0.get_type_id()
         }
     }
@@ -40544,7 +41026,7 @@ mod case_test_expr {
     impl CaseTestExpr {
         /// get `type_mod`
         #[must_use]
-        pub fn get_type_mod(&self) -> i32 {
+        pub const fn get_type_mod(&self) -> i32 {
             self.0.get_type_mod()
         }
     }
@@ -40560,7 +41042,7 @@ mod case_test_expr {
     impl CaseTestExpr {
         /// get `collation`
         #[must_use]
-        pub fn get_collation(&self) -> u32 {
+        pub const fn get_collation(&self) -> u32 {
             self.0.get_collation()
         }
     }
@@ -40746,6 +41228,12 @@ mod array_expr {
             /// `multidims`
             multidims: bool,
 
+            /// `list_start`
+            list_start: i32,
+
+            /// `list_end`
+            list_end: i32,
+
             /// `location`
             location: i32,
         }
@@ -40764,6 +41252,10 @@ mod array_expr {
 
                 let multidims = value.multidims;
 
+                let list_start = value.list_start;
+
+                let list_end = value.list_end;
+
                 let location = value.location;
 
                 Self {
@@ -40778,6 +41270,10 @@ mod array_expr {
                     elements,
 
                     multidims,
+
+                    list_start,
+
+                    list_end,
 
                     location,
                 }
@@ -40833,6 +41329,22 @@ mod array_expr {
         }
 
         impl ArrayExpr {
+            /// get `list_start`
+            #[must_use]
+            pub const fn get_list_start(&self) -> i32 {
+                self.list_start
+            }
+        }
+
+        impl ArrayExpr {
+            /// get `list_end`
+            #[must_use]
+            pub const fn get_list_end(&self) -> i32 {
+                self.list_end
+            }
+        }
+
+        impl ArrayExpr {
             /// get `location`
             #[must_use]
             pub const fn get_location(&self) -> i32 {
@@ -40863,7 +41375,7 @@ mod array_expr {
     impl ArrayExpr {
         /// get `array_typeid`
         #[must_use]
-        pub fn get_array_typeid(&self) -> u32 {
+        pub const fn get_array_typeid(&self) -> u32 {
             self.0.get_array_typeid()
         }
     }
@@ -40879,7 +41391,7 @@ mod array_expr {
     impl ArrayExpr {
         /// get `array_collid`
         #[must_use]
-        pub fn get_array_collid(&self) -> u32 {
+        pub const fn get_array_collid(&self) -> u32 {
             self.0.get_array_collid()
         }
     }
@@ -40895,7 +41407,7 @@ mod array_expr {
     impl ArrayExpr {
         /// get `element_typeid`
         #[must_use]
-        pub fn get_element_typeid(&self) -> u32 {
+        pub const fn get_element_typeid(&self) -> u32 {
             self.0.get_element_typeid()
         }
     }
@@ -40930,7 +41442,7 @@ mod array_expr {
     impl ArrayExpr {
         /// get `multidims`
         #[must_use]
-        pub fn get_multidims(&self) -> bool {
+        pub const fn get_multidims(&self) -> bool {
             self.0.get_multidims()
         }
     }
@@ -40944,9 +41456,41 @@ mod array_expr {
     }
 
     impl ArrayExpr {
+        /// get `list_start`
+        #[must_use]
+        pub const fn get_list_start(&self) -> i32 {
+            self.0.get_list_start()
+        }
+    }
+
+    impl ArrayExprOpt {
+        /// get `list_start`
+        #[must_use]
+        pub fn get_list_start(&self) -> Option<i32> {
+            self.0.as_ref().map(ArrayExpr::get_list_start)
+        }
+    }
+
+    impl ArrayExpr {
+        /// get `list_end`
+        #[must_use]
+        pub const fn get_list_end(&self) -> i32 {
+            self.0.get_list_end()
+        }
+    }
+
+    impl ArrayExprOpt {
+        /// get `list_end`
+        #[must_use]
+        pub fn get_list_end(&self) -> Option<i32> {
+            self.0.as_ref().map(ArrayExpr::get_list_end)
+        }
+    }
+
+    impl ArrayExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -41251,7 +41795,7 @@ mod row_expr {
     impl RowExpr {
         /// get `row_typeid`
         #[must_use]
-        pub fn get_row_typeid(&self) -> u32 {
+        pub const fn get_row_typeid(&self) -> u32 {
             self.0.get_row_typeid()
         }
     }
@@ -41305,7 +41849,7 @@ mod row_expr {
     impl RowExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -41474,8 +42018,8 @@ mod row_compare_expr {
             /// `xpr`
             xpr: NodeOpt,
 
-            /// `rctype`
-            rctype: RowCompareTypeOpt,
+            /// `cmptype`
+            cmptype: CompareTypeOpt,
 
             /// `opnos`
             opnos: NodeList,
@@ -41497,7 +42041,7 @@ mod row_compare_expr {
             fn from(value: ::pg_query::protobuf::RowCompareExpr) -> Self {
                 let xpr = NodeOpt::from(value.xpr);
 
-                let rctype = RowCompareTypeOpt::from(value.rctype);
+                let cmptype = CompareTypeOpt::from(value.cmptype);
 
                 let opnos = NodeList::from(value.opnos);
 
@@ -41512,7 +42056,7 @@ mod row_compare_expr {
                 Self {
                     xpr,
 
-                    rctype,
+                    cmptype,
 
                     opnos,
 
@@ -41536,10 +42080,10 @@ mod row_compare_expr {
         }
 
         impl RowCompareExpr {
-            /// get `rctype`
+            /// get `cmptype`
             #[must_use]
-            pub fn get_rctype(&self) -> RowCompareTypeOpt {
-                RowCompareTypeOpt::from(&self.rctype)
+            pub fn get_cmptype(&self) -> CompareTypeOpt {
+                CompareTypeOpt::from(&self.cmptype)
             }
         }
 
@@ -41604,20 +42148,20 @@ mod row_compare_expr {
     }
 
     impl RowCompareExpr {
-        /// get `rctype`
+        /// get `cmptype`
         #[must_use]
-        pub fn get_rctype(&self) -> RowCompareTypeOpt {
-            self.0.get_rctype()
+        pub fn get_cmptype(&self) -> CompareTypeOpt {
+            self.0.get_cmptype()
         }
     }
 
     impl RowCompareExprOpt {
-        /// get `rctype`
+        /// get `cmptype`
         #[must_use]
-        pub fn get_rctype(&self) -> RowCompareTypeOpt {
+        pub fn get_cmptype(&self) -> CompareTypeOpt {
             match &self.0 {
-                Some(v) => v.get_rctype(),
-                _ => RowCompareTypeOpt::none(),
+                Some(v) => v.get_cmptype(),
+                _ => CompareTypeOpt::none(),
             }
         }
     }
@@ -41977,7 +42521,7 @@ mod coalesce_expr {
     impl CoalesceExpr {
         /// get `coalescetype`
         #[must_use]
-        pub fn get_coalescetype(&self) -> u32 {
+        pub const fn get_coalescetype(&self) -> u32 {
             self.0.get_coalescetype()
         }
     }
@@ -41993,7 +42537,7 @@ mod coalesce_expr {
     impl CoalesceExpr {
         /// get `coalescecollid`
         #[must_use]
-        pub fn get_coalescecollid(&self) -> u32 {
+        pub const fn get_coalescecollid(&self) -> u32 {
             self.0.get_coalescecollid()
         }
     }
@@ -42028,7 +42572,7 @@ mod coalesce_expr {
     impl CoalesceExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -42331,7 +42875,7 @@ mod min_max_expr {
     impl MinMaxExpr {
         /// get `minmaxtype`
         #[must_use]
-        pub fn get_minmaxtype(&self) -> u32 {
+        pub const fn get_minmaxtype(&self) -> u32 {
             self.0.get_minmaxtype()
         }
     }
@@ -42347,7 +42891,7 @@ mod min_max_expr {
     impl MinMaxExpr {
         /// get `minmaxcollid`
         #[must_use]
-        pub fn get_minmaxcollid(&self) -> u32 {
+        pub const fn get_minmaxcollid(&self) -> u32 {
             self.0.get_minmaxcollid()
         }
     }
@@ -42363,7 +42907,7 @@ mod min_max_expr {
     impl MinMaxExpr {
         /// get `inputcollid`
         #[must_use]
-        pub fn get_inputcollid(&self) -> u32 {
+        pub const fn get_inputcollid(&self) -> u32 {
             self.0.get_inputcollid()
         }
     }
@@ -42417,7 +42961,7 @@ mod min_max_expr {
     impl MinMaxExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -42707,7 +43251,7 @@ mod sql_value_function {
     impl SqlValueFunction {
         /// get `type`
         #[must_use]
-        pub fn get_type(&self) -> u32 {
+        pub const fn get_type(&self) -> u32 {
             self.0.get_type()
         }
     }
@@ -42723,7 +43267,7 @@ mod sql_value_function {
     impl SqlValueFunction {
         /// get `typmod`
         #[must_use]
-        pub fn get_typmod(&self) -> i32 {
+        pub const fn get_typmod(&self) -> i32 {
             self.0.get_typmod()
         }
     }
@@ -42739,7 +43283,7 @@ mod sql_value_function {
     impl SqlValueFunction {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -43213,7 +43757,7 @@ mod xml_expr {
     impl XmlExpr {
         /// get `indent`
         #[must_use]
-        pub fn get_indent(&self) -> bool {
+        pub const fn get_indent(&self) -> bool {
             self.0.get_indent()
         }
     }
@@ -43229,7 +43773,7 @@ mod xml_expr {
     impl XmlExpr {
         /// get `type`
         #[must_use]
-        pub fn get_type(&self) -> u32 {
+        pub const fn get_type(&self) -> u32 {
             self.0.get_type()
         }
     }
@@ -43245,7 +43789,7 @@ mod xml_expr {
     impl XmlExpr {
         /// get `typmod`
         #[must_use]
-        pub fn get_typmod(&self) -> i32 {
+        pub const fn get_typmod(&self) -> i32 {
             self.0.get_typmod()
         }
     }
@@ -43261,7 +43805,7 @@ mod xml_expr {
     impl XmlExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -43521,7 +44065,7 @@ mod json_format {
     impl JsonFormat {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -43762,7 +44306,7 @@ mod json_returning {
     impl JsonReturning {
         /// get `typid`
         #[must_use]
-        pub fn get_typid(&self) -> u32 {
+        pub const fn get_typid(&self) -> u32 {
             self.0.get_typid()
         }
     }
@@ -43778,7 +44322,7 @@ mod json_returning {
     impl JsonReturning {
         /// get `typmod`
         #[must_use]
-        pub fn get_typmod(&self) -> i32 {
+        pub const fn get_typmod(&self) -> i32 {
             self.0.get_typmod()
         }
     }
@@ -44471,7 +45015,7 @@ mod json_constructor_expr {
     impl JsonConstructorExpr {
         /// get `absent_on_null`
         #[must_use]
-        pub fn get_absent_on_null(&self) -> bool {
+        pub const fn get_absent_on_null(&self) -> bool {
             self.0.get_absent_on_null()
         }
     }
@@ -44487,7 +45031,7 @@ mod json_constructor_expr {
     impl JsonConstructorExpr {
         /// get `unique`
         #[must_use]
-        pub fn get_unique(&self) -> bool {
+        pub const fn get_unique(&self) -> bool {
             self.0.get_unique()
         }
     }
@@ -44503,7 +45047,7 @@ mod json_constructor_expr {
     impl JsonConstructorExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -44815,7 +45359,7 @@ mod json_is_predicate {
     impl JsonIsPredicate {
         /// get `unique_keys`
         #[must_use]
-        pub fn get_unique_keys(&self) -> bool {
+        pub const fn get_unique_keys(&self) -> bool {
             self.0.get_unique_keys()
         }
     }
@@ -44831,7 +45375,7 @@ mod json_is_predicate {
     impl JsonIsPredicate {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -45108,7 +45652,7 @@ mod json_behavior {
     impl JsonBehavior {
         /// get `coerce`
         #[must_use]
-        pub fn get_coerce(&self) -> bool {
+        pub const fn get_coerce(&self) -> bool {
             self.0.get_coerce()
         }
     }
@@ -45124,7 +45668,7 @@ mod json_behavior {
     impl JsonBehavior {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -45764,7 +46308,7 @@ mod json_expr {
     impl JsonExpr {
         /// get `use_io_coercion`
         #[must_use]
-        pub fn get_use_io_coercion(&self) -> bool {
+        pub const fn get_use_io_coercion(&self) -> bool {
             self.0.get_use_io_coercion()
         }
     }
@@ -45780,7 +46324,7 @@ mod json_expr {
     impl JsonExpr {
         /// get `use_json_coercion`
         #[must_use]
-        pub fn get_use_json_coercion(&self) -> bool {
+        pub const fn get_use_json_coercion(&self) -> bool {
             self.0.get_use_json_coercion()
         }
     }
@@ -45815,7 +46359,7 @@ mod json_expr {
     impl JsonExpr {
         /// get `omit_quotes`
         #[must_use]
-        pub fn get_omit_quotes(&self) -> bool {
+        pub const fn get_omit_quotes(&self) -> bool {
             self.0.get_omit_quotes()
         }
     }
@@ -45831,7 +46375,7 @@ mod json_expr {
     impl JsonExpr {
         /// get `collation`
         #[must_use]
-        pub fn get_collation(&self) -> u32 {
+        pub const fn get_collation(&self) -> u32 {
             self.0.get_collation()
         }
     }
@@ -45847,7 +46391,7 @@ mod json_expr {
     impl JsonExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -46344,7 +46888,7 @@ mod json_table_path_scan {
     impl JsonTablePathScan {
         /// get `error_on_error`
         #[must_use]
-        pub fn get_error_on_error(&self) -> bool {
+        pub const fn get_error_on_error(&self) -> bool {
             self.0.get_error_on_error()
         }
     }
@@ -46379,7 +46923,7 @@ mod json_table_path_scan {
     impl JsonTablePathScan {
         /// get `col_min`
         #[must_use]
-        pub fn get_col_min(&self) -> i32 {
+        pub const fn get_col_min(&self) -> i32 {
             self.0.get_col_min()
         }
     }
@@ -46395,7 +46939,7 @@ mod json_table_path_scan {
     impl JsonTablePathScan {
         /// get `col_max`
         #[must_use]
-        pub fn get_col_max(&self) -> i32 {
+        pub const fn get_col_max(&self) -> i32 {
             self.0.get_col_max()
         }
     }
@@ -46966,7 +47510,7 @@ mod null_test {
     impl NullTest {
         /// get `argisrow`
         #[must_use]
-        pub fn get_argisrow(&self) -> bool {
+        pub const fn get_argisrow(&self) -> bool {
             self.0.get_argisrow()
         }
     }
@@ -46982,7 +47526,7 @@ mod null_test {
     impl NullTest {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -47276,7 +47820,7 @@ mod boolean_test {
     impl BooleanTest {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -47961,7 +48505,7 @@ mod coerce_to_domain {
     impl CoerceToDomain {
         /// get `resulttype`
         #[must_use]
-        pub fn get_resulttype(&self) -> u32 {
+        pub const fn get_resulttype(&self) -> u32 {
             self.0.get_resulttype()
         }
     }
@@ -47977,7 +48521,7 @@ mod coerce_to_domain {
     impl CoerceToDomain {
         /// get `resulttypmod`
         #[must_use]
-        pub fn get_resulttypmod(&self) -> i32 {
+        pub const fn get_resulttypmod(&self) -> i32 {
             self.0.get_resulttypmod()
         }
     }
@@ -47993,7 +48537,7 @@ mod coerce_to_domain {
     impl CoerceToDomain {
         /// get `resultcollid`
         #[must_use]
-        pub fn get_resultcollid(&self) -> u32 {
+        pub const fn get_resultcollid(&self) -> u32 {
             self.0.get_resultcollid()
         }
     }
@@ -48028,7 +48572,7 @@ mod coerce_to_domain {
     impl CoerceToDomain {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -48301,7 +48845,7 @@ mod coerce_to_domain_value {
     impl CoerceToDomainValue {
         /// get `type_id`
         #[must_use]
-        pub fn get_type_id(&self) -> u32 {
+        pub const fn get_type_id(&self) -> u32 {
             self.0.get_type_id()
         }
     }
@@ -48317,7 +48861,7 @@ mod coerce_to_domain_value {
     impl CoerceToDomainValue {
         /// get `type_mod`
         #[must_use]
-        pub fn get_type_mod(&self) -> i32 {
+        pub const fn get_type_mod(&self) -> i32 {
             self.0.get_type_mod()
         }
     }
@@ -48333,7 +48877,7 @@ mod coerce_to_domain_value {
     impl CoerceToDomainValue {
         /// get `collation`
         #[must_use]
-        pub fn get_collation(&self) -> u32 {
+        pub const fn get_collation(&self) -> u32 {
             self.0.get_collation()
         }
     }
@@ -48349,7 +48893,7 @@ mod coerce_to_domain_value {
     impl CoerceToDomainValue {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -48623,7 +49167,7 @@ mod set_to_default {
     impl SetToDefault {
         /// get `type_id`
         #[must_use]
-        pub fn get_type_id(&self) -> u32 {
+        pub const fn get_type_id(&self) -> u32 {
             self.0.get_type_id()
         }
     }
@@ -48639,7 +49183,7 @@ mod set_to_default {
     impl SetToDefault {
         /// get `type_mod`
         #[must_use]
-        pub fn get_type_mod(&self) -> i32 {
+        pub const fn get_type_mod(&self) -> i32 {
             self.0.get_type_mod()
         }
     }
@@ -48655,7 +49199,7 @@ mod set_to_default {
     impl SetToDefault {
         /// get `collation`
         #[must_use]
-        pub fn get_collation(&self) -> u32 {
+        pub const fn get_collation(&self) -> u32 {
             self.0.get_collation()
         }
     }
@@ -48671,7 +49215,7 @@ mod set_to_default {
     impl SetToDefault {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -48929,7 +49473,7 @@ mod current_of_expr {
     impl CurrentOfExpr {
         /// get `cvarno`
         #[must_use]
-        pub fn get_cvarno(&self) -> u32 {
+        pub const fn get_cvarno(&self) -> u32 {
             self.0.get_cvarno()
         }
     }
@@ -48961,7 +49505,7 @@ mod current_of_expr {
     impl CurrentOfExpr {
         /// get `cursor_param`
         #[must_use]
-        pub fn get_cursor_param(&self) -> i32 {
+        pub const fn get_cursor_param(&self) -> i32 {
             self.0.get_cursor_param()
         }
     }
@@ -49204,7 +49748,7 @@ mod next_value_expr {
     impl NextValueExpr {
         /// get `seqid`
         #[must_use]
-        pub fn get_seqid(&self) -> u32 {
+        pub const fn get_seqid(&self) -> u32 {
             self.0.get_seqid()
         }
     }
@@ -49220,7 +49764,7 @@ mod next_value_expr {
     impl NextValueExpr {
         /// get `type_id`
         #[must_use]
-        pub fn get_type_id(&self) -> u32 {
+        pub const fn get_type_id(&self) -> u32 {
             self.0.get_type_id()
         }
     }
@@ -49497,7 +50041,7 @@ mod inference_elem {
     impl InferenceElem {
         /// get `infercollid`
         #[must_use]
-        pub fn get_infercollid(&self) -> u32 {
+        pub const fn get_infercollid(&self) -> u32 {
             self.0.get_infercollid()
         }
     }
@@ -49513,7 +50057,7 @@ mod inference_elem {
     impl InferenceElem {
         /// get `inferopclass`
         #[must_use]
-        pub fn get_inferopclass(&self) -> u32 {
+        pub const fn get_inferopclass(&self) -> u32 {
             self.0.get_inferopclass()
         }
     }
@@ -49537,6 +50081,299 @@ pub use self::inference_elem::{
 
 #[cfg(test)]
 pub use self::inference_elem::InferenceElemBuilder;
+
+/// message type `ReturningExpr`
+#[allow(dead_code)]
+mod returning_expr {
+
+    #[allow(unused_imports)]
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    /// `ReturningExpr`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningExpr(Box<self::inner::ReturningExpr>);
+
+    /// optional `ReturningExpr`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningExprOpt(Option<ReturningExpr>);
+
+    #[cfg(test)]
+    impl From<self::inner::ReturningExpr> for ReturningExpr {
+        fn from(value: self::inner::ReturningExpr) -> Self {
+            Self(Box::new(value))
+        }
+    }
+
+    impl crate::syn::Opt<ReturningExpr> for ReturningExprOpt {
+        fn as_inner(&self) -> Option<ReturningExpr> {
+            self.0.clone()
+        }
+    }
+
+    /// `ReturningExpr` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningExprList(Vec<ReturningExpr>);
+
+    /// optional `ReturningExpr` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningExprListOpt(Option<Vec<ReturningExpr>>);
+
+    impl crate::syn::ListOpt<ReturningExpr> for ReturningExprListOpt {
+        type OptType = ReturningExprOpt;
+
+        fn as_inner(&self) -> Option<Vec<ReturningExpr>> {
+            self.0.clone()
+        }
+    }
+
+    impl From<Option<ReturningExpr>> for ReturningExprOpt {
+        fn from(value: Option<ReturningExpr>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<::pg_query::protobuf::ReturningExpr> for ReturningExpr {
+        fn from(value: ::pg_query::protobuf::ReturningExpr) -> Self {
+            Self(Box::new(self::inner::ReturningExpr::from(value)))
+        }
+    }
+
+    impl From<Box<::pg_query::protobuf::ReturningExpr>> for ReturningExpr {
+        fn from(value: Box<::pg_query::protobuf::ReturningExpr>) -> Self {
+            Self(Box::new(self::inner::ReturningExpr::from(*value)))
+        }
+    }
+
+    impl ReturningExprOpt {
+        /// returns None Value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<ReturningExpr> for ReturningExprOpt {
+        fn from(value: ReturningExpr) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&ReturningExpr> for ReturningExprOpt {
+        fn from(value: &ReturningExpr) -> Self {
+            Self(Some(value.clone()))
+        }
+    }
+
+    impl From<&ReturningExprOpt> for ReturningExprOpt {
+        fn from(value: &ReturningExprOpt) -> Self {
+            value.clone()
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::ReturningExpr>> for ReturningExprOpt {
+        fn from(value: Option<::pg_query::protobuf::ReturningExpr>) -> Self {
+            Self(value.map(ReturningExpr::from))
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::ReturningExpr>>> for ReturningExprOpt {
+        fn from(value: Option<Box<::pg_query::protobuf::ReturningExpr>>) -> Self {
+            Self(value.map(|v| ReturningExpr::from(*v)))
+        }
+    }
+
+    impl ReturningExprListOpt {
+        /// returns None value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<&ReturningExprList> for ReturningExprListOpt {
+        fn from(value: &ReturningExprList) -> Self {
+            Self(Some(value.0.clone()))
+        }
+    }
+
+    impl From<Vec<ReturningExpr>> for ReturningExprList {
+        fn from(value: Vec<ReturningExpr>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Vec<::pg_query::protobuf::ReturningExpr>> for ReturningExprList {
+        fn from(value: Vec<::pg_query::protobuf::ReturningExpr>) -> Self {
+            Self(value.into_iter().map(ReturningExpr::from).collect())
+        }
+    }
+
+    mod inner {
+
+        #[allow(unused_imports)]
+        #[allow(clippy::wildcard_imports)]
+        use super::*;
+
+        #[cfg_attr(test, derive(derive_builder::Builder))]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
+        #[allow(clippy::struct_excessive_bools)]
+        #[allow(clippy::struct_field_names)]
+        pub struct ReturningExpr {
+            /// `xpr`
+            xpr: NodeOpt,
+
+            /// `retlevelsup`
+            retlevelsup: i32,
+
+            /// `retold`
+            retold: bool,
+
+            /// `retexpr`
+            retexpr: NodeOpt,
+        }
+
+        impl From<::pg_query::protobuf::ReturningExpr> for ReturningExpr {
+            fn from(value: ::pg_query::protobuf::ReturningExpr) -> Self {
+                let xpr = NodeOpt::from(value.xpr);
+
+                let retlevelsup = value.retlevelsup;
+
+                let retold = value.retold;
+
+                let retexpr = NodeOpt::from(value.retexpr);
+
+                Self {
+                    xpr,
+
+                    retlevelsup,
+
+                    retold,
+
+                    retexpr,
+                }
+            }
+        }
+
+        impl ReturningExpr {
+            /// get `xpr`
+            #[must_use]
+            pub fn get_xpr(&self) -> NodeOpt {
+                NodeOpt::from(&self.xpr)
+            }
+        }
+
+        impl ReturningExpr {
+            /// get `retlevelsup`
+            #[must_use]
+            pub const fn get_retlevelsup(&self) -> i32 {
+                self.retlevelsup
+            }
+        }
+
+        impl ReturningExpr {
+            /// get `retold`
+            #[must_use]
+            pub const fn get_retold(&self) -> bool {
+                self.retold
+            }
+        }
+
+        impl ReturningExpr {
+            /// get `retexpr`
+            #[must_use]
+            pub fn get_retexpr(&self) -> NodeOpt {
+                NodeOpt::from(&self.retexpr)
+            }
+        }
+    } // mod inner
+
+    impl ReturningExpr {
+        /// get `xpr`
+        #[must_use]
+        pub fn get_xpr(&self) -> NodeOpt {
+            self.0.get_xpr()
+        }
+    }
+
+    impl ReturningExprOpt {
+        /// get `xpr`
+        #[must_use]
+        pub fn get_xpr(&self) -> NodeOpt {
+            match &self.0 {
+                Some(v) => v.get_xpr(),
+                _ => NodeOpt::none(),
+            }
+        }
+    }
+
+    impl ReturningExpr {
+        /// get `retlevelsup`
+        #[must_use]
+        pub const fn get_retlevelsup(&self) -> i32 {
+            self.0.get_retlevelsup()
+        }
+    }
+
+    impl ReturningExprOpt {
+        /// get `retlevelsup`
+        #[must_use]
+        pub fn get_retlevelsup(&self) -> Option<i32> {
+            self.0.as_ref().map(ReturningExpr::get_retlevelsup)
+        }
+    }
+
+    impl ReturningExpr {
+        /// get `retold`
+        #[must_use]
+        pub const fn get_retold(&self) -> bool {
+            self.0.get_retold()
+        }
+    }
+
+    impl ReturningExprOpt {
+        /// get `retold`
+        #[must_use]
+        pub fn get_retold(&self) -> Option<bool> {
+            self.0.as_ref().map(ReturningExpr::get_retold)
+        }
+    }
+
+    impl ReturningExpr {
+        /// get `retexpr`
+        #[must_use]
+        pub fn get_retexpr(&self) -> NodeOpt {
+            self.0.get_retexpr()
+        }
+    }
+
+    impl ReturningExprOpt {
+        /// get `retexpr`
+        #[must_use]
+        pub fn get_retexpr(&self) -> NodeOpt {
+            match &self.0 {
+                Some(v) => v.get_retexpr(),
+                _ => NodeOpt::none(),
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub use self::inner::ReturningExprBuilder;
+} // mod returning_expr
+
+#[allow(unused_imports)]
+pub use self::returning_expr::{
+    ReturningExpr, ReturningExprList, ReturningExprListOpt, ReturningExprOpt,
+};
+
+#[cfg(test)]
+pub use self::returning_expr::ReturningExprBuilder;
 
 /// message type `TargetEntry`
 #[allow(dead_code)]
@@ -49850,7 +50687,7 @@ mod target_entry {
     impl TargetEntry {
         /// get `resno`
         #[must_use]
-        pub fn get_resno(&self) -> i32 {
+        pub const fn get_resno(&self) -> i32 {
             self.0.get_resno()
         }
     }
@@ -49882,7 +50719,7 @@ mod target_entry {
     impl TargetEntry {
         /// get `ressortgroupref`
         #[must_use]
-        pub fn get_ressortgroupref(&self) -> u32 {
+        pub const fn get_ressortgroupref(&self) -> u32 {
             self.0.get_ressortgroupref()
         }
     }
@@ -49898,7 +50735,7 @@ mod target_entry {
     impl TargetEntry {
         /// get `resorigtbl`
         #[must_use]
-        pub fn get_resorigtbl(&self) -> u32 {
+        pub const fn get_resorigtbl(&self) -> u32 {
             self.0.get_resorigtbl()
         }
     }
@@ -49914,7 +50751,7 @@ mod target_entry {
     impl TargetEntry {
         /// get `resorigcol`
         #[must_use]
-        pub fn get_resorigcol(&self) -> i32 {
+        pub const fn get_resorigcol(&self) -> i32 {
             self.0.get_resorigcol()
         }
     }
@@ -49930,7 +50767,7 @@ mod target_entry {
     impl TargetEntry {
         /// get `resjunk`
         #[must_use]
-        pub fn get_resjunk(&self) -> bool {
+        pub const fn get_resjunk(&self) -> bool {
             self.0.get_resjunk()
         }
     }
@@ -50120,7 +50957,7 @@ mod range_tbl_ref {
     impl RangeTblRef {
         /// get `rtindex`
         #[must_use]
-        pub fn get_rtindex(&self) -> i32 {
+        pub const fn get_rtindex(&self) -> i32 {
             self.0.get_rtindex()
         }
     }
@@ -50451,7 +51288,7 @@ mod join_expr {
     impl JoinExpr {
         /// get `is_natural`
         #[must_use]
-        pub fn get_is_natural(&self) -> bool {
+        pub const fn get_is_natural(&self) -> bool {
             self.0.get_is_natural()
         }
     }
@@ -50581,7 +51418,7 @@ mod join_expr {
     impl JoinExpr {
         /// get `rtindex`
         #[must_use]
-        pub fn get_rtindex(&self) -> i32 {
+        pub const fn get_rtindex(&self) -> i32 {
             self.0.get_rtindex()
         }
     }
@@ -51160,7 +51997,7 @@ mod on_conflict_expr {
     impl OnConflictExpr {
         /// get `constraint`
         #[must_use]
-        pub fn get_constraint(&self) -> u32 {
+        pub const fn get_constraint(&self) -> u32 {
             self.0.get_constraint()
         }
     }
@@ -51214,7 +52051,7 @@ mod on_conflict_expr {
     impl OnConflictExpr {
         /// get `excl_rel_index`
         #[must_use]
-        pub fn get_excl_rel_index(&self) -> i32 {
+        pub const fn get_excl_rel_index(&self) -> i32 {
             self.0.get_excl_rel_index()
         }
     }
@@ -51443,6 +52280,9 @@ mod query {
             /// `has_row_security`
             has_row_security: bool,
 
+            /// `has_group_rte`
+            has_group_rte: bool,
+
             /// `is_return`
             is_return: bool,
 
@@ -51475,6 +52315,12 @@ mod query {
 
             /// `on_conflict`
             on_conflict: OnConflictExprOpt,
+
+            /// `returning_old_alias`
+            returning_old_alias: std::string::String,
+
+            /// `returning_new_alias`
+            returning_new_alias: std::string::String,
 
             /// `returning_list`
             returning_list: NodeList,
@@ -51558,6 +52404,8 @@ mod query {
 
                 let has_row_security = value.has_row_security;
 
+                let has_group_rte = value.has_group_rte;
+
                 let is_return = value.is_return;
 
                 let cte_list = NodeList::from(value.cte_list);
@@ -51579,6 +52427,10 @@ mod query {
                 let r#override = OverridingKindOpt::from(value.r#override);
 
                 let on_conflict = OnConflictExprOpt::from(value.on_conflict);
+
+                let returning_old_alias = value.returning_old_alias;
+
+                let returning_new_alias = value.returning_new_alias;
 
                 let returning_list = NodeList::from(value.returning_list);
 
@@ -51643,6 +52495,8 @@ mod query {
 
                     has_row_security,
 
+                    has_group_rte,
+
                     is_return,
 
                     cte_list,
@@ -51664,6 +52518,10 @@ mod query {
                     r#override,
 
                     on_conflict,
+
+                    returning_old_alias,
+
+                    returning_new_alias,
 
                     returning_list,
 
@@ -51815,6 +52673,14 @@ mod query {
         }
 
         impl Query {
+            /// get `has_group_rte`
+            #[must_use]
+            pub const fn get_has_group_rte(&self) -> bool {
+                self.has_group_rte
+            }
+        }
+
+        impl Query {
             /// get `is_return`
             #[must_use]
             pub const fn get_is_return(&self) -> bool {
@@ -51899,6 +52765,22 @@ mod query {
             #[must_use]
             pub fn get_on_conflict(&self) -> OnConflictExprOpt {
                 OnConflictExprOpt::from(&self.on_conflict)
+            }
+        }
+
+        impl Query {
+            /// get `returning_old_alias`
+            #[must_use]
+            pub fn get_returning_old_alias(&self) -> std::string::String {
+                std::string::String::from(&self.returning_old_alias)
+            }
+        }
+
+        impl Query {
+            /// get `returning_new_alias`
+            #[must_use]
+            pub fn get_returning_new_alias(&self) -> std::string::String {
+                std::string::String::from(&self.returning_new_alias)
             }
         }
 
@@ -52080,7 +52962,7 @@ mod query {
     impl Query {
         /// get `can_set_tag`
         #[must_use]
-        pub fn get_can_set_tag(&self) -> bool {
+        pub const fn get_can_set_tag(&self) -> bool {
             self.0.get_can_set_tag()
         }
     }
@@ -52115,7 +52997,7 @@ mod query {
     impl Query {
         /// get `result_relation`
         #[must_use]
-        pub fn get_result_relation(&self) -> i32 {
+        pub const fn get_result_relation(&self) -> i32 {
             self.0.get_result_relation()
         }
     }
@@ -52131,7 +53013,7 @@ mod query {
     impl Query {
         /// get `has_aggs`
         #[must_use]
-        pub fn get_has_aggs(&self) -> bool {
+        pub const fn get_has_aggs(&self) -> bool {
             self.0.get_has_aggs()
         }
     }
@@ -52147,7 +53029,7 @@ mod query {
     impl Query {
         /// get `has_window_funcs`
         #[must_use]
-        pub fn get_has_window_funcs(&self) -> bool {
+        pub const fn get_has_window_funcs(&self) -> bool {
             self.0.get_has_window_funcs()
         }
     }
@@ -52163,7 +53045,7 @@ mod query {
     impl Query {
         /// get `has_target_srfs`
         #[must_use]
-        pub fn get_has_target_srfs(&self) -> bool {
+        pub const fn get_has_target_srfs(&self) -> bool {
             self.0.get_has_target_srfs()
         }
     }
@@ -52179,7 +53061,7 @@ mod query {
     impl Query {
         /// get `has_sub_links`
         #[must_use]
-        pub fn get_has_sub_links(&self) -> bool {
+        pub const fn get_has_sub_links(&self) -> bool {
             self.0.get_has_sub_links()
         }
     }
@@ -52195,7 +53077,7 @@ mod query {
     impl Query {
         /// get `has_distinct_on`
         #[must_use]
-        pub fn get_has_distinct_on(&self) -> bool {
+        pub const fn get_has_distinct_on(&self) -> bool {
             self.0.get_has_distinct_on()
         }
     }
@@ -52211,7 +53093,7 @@ mod query {
     impl Query {
         /// get `has_recursive`
         #[must_use]
-        pub fn get_has_recursive(&self) -> bool {
+        pub const fn get_has_recursive(&self) -> bool {
             self.0.get_has_recursive()
         }
     }
@@ -52227,7 +53109,7 @@ mod query {
     impl Query {
         /// get `has_modifying_cte`
         #[must_use]
-        pub fn get_has_modifying_cte(&self) -> bool {
+        pub const fn get_has_modifying_cte(&self) -> bool {
             self.0.get_has_modifying_cte()
         }
     }
@@ -52243,7 +53125,7 @@ mod query {
     impl Query {
         /// get `has_for_update`
         #[must_use]
-        pub fn get_has_for_update(&self) -> bool {
+        pub const fn get_has_for_update(&self) -> bool {
             self.0.get_has_for_update()
         }
     }
@@ -52259,7 +53141,7 @@ mod query {
     impl Query {
         /// get `has_row_security`
         #[must_use]
-        pub fn get_has_row_security(&self) -> bool {
+        pub const fn get_has_row_security(&self) -> bool {
             self.0.get_has_row_security()
         }
     }
@@ -52273,9 +53155,25 @@ mod query {
     }
 
     impl Query {
+        /// get `has_group_rte`
+        #[must_use]
+        pub const fn get_has_group_rte(&self) -> bool {
+            self.0.get_has_group_rte()
+        }
+    }
+
+    impl QueryOpt {
+        /// get `has_group_rte`
+        #[must_use]
+        pub fn get_has_group_rte(&self) -> Option<bool> {
+            self.0.as_ref().map(Query::get_has_group_rte)
+        }
+    }
+
+    impl Query {
         /// get `is_return`
         #[must_use]
-        pub fn get_is_return(&self) -> bool {
+        pub const fn get_is_return(&self) -> bool {
             self.0.get_is_return()
         }
     }
@@ -52386,7 +53284,7 @@ mod query {
     impl Query {
         /// get `merge_target_relation`
         #[must_use]
-        pub fn get_merge_target_relation(&self) -> i32 {
+        pub const fn get_merge_target_relation(&self) -> i32 {
             self.0.get_merge_target_relation()
         }
     }
@@ -52476,6 +53374,38 @@ mod query {
     }
 
     impl Query {
+        /// get `returning_old_alias`
+        #[must_use]
+        pub fn get_returning_old_alias(&self) -> std::string::String {
+            self.0.get_returning_old_alias()
+        }
+    }
+
+    impl QueryOpt {
+        /// get `returning_old_alias`
+        #[must_use]
+        pub fn get_returning_old_alias(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(Query::get_returning_old_alias)
+        }
+    }
+
+    impl Query {
+        /// get `returning_new_alias`
+        #[must_use]
+        pub fn get_returning_new_alias(&self) -> std::string::String {
+            self.0.get_returning_new_alias()
+        }
+    }
+
+    impl QueryOpt {
+        /// get `returning_new_alias`
+        #[must_use]
+        pub fn get_returning_new_alias(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(Query::get_returning_new_alias)
+        }
+    }
+
+    impl Query {
         /// get `returning_list`
         #[must_use]
         pub fn get_returning_list(&self) -> NodeListOpt {
@@ -52516,7 +53446,7 @@ mod query {
     impl Query {
         /// get `group_distinct`
         #[must_use]
-        pub fn get_group_distinct(&self) -> bool {
+        pub const fn get_group_distinct(&self) -> bool {
             self.0.get_group_distinct()
         }
     }
@@ -52760,7 +53690,7 @@ mod query {
     impl Query {
         /// get `stmt_location`
         #[must_use]
-        pub fn get_stmt_location(&self) -> i32 {
+        pub const fn get_stmt_location(&self) -> i32 {
             self.0.get_stmt_location()
         }
     }
@@ -52776,7 +53706,7 @@ mod query {
     impl Query {
         /// get `stmt_len`
         #[must_use]
-        pub fn get_stmt_len(&self) -> i32 {
+        pub const fn get_stmt_len(&self) -> i32 {
             self.0.get_stmt_len()
         }
     }
@@ -53092,7 +54022,7 @@ mod type_name {
     impl TypeName {
         /// get `type_oid`
         #[must_use]
-        pub fn get_type_oid(&self) -> u32 {
+        pub const fn get_type_oid(&self) -> u32 {
             self.0.get_type_oid()
         }
     }
@@ -53108,7 +54038,7 @@ mod type_name {
     impl TypeName {
         /// get `setof`
         #[must_use]
-        pub fn get_setof(&self) -> bool {
+        pub const fn get_setof(&self) -> bool {
             self.0.get_setof()
         }
     }
@@ -53124,7 +54054,7 @@ mod type_name {
     impl TypeName {
         /// get `pct_type`
         #[must_use]
-        pub fn get_pct_type(&self) -> bool {
+        pub const fn get_pct_type(&self) -> bool {
             self.0.get_pct_type()
         }
     }
@@ -53159,7 +54089,7 @@ mod type_name {
     impl TypeName {
         /// get `typemod`
         #[must_use]
-        pub fn get_typemod(&self) -> i32 {
+        pub const fn get_typemod(&self) -> i32 {
             self.0.get_typemod()
         }
     }
@@ -53194,7 +54124,7 @@ mod type_name {
     impl TypeName {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -53416,7 +54346,7 @@ mod column_ref {
     impl ColumnRef {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -53619,7 +54549,7 @@ mod param_ref {
     impl ParamRef {
         /// get `number`
         #[must_use]
-        pub fn get_number(&self) -> i32 {
+        pub const fn get_number(&self) -> i32 {
             self.0.get_number()
         }
     }
@@ -53635,7 +54565,7 @@ mod param_ref {
     impl ParamRef {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -53813,6 +54743,12 @@ mod a_expr {
             /// `rexpr`
             rexpr: NodeOpt,
 
+            /// `rexpr_list_start`
+            rexpr_list_start: i32,
+
+            /// `rexpr_list_end`
+            rexpr_list_end: i32,
+
             /// `location`
             location: i32,
         }
@@ -53827,6 +54763,10 @@ mod a_expr {
 
                 let rexpr = NodeOpt::from(value.rexpr);
 
+                let rexpr_list_start = value.rexpr_list_start;
+
+                let rexpr_list_end = value.rexpr_list_end;
+
                 let location = value.location;
 
                 Self {
@@ -53837,6 +54777,10 @@ mod a_expr {
                     lexpr,
 
                     rexpr,
+
+                    rexpr_list_start,
+
+                    rexpr_list_end,
 
                     location,
                 }
@@ -53872,6 +54816,22 @@ mod a_expr {
             #[must_use]
             pub fn get_rexpr(&self) -> NodeOpt {
                 NodeOpt::from(&self.rexpr)
+            }
+        }
+
+        impl AExpr {
+            /// get `rexpr_list_start`
+            #[must_use]
+            pub const fn get_rexpr_list_start(&self) -> i32 {
+                self.rexpr_list_start
+            }
+        }
+
+        impl AExpr {
+            /// get `rexpr_list_end`
+            #[must_use]
+            pub const fn get_rexpr_list_end(&self) -> i32 {
+                self.rexpr_list_end
             }
         }
 
@@ -53961,9 +54921,41 @@ mod a_expr {
     }
 
     impl AExpr {
+        /// get `rexpr_list_start`
+        #[must_use]
+        pub const fn get_rexpr_list_start(&self) -> i32 {
+            self.0.get_rexpr_list_start()
+        }
+    }
+
+    impl AExprOpt {
+        /// get `rexpr_list_start`
+        #[must_use]
+        pub fn get_rexpr_list_start(&self) -> Option<i32> {
+            self.0.as_ref().map(AExpr::get_rexpr_list_start)
+        }
+    }
+
+    impl AExpr {
+        /// get `rexpr_list_end`
+        #[must_use]
+        pub const fn get_rexpr_list_end(&self) -> i32 {
+            self.0.get_rexpr_list_end()
+        }
+    }
+
+    impl AExprOpt {
+        /// get `rexpr_list_end`
+        #[must_use]
+        pub fn get_rexpr_list_end(&self) -> Option<i32> {
+            self.0.as_ref().map(AExpr::get_rexpr_list_end)
+        }
+    }
+
+    impl AExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -54223,7 +55215,7 @@ mod type_cast {
     impl TypeCast {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -54483,7 +55475,7 @@ mod collate_clause {
     impl CollateClause {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -54742,7 +55734,7 @@ mod role_spec {
     impl RoleSpec {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -55179,7 +56171,7 @@ mod func_call {
     impl FuncCall {
         /// get `agg_within_group`
         #[must_use]
-        pub fn get_agg_within_group(&self) -> bool {
+        pub const fn get_agg_within_group(&self) -> bool {
             self.0.get_agg_within_group()
         }
     }
@@ -55195,7 +56187,7 @@ mod func_call {
     impl FuncCall {
         /// get `agg_star`
         #[must_use]
-        pub fn get_agg_star(&self) -> bool {
+        pub const fn get_agg_star(&self) -> bool {
             self.0.get_agg_star()
         }
     }
@@ -55211,7 +56203,7 @@ mod func_call {
     impl FuncCall {
         /// get `agg_distinct`
         #[must_use]
-        pub fn get_agg_distinct(&self) -> bool {
+        pub const fn get_agg_distinct(&self) -> bool {
             self.0.get_agg_distinct()
         }
     }
@@ -55227,7 +56219,7 @@ mod func_call {
     impl FuncCall {
         /// get `func_variadic`
         #[must_use]
-        pub fn get_func_variadic(&self) -> bool {
+        pub const fn get_func_variadic(&self) -> bool {
             self.0.get_func_variadic()
         }
     }
@@ -55262,7 +56254,7 @@ mod func_call {
     impl FuncCall {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -55645,7 +56637,7 @@ mod a_indices {
     impl AIndices {
         /// get `is_slice`
         #[must_use]
-        pub fn get_is_slice(&self) -> bool {
+        pub const fn get_is_slice(&self) -> bool {
             self.0.get_is_slice()
         }
     }
@@ -56079,6 +57071,12 @@ mod a_array_expr {
             /// `elements`
             elements: NodeList,
 
+            /// `list_start`
+            list_start: i32,
+
+            /// `list_end`
+            list_end: i32,
+
             /// `location`
             location: i32,
         }
@@ -56087,9 +57085,21 @@ mod a_array_expr {
             fn from(value: ::pg_query::protobuf::AArrayExpr) -> Self {
                 let elements = NodeList::from(value.elements);
 
+                let list_start = value.list_start;
+
+                let list_end = value.list_end;
+
                 let location = value.location;
 
-                Self { elements, location }
+                Self {
+                    elements,
+
+                    list_start,
+
+                    list_end,
+
+                    location,
+                }
             }
         }
 
@@ -56098,6 +57108,22 @@ mod a_array_expr {
             #[must_use]
             pub fn get_elements(&self) -> NodeListOpt {
                 NodeListOpt::from(&self.elements)
+            }
+        }
+
+        impl AArrayExpr {
+            /// get `list_start`
+            #[must_use]
+            pub const fn get_list_start(&self) -> i32 {
+                self.list_start
+            }
+        }
+
+        impl AArrayExpr {
+            /// get `list_end`
+            #[must_use]
+            pub const fn get_list_end(&self) -> i32 {
+                self.list_end
             }
         }
 
@@ -56130,9 +57156,41 @@ mod a_array_expr {
     }
 
     impl AArrayExpr {
+        /// get `list_start`
+        #[must_use]
+        pub const fn get_list_start(&self) -> i32 {
+            self.0.get_list_start()
+        }
+    }
+
+    impl AArrayExprOpt {
+        /// get `list_start`
+        #[must_use]
+        pub fn get_list_start(&self) -> Option<i32> {
+            self.0.as_ref().map(AArrayExpr::get_list_start)
+        }
+    }
+
+    impl AArrayExpr {
+        /// get `list_end`
+        #[must_use]
+        pub const fn get_list_end(&self) -> i32 {
+            self.0.get_list_end()
+        }
+    }
+
+    impl AArrayExprOpt {
+        /// get `list_end`
+        #[must_use]
+        pub fn get_list_end(&self) -> Option<i32> {
+            self.0.as_ref().map(AArrayExpr::get_list_end)
+        }
+    }
+
+    impl AArrayExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -56423,7 +57481,7 @@ mod res_target {
     impl ResTarget {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -56664,7 +57722,7 @@ mod multi_assign_ref {
     impl MultiAssignRef {
         /// get `colno`
         #[must_use]
-        pub fn get_colno(&self) -> i32 {
+        pub const fn get_colno(&self) -> i32 {
             self.0.get_colno()
         }
     }
@@ -56680,7 +57738,7 @@ mod multi_assign_ref {
     impl MultiAssignRef {
         /// get `ncolumns`
         #[must_use]
-        pub fn get_ncolumns(&self) -> i32 {
+        pub const fn get_ncolumns(&self) -> i32 {
             self.0.get_ncolumns()
         }
     }
@@ -57010,7 +58068,7 @@ mod sort_by {
     impl SortBy {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -57377,7 +58435,7 @@ mod window_def {
     impl WindowDef {
         /// get `frame_options`
         #[must_use]
-        pub fn get_frame_options(&self) -> i32 {
+        pub const fn get_frame_options(&self) -> i32 {
             self.0.get_frame_options()
         }
     }
@@ -57431,7 +58489,7 @@ mod window_def {
     impl WindowDef {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -57653,7 +58711,7 @@ mod range_subselect {
     impl RangeSubselect {
         /// get `lateral`
         #[must_use]
-        pub fn get_lateral(&self) -> bool {
+        pub const fn get_lateral(&self) -> bool {
             self.0.get_lateral()
         }
     }
@@ -57960,7 +59018,7 @@ mod range_function {
     impl RangeFunction {
         /// get `lateral`
         #[must_use]
-        pub fn get_lateral(&self) -> bool {
+        pub const fn get_lateral(&self) -> bool {
             self.0.get_lateral()
         }
     }
@@ -57976,7 +59034,7 @@ mod range_function {
     impl RangeFunction {
         /// get `ordinality`
         #[must_use]
-        pub fn get_ordinality(&self) -> bool {
+        pub const fn get_ordinality(&self) -> bool {
             self.0.get_ordinality()
         }
     }
@@ -57992,7 +59050,7 @@ mod range_function {
     impl RangeFunction {
         /// get `is_rowsfrom`
         #[must_use]
-        pub fn get_is_rowsfrom(&self) -> bool {
+        pub const fn get_is_rowsfrom(&self) -> bool {
             self.0.get_is_rowsfrom()
         }
     }
@@ -58333,7 +59391,7 @@ mod range_table_func {
     impl RangeTableFunc {
         /// get `lateral`
         #[must_use]
-        pub fn get_lateral(&self) -> bool {
+        pub const fn get_lateral(&self) -> bool {
             self.0.get_lateral()
         }
     }
@@ -58444,7 +59502,7 @@ mod range_table_func {
     impl RangeTableFunc {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -58763,7 +59821,7 @@ mod range_table_func_col {
     impl RangeTableFuncCol {
         /// get `for_ordinality`
         #[must_use]
-        pub fn get_for_ordinality(&self) -> bool {
+        pub const fn get_for_ordinality(&self) -> bool {
             self.0.get_for_ordinality()
         }
     }
@@ -58779,7 +59837,7 @@ mod range_table_func_col {
     impl RangeTableFuncCol {
         /// get `is_not_null`
         #[must_use]
-        pub fn get_is_not_null(&self) -> bool {
+        pub const fn get_is_not_null(&self) -> bool {
             self.0.get_is_not_null()
         }
     }
@@ -58833,7 +59891,7 @@ mod range_table_func_col {
     impl RangeTableFuncCol {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -59163,7 +60221,7 @@ mod range_table_sample {
     impl RangeTableSample {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -59678,7 +60736,7 @@ mod column_def {
     impl ColumnDef {
         /// get `inhcount`
         #[must_use]
-        pub fn get_inhcount(&self) -> i32 {
+        pub const fn get_inhcount(&self) -> i32 {
             self.0.get_inhcount()
         }
     }
@@ -59694,7 +60752,7 @@ mod column_def {
     impl ColumnDef {
         /// get `is_local`
         #[must_use]
-        pub fn get_is_local(&self) -> bool {
+        pub const fn get_is_local(&self) -> bool {
             self.0.get_is_local()
         }
     }
@@ -59710,7 +60768,7 @@ mod column_def {
     impl ColumnDef {
         /// get `is_not_null`
         #[must_use]
-        pub fn get_is_not_null(&self) -> bool {
+        pub const fn get_is_not_null(&self) -> bool {
             self.0.get_is_not_null()
         }
     }
@@ -59726,7 +60784,7 @@ mod column_def {
     impl ColumnDef {
         /// get `is_from_type`
         #[must_use]
-        pub fn get_is_from_type(&self) -> bool {
+        pub const fn get_is_from_type(&self) -> bool {
             self.0.get_is_from_type()
         }
     }
@@ -59882,7 +60940,7 @@ mod column_def {
     impl ColumnDef {
         /// get `coll_oid`
         #[must_use]
-        pub fn get_coll_oid(&self) -> u32 {
+        pub const fn get_coll_oid(&self) -> u32 {
             self.0.get_coll_oid()
         }
     }
@@ -59936,7 +60994,7 @@ mod column_def {
     impl ColumnDef {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -60177,7 +61235,7 @@ mod table_like_clause {
     impl TableLikeClause {
         /// get `options`
         #[must_use]
-        pub fn get_options(&self) -> u32 {
+        pub const fn get_options(&self) -> u32 {
             self.0.get_options()
         }
     }
@@ -60193,7 +61251,7 @@ mod table_like_clause {
     impl TableLikeClause {
         /// get `relation_oid`
         #[must_use]
-        pub fn get_relation_oid(&self) -> u32 {
+        pub const fn get_relation_oid(&self) -> u32 {
             self.0.get_relation_oid()
         }
     }
@@ -60802,6 +61860,9 @@ mod def_elem {
 
             /// `location`
             location: i32,
+
+            /// `arg_location`
+            arg_location: i32,
         }
 
         impl From<::pg_query::protobuf::DefElem> for DefElem {
@@ -60816,6 +61877,8 @@ mod def_elem {
 
                 let location = value.location;
 
+                let arg_location = value.arg_location;
+
                 Self {
                     defnamespace,
 
@@ -60826,6 +61889,8 @@ mod def_elem {
                     defaction,
 
                     location,
+
+                    arg_location,
                 }
             }
         }
@@ -60867,6 +61932,14 @@ mod def_elem {
             #[must_use]
             pub const fn get_location(&self) -> i32 {
                 self.location
+            }
+        }
+
+        impl DefElem {
+            /// get `arg_location`
+            #[must_use]
+            pub const fn get_arg_location(&self) -> i32 {
+                self.arg_location
             }
         }
     } // mod inner
@@ -60944,7 +62017,7 @@ mod def_elem {
     impl DefElem {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -60954,6 +62027,22 @@ mod def_elem {
         #[must_use]
         pub fn get_location(&self) -> Option<i32> {
             self.0.as_ref().map(DefElem::get_location)
+        }
+    }
+
+    impl DefElem {
+        /// get `arg_location`
+        #[must_use]
+        pub const fn get_arg_location(&self) -> i32 {
+            self.0.get_arg_location()
+        }
+    }
+
+    impl DefElemOpt {
+        /// get `arg_location`
+        #[must_use]
+        pub fn get_arg_location(&self) -> Option<i32> {
+            self.0.as_ref().map(DefElem::get_arg_location)
         }
     }
 
@@ -61518,7 +62607,7 @@ mod xml_serialize {
     impl XmlSerialize {
         /// get `indent`
         #[must_use]
-        pub fn get_indent(&self) -> bool {
+        pub const fn get_indent(&self) -> bool {
             self.0.get_indent()
         }
     }
@@ -61534,7 +62623,7 @@ mod xml_serialize {
     impl XmlSerialize {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -61861,7 +62950,7 @@ mod partition_elem {
     impl PartitionElem {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -62123,7 +63212,7 @@ mod partition_spec {
     impl PartitionSpec {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -62438,7 +63527,7 @@ mod partition_bound_spec {
     impl PartitionBoundSpec {
         /// get `is_default`
         #[must_use]
-        pub fn get_is_default(&self) -> bool {
+        pub const fn get_is_default(&self) -> bool {
             self.0.get_is_default()
         }
     }
@@ -62454,7 +63543,7 @@ mod partition_bound_spec {
     impl PartitionBoundSpec {
         /// get `modulus`
         #[must_use]
-        pub fn get_modulus(&self) -> i32 {
+        pub const fn get_modulus(&self) -> i32 {
             self.0.get_modulus()
         }
     }
@@ -62470,7 +63559,7 @@ mod partition_bound_spec {
     impl PartitionBoundSpec {
         /// get `remainder`
         #[must_use]
-        pub fn get_remainder(&self) -> i32 {
+        pub const fn get_remainder(&self) -> i32 {
             self.0.get_remainder()
         }
     }
@@ -62543,7 +63632,7 @@ mod partition_bound_spec {
     impl PartitionBoundSpec {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -62805,7 +63894,7 @@ mod partition_range_datum {
     impl PartitionRangeDatum {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -62830,170 +63919,6 @@ pub use self::partition_range_datum::{
 
 #[cfg(test)]
 pub use self::partition_range_datum::PartitionRangeDatumBuilder;
-
-/// message type `SinglePartitionSpec`
-#[allow(dead_code)]
-mod single_partition_spec {
-
-    #[allow(unused_imports)]
-    #[allow(clippy::wildcard_imports)]
-    use super::*;
-
-    /// `SinglePartitionSpec`
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct SinglePartitionSpec(Box<self::inner::SinglePartitionSpec>);
-
-    /// optional `SinglePartitionSpec`
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct SinglePartitionSpecOpt(Option<SinglePartitionSpec>);
-
-    #[cfg(test)]
-    impl From<self::inner::SinglePartitionSpec> for SinglePartitionSpec {
-        fn from(value: self::inner::SinglePartitionSpec) -> Self {
-            Self(Box::new(value))
-        }
-    }
-
-    impl crate::syn::Opt<SinglePartitionSpec> for SinglePartitionSpecOpt {
-        fn as_inner(&self) -> Option<SinglePartitionSpec> {
-            self.0.clone()
-        }
-    }
-
-    /// `SinglePartitionSpec` list
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct SinglePartitionSpecList(Vec<SinglePartitionSpec>);
-
-    /// optional `SinglePartitionSpec` list
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct SinglePartitionSpecListOpt(Option<Vec<SinglePartitionSpec>>);
-
-    impl crate::syn::ListOpt<SinglePartitionSpec> for SinglePartitionSpecListOpt {
-        type OptType = SinglePartitionSpecOpt;
-
-        fn as_inner(&self) -> Option<Vec<SinglePartitionSpec>> {
-            self.0.clone()
-        }
-    }
-
-    impl From<Option<SinglePartitionSpec>> for SinglePartitionSpecOpt {
-        fn from(value: Option<SinglePartitionSpec>) -> Self {
-            Self(value)
-        }
-    }
-
-    impl From<::pg_query::protobuf::SinglePartitionSpec> for SinglePartitionSpec {
-        fn from(value: ::pg_query::protobuf::SinglePartitionSpec) -> Self {
-            Self(Box::new(self::inner::SinglePartitionSpec::from(value)))
-        }
-    }
-
-    impl From<Box<::pg_query::protobuf::SinglePartitionSpec>> for SinglePartitionSpec {
-        fn from(value: Box<::pg_query::protobuf::SinglePartitionSpec>) -> Self {
-            Self(Box::new(self::inner::SinglePartitionSpec::from(*value)))
-        }
-    }
-
-    impl SinglePartitionSpecOpt {
-        /// returns None Value
-        #[must_use]
-        pub const fn none() -> Self {
-            Self(None)
-        }
-    }
-
-    impl From<SinglePartitionSpec> for SinglePartitionSpecOpt {
-        fn from(value: SinglePartitionSpec) -> Self {
-            Self(Some(value))
-        }
-    }
-
-    impl From<&SinglePartitionSpec> for SinglePartitionSpecOpt {
-        fn from(value: &SinglePartitionSpec) -> Self {
-            Self(Some(value.clone()))
-        }
-    }
-
-    impl From<&SinglePartitionSpecOpt> for SinglePartitionSpecOpt {
-        fn from(value: &SinglePartitionSpecOpt) -> Self {
-            value.clone()
-        }
-    }
-
-    impl From<Option<::pg_query::protobuf::SinglePartitionSpec>> for SinglePartitionSpecOpt {
-        fn from(value: Option<::pg_query::protobuf::SinglePartitionSpec>) -> Self {
-            Self(value.map(SinglePartitionSpec::from))
-        }
-    }
-
-    impl From<Option<Box<::pg_query::protobuf::SinglePartitionSpec>>> for SinglePartitionSpecOpt {
-        fn from(value: Option<Box<::pg_query::protobuf::SinglePartitionSpec>>) -> Self {
-            Self(value.map(|v| SinglePartitionSpec::from(*v)))
-        }
-    }
-
-    impl SinglePartitionSpecListOpt {
-        /// returns None value
-        #[must_use]
-        pub const fn none() -> Self {
-            Self(None)
-        }
-    }
-
-    impl From<&SinglePartitionSpecList> for SinglePartitionSpecListOpt {
-        fn from(value: &SinglePartitionSpecList) -> Self {
-            Self(Some(value.0.clone()))
-        }
-    }
-
-    impl From<Vec<SinglePartitionSpec>> for SinglePartitionSpecList {
-        fn from(value: Vec<SinglePartitionSpec>) -> Self {
-            Self(value)
-        }
-    }
-
-    impl From<Vec<::pg_query::protobuf::SinglePartitionSpec>> for SinglePartitionSpecList {
-        fn from(value: Vec<::pg_query::protobuf::SinglePartitionSpec>) -> Self {
-            Self(value.into_iter().map(SinglePartitionSpec::from).collect())
-        }
-    }
-
-    mod inner {
-
-        #[allow(unused_imports)]
-        #[allow(clippy::wildcard_imports)]
-        use super::*;
-
-        #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-        #[derive(Clone, Debug)]
-        #[allow(clippy::struct_excessive_bools)]
-        #[allow(clippy::struct_field_names)]
-        pub struct SinglePartitionSpec {}
-
-        impl From<::pg_query::protobuf::SinglePartitionSpec> for SinglePartitionSpec {
-            fn from(_value: ::pg_query::protobuf::SinglePartitionSpec) -> Self {
-                Self {}
-            }
-        }
-    } // mod inner
-
-    #[cfg(test)]
-    pub use self::inner::SinglePartitionSpecBuilder;
-} // mod single_partition_spec
-
-#[allow(unused_imports)]
-pub use self::single_partition_spec::{
-    SinglePartitionSpec, SinglePartitionSpecList, SinglePartitionSpecListOpt,
-    SinglePartitionSpecOpt,
-};
-
-#[cfg(test)]
-pub use self::single_partition_spec::SinglePartitionSpecBuilder;
 
 /// message type `PartitionCmd`
 #[allow(dead_code)]
@@ -63232,7 +64157,7 @@ mod partition_cmd {
     impl PartitionCmd {
         /// get `concurrent`
         #[must_use]
-        pub fn get_concurrent(&self) -> bool {
+        pub const fn get_concurrent(&self) -> bool {
             self.0.get_concurrent()
         }
     }
@@ -63487,6 +64412,9 @@ mod range_tbl_entry {
             /// `enrtuples`
             enrtuples: f64,
 
+            /// `groupexprs`
+            groupexprs: NodeList,
+
             /// `lateral`
             lateral: bool,
 
@@ -63557,6 +64485,8 @@ mod range_tbl_entry {
 
                 let enrtuples = value.enrtuples;
 
+                let groupexprs = NodeList::from(value.groupexprs);
+
                 let lateral = value.lateral;
 
                 let in_from_cl = value.in_from_cl;
@@ -63621,6 +64551,8 @@ mod range_tbl_entry {
                     enrname,
 
                     enrtuples,
+
+                    groupexprs,
 
                     lateral,
 
@@ -63864,6 +64796,14 @@ mod range_tbl_entry {
         }
 
         impl RangeTblEntry {
+            /// get `groupexprs`
+            #[must_use]
+            pub fn get_groupexprs(&self) -> NodeListOpt {
+                NodeListOpt::from(&self.groupexprs)
+            }
+        }
+
+        impl RangeTblEntry {
             /// get `lateral`
             #[must_use]
             pub const fn get_lateral(&self) -> bool {
@@ -63948,7 +64888,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `relid`
         #[must_use]
-        pub fn get_relid(&self) -> u32 {
+        pub const fn get_relid(&self) -> u32 {
             self.0.get_relid()
         }
     }
@@ -63964,7 +64904,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `inh`
         #[must_use]
-        pub fn get_inh(&self) -> bool {
+        pub const fn get_inh(&self) -> bool {
             self.0.get_inh()
         }
     }
@@ -63996,7 +64936,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `rellockmode`
         #[must_use]
-        pub fn get_rellockmode(&self) -> i32 {
+        pub const fn get_rellockmode(&self) -> i32 {
             self.0.get_rellockmode()
         }
     }
@@ -64012,7 +64952,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `perminfoindex`
         #[must_use]
-        pub fn get_perminfoindex(&self) -> u32 {
+        pub const fn get_perminfoindex(&self) -> u32 {
             self.0.get_perminfoindex()
         }
     }
@@ -64066,7 +65006,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `security_barrier`
         #[must_use]
-        pub fn get_security_barrier(&self) -> bool {
+        pub const fn get_security_barrier(&self) -> bool {
             self.0.get_security_barrier()
         }
     }
@@ -64101,7 +65041,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `joinmergedcols`
         #[must_use]
-        pub fn get_joinmergedcols(&self) -> i32 {
+        pub const fn get_joinmergedcols(&self) -> i32 {
             self.0.get_joinmergedcols()
         }
     }
@@ -64212,7 +65152,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `funcordinality`
         #[must_use]
-        pub fn get_funcordinality(&self) -> bool {
+        pub const fn get_funcordinality(&self) -> bool {
             self.0.get_funcordinality()
         }
     }
@@ -64282,7 +65222,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `ctelevelsup`
         #[must_use]
-        pub fn get_ctelevelsup(&self) -> u32 {
+        pub const fn get_ctelevelsup(&self) -> u32 {
             self.0.get_ctelevelsup()
         }
     }
@@ -64298,7 +65238,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `self_reference`
         #[must_use]
-        pub fn get_self_reference(&self) -> bool {
+        pub const fn get_self_reference(&self) -> bool {
             self.0.get_self_reference()
         }
     }
@@ -64387,7 +65327,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `enrtuples`
         #[must_use]
-        pub fn get_enrtuples(&self) -> f64 {
+        pub const fn get_enrtuples(&self) -> f64 {
             self.0.get_enrtuples()
         }
     }
@@ -64401,9 +65341,28 @@ mod range_tbl_entry {
     }
 
     impl RangeTblEntry {
+        /// get `groupexprs`
+        #[must_use]
+        pub fn get_groupexprs(&self) -> NodeListOpt {
+            self.0.get_groupexprs()
+        }
+    }
+
+    impl RangeTblEntryOpt {
+        /// get `groupexprs`
+        #[must_use]
+        pub fn get_groupexprs(&self) -> NodeListOpt {
+            match &self.0 {
+                Some(v) => v.get_groupexprs(),
+                _ => NodeListOpt::none(),
+            }
+        }
+    }
+
+    impl RangeTblEntry {
         /// get `lateral`
         #[must_use]
-        pub fn get_lateral(&self) -> bool {
+        pub const fn get_lateral(&self) -> bool {
             self.0.get_lateral()
         }
     }
@@ -64419,7 +65378,7 @@ mod range_tbl_entry {
     impl RangeTblEntry {
         /// get `in_from_cl`
         #[must_use]
-        pub fn get_in_from_cl(&self) -> bool {
+        pub const fn get_in_from_cl(&self) -> bool {
             self.0.get_in_from_cl()
         }
     }
@@ -64722,7 +65681,7 @@ mod rte_permission_info {
     impl RtePermissionInfo {
         /// get `relid`
         #[must_use]
-        pub fn get_relid(&self) -> u32 {
+        pub const fn get_relid(&self) -> u32 {
             self.0.get_relid()
         }
     }
@@ -64738,7 +65697,7 @@ mod rte_permission_info {
     impl RtePermissionInfo {
         /// get `inh`
         #[must_use]
-        pub fn get_inh(&self) -> bool {
+        pub const fn get_inh(&self) -> bool {
             self.0.get_inh()
         }
     }
@@ -64754,7 +65713,7 @@ mod rte_permission_info {
     impl RtePermissionInfo {
         /// get `required_perms`
         #[must_use]
-        pub fn get_required_perms(&self) -> u64 {
+        pub const fn get_required_perms(&self) -> u64 {
             self.0.get_required_perms()
         }
     }
@@ -64770,7 +65729,7 @@ mod rte_permission_info {
     impl RtePermissionInfo {
         /// get `check_as_user`
         #[must_use]
-        pub fn get_check_as_user(&self) -> u32 {
+        pub const fn get_check_as_user(&self) -> u32 {
             self.0.get_check_as_user()
         }
     }
@@ -65121,7 +66080,7 @@ mod range_tbl_function {
     impl RangeTblFunction {
         /// get `funccolcount`
         #[must_use]
-        pub fn get_funccolcount(&self) -> i32 {
+        pub const fn get_funccolcount(&self) -> i32 {
             self.0.get_funccolcount()
         }
     }
@@ -65437,7 +66396,7 @@ mod table_sample_clause {
     impl TableSampleClause {
         /// get `tsmhandler`
         #[must_use]
-        pub fn get_tsmhandler(&self) -> u32 {
+        pub const fn get_tsmhandler(&self) -> u32 {
             self.0.get_tsmhandler()
         }
     }
@@ -65799,7 +66758,7 @@ mod with_check_option {
     impl WithCheckOption {
         /// get `cascaded`
         #[must_use]
-        pub fn get_cascaded(&self) -> bool {
+        pub const fn get_cascaded(&self) -> bool {
             self.0.get_cascaded()
         }
     }
@@ -65976,6 +66935,9 @@ mod sort_group_clause {
             /// `sortop`
             sortop: u32,
 
+            /// `reverse_sort`
+            reverse_sort: bool,
+
             /// `nulls_first`
             nulls_first: bool,
 
@@ -65991,6 +66953,8 @@ mod sort_group_clause {
 
                 let sortop = value.sortop;
 
+                let reverse_sort = value.reverse_sort;
+
                 let nulls_first = value.nulls_first;
 
                 let hashable = value.hashable;
@@ -66001,6 +66965,8 @@ mod sort_group_clause {
                     eqop,
 
                     sortop,
+
+                    reverse_sort,
 
                     nulls_first,
 
@@ -66034,6 +67000,14 @@ mod sort_group_clause {
         }
 
         impl SortGroupClause {
+            /// get `reverse_sort`
+            #[must_use]
+            pub const fn get_reverse_sort(&self) -> bool {
+                self.reverse_sort
+            }
+        }
+
+        impl SortGroupClause {
             /// get `nulls_first`
             #[must_use]
             pub const fn get_nulls_first(&self) -> bool {
@@ -66053,7 +67027,7 @@ mod sort_group_clause {
     impl SortGroupClause {
         /// get `tle_sort_group_ref`
         #[must_use]
-        pub fn get_tle_sort_group_ref(&self) -> u32 {
+        pub const fn get_tle_sort_group_ref(&self) -> u32 {
             self.0.get_tle_sort_group_ref()
         }
     }
@@ -66069,7 +67043,7 @@ mod sort_group_clause {
     impl SortGroupClause {
         /// get `eqop`
         #[must_use]
-        pub fn get_eqop(&self) -> u32 {
+        pub const fn get_eqop(&self) -> u32 {
             self.0.get_eqop()
         }
     }
@@ -66085,7 +67059,7 @@ mod sort_group_clause {
     impl SortGroupClause {
         /// get `sortop`
         #[must_use]
-        pub fn get_sortop(&self) -> u32 {
+        pub const fn get_sortop(&self) -> u32 {
             self.0.get_sortop()
         }
     }
@@ -66099,9 +67073,25 @@ mod sort_group_clause {
     }
 
     impl SortGroupClause {
+        /// get `reverse_sort`
+        #[must_use]
+        pub const fn get_reverse_sort(&self) -> bool {
+            self.0.get_reverse_sort()
+        }
+    }
+
+    impl SortGroupClauseOpt {
+        /// get `reverse_sort`
+        #[must_use]
+        pub fn get_reverse_sort(&self) -> Option<bool> {
+            self.0.as_ref().map(SortGroupClause::get_reverse_sort)
+        }
+    }
+
+    impl SortGroupClause {
         /// get `nulls_first`
         #[must_use]
-        pub fn get_nulls_first(&self) -> bool {
+        pub const fn get_nulls_first(&self) -> bool {
             self.0.get_nulls_first()
         }
     }
@@ -66117,7 +67107,7 @@ mod sort_group_clause {
     impl SortGroupClause {
         /// get `hashable`
         #[must_use]
-        pub fn get_hashable(&self) -> bool {
+        pub const fn get_hashable(&self) -> bool {
             self.0.get_hashable()
         }
     }
@@ -66379,7 +67369,7 @@ mod grouping_set {
     impl GroupingSet {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -66836,7 +67826,7 @@ mod window_clause {
     impl WindowClause {
         /// get `frame_options`
         #[must_use]
-        pub fn get_frame_options(&self) -> i32 {
+        pub const fn get_frame_options(&self) -> i32 {
             self.0.get_frame_options()
         }
     }
@@ -66890,7 +67880,7 @@ mod window_clause {
     impl WindowClause {
         /// get `start_in_range_func`
         #[must_use]
-        pub fn get_start_in_range_func(&self) -> u32 {
+        pub const fn get_start_in_range_func(&self) -> u32 {
             self.0.get_start_in_range_func()
         }
     }
@@ -66906,7 +67896,7 @@ mod window_clause {
     impl WindowClause {
         /// get `end_in_range_func`
         #[must_use]
-        pub fn get_end_in_range_func(&self) -> u32 {
+        pub const fn get_end_in_range_func(&self) -> u32 {
             self.0.get_end_in_range_func()
         }
     }
@@ -66922,7 +67912,7 @@ mod window_clause {
     impl WindowClause {
         /// get `in_range_coll`
         #[must_use]
-        pub fn get_in_range_coll(&self) -> u32 {
+        pub const fn get_in_range_coll(&self) -> u32 {
             self.0.get_in_range_coll()
         }
     }
@@ -66938,7 +67928,7 @@ mod window_clause {
     impl WindowClause {
         /// get `in_range_asc`
         #[must_use]
-        pub fn get_in_range_asc(&self) -> bool {
+        pub const fn get_in_range_asc(&self) -> bool {
             self.0.get_in_range_asc()
         }
     }
@@ -66954,7 +67944,7 @@ mod window_clause {
     impl WindowClause {
         /// get `in_range_nulls_first`
         #[must_use]
-        pub fn get_in_range_nulls_first(&self) -> bool {
+        pub const fn get_in_range_nulls_first(&self) -> bool {
             self.0.get_in_range_nulls_first()
         }
     }
@@ -66970,7 +67960,7 @@ mod window_clause {
     impl WindowClause {
         /// get `winref`
         #[must_use]
-        pub fn get_winref(&self) -> u32 {
+        pub const fn get_winref(&self) -> u32 {
             self.0.get_winref()
         }
     }
@@ -66986,7 +67976,7 @@ mod window_clause {
     impl WindowClause {
         /// get `copied_order`
         #[must_use]
-        pub fn get_copied_order(&self) -> bool {
+        pub const fn get_copied_order(&self) -> bool {
             self.0.get_copied_order()
         }
     }
@@ -67225,7 +68215,7 @@ mod row_mark_clause {
     impl RowMarkClause {
         /// get `rti`
         #[must_use]
-        pub fn get_rti(&self) -> u32 {
+        pub const fn get_rti(&self) -> u32 {
             self.0.get_rti()
         }
     }
@@ -67279,7 +68269,7 @@ mod row_mark_clause {
     impl RowMarkClause {
         /// get `pushed_down`
         #[must_use]
-        pub fn get_pushed_down(&self) -> bool {
+        pub const fn get_pushed_down(&self) -> bool {
             self.0.get_pushed_down()
         }
     }
@@ -67522,7 +68512,7 @@ mod with_clause {
     impl WithClause {
         /// get `recursive`
         #[must_use]
-        pub fn get_recursive(&self) -> bool {
+        pub const fn get_recursive(&self) -> bool {
             self.0.get_recursive()
         }
     }
@@ -67538,7 +68528,7 @@ mod with_clause {
     impl WithClause {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -67829,7 +68819,7 @@ mod infer_clause {
     impl InferClause {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -68157,7 +69147,7 @@ mod on_conflict_clause {
     impl OnConflictClause {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -68415,7 +69405,7 @@ mod cte_search_clause {
     impl CteSearchClause {
         /// get `search_breadth_first`
         #[must_use]
-        pub fn get_search_breadth_first(&self) -> bool {
+        pub const fn get_search_breadth_first(&self) -> bool {
             self.0.get_search_breadth_first()
         }
     }
@@ -68449,7 +69439,7 @@ mod cte_search_clause {
     impl CteSearchClause {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -68867,7 +69857,7 @@ mod cte_cycle_clause {
     impl CteCycleClause {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -68883,7 +69873,7 @@ mod cte_cycle_clause {
     impl CteCycleClause {
         /// get `cycle_mark_type`
         #[must_use]
-        pub fn get_cycle_mark_type(&self) -> u32 {
+        pub const fn get_cycle_mark_type(&self) -> u32 {
             self.0.get_cycle_mark_type()
         }
     }
@@ -68899,7 +69889,7 @@ mod cte_cycle_clause {
     impl CteCycleClause {
         /// get `cycle_mark_typmod`
         #[must_use]
-        pub fn get_cycle_mark_typmod(&self) -> i32 {
+        pub const fn get_cycle_mark_typmod(&self) -> i32 {
             self.0.get_cycle_mark_typmod()
         }
     }
@@ -68915,7 +69905,7 @@ mod cte_cycle_clause {
     impl CteCycleClause {
         /// get `cycle_mark_collation`
         #[must_use]
-        pub fn get_cycle_mark_collation(&self) -> u32 {
+        pub const fn get_cycle_mark_collation(&self) -> u32 {
             self.0.get_cycle_mark_collation()
         }
     }
@@ -68933,7 +69923,7 @@ mod cte_cycle_clause {
     impl CteCycleClause {
         /// get `cycle_mark_neop`
         #[must_use]
-        pub fn get_cycle_mark_neop(&self) -> u32 {
+        pub const fn get_cycle_mark_neop(&self) -> u32 {
             self.0.get_cycle_mark_neop()
         }
     }
@@ -69418,7 +70408,7 @@ mod common_table_expr {
     impl CommonTableExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -69434,7 +70424,7 @@ mod common_table_expr {
     impl CommonTableExpr {
         /// get `cterecursive`
         #[must_use]
-        pub fn get_cterecursive(&self) -> bool {
+        pub const fn get_cterecursive(&self) -> bool {
             self.0.get_cterecursive()
         }
     }
@@ -69450,7 +70440,7 @@ mod common_table_expr {
     impl CommonTableExpr {
         /// get `cterefcount`
         #[must_use]
-        pub fn get_cterefcount(&self) -> i32 {
+        pub const fn get_cterefcount(&self) -> i32 {
             self.0.get_cterefcount()
         }
     }
@@ -69918,6 +70908,492 @@ pub use self::merge_when_clause::{
 #[cfg(test)]
 pub use self::merge_when_clause::MergeWhenClauseBuilder;
 
+/// message type `ReturningOption`
+#[allow(dead_code)]
+mod returning_option {
+
+    #[allow(unused_imports)]
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    /// `ReturningOption`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningOption(Box<self::inner::ReturningOption>);
+
+    /// optional `ReturningOption`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningOptionOpt(Option<ReturningOption>);
+
+    #[cfg(test)]
+    impl From<self::inner::ReturningOption> for ReturningOption {
+        fn from(value: self::inner::ReturningOption) -> Self {
+            Self(Box::new(value))
+        }
+    }
+
+    impl crate::syn::Opt<ReturningOption> for ReturningOptionOpt {
+        fn as_inner(&self) -> Option<ReturningOption> {
+            self.0.clone()
+        }
+    }
+
+    /// `ReturningOption` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningOptionList(Vec<ReturningOption>);
+
+    /// optional `ReturningOption` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningOptionListOpt(Option<Vec<ReturningOption>>);
+
+    impl crate::syn::ListOpt<ReturningOption> for ReturningOptionListOpt {
+        type OptType = ReturningOptionOpt;
+
+        fn as_inner(&self) -> Option<Vec<ReturningOption>> {
+            self.0.clone()
+        }
+    }
+
+    impl From<Option<ReturningOption>> for ReturningOptionOpt {
+        fn from(value: Option<ReturningOption>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<::pg_query::protobuf::ReturningOption> for ReturningOption {
+        fn from(value: ::pg_query::protobuf::ReturningOption) -> Self {
+            Self(Box::new(self::inner::ReturningOption::from(value)))
+        }
+    }
+
+    impl From<Box<::pg_query::protobuf::ReturningOption>> for ReturningOption {
+        fn from(value: Box<::pg_query::protobuf::ReturningOption>) -> Self {
+            Self(Box::new(self::inner::ReturningOption::from(*value)))
+        }
+    }
+
+    impl ReturningOptionOpt {
+        /// returns None Value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<ReturningOption> for ReturningOptionOpt {
+        fn from(value: ReturningOption) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&ReturningOption> for ReturningOptionOpt {
+        fn from(value: &ReturningOption) -> Self {
+            Self(Some(value.clone()))
+        }
+    }
+
+    impl From<&ReturningOptionOpt> for ReturningOptionOpt {
+        fn from(value: &ReturningOptionOpt) -> Self {
+            value.clone()
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::ReturningOption>> for ReturningOptionOpt {
+        fn from(value: Option<::pg_query::protobuf::ReturningOption>) -> Self {
+            Self(value.map(ReturningOption::from))
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::ReturningOption>>> for ReturningOptionOpt {
+        fn from(value: Option<Box<::pg_query::protobuf::ReturningOption>>) -> Self {
+            Self(value.map(|v| ReturningOption::from(*v)))
+        }
+    }
+
+    impl ReturningOptionListOpt {
+        /// returns None value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<&ReturningOptionList> for ReturningOptionListOpt {
+        fn from(value: &ReturningOptionList) -> Self {
+            Self(Some(value.0.clone()))
+        }
+    }
+
+    impl From<Vec<ReturningOption>> for ReturningOptionList {
+        fn from(value: Vec<ReturningOption>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Vec<::pg_query::protobuf::ReturningOption>> for ReturningOptionList {
+        fn from(value: Vec<::pg_query::protobuf::ReturningOption>) -> Self {
+            Self(value.into_iter().map(ReturningOption::from).collect())
+        }
+    }
+
+    mod inner {
+
+        #[allow(unused_imports)]
+        #[allow(clippy::wildcard_imports)]
+        use super::*;
+
+        #[cfg_attr(test, derive(derive_builder::Builder))]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
+        #[allow(clippy::struct_excessive_bools)]
+        #[allow(clippy::struct_field_names)]
+        pub struct ReturningOption {
+            /// `option`
+            option: ReturningOptionKindOpt,
+
+            /// `value`
+            value: std::string::String,
+
+            /// `location`
+            location: i32,
+        }
+
+        impl From<::pg_query::protobuf::ReturningOption> for ReturningOption {
+            fn from(value: ::pg_query::protobuf::ReturningOption) -> Self {
+                let option = ReturningOptionKindOpt::from(value.option);
+
+                let value_ = value.value;
+
+                let location = value.location;
+
+                Self {
+                    option,
+
+                    value: value_,
+
+                    location,
+                }
+            }
+        }
+
+        impl ReturningOption {
+            /// get `option`
+            #[must_use]
+            pub fn get_option(&self) -> ReturningOptionKindOpt {
+                ReturningOptionKindOpt::from(&self.option)
+            }
+        }
+
+        impl ReturningOption {
+            /// get `value`
+            #[must_use]
+            pub fn get_value(&self) -> std::string::String {
+                std::string::String::from(&self.value)
+            }
+        }
+
+        impl ReturningOption {
+            /// get `location`
+            #[must_use]
+            pub const fn get_location(&self) -> i32 {
+                self.location
+            }
+        }
+    } // mod inner
+
+    impl ReturningOption {
+        /// get `option`
+        #[must_use]
+        pub fn get_option(&self) -> ReturningOptionKindOpt {
+            self.0.get_option()
+        }
+    }
+
+    impl ReturningOptionOpt {
+        /// get `option`
+        #[must_use]
+        pub fn get_option(&self) -> ReturningOptionKindOpt {
+            match &self.0 {
+                Some(v) => v.get_option(),
+                _ => ReturningOptionKindOpt::none(),
+            }
+        }
+    }
+
+    impl ReturningOption {
+        /// get `value`
+        #[must_use]
+        pub fn get_value(&self) -> std::string::String {
+            self.0.get_value()
+        }
+    }
+
+    impl ReturningOptionOpt {
+        /// get `value`
+        #[must_use]
+        pub fn get_value(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(ReturningOption::get_value)
+        }
+    }
+
+    impl ReturningOption {
+        /// get `location`
+        #[must_use]
+        pub const fn get_location(&self) -> i32 {
+            self.0.get_location()
+        }
+    }
+
+    impl ReturningOptionOpt {
+        /// get `location`
+        #[must_use]
+        pub fn get_location(&self) -> Option<i32> {
+            self.0.as_ref().map(ReturningOption::get_location)
+        }
+    }
+
+    #[cfg(test)]
+    pub use self::inner::ReturningOptionBuilder;
+} // mod returning_option
+
+#[allow(unused_imports)]
+pub use self::returning_option::{
+    ReturningOption, ReturningOptionList, ReturningOptionListOpt, ReturningOptionOpt,
+};
+
+#[cfg(test)]
+pub use self::returning_option::ReturningOptionBuilder;
+
+/// message type `ReturningClause`
+#[allow(dead_code)]
+mod returning_clause {
+
+    #[allow(unused_imports)]
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    /// `ReturningClause`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningClause(Box<self::inner::ReturningClause>);
+
+    /// optional `ReturningClause`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningClauseOpt(Option<ReturningClause>);
+
+    #[cfg(test)]
+    impl From<self::inner::ReturningClause> for ReturningClause {
+        fn from(value: self::inner::ReturningClause) -> Self {
+            Self(Box::new(value))
+        }
+    }
+
+    impl crate::syn::Opt<ReturningClause> for ReturningClauseOpt {
+        fn as_inner(&self) -> Option<ReturningClause> {
+            self.0.clone()
+        }
+    }
+
+    /// `ReturningClause` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningClauseList(Vec<ReturningClause>);
+
+    /// optional `ReturningClause` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReturningClauseListOpt(Option<Vec<ReturningClause>>);
+
+    impl crate::syn::ListOpt<ReturningClause> for ReturningClauseListOpt {
+        type OptType = ReturningClauseOpt;
+
+        fn as_inner(&self) -> Option<Vec<ReturningClause>> {
+            self.0.clone()
+        }
+    }
+
+    impl From<Option<ReturningClause>> for ReturningClauseOpt {
+        fn from(value: Option<ReturningClause>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<::pg_query::protobuf::ReturningClause> for ReturningClause {
+        fn from(value: ::pg_query::protobuf::ReturningClause) -> Self {
+            Self(Box::new(self::inner::ReturningClause::from(value)))
+        }
+    }
+
+    impl From<Box<::pg_query::protobuf::ReturningClause>> for ReturningClause {
+        fn from(value: Box<::pg_query::protobuf::ReturningClause>) -> Self {
+            Self(Box::new(self::inner::ReturningClause::from(*value)))
+        }
+    }
+
+    impl ReturningClauseOpt {
+        /// returns None Value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<ReturningClause> for ReturningClauseOpt {
+        fn from(value: ReturningClause) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&ReturningClause> for ReturningClauseOpt {
+        fn from(value: &ReturningClause) -> Self {
+            Self(Some(value.clone()))
+        }
+    }
+
+    impl From<&ReturningClauseOpt> for ReturningClauseOpt {
+        fn from(value: &ReturningClauseOpt) -> Self {
+            value.clone()
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::ReturningClause>> for ReturningClauseOpt {
+        fn from(value: Option<::pg_query::protobuf::ReturningClause>) -> Self {
+            Self(value.map(ReturningClause::from))
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::ReturningClause>>> for ReturningClauseOpt {
+        fn from(value: Option<Box<::pg_query::protobuf::ReturningClause>>) -> Self {
+            Self(value.map(|v| ReturningClause::from(*v)))
+        }
+    }
+
+    impl ReturningClauseListOpt {
+        /// returns None value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<&ReturningClauseList> for ReturningClauseListOpt {
+        fn from(value: &ReturningClauseList) -> Self {
+            Self(Some(value.0.clone()))
+        }
+    }
+
+    impl From<Vec<ReturningClause>> for ReturningClauseList {
+        fn from(value: Vec<ReturningClause>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Vec<::pg_query::protobuf::ReturningClause>> for ReturningClauseList {
+        fn from(value: Vec<::pg_query::protobuf::ReturningClause>) -> Self {
+            Self(value.into_iter().map(ReturningClause::from).collect())
+        }
+    }
+
+    mod inner {
+
+        #[allow(unused_imports)]
+        #[allow(clippy::wildcard_imports)]
+        use super::*;
+
+        #[cfg_attr(test, derive(derive_builder::Builder))]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
+        #[allow(clippy::struct_excessive_bools)]
+        #[allow(clippy::struct_field_names)]
+        pub struct ReturningClause {
+            /// `options`
+            options: NodeList,
+
+            /// `exprs`
+            exprs: NodeList,
+        }
+
+        impl From<::pg_query::protobuf::ReturningClause> for ReturningClause {
+            fn from(value: ::pg_query::protobuf::ReturningClause) -> Self {
+                let options = NodeList::from(value.options);
+
+                let exprs = NodeList::from(value.exprs);
+
+                Self { options, exprs }
+            }
+        }
+
+        impl ReturningClause {
+            /// get `options`
+            #[must_use]
+            pub fn get_options(&self) -> NodeListOpt {
+                NodeListOpt::from(&self.options)
+            }
+        }
+
+        impl ReturningClause {
+            /// get `exprs`
+            #[must_use]
+            pub fn get_exprs(&self) -> NodeListOpt {
+                NodeListOpt::from(&self.exprs)
+            }
+        }
+    } // mod inner
+
+    impl ReturningClause {
+        /// get `options`
+        #[must_use]
+        pub fn get_options(&self) -> NodeListOpt {
+            self.0.get_options()
+        }
+    }
+
+    impl ReturningClauseOpt {
+        /// get `options`
+        #[must_use]
+        pub fn get_options(&self) -> NodeListOpt {
+            match &self.0 {
+                Some(v) => v.get_options(),
+                _ => NodeListOpt::none(),
+            }
+        }
+    }
+
+    impl ReturningClause {
+        /// get `exprs`
+        #[must_use]
+        pub fn get_exprs(&self) -> NodeListOpt {
+            self.0.get_exprs()
+        }
+    }
+
+    impl ReturningClauseOpt {
+        /// get `exprs`
+        #[must_use]
+        pub fn get_exprs(&self) -> NodeListOpt {
+            match &self.0 {
+                Some(v) => v.get_exprs(),
+                _ => NodeListOpt::none(),
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub use self::inner::ReturningClauseBuilder;
+} // mod returning_clause
+
+#[allow(unused_imports)]
+pub use self::returning_clause::{
+    ReturningClause, ReturningClauseList, ReturningClauseListOpt, ReturningClauseOpt,
+};
+
+#[cfg(test)]
+pub use self::returning_clause::ReturningClauseBuilder;
+
 /// message type `TriggerTransition`
 #[allow(dead_code)]
 mod trigger_transition {
@@ -70133,7 +71609,7 @@ mod trigger_transition {
     impl TriggerTransition {
         /// get `is_new`
         #[must_use]
-        pub fn get_is_new(&self) -> bool {
+        pub const fn get_is_new(&self) -> bool {
             self.0.get_is_new()
         }
     }
@@ -70149,7 +71625,7 @@ mod trigger_transition {
     impl TriggerTransition {
         /// get `is_table`
         #[must_use]
-        pub fn get_is_table(&self) -> bool {
+        pub const fn get_is_table(&self) -> bool {
             self.0.get_is_table()
         }
     }
@@ -71133,7 +72609,7 @@ mod json_func_expr {
     impl JsonFuncExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -71407,7 +72883,7 @@ mod json_table_path_spec {
     impl JsonTablePathSpec {
         /// get `name_location`
         #[must_use]
-        pub fn get_name_location(&self) -> i32 {
+        pub const fn get_name_location(&self) -> i32 {
             self.0.get_name_location()
         }
     }
@@ -71423,7 +72899,7 @@ mod json_table_path_spec {
     impl JsonTablePathSpec {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -71836,7 +73312,7 @@ mod json_table {
     impl JsonTable {
         /// get `lateral`
         #[must_use]
-        pub fn get_lateral(&self) -> bool {
+        pub const fn get_lateral(&self) -> bool {
             self.0.get_lateral()
         }
     }
@@ -71852,7 +73328,7 @@ mod json_table {
     impl JsonTable {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -72381,7 +73857,7 @@ mod json_table_column {
     impl JsonTableColumn {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -72885,7 +74361,7 @@ mod json_parse_expr {
     impl JsonParseExpr {
         /// get `unique_keys`
         #[must_use]
-        pub fn get_unique_keys(&self) -> bool {
+        pub const fn get_unique_keys(&self) -> bool {
             self.0.get_unique_keys()
         }
     }
@@ -72901,7 +74377,7 @@ mod json_parse_expr {
     impl JsonParseExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -73163,7 +74639,7 @@ mod json_scalar_expr {
     impl JsonScalarExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -73425,7 +74901,7 @@ mod json_serialize_expr {
     impl JsonSerializeExpr {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -73717,7 +75193,7 @@ mod json_object_constructor {
     impl JsonObjectConstructor {
         /// get `absent_on_null`
         #[must_use]
-        pub fn get_absent_on_null(&self) -> bool {
+        pub const fn get_absent_on_null(&self) -> bool {
             self.0.get_absent_on_null()
         }
     }
@@ -73735,7 +75211,7 @@ mod json_object_constructor {
     impl JsonObjectConstructor {
         /// get `unique`
         #[must_use]
-        pub fn get_unique(&self) -> bool {
+        pub const fn get_unique(&self) -> bool {
             self.0.get_unique()
         }
     }
@@ -73751,7 +75227,7 @@ mod json_object_constructor {
     impl JsonObjectConstructor {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -74029,7 +75505,7 @@ mod json_array_constructor {
     impl JsonArrayConstructor {
         /// get `absent_on_null`
         #[must_use]
-        pub fn get_absent_on_null(&self) -> bool {
+        pub const fn get_absent_on_null(&self) -> bool {
             self.0.get_absent_on_null()
         }
     }
@@ -74047,7 +75523,7 @@ mod json_array_constructor {
     impl JsonArrayConstructor {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -74372,7 +75848,7 @@ mod json_array_query_constructor {
     impl JsonArrayQueryConstructor {
         /// get `absent_on_null`
         #[must_use]
-        pub fn get_absent_on_null(&self) -> bool {
+        pub const fn get_absent_on_null(&self) -> bool {
             self.0.get_absent_on_null()
         }
     }
@@ -74390,7 +75866,7 @@ mod json_array_query_constructor {
     impl JsonArrayQueryConstructor {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -74721,7 +76197,7 @@ mod json_agg_constructor {
     impl JsonAggConstructor {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -74998,7 +76474,7 @@ mod json_object_agg {
     impl JsonObjectAgg {
         /// get `absent_on_null`
         #[must_use]
-        pub fn get_absent_on_null(&self) -> bool {
+        pub const fn get_absent_on_null(&self) -> bool {
             self.0.get_absent_on_null()
         }
     }
@@ -75014,7 +76490,7 @@ mod json_object_agg {
     impl JsonObjectAgg {
         /// get `unique`
         #[must_use]
-        pub fn get_unique(&self) -> bool {
+        pub const fn get_unique(&self) -> bool {
             self.0.get_unique()
         }
     }
@@ -75276,7 +76752,7 @@ mod json_array_agg {
     impl JsonArrayAgg {
         /// get `absent_on_null`
         #[must_use]
-        pub fn get_absent_on_null(&self) -> bool {
+        pub const fn get_absent_on_null(&self) -> bool {
             self.0.get_absent_on_null()
         }
     }
@@ -75519,7 +76995,7 @@ mod raw_stmt {
     impl RawStmt {
         /// get `stmt_location`
         #[must_use]
-        pub fn get_stmt_location(&self) -> i32 {
+        pub const fn get_stmt_location(&self) -> i32 {
             self.0.get_stmt_location()
         }
     }
@@ -75535,7 +77011,7 @@ mod raw_stmt {
     impl RawStmt {
         /// get `stmt_len`
         #[must_use]
-        pub fn get_stmt_len(&self) -> i32 {
+        pub const fn get_stmt_len(&self) -> i32 {
             self.0.get_stmt_len()
         }
     }
@@ -75713,8 +77189,8 @@ mod insert_stmt {
             /// `on_conflict_clause`
             on_conflict_clause: OnConflictClauseOpt,
 
-            /// `returning_list`
-            returning_list: NodeList,
+            /// `returning_clause`
+            returning_clause: ReturningClauseOpt,
 
             /// `with_clause`
             with_clause: WithClauseOpt,
@@ -75733,7 +77209,7 @@ mod insert_stmt {
 
                 let on_conflict_clause = OnConflictClauseOpt::from(value.on_conflict_clause);
 
-                let returning_list = NodeList::from(value.returning_list);
+                let returning_clause = ReturningClauseOpt::from(value.returning_clause);
 
                 let with_clause = WithClauseOpt::from(value.with_clause);
 
@@ -75748,7 +77224,7 @@ mod insert_stmt {
 
                     on_conflict_clause,
 
-                    returning_list,
+                    returning_clause,
 
                     with_clause,
 
@@ -75790,10 +77266,10 @@ mod insert_stmt {
         }
 
         impl InsertStmt {
-            /// get `returning_list`
+            /// get `returning_clause`
             #[must_use]
-            pub fn get_returning_list(&self) -> NodeListOpt {
-                NodeListOpt::from(&self.returning_list)
+            pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+                ReturningClauseOpt::from(&self.returning_clause)
             }
         }
 
@@ -75891,20 +77367,20 @@ mod insert_stmt {
     }
 
     impl InsertStmt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
-            self.0.get_returning_list()
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+            self.0.get_returning_clause()
         }
     }
 
     impl InsertStmtOpt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
             match &self.0 {
-                Some(v) => v.get_returning_list(),
-                _ => NodeListOpt::none(),
+                Some(v) => v.get_returning_clause(),
+                _ => ReturningClauseOpt::none(),
             }
         }
     }
@@ -76109,8 +77585,8 @@ mod delete_stmt {
             /// `where_clause`
             where_clause: NodeOpt,
 
-            /// `returning_list`
-            returning_list: NodeList,
+            /// `returning_clause`
+            returning_clause: ReturningClauseOpt,
 
             /// `with_clause`
             with_clause: WithClauseOpt,
@@ -76124,7 +77600,7 @@ mod delete_stmt {
 
                 let where_clause = NodeOpt::from(value.where_clause);
 
-                let returning_list = NodeList::from(value.returning_list);
+                let returning_clause = ReturningClauseOpt::from(value.returning_clause);
 
                 let with_clause = WithClauseOpt::from(value.with_clause);
 
@@ -76135,7 +77611,7 @@ mod delete_stmt {
 
                     where_clause,
 
-                    returning_list,
+                    returning_clause,
 
                     with_clause,
                 }
@@ -76167,10 +77643,10 @@ mod delete_stmt {
         }
 
         impl DeleteStmt {
-            /// get `returning_list`
+            /// get `returning_clause`
             #[must_use]
-            pub fn get_returning_list(&self) -> NodeListOpt {
-                NodeListOpt::from(&self.returning_list)
+            pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+                ReturningClauseOpt::from(&self.returning_clause)
             }
         }
 
@@ -76241,20 +77717,20 @@ mod delete_stmt {
     }
 
     impl DeleteStmt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
-            self.0.get_returning_list()
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+            self.0.get_returning_clause()
         }
     }
 
     impl DeleteStmtOpt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
             match &self.0 {
-                Some(v) => v.get_returning_list(),
-                _ => NodeListOpt::none(),
+                Some(v) => v.get_returning_clause(),
+                _ => ReturningClauseOpt::none(),
             }
         }
     }
@@ -76443,8 +77919,8 @@ mod update_stmt {
             /// `from_clause`
             from_clause: NodeList,
 
-            /// `returning_list`
-            returning_list: NodeList,
+            /// `returning_clause`
+            returning_clause: ReturningClauseOpt,
 
             /// `with_clause`
             with_clause: WithClauseOpt,
@@ -76460,7 +77936,7 @@ mod update_stmt {
 
                 let from_clause = NodeList::from(value.from_clause);
 
-                let returning_list = NodeList::from(value.returning_list);
+                let returning_clause = ReturningClauseOpt::from(value.returning_clause);
 
                 let with_clause = WithClauseOpt::from(value.with_clause);
 
@@ -76473,7 +77949,7 @@ mod update_stmt {
 
                     from_clause,
 
-                    returning_list,
+                    returning_clause,
 
                     with_clause,
                 }
@@ -76513,10 +77989,10 @@ mod update_stmt {
         }
 
         impl UpdateStmt {
-            /// get `returning_list`
+            /// get `returning_clause`
             #[must_use]
-            pub fn get_returning_list(&self) -> NodeListOpt {
-                NodeListOpt::from(&self.returning_list)
+            pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+                ReturningClauseOpt::from(&self.returning_clause)
             }
         }
 
@@ -76606,20 +78082,20 @@ mod update_stmt {
     }
 
     impl UpdateStmt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
-            self.0.get_returning_list()
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+            self.0.get_returning_clause()
         }
     }
 
     impl UpdateStmtOpt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
             match &self.0 {
-                Some(v) => v.get_returning_list(),
-                _ => NodeListOpt::none(),
+                Some(v) => v.get_returning_clause(),
+                _ => ReturningClauseOpt::none(),
             }
         }
     }
@@ -76808,8 +78284,8 @@ mod merge_stmt {
             /// `merge_when_clauses`
             merge_when_clauses: NodeList,
 
-            /// `returning_list`
-            returning_list: NodeList,
+            /// `returning_clause`
+            returning_clause: ReturningClauseOpt,
 
             /// `with_clause`
             with_clause: WithClauseOpt,
@@ -76825,7 +78301,7 @@ mod merge_stmt {
 
                 let merge_when_clauses = NodeList::from(value.merge_when_clauses);
 
-                let returning_list = NodeList::from(value.returning_list);
+                let returning_clause = ReturningClauseOpt::from(value.returning_clause);
 
                 let with_clause = WithClauseOpt::from(value.with_clause);
 
@@ -76838,7 +78314,7 @@ mod merge_stmt {
 
                     merge_when_clauses,
 
-                    returning_list,
+                    returning_clause,
 
                     with_clause,
                 }
@@ -76878,10 +78354,10 @@ mod merge_stmt {
         }
 
         impl MergeStmt {
-            /// get `returning_list`
+            /// get `returning_clause`
             #[must_use]
-            pub fn get_returning_list(&self) -> NodeListOpt {
-                NodeListOpt::from(&self.returning_list)
+            pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+                ReturningClauseOpt::from(&self.returning_clause)
             }
         }
 
@@ -76971,20 +78447,20 @@ mod merge_stmt {
     }
 
     impl MergeStmt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
-            self.0.get_returning_list()
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
+            self.0.get_returning_clause()
         }
     }
 
     impl MergeStmtOpt {
-        /// get `returning_list`
+        /// get `returning_clause`
         #[must_use]
-        pub fn get_returning_list(&self) -> NodeListOpt {
+        pub fn get_returning_clause(&self) -> ReturningClauseOpt {
             match &self.0 {
-                Some(v) => v.get_returning_list(),
-                _ => NodeListOpt::none(),
+                Some(v) => v.get_returning_clause(),
+                _ => ReturningClauseOpt::none(),
             }
         }
     }
@@ -77586,7 +79062,7 @@ mod select_stmt {
     impl SelectStmt {
         /// get `group_distinct`
         #[must_use]
-        pub fn get_group_distinct(&self) -> bool {
+        pub const fn get_group_distinct(&self) -> bool {
             self.0.get_group_distinct()
         }
     }
@@ -77792,7 +79268,7 @@ mod select_stmt {
     impl SelectStmt {
         /// get `all`
         #[must_use]
-        pub fn get_all(&self) -> bool {
+        pub const fn get_all(&self) -> bool {
             self.0.get_all()
         }
     }
@@ -78146,7 +79622,7 @@ mod set_operation_stmt {
     impl SetOperationStmt {
         /// get `all`
         #[must_use]
-        pub fn get_all(&self) -> bool {
+        pub const fn get_all(&self) -> bool {
             self.0.get_all()
         }
     }
@@ -78742,7 +80218,7 @@ mod pl_assign_stmt {
     impl PlAssignStmt {
         /// get `nnames`
         #[must_use]
-        pub fn get_nnames(&self) -> i32 {
+        pub const fn get_nnames(&self) -> i32 {
             self.0.get_nnames()
         }
     }
@@ -78777,7 +80253,7 @@ mod pl_assign_stmt {
     impl PlAssignStmt {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -79070,7 +80546,7 @@ mod create_schema_stmt {
     impl CreateSchemaStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -79366,7 +80842,7 @@ mod alter_table_stmt {
     impl AlterTableStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -79390,232 +80866,6 @@ pub use self::alter_table_stmt::{
 
 #[cfg(test)]
 pub use self::alter_table_stmt::AlterTableStmtBuilder;
-
-/// message type `ReplicaIdentityStmt`
-#[allow(dead_code)]
-mod replica_identity_stmt {
-
-    #[allow(unused_imports)]
-    #[allow(clippy::wildcard_imports)]
-    use super::*;
-
-    /// `ReplicaIdentityStmt`
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct ReplicaIdentityStmt(Box<self::inner::ReplicaIdentityStmt>);
-
-    /// optional `ReplicaIdentityStmt`
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct ReplicaIdentityStmtOpt(Option<ReplicaIdentityStmt>);
-
-    #[cfg(test)]
-    impl From<self::inner::ReplicaIdentityStmt> for ReplicaIdentityStmt {
-        fn from(value: self::inner::ReplicaIdentityStmt) -> Self {
-            Self(Box::new(value))
-        }
-    }
-
-    impl crate::syn::Opt<ReplicaIdentityStmt> for ReplicaIdentityStmtOpt {
-        fn as_inner(&self) -> Option<ReplicaIdentityStmt> {
-            self.0.clone()
-        }
-    }
-
-    /// `ReplicaIdentityStmt` list
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct ReplicaIdentityStmtList(Vec<ReplicaIdentityStmt>);
-
-    /// optional `ReplicaIdentityStmt` list
-    #[derive(Debug, Clone)]
-    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-    pub struct ReplicaIdentityStmtListOpt(Option<Vec<ReplicaIdentityStmt>>);
-
-    impl crate::syn::ListOpt<ReplicaIdentityStmt> for ReplicaIdentityStmtListOpt {
-        type OptType = ReplicaIdentityStmtOpt;
-
-        fn as_inner(&self) -> Option<Vec<ReplicaIdentityStmt>> {
-            self.0.clone()
-        }
-    }
-
-    impl From<Option<ReplicaIdentityStmt>> for ReplicaIdentityStmtOpt {
-        fn from(value: Option<ReplicaIdentityStmt>) -> Self {
-            Self(value)
-        }
-    }
-
-    impl From<::pg_query::protobuf::ReplicaIdentityStmt> for ReplicaIdentityStmt {
-        fn from(value: ::pg_query::protobuf::ReplicaIdentityStmt) -> Self {
-            Self(Box::new(self::inner::ReplicaIdentityStmt::from(value)))
-        }
-    }
-
-    impl From<Box<::pg_query::protobuf::ReplicaIdentityStmt>> for ReplicaIdentityStmt {
-        fn from(value: Box<::pg_query::protobuf::ReplicaIdentityStmt>) -> Self {
-            Self(Box::new(self::inner::ReplicaIdentityStmt::from(*value)))
-        }
-    }
-
-    impl ReplicaIdentityStmtOpt {
-        /// returns None Value
-        #[must_use]
-        pub const fn none() -> Self {
-            Self(None)
-        }
-    }
-
-    impl From<ReplicaIdentityStmt> for ReplicaIdentityStmtOpt {
-        fn from(value: ReplicaIdentityStmt) -> Self {
-            Self(Some(value))
-        }
-    }
-
-    impl From<&ReplicaIdentityStmt> for ReplicaIdentityStmtOpt {
-        fn from(value: &ReplicaIdentityStmt) -> Self {
-            Self(Some(value.clone()))
-        }
-    }
-
-    impl From<&ReplicaIdentityStmtOpt> for ReplicaIdentityStmtOpt {
-        fn from(value: &ReplicaIdentityStmtOpt) -> Self {
-            value.clone()
-        }
-    }
-
-    impl From<Option<::pg_query::protobuf::ReplicaIdentityStmt>> for ReplicaIdentityStmtOpt {
-        fn from(value: Option<::pg_query::protobuf::ReplicaIdentityStmt>) -> Self {
-            Self(value.map(ReplicaIdentityStmt::from))
-        }
-    }
-
-    impl From<Option<Box<::pg_query::protobuf::ReplicaIdentityStmt>>> for ReplicaIdentityStmtOpt {
-        fn from(value: Option<Box<::pg_query::protobuf::ReplicaIdentityStmt>>) -> Self {
-            Self(value.map(|v| ReplicaIdentityStmt::from(*v)))
-        }
-    }
-
-    impl ReplicaIdentityStmtListOpt {
-        /// returns None value
-        #[must_use]
-        pub const fn none() -> Self {
-            Self(None)
-        }
-    }
-
-    impl From<&ReplicaIdentityStmtList> for ReplicaIdentityStmtListOpt {
-        fn from(value: &ReplicaIdentityStmtList) -> Self {
-            Self(Some(value.0.clone()))
-        }
-    }
-
-    impl From<Vec<ReplicaIdentityStmt>> for ReplicaIdentityStmtList {
-        fn from(value: Vec<ReplicaIdentityStmt>) -> Self {
-            Self(value)
-        }
-    }
-
-    impl From<Vec<::pg_query::protobuf::ReplicaIdentityStmt>> for ReplicaIdentityStmtList {
-        fn from(value: Vec<::pg_query::protobuf::ReplicaIdentityStmt>) -> Self {
-            Self(value.into_iter().map(ReplicaIdentityStmt::from).collect())
-        }
-    }
-
-    mod inner {
-
-        #[allow(unused_imports)]
-        #[allow(clippy::wildcard_imports)]
-        use super::*;
-
-        #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
-        #[derive(Clone, Debug)]
-        #[allow(clippy::struct_excessive_bools)]
-        #[allow(clippy::struct_field_names)]
-        pub struct ReplicaIdentityStmt {
-            /// `identity_type`
-            identity_type: std::string::String,
-
-            /// `name`
-            name: std::string::String,
-        }
-
-        impl From<::pg_query::protobuf::ReplicaIdentityStmt> for ReplicaIdentityStmt {
-            fn from(value: ::pg_query::protobuf::ReplicaIdentityStmt) -> Self {
-                let identity_type = value.identity_type;
-
-                let name = value.name;
-
-                Self {
-                    identity_type,
-
-                    name,
-                }
-            }
-        }
-
-        impl ReplicaIdentityStmt {
-            /// get `identity_type`
-            #[must_use]
-            pub fn get_identity_type(&self) -> std::string::String {
-                std::string::String::from(&self.identity_type)
-            }
-        }
-
-        impl ReplicaIdentityStmt {
-            /// get `name`
-            #[must_use]
-            pub fn get_name(&self) -> std::string::String {
-                std::string::String::from(&self.name)
-            }
-        }
-    } // mod inner
-
-    impl ReplicaIdentityStmt {
-        /// get `identity_type`
-        #[must_use]
-        pub fn get_identity_type(&self) -> std::string::String {
-            self.0.get_identity_type()
-        }
-    }
-
-    impl ReplicaIdentityStmtOpt {
-        /// get `identity_type`
-        #[must_use]
-        pub fn get_identity_type(&self) -> Option<std::string::String> {
-            self.0.as_ref().map(ReplicaIdentityStmt::get_identity_type)
-        }
-    }
-
-    impl ReplicaIdentityStmt {
-        /// get `name`
-        #[must_use]
-        pub fn get_name(&self) -> std::string::String {
-            self.0.get_name()
-        }
-    }
-
-    impl ReplicaIdentityStmtOpt {
-        /// get `name`
-        #[must_use]
-        pub fn get_name(&self) -> Option<std::string::String> {
-            self.0.as_ref().map(ReplicaIdentityStmt::get_name)
-        }
-    }
-
-    #[cfg(test)]
-    pub use self::inner::ReplicaIdentityStmtBuilder;
-} // mod replica_identity_stmt
-
-#[allow(unused_imports)]
-pub use self::replica_identity_stmt::{
-    ReplicaIdentityStmt, ReplicaIdentityStmtList, ReplicaIdentityStmtListOpt,
-    ReplicaIdentityStmtOpt,
-};
-
-#[cfg(test)]
-pub use self::replica_identity_stmt::ReplicaIdentityStmtBuilder;
 
 /// message type `AlterTableCmd`
 #[allow(dead_code)]
@@ -79926,7 +81176,7 @@ mod alter_table_cmd {
     impl AlterTableCmd {
         /// get `num`
         #[must_use]
-        pub fn get_num(&self) -> i32 {
+        pub const fn get_num(&self) -> i32 {
             self.0.get_num()
         }
     }
@@ -79999,7 +81249,7 @@ mod alter_table_cmd {
     impl AlterTableCmd {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -80015,7 +81265,7 @@ mod alter_table_cmd {
     impl AlterTableCmd {
         /// get `recurse`
         #[must_use]
-        pub fn get_recurse(&self) -> bool {
+        pub const fn get_recurse(&self) -> bool {
             self.0.get_recurse()
         }
     }
@@ -80039,6 +81289,649 @@ pub use self::alter_table_cmd::{
 
 #[cfg(test)]
 pub use self::alter_table_cmd::AlterTableCmdBuilder;
+
+/// message type `AtAlterConstraint`
+#[allow(dead_code)]
+mod at_alter_constraint {
+
+    #[allow(unused_imports)]
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    /// `AtAlterConstraint`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct AtAlterConstraint(Box<self::inner::AtAlterConstraint>);
+
+    /// optional `AtAlterConstraint`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct AtAlterConstraintOpt(Option<AtAlterConstraint>);
+
+    #[cfg(test)]
+    impl From<self::inner::AtAlterConstraint> for AtAlterConstraint {
+        fn from(value: self::inner::AtAlterConstraint) -> Self {
+            Self(Box::new(value))
+        }
+    }
+
+    impl crate::syn::Opt<AtAlterConstraint> for AtAlterConstraintOpt {
+        fn as_inner(&self) -> Option<AtAlterConstraint> {
+            self.0.clone()
+        }
+    }
+
+    /// `AtAlterConstraint` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct AtAlterConstraintList(Vec<AtAlterConstraint>);
+
+    /// optional `AtAlterConstraint` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct AtAlterConstraintListOpt(Option<Vec<AtAlterConstraint>>);
+
+    impl crate::syn::ListOpt<AtAlterConstraint> for AtAlterConstraintListOpt {
+        type OptType = AtAlterConstraintOpt;
+
+        fn as_inner(&self) -> Option<Vec<AtAlterConstraint>> {
+            self.0.clone()
+        }
+    }
+
+    impl From<Option<AtAlterConstraint>> for AtAlterConstraintOpt {
+        fn from(value: Option<AtAlterConstraint>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<::pg_query::protobuf::AtAlterConstraint> for AtAlterConstraint {
+        fn from(value: ::pg_query::protobuf::AtAlterConstraint) -> Self {
+            Self(Box::new(self::inner::AtAlterConstraint::from(value)))
+        }
+    }
+
+    impl From<Box<::pg_query::protobuf::AtAlterConstraint>> for AtAlterConstraint {
+        fn from(value: Box<::pg_query::protobuf::AtAlterConstraint>) -> Self {
+            Self(Box::new(self::inner::AtAlterConstraint::from(*value)))
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// returns None Value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<AtAlterConstraint> for AtAlterConstraintOpt {
+        fn from(value: AtAlterConstraint) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&AtAlterConstraint> for AtAlterConstraintOpt {
+        fn from(value: &AtAlterConstraint) -> Self {
+            Self(Some(value.clone()))
+        }
+    }
+
+    impl From<&AtAlterConstraintOpt> for AtAlterConstraintOpt {
+        fn from(value: &AtAlterConstraintOpt) -> Self {
+            value.clone()
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::AtAlterConstraint>> for AtAlterConstraintOpt {
+        fn from(value: Option<::pg_query::protobuf::AtAlterConstraint>) -> Self {
+            Self(value.map(AtAlterConstraint::from))
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::AtAlterConstraint>>> for AtAlterConstraintOpt {
+        fn from(value: Option<Box<::pg_query::protobuf::AtAlterConstraint>>) -> Self {
+            Self(value.map(|v| AtAlterConstraint::from(*v)))
+        }
+    }
+
+    impl AtAlterConstraintListOpt {
+        /// returns None value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<&AtAlterConstraintList> for AtAlterConstraintListOpt {
+        fn from(value: &AtAlterConstraintList) -> Self {
+            Self(Some(value.0.clone()))
+        }
+    }
+
+    impl From<Vec<AtAlterConstraint>> for AtAlterConstraintList {
+        fn from(value: Vec<AtAlterConstraint>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Vec<::pg_query::protobuf::AtAlterConstraint>> for AtAlterConstraintList {
+        fn from(value: Vec<::pg_query::protobuf::AtAlterConstraint>) -> Self {
+            Self(value.into_iter().map(AtAlterConstraint::from).collect())
+        }
+    }
+
+    mod inner {
+
+        #[allow(unused_imports)]
+        #[allow(clippy::wildcard_imports)]
+        use super::*;
+
+        #[cfg_attr(test, derive(derive_builder::Builder))]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
+        #[allow(clippy::struct_excessive_bools)]
+        #[allow(clippy::struct_field_names)]
+        pub struct AtAlterConstraint {
+            /// `conname`
+            conname: std::string::String,
+
+            /// `alter_enforceability`
+            alter_enforceability: bool,
+
+            /// `is_enforced`
+            is_enforced: bool,
+
+            /// `alter_deferrability`
+            alter_deferrability: bool,
+
+            /// `deferrable`
+            deferrable: bool,
+
+            /// `initdeferred`
+            initdeferred: bool,
+
+            /// `alter_inheritability`
+            alter_inheritability: bool,
+
+            /// `noinherit`
+            noinherit: bool,
+        }
+
+        impl From<::pg_query::protobuf::AtAlterConstraint> for AtAlterConstraint {
+            fn from(value: ::pg_query::protobuf::AtAlterConstraint) -> Self {
+                let conname = value.conname;
+
+                let alter_enforceability = value.alter_enforceability;
+
+                let is_enforced = value.is_enforced;
+
+                let alter_deferrability = value.alter_deferrability;
+
+                let deferrable = value.deferrable;
+
+                let initdeferred = value.initdeferred;
+
+                let alter_inheritability = value.alter_inheritability;
+
+                let noinherit = value.noinherit;
+
+                Self {
+                    conname,
+
+                    alter_enforceability,
+
+                    is_enforced,
+
+                    alter_deferrability,
+
+                    deferrable,
+
+                    initdeferred,
+
+                    alter_inheritability,
+
+                    noinherit,
+                }
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `conname`
+            #[must_use]
+            pub fn get_conname(&self) -> std::string::String {
+                std::string::String::from(&self.conname)
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `alter_enforceability`
+            #[must_use]
+            pub const fn get_alter_enforceability(&self) -> bool {
+                self.alter_enforceability
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `is_enforced`
+            #[must_use]
+            pub const fn get_is_enforced(&self) -> bool {
+                self.is_enforced
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `alter_deferrability`
+            #[must_use]
+            pub const fn get_alter_deferrability(&self) -> bool {
+                self.alter_deferrability
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `deferrable`
+            #[must_use]
+            pub const fn get_deferrable(&self) -> bool {
+                self.deferrable
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `initdeferred`
+            #[must_use]
+            pub const fn get_initdeferred(&self) -> bool {
+                self.initdeferred
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `alter_inheritability`
+            #[must_use]
+            pub const fn get_alter_inheritability(&self) -> bool {
+                self.alter_inheritability
+            }
+        }
+
+        impl AtAlterConstraint {
+            /// get `noinherit`
+            #[must_use]
+            pub const fn get_noinherit(&self) -> bool {
+                self.noinherit
+            }
+        }
+    } // mod inner
+
+    impl AtAlterConstraint {
+        /// get `conname`
+        #[must_use]
+        pub fn get_conname(&self) -> std::string::String {
+            self.0.get_conname()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `conname`
+        #[must_use]
+        pub fn get_conname(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(AtAlterConstraint::get_conname)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `alter_enforceability`
+        #[must_use]
+        pub const fn get_alter_enforceability(&self) -> bool {
+            self.0.get_alter_enforceability()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `alter_enforceability`
+        #[must_use]
+        pub fn get_alter_enforceability(&self) -> Option<bool> {
+            self.0
+                .as_ref()
+                .map(AtAlterConstraint::get_alter_enforceability)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `is_enforced`
+        #[must_use]
+        pub const fn get_is_enforced(&self) -> bool {
+            self.0.get_is_enforced()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `is_enforced`
+        #[must_use]
+        pub fn get_is_enforced(&self) -> Option<bool> {
+            self.0.as_ref().map(AtAlterConstraint::get_is_enforced)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `alter_deferrability`
+        #[must_use]
+        pub const fn get_alter_deferrability(&self) -> bool {
+            self.0.get_alter_deferrability()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `alter_deferrability`
+        #[must_use]
+        pub fn get_alter_deferrability(&self) -> Option<bool> {
+            self.0
+                .as_ref()
+                .map(AtAlterConstraint::get_alter_deferrability)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `deferrable`
+        #[must_use]
+        pub const fn get_deferrable(&self) -> bool {
+            self.0.get_deferrable()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `deferrable`
+        #[must_use]
+        pub fn get_deferrable(&self) -> Option<bool> {
+            self.0.as_ref().map(AtAlterConstraint::get_deferrable)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `initdeferred`
+        #[must_use]
+        pub const fn get_initdeferred(&self) -> bool {
+            self.0.get_initdeferred()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `initdeferred`
+        #[must_use]
+        pub fn get_initdeferred(&self) -> Option<bool> {
+            self.0.as_ref().map(AtAlterConstraint::get_initdeferred)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `alter_inheritability`
+        #[must_use]
+        pub const fn get_alter_inheritability(&self) -> bool {
+            self.0.get_alter_inheritability()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `alter_inheritability`
+        #[must_use]
+        pub fn get_alter_inheritability(&self) -> Option<bool> {
+            self.0
+                .as_ref()
+                .map(AtAlterConstraint::get_alter_inheritability)
+        }
+    }
+
+    impl AtAlterConstraint {
+        /// get `noinherit`
+        #[must_use]
+        pub const fn get_noinherit(&self) -> bool {
+            self.0.get_noinherit()
+        }
+    }
+
+    impl AtAlterConstraintOpt {
+        /// get `noinherit`
+        #[must_use]
+        pub fn get_noinherit(&self) -> Option<bool> {
+            self.0.as_ref().map(AtAlterConstraint::get_noinherit)
+        }
+    }
+
+    #[cfg(test)]
+    pub use self::inner::AtAlterConstraintBuilder;
+} // mod at_alter_constraint
+
+#[allow(unused_imports)]
+pub use self::at_alter_constraint::{
+    AtAlterConstraint, AtAlterConstraintList, AtAlterConstraintListOpt, AtAlterConstraintOpt,
+};
+
+#[cfg(test)]
+pub use self::at_alter_constraint::AtAlterConstraintBuilder;
+
+/// message type `ReplicaIdentityStmt`
+#[allow(dead_code)]
+mod replica_identity_stmt {
+
+    #[allow(unused_imports)]
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    /// `ReplicaIdentityStmt`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReplicaIdentityStmt(Box<self::inner::ReplicaIdentityStmt>);
+
+    /// optional `ReplicaIdentityStmt`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReplicaIdentityStmtOpt(Option<ReplicaIdentityStmt>);
+
+    #[cfg(test)]
+    impl From<self::inner::ReplicaIdentityStmt> for ReplicaIdentityStmt {
+        fn from(value: self::inner::ReplicaIdentityStmt) -> Self {
+            Self(Box::new(value))
+        }
+    }
+
+    impl crate::syn::Opt<ReplicaIdentityStmt> for ReplicaIdentityStmtOpt {
+        fn as_inner(&self) -> Option<ReplicaIdentityStmt> {
+            self.0.clone()
+        }
+    }
+
+    /// `ReplicaIdentityStmt` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReplicaIdentityStmtList(Vec<ReplicaIdentityStmt>);
+
+    /// optional `ReplicaIdentityStmt` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct ReplicaIdentityStmtListOpt(Option<Vec<ReplicaIdentityStmt>>);
+
+    impl crate::syn::ListOpt<ReplicaIdentityStmt> for ReplicaIdentityStmtListOpt {
+        type OptType = ReplicaIdentityStmtOpt;
+
+        fn as_inner(&self) -> Option<Vec<ReplicaIdentityStmt>> {
+            self.0.clone()
+        }
+    }
+
+    impl From<Option<ReplicaIdentityStmt>> for ReplicaIdentityStmtOpt {
+        fn from(value: Option<ReplicaIdentityStmt>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<::pg_query::protobuf::ReplicaIdentityStmt> for ReplicaIdentityStmt {
+        fn from(value: ::pg_query::protobuf::ReplicaIdentityStmt) -> Self {
+            Self(Box::new(self::inner::ReplicaIdentityStmt::from(value)))
+        }
+    }
+
+    impl From<Box<::pg_query::protobuf::ReplicaIdentityStmt>> for ReplicaIdentityStmt {
+        fn from(value: Box<::pg_query::protobuf::ReplicaIdentityStmt>) -> Self {
+            Self(Box::new(self::inner::ReplicaIdentityStmt::from(*value)))
+        }
+    }
+
+    impl ReplicaIdentityStmtOpt {
+        /// returns None Value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<ReplicaIdentityStmt> for ReplicaIdentityStmtOpt {
+        fn from(value: ReplicaIdentityStmt) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&ReplicaIdentityStmt> for ReplicaIdentityStmtOpt {
+        fn from(value: &ReplicaIdentityStmt) -> Self {
+            Self(Some(value.clone()))
+        }
+    }
+
+    impl From<&ReplicaIdentityStmtOpt> for ReplicaIdentityStmtOpt {
+        fn from(value: &ReplicaIdentityStmtOpt) -> Self {
+            value.clone()
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::ReplicaIdentityStmt>> for ReplicaIdentityStmtOpt {
+        fn from(value: Option<::pg_query::protobuf::ReplicaIdentityStmt>) -> Self {
+            Self(value.map(ReplicaIdentityStmt::from))
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::ReplicaIdentityStmt>>> for ReplicaIdentityStmtOpt {
+        fn from(value: Option<Box<::pg_query::protobuf::ReplicaIdentityStmt>>) -> Self {
+            Self(value.map(|v| ReplicaIdentityStmt::from(*v)))
+        }
+    }
+
+    impl ReplicaIdentityStmtListOpt {
+        /// returns None value
+        #[must_use]
+        pub const fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<&ReplicaIdentityStmtList> for ReplicaIdentityStmtListOpt {
+        fn from(value: &ReplicaIdentityStmtList) -> Self {
+            Self(Some(value.0.clone()))
+        }
+    }
+
+    impl From<Vec<ReplicaIdentityStmt>> for ReplicaIdentityStmtList {
+        fn from(value: Vec<ReplicaIdentityStmt>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Vec<::pg_query::protobuf::ReplicaIdentityStmt>> for ReplicaIdentityStmtList {
+        fn from(value: Vec<::pg_query::protobuf::ReplicaIdentityStmt>) -> Self {
+            Self(value.into_iter().map(ReplicaIdentityStmt::from).collect())
+        }
+    }
+
+    mod inner {
+
+        #[allow(unused_imports)]
+        #[allow(clippy::wildcard_imports)]
+        use super::*;
+
+        #[cfg_attr(test, derive(derive_builder::Builder))]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
+        #[allow(clippy::struct_excessive_bools)]
+        #[allow(clippy::struct_field_names)]
+        pub struct ReplicaIdentityStmt {
+            /// `identity_type`
+            identity_type: std::string::String,
+
+            /// `name`
+            name: std::string::String,
+        }
+
+        impl From<::pg_query::protobuf::ReplicaIdentityStmt> for ReplicaIdentityStmt {
+            fn from(value: ::pg_query::protobuf::ReplicaIdentityStmt) -> Self {
+                let identity_type = value.identity_type;
+
+                let name = value.name;
+
+                Self {
+                    identity_type,
+
+                    name,
+                }
+            }
+        }
+
+        impl ReplicaIdentityStmt {
+            /// get `identity_type`
+            #[must_use]
+            pub fn get_identity_type(&self) -> std::string::String {
+                std::string::String::from(&self.identity_type)
+            }
+        }
+
+        impl ReplicaIdentityStmt {
+            /// get `name`
+            #[must_use]
+            pub fn get_name(&self) -> std::string::String {
+                std::string::String::from(&self.name)
+            }
+        }
+    } // mod inner
+
+    impl ReplicaIdentityStmt {
+        /// get `identity_type`
+        #[must_use]
+        pub fn get_identity_type(&self) -> std::string::String {
+            self.0.get_identity_type()
+        }
+    }
+
+    impl ReplicaIdentityStmtOpt {
+        /// get `identity_type`
+        #[must_use]
+        pub fn get_identity_type(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(ReplicaIdentityStmt::get_identity_type)
+        }
+    }
+
+    impl ReplicaIdentityStmt {
+        /// get `name`
+        #[must_use]
+        pub fn get_name(&self) -> std::string::String {
+            self.0.get_name()
+        }
+    }
+
+    impl ReplicaIdentityStmtOpt {
+        /// get `name`
+        #[must_use]
+        pub fn get_name(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(ReplicaIdentityStmt::get_name)
+        }
+    }
+
+    #[cfg(test)]
+    pub use self::inner::ReplicaIdentityStmtBuilder;
+} // mod replica_identity_stmt
+
+#[allow(unused_imports)]
+pub use self::replica_identity_stmt::{
+    ReplicaIdentityStmt, ReplicaIdentityStmtList, ReplicaIdentityStmtListOpt,
+    ReplicaIdentityStmtOpt,
+};
+
+#[cfg(test)]
+pub use self::replica_identity_stmt::ReplicaIdentityStmtBuilder;
 
 /// message type `AlterCollationStmt`
 #[allow(dead_code)]
@@ -80568,7 +82461,7 @@ mod alter_domain_stmt {
     impl AlterDomainStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -80882,7 +82775,7 @@ mod grant_stmt {
     impl GrantStmt {
         /// get `is_grant`
         #[must_use]
-        pub fn get_is_grant(&self) -> bool {
+        pub const fn get_is_grant(&self) -> bool {
             self.0.get_is_grant()
         }
     }
@@ -80993,7 +82886,7 @@ mod grant_stmt {
     impl GrantStmt {
         /// get `grant_option`
         #[must_use]
-        pub fn get_grant_option(&self) -> bool {
+        pub const fn get_grant_option(&self) -> bool {
             self.0.get_grant_option()
         }
     }
@@ -81325,7 +83218,7 @@ mod object_with_args {
     impl ObjectWithArgs {
         /// get `args_unspecified`
         #[must_use]
-        pub fn get_args_unspecified(&self) -> bool {
+        pub const fn get_args_unspecified(&self) -> bool {
             self.0.get_args_unspecified()
         }
     }
@@ -81854,7 +83747,7 @@ mod grant_role_stmt {
     impl GrantRoleStmt {
         /// get `is_grant`
         #[must_use]
-        pub fn get_is_grant(&self) -> bool {
+        pub const fn get_is_grant(&self) -> bool {
             self.0.get_is_grant()
         }
     }
@@ -82510,7 +84403,7 @@ mod copy_stmt {
     impl CopyStmt {
         /// get `is_from`
         #[must_use]
-        pub fn get_is_from(&self) -> bool {
+        pub const fn get_is_from(&self) -> bool {
             self.0.get_is_from()
         }
     }
@@ -82526,7 +84419,7 @@ mod copy_stmt {
     impl CopyStmt {
         /// get `is_program`
         #[must_use]
-        pub fn get_is_program(&self) -> bool {
+        pub const fn get_is_program(&self) -> bool {
             self.0.get_is_program()
         }
     }
@@ -82755,8 +84648,14 @@ mod variable_set_stmt {
             /// `args`
             args: NodeList,
 
+            /// `jumble_args`
+            jumble_args: bool,
+
             /// `is_local`
             is_local: bool,
+
+            /// `location`
+            location: i32,
         }
 
         impl From<::pg_query::protobuf::VariableSetStmt> for VariableSetStmt {
@@ -82767,7 +84666,11 @@ mod variable_set_stmt {
 
                 let args = NodeList::from(value.args);
 
+                let jumble_args = value.jumble_args;
+
                 let is_local = value.is_local;
+
+                let location = value.location;
 
                 Self {
                     kind,
@@ -82776,7 +84679,11 @@ mod variable_set_stmt {
 
                     args,
 
+                    jumble_args,
+
                     is_local,
+
+                    location,
                 }
             }
         }
@@ -82806,10 +84713,26 @@ mod variable_set_stmt {
         }
 
         impl VariableSetStmt {
+            /// get `jumble_args`
+            #[must_use]
+            pub const fn get_jumble_args(&self) -> bool {
+                self.jumble_args
+            }
+        }
+
+        impl VariableSetStmt {
             /// get `is_local`
             #[must_use]
             pub const fn get_is_local(&self) -> bool {
                 self.is_local
+            }
+        }
+
+        impl VariableSetStmt {
+            /// get `location`
+            #[must_use]
+            pub const fn get_location(&self) -> i32 {
+                self.location
             }
         }
     } // mod inner
@@ -82869,9 +84792,25 @@ mod variable_set_stmt {
     }
 
     impl VariableSetStmt {
+        /// get `jumble_args`
+        #[must_use]
+        pub const fn get_jumble_args(&self) -> bool {
+            self.0.get_jumble_args()
+        }
+    }
+
+    impl VariableSetStmtOpt {
+        /// get `jumble_args`
+        #[must_use]
+        pub fn get_jumble_args(&self) -> Option<bool> {
+            self.0.as_ref().map(VariableSetStmt::get_jumble_args)
+        }
+    }
+
+    impl VariableSetStmt {
         /// get `is_local`
         #[must_use]
-        pub fn get_is_local(&self) -> bool {
+        pub const fn get_is_local(&self) -> bool {
             self.0.get_is_local()
         }
     }
@@ -82881,6 +84820,22 @@ mod variable_set_stmt {
         #[must_use]
         pub fn get_is_local(&self) -> Option<bool> {
             self.0.as_ref().map(VariableSetStmt::get_is_local)
+        }
+    }
+
+    impl VariableSetStmt {
+        /// get `location`
+        #[must_use]
+        pub const fn get_location(&self) -> i32 {
+            self.0.get_location()
+        }
+    }
+
+    impl VariableSetStmtOpt {
+        /// get `location`
+        #[must_use]
+        pub fn get_location(&self) -> Option<i32> {
+            self.0.as_ref().map(VariableSetStmt::get_location)
         }
     }
 
@@ -83252,6 +85207,9 @@ mod create_stmt {
             /// `constraints`
             constraints: NodeList,
 
+            /// `nnconstraints`
+            nnconstraints: NodeList,
+
             /// `options`
             options: NodeList,
 
@@ -83284,6 +85242,8 @@ mod create_stmt {
 
                 let constraints = NodeList::from(value.constraints);
 
+                let nnconstraints = NodeList::from(value.nnconstraints);
+
                 let options = NodeList::from(value.options);
 
                 let oncommit = OnCommitActionOpt::from(value.oncommit);
@@ -83308,6 +85268,8 @@ mod create_stmt {
                     of_typename,
 
                     constraints,
+
+                    nnconstraints,
 
                     options,
 
@@ -83375,6 +85337,14 @@ mod create_stmt {
             #[must_use]
             pub fn get_constraints(&self) -> NodeListOpt {
                 NodeListOpt::from(&self.constraints)
+            }
+        }
+
+        impl CreateStmt {
+            /// get `nnconstraints`
+            #[must_use]
+            pub fn get_nnconstraints(&self) -> NodeListOpt {
+                NodeListOpt::from(&self.nnconstraints)
             }
         }
 
@@ -83553,6 +85523,25 @@ mod create_stmt {
     }
 
     impl CreateStmt {
+        /// get `nnconstraints`
+        #[must_use]
+        pub fn get_nnconstraints(&self) -> NodeListOpt {
+            self.0.get_nnconstraints()
+        }
+    }
+
+    impl CreateStmtOpt {
+        /// get `nnconstraints`
+        #[must_use]
+        pub fn get_nnconstraints(&self) -> NodeListOpt {
+            match &self.0 {
+                Some(v) => v.get_nnconstraints(),
+                _ => NodeListOpt::none(),
+            }
+        }
+    }
+
+    impl CreateStmt {
         /// get `options`
         #[must_use]
         pub fn get_options(&self) -> NodeListOpt {
@@ -83625,7 +85614,7 @@ mod create_stmt {
     impl CreateStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -83803,6 +85792,9 @@ mod constraint {
             /// `initdeferred`
             initdeferred: bool,
 
+            /// `is_enforced`
+            is_enforced: bool,
+
             /// `skip_validation`
             skip_validation: bool,
 
@@ -83821,14 +85813,17 @@ mod constraint {
             /// `generated_when`
             generated_when: std::string::String,
 
-            /// `inhcount`
-            inhcount: i32,
+            /// `generated_kind`
+            generated_kind: std::string::String,
 
             /// `nulls_not_distinct`
             nulls_not_distinct: bool,
 
             /// `keys`
             keys: NodeList,
+
+            /// `without_overlaps`
+            without_overlaps: bool,
 
             /// `including`
             including: NodeList,
@@ -83863,6 +85858,12 @@ mod constraint {
             /// `pk_attrs`
             pk_attrs: NodeList,
 
+            /// `fk_with_period`
+            fk_with_period: bool,
+
+            /// `pk_with_period`
+            pk_with_period: bool,
+
             /// `fk_matchtype`
             fk_matchtype: std::string::String,
 
@@ -83895,6 +85896,8 @@ mod constraint {
 
                 let initdeferred = value.initdeferred;
 
+                let is_enforced = value.is_enforced;
+
                 let skip_validation = value.skip_validation;
 
                 let initially_valid = value.initially_valid;
@@ -83907,11 +85910,13 @@ mod constraint {
 
                 let generated_when = value.generated_when;
 
-                let inhcount = value.inhcount;
+                let generated_kind = value.generated_kind;
 
                 let nulls_not_distinct = value.nulls_not_distinct;
 
                 let keys = NodeList::from(value.keys);
+
+                let without_overlaps = value.without_overlaps;
 
                 let including = NodeList::from(value.including);
 
@@ -83934,6 +85939,10 @@ mod constraint {
                 let fk_attrs = NodeList::from(value.fk_attrs);
 
                 let pk_attrs = NodeList::from(value.pk_attrs);
+
+                let fk_with_period = value.fk_with_period;
+
+                let pk_with_period = value.pk_with_period;
 
                 let fk_matchtype = value.fk_matchtype;
 
@@ -83958,6 +85967,8 @@ mod constraint {
 
                     initdeferred,
 
+                    is_enforced,
+
                     skip_validation,
 
                     initially_valid,
@@ -83970,11 +85981,13 @@ mod constraint {
 
                     generated_when,
 
-                    inhcount,
+                    generated_kind,
 
                     nulls_not_distinct,
 
                     keys,
+
+                    without_overlaps,
 
                     including,
 
@@ -83997,6 +86010,10 @@ mod constraint {
                     fk_attrs,
 
                     pk_attrs,
+
+                    fk_with_period,
+
+                    pk_with_period,
 
                     fk_matchtype,
 
@@ -84044,6 +86061,14 @@ mod constraint {
             #[must_use]
             pub const fn get_initdeferred(&self) -> bool {
                 self.initdeferred
+            }
+        }
+
+        impl Constraint {
+            /// get `is_enforced`
+            #[must_use]
+            pub const fn get_is_enforced(&self) -> bool {
+                self.is_enforced
             }
         }
 
@@ -84096,10 +86121,10 @@ mod constraint {
         }
 
         impl Constraint {
-            /// get `inhcount`
+            /// get `generated_kind`
             #[must_use]
-            pub const fn get_inhcount(&self) -> i32 {
-                self.inhcount
+            pub fn get_generated_kind(&self) -> std::string::String {
+                std::string::String::from(&self.generated_kind)
             }
         }
 
@@ -84116,6 +86141,14 @@ mod constraint {
             #[must_use]
             pub fn get_keys(&self) -> NodeListOpt {
                 NodeListOpt::from(&self.keys)
+            }
+        }
+
+        impl Constraint {
+            /// get `without_overlaps`
+            #[must_use]
+            pub const fn get_without_overlaps(&self) -> bool {
+                self.without_overlaps
             }
         }
 
@@ -84204,6 +86237,22 @@ mod constraint {
             #[must_use]
             pub fn get_pk_attrs(&self) -> NodeListOpt {
                 NodeListOpt::from(&self.pk_attrs)
+            }
+        }
+
+        impl Constraint {
+            /// get `fk_with_period`
+            #[must_use]
+            pub const fn get_fk_with_period(&self) -> bool {
+                self.fk_with_period
+            }
+        }
+
+        impl Constraint {
+            /// get `pk_with_period`
+            #[must_use]
+            pub const fn get_pk_with_period(&self) -> bool {
+                self.pk_with_period
             }
         }
 
@@ -84302,7 +86351,7 @@ mod constraint {
     impl Constraint {
         /// get `deferrable`
         #[must_use]
-        pub fn get_deferrable(&self) -> bool {
+        pub const fn get_deferrable(&self) -> bool {
             self.0.get_deferrable()
         }
     }
@@ -84318,7 +86367,7 @@ mod constraint {
     impl Constraint {
         /// get `initdeferred`
         #[must_use]
-        pub fn get_initdeferred(&self) -> bool {
+        pub const fn get_initdeferred(&self) -> bool {
             self.0.get_initdeferred()
         }
     }
@@ -84332,9 +86381,25 @@ mod constraint {
     }
 
     impl Constraint {
+        /// get `is_enforced`
+        #[must_use]
+        pub const fn get_is_enforced(&self) -> bool {
+            self.0.get_is_enforced()
+        }
+    }
+
+    impl ConstraintOpt {
+        /// get `is_enforced`
+        #[must_use]
+        pub fn get_is_enforced(&self) -> Option<bool> {
+            self.0.as_ref().map(Constraint::get_is_enforced)
+        }
+    }
+
+    impl Constraint {
         /// get `skip_validation`
         #[must_use]
-        pub fn get_skip_validation(&self) -> bool {
+        pub const fn get_skip_validation(&self) -> bool {
             self.0.get_skip_validation()
         }
     }
@@ -84350,7 +86415,7 @@ mod constraint {
     impl Constraint {
         /// get `initially_valid`
         #[must_use]
-        pub fn get_initially_valid(&self) -> bool {
+        pub const fn get_initially_valid(&self) -> bool {
             self.0.get_initially_valid()
         }
     }
@@ -84366,7 +86431,7 @@ mod constraint {
     impl Constraint {
         /// get `is_no_inherit`
         #[must_use]
-        pub fn get_is_no_inherit(&self) -> bool {
+        pub const fn get_is_no_inherit(&self) -> bool {
             self.0.get_is_no_inherit()
         }
     }
@@ -84431,25 +86496,25 @@ mod constraint {
     }
 
     impl Constraint {
-        /// get `inhcount`
+        /// get `generated_kind`
         #[must_use]
-        pub fn get_inhcount(&self) -> i32 {
-            self.0.get_inhcount()
+        pub fn get_generated_kind(&self) -> std::string::String {
+            self.0.get_generated_kind()
         }
     }
 
     impl ConstraintOpt {
-        /// get `inhcount`
+        /// get `generated_kind`
         #[must_use]
-        pub fn get_inhcount(&self) -> Option<i32> {
-            self.0.as_ref().map(Constraint::get_inhcount)
+        pub fn get_generated_kind(&self) -> Option<std::string::String> {
+            self.0.as_ref().map(Constraint::get_generated_kind)
         }
     }
 
     impl Constraint {
         /// get `nulls_not_distinct`
         #[must_use]
-        pub fn get_nulls_not_distinct(&self) -> bool {
+        pub const fn get_nulls_not_distinct(&self) -> bool {
             self.0.get_nulls_not_distinct()
         }
     }
@@ -84478,6 +86543,22 @@ mod constraint {
                 Some(v) => v.get_keys(),
                 _ => NodeListOpt::none(),
             }
+        }
+    }
+
+    impl Constraint {
+        /// get `without_overlaps`
+        #[must_use]
+        pub const fn get_without_overlaps(&self) -> bool {
+            self.0.get_without_overlaps()
+        }
+    }
+
+    impl ConstraintOpt {
+        /// get `without_overlaps`
+        #[must_use]
+        pub fn get_without_overlaps(&self) -> Option<bool> {
+            self.0.as_ref().map(Constraint::get_without_overlaps)
         }
     }
 
@@ -84573,7 +86654,7 @@ mod constraint {
     impl Constraint {
         /// get `reset_default_tblspc`
         #[must_use]
-        pub fn get_reset_default_tblspc(&self) -> bool {
+        pub const fn get_reset_default_tblspc(&self) -> bool {
             self.0.get_reset_default_tblspc()
         }
     }
@@ -84679,6 +86760,38 @@ mod constraint {
     }
 
     impl Constraint {
+        /// get `fk_with_period`
+        #[must_use]
+        pub const fn get_fk_with_period(&self) -> bool {
+            self.0.get_fk_with_period()
+        }
+    }
+
+    impl ConstraintOpt {
+        /// get `fk_with_period`
+        #[must_use]
+        pub fn get_fk_with_period(&self) -> Option<bool> {
+            self.0.as_ref().map(Constraint::get_fk_with_period)
+        }
+    }
+
+    impl Constraint {
+        /// get `pk_with_period`
+        #[must_use]
+        pub const fn get_pk_with_period(&self) -> bool {
+            self.0.get_pk_with_period()
+        }
+    }
+
+    impl ConstraintOpt {
+        /// get `pk_with_period`
+        #[must_use]
+        pub fn get_pk_with_period(&self) -> Option<bool> {
+            self.0.as_ref().map(Constraint::get_pk_with_period)
+        }
+    }
+
+    impl Constraint {
         /// get `fk_matchtype`
         #[must_use]
         pub fn get_fk_matchtype(&self) -> std::string::String {
@@ -84767,7 +86880,7 @@ mod constraint {
     impl Constraint {
         /// get `old_pktable_oid`
         #[must_use]
-        pub fn get_old_pktable_oid(&self) -> u32 {
+        pub const fn get_old_pktable_oid(&self) -> u32 {
             self.0.get_old_pktable_oid()
         }
     }
@@ -84783,7 +86896,7 @@ mod constraint {
     impl Constraint {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -85302,7 +87415,7 @@ mod drop_table_space_stmt {
     impl DropTableSpaceStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -85578,7 +87691,7 @@ mod alter_table_space_options_stmt {
     impl AlterTableSpaceOptionsStmt {
         /// get `is_reset`
         #[must_use]
-        pub fn get_is_reset(&self) -> bool {
+        pub const fn get_is_reset(&self) -> bool {
             self.0.get_is_reset()
         }
     }
@@ -85909,7 +88022,7 @@ mod alter_table_move_all_stmt {
     impl AlterTableMoveAllStmt {
         /// get `nowait`
         #[must_use]
-        pub fn get_nowait(&self) -> bool {
+        pub const fn get_nowait(&self) -> bool {
             self.0.get_nowait()
         }
     }
@@ -86150,7 +88263,7 @@ mod create_extension_stmt {
     impl CreateExtensionStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -86664,7 +88777,7 @@ mod alter_extension_contents_stmt {
     impl AlterExtensionContentsStmt {
         /// get `action`
         #[must_use]
-        pub fn get_action(&self) -> i32 {
+        pub const fn get_action(&self) -> i32 {
             self.0.get_action()
         }
     }
@@ -87567,7 +89680,7 @@ mod create_foreign_server_stmt {
     impl CreateForeignServerStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -87884,7 +89997,7 @@ mod alter_foreign_server_stmt {
     impl AlterForeignServerStmt {
         /// get `has_version`
         #[must_use]
-        pub fn get_has_version(&self) -> bool {
+        pub const fn get_has_version(&self) -> bool {
             self.0.get_has_version()
         }
     }
@@ -88427,7 +90540,7 @@ mod create_user_mapping_stmt {
     impl CreateUserMappingStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -88971,7 +91084,7 @@ mod drop_user_mapping_stmt {
     impl DropUserMappingStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -89679,7 +91792,7 @@ mod create_policy_stmt {
     impl CreatePolicyStmt {
         /// get `permissive`
         #[must_use]
-        pub fn get_permissive(&self) -> bool {
+        pub const fn get_permissive(&self) -> bool {
             self.0.get_permissive()
         }
     }
@@ -90729,7 +92842,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -90745,7 +92858,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `isconstraint`
         #[must_use]
-        pub fn get_isconstraint(&self) -> bool {
+        pub const fn get_isconstraint(&self) -> bool {
             self.0.get_isconstraint()
         }
     }
@@ -90834,7 +92947,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `row`
         #[must_use]
-        pub fn get_row(&self) -> bool {
+        pub const fn get_row(&self) -> bool {
             self.0.get_row()
         }
     }
@@ -90850,7 +92963,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `timing`
         #[must_use]
-        pub fn get_timing(&self) -> i32 {
+        pub const fn get_timing(&self) -> i32 {
             self.0.get_timing()
         }
     }
@@ -90866,7 +92979,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `events`
         #[must_use]
-        pub fn get_events(&self) -> i32 {
+        pub const fn get_events(&self) -> i32 {
             self.0.get_events()
         }
     }
@@ -90939,7 +93052,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `deferrable`
         #[must_use]
-        pub fn get_deferrable(&self) -> bool {
+        pub const fn get_deferrable(&self) -> bool {
             self.0.get_deferrable()
         }
     }
@@ -90955,7 +93068,7 @@ mod create_trig_stmt {
     impl CreateTrigStmt {
         /// get `initdeferred`
         #[must_use]
-        pub fn get_initdeferred(&self) -> bool {
+        pub const fn get_initdeferred(&self) -> bool {
             self.0.get_initdeferred()
         }
     }
@@ -91762,7 +93875,7 @@ mod create_p_lang_stmt {
     impl CreatePLangStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -91851,7 +93964,7 @@ mod create_p_lang_stmt {
     impl CreatePLangStmt {
         /// get `pltrusted`
         #[must_use]
-        pub fn get_pltrusted(&self) -> bool {
+        pub const fn get_pltrusted(&self) -> bool {
             self.0.get_pltrusted()
         }
     }
@@ -92375,7 +94488,7 @@ mod alter_role_stmt {
     impl AlterRoleStmt {
         /// get `action`
         #[must_use]
-        pub fn get_action(&self) -> i32 {
+        pub const fn get_action(&self) -> i32 {
             self.0.get_action()
         }
     }
@@ -92861,7 +94974,7 @@ mod drop_role_stmt {
     impl DropRoleStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -93153,7 +95266,7 @@ mod create_seq_stmt {
     impl CreateSeqStmt {
         /// get `owner_id`
         #[must_use]
-        pub fn get_owner_id(&self) -> u32 {
+        pub const fn get_owner_id(&self) -> u32 {
             self.0.get_owner_id()
         }
     }
@@ -93169,7 +95282,7 @@ mod create_seq_stmt {
     impl CreateSeqStmt {
         /// get `for_identity`
         #[must_use]
-        pub fn get_for_identity(&self) -> bool {
+        pub const fn get_for_identity(&self) -> bool {
             self.0.get_for_identity()
         }
     }
@@ -93185,7 +95298,7 @@ mod create_seq_stmt {
     impl CreateSeqStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -93462,7 +95575,7 @@ mod alter_seq_stmt {
     impl AlterSeqStmt {
         /// get `for_identity`
         #[must_use]
-        pub fn get_for_identity(&self) -> bool {
+        pub const fn get_for_identity(&self) -> bool {
             self.0.get_for_identity()
         }
     }
@@ -93478,7 +95591,7 @@ mod alter_seq_stmt {
     impl AlterSeqStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -93781,7 +95894,7 @@ mod define_stmt {
     impl DefineStmt {
         /// get `oldstyle`
         #[must_use]
-        pub fn get_oldstyle(&self) -> bool {
+        pub const fn get_oldstyle(&self) -> bool {
             self.0.get_oldstyle()
         }
     }
@@ -93854,7 +95967,7 @@ mod define_stmt {
     impl DefineStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -93870,7 +95983,7 @@ mod define_stmt {
     impl DefineStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -94528,7 +96641,7 @@ mod create_op_class_stmt {
     impl CreateOpClassStmt {
         /// get `is_default`
         #[must_use]
-        pub fn get_is_default(&self) -> bool {
+        pub const fn get_is_default(&self) -> bool {
             self.0.get_is_default()
         }
     }
@@ -94797,7 +96910,7 @@ mod create_op_class_item {
     impl CreateOpClassItem {
         /// get `itemtype`
         #[must_use]
-        pub fn get_itemtype(&self) -> i32 {
+        pub const fn get_itemtype(&self) -> i32 {
             self.0.get_itemtype()
         }
     }
@@ -94832,7 +96945,7 @@ mod create_op_class_item {
     impl CreateOpClassItem {
         /// get `number`
         #[must_use]
-        pub fn get_number(&self) -> i32 {
+        pub const fn get_number(&self) -> i32 {
             self.0.get_number()
         }
     }
@@ -95391,7 +97504,7 @@ mod alter_op_family_stmt {
     impl AlterOpFamilyStmt {
         /// get `is_drop`
         #[must_use]
-        pub fn get_is_drop(&self) -> bool {
+        pub const fn get_is_drop(&self) -> bool {
             self.0.get_is_drop()
         }
     }
@@ -95721,7 +97834,7 @@ mod drop_stmt {
     impl DropStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -95737,7 +97850,7 @@ mod drop_stmt {
     impl DropStmt {
         /// get `concurrent`
         #[must_use]
-        pub fn get_concurrent(&self) -> bool {
+        pub const fn get_concurrent(&self) -> bool {
             self.0.get_concurrent()
         }
     }
@@ -95978,7 +98091,7 @@ mod truncate_stmt {
     impl TruncateStmt {
         /// get `restart_seqs`
         #[must_use]
-        pub fn get_restart_seqs(&self) -> bool {
+        pub const fn get_restart_seqs(&self) -> bool {
             self.0.get_restart_seqs()
         }
     }
@@ -96790,7 +98903,7 @@ mod declare_cursor_stmt {
     impl DeclareCursorStmt {
         /// get `options`
         #[must_use]
-        pub fn get_options(&self) -> i32 {
+        pub const fn get_options(&self) -> i32 {
             self.0.get_options()
         }
     }
@@ -97259,7 +99372,7 @@ mod fetch_stmt {
     impl FetchStmt {
         /// get `how_many`
         #[must_use]
-        pub fn get_how_many(&self) -> i64 {
+        pub const fn get_how_many(&self) -> i64 {
             self.0.get_how_many()
         }
     }
@@ -97291,7 +99404,7 @@ mod fetch_stmt {
     impl FetchStmt {
         /// get `ismove`
         #[must_use]
-        pub fn get_ismove(&self) -> bool {
+        pub const fn get_ismove(&self) -> bool {
             self.0.get_ismove()
         }
     }
@@ -97511,6 +99624,9 @@ mod index_stmt {
             /// `isconstraint`
             isconstraint: bool,
 
+            /// `iswithoutoverlaps`
+            iswithoutoverlaps: bool,
+
             /// `deferrable`
             deferrable: bool,
 
@@ -97568,6 +99684,8 @@ mod index_stmt {
 
                 let isconstraint = value.isconstraint;
 
+                let iswithoutoverlaps = value.iswithoutoverlaps;
+
                 let deferrable = value.deferrable;
 
                 let initdeferred = value.initdeferred;
@@ -97616,6 +99734,8 @@ mod index_stmt {
                     primary,
 
                     isconstraint,
+
+                    iswithoutoverlaps,
 
                     deferrable,
 
@@ -97773,6 +99893,14 @@ mod index_stmt {
             #[must_use]
             pub const fn get_isconstraint(&self) -> bool {
                 self.isconstraint
+            }
+        }
+
+        impl IndexStmt {
+            /// get `iswithoutoverlaps`
+            #[must_use]
+            pub const fn get_iswithoutoverlaps(&self) -> bool {
+                self.iswithoutoverlaps
             }
         }
 
@@ -98006,7 +100134,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `index_oid`
         #[must_use]
-        pub fn get_index_oid(&self) -> u32 {
+        pub const fn get_index_oid(&self) -> u32 {
             self.0.get_index_oid()
         }
     }
@@ -98022,7 +100150,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `old_number`
         #[must_use]
-        pub fn get_old_number(&self) -> u32 {
+        pub const fn get_old_number(&self) -> u32 {
             self.0.get_old_number()
         }
     }
@@ -98038,7 +100166,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `old_create_subid`
         #[must_use]
-        pub fn get_old_create_subid(&self) -> u32 {
+        pub const fn get_old_create_subid(&self) -> u32 {
             self.0.get_old_create_subid()
         }
     }
@@ -98054,7 +100182,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `old_first_relfilelocator_subid`
         #[must_use]
-        pub fn get_old_first_relfilelocator_subid(&self) -> u32 {
+        pub const fn get_old_first_relfilelocator_subid(&self) -> u32 {
             self.0.get_old_first_relfilelocator_subid()
         }
     }
@@ -98072,7 +100200,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `unique`
         #[must_use]
-        pub fn get_unique(&self) -> bool {
+        pub const fn get_unique(&self) -> bool {
             self.0.get_unique()
         }
     }
@@ -98088,7 +100216,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `nulls_not_distinct`
         #[must_use]
-        pub fn get_nulls_not_distinct(&self) -> bool {
+        pub const fn get_nulls_not_distinct(&self) -> bool {
             self.0.get_nulls_not_distinct()
         }
     }
@@ -98104,7 +100232,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `primary`
         #[must_use]
-        pub fn get_primary(&self) -> bool {
+        pub const fn get_primary(&self) -> bool {
             self.0.get_primary()
         }
     }
@@ -98120,7 +100248,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `isconstraint`
         #[must_use]
-        pub fn get_isconstraint(&self) -> bool {
+        pub const fn get_isconstraint(&self) -> bool {
             self.0.get_isconstraint()
         }
     }
@@ -98134,9 +100262,25 @@ mod index_stmt {
     }
 
     impl IndexStmt {
+        /// get `iswithoutoverlaps`
+        #[must_use]
+        pub const fn get_iswithoutoverlaps(&self) -> bool {
+            self.0.get_iswithoutoverlaps()
+        }
+    }
+
+    impl IndexStmtOpt {
+        /// get `iswithoutoverlaps`
+        #[must_use]
+        pub fn get_iswithoutoverlaps(&self) -> Option<bool> {
+            self.0.as_ref().map(IndexStmt::get_iswithoutoverlaps)
+        }
+    }
+
+    impl IndexStmt {
         /// get `deferrable`
         #[must_use]
-        pub fn get_deferrable(&self) -> bool {
+        pub const fn get_deferrable(&self) -> bool {
             self.0.get_deferrable()
         }
     }
@@ -98152,7 +100296,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `initdeferred`
         #[must_use]
-        pub fn get_initdeferred(&self) -> bool {
+        pub const fn get_initdeferred(&self) -> bool {
             self.0.get_initdeferred()
         }
     }
@@ -98168,7 +100312,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `transformed`
         #[must_use]
-        pub fn get_transformed(&self) -> bool {
+        pub const fn get_transformed(&self) -> bool {
             self.0.get_transformed()
         }
     }
@@ -98184,7 +100328,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `concurrent`
         #[must_use]
-        pub fn get_concurrent(&self) -> bool {
+        pub const fn get_concurrent(&self) -> bool {
             self.0.get_concurrent()
         }
     }
@@ -98200,7 +100344,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -98216,7 +100360,7 @@ mod index_stmt {
     impl IndexStmt {
         /// get `reset_default_tblspc`
         #[must_use]
-        pub fn get_reset_default_tblspc(&self) -> bool {
+        pub const fn get_reset_default_tblspc(&self) -> bool {
             self.0.get_reset_default_tblspc()
         }
     }
@@ -98590,7 +100734,7 @@ mod create_stats_stmt {
     impl CreateStatsStmt {
         /// get `transformed`
         #[must_use]
-        pub fn get_transformed(&self) -> bool {
+        pub const fn get_transformed(&self) -> bool {
             self.0.get_transformed()
         }
     }
@@ -98606,7 +100750,7 @@ mod create_stats_stmt {
     impl CreateStatsStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -99090,7 +101234,7 @@ mod alter_stats_stmt {
     impl AlterStatsStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -99374,7 +101518,7 @@ mod create_function_stmt {
     impl CreateFunctionStmt {
         /// get `is_procedure`
         #[must_use]
-        pub fn get_is_procedure(&self) -> bool {
+        pub const fn get_is_procedure(&self) -> bool {
             self.0.get_is_procedure()
         }
     }
@@ -99390,7 +101534,7 @@ mod create_function_stmt {
     impl CreateFunctionStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -99664,6 +101808,9 @@ mod function_parameter {
 
             /// `defexpr`
             defexpr: NodeOpt,
+
+            /// `location`
+            location: i32,
         }
 
         impl From<::pg_query::protobuf::FunctionParameter> for FunctionParameter {
@@ -99676,6 +101823,8 @@ mod function_parameter {
 
                 let defexpr = NodeOpt::from(value.defexpr);
 
+                let location = value.location;
+
                 Self {
                     name,
 
@@ -99684,6 +101833,8 @@ mod function_parameter {
                     mode,
 
                     defexpr,
+
+                    location,
                 }
             }
         }
@@ -99717,6 +101868,14 @@ mod function_parameter {
             #[must_use]
             pub fn get_defexpr(&self) -> NodeOpt {
                 NodeOpt::from(&self.defexpr)
+            }
+        }
+
+        impl FunctionParameter {
+            /// get `location`
+            #[must_use]
+            pub const fn get_location(&self) -> i32 {
+                self.location
             }
         }
     } // mod inner
@@ -99791,6 +101950,22 @@ mod function_parameter {
                 Some(v) => v.get_defexpr(),
                 _ => NodeOpt::none(),
             }
+        }
+    }
+
+    impl FunctionParameter {
+        /// get `location`
+        #[must_use]
+        pub const fn get_location(&self) -> i32 {
+            self.0.get_location()
+        }
+    }
+
+    impl FunctionParameterOpt {
+        /// get `location`
+        #[must_use]
+        pub fn get_location(&self) -> Option<i32> {
+            self.0.as_ref().map(FunctionParameter::get_location)
         }
     }
 
@@ -100494,7 +102669,7 @@ mod inline_code_block {
     impl InlineCodeBlock {
         /// get `lang_oid`
         #[must_use]
-        pub fn get_lang_oid(&self) -> u32 {
+        pub const fn get_lang_oid(&self) -> u32 {
             self.0.get_lang_oid()
         }
     }
@@ -100510,7 +102685,7 @@ mod inline_code_block {
     impl InlineCodeBlock {
         /// get `lang_is_trusted`
         #[must_use]
-        pub fn get_lang_is_trusted(&self) -> bool {
+        pub const fn get_lang_is_trusted(&self) -> bool {
             self.0.get_lang_is_trusted()
         }
     }
@@ -100526,7 +102701,7 @@ mod inline_code_block {
     impl InlineCodeBlock {
         /// get `atomic`
         #[must_use]
-        pub fn get_atomic(&self) -> bool {
+        pub const fn get_atomic(&self) -> bool {
             self.0.get_atomic()
         }
     }
@@ -100981,7 +103156,7 @@ mod call_context {
     impl CallContext {
         /// get `atomic`
         #[must_use]
-        pub fn get_atomic(&self) -> bool {
+        pub const fn get_atomic(&self) -> bool {
             self.0.get_atomic()
         }
     }
@@ -101405,7 +103580,7 @@ mod rename_stmt {
     impl RenameStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -101738,7 +103913,7 @@ mod alter_object_depends_stmt {
     impl AlterObjectDependsStmt {
         /// get `remove`
         #[must_use]
-        pub fn get_remove(&self) -> bool {
+        pub const fn get_remove(&self) -> bool {
             self.0.get_remove()
         }
     }
@@ -102066,7 +104241,7 @@ mod alter_object_schema_stmt {
     impl AlterObjectSchemaStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -103177,7 +105352,7 @@ mod rule_stmt {
     impl RuleStmt {
         /// get `instead`
         #[must_use]
-        pub fn get_instead(&self) -> bool {
+        pub const fn get_instead(&self) -> bool {
             self.0.get_instead()
         }
     }
@@ -103212,7 +105387,7 @@ mod rule_stmt {
     impl RuleStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -103383,6 +105558,9 @@ mod notify_stmt {
 
             /// `payload`
             payload: std::string::String,
+
+            /// `payload_location`
+            payload_location: i32,
         }
 
         impl From<::pg_query::protobuf::NotifyStmt> for NotifyStmt {
@@ -103391,10 +105569,14 @@ mod notify_stmt {
 
                 let payload = value.payload;
 
+                let payload_location = value.payload_location;
+
                 Self {
                     conditionname,
 
                     payload,
+
+                    payload_location,
                 }
             }
         }
@@ -103412,6 +105594,14 @@ mod notify_stmt {
             #[must_use]
             pub fn get_payload(&self) -> std::string::String {
                 std::string::String::from(&self.payload)
+            }
+        }
+
+        impl NotifyStmt {
+            /// get `payload_location`
+            #[must_use]
+            pub const fn get_payload_location(&self) -> i32 {
+                self.payload_location
             }
         }
     } // mod inner
@@ -103445,6 +105635,22 @@ mod notify_stmt {
         #[must_use]
         pub fn get_payload(&self) -> Option<std::string::String> {
             self.0.as_ref().map(NotifyStmt::get_payload)
+        }
+    }
+
+    impl NotifyStmt {
+        /// get `payload_location`
+        #[must_use]
+        pub const fn get_payload_location(&self) -> i32 {
+            self.0.get_payload_location()
+        }
+    }
+
+    impl NotifyStmtOpt {
+        /// get `payload_location`
+        #[must_use]
+        pub fn get_payload_location(&self) -> Option<i32> {
+            self.0.as_ref().map(NotifyStmt::get_payload_location)
         }
     }
 
@@ -104154,7 +106360,7 @@ mod transaction_stmt {
     impl TransactionStmt {
         /// get `chain`
         #[must_use]
-        pub fn get_chain(&self) -> bool {
+        pub const fn get_chain(&self) -> bool {
             self.0.get_chain()
         }
     }
@@ -104170,7 +106376,7 @@ mod transaction_stmt {
     impl TransactionStmt {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -105191,7 +107397,7 @@ mod alter_enum_stmt {
     impl AlterEnumStmt {
         /// get `new_val_is_after`
         #[must_use]
-        pub fn get_new_val_is_after(&self) -> bool {
+        pub const fn get_new_val_is_after(&self) -> bool {
             self.0.get_new_val_is_after()
         }
     }
@@ -105207,7 +107413,7 @@ mod alter_enum_stmt {
     impl AlterEnumStmt {
         /// get `skip_if_new_val_exists`
         #[must_use]
-        pub fn get_skip_if_new_val_exists(&self) -> bool {
+        pub const fn get_skip_if_new_val_exists(&self) -> bool {
             self.0.get_skip_if_new_val_exists()
         }
     }
@@ -105535,7 +107741,7 @@ mod view_stmt {
     impl ViewStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -106886,7 +109092,7 @@ mod dropdb_stmt {
     impl DropdbStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -107620,7 +109826,7 @@ mod vacuum_stmt {
     impl VacuumStmt {
         /// get `is_vacuumcmd`
         #[must_use]
-        pub fn get_is_vacuumcmd(&self) -> bool {
+        pub const fn get_is_vacuumcmd(&self) -> bool {
             self.0.get_is_vacuumcmd()
         }
     }
@@ -107861,7 +110067,7 @@ mod vacuum_relation {
     impl VacuumRelation {
         /// get `oid`
         #[must_use]
-        pub fn get_oid(&self) -> u32 {
+        pub const fn get_oid(&self) -> u32 {
             self.0.get_oid()
         }
     }
@@ -108416,7 +110622,7 @@ mod create_table_as_stmt {
     impl CreateTableAsStmt {
         /// get `is_select_into`
         #[must_use]
-        pub fn get_is_select_into(&self) -> bool {
+        pub const fn get_is_select_into(&self) -> bool {
             self.0.get_is_select_into()
         }
     }
@@ -108432,7 +110638,7 @@ mod create_table_as_stmt {
     impl CreateTableAsStmt {
         /// get `if_not_exists`
         #[must_use]
-        pub fn get_if_not_exists(&self) -> bool {
+        pub const fn get_if_not_exists(&self) -> bool {
             self.0.get_if_not_exists()
         }
     }
@@ -108656,7 +110862,7 @@ mod refresh_mat_view_stmt {
     impl RefreshMatViewStmt {
         /// get `concurrent`
         #[must_use]
-        pub fn get_concurrent(&self) -> bool {
+        pub const fn get_concurrent(&self) -> bool {
             self.0.get_concurrent()
         }
     }
@@ -108672,7 +110878,7 @@ mod refresh_mat_view_stmt {
     impl RefreshMatViewStmt {
         /// get `skip_data`
         #[must_use]
-        pub fn get_skip_data(&self) -> bool {
+        pub const fn get_skip_data(&self) -> bool {
             self.0.get_skip_data()
         }
     }
@@ -109290,7 +111496,7 @@ mod lock_stmt {
     impl LockStmt {
         /// get `mode`
         #[must_use]
-        pub fn get_mode(&self) -> i32 {
+        pub const fn get_mode(&self) -> i32 {
             self.0.get_mode()
         }
     }
@@ -109306,7 +111512,7 @@ mod lock_stmt {
     impl LockStmt {
         /// get `nowait`
         #[must_use]
-        pub fn get_nowait(&self) -> bool {
+        pub const fn get_nowait(&self) -> bool {
             self.0.get_nowait()
         }
     }
@@ -109532,7 +111738,7 @@ mod constraints_set_stmt {
     impl ConstraintsSetStmt {
         /// get `deferred`
         #[must_use]
-        pub fn get_deferred(&self) -> bool {
+        pub const fn get_deferred(&self) -> bool {
             self.0.get_deferred()
         }
     }
@@ -110154,7 +112360,7 @@ mod create_conversion_stmt {
     impl CreateConversionStmt {
         /// get `def`
         #[must_use]
-        pub fn get_def(&self) -> bool {
+        pub const fn get_def(&self) -> bool {
             self.0.get_def()
         }
     }
@@ -110485,7 +112691,7 @@ mod create_cast_stmt {
     impl CreateCastStmt {
         /// get `inout`
         #[must_use]
-        pub fn get_inout(&self) -> bool {
+        pub const fn get_inout(&self) -> bool {
             self.0.get_inout()
         }
     }
@@ -110739,7 +112945,7 @@ mod create_transform_stmt {
     impl CreateTransformStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -111535,7 +113741,7 @@ mod deallocate_stmt {
     impl DeallocateStmt {
         /// get `isall`
         #[must_use]
-        pub fn get_isall(&self) -> bool {
+        pub const fn get_isall(&self) -> bool {
             self.0.get_isall()
         }
     }
@@ -111551,7 +113757,7 @@ mod deallocate_stmt {
     impl DeallocateStmt {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -112602,7 +114808,7 @@ mod alter_ts_configuration_stmt {
     impl AlterTsConfigurationStmt {
         /// get `override`
         #[must_use]
-        pub fn get_override(&self) -> bool {
+        pub const fn get_override(&self) -> bool {
             self.0.get_override()
         }
     }
@@ -112618,7 +114824,7 @@ mod alter_ts_configuration_stmt {
     impl AlterTsConfigurationStmt {
         /// get `replace`
         #[must_use]
-        pub fn get_replace(&self) -> bool {
+        pub const fn get_replace(&self) -> bool {
             self.0.get_replace()
         }
     }
@@ -112634,7 +114840,7 @@ mod alter_ts_configuration_stmt {
     impl AlterTsConfigurationStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -113195,7 +115401,7 @@ mod publication_obj_spec {
     impl PublicationObjSpec {
         /// get `location`
         #[must_use]
-        pub fn get_location(&self) -> i32 {
+        pub const fn get_location(&self) -> i32 {
             self.0.get_location()
         }
     }
@@ -113488,7 +115694,7 @@ mod create_publication_stmt {
     impl CreatePublicationStmt {
         /// get `for_all_tables`
         #[must_use]
-        pub fn get_for_all_tables(&self) -> bool {
+        pub const fn get_for_all_tables(&self) -> bool {
             self.0.get_for_all_tables()
         }
     }
@@ -113799,7 +116005,7 @@ mod alter_publication_stmt {
     impl AlterPublicationStmt {
         /// get `for_all_tables`
         #[must_use]
-        pub fn get_for_all_tables(&self) -> bool {
+        pub const fn get_for_all_tables(&self) -> bool {
             self.0.get_for_all_tables()
         }
     }
@@ -114005,6 +116211,9 @@ mod create_subscription_stmt {
 
             /// `options`
             options: NodeList,
+
+            /// `conninfo_location`
+            conninfo_location: i32,
         }
 
         impl From<::pg_query::protobuf::CreateSubscriptionStmt> for CreateSubscriptionStmt {
@@ -114017,6 +116226,8 @@ mod create_subscription_stmt {
 
                 let options = NodeList::from(value.options);
 
+                let conninfo_location = value.conninfo_location;
+
                 Self {
                     subname,
 
@@ -114025,6 +116236,8 @@ mod create_subscription_stmt {
                     publication,
 
                     options,
+
+                    conninfo_location,
                 }
             }
         }
@@ -114058,6 +116271,14 @@ mod create_subscription_stmt {
             #[must_use]
             pub fn get_options(&self) -> NodeListOpt {
                 NodeListOpt::from(&self.options)
+            }
+        }
+
+        impl CreateSubscriptionStmt {
+            /// get `conninfo_location`
+            #[must_use]
+            pub const fn get_conninfo_location(&self) -> i32 {
+                self.conninfo_location
             }
         }
     } // mod inner
@@ -114129,6 +116350,24 @@ mod create_subscription_stmt {
                 Some(v) => v.get_options(),
                 _ => NodeListOpt::none(),
             }
+        }
+    }
+
+    impl CreateSubscriptionStmt {
+        /// get `conninfo_location`
+        #[must_use]
+        pub const fn get_conninfo_location(&self) -> i32 {
+            self.0.get_conninfo_location()
+        }
+    }
+
+    impl CreateSubscriptionStmtOpt {
+        /// get `conninfo_location`
+        #[must_use]
+        pub fn get_conninfo_location(&self) -> Option<i32> {
+            self.0
+                .as_ref()
+                .map(CreateSubscriptionStmt::get_conninfo_location)
         }
     }
 
@@ -114302,6 +116541,9 @@ mod alter_subscription_stmt {
 
             /// `options`
             options: NodeList,
+
+            /// `conninfo_location`
+            conninfo_location: i32,
         }
 
         impl From<::pg_query::protobuf::AlterSubscriptionStmt> for AlterSubscriptionStmt {
@@ -114316,6 +116558,8 @@ mod alter_subscription_stmt {
 
                 let options = NodeList::from(value.options);
 
+                let conninfo_location = value.conninfo_location;
+
                 Self {
                     kind,
 
@@ -114326,6 +116570,8 @@ mod alter_subscription_stmt {
                     publication,
 
                     options,
+
+                    conninfo_location,
                 }
             }
         }
@@ -114367,6 +116613,14 @@ mod alter_subscription_stmt {
             #[must_use]
             pub fn get_options(&self) -> NodeListOpt {
                 NodeListOpt::from(&self.options)
+            }
+        }
+
+        impl AlterSubscriptionStmt {
+            /// get `conninfo_location`
+            #[must_use]
+            pub const fn get_conninfo_location(&self) -> i32 {
+                self.conninfo_location
             }
         }
     } // mod inner
@@ -114457,6 +116711,24 @@ mod alter_subscription_stmt {
                 Some(v) => v.get_options(),
                 _ => NodeListOpt::none(),
             }
+        }
+    }
+
+    impl AlterSubscriptionStmt {
+        /// get `conninfo_location`
+        #[must_use]
+        pub const fn get_conninfo_location(&self) -> i32 {
+            self.0.get_conninfo_location()
+        }
+    }
+
+    impl AlterSubscriptionStmtOpt {
+        /// get `conninfo_location`
+        #[must_use]
+        pub fn get_conninfo_location(&self) -> Option<i32> {
+            self.0
+                .as_ref()
+                .map(AlterSubscriptionStmt::get_conninfo_location)
         }
     }
 
@@ -114688,7 +116960,7 @@ mod drop_subscription_stmt {
     impl DropSubscriptionStmt {
         /// get `missing_ok`
         #[must_use]
-        pub fn get_missing_ok(&self) -> bool {
+        pub const fn get_missing_ok(&self) -> bool {
             self.0.get_missing_ok()
         }
     }
@@ -114947,7 +117219,7 @@ mod scan_token {
     impl ScanToken {
         /// get `start`
         #[must_use]
-        pub fn get_start(&self) -> i32 {
+        pub const fn get_start(&self) -> i32 {
             self.0.get_start()
         }
     }
@@ -114963,7 +117235,7 @@ mod scan_token {
     impl ScanToken {
         /// get `end`
         #[must_use]
-        pub fn get_end(&self) -> i32 {
+        pub const fn get_end(&self) -> i32 {
             self.0.get_end()
         }
     }

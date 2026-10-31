@@ -64,6 +64,21 @@ pub trait DiagnosticMessage {
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// Syntax is unavailable on the explicitly selected engine version.
+    IncompatibleEngineVersion {
+        /// Syntax feature used by the statement.
+        feature: String,
+        /// Minimum supported PostgreSQL major version.
+        required: u32,
+        /// Explicitly configured engine version, if supplied.
+        selected: Option<String>,
+    },
+    /// Recognized syntax whose semantic analysis is not implemented.
+    FeatureAnalysisUnsupported {
+        /// Recognized feature and the tracked semantic limitation.
+        feature: String,
+    },
+
     /// SQL analysis could not establish a finalized parameter type.
     ParameterTypeUnresolved(u32),
     /// Inference would need an unsupported catalog-wide candidate search.
@@ -423,6 +438,8 @@ impl AnalysisProblem {
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
+            Self::IncompatibleEngineVersion { .. } => "incompatible_engine_version",
+            Self::FeatureAnalysisUnsupported { .. } => "feature_analysis_unsupported",
             Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
             Self::InferenceCandidateSpaceUnsupported { .. } => {
                 "inference_candidate_space_unsupported"
@@ -489,7 +506,10 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
-            Self::ParameterTypeUnresolved(_) | Self::InferenceCandidateSpaceUnsupported { .. } => {
+            Self::IncompatibleEngineVersion { .. }
+            | Self::FeatureAnalysisUnsupported { .. }
+            | Self::ParameterTypeUnresolved(_)
+            | Self::InferenceCandidateSpaceUnsupported { .. } => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
@@ -528,6 +548,17 @@ impl AnalysisProblem {
 impl DiagnosticMessage for AnalysisProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::IncompatibleEngineVersion {
+                feature,
+                required,
+                selected,
+            } => format!(
+                "{feature} requires PostgreSQL {required} or later; selected version: {}",
+                selected.as_deref().unwrap_or("unspecified")
+            ),
+            Self::FeatureAnalysisUnsupported { feature } => {
+                format!("semantic analysis of {feature} is not implemented")
+            }
             Self::InferenceCandidateSpaceUnsupported { operation } => format!(
                 "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"
             ),

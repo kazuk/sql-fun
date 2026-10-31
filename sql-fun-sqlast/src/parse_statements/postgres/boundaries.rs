@@ -10,10 +10,7 @@ use ::pg_query::protobuf::Token;
 
 pub(super) fn discover(sql: &str) -> Vec<Result<StringSpan, ParseStatementError>> {
     if let Ok(statements) = ::pg_query::split_with_parser(sql) {
-        return statements
-            .into_iter()
-            .map(|statement| Ok(source_span(sql, statement)))
-            .collect();
+        return parser_ranges(sql, statements);
     }
     let candidates = match ::pg_query::split_with_scanner(sql) {
         Ok(candidates) => candidates,
@@ -79,6 +76,39 @@ pub(super) fn discover(sql: &str) -> Vec<Result<StringSpan, ParseStatementError>
     ranges
 }
 
+// PostgreSQL 18 starts raw ranges at the first substantive token. The public
+// iterator retains the existing contract: trivia after the preceding separator
+// belongs to the following statement. Scanner tokens distinguish separators
+// from semicolons in comments, quoted strings and routine bodies.
+fn parser_ranges(sql: &str, statements: Vec<&str>) -> Vec<Result<StringSpan, ParseStatementError>> {
+    let scanned = match ::pg_query::scan(sql) {
+        Ok(scanned) => scanned,
+        Err(error) => {
+            return vec![Err(ParseStatementError::boundary_discovery(
+                StringSpan::new(0, sql.len()),
+                &error.to_string(),
+            ))];
+        }
+    };
+    let mut separators = scanned
+        .tokens
+        .iter()
+        .filter(|token| token.token() == Token::Ascii59)
+        .map(|token| token.end as usize)
+        .peekable();
+    let mut start = 0;
+    statements
+        .into_iter()
+        .map(|statement| {
+            let span = source_span(sql, statement);
+            while separators.peek().is_some_and(|end| *end <= span.offset()) {
+                start = separators.next().expect("peeked separator");
+            }
+            Ok(StringSpan::new(start, span.end_pos() - start))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod test_discover {
     #[rstest::rstest]
@@ -109,7 +139,11 @@ mod test_discover {
         #[values(false, true)] malformed_before: bool,
     ) {
         assert_eq!(
-            ::pg_query::parse(statement).unwrap().protobuf.stmts.len(),
+            ::pg_query::parse(statement, ::pg_query::ParserOptions::default())
+                .unwrap()
+                .protobuf
+                .stmts
+                .len(),
             1
         );
         let sql = if malformed_before {
@@ -145,7 +179,7 @@ mod test_discover {
         let ranges = super::discover(&sql);
         assert_eq!(ranges.len(), 3);
         assert_eq!(ranges[1].as_ref().unwrap().get_from(&sql), Some(statement));
-        assert!(::pg_query::parse(statement).is_err());
+        assert!(::pg_query::parse(statement, ::pg_query::ParserOptions::default()).is_err());
         assert_eq!(ranges[2].as_ref().unwrap().get_from(&sql), Some("SELECT 3"));
     }
 
@@ -173,7 +207,11 @@ mod test_discover {
     fn parser_fast_path_preserves_authoritative_ranges() {
         let sql =
             " ; /* ; */ CREATE RULE r AS ON INSERT TO t DO (SELECT 1; SELECT 2;); BEGIN; END;";
-        let expected = ::pg_query::split_with_parser(sql).unwrap();
+        let expected = [
+            " /* ; */ CREATE RULE r AS ON INSERT TO t DO (SELECT 1; SELECT 2;)",
+            " BEGIN",
+            " END",
+        ];
         let actual: Vec<_> = super::discover(sql)
             .into_iter()
             .map(|range| range.unwrap().get_from(sql).unwrap())

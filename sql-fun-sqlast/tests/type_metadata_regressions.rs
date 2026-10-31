@@ -220,10 +220,7 @@ fn omitted_defaults_do_not_contribute_matches() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-
-
 // Timed-out ordinary_signature_precedes_identical_variadic_expansion cases were deleted in 9398769e.
-
 
 #[test]
 fn output_parameters_do_not_contribute_input_matches() -> Result<(), Box<dyn std::error::Error>> {

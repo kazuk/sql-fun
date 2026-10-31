@@ -738,7 +738,13 @@ impl TryFromWithTokens<&syn::InsertStmt> for Insert {
                 .as_inner()
                 .map(|conflict| Conflict::try_from_with_tokens(&conflict, tokens))
                 .transpose()?,
-            returning: Target::try_collect_from_with_tokens(value.get_returning_list(), tokens)?,
+            returning_options: crate::ast::ReturningOption::from_postgres(
+                &value.get_returning_clause(),
+            )?,
+            returning: Target::try_collect_from_with_tokens(
+                value.get_returning_clause().get_exprs(),
+                tokens,
+            )?,
         })
     }
 }
@@ -760,7 +766,13 @@ impl TryFromWithTokens<&syn::UpdateStmt> for Update {
             assignments: Assignment::try_collect_from_with_tokens(value.get_target_list(), tokens)?,
             from: FromItem::try_collect_from_with_tokens(value.get_from_clause(), tokens)?,
             predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
-            returning: Target::try_collect_from_with_tokens(value.get_returning_list(), tokens)?,
+            returning_options: crate::ast::ReturningOption::from_postgres(
+                &value.get_returning_clause(),
+            )?,
+            returning: Target::try_collect_from_with_tokens(
+                value.get_returning_clause().get_exprs(),
+                tokens,
+            )?,
         })
     }
 }
@@ -780,7 +792,13 @@ impl TryFromWithTokens<&syn::DeleteStmt> for Delete {
             )?)?,
             using: FromItem::try_collect_from_with_tokens(value.get_using_clause(), tokens)?,
             predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
-            returning: Target::try_collect_from_with_tokens(value.get_returning_list(), tokens)?,
+            returning_options: crate::ast::ReturningOption::from_postgres(
+                &value.get_returning_clause(),
+            )?,
+            returning: Target::try_collect_from_with_tokens(
+                value.get_returning_clause().get_exprs(),
+                tokens,
+            )?,
         })
     }
 }

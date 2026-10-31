@@ -16,6 +16,8 @@ pub enum JoinKind {
     Full,
     /// semi join  (may be not use in SQL syntax)
     Semi,
+    /// Right semi join in PostgreSQL internal trees; not raw SQL syntax.
+    RightSemi,
     /// anti join  (may be not use in SQL syntax)
     Anti,
     /// right anti join  (may be not use in SQL syntax)
@@ -39,6 +41,7 @@ impl TryFrom<JoinTypeOpt> for JoinKind {
             JoinType::JoinFull => Ok(Self::Full),
             JoinType::JoinRight => Ok(Self::Right),
             JoinType::JoinSemi => Ok(Self::Semi),
+            JoinType::JoinRightSemi => Ok(Self::RightSemi),
             JoinType::JoinAnti => Ok(Self::Anti),
             JoinType::JoinRightAnti => Ok(Self::RightAnti),
             JoinType::JoinUniqueOuter => Ok(Self::UniqueOuter),
@@ -76,7 +79,7 @@ impl JoinKind {
             Self::Left => in_nullable,
             Self::Right => true,
             Self::Full => true,
-            Self::Semi => in_nullable,
+            Self::Semi | Self::RightSemi => in_nullable,
             Self::Anti => in_nullable,
             Self::RightAnti => false,
             Self::UniqueInner => in_nullable,
@@ -92,7 +95,7 @@ impl JoinKind {
             Self::Left => true,
             Self::Right => in_nullable,
             Self::Full => true,
-            Self::Semi => in_nullable,
+            Self::Semi | Self::RightSemi => in_nullable,
             Self::Anti => in_nullable,
             Self::RightAnti => false,
             Self::UniqueInner => in_nullable,

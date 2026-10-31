@@ -93,7 +93,6 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 // Timed-out parameters_retain_correlated_numeric_sources cases were deleted in 9398769e.
 // Further timed-out parameters_retain_correlated_numeric_sources cases were deleted in 4b785462.
 
-
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 // Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 9398769e.
 // Further timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 4b785462.
@@ -277,10 +276,8 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 // Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 4b785462.
 // The remaining owned-array cases were deleted in 2803641d.
 
-
 // Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 9398769e.
 // Further timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 4b785462.
-
 
 // Removed the subscript case after parallel timeouts; restore from
 // e1039d77f118af4a82783dfb31666046bebd8635.

@@ -103,8 +103,14 @@ mod test_query_emission {
             .unwrap()
             .unwrap();
         let emitted = statement.deparse_sql(Dialect::postgres()).unwrap();
-        let original = pg_query::parse(sql).unwrap().deparse().unwrap();
-        let reparsed = pg_query::parse(&emitted).unwrap().deparse().unwrap();
+        let original = pg_query::parse(sql, ::pg_query::ParserOptions::default())
+            .unwrap()
+            .deparse(::pg_query::DeparseOptions::default())
+            .unwrap();
+        let reparsed = pg_query::parse(&emitted, ::pg_query::ParserOptions::default())
+            .unwrap()
+            .deparse(::pg_query::DeparseOptions::default())
+            .unwrap();
         assert_eq!(original, reparsed, "emitted SQL: {emitted}");
     }
 

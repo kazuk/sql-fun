@@ -33,14 +33,14 @@ impl GeneratedColumnMode {
     const GENERATED_COLUMN_MODE_STORED: &'static str = "s";
     const GENERATED_COLUMN_MODE_VIRTUAL: &'static str = "v";
 
-    /// from [`crate::syn::Constraint`] `generated_when` value
+    /// from [`crate::syn::Constraint`] `generated_kind` value
     pub fn from_postgres_generated_column_mode(value: &str) -> Result<Self, AnalysisError> {
         if value == Self::GENERATED_COLUMN_MODE_STORED {
             Ok(Self::stored())
         } else if value == Self::GENERATED_COLUMN_MODE_VIRTUAL {
             Ok(Self::r#virtual())
         } else {
-            AnalysisError::raise_unexpected_input("generated_when")?;
+            AnalysisError::raise_unexpected_input("generated_kind")?;
             AnalysisError::never()
         }
     }
@@ -171,7 +171,7 @@ impl GeneratedColumnConstraint {
         };
 
         let generated_when =
-            GeneratedColumnMode::from_postgres_generated_column_mode(&syn.get_generated_when())?;
+            GeneratedColumnMode::from_postgres_generated_column_mode(&syn.get_generated_kind())?;
         let (expr, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
             &ScalarAnalysisContext::default(),

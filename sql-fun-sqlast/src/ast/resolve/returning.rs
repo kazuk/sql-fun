@@ -20,6 +20,9 @@ impl ResultColumnCollection {
         let mut results = Self::default();
         for target in targets {
             if let Some(name) = target.source_star_name() {
+                if scope.check_returning_star(context, name.star_qualifier()?.as_ref())? {
+                    continue;
+                }
                 name.require_returning_star(context, alias)?;
                 let first = results.len();
                 let mut index = 0;
@@ -66,6 +69,9 @@ impl ResultColumnCollection {
                 }
                 // Unqualified RETURNING * expands only the modified relation.
                 let qualifier = name.star_qualifier()?;
+                if scope.check_returning_star(context, qualifier.as_ref())? {
+                    continue;
+                }
                 if !results.expand_returning_projection(
                     context,
                     from,
@@ -102,6 +108,9 @@ impl ResultColumnCollection {
                 }
                 // Unqualified RETURNING * expands only the modified relation.
                 let qualifier = name.star_qualifier()?;
+                if scope.check_returning_star(context, qualifier.as_ref())? {
+                    continue;
+                }
                 // PostgreSQL 18 can bind OLD and NEW to the modified row while
                 // projection_names still needs the underlying target alias.
                 let projection_qualifier = qualifier.as_ref().map(|alias| {

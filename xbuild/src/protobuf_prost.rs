@@ -108,6 +108,12 @@ impl StructTypesCommand {
         let message_types = j9::run(".file[].messageType[]", &schema)?;
         for message_type in message_types {
             let struct_type: MessageType = serde_json::from_str(&message_type)?;
+            // SummaryResult belongs to libpg_query's separate summary API, not
+            // the PostgreSQL syntax tree consumed by sql-fun. Its nested
+            // messages are not syntax nodes.
+            if struct_type.struct_type_name() == "SummaryResult" {
+                continue;
+            }
             if struct_type.field().iter().all(|f| f.oneof_index.is_none()) {
                 eprintln!("{struct_type:?}");
 

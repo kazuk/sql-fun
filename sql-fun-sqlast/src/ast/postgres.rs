@@ -535,7 +535,7 @@ impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
             .map(|constraints| constraints.as_constraint())
             .unwrap_or_default()
         {
-            constraints.push(super::TableConstraint::try_from_with_tokens(
+            constraints.push(super::TableConstraint::from_postgres_inline(
                 &constraint,
                 tokens,
             )?);

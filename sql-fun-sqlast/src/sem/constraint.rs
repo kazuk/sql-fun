@@ -214,6 +214,11 @@ where
             ConstrType::ConstrAttrNotDeferrable => todo!(),
             ConstrType::ConstrAttrDeferred => todo!(),
             ConstrType::ConstrAttrImmediate => todo!(),
+            ConstrType::ConstrAttrEnforced | ConstrType::ConstrAttrNotEnforced => {
+                AnalysisError::raise_unexpected_input(
+                    "standalone enforcement attribute is not a table constraint",
+                )
+            }
             ConstrType::OptionNone => todo!(),
             ConstrType::Undefined => todo!(),
         }

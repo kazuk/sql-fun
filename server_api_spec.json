@@ -470,6 +470,64 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Syntax is unavailable on the explicitly selected engine version.",
+                  "type": "object",
+                  "properties": {
+                    "IncompatibleEngineVersion": {
+                      "type": "object",
+                      "properties": {
+                        "feature": {
+                          "description": "Syntax feature used by the statement.",
+                          "type": "string"
+                        },
+                        "required": {
+                          "description": "Minimum supported PostgreSQL major version.",
+                          "type": "integer",
+                          "format": "uint32",
+                          "minimum": 0
+                        },
+                        "selected": {
+                          "description": "Explicitly configured engine version, if supplied.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "feature",
+                        "required"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "IncompatibleEngineVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Recognized syntax whose semantic analysis is not implemented.",
+                  "type": "object",
+                  "properties": {
+                    "FeatureAnalysisUnsupported": {
+                      "type": "object",
+                      "properties": {
+                        "feature": {
+                          "description": "Recognized feature and the tracked semantic limitation.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "feature"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "FeatureAnalysisUnsupported"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "SQL analysis could not establish a finalized parameter type.",
                   "type": "object",
                   "properties": {
@@ -4296,6 +4354,64 @@
             "AnalysisProblem": {
               "description": "Semantic analysis problems",
               "oneOf": [
+                {
+                  "description": "Syntax is unavailable on the explicitly selected engine version.",
+                  "type": "object",
+                  "properties": {
+                    "IncompatibleEngineVersion": {
+                      "type": "object",
+                      "properties": {
+                        "feature": {
+                          "description": "Syntax feature used by the statement.",
+                          "type": "string"
+                        },
+                        "required": {
+                          "description": "Minimum supported PostgreSQL major version.",
+                          "type": "integer",
+                          "format": "uint32",
+                          "minimum": 0
+                        },
+                        "selected": {
+                          "description": "Explicitly configured engine version, if supplied.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "feature",
+                        "required"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "IncompatibleEngineVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Recognized syntax whose semantic analysis is not implemented.",
+                  "type": "object",
+                  "properties": {
+                    "FeatureAnalysisUnsupported": {
+                      "type": "object",
+                      "properties": {
+                        "feature": {
+                          "description": "Recognized feature and the tracked semantic limitation.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "feature"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "FeatureAnalysisUnsupported"
+                  ],
+                  "additionalProperties": false
+                },
                 {
                   "description": "SQL analysis could not establish a finalized parameter type.",
                   "type": "object",

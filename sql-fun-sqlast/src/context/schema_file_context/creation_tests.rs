@@ -547,7 +547,8 @@ mod test_helpers {
         sql: &str,
     ) -> Result<SchemaFileContext, AnalysisError> {
         use crate::ast::TryFromWithTokens;
-        let parsed = ::pg_query::parse(sql).expect("valid PostgreSQL fixture");
+        let parsed = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
+            .expect("valid PostgreSQL fixture");
         for raw in parsed.protobuf.stmts {
             let node = crate::syn::Node::from(raw.stmt.expect("statement").as_ref().clone());
             let syntax = crate::ast::StatementNode::try_from_with_tokens(

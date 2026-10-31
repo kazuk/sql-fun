@@ -93,7 +93,8 @@ fn equivalent_concepts_use_common_shapes() {
 }
 
 fn postgres_drop_syntax(sql: &str) -> ::pg_query::protobuf::DropStmt {
-    let result = ::pg_query::parse(sql).expect("DROP syntax fixture");
+    let result =
+        ::pg_query::parse(sql, ::pg_query::ParserOptions::default()).expect("DROP syntax fixture");
     let node = result
         .protobuf
         .stmts

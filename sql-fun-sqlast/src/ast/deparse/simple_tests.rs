@@ -1,6 +1,6 @@
-use super::tests::assert_postgres_structure;
 use super::{SqlEmit, SqlWriter};
 use crate::ast::{Dialect, DropTable, Name};
+use crate::test_helpers::assert_postgres_structure;
 
 #[rstest::rstest]
 #[case("SET work_mem TO '64MB'")]

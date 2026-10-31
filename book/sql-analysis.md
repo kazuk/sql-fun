@@ -449,10 +449,13 @@ link in the child, preserving parent and sibling catalogs.
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion
 supports tables, ordinary views, derived queries, nonrecursive CTEs, and joins.
-The PostgreSQL parser currently accepts PostgreSQL 17
-grammar, so PostgreSQL 18's RETURNING OLD/NEW alias syntax is unavailable.
-These limitations can terminate analysis; parsing a statement does not establish
-that its semantics are supported.
+The PostgreSQL parser accepts PostgreSQL 18 grammar. Analysis checks new syntax
+against the explicitly configured engine version: a PostgreSQL 17 target reports
+`incompatible_engine_version`. Recognized syntax whose analysis is not yet
+implemented reports `feature_analysis_unsupported` on PostgreSQL 18. This includes
+renamed RETURNING row images, INSERT/UPDATE destination row images, temporal
+constraints, and new constraint enforcement/inheritance transitions. Parsing a
+statement does not establish that its semantics are supported.
 
 ## PostgreSQL truth predicates
 
@@ -750,9 +753,10 @@ record. A source row can be absent when an action runs for NOT MATCHED BY SOURCE
 Starting with PostgreSQL 18, implicit `old` and `new` references expose target row
 images. The old image is nullable when INSERT is possible, and the new image is
 nullable when DELETE is possible. Explicit relation aliases named `old` or `new`
-take precedence. The PostgreSQL 17 parser cannot accept PostgreSQL 18's
-`RETURNING WITH (OLD AS ..., NEW AS ...)` syntax. It also normalizes plain
-`NOT MATCHED` and `NOT MATCHED BY TARGET` to the same syntax node, so analysis
+take precedence. `RETURNING WITH (OLD AS ..., NEW AS ...)` is retained when
+parsing and rendering SQL, but binding those renamed images remains unsupported.
+The parser normalizes plain `NOT MATCHED` and `NOT MATCHED BY TARGET` to the same
+syntax node, so analysis
 cannot diagnose use of the explicit `BY TARGET` spelling against PostgreSQL
 15 or 16; that spelling requires PostgreSQL 17.
 

@@ -73,6 +73,12 @@ impl super::AlterRelation {
         mut context: TContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        if !self.check_engine_features(&mut context)? {
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         let changes = self.view_default_changes(&mut context);
         let Some(changes) = ResolutionFailure::finish(changes, &mut context)? else {
             return Ok(AstAndContextPair::new(
@@ -574,9 +580,10 @@ pub(crate) struct AlterColumnType {
 }
 #[derive(Clone, Debug)]
 pub(crate) struct AlterConstraintFlags {
-    name: String,
-    deferrable: bool,
-    initially_deferred: bool,
+    pub(super) name: String,
+    pub(super) deferrability: Option<(bool, bool)>,
+    pub(super) enforced: Option<bool>,
+    pub(super) no_inherit: Option<bool>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct GenericOption {
@@ -664,15 +671,6 @@ impl AlterColumnType {
             type_name: type_name.clone(),
             collation: collation.cloned(),
             using: using.cloned(),
-        }
-    }
-}
-impl AlterConstraintFlags {
-    pub(super) fn new(name: &str, deferrable: bool, initially_deferred: bool) -> Self {
-        Self {
-            name: name.to_owned(),
-            deferrable,
-            initially_deferred,
         }
     }
 }
@@ -912,6 +910,12 @@ impl super::Table {
         mut context: TContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        if !self.check_engine_features(&mut context)? {
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         let name = context.creation_name(&self.name.full_name()?, self.temporary)?;
         if !context.permits_relation_creation(
             &name,
@@ -1083,6 +1087,14 @@ impl super::Column {
         column: &mut ColumnDefinition,
     ) -> Result<(), AnalysisError> {
         for constraint in &self.constraints {
+            // ENFORCED is the existing constraint behavior. Retain its explicit
+            // syntax, but it does not add a separate semantic column constraint.
+            if matches!(
+                constraint.constraint,
+                super::ColumnConstraint::Enforcement(true)
+            ) {
+                continue;
+            }
             if constraint.constraint.is_unique_key() && constraint.extras.deferrable {
                 todo!("deferrable unique-key catalog representation");
             }
@@ -1137,6 +1149,9 @@ impl super::ColumnConstraint {
     ) -> Result<ColumnConstraint, AnalysisError> {
         let scope = ScalarAnalysisContext::default();
         Ok(match self {
+            Self::Enforcement(_) => {
+                unreachable!("versioned enforcement is checked before resolution")
+            }
             Self::Nullability(not_null, conflict, validity) => {
                 ColumnConstraint::nullability(ColumnNullabilityConstraint::new(
                     table,
@@ -2094,6 +2109,12 @@ impl Domain {
         &self,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        if !self.check_engine_features(&mut context)? {
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         let domain = self.resolve(&mut context)?;
         let context = context.apply_create_domain(&domain)?;
         Ok(AstAndContextPair::new(
@@ -2238,5 +2259,79 @@ impl AlterDefinition {
                 AnalysisError::raise_unexpected_input("view default expression").map_err(Into::into)
             }
         }
+    }
+}
+
+impl super::AlterCommand {
+    pub(super) fn check_engine_features(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+        match self {
+            Self::Postgres(command) => match &command.definition {
+                AlterDefinition::Constraint(constraint) => {
+                    constraint.check_engine_features(context, false)
+                }
+                AlterDefinition::Column(column) => {
+                    let mut valid = true;
+                    for constraint in &column.constraints {
+                        valid &= constraint.check_engine_features(context, true)?;
+                    }
+                    Ok(valid)
+                }
+                AlterDefinition::ConstraintFlags(flags) => {
+                    let mut recognized = true;
+                    let mut unsupported = false;
+                    if flags.enforced.is_some() {
+                        recognized &= context
+                            .postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
+                        unsupported = true;
+                    }
+                    if flags.no_inherit.is_some() {
+                        recognized &= context
+                            .postgres18_syntax_used(Postgres18Syntax::ConstraintInheritance)?;
+                        unsupported = true;
+                    }
+                    if recognized && unsupported {
+                        context.report_analysis_problem(
+                            AnalysisProblem::FeatureAnalysisUnsupported {
+                                feature: "ALTER CONSTRAINT enforcement/inheritance".to_owned(),
+                            },
+                        )?;
+                    }
+                    Ok(recognized && !unsupported)
+                }
+                _ => Ok(true),
+            },
+            Self::Constraint(constraint) => constraint.check_engine_features(context, false),
+            _ => Ok(true),
+        }
+    }
+}
+
+impl Domain {
+    pub(super) fn check_engine_features(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        let mut valid = true;
+        for constraint in &self.constraints {
+            valid &= constraint.check_engine_features(context, true)?;
+        }
+        if valid
+            && self.constraints.iter().any(|constraint| {
+                matches!(
+                    constraint.constraint,
+                    super::ColumnConstraint::Enforcement(_)
+                )
+            })
+        {
+            context.report_analysis_problem(AnalysisProblem::FeatureAnalysisUnsupported {
+                feature: "domain constraint analysis (#548)".to_owned(),
+            })?;
+            valid = false;
+        }
+        Ok(valid)
     }
 }

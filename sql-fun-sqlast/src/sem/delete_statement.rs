@@ -157,6 +157,7 @@ pub fn analyze_delete_statement<T: ParseContext>(
 ) -> Result<(SemAst, T), AnalysisError> {
     AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
     let syntax = crate::ast::Delete::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let delete = syntax.resolve(&mut context, &mut crate::CacheContext::new())?;
-    Ok((SemAst::delete(&delete), context))
+    let statement = crate::ast::StatementNode::Delete(syntax)
+        .resolve(&mut context, &mut crate::CacheContext::new())?;
+    Ok((statement, context))
 }

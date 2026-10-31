@@ -184,14 +184,12 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
 
 // Timed-out nested_queries_retain_solved_parameter_domains cases were deleted in 9398769e.
 
-
 // Removed the composite_array case after a parallel timeout; restore from
 // 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
 // Removed real_catalog_keeps_explicit_array_input_hints::builtin_array after a standard timeout;
 // restore from 9366c1a8288cde410c30daa8ce6338708b3e69b0.
 
 // Timed-out real_catalog_keeps_explicit_array_input_hints cases were deleted in 9398769e.
-
 
 // Removed array_hints_resolve_expression_results_without_catalog_search
 // (integer and uuid) after parallel timeouts; restore from 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.

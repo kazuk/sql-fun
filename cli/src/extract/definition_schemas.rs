@@ -74,7 +74,7 @@ mod tests {
             .unwrap()
             .session_sql()
             .unwrap();
-        pg_query::parse(&sql).unwrap();
+        pg_query::parse(&sql, ::pg_query::ParserOptions::default()).unwrap();
         assert!(sql.contains("Odd''"));
         assert!(sql.contains("雪"));
     }

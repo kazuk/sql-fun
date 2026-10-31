@@ -706,6 +706,7 @@ impl SqlEmit for Merge {
         }
         if !self.returning_list.is_empty() {
             w.sql(" RETURNING ");
+            crate::ast::ReturningOption::emit_options(&self.returning_options, w)?;
             w.list(&self.returning_list, ", ")?;
         }
         Ok(())

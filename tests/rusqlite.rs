@@ -105,5 +105,5 @@ mod test_helpers {
     }
 }
 
-// Timed-out test_rusqlite and test_rusqlite_check were deleted in caca9608;
+// Timed-out test_rusqlite and test_rusqlite_check were deleted in b74a966b635090cdcb3176de40f74f8ea1fd6a62;
 // recover their implementations from that commit's parent.

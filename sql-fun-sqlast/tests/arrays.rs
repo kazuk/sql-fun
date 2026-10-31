@@ -90,12 +90,11 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 }
 
 // Removed repeated and nested numeric-source cases in 81568731f391becc60f90cbeac057ddd96c0baa6, and the CTE case in 22cf48f9b8718c8f344f40158c272d052a844340.
-// Timed-out parameters_retain_correlated_numeric_sources cases were deleted in 9398769e.
-// Further timed-out parameters_retain_correlated_numeric_sources cases were deleted in 4b785462.
+// Timed-out parameters_retain_correlated_numeric_sources cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out parameters_retain_correlated_numeric_sources cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
-// Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 9398769e.
-// Further timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 4b785462.
+// Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 #[rstest::rstest]
 // Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
 // Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
@@ -272,16 +271,16 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
     Ok(())
 }
 
-// Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 9398769e.
-// Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 4b785462.
-// The remaining owned-array cases were deleted in 2803641d.
+// Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
+// The remaining owned-array cases were deleted in 78296d13d739d719733a6b23574f74c5200cc1ad.
 
-// Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 9398769e.
-// Further timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 4b785462.
+// Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
 
 // Removed the subscript case after parallel timeouts; restore from
 // e1039d77f118af4a82783dfb31666046bebd8635.
-// Timed-out late_constraints_reach_array_results cases were deleted in 9398769e.
+// Timed-out late_constraints_reach_array_results cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 #[rstest::rstest]
 #[case::predicate("SELECT ARRAY[$1,NULL] WHERE $1", "_bool")]
 fn late_constraints_reach_array_results(
@@ -305,7 +304,7 @@ fn late_constraints_reach_array_results(
     Ok(())
 }
 
-// Timed-out deferred_arrays_accept_catalog_defined_types cases were deleted in 9398769e.
+// Timed-out deferred_arrays_accept_catalog_defined_types cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 
 #[rstest::rstest]
 #[case::constructor("SELECT ARRAY[1::oid] = ARRAY[1::oid]", &[], "_oid")]

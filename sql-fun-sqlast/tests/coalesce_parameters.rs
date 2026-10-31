@@ -7,7 +7,7 @@ use ::sql_fun_sqlast::{
 use std::collections::BTreeMap;
 
 // Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
-// Timed-out numeric_inputs_keep_admissible_assignments cases were deleted in 9398769e.
+// Timed-out numeric_inputs_keep_admissible_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 #[rstest::rstest]
 #[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]

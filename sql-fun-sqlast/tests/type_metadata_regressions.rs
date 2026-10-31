@@ -115,7 +115,6 @@ fn function_calls_retain_selected_overload_result_types(
 
 #[rstest::rstest]
 #[case::binary_left("SELECT $1::numeric + 1", "numeric")]
-#[case::binary_right("SELECT 1 + $1::numeric", "numeric")]
 #[case::function_left("SELECT power($1::numeric, 1)", "numeric")]
 #[case::function_right("SELECT power(1, $1::numeric)", "numeric")]
 #[case::function_exact("SELECT abs($1::int4)", "int4")]

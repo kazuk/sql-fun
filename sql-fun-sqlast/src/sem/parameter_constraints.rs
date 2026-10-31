@@ -74,13 +74,18 @@ impl InputTypeConstraint {
     }
 
     fn intersect(&mut self, other: &Self) -> bool {
-        let before = self.clone();
         match (&mut self.0, &other.0) {
-            (Some(types), Some(other)) => types.retain(|ty| other.contains(ty)),
-            (None, Some(types)) => self.0 = Some(types.clone()),
-            _ => {}
+            (Some(types), Some(other)) => {
+                let before = types.len();
+                types.retain(|ty| other.contains(ty));
+                types.len() != before
+            }
+            (None, Some(types)) => {
+                self.0 = Some(types.clone());
+                true
+            }
+            _ => false,
         }
-        *self != before
     }
 
     fn exclude(&mut self, excluded: &[TypeReference]) {

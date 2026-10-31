@@ -1,0 +1,687 @@
+[
+  {
+    "name": "like-plain",
+    "sql": "SELECT 'abc' LIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "like-escape",
+    "sql": "SELECT 'abc' LIKE 'a%' ESCAPE '!' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "like-empty-escape",
+    "sql": "SELECT 'abc' LIKE 'a%' ESCAPE '' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "like-null-escape",
+    "sql": "SELECT 'abc' LIKE 'a%' ESCAPE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-like-plain",
+    "sql": "SELECT 'abc' NOT LIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-like-escape",
+    "sql": "SELECT 'abc' NOT LIKE 'a%' ESCAPE '!' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-like-empty-escape",
+    "sql": "SELECT 'abc' NOT LIKE 'a%' ESCAPE '' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-like-null-escape",
+    "sql": "SELECT 'abc' NOT LIKE 'a%' ESCAPE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ilike-plain",
+    "sql": "SELECT 'abc' ILIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ilike-escape",
+    "sql": "SELECT 'abc' ILIKE 'a%' ESCAPE '!' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ilike-empty-escape",
+    "sql": "SELECT 'abc' ILIKE 'a%' ESCAPE '' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ilike-null-escape",
+    "sql": "SELECT 'abc' ILIKE 'a%' ESCAPE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-ilike-plain",
+    "sql": "SELECT 'abc' NOT ILIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-ilike-escape",
+    "sql": "SELECT 'abc' NOT ILIKE 'a%' ESCAPE '!' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-ilike-empty-escape",
+    "sql": "SELECT 'abc' NOT ILIKE 'a%' ESCAPE '' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-ilike-null-escape",
+    "sql": "SELECT 'abc' NOT ILIKE 'a%' ESCAPE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "similar-plain",
+    "sql": "SELECT 'abc' SIMILAR TO 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "similar-escape",
+    "sql": "SELECT 'abc' SIMILAR TO 'a%' ESCAPE '!' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "similar-empty-escape",
+    "sql": "SELECT 'abc' SIMILAR TO 'a%' ESCAPE '' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "similar-null-escape",
+    "sql": "SELECT 'abc' SIMILAR TO 'a%' ESCAPE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-similar-plain",
+    "sql": "SELECT 'abc' NOT SIMILAR TO 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-similar-escape",
+    "sql": "SELECT 'abc' NOT SIMILAR TO 'a%' ESCAPE '!' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-similar-empty-escape",
+    "sql": "SELECT 'abc' NOT SIMILAR TO 'a%' ESCAPE '' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "not-similar-null-escape",
+    "sql": "SELECT 'abc' NOT SIMILAR TO 'a%' ESCAPE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "null-value",
+    "sql": "SELECT NULL LIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "null-pattern",
+    "sql": "SELECT 'a' NOT LIKE NULL AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "varchar-value",
+    "sql": "SELECT 'abc'::varchar LIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "name-value",
+    "sql": "SELECT 'abc'::name ILIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "bytea-like",
+    "sql": "SELECT 'abc'::bytea LIKE 'a%'::bytea AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "bytea-not-like-escape",
+    "sql": "SELECT 'abc'::bytea NOT LIKE 'a%'::bytea ESCAPE '!'::bytea AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "numeric-rejected",
+    "sql": "SELECT 1 LIKE '1' AS result",
+    "expected": {
+      "diagnostics": [
+        "binary_operator_overload_resolution_failed",
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "numeric-escape-rejected",
+    "sql": "SELECT 'a' LIKE 'a' ESCAPE 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-value",
+    "sql": "SELECT missing LIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-pattern",
+    "sql": "SELECT 'abc' ILIKE missing AS result",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-escape",
+    "sql": "SELECT 'abc' LIKE 'a%' ESCAPE missing AS result",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "bytea-unknown-pattern",
+    "sql": "SELECT 'abc'::bytea LIKE 'a%' AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nullable-column",
+    "sql": "SELECT v LIKE 'a%' AS result FROM (SELECT NULL::text AS v) x",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "bound-escape-column",
+    "sql": "SELECT v NOT ILIKE p ESCAPE e AS result FROM (SELECT 'a' AS v, 'a' AS p, '!' AS e) x",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ambiguous-escape-column",
+    "sql": "SELECT 'a' LIKE 'a' ESCAPE e AS result FROM (SELECT '!' AS e) a, (SELECT '#' AS e) b",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

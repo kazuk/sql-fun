@@ -2,8 +2,8 @@ use crate::{
     ast::TryFromWithTokens,
     context::ParseContext,
     sem::{
-        AliasSpec, AnalysisError, DataSource, FromClause, FullName, Nullable,
-        ScalarAnalysisContext, SemScalarExpr, WithClause, data_source::AliasName,
+        AliasSpec, AnalysisError, DataSource, FromClause, Nullable, ScalarAnalysisContext,
+        SemScalarExpr, WithClause, data_source::AliasName,
     },
     syn::ScanToken,
 };
@@ -23,12 +23,12 @@ impl DataSourceRowFunctions {
     pub(super) fn projection_shape_is_resolved(&self) -> bool {
         self.functions
             .iter()
-            .all(|function| function.source().projection_shape_is_resolved())
+            .all(DataSourceRowsFromFunc::projection_shape_is_resolved)
     }
     pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         self.functions
             .iter()
-            .any(|function| function.source().projection_is_table_dependent(context))
+            .any(|function| function.projection_is_table_dependent(context))
     }
 
     pub(super) fn matches_alias(&self, name: &AliasName) -> bool {
@@ -66,7 +66,7 @@ impl DataSourceRowFunctions {
     pub fn resolved_function_names(&self) -> Vec<crate::sem::QueryName> {
         self.functions
             .iter()
-            .filter_map(|function| function.source().resolved_function_name().cloned())
+            .filter_map(|function| function.source()?.resolved_function_name().cloned())
             .collect()
     }
 
@@ -80,57 +80,128 @@ impl DataSourceRowFunctions {
 /// One ROWS FROM invocation, retaining its signature and output shape.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DataSourceRowsFromFunc {
-    source: Box<DataSource>,
+    source: RowsFromSource,
 }
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+enum RowsFromSource {
+    Invocation(Box<DataSource>),
+    Expression(Box<RowsFromExpression>),
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+struct RowsFromExpression {
+    value: SemScalarExpr,
+    name: String,
+    invalid_expression: bool,
+    columns: Vec<crate::sem::ColumnName>,
+    output: super::TableFunctionOutput,
+}
+
 impl DataSourceRowsFromFunc {
+    fn projection_shape_is_resolved(&self) -> bool {
+        self.source()
+            .is_none_or(DataSource::projection_shape_is_resolved)
+    }
+    fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        self.source()
+            .is_some_and(|source| source.projection_is_table_dependent(context))
+    }
+    fn column_names(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<crate::sem::ColumnName>, AnalysisError> {
+        match &self.source {
+            RowsFromSource::Invocation(source) => source.column_names(context, with),
+            RowsFromSource::Expression(source) => Ok(source.columns.clone()),
+        }
+    }
     fn wildcard_layout(
         &self,
         context: &impl ParseContext,
         with: &WithClause,
     ) -> Result<crate::sem::WildcardRowsFunction, AnalysisError> {
-        let names = self.source.column_names(context, with)?;
-        Ok(crate::sem::WildcardRowsFunction::from_columns(&names))
+        Ok(crate::sem::WildcardRowsFunction::from_columns(
+            &self.column_names(context, with)?,
+        ))
     }
-
     pub(crate) fn invocation(source: &DataSource) -> Self {
         Self {
-            source: Box::new(source.clone()),
+            source: RowsFromSource::Invocation(Box::new(source.clone())),
+        }
+    }
+    pub(crate) fn expression(
+        value: &SemScalarExpr,
+        name: &str,
+        context: &mut impl ParseContext,
+    ) -> Result<Self, AnalysisError> {
+        let mut value = value.clone();
+        let invalid_expression = Self::validate_expression(context, &mut value)?;
+        let columns = value
+            .composite_columns(context)
+            .map(|columns| columns.names())
+            .unwrap_or_else(|| vec![crate::sem::ColumnName::from(name)]);
+        Ok(Self {
+            source: RowsFromSource::Expression(Box::new(RowsFromExpression {
+                value,
+                name: name.to_owned(),
+                invalid_expression,
+                columns,
+                output: super::TableFunctionOutput::default(),
+            })),
+        })
+    }
+    pub(crate) fn apply_output(
+        &mut self,
+        context: &mut impl ParseContext,
+        output: &super::TableFunctionOutput,
+    ) -> Result<(), AnalysisError> {
+        match &mut self.source {
+            RowsFromSource::Invocation(source) => source.apply_function_output(context, output),
+            RowsFromSource::Expression(source) => {
+                source.output = output.clone();
+                source.output.validate_requirement(context, false)
+            }
         }
     }
     pub(crate) fn default_alias(&self) -> String {
-        self.source
-            .get_aliases()
-            .first()
-            .map(|alias| alias.name().as_str().to_owned())
-            .unwrap_or_default()
-    }
-    pub(crate) fn deferred(call: &crate::sem::FuncCallExpr) -> Self {
-        Self::invocation(&DataSource::deferred_table_function(
-            call,
-            &AliasSpec::from_local_name(&call.name().local_name()),
-        ))
+        match &self.source {
+            RowsFromSource::Invocation(source) => source
+                .get_aliases()
+                .first()
+                .map(|alias| alias.name().as_str().to_owned())
+                .unwrap_or_default(),
+            RowsFromSource::Expression(source) => source.name.clone(),
+        }
     }
     /// Preserved invocation when its signature is deferred.
     pub fn deferred_function(&self) -> Option<&crate::sem::FuncCallExpr> {
-        self.source.deferred_function().map(|source| source.call())
+        self.source()?
+            .deferred_function()
+            .map(|source| source.call())
     }
-    /// Function source, including the selected overload and invocation output.
-    pub fn source(&self) -> &DataSource {
-        &self.source
+    /// Function source, absent for SQL-value and special-expression elements.
+    pub fn source(&self) -> Option<&DataSource> {
+        match &self.source {
+            RowsFromSource::Invocation(source) => Some(source),
+            _ => None,
+        }
     }
-    pub(crate) fn resolve<C: ParseContext>(
-        context: &mut C,
-        name: &FullName,
-        arguments: &[SemScalarExpr],
-    ) -> Result<Self, AnalysisError> {
-        let mut source = DataSource::resolve_function(
-            context,
-            name,
-            arguments,
-            &AliasSpec::from_local_name(&name.local_name()),
-        )?;
-        source.apply_function_output(context, &super::TableFunctionOutput::default())?;
-        Ok(Self::invocation(&source))
+    /// Whether expression placement validation rejected this special element.
+    /// Name/type lookup outcomes remain retained in the expression independently.
+    pub fn has_invalid_expression(&self) -> bool {
+        match &self.source {
+            RowsFromSource::Expression(source) => source.invalid_expression,
+            _ => false,
+        }
+    }
+    /// Analyzed SQL-value or special expression supplied as a FROM element.
+    pub fn value(&self) -> Option<&SemScalarExpr> {
+        match &self.source {
+            RowsFromSource::Expression(source) => Some(&source.value),
+            _ => None,
+        }
     }
     /// analyze `FuncCall` node in RangeFunction.functions
     pub fn analyze_func_call<TParseContext>(
@@ -171,6 +242,132 @@ impl DataSourceRowsFromFunc {
     }
 }
 
+#[cfg(test)]
+mod test_expression_sources {
+    use crate::{
+        context::ParseContext,
+        sem::{AliasName, DataSourceRowFunctions, PgBuiltInType},
+        test_helpers::{rows_from, sampling},
+    };
+
+    #[test]
+    fn retains_expression_binding_and_serialization() {
+        let mut context = sampling::context();
+        let query = sampling::query(
+            "SELECT r.v FROM ROWS FROM(CAST(1 AS int)) r(v)",
+            &mut context,
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let source = rows_from::source(&query, "r");
+        assert!(source.functions()[0].source().is_none());
+        assert!(source.functions()[0].value().is_some());
+        let restored: DataSourceRowFunctions =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+        let column = query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_source_column()
+            .unwrap();
+        assert_eq!(column.alias(), &AliasName::from("r"));
+        assert_eq!(column.name().as_str(), "v");
+        assert_eq!(column.value().get_type(), Some(PgBuiltInType::int4()));
+    }
+
+    #[rstest::rstest]
+    #[case::sql_value("CURRENT_DATE")]
+    #[case::coalesce("COALESCE(NULL::int,1)")]
+    #[case::cast("CAST(1 AS int)")]
+    fn legacy_entry_retains_special_expression(#[case] expression: &str) {
+        let source = rows_from::legacy_element(expression, sampling::context());
+        assert!(source.source().is_none());
+        assert!(source.value().is_some());
+        assert!(!source.has_invalid_expression());
+    }
+
+    #[test]
+    fn preserves_existing_invocation_wire_shape() {
+        let mut context = sampling::context();
+        let query =
+            sampling::query("SELECT r.v FROM ROWS FROM(scalar507(1)) r(v)", &mut context).unwrap();
+        let source = rows_from::source(&query, "r");
+        let value = ::serde_json::to_value(&source.functions()[0]).unwrap();
+        assert!(value["source"].get("CallTableFunc").is_some());
+        let restored: crate::sem::DataSourceRowsFromFunc = ::serde_json::from_value(value).unwrap();
+        assert_eq!(&restored, &source.functions()[0]);
+    }
+
+    #[test]
+    fn retains_rejected_expression_and_its_operands() {
+        let mut context = sampling::context();
+        let query = sampling::query(
+            "SELECT 1 FROM ROWS FROM(COALESCE(set507(1),0)) r",
+            &mut context,
+        )
+        .unwrap();
+        let source = rows_from::source(&query, "r");
+        assert!(source.functions()[0].has_invalid_expression());
+        assert!(matches!(
+            source.functions()[0].value().unwrap(),
+            crate::sem::SemScalarExpr::Coalesce(_)
+        ));
+        let restored: DataSourceRowFunctions =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+    }
+
+    #[test]
+    fn visits_unselected_operands_and_preserves_parameter_domains() {
+        let mut context = sampling::context();
+        let query = sampling::query(
+            "SELECT r.v FROM ROWS FROM(COALESCE($1::int,1),CAST($2 AS int)) r(v,unused)",
+            &mut context,
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let constraints = context.parameter_constraints();
+        assert!(constraints.allows(&std::collections::BTreeMap::from([
+            (1, PgBuiltInType::int4()),
+            (2, PgBuiltInType::int4())
+        ])));
+        assert!(!constraints.allows(&std::collections::BTreeMap::from([
+            (1, PgBuiltInType::bool()),
+            (2, PgBuiltInType::int4())
+        ])));
+        let parameters: std::collections::BTreeMap<_, _> =
+            rows_from::parameter_bindings(&query).into_iter().collect();
+        assert_eq!(
+            parameters,
+            std::collections::BTreeMap::from([
+                (1, Some(PgBuiltInType::int4())),
+                (2, Some(PgBuiltInType::int4())),
+            ])
+        );
+        assert_eq!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .is_not_null(),
+            &Some(false)
+        );
+    }
+}
+
 impl DataSourceRowFunctions {
     pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
@@ -189,7 +386,10 @@ impl DataSourceRowsFromFunc {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        self.source.walk(visitor)?;
+        match &mut self.source {
+            RowsFromSource::Invocation(source) => source.walk(visitor)?,
+            RowsFromSource::Expression(source) => source.value.walk(visitor)?,
+        }
         Ok(())
     }
 }
@@ -204,6 +404,8 @@ impl DataSourceRowFunctions {
         for function in &self.functions {
             function.append_projection(context, with, &mut columns)?;
         }
+        // Independent set lengths can null-extend every constituent output.
+        let mut columns = columns.with_occurrence(None, self.functions.len() > 1);
         if self.ordinality {
             columns.append_ordinality(&self.alias);
         }
@@ -282,7 +484,13 @@ impl DataSourceRowsFromFunc {
         with: &WithClause,
         columns: &mut super::projection::ProjectionColumns<'a>,
     ) -> Result<(), AnalysisError> {
-        columns.append_source(&self.source, context, with)
+        match &self.source {
+            RowsFromSource::Invocation(source) => columns.append_source(source, context, with),
+            RowsFromSource::Expression(source) => {
+                columns.append_expression(&source.value, &source.name, context);
+                Ok(())
+            }
+        }
     }
 }
 
@@ -303,7 +511,13 @@ impl DataSourceRowsFromFunc {
         &self,
         names: &mut super::function_columns::OutputColumnNames,
     ) -> Option<()> {
-        names.append_function_columns(&self.source)
+        match &self.source {
+            RowsFromSource::Invocation(source) => names.append_function_columns(source),
+            RowsFromSource::Expression(source) => {
+                names.append_names(&source.columns);
+                Some(())
+            }
+        }
     }
 }
 
@@ -318,5 +532,85 @@ impl DataSourceRowFunctions {
             return Ok(Vec::new());
         }
         Ok(self.project(context, with)?.into_columns())
+    }
+}
+
+impl DataSourceRowFunctions {
+    pub(super) fn apply_output(
+        &mut self,
+        context: &mut impl ParseContext,
+        output: &super::TableFunctionOutput,
+    ) -> Result<(), AnalysisError> {
+        let mut functions = self.functions.to_vec();
+        for function in &mut functions {
+            function.apply_output(context, output)?;
+        }
+        self.functions = functions.into();
+        self.outer_definition = output.clone();
+        Ok(())
+    }
+}
+
+struct FromExpressionValidator<'a, C> {
+    context: &'a C,
+    query_depth: usize,
+    expression_depth: usize,
+    root_depth: usize,
+    invalid: bool,
+}
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for FromExpressionValidator<'_, C> {
+    fn enter_expression(&mut self, _: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        self.expression_depth += 1;
+        Ok(())
+    }
+    fn enter_query(&mut self) {
+        self.query_depth += 1;
+    }
+    fn leave_query(&mut self) {
+        self.query_depth -= 1;
+    }
+    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        if self.query_depth == 0
+            && value.invalid_from_scalar(self.context, self.expression_depth <= self.root_depth)
+        {
+            self.invalid = true;
+        }
+        self.expression_depth -= 1;
+        Ok(())
+    }
+}
+impl DataSourceRowsFromFunc {
+    pub(crate) fn validate_expression(
+        context: &mut impl ParseContext,
+        value: &mut SemScalarExpr,
+    ) -> Result<bool, AnalysisError> {
+        Self::validate_value(context, value, value.table_root_depth())
+    }
+    pub(crate) fn validate_argument(
+        context: &mut impl ParseContext,
+        value: &mut SemScalarExpr,
+    ) -> Result<bool, AnalysisError> {
+        Self::validate_value(context, value, 0)
+    }
+    fn validate_value(
+        context: &mut impl ParseContext,
+        value: &mut SemScalarExpr,
+        root_depth: usize,
+    ) -> Result<bool, AnalysisError> {
+        let mut visitor = FromExpressionValidator {
+            context: &*context,
+            query_depth: 0,
+            expression_depth: 0,
+            root_depth,
+            invalid: false,
+        };
+        value.walk(&mut visitor)?;
+        let invalid = visitor.invalid;
+        if invalid {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::table_function(
+                crate::sem::TableFunctionProblem::invalid_expression(),
+            ))?;
+        }
+        Ok(invalid)
     }
 }

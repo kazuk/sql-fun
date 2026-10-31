@@ -21,6 +21,7 @@ mod min_max;
 mod named_arg;
 mod param_ref;
 mod resolved;
+mod source_column;
 mod sql_value;
 mod sub_link;
 mod truth_test;
@@ -51,6 +52,7 @@ pub use self::{
     min_max::MinMaxExpr,
     named_arg::NamedArgExpr,
     param_ref::ParamRef,
+    source_column::SourceColumnExpr,
     sql_value::SqlValueExpr,
     sub_link::SubLinkExpr,
     truth_test::TruthTestExpr,
@@ -234,6 +236,8 @@ mod list_contract_tests {
 /// scalar explation in semantic ast
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SemScalarExpr {
+    /// Bound expression-backed FROM column, retaining its value and null extension.
+    SourceColumn(Box<SourceColumnExpr>),
     /// A qualified whole-row value with its completed source lookup.
     WholeRow(Box<WholeRowExpr>),
     /// Anonymous SQL row constructor.
@@ -585,6 +589,9 @@ impl SemScalarExpr {
         column: &crate::sem::ColumnName,
     ) -> Self {
         match self {
+            Self::SourceColumn(value) => {
+                Self::SourceColumn(Box::new(value.with_reference_name(alias, column)))
+            }
             Self::ColumnRef(reference) => {
                 Self::column_reference(reference.with_reference_name(alias, column))
             }
@@ -664,6 +671,7 @@ impl SemScalarExpr {
 
     pub(crate) const fn constraint_node(&self) -> Option<usize> {
         match self {
+            Self::SourceColumn(value) => value.value().constraint_node(),
             Self::Param(value) => Some(value.node()),
             Self::Constrained(value) => Some(value.node()),
             Self::MinMax(value) => value.node(),
@@ -784,6 +792,7 @@ impl SemScalarExpr {
     #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
+            Self::SourceColumn(value) => value.value().get_type(),
             Self::Const(scalar_const_expr) => scalar_const_expr.get_type(),
             Self::FuncCall(func_call_expr) => func_call_expr.get_type(),
             Self::Arith(arith_expr) => arith_expr.get_type(),
@@ -821,6 +830,7 @@ impl SemScalarExpr {
     #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
+            Self::SourceColumn(value) => value.is_not_null(),
             Self::Const(scalar_const_expr) => scalar_const_expr.is_not_null(),
             Self::FuncCall(func_call_expr) => func_call_expr.is_not_null(),
             Self::Arith(arith_expr) => arith_expr.is_not_null(),
@@ -876,6 +886,12 @@ impl SemScalarExpr {
     #[must_use]
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
         match self {
+            Self::SourceColumn(value) => Some(crate::sem::ColumnDefinition::new(
+                &Some(value.name().clone()),
+                value.value().get_type().as_ref(),
+                value.is_not_null(),
+                &[],
+            )),
             Self::ColumnRef(c) => c.get_column_def().clone(),
             Self::TypeCast(_)
             | Self::FuncCall(_)
@@ -908,6 +924,7 @@ impl SemScalarExpr {
     #[must_use]
     pub fn get_column_name(&self) -> String {
         match self {
+            Self::SourceColumn(value) => value.name().as_str().to_owned(),
             Self::Const(_scalar_const_expr) => String::new(),
             Self::ColumnRef(cr) => cr.get_column_name().to_string(),
             Self::FuncCall(call) => call.name().local_name(),
@@ -1244,6 +1261,7 @@ impl SemScalarExpr {
     ) -> Result<(), AnalysisError> {
         visitor.enter_expression(self)?;
         match self {
+            Self::SourceColumn(value) => value.walk(visitor)?,
             Self::Grouping(v) => v.walk(visitor)?,
             Self::Array(v) => v.walk(visitor)?,
             Self::FuncCall(v) => v.walk(visitor)?,
@@ -1603,5 +1621,46 @@ mod test_domain_comparison_literals {
                 PgBuiltInType::int4()
             })
         );
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn invalid_from_scalar(
+        &self,
+        context: &impl crate::context::ParseContext,
+        allow_set: bool,
+    ) -> bool {
+        if let Self::FuncCall(call) = self {
+            call.invalid_from(context, allow_set)
+        } else {
+            false
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn table_root_depth(&self) -> usize {
+        match self {
+            Self::TypeCast(cast) => {
+                let (value, target) = cast.projection_operand();
+                if value.get_type().as_ref() == Some(target) {
+                    1 + value.table_root_depth()
+                } else {
+                    0
+                }
+            }
+            Self::FuncCall(_) => 1,
+            _ => 0,
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn explicit_cast_operand(&self) -> Option<&Self> {
+        if let Self::TypeCast(cast) = self {
+            Some(cast.projection_operand().0)
+        } else {
+            None
+        }
     }
 }

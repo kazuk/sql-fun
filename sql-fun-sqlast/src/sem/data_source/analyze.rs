@@ -278,7 +278,7 @@ mod test_data_source_analyze_range_func_rows_from {
         let mut invocation = DataSource::table_function(
             &overload,
             IVec::default(),
-            &AliasSpec::from_local_name(&func_name.local_name()),
+            &AliasSpec::from_names("rows_alias", &[]),
         );
         invocation.record_function_name(
             &crate::sem::FullName::from_local_name(&func_name.local_name()),

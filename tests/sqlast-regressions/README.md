@@ -31,7 +31,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 144 groups are split 10/67/67.
+in the committed file. The current 146 groups are split 10/68/68.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -98,8 +98,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 1133 inputs for PostgreSQL 17 and 1139 for
-PostgreSQL 18 (2272 total). These count positive contract inputs separately from
+manifest totals are 1210 inputs for PostgreSQL 17 and 1193 for
+PostgreSQL 18 (2403 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -330,3 +330,10 @@ diagnostics (36 cases on 17, 13 on 18). Missing common-AST conversion or analysi
 retains explicit `todo!()` panics; focused Rust tests verify those markers rather
 than terminating the shared CLI regression server. Utility implementation is
 tracked in #891 and remaining constraint semantics in #887.
+
+Issue #508 adds `rows-from.json` with the explicit `rows-from.sql` project
+schema for PostgreSQL 17/18 through both maintained paths. It checks SQL-value
+and special-expression sources alongside ordinary function outputs, aliases,
+ambiguity, ordinality, NULL padding, composites, parameters and recovery.
+Rust retains source bindings, serialized semantics, legacy entry-point and
+parameter-domain assertions; see [the ROWS FROM inventory](inventory-rows-from.md).

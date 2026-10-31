@@ -797,3 +797,24 @@ impl FuncCallExpr {
         SemScalarExpr::function_call(&Self::new(name, &None, &args.into()))
     }
 }
+
+impl FuncCallExpr {
+    pub(crate) fn invalid_from(
+        &self,
+        context: &impl crate::context::ParseContext,
+        allow_set: bool,
+    ) -> bool {
+        (!allow_set && self.returns_set(context) == Some(true))
+            || self.modifiers().over().is_some()
+            || self
+                .name_resolution()
+                .function_identity()
+                .is_some_and(|name| {
+                    context.is_aggregate_impl(name)
+                        || self.overload().as_ref().is_some_and(|overload| {
+                            !context.function_returns_set(name, overload)
+                                && !context.function_preserves_view_rows(name, overload)
+                        })
+                })
+    }
+}

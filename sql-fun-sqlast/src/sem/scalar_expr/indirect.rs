@@ -26,6 +26,19 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
+    pub(crate) fn projected_member(
+        base: &SemScalarExpr,
+        field: &crate::sem::ColumnDefinition,
+    ) -> SemScalarExpr {
+        let name = field.name().as_ref().expect("composite field name");
+        SemScalarExpr::indirection(&Self::MemberRef(Box::new(MemberRef::new(
+            base.clone(),
+            name.as_str().to_owned(),
+            field.get_type_cloned(),
+            field.is_not_null(),
+        ))))
+    }
+
     pub(super) fn row_constructor(&self) -> Option<&super::RowExpr> {
         if let Self::MemberRef(value) = self {
             value.row_constructor()

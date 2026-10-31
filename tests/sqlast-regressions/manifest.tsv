@@ -73,3 +73,4 @@ column-renames	project	column-renames.sql	6	17,18
 rows	project	rows.sql	30	17,18
 postgres18-syntax-17	project	postgres18-syntax.sql	36	17
 postgres18-syntax-18	project	postgres18-syntax.sql	13	18
+rows-from	project	rows-from.sql	40	17,18

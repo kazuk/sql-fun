@@ -443,7 +443,10 @@ mod test_set_operation {
         );
         let encoded = serde_json::to_string(set)?;
         let restored: SetOperationQuery = serde_json::from_str(&encoded)?;
-        assert_eq!(restored.columns(), set.columns());
+        assert_eq!(
+            restored.columns().composite_field_collection()?,
+            set.columns().composite_field_collection()?
+        );
         assert_eq!(restored.output_coercions(0), set.output_coercions(0));
         assert!(!restored.is_invalid());
         assert_eq!(

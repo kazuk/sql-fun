@@ -75,4 +75,4 @@ postgres18-syntax-17	project	postgres18-syntax.sql	36	17
 postgres18-syntax-18	project	postgres18-syntax.sql	13	18
 rows-from	project	rows-from.sql	44	17,18
 patterns	builtin	-	39	17,18
-set-operations	project	set-operations.sql	52	17,18
+set-operations	project	set-operations.sql	62	17,18

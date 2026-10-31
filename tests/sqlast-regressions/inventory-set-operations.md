@@ -4,7 +4,7 @@ Issue #515 resolves the output of each binary UNION, INTERSECT and EXCEPT
 against both operands. The original children retain their own output types;
 the operation retains combined output domains and positional implicit coercions.
 
-[set-operations.json](set-operations.json) contains 52 cases per PostgreSQL 17/18
+[set-operations.json](set-operations.json) contains 62 cases per PostgreSQL 17/18
 catalog, selected with [set-operations.sql](set-operations.sql) through the shared
 manifest. Both source-tree and installed-distribution verification run these
 contracts through the CLI, client and analysis server.
@@ -14,6 +14,12 @@ operator-specific NULL guarantees, incompatible types, unequal widths,
 left-side names, unknown strings/NULL, pairwise nested resolution, derived tables,
 CTEs and explicit CTE aliases, domains, arrays, ORDER BY, explicit parameter
 types and preservation of independent valid output columns.
+
+Assignment cases validate the combined output of parameter-free sets for INSERT
+and UPDATE row subqueries. All three operators reject boolean-to-integer
+assignments; numeric common outputs accept assignment casts, while all-unknown
+outputs resolve to text before destination validation. These cases reproduce
+the review finding on PR #913 and run on both maintained regression paths.
 
 Small PostgreSQL 17.6/18.1 development probes establish numeric widening,
 integer/boolean and width rejection, pairwise unknown handling, domain

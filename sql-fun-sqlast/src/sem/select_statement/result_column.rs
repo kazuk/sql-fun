@@ -617,6 +617,11 @@ impl ResultColumnCollection {
             column.is_not_null = not_null;
             if let Some(expression) = expression {
                 column.expression = Some(Box::new(expression));
+            } else if column.expression.is_none() {
+                // Assignment checks also walk parameter-free set results.
+                column.expression = Some(Box::new(SemScalarExpr::column_reference(
+                    ColumnReferenceExpr::output_column(index, &column.create_column_definition()),
+                )));
             }
         }
     }

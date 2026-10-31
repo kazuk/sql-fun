@@ -944,5 +944,101 @@
         }
       ]
     }
+  },
+  {
+    "name": "insert_union_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT true UNION SELECT false",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_union_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT true,1 UNION SELECT false,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_intersect_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT true INTERSECT SELECT false",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_intersect_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT true,1 INTERSECT SELECT false,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_except_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT true EXCEPT SELECT false",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_except_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT true,1 EXCEPT SELECT false,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_common_output_assignment_cast",
+    "sql": "INSERT INTO set_items(id) SELECT 1 UNION ALL SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_common_output_assignment_cast",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT 1,2 UNION ALL SELECT 1.5,3)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_resolved_unknown_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT NULL UNION SELECT NULL",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_resolved_unknown_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT NULL,1 UNION SELECT NULL,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
   }
 ]

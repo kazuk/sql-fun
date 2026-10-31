@@ -1040,5 +1040,242 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "hints_integer_numeric",
+    "sql": "SELECT ${a:integer} AS x UNION SELECT ${b:numeric}",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "hints_numeric_integer",
+    "sql": "SELECT ${a:numeric} AS x UNION SELECT ${b:integer}",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "hint_right_only",
+    "sql": "SELECT ${a} AS x UNION SELECT ${b:integer}",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "hint_left_only",
+    "sql": "SELECT ${a:integer} AS x UNION SELECT ${b}",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_right_parameter_left",
+    "sql": "SELECT ${id} AS id UNION SELECT x.id FROM set_items AS x",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_left_parameter_right",
+    "sql": "SELECT x.id FROM set_items AS x UNION SELECT ${id}",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_union_except",
+    "sql": "(SELECT 1::integer AS x UNION SELECT 2::bigint) EXCEPT SELECT 3::numeric",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_union_except_reverse_outer",
+    "sql": "SELECT 3::numeric AS x EXCEPT (SELECT 1::integer UNION SELECT 2::bigint)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_union_except_reverse_inner",
+    "sql": "(SELECT 2::bigint AS x UNION SELECT 1::integer) EXCEPT SELECT 3::numeric",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_unions_intersect",
+    "sql": "(SELECT 1::integer AS x UNION SELECT 2::bigint) INTERSECT (SELECT 3::numeric UNION SELECT 4::integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_unions_intersect_reverse_outer",
+    "sql": "(SELECT 3::numeric AS x UNION SELECT 4::integer) INTERSECT (SELECT 1::integer UNION SELECT 2::bigint)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_valid_unions_incompatible_outer",
+    "sql": "(SELECT 1::integer AS x UNION SELECT 2::numeric) EXCEPT (SELECT true UNION SELECT false)",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_hint_union_except",
+    "sql": "(SELECT ${a:integer} AS x UNION SELECT 2::bigint) EXCEPT SELECT 3::numeric",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_hint_unions_intersect",
+    "sql": "(SELECT ${a:integer} AS x UNION SELECT 2::bigint) INTERSECT (SELECT 3::numeric UNION SELECT 4::integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
   }
 ]

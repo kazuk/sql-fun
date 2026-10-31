@@ -571,6 +571,49 @@ mod test_set_operation {
         Ok(())
     }
 
+    #[rstest::rstest]
+    #[case("SELECT $1 AS id UNION SELECT x.id FROM table_x AS x")]
+    #[case("SELECT x.id FROM table_x AS x UNION SELECT $1")]
+    fn catalog_column_constrains_both_input_and_output_domains(
+        #[case] sql: &str,
+    ) -> testresult::TestResult {
+        let catalog = crate::test_helpers::ownership::apply_ownership_sql(
+            set_operations::context(crate::ast::Dialect::postgres()),
+            "CREATE TABLE table_x(id integer)",
+        )?;
+        let analyzed = crate::parse_statements(sql, crate::ast::Dialect::postgres())
+            .next()
+            .unwrap()?
+            .analyze(
+                catalog.into_context(),
+                &mut crate::test_helpers::create_cache_context(),
+            )?;
+        assert!(analyzed.context().problems().is_empty());
+        let constraints = analyzed.context().parameter_constraints();
+        let input = constraints.parameter(1).unwrap().constraint();
+        let output = constraints.result_column(0).unwrap();
+        for ty in [PgBuiltInType::int4(), PgBuiltInType::int8()] {
+            assert!(input.allows(&ty));
+            assert!(constraints.allows(&BTreeMap::from([(1, ty.clone())])));
+            assert!(output.allows(&ty));
+        }
+        assert!(!input.allows(&PgBuiltInType::text()));
+        assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+        assert!(!output.allows(&PgBuiltInType::text()));
+        assert!(
+            analyzed
+                .ast()
+                .select_statement()
+                .unwrap()
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type()
+                .is_none()
+        );
+        Ok(())
+    }
+
     #[test]
     fn array_query_consumes_the_combined_output_domain() -> testresult::TestResult {
         let analyzed = set_operations::analyze("SELECT ARRAY(SELECT $1 UNION SELECT 1) AS values")?;

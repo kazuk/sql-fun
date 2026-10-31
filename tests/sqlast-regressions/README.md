@@ -354,3 +354,12 @@ types. Existing cases retain incompatible-category diagnostics and
 unknown/domain/array/nested coverage. The shared manifest runs these contracts
 through source and installed verification; Rust retains coercion, comparison,
 parameter-domain and recovery assertions.
+
+Issue #501 adds `patterns.json` for PostgreSQL 17/18 through source and installed
+verification. Cases cover positive and negative LIKE/ILIKE/SIMILAR TO, explicit,
+omitted, empty and NULL escapes, NULL operands, compatible string and bytea
+signatures, rejected numeric operands and unresolved references. Rust tests retain
+operator/helper bindings, serialized operands and correlated parameter domains;
+SQLite feature-enabled tests check builtin LIKE semantics and operand retention.
+SQLite GLOB/MATCH/REGEXP classification remains distinct and unsupported semantic
+paths retain intentional TODOs owned by #907, #908 and #909 respectively.

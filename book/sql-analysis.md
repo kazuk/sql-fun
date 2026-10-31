@@ -984,3 +984,29 @@ true. Result nullability is conservative: analysis does not execute a query to
 determine whether its result is empty or whether another list item will match.
 Membership participates in the existing parameter analysis; no additional hints
 are required by this syntax.
+
+## Pattern predicates
+
+PostgreSQL analysis supports `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`,
+`SIMILAR TO`, and `NOT SIMILAR TO`, including legal `ESCAPE` clauses:
+
+```sql
+SELECT name LIKE $1 ESCAPE '!' AS matches FROM products
+```
+
+Analysis resolves operand references, operator signatures, conversions and
+parameter constraints. PostgreSQL results are boolean. LIKE also supports
+compatible `bytea` operands; numeric inputs do not gain an implicit text cast.
+NULL inputs, including an explicit NULL escape, can produce NULL. Result
+nullability follows the analyzer's conservative catalog-based policy.
+
+SQLite analysis supports `LIKE` and `NOT LIKE`, with an optional `ESCAPE`
+expression. Results have integer truth values, and operands follow SQLite's
+coercion rules rather than PostgreSQL text constraints. An omitted escape and
+an explicit NULL escape remain distinct. Result nullability remains unknown
+because applications can override either the two- or three-argument `like()`
+function, and analysis does not establish the replacement function's return
+contract. SQLite GLOB, MATCH and REGEXP semantic
+analysis remains unimplemented.
+
+Analysis does not execute patterns or validate runtime pattern contents.

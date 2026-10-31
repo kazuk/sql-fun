@@ -3,6 +3,8 @@ mod binary;
 mod call_sites;
 mod impl_build_op;
 mod null_if;
+mod pattern;
+mod sqlite_like;
 mod unary;
 
 pub use self::{
@@ -12,6 +14,8 @@ pub use self::{
         UndefinedOperatorCallSite,
     },
     null_if::NullIfExpr,
+    pattern::PatternExpr,
+    sqlite_like::SqliteLikeExpr,
 };
 
 use crate::sem::{SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
@@ -39,6 +43,12 @@ pub enum ArithExpr {
 
     /// null-if  expression
     NullIfExpr(Box<NullIfExpr>),
+
+    /// Deferred PostgreSQL pattern call with unknown literal operands.
+    Pattern(Box<PatternExpr>),
+
+    /// SQLite builtin LIKE predicate, without a PostgreSQL operator binding.
+    SqliteLike(Box<SqliteLikeExpr>),
 
     /// Between
     Between(Box<BetweenExpr>),
@@ -102,6 +112,8 @@ impl ArithExpr {
             Self::UndefinedOperatorAll(call_site) => call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_not_null(),
             Self::Between(value) => value.inputs_is_not_null(),
+            Self::Pattern(_) => None,
+            Self::SqliteLike(value) => value.is_not_null(),
         }
     }
 
@@ -123,6 +135,8 @@ impl SemScalarExprNode for ArithExpr {
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => None,
             Self::Between(_) => Some(crate::sem::PgBuiltInType::bool()),
+            Self::Pattern(_) => None,
+            Self::SqliteLike(value) => value.get_type(),
         }
     }
 
@@ -140,6 +154,8 @@ impl SemScalarExprNode for ArithExpr {
             // A context-free builder has no selected comparison signatures yet.
             // Analysis expands it before collecting operand constraints.
             Self::Between(_) => return None,
+            Self::Pattern(_) => return None,
+            Self::SqliteLike(value) => return value.is_not_null(),
         };
         if is_strict {
             if matches!(self.inputs_is_not_null(), Some(true)) {
@@ -185,6 +201,8 @@ impl ArithExpr {
             Self::UndefinedOperatorAll(v) => v.walk(visitor)?,
             Self::NullIfExpr(v) => v.walk(visitor)?,
             Self::Between(v) => v.walk(visitor)?,
+            Self::Pattern(value) => value.walk(visitor)?,
+            Self::SqliteLike(value) => value.walk(visitor)?,
         }
         Ok(())
     }
@@ -210,6 +228,7 @@ impl ArithExpr {
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
         match self {
+            Self::Pattern(value) => value.collect_constraints(parameters, context),
             Self::OpBinary(v) => v.collect_constraints(parameters, context),
             Self::OpLeftUnary(v) => v.collect_constraints(parameters, context),
             Self::OpRightUnary(v) => v.collect_constraints(parameters, context),
@@ -238,6 +257,9 @@ impl ArithExpr {
                 v.collect_constraints(parameters);
                 Ok(None)
             }
+            // Traversal collects operand constraints; SQLite LIKE accepts any affinity
+            // and its integer result imposes no operand type relationship.
+            Self::SqliteLike(_) => Ok(None),
         }
     }
 }
@@ -285,6 +307,7 @@ impl ArithExpr {
     }
     pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
         match self {
+            Self::Pattern(value) => value.set_binding(binding),
             Self::OpBinary(call) => call.set_binding(binding),
             Self::OpLeftUnary(call) => call.set_binding(binding),
             Self::OpRightUnary(call) => call.set_binding(binding),
@@ -299,6 +322,7 @@ impl ArithExpr {
     /// Operator-name resolution, retained separately from overload/type selection.
     pub fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
         match self {
+            Self::Pattern(value) => Some(value.binding()),
             Self::OpBinary(call) => call.binding(),
             Self::OpLeftUnary(call) => call.binding(),
             Self::OpRightUnary(call) => call.binding(),

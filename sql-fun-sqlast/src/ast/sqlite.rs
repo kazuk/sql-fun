@@ -391,6 +391,31 @@ impl TryFrom<&syn::ExprLike> for OperatorExpr {
     }
 }
 
+#[cfg(test)]
+mod test_pattern_classification {
+    use super::{OperatorExpr, OperatorKind, syn};
+
+    #[rstest::rstest]
+    #[case(syn::LikeOperator::Like, "like")]
+    #[case(syn::LikeOperator::Glob, "glob")]
+    #[case(syn::LikeOperator::Match, "match")]
+    #[case(syn::LikeOperator::Regexp, "regexp")]
+    fn preserves_identity_and_negation(
+        #[case] operator: syn::LikeOperator,
+        #[case] name: &str,
+        #[values(false, true)] negated: bool,
+    ) -> testresult::TestResult {
+        let operand = syn::Expr::literal(syn::Literal::from(::turso_parser::ast::Literal::Null));
+        let syntax = syn::ExprLike::new(operand.clone(), negated, operator, operand, None);
+        let common = OperatorExpr::try_from(&syntax)?;
+        assert_eq!(common.name.0.as_slice(), &[name]);
+        assert_eq!(matches!(common.kind, OperatorKind::NotLike), negated);
+        assert!(common.left.is_some());
+        assert!(common.right.is_some());
+        Ok(())
+    }
+}
+
 impl From<&syn::Variable> for Expr {
     fn from(value: &syn::Variable) -> Self {
         Self::Parameter(Parameter {

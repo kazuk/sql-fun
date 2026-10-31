@@ -470,6 +470,9 @@ impl OperatorExpr {
                 context, left, right, negated,
             )?));
         }
+        if context.dialect() == Dialect::sqlite() && self.kind.is_pattern() {
+            return self.resolve_sqlite_pattern(context, scope, left, right);
+        }
         if context.dialect() == Dialect::sqlite() && !self.kind.without_catalog_operator() {
             if left
                 .as_ref()
@@ -498,6 +501,34 @@ impl OperatorExpr {
         }
         Ok(expression)
     }
+    fn resolve_sqlite_pattern(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        match self.name.0.as_slice() {
+            [name] if name == "like" => {
+                let (Some(left), Some(right)) = (left, right) else {
+                    return AnalysisError::raise_unexpected_input("LIKE operands");
+                };
+                let escape = Expr::resolve_optional(&self.escape, context, scope)?;
+                ArithExpr::sqlite_like(
+                    context,
+                    &left,
+                    &right,
+                    escape.as_ref(),
+                    self.kind.is_not_like(),
+                )
+            }
+            [name] if name == "glob" => todo!("SQLite GLOB semantics (#907)"),
+            [name] if name == "match" => todo!("SQLite MATCH semantics (#908)"),
+            [name] if name == "regexp" => todo!("SQLite REGEXP semantics (#909)"),
+            _ => AnalysisError::raise_unexpected_input("SQLite pattern operator"),
+        }
+    }
+
     fn distinctness(&self, context: &impl ParseContext) -> Option<bool> {
         if let Some(negated) = self.kind.distinctness() {
             return Some(negated);
@@ -513,7 +544,50 @@ impl OperatorExpr {
     }
 }
 
+#[cfg(all(test, feature = "sqlite"))]
+mod test_sqlite_pattern_resolution {
+    use crate::test_helpers::pattern::query;
+
+    #[rstest::rstest]
+    #[case::glob("GLOB")]
+    #[case::match_operator("MATCH")]
+    #[case::regexp("REGEXP")]
+    fn sqlite_deferred_patterns_remain_explicitly_unsupported(
+        #[case] operator: &str,
+        #[values("", "NOT ")] negation: &str,
+        #[values("'a'", "$1")] value: &str,
+    ) {
+        let failure = std::panic::catch_unwind(|| {
+            let _ = query(
+                &format!("SELECT {value} {negation}{operator} 'a'"),
+                crate::test_helpers::membership::context_for(crate::ast::Dialect::sqlite()),
+            );
+        })
+        .expect_err("deferred semantics must not return success");
+        let message = if let Some(message) = failure.downcast_ref::<String>() {
+            message.as_str()
+        } else {
+            failure.downcast_ref::<&str>().unwrap()
+        };
+        assert!(
+            message.contains(operator),
+            "unexpected unsupported path: {message}"
+        );
+    }
+}
+
 impl OperatorKind {
+    const fn is_pattern(&self) -> bool {
+        matches!(
+            self,
+            Self::Like | Self::NotLike | Self::ILike | Self::Similar
+        )
+    }
+
+    const fn is_not_like(&self) -> bool {
+        matches!(self, Self::NotLike)
+    }
+
     fn membership_negated(&self, name: &Name) -> Option<bool> {
         match self {
             Self::In => Some(name.0.as_slice() == ["<>"]),
@@ -537,7 +611,13 @@ impl OperatorKind {
         right: bool,
     ) -> Result<Option<ResolvedOperator>, AnalysisError> {
         match self {
-            Self::Ordinary | Self::Any | Self::All => Ok(Some(ResolvedOperator::resolve(
+            Self::Ordinary
+            | Self::Any
+            | Self::All
+            | Self::Like
+            | Self::NotLike
+            | Self::ILike
+            | Self::Similar => Ok(Some(ResolvedOperator::resolve(
                 context,
                 &name.operator_name()?,
                 left,
@@ -560,6 +640,9 @@ impl OperatorKind {
         match self {
             Self::Ordinary => {
                 Ok(ArithExpr::build_op(context, &name.operator_name()?, left, right)?.0)
+            }
+            Self::Like | Self::NotLike | Self::ILike | Self::Similar => {
+                ArithExpr::pattern(context, &name.operator_name()?, left, right)
             }
             Self::Any => {
                 Ok(
@@ -628,6 +711,191 @@ impl OperatorKind {
             &end,
             matches!(self, Self::NotBetweenSymmetric),
         )
+    }
+}
+
+#[cfg(test)]
+mod test_pattern_resolution {
+    use crate::context::ParseContext;
+    use crate::sem::{PgBuiltInType, SemScalarExpr};
+    use crate::test_helpers::pattern::{context, expression, query};
+    use std::collections::BTreeMap;
+
+    #[rstest::rstest]
+    #[case::like("LIKE", "~~")]
+    #[case::not_like("NOT LIKE", "!~~")]
+    #[case::ilike("ILIKE", "~~*")]
+    #[case::not_ilike("NOT ILIKE", "!~~*")]
+    #[case::similar("SIMILAR TO", "~")]
+    #[case::not_similar("NOT SIMILAR TO", "!~")]
+    fn postgres_patterns_retain_bound_operators(
+        #[case] operator: &str,
+        #[case] name: &str,
+        #[values("", " ESCAPE '!'")] escape: &str,
+    ) -> testresult::TestResult {
+        let (query, context) = query(&format!("SELECT 'a' {operator} 'a'{escape}"), context())?;
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let value = expression(&query);
+        assert!(value.operator_binding().unwrap().resolution().is_resolved());
+        assert_eq!(
+            crate::test_helpers::between::comparison_bindings(value)?,
+            vec![name]
+        );
+        let encoded = ::serde_json::to_value(value)?;
+        let decoded: SemScalarExpr = ::serde_json::from_value(encoded.clone())?;
+        assert_eq!(::serde_json::to_value(&decoded)?, encoded);
+        assert_eq!(decoded.get_type(), Some(PgBuiltInType::bool()));
+        if !escape.is_empty() || operator.contains("SIMILAR") {
+            let helper = value
+                .binary_argument(1)
+                .unwrap()
+                .as_function_call()
+                .unwrap();
+            assert!(helper.name_resolution().is_resolved());
+            let name = if operator.contains("SIMILAR") {
+                "similar_to_escape"
+            } else {
+                "like_escape"
+            };
+            assert_eq!(
+                helper.name(),
+                &crate::sem::FullName::with_schema("pg_catalog", name)
+            );
+        }
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::like("LIKE")]
+    #[case::not_like("NOT LIKE")]
+    fn postgres_escape_constraints_preserve_correlated_overloads(
+        #[case] operator: &str,
+    ) -> testresult::TestResult {
+        let (query, context) = query(&format!("SELECT $1 {operator} $2 ESCAPE $3"), context())?;
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        for ty in [
+            PgBuiltInType::text(),
+            crate::sem::TypeReference::from_master_type_name("bytea"),
+        ] {
+            assert!(context.parameter_constraints().allows(&BTreeMap::from([
+                (1, ty.clone()),
+                (2, ty.clone()),
+                (3, ty),
+            ])));
+        }
+        assert!(!context.parameter_constraints().allows(&BTreeMap::from([
+            (1, PgBuiltInType::text()),
+            (2, crate::sem::TypeReference::from_master_type_name("bytea")),
+            (3, PgBuiltInType::text()),
+        ])));
+        assert!(
+            !context
+                .parameter_constraints()
+                .allows(&BTreeMap::from([(3, PgBuiltInType::int4())]))
+        );
+        assert!(
+            expression(&query)
+                .operator_binding()
+                .unwrap()
+                .resolution()
+                .is_resolved()
+        );
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::ilike("SELECT $1 ILIKE $2 ESCAPE $3")]
+    #[case::similar("SELECT $1 SIMILAR TO $2 ESCAPE $3")]
+    #[case::repeat("SELECT $1 LIKE $1 ESCAPE $1")]
+    #[case::cast("SELECT $1 LIKE $2 ESCAPE $3::text")]
+    fn postgres_pattern_constraints_visit_every_operand(
+        #[case] sql: &str,
+    ) -> testresult::TestResult {
+        let (_, context) = query(sql, context())?;
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let constraints = context.parameter_constraints();
+        assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+        assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::pattern_literal("SELECT $1 LIKE 'a%'")]
+    #[case::value_literal("SELECT 'a' NOT LIKE $1")]
+    #[case::null_literal("SELECT NULL LIKE $1")]
+    fn postgres_unknown_pattern_literals_follow_parameter_context(
+        #[case] sql: &str,
+    ) -> testresult::TestResult {
+        let (query, context) = query(sql, context())?;
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        for ty in [
+            PgBuiltInType::text(),
+            crate::sem::TypeReference::from_master_type_name("bytea"),
+        ] {
+            assert!(
+                context
+                    .parameter_constraints()
+                    .allows(&BTreeMap::from([(1, ty)]))
+            );
+        }
+        assert!(
+            !context
+                .parameter_constraints()
+                .allows(&BTreeMap::from([(1, PgBuiltInType::int4())]))
+        );
+        assert!(
+            expression(&query)
+                .operator_binding()
+                .unwrap()
+                .resolution()
+                .is_resolved()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn postgres_pattern_conflicting_use_is_not_accepted() -> testresult::TestResult {
+        let (_, context) = query("SELECT $1 LIKE 'a%', NOT $1", context())?;
+        assert!(
+            context
+                .problems()
+                .iter()
+                .any(|problem| problem.code() == "parameter_constraint")
+        );
+        assert!(
+            !context
+                .parameter_constraints()
+                .allows(&BTreeMap::from([(1, PgBuiltInType::text())]))
+        );
+        assert!(
+            !context
+                .parameter_constraints()
+                .allows(&BTreeMap::from([(1, PgBuiltInType::bool())]))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn postgres_missing_pattern_operator_retains_failed_binding() -> testresult::TestResult {
+        let (query, context) = query(
+            "SELECT 'a' LIKE 'a'",
+            crate::test_helpers::membership::context(),
+        )?;
+        assert!(
+            !expression(&query)
+                .operator_binding()
+                .unwrap()
+                .resolution()
+                .is_resolved()
+        );
+        assert_eq!(expression(&query).get_type(), None);
+        assert!(
+            context
+                .problems()
+                .iter()
+                .any(|problem| problem.code() == "undefined_operator")
+        );
+        Ok(())
     }
 }
 

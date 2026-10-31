@@ -28,7 +28,7 @@ mod truth_test;
 mod whole_row;
 
 pub use self::{
-    arith_expr::ArithExpr,
+    arith_expr::{ArithExpr, SqliteLikeExpr},
     array::ArrayExpr,
     array_subquery::ArraySubqueryExpr,
     boolean::{BooleanExpr, NullTestExpr},
@@ -1472,6 +1472,14 @@ impl SemScalarExpr {
     pub(crate) fn requires_argument_type(&self) -> bool {
         self.get_type().is_none() && !self.as_const().is_some_and(ScalarConstExpr::is_null)
     }
+    /// SQLite builtin LIKE predicate with its analyzed value, pattern and escape.
+    pub const fn as_sqlite_like(&self) -> Option<&SqliteLikeExpr> {
+        match self {
+            Self::Arith(value) => value.as_sqlite_like(),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn arithmetic(value: ArithExpr) -> Self {
         Self::Arith(value)
     }

@@ -353,6 +353,10 @@ where
     /// ```
     fn freeze(self) -> FrozenBaseContext;
 
+    /// Retain the effective immutable catalog for later assignment inspection.
+    /// Query-local diagnostics, bindings and inferred constraints are excluded.
+    fn retain_catalog(&self) -> FrozenBaseContext;
+
     /// Replace the search path for this parse context without updating its base.
     fn set_search_path(&mut self, search_path: &[SchemaName]);
 

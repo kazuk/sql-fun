@@ -4,7 +4,7 @@ use crate::sem::{
 };
 use crate::test_helpers::TestParseContext;
 
-pub(super) fn context() -> TestParseContext {
+pub(crate) fn context() -> TestParseContext {
     let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());
     for ty in [
         PgBuiltInType::int4(),
@@ -36,7 +36,7 @@ pub(super) fn context() -> TestParseContext {
 }
 
 /// Small explicit catalog for domain identity and array conversion relationships.
-pub(super) fn domain_context() -> TestParseContext {
+pub(crate) fn domain_context() -> TestParseContext {
     let mut context = context();
     let amount = TypeReference::from_full_name(FullName::with_schema("public", "amount"));
     let amount_array =
@@ -51,5 +51,30 @@ pub(super) fn domain_context() -> TestParseContext {
         let definition = TypeDefinition::from(&CreateDomain::new(&ty, &Some(base)));
         context.set_get_type_impl_result(ty.full_name(), &definition);
     }
+    context
+}
+
+/// Catalog for post-analysis assignments, forbidding catalog-wide inference.
+pub(crate) fn inspection_context() -> TestParseContext {
+    let mut context = assignment_context();
+    context.forbid_type_enumeration();
+    context
+}
+
+/// The maintained protocol inference contract, independent of implementation seeds.
+pub(crate) fn protocol_candidates() -> crate::sem::InputTypeConstraint {
+    crate::sem::InputTypeConstraint::types(
+        [
+            "bool", "int4", "int8", "float4", "float8", "text", "numeric",
+        ]
+        .map(TypeReference::from_master_type_name),
+    )
+}
+
+/// Catalog for CASE analysis, including SQL-established boolean conditions.
+pub(crate) fn assignment_context() -> TestParseContext {
+    let mut context = domain_context();
+    context.setup_type(TypeReference::from_master_type_name("uuid"));
+    context.setup_type(PgBuiltInType::bool());
     context
 }

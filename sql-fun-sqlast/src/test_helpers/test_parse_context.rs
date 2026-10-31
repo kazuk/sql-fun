@@ -26,7 +26,7 @@ use crate::{
 use std::collections::{HashMap, HashSet};
 
 /// ParseContext implementation for tests
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct TestParseContext {
     rules: HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::context::ownership::OwnershipCatalog,
@@ -720,6 +720,13 @@ impl ParseContext for TestParseContext {
 
     fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
         self.parameter_constraints = constraints.clone();
+    }
+
+    fn retain_catalog(&self) -> crate::context::FrozenBaseContext {
+        let mut catalog = self.clone();
+        catalog.cursors = Default::default();
+        catalog.analysis_state = Default::default();
+        catalog.freeze()
     }
 
     fn freeze(mut self) -> crate::context::FrozenBaseContext {

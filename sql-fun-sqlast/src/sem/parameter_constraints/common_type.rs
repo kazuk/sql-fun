@@ -1,10 +1,12 @@
 //! Owned common-type facts and relationships for initially unrestricted inputs.
 //! These are inference data, not a second catalog or analysis environment.
+use crate::context::{CastInfoRead, SchemaFileContext};
 use crate::sem::parameter_constraints::{
     ConstraintGraph, InputTypeConstraint, SignatureAlternative,
 };
 use crate::sem::{MinMaxExpr, ParseContext, PgBuiltInType, TypeReference};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 struct TypeFacts {
@@ -14,23 +16,55 @@ struct TypeFacts {
     ordered: Option<bool>,
 }
 
-/// Retain only the facts needed after the borrowed ParseContext is gone.
-/// Catalog-defined nominal types are included; supplied owned definitions can
-/// additionally supply identity, structural, category, and ordering evidence.
-#[derive(Clone, Debug, Default)]
-pub(super) struct CommonTypeFacts(HashMap<TypeReference, TypeFacts>);
+/// Original catalog and explicit configuration for post-analysis inspection.
+/// The frozen base is shared; only the current catalog layer is copied.
+#[derive(Debug)]
+struct CommonTypeEnvironment {
+    catalog: crate::context::FrozenBaseContext,
+    args: sql_fun_core::SqlFunArgs,
+    metadata: sql_fun_core::SqlFunMetadata,
+}
+
+impl CommonTypeEnvironment {
+    fn new(context: &impl ParseContext) -> Self {
+        Self {
+            catalog: context.retain_catalog(),
+            args: context.get_args().clone(),
+            metadata: context.metadata().clone(),
+        }
+    }
+
+    fn context(&self) -> SchemaFileContext {
+        SchemaFileContext::new(
+            std::path::Path::new("<assignment>"),
+            &self.catalog,
+            &self.args,
+            &self.metadata,
+        )
+    }
+}
+
+/// Query-owned semantic facts, prepared only for encountered types.
+#[derive(Clone, Debug)]
+pub(super) struct CommonTypeFacts {
+    types: HashMap<TypeReference, TypeFacts>,
+    environment: Arc<CommonTypeEnvironment>,
+}
 
 impl CommonTypeFacts {
     pub(super) fn prepare(context: &impl ParseContext) -> Self {
-        let mut facts = Self::default();
-        for ty in context.type_references() {
-            facts.retain(context, &ty);
+        Self {
+            types: HashMap::new(),
+            environment: Arc::new(CommonTypeEnvironment::new(context)),
         }
-        facts
+    }
+
+    fn permits_defaults(&self) -> bool {
+        crate::ast::Dialect::from(&self.environment.metadata) == crate::ast::Dialect::postgres()
     }
 
     pub(super) fn retain(&mut self, context: &impl ParseContext, ty: &TypeReference) {
-        if self.0.contains_key(ty) {
+        if self.types.contains_key(ty) {
             return;
         }
         let canonical = if ty.is_dynamic() {
@@ -58,8 +92,20 @@ impl CommonTypeFacts {
             targets,
             ordered: MinMaxExpr::ordered(context, &canonical),
         };
-        self.0.insert(ty.clone(), facts.clone());
-        self.0.insert(canonical, facts);
+        let base = facts.base.clone();
+        self.types.insert(ty.clone(), facts.clone());
+        self.types.insert(canonical, facts);
+        if base != *ty {
+            self.retain(context, &base);
+        }
+        if ty.is_array() == Some(true) {
+            self.retain(context, &ty.element_type());
+        }
+        if let Some(definition) = ty.type_definition()
+            && let Some(base) = definition.domain_base()
+        {
+            self.retain(context, base);
+        }
     }
 
     fn catalog_base_type(context: &impl ParseContext, ty: &TypeReference) -> TypeReference {
@@ -92,7 +138,7 @@ impl CommonTypeFacts {
     }
 
     fn base(&self, ty: &TypeReference) -> TypeReference {
-        match self.0.get(&Self::identity(ty)) {
+        match self.types.get(&Self::identity(ty)) {
             Some(facts) => facts.base.clone(),
             None => match ty.type_definition() {
                 Some(definition) => match definition.domain_base() {
@@ -108,7 +154,7 @@ impl CommonTypeFacts {
         if ty.is_array() == Some(true) {
             return Some(('A', false));
         }
-        if let Some(facts) = self.0.get(ty)
+        if let Some(facts) = self.types.get(ty)
             && let Some(category) = facts.category
         {
             return Some(category);
@@ -121,7 +167,7 @@ impl CommonTypeFacts {
         if base.is_array() == Some(true) {
             return self.ordered(&base.element_type());
         }
-        if let Some(facts) = self.0.get(&base)
+        if let Some(facts) = self.types.get(&base)
             && let Some(ordered) = facts.ordered
         {
             return Some(ordered);
@@ -146,7 +192,7 @@ impl CommonTypeFacts {
             return self.coerce(&source.element_type(), &target.element_type());
         }
         if self
-            .0
+            .types
             .get(&source)
             .is_some_and(|facts| facts.targets.contains(&Self::identity(&target)))
         {
@@ -155,9 +201,14 @@ impl CommonTypeFacts {
         source.implicit_match_owned(&target)
     }
 
-    fn select(&self, left: &TypeReference, right: &TypeReference) -> Option<TypeReference> {
+    fn select(&mut self, left: &TypeReference, right: &TypeReference) -> Option<TypeReference> {
         if left == right {
             return Some(left.clone());
+        }
+        if !self.types.contains_key(left) || !self.types.contains_key(right) {
+            let context = self.environment.context();
+            self.retain(&context, left);
+            self.retain(&context, right);
         }
         let left = self.base(left);
         let right = self.base(right);
@@ -181,41 +232,72 @@ impl CommonTypeFacts {
         .ok()
     }
 
-    // Complete the connected conversion families of the observed types. This
-    // supplies witnesses for omitted inputs without choosing one of them.
-    fn choices(&self, seeds: impl Iterator<Item = TypeReference>) -> InputTypeConstraint {
-        let mut types: HashSet<_> = seeds.filter(|ty| *ty != MinMaxExpr::unknown()).collect();
-        let array_elements: Vec<_> = types
-            .iter()
-            .filter(|ty| ty.is_array() == Some(true))
-            .map(TypeReference::element_type)
+    /// Retain the same semantic calculations for newly supplied assignments.
+    fn choices(&mut self, seeds: Vec<TypeReference>, expand_sources: bool) -> InputTypeConstraint {
+        let context = self.environment.context();
+        let mut types: HashSet<_> = seeds
+            .into_iter()
+            .filter(|ty| *ty != MinMaxExpr::unknown())
             .collect();
-        if !array_elements.is_empty() {
-            types.extend(
-                self.choices(array_elements.into_iter())
-                    .admissible_types()
-                    .unwrap_or(&[])
-                    .iter()
-                    .map(TypeReference::array_type),
-            );
-        }
-        loop {
-            let before = types.len();
-            for (source, facts) in &self.0 {
-                if types.contains(source)
-                    || types.contains(&facts.base)
-                    || facts.targets.iter().any(|target| types.contains(target))
-                {
-                    types.insert(source.clone());
-                    types.insert(facts.base.clone());
-                    types.extend(facts.targets.iter().cloned());
-                }
+        if expand_sources {
+            // A concrete SQL/assignment target justifies its incoming conversions.
+            for target in types.clone() {
+                types.extend(context.declared_implicit_cast_sources(&target));
             }
-            if types.len() == before {
-                break;
+        }
+        for ty in types.clone() {
+            self.retain(&context, &ty);
+            let base = Self::catalog_base_type(&context, &ty);
+            self.retain(&context, &base);
+            if ty.is_array() == Some(true) {
+                self.retain(&context, &ty.element_type());
             }
         }
         InputTypeConstraint::types(types)
+    }
+}
+
+#[cfg(test)]
+mod test_common_type_facts {
+    use crate::sem::{MinMaxExpr, TypeReference};
+    use crate::test_helpers::common_types as test_helpers;
+
+    #[rstest::rstest]
+    #[case::domain_first("public.amount[]", "pg_catalog.int4[]", "public.amount[]")]
+    #[case::base_first("pg_catalog.int4[]", "public.amount[]", "pg_catalog.int4[]")]
+    #[case::nested_elements(
+        "public.nested_amount[]",
+        "pg_catalog.int4[]",
+        "public.nested_amount[]"
+    )]
+    #[case::promoted("public.amount[]", "pg_catalog.int8[]", "pg_catalog.int8[]")]
+    #[case::array_domain("public.amount_array", "pg_catalog.int4[]", "pg_catalog.int4[]")]
+    #[case::nested_array_domain(
+        "public.nested_amount_array",
+        "pg_catalog.int4[]",
+        "pg_catalog.int4[]"
+    )]
+    fn domain_array_coercions_keep_candidate_identity(
+        #[case] left: &str,
+        #[case] right: &str,
+        #[case] result: &str,
+    ) {
+        let left: TypeReference = left.parse().unwrap();
+        let right: TypeReference = right.parse().unwrap();
+        let result: TypeReference = result.parse().unwrap();
+        let context = test_helpers::domain_context();
+        assert_eq!(
+            MinMaxExpr::select_common_type(&context, &[left.clone(), right.clone()]).unwrap(),
+            result
+        );
+        assert!(MinMaxExpr::can_coerce(&context, &left, &result));
+        assert!(MinMaxExpr::can_coerce(&context, &right, &result));
+
+        let mut facts = super::CommonTypeFacts::prepare(&context);
+        drop(context);
+        assert_eq!(facts.select(&left, &right), Some(result.clone()));
+        assert!(facts.coerce(&left, &result));
+        assert!(facts.coerce(&right, &result));
     }
 }
 
@@ -237,23 +319,62 @@ impl CommonTypeConstraint {
         }
     }
 
-    pub(super) fn instantiate(&self, graph: &mut ConstraintGraph, facts: &CommonTypeFacts) -> bool {
-        let seeds = self
-            .inputs
-            .iter()
-            .chain(std::iter::once(&self.result))
-            .filter_map(|node| graph.domain(*node).admissible_types())
-            .flatten()
-            .cloned();
-        let choices = facts.choices(seeds);
-        if choices.is_empty() {
+    pub(super) fn instantiate(
+        &self,
+        graph: &mut ConstraintGraph,
+        facts: &mut CommonTypeFacts,
+        defaults: bool,
+    ) -> bool {
+        let Some(choices) = self.candidates(graph, facts, defaults) else {
             return false;
-        }
+        };
         for input in &self.inputs {
             if graph.domain(*input).is_any() {
                 graph.restrict(*input, &choices);
             }
         }
+        let candidate = self.select_inputs(graph, facts);
+        self.constrain_result(graph, facts, candidate);
+        self.constrain_coercions(graph, facts);
+        true
+    }
+
+    fn candidates(
+        &self,
+        graph: &ConstraintGraph,
+        facts: &mut CommonTypeFacts,
+        defaults: bool,
+    ) -> Option<InputTypeConstraint> {
+        let mut seeds = self
+            .inputs
+            .iter()
+            .chain(std::iter::once(&self.result))
+            .filter_map(|node| graph.domain(*node).admissible_types())
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        let unseeded = seeds.iter().all(|ty| *ty == MinMaxExpr::unknown());
+        if unseeded {
+            if !defaults
+                || !facts.permits_defaults()
+                || !self.inputs.iter().any(|node| graph.is_parameter(*node))
+                || !self
+                    .inputs
+                    .iter()
+                    .all(|node| graph.is_parameter(*node) || !graph.domain(*node).is_any())
+            {
+                return None;
+            }
+            seeds.extend(super::default_types());
+        }
+        let choices = facts.choices(seeds, !defaults);
+        if choices.is_empty() {
+            return None;
+        }
+        Some(choices)
+    }
+
+    fn select_inputs(&self, graph: &mut ConstraintGraph, facts: &mut CommonTypeFacts) -> usize {
         let mut candidate = self.inputs[0];
         for input in self.inputs.iter().skip(1) {
             let mut alternatives = Vec::new();
@@ -274,6 +395,15 @@ impl CommonTypeConstraint {
             graph.overload(&[candidate, *input, next], &alternatives, &self.operation);
             candidate = next;
         }
+        candidate
+    }
+
+    fn constrain_result(
+        &self,
+        graph: &mut ConstraintGraph,
+        facts: &CommonTypeFacts,
+        candidate: usize,
+    ) {
         let mut alternatives = Vec::new();
         let mut targets = Vec::new();
         let mut unordered = None;
@@ -313,6 +443,9 @@ impl CommonTypeConstraint {
         }
         graph.restrict(self.result, &InputTypeConstraint::types(targets));
         graph.overload(&[candidate, self.result], &alternatives, &self.operation);
+    }
+
+    fn constrain_coercions(&self, graph: &mut ConstraintGraph, facts: &CommonTypeFacts) {
         for input in &self.inputs {
             let mut alternatives = Vec::new();
             for target in graph.domain(self.result).admissible_types().unwrap_or(&[]) {
@@ -330,19 +463,44 @@ impl CommonTypeConstraint {
             }
             graph.overload(&[*input, self.result], &alternatives, &self.operation);
         }
-        true
     }
 }
 
 #[cfg(test)]
 mod tests {
-    mod test_helpers;
+    use crate::test_helpers::common_types as test_helpers;
 
     use crate::sem::parameter_constraints::{
         ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
     };
     use crate::sem::{MinMaxExpr, PgBuiltInType, TypeReference};
     use std::collections::BTreeMap;
+
+    #[rstest::rstest]
+    fn sql_established_domain_is_not_broadened(
+        #[values(false, true)] defaults: bool,
+        #[values(false, true)] provisional: bool,
+    ) {
+        let context = test_helpers::inspection_context();
+        let mut graph = ConstraintGraph::default();
+        let left = graph.parameter(1);
+        let right = graph.parameter(2);
+        let result = graph.common_type(&context, &[left, right], false, "CASE");
+        drop(context);
+        if provisional {
+            graph.solve().unwrap();
+            assert_eq!(graph.domain(left), &test_helpers::protocol_candidates());
+        }
+        let domain = InputTypeConstraint::exact(&"public.amount".parse().unwrap());
+        graph.restrict(right, &domain);
+        // A relation can acquire SQL context while deferred. Its witnesses
+        // must obey that context even during the bounded-default phase.
+        assert!(graph.instantiate_common_types(defaults));
+        assert!(graph.propagate(false));
+        assert_eq!(graph.domain(left), &domain);
+        assert_eq!(graph.domain(right), &domain);
+        assert_eq!(graph.domain(result), &domain);
+    }
 
     #[rstest::rstest]
     #[case::promoted("int8", true)]
@@ -361,7 +519,7 @@ mod tests {
         );
         graph.equal(result_node, output);
         graph.solve().unwrap();
-        assert!(graph.domain(left).is_any());
+        assert_eq!(graph.domain(left), &test_helpers::protocol_candidates());
         let constraints = ParameterConstraints::from_graph(&graph);
         assert_eq!(
             constraints.allows(&BTreeMap::from([
@@ -374,41 +532,68 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case::domain_first("public.amount[]", "pg_catalog.int4[]", "public.amount[]")]
-    #[case::base_first("pg_catalog.int4[]", "public.amount[]", "pg_catalog.int4[]")]
-    #[case::nested_elements(
-        "public.nested_amount[]",
-        "pg_catalog.int4[]",
-        "public.nested_amount[]"
-    )]
-    #[case::promoted("public.amount[]", "pg_catalog.int8[]", "pg_catalog.int8[]")]
-    #[case::array_domain("public.amount_array", "pg_catalog.int4[]", "pg_catalog.int4[]")]
-    #[case::nested_array_domain(
-        "public.nested_amount_array",
-        "pg_catalog.int4[]",
-        "pg_catalog.int4[]"
-    )]
-    fn domain_array_coercions_keep_candidate_identity(
-        #[case] left: &str,
-        #[case] right: &str,
-        #[case] result: &str,
-    ) {
-        let left: TypeReference = left.parse().unwrap();
-        let right: TypeReference = right.parse().unwrap();
-        let result: TypeReference = result.parse().unwrap();
-        let context = test_helpers::domain_context();
+    #[case::uuid("pg_catalog.uuid")]
+    #[case::domain("public.amount")]
+    #[case::array("pg_catalog.int4[]")]
+    fn analyzed_case_retains_non_default_assignment_inspection(
+        #[case] source: &str,
+    ) -> testresult::TestResult {
+        use crate::sem::ParseContext;
+        let context = test_helpers::assignment_context();
+        let mut cache = crate::test_helpers::create_cache_context();
+        let analyzed = crate::parse_statements(
+            "SELECT CASE WHEN true THEN $1 ELSE $2 END",
+            crate::ast::Dialect::postgres(),
+        )
+        .next()
+        .unwrap()?
+        .analyze(context, &mut cache)?;
+        let constraints = analyzed.context().parameter_constraints().clone();
+        drop(analyzed);
         assert_eq!(
-            MinMaxExpr::select_common_type(&context, &[left.clone(), right.clone()]).unwrap(),
-            result
+            constraints.parameter(1).unwrap().constraint(),
+            &test_helpers::protocol_candidates()
         );
-        assert!(MinMaxExpr::can_coerce(&context, &left, &result));
-        assert!(MinMaxExpr::can_coerce(&context, &right, &result));
+        let source: TypeReference = source.parse()?;
+        assert!(constraints.allows(&BTreeMap::from([(1, source.clone()), (2, source.clone())])));
+        assert!(!constraints.allows(&BTreeMap::from([(1, source), (2, PgBuiltInType::text())])));
+        Ok(())
+    }
 
-        let facts = super::CommonTypeFacts::prepare(&context);
+    #[rstest::rstest]
+    #[case::uuid("pg_catalog.uuid")]
+    #[case::domain("public.amount")]
+    #[case::array("pg_catalog.int4[]")]
+    #[case::domain_array("public.amount[]")]
+    fn non_default_assignments_survive_solving_and_restoration(
+        #[case] source: &str,
+        #[values(false, true)] provisional: bool,
+    ) {
+        let context = test_helpers::inspection_context();
+        let mut graph = ConstraintGraph::default();
+        let left = graph.parameter(1);
+        let right = graph.parameter(2);
+        let output = graph.parameter(3);
+        let result = graph.common_type(&context, &[left, right], false, "CASE");
         drop(context);
-        assert_eq!(facts.select(&left, &right), Some(result.clone()));
-        assert!(facts.coerce(&left, &result));
-        assert!(facts.coerce(&right, &result));
+        if provisional {
+            graph.solve().unwrap();
+        }
+        graph.equal(result, output);
+        graph.solve().unwrap();
+        let constraints = ParameterConstraints::from_graph(&graph);
+        let source: TypeReference = source.parse().unwrap();
+        assert!(constraints.allows(&BTreeMap::from([(1, source.clone())])));
+        assert!(constraints.allows(&BTreeMap::from([
+            (1, source.clone()),
+            (2, source.clone()),
+            (3, source.clone()),
+        ])));
+        assert!(!constraints.allows(&BTreeMap::from([
+            (1, source.clone()),
+            (2, source),
+            (3, PgBuiltInType::text()),
+        ])));
     }
 
     #[rstest::rstest]

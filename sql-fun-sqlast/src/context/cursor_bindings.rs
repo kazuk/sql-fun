@@ -4,6 +4,7 @@ use crate::sem::CursorInfo;
 /// These are portal names, not PL/pgSQL refcursor variable names. A procedural
 /// analyzer must resolve a variable's value before establishing a portal binding.
 /// Bindings are not inherited from or frozen into a schema catalog.
+#[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Default)]
 pub(crate) struct CursorBindings {
     portals: std::collections::HashMap<String, CursorInfo>,

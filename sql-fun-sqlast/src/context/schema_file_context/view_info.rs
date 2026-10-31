@@ -8,7 +8,7 @@ use crate::{
     syn::ObjectType,
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ViewInformationCollection(TrieMap<ViewLike>, Vec<FullName>);
 
 impl ViewInformationCollection {

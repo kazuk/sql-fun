@@ -237,6 +237,26 @@ default bind candidates; graph node identities preserve their semantic origin.
 Candidate order never chooses a binding, and an absent default witness does not
 establish invalid SQL.
 
+The same bound applies to deferred common-type relationships. Finish SQL-derived
+propagation before preparing finite witnesses, including equality and structural
+projection constraints. Only unseeded placeholder inputs receive the seven
+candidates; an unresolved expression node does not inherit them. Common-type
+facts are prepared for encountered types instead of enumerating the catalog.
+Entering the default phase does not authorize adding default witnesses to a
+relation already seeded by SQL-established types.
+Keep the bounded-default phase through nested propagation: a result derived
+from defaults must not expand another placeholder back to catalog cast sources.
+The original effective catalog is retained through `ParseContext::retain_catalog`:
+the immutable base is shared and the active layer is copied, without retaining
+diagnostics or inferred graphs. The original analysis arguments and metadata
+remain explicit when constructing the later inspection context.
+
+`allows` restores the pre-default graph and prepares the original semantic facts
+on demand for explicit types, including non-default nominal types, domains,
+arrays and supplied owned definitions. Missing prepared facts are not evidence
+of an illegal assignment. Provisional solves and resumed collection retain this
+capability and must not publish speculative defaults as SQL constraints.
+
 Keep `anyarray` declarations deferred. Instantiate comparison signatures from
 observed array types and their conversion targets, preserving concrete overload
 precedence. Retain conversion ranks only for finite declaration/default types

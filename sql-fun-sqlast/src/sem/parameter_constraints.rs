@@ -16,6 +16,13 @@ use self::structural::StructuralConstraint;
 use crate::sem::{ParameterConstraintProblem, TypeReference};
 use std::collections::BTreeMap;
 
+fn default_types() -> [TypeReference; 7] {
+    [
+        "bool", "int4", "int8", "float4", "float8", "text", "numeric",
+    ]
+    .map(TypeReference::from_master_type_name)
+}
+
 /// Admissible SQL types. An unconstrained domain is `any`, not inference failure.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InputTypeConstraint(Option<Vec<TypeReference>>);
@@ -539,39 +546,52 @@ impl ConstraintGraph {
         // Inspect each relationship before it can discard an invalid source.
         // A clone preserves the original graph for solving and conflict reporting.
         let mut diagnostic_graph = self.inspection.as_deref().unwrap_or(self).clone();
-        diagnostic_graph
-            .propagate_with(|relation, domains| relation.report_problem(domains, context))?;
+        diagnostic_graph.propagate_with(false, |relation, domains| {
+            relation.report_problem(domains, context)
+        })?;
         for problem in diagnostic_graph.common_problems {
             context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(problem))?;
         }
         Ok(())
     }
 
-    fn propagate(&mut self) -> bool {
-        self.propagate_with(|_, _| Ok::<(), std::convert::Infallible>(()))
+    fn is_parameter(&self, node: usize) -> bool {
+        self.parameters.values().any(|parameter| *parameter == node)
+    }
+
+    fn instantiate_common_types(&mut self, defaults: bool) -> bool {
+        let Some(mut facts) = self.common_facts.take() else {
+            return false;
+        };
+        let mut changed = false;
+        let mut deferred = Vec::new();
+        for relation in std::mem::take(&mut self.common_types) {
+            if relation.instantiate(self, Arc::make_mut(&mut facts), defaults) {
+                changed = true;
+            } else {
+                deferred.push(relation);
+            }
+        }
+        self.common_types = deferred;
+        self.common_facts = Some(facts);
+        changed
+    }
+
+    fn propagate(&mut self, defaults: bool) -> bool {
+        self.propagate_with(defaults, |_, _| Ok::<(), std::convert::Infallible>(()))
             .expect("propagation without diagnostic delivery is infallible")
     }
 
     fn propagate_with<E>(
         &mut self,
+        defaults: bool,
         mut inspect: impl FnMut(&StructuralConstraint, &[InputTypeConstraint]) -> Result<(), E>,
     ) -> Result<bool, E> {
         loop {
             if self.domains.iter().any(InputTypeConstraint::is_empty) {
                 return Ok(false);
             }
-            let mut changed = self.instantiate_calls(false);
-            if let Some(facts) = self.common_facts.clone() {
-                let mut deferred = Vec::new();
-                for relation in std::mem::take(&mut self.common_types) {
-                    if relation.instantiate(self, &facts) {
-                        changed = true;
-                    } else {
-                        deferred.push(relation);
-                    }
-                }
-                self.common_types = deferred;
-            }
+            let mut changed = false;
             for (left, right) in &self.equalities {
                 let domain = self.domains[*left].clone();
                 changed |= self.domains[*right].intersect(&domain);
@@ -590,8 +610,16 @@ impl ConstraintGraph {
                 changed |= relation.propagate(&mut self.domains);
             }
 
+            // Finish equality/structural propagation before materializing
+            // finite common-type witnesses from the observed domains.
             if !changed {
-                return Ok(true);
+                changed = self.instantiate_calls(defaults);
+                if !changed {
+                    changed = self.instantiate_common_types(defaults);
+                }
+                if !changed {
+                    return Ok(true);
+                }
             }
         }
     }
@@ -600,14 +628,11 @@ impl ConstraintGraph {
         if self.parameters.contains_key(&0) {
             return false;
         }
-        if !self.propagate() {
+        if !self.propagate(false) {
             return false;
         }
-        if !self.calls.is_empty() {
-            self.instantiate_calls(true);
-            if !self.propagate() {
-                return false;
-            }
+        if (!self.calls.is_empty() || !self.common_types.is_empty()) && !self.propagate(true) {
+            return false;
         }
         let branch = self
             .overloads
@@ -631,7 +656,7 @@ impl ConstraintGraph {
 
     pub(crate) fn solve(&mut self) -> Result<(), ParameterConstraintProblem> {
         self.resume_collection();
-        let original = if self.calls.is_empty() {
+        let original = if self.calls.is_empty() && self.common_types.is_empty() {
             None
         } else {
             Some(Arc::new(self.clone()))
@@ -666,7 +691,7 @@ impl ConstraintGraph {
             }
             self.overloads[index].alternatives = retained;
         }
-        if !self.propagate() {
+        if !self.propagate(false) {
             return Err(self.conflict());
         }
         for node in 0..self.domains.len() {

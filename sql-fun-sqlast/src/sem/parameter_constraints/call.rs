@@ -1,17 +1,10 @@
 //! Deferred overload relations. Retained ranks are inference facts, not a catalog.
-use super::{ConstraintGraph, InputTypeConstraint, SignatureAlternative};
+use super::{ConstraintGraph, InputTypeConstraint, SignatureAlternative, default_types};
 use crate::sem::overload_rank::OverloadRank;
 use crate::sem::parameter_resolution::Signature;
 use crate::sem::{ParseContext, TypeReference};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
-
-pub(super) fn default_types() -> [TypeReference; 7] {
-    [
-        "bool", "int4", "int8", "float4", "float8", "text", "numeric",
-    ]
-    .map(TypeReference::from_master_type_name)
-}
 
 #[derive(Clone, Debug)]
 struct RankedSignature {

@@ -30,6 +30,7 @@ pub trait ParameterTypeHintWrite {
 }
 
 /// Mutable request state, deliberately excluded from the frozen schema catalog.
+#[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Default)]
 pub(crate) struct ParameterTypeHints(Vec<Option<TypeReference>>);
 

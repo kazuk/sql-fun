@@ -222,6 +222,7 @@ impl SelectStatement {
     }
 }
 
+#[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Default)]
 pub(crate) struct GroupingAnalysis {
     has_operations: bool,

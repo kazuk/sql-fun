@@ -8,6 +8,7 @@ pub(crate) mod column_rename;
 
 pub(crate) mod between;
 pub(crate) mod collate;
+pub(crate) mod common_types;
 pub(crate) mod conflict_masters;
 pub(crate) mod declaration_collation;
 pub(crate) mod domain_casts;

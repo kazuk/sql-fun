@@ -38,6 +38,16 @@ pub struct TrieMap<TValue> {
     nodes: TrieLeaves<TValue>,
 }
 
+impl<TValue: Clone> Clone for TrieMap<TValue> {
+    fn clone(&self) -> Self {
+        let mut cloned = Self::new();
+        for (key, value) in self.iter() {
+            cloned.insert(&key, value.clone());
+        }
+        cloned
+    }
+}
+
 impl<TValue> Default for TrieMap<TValue> {
     fn default() -> Self {
         Self::new()

@@ -6,6 +6,7 @@ use crate::sem::AnalysisProblem;
 ///
 /// This contains no configuration or catalog. Nested resolvers share the owning
 /// `ParseContext`; only its outer analysis boundary starts and completes a run.
+#[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Default)]
 pub struct AnalysisState {
     active: bool,

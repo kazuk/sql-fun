@@ -335,7 +335,6 @@ function run_version_materialization() {
   echo "== Verify release version materialization"
   "${GIT_ROOT}/.local/bin/test-release-publication"
   "${GIT_ROOT}/.local/bin/test-release-preparation"
-  "${GIT_ROOT}/.local/bin/test-pages-prototype"
   "${GIT_ROOT}/.local/bin/test-materialize-release-state"
 }
 

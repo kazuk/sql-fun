@@ -32,6 +32,7 @@ pub struct TestParseContext {
     ownership: crate::context::ownership::OwnershipCatalog,
     triggers: HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
     masters: Option<crate::context::ConflictMasters>,
+    function_set_properties: HashMap<(FullName, crate::sem::OverloadVariant), bool>,
     sampling_methods: Option<HashMap<FullName, crate::sem::SamplingMethodLookup>>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
@@ -76,6 +77,16 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
+    pub(crate) fn set_function_returns_set(
+        &mut self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+        returns_set: bool,
+    ) {
+        self.function_set_properties
+            .insert((name.clone(), overload.clone()), returns_set);
+    }
+
     pub(crate) fn set_sampling_method(
         &mut self,
         name: &FullName,
@@ -386,6 +397,16 @@ impl OperatorInfoRead for TestParseContext {
 impl FunctionInfoRead for TestParseContext {
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
         self.aggregate_functions.contains(name)
+    }
+    fn function_returns_set(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        self.function_set_properties
+            .get(&(name.clone(), overload.clone()))
+            .copied()
+            .expect("explicit mock returns_set metadata")
     }
     fn function_preserves_view_rows(
         &self,

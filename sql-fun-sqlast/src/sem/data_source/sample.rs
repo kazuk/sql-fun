@@ -327,6 +327,53 @@ mod test_sampling_semantics {
         Ok(())
     }
 
+    // PostgreSQL 15/18 EXPLAIN oracles use sum, abs and generate_series
+    // respectively for aggregate507, scalar507 and set507 (one output row).
+    #[rstest::rstest]
+    #[case::aggregate_local("aggregate507(1)", false)]
+    #[case::aggregate_outer("aggregate507(a.id)", true)]
+    #[case::aggregate_nested_outer("scalar507(aggregate507(a.id))", true)]
+    #[case::aggregate_subquery("(SELECT aggregate507(1))", true)]
+    #[case::aggregate_subquery_outer("(SELECT aggregate507(a.id))", true)]
+    #[case::window_direct("aggregate507(1) OVER ()", false)]
+    #[case::window_nested_call("scalar507(aggregate507(1) OVER ())", false)]
+    #[case::window_subquery("(SELECT aggregate507(1) OVER ())", true)]
+    #[case::window_outer("aggregate507(a.id) OVER ()", false)]
+    #[case::window_subquery_outer("(SELECT aggregate507(a.id) OVER ())", true)]
+    #[case::srf_direct("set507(1)", false)]
+    #[case::srf_nested_call("scalar507(set507(1))", false)]
+    #[case::srf_subquery("(SELECT set507(1))", true)]
+    #[case::srf_outer("set507(a.id)", false)]
+    #[case::srf_subquery_outer("(SELECT set507(a.id))", true)]
+    #[case::scalar("scalar507(1)", true)]
+    fn respects_expression_placement_and_query_ownership(
+        #[case] expression: &str,
+        #[case] valid: bool,
+        #[values(false, true)] seed: bool,
+    ) -> testresult::TestResult {
+        let clause = if seed {
+            format!("system(1) REPEATABLE({expression})")
+        } else {
+            format!("system({expression})")
+        };
+        let sql = format!(
+            "SELECT (SELECT s.id FROM sampled s TABLESAMPLE {clause} LIMIT 1) FROM sampled a"
+        );
+        let mut context = context();
+        query(&sql, &mut context)?;
+        assert_eq!(
+            context.reported_problem_count(),
+            usize::from(!valid),
+            "{sql}: {:?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            context.has_reported_problem("tablesample_expression"),
+            !valid
+        );
+        Ok(())
+    }
+
     #[test]
     fn lookup_obeys_search_path_and_explicit_qualification() -> testresult::TestResult {
         let mut context = context();
@@ -515,6 +562,17 @@ impl SamplingInput {
     fn validate(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
         self.validate_placement(context)?;
         self.validate_type(context)
+    }
+    pub(crate) fn validate_aggregate_placement(
+        context: &mut impl ParseContext,
+        owner_placement: &str,
+    ) -> Result<(), AnalysisError> {
+        if matches!(owner_placement, "TABLESAMPLE" | "REPEATABLE") {
+            context.report_analysis_problem(AnalysisProblem::table_sample(
+                TableSampleProblem::expression(owner_placement),
+            ))?;
+        }
+        Ok(())
     }
     fn validate_placement(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
         let mut placement = SamplingPlacement {

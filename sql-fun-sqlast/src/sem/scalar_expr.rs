@@ -544,7 +544,7 @@ impl SemScalarExpr {
         context: &impl crate::context::BaseParseContext,
     ) -> bool {
         if let Self::FuncCall(call) = self {
-            call.row_preservation(context) == Some(false)
+            call.modifiers().over().is_some() || call.returns_set(context) == Some(true)
         } else if let Self::Constrained(value) = self {
             value
                 .function_binding()

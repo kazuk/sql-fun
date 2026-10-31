@@ -1144,8 +1144,16 @@ impl crate::ast::TableSample {
     ) -> Result<DataSource, AnalysisError> {
         let source = self.relation.resolve_in_scope(context, with, scope)?;
         let expression_scope = scope.with_from_clause(&FromClause::default());
-        let arguments = Expr::resolve_list(&self.arguments, context, &expression_scope)?;
-        let repeatable = Expr::resolve_optional(&self.repeatable, context, &expression_scope)?;
+        let arguments = Expr::resolve_list(
+            &self.arguments,
+            context,
+            &expression_scope.with_grouping_placement("TABLESAMPLE"),
+        )?;
+        let repeatable = Expr::resolve_optional(
+            &self.repeatable,
+            context,
+            &expression_scope.with_grouping_placement("REPEATABLE"),
+        )?;
         let sample = crate::sem::TableSampleSource::resolve(
             context,
             &source,

@@ -191,18 +191,15 @@ mod implementation {
         pub(crate) fn set_candidates(&mut self, candidates: Option<Vec<OverloadVariant>>) {
             self.candidates = candidates;
         }
-        pub(crate) fn row_preservation(
+        pub(crate) fn returns_set(
             &self,
             context: &impl crate::context::BaseParseContext,
         ) -> Option<bool> {
-            if self.modifiers().over().is_some() {
-                return Some(false);
-            }
             let name = self.name_resolution().function_identity()?;
             if let Some(overload) = self.overload() {
-                Some(context.function_preserves_view_rows(name, overload))
+                Some(context.function_returns_set(name, overload))
             } else {
-                self.candidates()?.row_preservation(context, name)
+                self.candidates()?.returns_set(context, name)
             }
         }
         pub(crate) fn candidates(&self) -> Option<crate::sem::FunctionOverloadCollection> {

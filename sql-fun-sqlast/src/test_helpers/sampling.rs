@@ -1,5 +1,6 @@
 use crate::{
     ast::Dialect,
+    context::ParseContext,
     sem::{
         CastContext, CastDefinition, ColumnDefinition, ColumnName, FullName, PgBuiltInType,
         SamplingMethod, SamplingMethodLookup, SchemaName, SelectStatement, TableSampleSource,
@@ -91,6 +92,7 @@ pub(crate) fn context() -> TestParseContext {
             context.setup_function(name, std::slice::from_ref(&overload))
         };
         context.set_function_row_property(&identity, &overload, preserves);
+        context.set_function_returns_set(&identity, &overload, name == "set507");
     }
     context
 }
@@ -128,4 +130,10 @@ pub(crate) fn with_views(mut context: TestParseContext) -> TestParseContext {
         &Some(crate::sem::ViewLike::from(&definition)),
     );
     context
+}
+
+/// Explicit schema layer for function-property tests; no builtin initialization.
+pub(crate) fn schema_context() -> crate::context::SchemaFileContext {
+    let base = context().freeze();
+    crate::test_helpers::schema_layer(std::path::Path::new("sampling-properties.sql"), &base)
 }

@@ -23,6 +23,11 @@ pub trait FunctionInfoRead {
         overload: &crate::sem::OverloadVariant,
     ) -> bool;
 
+    /// Whether this exactly qualified overload returns a set. This is independent
+    /// of aggregate/window classification and view row preservation.
+    fn function_returns_set(&self, name: &FullName, overload: &crate::sem::OverloadVariant)
+    -> bool;
+
     /// get `CREATE FUNCTION` statement by function name
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection>;
 }

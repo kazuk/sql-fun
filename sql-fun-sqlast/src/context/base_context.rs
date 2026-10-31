@@ -411,6 +411,14 @@ impl FunctionInfoRead for BaseContext {
         self.functions.preserves_view_rows(name, overload)
     }
 
+    fn function_returns_set(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        self.functions.returns_set(name, overload)
+    }
+
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         let create_function = self.functions.find_function_by_name(name)?;
         Some(create_function.overloads().clone())

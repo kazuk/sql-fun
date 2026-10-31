@@ -40,6 +40,10 @@ impl PgFunctionProto {
         };
         kind == "f" && !returns_set
     }
+    const fn returns_set(&self) -> bool {
+        self.returns_set
+            .expect("builtin function returns_set metadata")
+    }
     fn matches_input_signature(&self, overload: &OverloadVariant) -> bool {
         let input: Vec<_> = overload
             .params()
@@ -50,6 +54,32 @@ impl PgFunctionProto {
             && self.args.iter().zip(input).all(|(name, parameter)| {
                 parameter.get_type() == Some(&TypeReference::from_master_type_name(name))
             })
+    }
+}
+
+#[cfg(test)]
+mod test_function_properties {
+    use super::PgFunctionProto;
+
+    #[rstest::rstest]
+    #[case::scalar("f", false, true)]
+    #[case::aggregate("a", false, false)]
+    #[case::window("w", false, false)]
+    #[case::set("f", true, false)]
+    fn retains_set_returning_independently_of_function_kind(
+        #[case] kind: &str,
+        #[case] returns_set: bool,
+        #[case] preserves_rows: bool,
+    ) {
+        let definition = PgFunctionProto {
+            args: vec!["int4".to_owned()],
+            ret: "int4".to_owned(),
+            is_strict: false,
+            kind: Some(kind.to_owned()),
+            returns_set: Some(returns_set),
+        };
+        assert_eq!(definition.returns_set(), returns_set);
+        assert_eq!(definition.preserves_view_rows(), preserves_rows);
     }
 }
 
@@ -176,17 +206,27 @@ pub struct PgBuiltInFunctions {
 
 impl PgBuiltInFunctions {
     pub(super) fn preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        self.property(name, overload, PgFunctionProto::preserves_view_rows)
+    }
+    pub(super) fn returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        self.property(name, overload, PgFunctionProto::returns_set)
+    }
+    fn property(
+        &self,
+        name: &FullName,
+        overload: &OverloadVariant,
+        property: fn(&PgFunctionProto) -> bool,
+    ) -> bool {
         let definitions = self
             .function_by_name
             .get(name.name().as_str())
             .expect("bound builtin function");
-        // PostgreSQL's masters currently give every overload of a name the
-        // same row-preservation property (including polymorphic signatures).
-        // Keep an exact-signature path for future mixed-property overloads.
+        // A uniform property also covers specialized polymorphic signatures.
+        // Otherwise consult the exact producer signature.
         let mut common = None;
         let mut uniform = true;
         for definition in definitions {
-            let preserves = definition.preserves_view_rows();
+            let preserves = property(definition);
             if common.is_some_and(|old| old != preserves) {
                 uniform = false;
             }
@@ -197,7 +237,7 @@ impl PgBuiltInFunctions {
         }
         for definition in definitions {
             if definition.matches_input_signature(overload) {
-                return definition.preserves_view_rows();
+                return property(definition);
             }
         }
         todo!("builtin function properties for selected polymorphic overload")

@@ -248,6 +248,17 @@ macro_rules! forward_catalog_reads {
             fn is_aggregate_impl(&self, name: &crate::sem::FullName) -> bool {
                 crate::context::FunctionInfoRead::is_aggregate_impl(self.$catalog(), name)
             }
+            fn function_returns_set(
+                &self,
+                name: &crate::sem::FullName,
+                overload: &crate::sem::OverloadVariant,
+            ) -> bool {
+                crate::context::FunctionInfoRead::function_returns_set(
+                    self.$catalog(),
+                    name,
+                    overload,
+                )
+            }
             fn function_preserves_view_rows(
                 &self,
                 name: &crate::sem::FullName,

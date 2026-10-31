@@ -28,16 +28,16 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
-    pub(crate) fn row_preservation(
+    pub(crate) fn returns_set(
         &self,
         context: &impl BaseParseContext,
         name: &FullName,
     ) -> Option<bool> {
-        let first = context.function_preserves_view_rows(name, self.overloads.first()?);
+        let first = context.function_returns_set(name, self.overloads.first()?);
         if self
             .overloads
             .iter()
-            .all(|overload| context.function_preserves_view_rows(name, overload) == first)
+            .all(|overload| context.function_returns_set(name, overload) == first)
         {
             Some(first)
         } else {

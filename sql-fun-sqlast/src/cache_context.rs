@@ -1,5 +1,9 @@
 //! Memoized calculation facts for an immutable analysis base.
 
+mod argument_rank;
+
+use self::argument_rank::{ArgumentRankInput, ArgumentRanks};
+
 use crate::context::BaseParseContext;
 use crate::sem::parameter_resolution::Signature;
 use crate::sem::{OverloadRank, TypeReference};
@@ -11,13 +15,15 @@ use std::collections::{HashMap, HashSet};
 /// it only for calculations against that base. The server owns this association;
 /// cache lookups do not validate or fingerprint the environment.
 /// It supplements the shared parse context without providing catalog,
-/// configuration, or diagnostic services.
+/// configuration, or diagnostic services. Query-derived operation results are
+/// cleared when their inference pass ends.
 pub struct CacheContext {
+    constraint_memo: crate::sem::ConstraintMemo,
     declared_implicit_cast_sources: HashMap<TypeReference, HashSet<TypeReference>>,
     array_cast_ranks: HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>,
     assignment_sources: HashMap<TypeReference, HashSet<TypeReference>>,
     cast_sources: HashMap<(TypeReference, bool), HashSet<TypeReference>>,
-    argument_ranks: HashMap<(Signature, usize, TypeReference), Option<OverloadRank>>,
+    argument_ranks: ArgumentRanks,
     #[cfg(test)]
     cast_source_computations: usize,
     #[cfg(test)]
@@ -38,11 +44,12 @@ impl CacheContext {
     )]
     pub fn new() -> Self {
         Self {
+            constraint_memo: crate::sem::ConstraintMemo::default(),
             declared_implicit_cast_sources: HashMap::new(),
             array_cast_ranks: HashMap::new(),
             assignment_sources: HashMap::new(),
             cast_sources: HashMap::new(),
-            argument_ranks: HashMap::new(),
+            argument_ranks: ArgumentRanks::default(),
             #[cfg(test)]
             cast_source_computations: 0,
             #[cfg(test)]
@@ -54,6 +61,16 @@ impl CacheContext {
             #[cfg(test)]
             array_rank_computations: 0,
         }
+    }
+
+    /// Share operation results across branches of the current inference pass.
+    pub(crate) const fn constraint_memo(&mut self) -> &mut crate::sem::ConstraintMemo {
+        &mut self.constraint_memo
+    }
+
+    /// Query-derived combinations must not accumulate across requests.
+    pub(crate) fn clear_constraint_memo(&mut self) {
+        self.constraint_memo = crate::sem::ConstraintMemo::default();
     }
 
     /// Memoize declared sources without broadening the finite candidate domain.
@@ -135,16 +152,14 @@ impl CacheContext {
         index: usize,
         source: &TypeReference,
     ) -> Option<OverloadRank> {
-        *self
-            .argument_ranks
-            .entry((signature.clone(), index, source.clone()))
-            .or_insert_with(|| {
-                #[cfg(test)]
-                {
-                    self.rank_computations += 1;
-                }
-                signature.cast_score(context, source, index)
-            })
+        let input = ArgumentRankInput::new(signature, index, source);
+        self.argument_ranks.get_or_compute(&input, || {
+            #[cfg(test)]
+            {
+                self.rank_computations += 1;
+            }
+            signature.cast_score(context, source, index)
+        })
     }
 }
 

@@ -2,7 +2,10 @@
 
 mod call;
 mod common_type;
+mod memo;
 mod structural;
+
+pub(crate) use self::memo::ConstraintMemo;
 
 pub(crate) use self::call::array_cast_ranks;
 
@@ -14,7 +17,8 @@ pub(crate) use self::structural::TypeProjection;
 use self::structural::StructuralConstraint;
 
 use crate::sem::{ParameterConstraintProblem, TypeReference};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, hash_map::DefaultHasher};
+use std::hash::{Hash, Hasher};
 
 fn default_types() -> [TypeReference; 7] {
     [
@@ -70,13 +74,18 @@ impl InputTypeConstraint {
     }
 
     fn intersect(&mut self, other: &Self) -> bool {
-        let before = self.clone();
         match (&mut self.0, &other.0) {
-            (Some(types), Some(other)) => types.retain(|ty| other.contains(ty)),
-            (None, Some(types)) => self.0 = Some(types.clone()),
-            _ => {}
+            (Some(types), Some(other)) => {
+                let before = types.len();
+                types.retain(|ty| other.contains(ty));
+                types.len() != before
+            }
+            (None, Some(types)) => {
+                self.0 = Some(types.clone());
+                true
+            }
+            _ => false,
         }
-        *self != before
     }
 
     fn exclude(&mut self, excluded: &[TypeReference]) {
@@ -217,12 +226,22 @@ impl ParameterConstraints {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SignatureAlternative {
-    domains: Vec<InputTypeConstraint>,
+    // Immutable requirements are shared by search branches and memo keys.
+    domains: Arc<[InputTypeConstraint]>,
     // Unrestricted variadic positions exclude source types that were ranked
     // separately against concrete overloads. Kept private to the solver.
-    excluded: Vec<Vec<TypeReference>>,
+    excluded: Arc<[Vec<TypeReference>]>,
+    fingerprint: u64,
+}
+
+// Requirements are immutable, so their hash is computed once and cloned with
+// the alternative. Equality still compares complete domains and exclusions.
+impl Hash for SignatureAlternative {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.fingerprint.hash(state);
+    }
 }
 
 impl SignatureAlternative {
@@ -234,9 +253,13 @@ impl SignatureAlternative {
         domains: &[InputTypeConstraint],
         excluded: &[Vec<TypeReference>],
     ) -> Self {
+        let mut fingerprint = DefaultHasher::new();
+        domains.hash(&mut fingerprint);
+        excluded.hash(&mut fingerprint);
         Self {
-            domains: domains.to_vec(),
-            excluded: excluded.to_vec(),
+            domains: Arc::from(domains),
+            excluded: Arc::from(excluded),
+            fingerprint: fingerprint.finish(),
         }
     }
 
@@ -260,7 +283,7 @@ impl SignatureAlternative {
     // before comparing this alternative with the current graph domains.
     fn compatible_with(&self, nodes: &[usize], domains: &[InputTypeConstraint]) -> bool {
         let mut requirements = BTreeMap::<usize, InputTypeConstraint>::new();
-        for (node, required) in nodes.iter().zip(&self.domains) {
+        for (node, required) in nodes.iter().zip(self.domains.as_ref()) {
             requirements
                 .entry(*node)
                 .or_insert_with(InputTypeConstraint::any)
@@ -303,9 +326,14 @@ impl OverloadConstraint {
         }
     }
 
-    fn retain_compatible(&mut self, domains: &[InputTypeConstraint]) -> bool {
+    fn retain_compatible(
+        &mut self,
+        domains: &[InputTypeConstraint],
+        memo: &mut ConstraintMemo,
+    ) -> bool {
+        let operands = self.operand_domains(domains, memo);
         self.alternatives
-            .retain(|alternative| alternative.compatible_with(&self.nodes, domains));
+            .retain(|alternative| memo.compatible(alternative, &operands, &self.nodes, domains));
         !self.alternatives.is_empty()
     }
 
@@ -371,7 +399,7 @@ impl ConstraintGraph {
             };
             graph.domains[node].intersect(&InputTypeConstraint::exact(&supplied));
         }
-        graph.satisfiable() && graph.unsupported_inference.is_empty()
+        graph.satisfiable(&mut ConstraintMemo::default()) && graph.unsupported_inference.is_empty()
     }
 
     pub(crate) fn node(&mut self, domain: &InputTypeConstraint) -> usize {
@@ -542,11 +570,12 @@ impl ConstraintGraph {
     pub(crate) fn report_projection_problems(
         &self,
         context: &mut impl crate::sem::ParseContext,
+        memo: &mut ConstraintMemo,
     ) -> Result<(), crate::sem::AnalysisError> {
         // Inspect each relationship before it can discard an invalid source.
         // A clone preserves the original graph for solving and conflict reporting.
         let mut diagnostic_graph = self.inspection.as_deref().unwrap_or(self).clone();
-        diagnostic_graph.propagate_with(false, |relation, domains| {
+        diagnostic_graph.propagate_with(false, memo, |relation, domains| {
             relation.report_problem(domains, context)
         })?;
         for problem in diagnostic_graph.common_problems {
@@ -577,14 +606,19 @@ impl ConstraintGraph {
         changed
     }
 
-    fn propagate(&mut self, defaults: bool) -> bool {
-        self.propagate_with(defaults, |_, _| Ok::<(), std::convert::Infallible>(()))
-            .expect("propagation without diagnostic delivery is infallible")
+    fn propagate(&mut self, defaults: bool, memo: &mut ConstraintMemo) -> bool {
+        self.propagate_with(
+            defaults,
+            memo,
+            |_, _| Ok::<(), std::convert::Infallible>(()),
+        )
+        .expect("propagation without diagnostic delivery is infallible")
     }
 
     fn propagate_with<E>(
         &mut self,
         defaults: bool,
+        memo: &mut ConstraintMemo,
         mut inspect: impl FnMut(&StructuralConstraint, &[InputTypeConstraint]) -> Result<(), E>,
     ) -> Result<bool, E> {
         loop {
@@ -599,7 +633,7 @@ impl ConstraintGraph {
                 changed |= self.domains[*left].intersect(&domain);
             }
             for overload in &mut self.overloads {
-                if !overload.retain_compatible(&self.domains) {
+                if !overload.retain_compatible(&self.domains, memo) {
                     return Ok(false);
                 }
                 changed |= overload.propagate_domains(&mut self.domains);
@@ -624,14 +658,15 @@ impl ConstraintGraph {
         }
     }
 
-    fn satisfiable(&mut self) -> bool {
+    fn satisfiable(&mut self, memo: &mut ConstraintMemo) -> bool {
         if self.parameters.contains_key(&0) {
             return false;
         }
-        if !self.propagate(false) {
+        if !self.propagate(false, memo) {
             return false;
         }
-        if (!self.calls.is_empty() || !self.common_types.is_empty()) && !self.propagate(true) {
+        if (!self.calls.is_empty() || !self.common_types.is_empty()) && !self.propagate(true, memo)
+        {
             return false;
         }
         let branch = self
@@ -647,32 +682,43 @@ impl ConstraintGraph {
         for alternative in self.overloads[index].alternatives.clone() {
             let mut branch = self.clone();
             branch.overloads[index].alternatives = vec![alternative];
-            if crate::sem::with_stack(|| branch.satisfiable()) {
+            if crate::sem::with_stack(|| branch.satisfiable(memo)) {
                 return true;
             }
         }
         false
     }
 
+    #[cfg(test)]
     pub(crate) fn solve(&mut self) -> Result<(), ParameterConstraintProblem> {
+        self.solve_with(&mut ConstraintMemo::default())
+    }
+
+    pub(crate) fn solve_with(
+        &mut self,
+        memo: &mut ConstraintMemo,
+    ) -> Result<(), ParameterConstraintProblem> {
         self.resume_collection();
         let original = if self.calls.is_empty() && self.common_types.is_empty() {
             None
         } else {
             Some(Arc::new(self.clone()))
         };
-        let result = self.solve_domains();
+        let result = self.solve_domains(memo);
         self.inspection = original;
         result
     }
 
-    fn solve_domains(&mut self) -> Result<(), ParameterConstraintProblem> {
+    fn solve_domains(
+        &mut self,
+        memo: &mut ConstraintMemo,
+    ) -> Result<(), ParameterConstraintProblem> {
         if self.parameters.contains_key(&0) {
             return Err(ParameterConstraintProblem::new(
                 "parameter positions start at one",
             ));
         }
-        if !self.satisfiable() {
+        if !self.satisfiable(memo) {
             return Err(self.conflict());
         }
         if !self.unsupported_inference.is_empty() {
@@ -685,13 +731,13 @@ impl ConstraintGraph {
             for alternative in self.overloads[index].alternatives.clone() {
                 let mut branch = self.clone();
                 branch.overloads[index].alternatives = vec![alternative.clone()];
-                if branch.satisfiable() {
+                if branch.satisfiable(memo) {
                     retained.push(alternative);
                 }
             }
             self.overloads[index].alternatives = retained;
         }
-        if !self.propagate(false) {
+        if !self.propagate(false, memo) {
             return Err(self.conflict());
         }
         for node in 0..self.domains.len() {
@@ -702,7 +748,7 @@ impl ConstraintGraph {
             for ty in types {
                 let mut branch = self.clone();
                 branch.domains[node].intersect(&InputTypeConstraint::exact(&ty));
-                if branch.satisfiable() {
+                if branch.satisfiable(memo) {
                     retained.push(ty);
                 }
             }

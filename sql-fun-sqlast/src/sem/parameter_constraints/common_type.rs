@@ -496,7 +496,7 @@ mod tests {
         // A relation can acquire SQL context while deferred. Its witnesses
         // must obey that context even during the bounded-default phase.
         assert!(graph.instantiate_common_types(defaults));
-        assert!(graph.propagate(false));
+        assert!(graph.propagate(false, &mut crate::sem::ConstraintMemo::default()));
         assert_eq!(graph.domain(left), &domain);
         assert_eq!(graph.domain(right), &domain);
         assert_eq!(graph.domain(result), &domain);

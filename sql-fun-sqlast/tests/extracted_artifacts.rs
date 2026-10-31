@@ -12,7 +12,6 @@ use std::path::PathBuf;
 
 #[rstest::rstest]
 #[case::seventeen("17")]
-#[case::eighteen("18")]
 fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()

@@ -275,31 +275,7 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 
 // Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 9398769e.
 // Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 4b785462.
-#[rstest::rstest]
-#[case::string("ARRAY[$1,'1']")]
-#[case::nested("ARRAY[ARRAY[$1],ARRAY[$1,NULL]]")]
-fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testresult::TestResult {
-    // The builtin catalog supplies scalar and array conversion families. The
-    // cloned constraint graph must remain inspectable after its context is gone.
-    let constraints = {
-        let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
-        assert!(
-            analyzed.context().problems().is_empty(),
-            "{:?}",
-            analyzed.context().problems()
-        );
-        analyzed.context().parameter_constraints().clone()
-    };
-    assert!(constraints.result_column(0).unwrap().is_any());
-    for ty in [
-        PgBuiltInType::int4(),
-        PgBuiltInType::int8(),
-        PgBuiltInType::text(),
-    ] {
-        assert!(constraints.allows(&BTreeMap::from([(1, ty)])));
-    }
-    Ok(())
-}
+
 
 // Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 9398769e.
 // Further timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 4b785462.

@@ -19,10 +19,11 @@ use crate::{
     context::ParseContext,
     sem::{
         AliasName, AnalysisError, AnalysisProblem, ArithExpr, ArrayExpr, ArraySubscript, CaseExpr,
-        CaseExprAnalysisContext, CoalesceExpr, CollateExpr, ColumnName, DistinctExpr, FullName,
-        FuncCallExpr, IndirectionExpr, MinMaxExpr, OperatorName, QueryNameResolution, QueryProblem,
+        CoalesceExpr, CollateExpr, ColumnName, DistinctExpr, FullName, FuncCallExpr,
+        IndirectionExpr, MinMaxExpr, OperatorName, QueryNameResolution, QueryProblem,
         ReferenceCapture, ResolvedOperator, ScalarAnalysisContext, ScalarConstExpr,
-        SelectStatement, SemScalarExpr, SqlValueExpr, TypeReference, problem::RuleProblem,
+        SelectStatement, SemScalarExpr, SqlValueExpr, SqliteCaseBuilder, TypeReference,
+        problem::RuleProblem,
     },
 };
 
@@ -835,17 +836,13 @@ impl Case {
         {
             return Ok(expression);
         }
-        let mut analysis = if context.dialect() == Dialect::sqlite() {
-            CaseExprAnalysisContext::without_catalog_casts()
-        } else {
-            CaseExprAnalysisContext::new()
-        };
+        let mut analysis = SqliteCaseBuilder::new();
         analysis.set_argument(&argument);
         for (condition, result) in &arms {
-            analysis.push_arm(context, condition, result)?;
+            analysis.push_arm(condition, result);
         }
-        analysis.set_default(context, &otherwise)?;
-        analysis.finish(&mut *context)
+        analysis.set_default(&otherwise);
+        Ok(analysis.finish())
     }
 }
 

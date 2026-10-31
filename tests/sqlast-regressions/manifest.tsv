@@ -13,7 +13,7 @@ arrays-operators	builtin	-	4	17,18
 minmax-metadata	builtin	-	20	17,18
 minmax-diagnostics	builtin	-	12	17,18
 metadata-overloads	builtin	-	10	17,18
-case-common-types	project	case-common-types.sql	15	17,18
+case-common-types	project	case-common-types.sql	21	17,18
 case_semantic	builtin	-	3	17,18
 coalesce_semantic	builtin	-	3	17,18
 array-subqueries	builtin	-	28	17,18

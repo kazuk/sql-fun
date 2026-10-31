@@ -190,6 +190,46 @@ fn sqlite_does_not_use_postgres_condition_constraints(#[case] sql: &str) -> test
     Ok(())
 }
 
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::searched("SELECT CASE WHEN 1 THEN 2 ELSE 3 END", Some(PgBuiltInType::int4()))]
+#[case::simple("SELECT CASE 1 WHEN 1 THEN 2 ELSE 3 END", Some(PgBuiltInType::int4()))]
+#[case::heterogeneous("SELECT CASE WHEN 1 THEN 2 ELSE 'text' END", None)]
+fn typed_sqlite_results_preserve_operands(
+    #[case] sql: &str,
+    #[case] expected: Option<crate::sem::TypeReference>,
+) -> testresult::TestResult {
+    let mut cache_context = crate::test_helpers::create_cache_context();
+    let analyzed = parse_statements(sql, Dialect::sqlite())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
+    assert!(analyzed.context().problems().is_empty());
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = query.result_columns().get_column_at(0).unwrap();
+    assert_eq!(column.col_type(), &expected);
+    assert_eq!(column.is_not_null(), &Some(true));
+    let case = column.expression().unwrap().as_case().unwrap();
+    assert_eq!(
+        case.arms()[0].condition().get_type(),
+        Some(PgBuiltInType::int4())
+    );
+    assert_eq!(
+        case.arms()[0].result().get_type(),
+        Some(PgBuiltInType::int4())
+    );
+    assert!(case.arms()[0].comparison().is_none());
+    assert_eq!(
+        case.otherwise().unwrap().get_type(),
+        Some(if expected.is_some() {
+            PgBuiltInType::int4()
+        } else {
+            PgBuiltInType::text()
+        })
+    );
+    Ok(())
+}
+
 #[rstest::rstest]
 #[case::array_else_domain(
     "CASE WHEN true THEN NULL::integer[] ELSE NULL::amount[] END",
@@ -256,6 +296,16 @@ fn sqlite_does_not_use_postgres_condition_constraints(#[case] sql: &str) -> test
     "public.amount[]",
     false
 )]
+#[case::parameter_condition_reverse(
+    "CASE WHEN $1 THEN NULL::amount[] ELSE NULL::integer[] END",
+    "pg_catalog.int4[]",
+    false
+)]
+#[case::parameter_result(
+    "CASE WHEN true THEN $1::integer[] ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
 fn known_results_use_ordered_common_types(
     #[case] expression: &str,
     #[case] expected: &str,
@@ -281,6 +331,53 @@ fn known_results_use_ordered_common_types(
             assert_eq!(otherwise.get_type(), Some(expected.parse()?));
         }
     }
+    Ok(())
+}
+
+#[test]
+fn deferred_array_results_keep_parameter_requirements() -> testresult::TestResult {
+    let mut cache_context = crate::test_helpers::create_cache_context();
+    let analyzed = parse_statements(
+        "SELECT CASE WHEN $1 THEN $2::integer[] ELSE NULL::amount[] END",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()?
+    .analyze(test_helpers::context(), &mut cache_context)?;
+    assert!(analyzed.context().problems().is_empty());
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::bool()),
+        (2, PgBuiltInType::int4().array_type()),
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int4().array_type()),
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::bool()),
+        (2, PgBuiltInType::int4()),
+    ])));
+    let result: crate::sem::TypeReference = "public.amount[]".parse()?;
+    assert_eq!(
+        constraints.result_column(0).unwrap().single_type(),
+        Some(result.clone())
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let case = query
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .expression()
+        .unwrap()
+        .as_case()
+        .unwrap();
+    assert_eq!(
+        case.arms()[0].condition().get_type(),
+        Some(PgBuiltInType::bool())
+    );
+    assert_eq!(case.arms()[0].result().get_type(), Some(result.clone()));
+    assert_eq!(case.otherwise().unwrap().get_type(), Some(result));
     Ok(())
 }
 

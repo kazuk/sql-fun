@@ -337,3 +337,20 @@ and special-expression sources alongside ordinary function outputs, aliases,
 ambiguity, ordinality, NULL padding, composites, parameters and recovery.
 Rust retains source bindings, serialized semantics, legacy entry-point and
 parameter-domain assertions; see [the ROWS FROM inventory](inventory-rows-from.md).
+
+Issue #514 removes the obsolete CASE cast-candidate algorithm. PostgreSQL CASE
+always returns through `CaseExpr::resolve_postgres_or_untyped`, with known
+results selected eagerly by the shared ordered common-type resolver and
+parameter-dependent results retained in the common-type constraint graph.
+The remaining builder serves fully typed SQLite expressions only and performs
+no PostgreSQL cast selection. Direct unit tests of the removed algorithm were
+legacy scaffolding, not a reachable PostgreSQL analysis path.
+
+The existing `case-common-types` fixture now also covers bidirectional
+`varchar`/`bpchar` candidates in both ELSE orders, preferred `float8` selection
+against `numeric` in both orders, simple CASE with multiple arms, and explicitly
+bound parameter results. PostgreSQL 17.6/18.1 oracle probes agree on these result
+types. Existing cases retain incompatible-category diagnostics and
+unknown/domain/array/nested coverage. The shared manifest runs these contracts
+through source and installed verification; Rust retains coercion, comparison,
+parameter-domain and recovery assertions.

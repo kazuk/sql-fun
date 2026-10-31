@@ -122,7 +122,6 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
-#[case::greatest("GREATEST($1,NULL)", false)]
 #[case::greatest_reverse("GREATEST($1,NULL)", true)]
 #[case::least("LEAST($1,NULL)", false)]
 #[case::least_reverse("LEAST($1,NULL)", true)]

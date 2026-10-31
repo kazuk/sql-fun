@@ -1,0 +1,1281 @@
+[
+  {
+    "name": "union_widen",
+    "sql": "SELECT 1 AS x UNION SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_reverse",
+    "sql": "SELECT 1.5 AS x UNION SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_left_null",
+    "sql": "SELECT NULL AS x UNION SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_right_null",
+    "sql": "SELECT 1 AS x UNION SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_incompatible",
+    "sql": "SELECT 1 AS x UNION SELECT true",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_width",
+    "sql": "SELECT 1 AS x UNION SELECT 1,2",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_count"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_all_widen",
+    "sql": "SELECT 1 AS x UNION ALL SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_all_reverse",
+    "sql": "SELECT 1.5 AS x UNION ALL SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_all_left_null",
+    "sql": "SELECT NULL AS x UNION ALL SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_all_right_null",
+    "sql": "SELECT 1 AS x UNION ALL SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_all_incompatible",
+    "sql": "SELECT 1 AS x UNION ALL SELECT true",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "union_all_width",
+    "sql": "SELECT 1 AS x UNION ALL SELECT 1,2",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_count"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_widen",
+    "sql": "SELECT 1 AS x INTERSECT SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_reverse",
+    "sql": "SELECT 1.5 AS x INTERSECT SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_left_null",
+    "sql": "SELECT NULL AS x INTERSECT SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_right_null",
+    "sql": "SELECT 1 AS x INTERSECT SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_incompatible",
+    "sql": "SELECT 1 AS x INTERSECT SELECT true",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_width",
+    "sql": "SELECT 1 AS x INTERSECT SELECT 1,2",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_count"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_all_widen",
+    "sql": "SELECT 1 AS x INTERSECT ALL SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_all_reverse",
+    "sql": "SELECT 1.5 AS x INTERSECT ALL SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_all_left_null",
+    "sql": "SELECT NULL AS x INTERSECT ALL SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_all_right_null",
+    "sql": "SELECT 1 AS x INTERSECT ALL SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_all_incompatible",
+    "sql": "SELECT 1 AS x INTERSECT ALL SELECT true",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "intersect_all_width",
+    "sql": "SELECT 1 AS x INTERSECT ALL SELECT 1,2",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_count"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_widen",
+    "sql": "SELECT 1 AS x EXCEPT SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_reverse",
+    "sql": "SELECT 1.5 AS x EXCEPT SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_left_null",
+    "sql": "SELECT NULL AS x EXCEPT SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_right_null",
+    "sql": "SELECT 1 AS x EXCEPT SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_incompatible",
+    "sql": "SELECT 1 AS x EXCEPT SELECT true",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_width",
+    "sql": "SELECT 1 AS x EXCEPT SELECT 1,2",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_count"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_all_widen",
+    "sql": "SELECT 1 AS x EXCEPT ALL SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_all_reverse",
+    "sql": "SELECT 1.5 AS x EXCEPT ALL SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_all_left_null",
+    "sql": "SELECT NULL AS x EXCEPT ALL SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_all_right_null",
+    "sql": "SELECT 1 AS x EXCEPT ALL SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_all_incompatible",
+    "sql": "SELECT 1 AS x EXCEPT ALL SELECT true",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "except_all_width",
+    "sql": "SELECT 1 AS x EXCEPT ALL SELECT 1,2",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_count"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "left_names",
+    "sql": "SELECT 1 AS chosen, 2 AS second UNION SELECT 1.5 AS ignored, 3::bigint",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "chosen",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        },
+        {
+          "name": "second",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown_strings",
+    "sql": "SELECT 'a' AS x UNION SELECT 'b'",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown_string_integer",
+    "sql": "SELECT '1' AS x UNION SELECT 2",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "all_null",
+    "sql": "SELECT NULL AS x UNION SELECT NULL",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_pairwise_failure",
+    "sql": "SELECT NULL AS x UNION SELECT NULL UNION SELECT 1",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_pairwise_success",
+    "sql": "SELECT 1 AS x UNION SELECT NULL UNION SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "derived",
+    "sql": "SELECT x FROM (SELECT 1 AS x UNION SELECT 1.5) q",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "cte",
+    "sql": "WITH q AS (SELECT 1 AS x UNION SELECT 1.5) SELECT x FROM q",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "cte_alias",
+    "sql": "WITH q(renamed) AS (SELECT 1 AS x UNION SELECT 1.5) SELECT renamed FROM q",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "renamed",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_preserved",
+    "sql": "SELECT NULL::set_amount AS x UNION SELECT NULL::set_amount",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "public",
+            "local_name": "set_amount",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_reduced",
+    "sql": "SELECT NULL::set_amount AS x UNION SELECT 1",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "arrays",
+    "sql": "SELECT ARRAY[1] AS x UNION SELECT ARRAY[2::bigint]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_preserves_other_column",
+    "sql": "SELECT 1 AS x, 1 AS valid UNION SELECT true, 1.5",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        },
+        {
+          "name": "valid",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "order_consumer",
+    "sql": "SELECT 1 AS x UNION SELECT 1.5 ORDER BY x",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "explicit_input",
+    "sql": "SELECT $1::integer AS x UNION SELECT 1.5",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "explicit_right_input",
+    "sql": "SELECT 1.5 AS x UNION SELECT $1::integer",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert_union_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT true UNION SELECT false",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_union_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT true,1 UNION SELECT false,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_intersect_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT true INTERSECT SELECT false",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_intersect_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT true,1 INTERSECT SELECT false,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_except_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT true EXCEPT SELECT false",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_except_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT true,1 EXCEPT SELECT false,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_common_output_assignment_cast",
+    "sql": "INSERT INTO set_items(id) SELECT 1 UNION ALL SELECT 1.5",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_common_output_assignment_cast",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT 1,2 UNION ALL SELECT 1.5,3)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert_resolved_unknown_assignment_type",
+    "sql": "INSERT INTO set_items(id) SELECT NULL UNION SELECT NULL",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update_resolved_unknown_assignment_type",
+    "sql": "UPDATE set_items SET (id,n) = (SELECT NULL,1 UNION SELECT NULL,2)",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "hints_integer_numeric",
+    "sql": "SELECT ${a:integer} AS x UNION SELECT ${b:numeric}",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "hints_numeric_integer",
+    "sql": "SELECT ${a:numeric} AS x UNION SELECT ${b:integer}",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "hint_right_only",
+    "sql": "SELECT ${a} AS x UNION SELECT ${b:integer}",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "hint_left_only",
+    "sql": "SELECT ${a:integer} AS x UNION SELECT ${b}",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_right_parameter_left",
+    "sql": "SELECT ${id} AS id UNION SELECT x.id FROM set_items AS x",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "column_left_parameter_right",
+    "sql": "SELECT x.id FROM set_items AS x UNION SELECT ${id}",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_union_except",
+    "sql": "(SELECT 1::integer AS x UNION SELECT 2::bigint) EXCEPT SELECT 3::numeric",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_union_except_reverse_outer",
+    "sql": "SELECT 3::numeric AS x EXCEPT (SELECT 1::integer UNION SELECT 2::bigint)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_union_except_reverse_inner",
+    "sql": "(SELECT 2::bigint AS x UNION SELECT 1::integer) EXCEPT SELECT 3::numeric",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_unions_intersect",
+    "sql": "(SELECT 1::integer AS x UNION SELECT 2::bigint) INTERSECT (SELECT 3::numeric UNION SELECT 4::integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_unions_intersect_reverse_outer",
+    "sql": "(SELECT 3::numeric AS x UNION SELECT 4::integer) INTERSECT (SELECT 1::integer UNION SELECT 2::bigint)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_valid_unions_incompatible_outer",
+    "sql": "(SELECT 1::integer AS x UNION SELECT 2::numeric) EXCEPT (SELECT true UNION SELECT false)",
+    "expected": {
+      "diagnostics": [
+        "query_set_column_type"
+      ],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_hint_union_except",
+    "sql": "(SELECT ${a:integer} AS x UNION SELECT 2::bigint) EXCEPT SELECT 3::numeric",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_hint_unions_intersect",
+    "sql": "(SELECT ${a:integer} AS x UNION SELECT 2::bigint) INTERSECT (SELECT 3::numeric UNION SELECT 4::integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  }
+]

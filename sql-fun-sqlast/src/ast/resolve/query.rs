@@ -194,12 +194,18 @@ impl QueryBody {
 }
 
 impl SetOperation {
-    fn resolve(&self, left: SelectStatement, right: SelectStatement) -> SelectStatement {
-        match self {
-            Self::Union => SelectStatement::union(left, right),
-            Self::Intersect => SelectStatement::intersect(left, right),
-            Self::Except => SelectStatement::except(left, right),
-        }
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        left: SelectStatement,
+        right: SelectStatement,
+    ) -> Result<SelectStatement, AnalysisError> {
+        let kind = match self {
+            Self::Union => crate::sem::SetOperationKind::union(),
+            Self::Intersect => crate::sem::SetOperationKind::intersect(),
+            Self::Except => crate::sem::SetOperationKind::except(),
+        };
+        SelectStatement::set_operation(context, kind, left, right)
     }
 }
 
@@ -1129,7 +1135,7 @@ impl SetQuery {
         let scope = ScalarAnalysisContext::nested(with, &from, outer);
         let left = self.left.resolve_in(context, Some(&scope))?;
         let right = self.right.resolve_in(context, Some(&scope))?;
-        Ok(self.operation.resolve(left, right))
+        self.operation.resolve(context, left, right)
     }
 }
 

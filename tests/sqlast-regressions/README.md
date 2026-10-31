@@ -363,3 +363,11 @@ operator/helper bindings, serialized operands and correlated parameter domains;
 SQLite feature-enabled tests check builtin LIKE semantics and operand retention.
 SQLite GLOB/MATCH/REGEXP classification remains distinct and unsupported semantic
 paths retain intentional TODOs owned by #907, #908 and #909 respectively.
+
+Issue #515 set-operation outputs are covered by `set-operations.json` on
+PostgreSQL 17/18 through both maintained paths. UNION/INTERSECT/EXCEPT and ALL
+cases check common types, left-side names, nullability, shape/type diagnostics,
+nested/derived/CTE consumers, domains, arrays, explicit parameter inputs and
+INSERT/UPDATE assignments from parameter-free set results.
+Rust retains coercion, serialization, parameter-domain, catalog-application and
+SQLite contracts; see [the set-operation inventory](inventory-set-operations.md).

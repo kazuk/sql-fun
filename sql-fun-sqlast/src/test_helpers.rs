@@ -19,6 +19,7 @@ pub(crate) mod parameter_calls;
 pub(crate) mod pattern;
 pub(crate) mod rows_from;
 pub(crate) mod sampling;
+pub(crate) mod set_operations;
 mod syn_builder;
 mod test_parse_context;
 

@@ -74,6 +74,8 @@ pub(crate) trait SemanticVisitor {
     fn enter_dml(&mut self) {}
     fn leave_dml(&mut self) {}
     fn enter_query(&mut self) {}
+    fn enter_set_operand(&mut self) {}
+    fn leave_set_operand(&mut self) {}
     fn leave_query(&mut self) {}
     fn cte(&mut self, _name: &str) {}
     fn relation(&mut self, _name: Option<&str>, _alias: &str, _columns: &[String]) {}
@@ -129,7 +131,12 @@ pub(crate) trait SemanticVisitor {
         _reference: Option<&crate::sem::QueryName>,
     ) {
     }
-    fn retain_set_outputs(&mut self) {}
+    fn set_operation(
+        &mut self,
+        _query: &mut crate::sem::SetOperationQuery,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
 }
 
 pub(crate) fn optional<V: SemanticVisitor>(

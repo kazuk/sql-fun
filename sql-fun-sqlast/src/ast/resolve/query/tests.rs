@@ -204,11 +204,11 @@ fn compound_boundary_owns_its_trailing_clauses() {
     assert_eq!(boundary.order().len(), 1);
     assert!(boundary.limit().is_some());
     assert!(boundary.offset().is_some());
-    let crate::sem::SelectStatement::Union(left, right) = boundary.body() else {
+    let crate::sem::SelectStatement::Set(set) = boundary.body() else {
         panic!("compound body");
     };
-    assert!(left.query_clauses().unwrap().order().is_empty());
-    assert!(right.query_clauses().unwrap().order().is_empty());
+    assert!(set.left().query_clauses().unwrap().order().is_empty());
+    assert!(set.right().query_clauses().unwrap().order().is_empty());
 }
 
 #[test]

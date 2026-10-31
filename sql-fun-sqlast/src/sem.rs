@@ -207,7 +207,9 @@ pub use self::{
         SemScalarExpr, SqlValueExpr, SqliteLikeExpr, SubLinkExpr, SubQueryColumnRef,
         SystemColumnRef, TableColumnRef, TruthTestExpr, TypeCastExpr, WholeRowExpr,
     },
-    select_statement::{ResultColumnCollection, SelectStatement},
+    select_statement::{
+        ResultColumnCollection, SelectStatement, SetOperationKind, SetOperationQuery,
+    },
     type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult},
     update_statement::{
         UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,

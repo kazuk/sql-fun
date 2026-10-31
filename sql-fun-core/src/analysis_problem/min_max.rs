@@ -1,7 +1,7 @@
 use super::{DiagnosticMetadata, TypeReference};
 
 /// A `PostgreSQL` GREATEST/LEAST type-resolution failure.
-#[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum MinMaxProblem {
     /// No operand was supplied.
@@ -63,21 +63,24 @@ impl MinMaxProblem {
 
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
-        let message = match self {
-            Self::Empty => "GREATEST/LEAST requires at least one argument".to_owned(),
+        DiagnosticMetadata::from(self.message_for("GREATEST/LEAST"))
+    }
+
+    pub(super) fn message_for(&self, operation: &str) -> String {
+        match self {
+            Self::Empty => format!("{operation} requires at least one argument"),
             Self::Incompatible(left, right) => {
-                format!("GREATEST/LEAST cannot match {left} and {right}")
+                format!("{operation} cannot match {left} and {right}")
             }
             Self::MissingTypeFacts(ty) => {
-                format!("GREATEST/LEAST requires type-category metadata for {ty}")
+                format!("{operation} requires type-category metadata for {ty}")
             }
             Self::MissingComparisonFacts(ty) => {
-                format!("GREATEST/LEAST requires comparison metadata for {ty}")
+                format!("{operation} requires comparison metadata for {ty}")
             }
             Self::NotOrdered(ty) => {
-                format!("GREATEST/LEAST cannot identify a comparison function for {ty}")
+                format!("{operation} cannot identify a comparison function for {ty}")
             }
-        };
-        DiagnosticMetadata::from(message)
+        }
     }
 }

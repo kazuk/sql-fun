@@ -81,6 +81,9 @@ impl ViewInfoWrite for SchemaFileContext {
         mut self,
         create_table_as: &CreateTableAs,
     ) -> Result<Self, AnalysisError> {
+        if !create_table_as.set_operations_valid()? {
+            return Ok(self);
+        }
         let name = self.apply_default_schema(create_table_as.name())?;
         match create_table_as.obj_type() {
             ObjectType::ObjectMatview => {
@@ -104,6 +107,9 @@ impl ViewInfoWrite for SchemaFileContext {
 
     #[tracing::instrument(skip(self))]
     fn apply_create_view(mut self, create_view: &CreateView) -> Result<Self, AnalysisError> {
+        if !create_view.query().set_operations_valid()? {
+            return Ok(self);
+        }
         let name = self.creation_name(create_view.name(), create_view.temporary())?;
         let kind = if create_view.is_materialized() {
             crate::sem::Kind::materialized_view()
@@ -146,5 +152,56 @@ impl ViewInfoWrite for SchemaFileContext {
         }
         self.catalog.store_view(&name, &definition)?;
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_set_operation_catalog {
+    use crate::{
+        ast::Dialect,
+        context::ViewInfoRead,
+        sem::{FullName, PgBuiltInType},
+        test_helpers::{ownership::apply_ownership_sql, set_operations},
+    };
+
+    #[test]
+    fn rejected_set_queries_preserve_catalog_and_allow_following_statements()
+    -> testresult::TestResult {
+        let context = set_operations::context(Dialect::postgres());
+        let initial = apply_ownership_sql(context, "CREATE VIEW kept AS SELECT 1::bigint AS x")?;
+        let rejected = apply_ownership_sql(
+            initial.into_context(),
+            "CREATE OR REPLACE VIEW kept AS SELECT 1 AS x UNION SELECT 'x'::text",
+        )?;
+        let name = FullName::with_schema("public", "kept");
+        let kept = rejected.context().get_view_impl(&name).unwrap();
+        assert_eq!(
+            kept.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int8())
+        );
+        let rejected = apply_ownership_sql(
+            rejected.into_context(),
+            "CREATE MATERIALIZED VIEW absent AS SELECT 1 UNION SELECT 1,2",
+        )?;
+        assert!(
+            rejected
+                .context()
+                .get_view_impl(&FullName::with_schema("public", "absent"))
+                .is_none()
+        );
+        let recovered = apply_ownership_sql(
+            rejected.into_context(),
+            "CREATE VIEW next AS SELECT 1 AS x UNION SELECT 2::bigint",
+        )?;
+        let next = recovered
+            .context()
+            .get_view_impl(&FullName::with_schema("public", "next"))
+            .unwrap();
+        assert_eq!(
+            next.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int8())
+        );
+        assert_eq!(recovered.context().problems().len(), 2);
+        Ok(())
     }
 }

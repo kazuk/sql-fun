@@ -5,7 +5,7 @@ use crate::{
     sem::{AnalysisError, CreateFunction, FullName, FunctionOverloadCollection},
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FunctionDefinitionCollection(TrieMap<Vec<CreateFunction>>, Vec<FullName>);
 
 impl FunctionDefinitionCollection {

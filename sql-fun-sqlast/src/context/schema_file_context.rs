@@ -61,7 +61,7 @@ pub struct SchemaFileContext {
     parameter_type_hints: crate::context::ParameterTypeHints,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct SchemaCatalog {
     replaced_routines: std::collections::HashSet<FullName>,
     renamed_relations: std::collections::HashSet<FullName>,
@@ -890,6 +890,10 @@ impl ParseContext for SchemaFileContext {
 
     fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
         self.parameter_constraints = constraints.clone();
+    }
+
+    fn retain_catalog(&self) -> FrozenBaseContext {
+        FrozenBaseContext::new(self.catalog.clone())
     }
 
     fn freeze(self) -> FrozenBaseContext {

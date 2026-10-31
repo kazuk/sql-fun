@@ -120,11 +120,17 @@ impl MinMaxExpr {
         if ty.is_dynamic() {
             return Ok((category.code(), false));
         }
-        let preferred = context.cast_sources(ty, false).into_iter().any(|source| {
-            context
-                .get_implicit_cast(&source, ty)
-                .is_some_and(|cast| cast.is_implicit_preferred())
-        });
+        // Preference originates in a declared conversion. Domain-source
+        // reductions preserve that declaration's target preference; discovering
+        // every nominal domain cannot add a preferred target.
+        let preferred = context
+            .declared_implicit_cast_sources(ty)
+            .into_iter()
+            .any(|source| {
+                context
+                    .get_implicit_cast(&source, ty)
+                    .is_some_and(|cast| cast.is_implicit_preferred())
+            });
         Ok((category.code(), preferred))
     }
 

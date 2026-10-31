@@ -5,7 +5,7 @@ use crate::{
     sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, FullName},
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SequenceInfoCollection(TrieMap<CreateSequence>);
 
 impl SequenceInfoCollection {

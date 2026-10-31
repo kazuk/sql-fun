@@ -3,7 +3,7 @@
 use crate::sem::{FullName, ObjectKind, OwnedObjectDefinition, Role};
 
 /// Roles derived from the current analysis metadata, independent of frozen configuration.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ConfiguredRoles(std::collections::HashMap<String, Role>);
 impl From<&::sql_fun_core::SqlFunMetadata> for ConfiguredRoles {
     fn from(metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
@@ -23,7 +23,7 @@ impl ConfiguredRoles {
 }
 
 /// Layer-local inventory for object classes without richer DDL representations.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct OwnershipCatalog {
     roles: std::collections::HashMap<String, Role>,
     definitions: Vec<OwnedObjectDefinition>,

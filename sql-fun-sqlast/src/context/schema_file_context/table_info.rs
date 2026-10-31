@@ -8,7 +8,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct TableDefinitionCollection(TrieMap<CreateTable>, Vec<FullName>);
 
 impl TableDefinitionCollection {

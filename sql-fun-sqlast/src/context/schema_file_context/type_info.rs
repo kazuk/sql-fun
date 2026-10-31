@@ -89,7 +89,7 @@ impl TypeInfoWrite for SchemaFileContext {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(super) struct TypeDefinitionCollection(TrieMap<TypeDefinition>);
 
 impl TypeDefinitionCollection {

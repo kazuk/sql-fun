@@ -255,7 +255,29 @@ fn unanchored_result_parameters_preserve_assignments(
         analyzed.context().problems()
     );
     let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.result_column(0).unwrap().is_any());
+    assert!(
+        !constraints.result_column(0).unwrap().is_any(),
+        "{:?}",
+        constraints.result_column(0)
+    );
+    let defaults = [
+        "bool", "int4", "int8", "float4", "float8", "text", "numeric",
+    ]
+    .map(TypeReference::from_master_type_name)
+    .into_iter()
+    .collect::<std::collections::HashSet<_>>();
+    for position in 1..=2 {
+        if let Some(parameter) = constraints.parameter(position) {
+            let candidates = parameter
+                .constraint()
+                .admissible_types()
+                .unwrap()
+                .iter()
+                .cloned()
+                .collect::<std::collections::HashSet<_>>();
+            assert_eq!(candidates, defaults, "parameter {position}");
+        }
+    }
     let mut assignments = BTreeMap::from([(1, PgBuiltInType::int4())]);
     if expression.contains("$2") {
         assignments.insert(2, PgBuiltInType::int8());

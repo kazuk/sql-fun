@@ -28,6 +28,23 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    // Shared declaration result, without binding or selecting an overload.
+    pub(crate) fn common_scalar_result(&self) -> Option<crate::sem::TypeReference> {
+        let result = self.overloads.first()?.scaler_ret_type()?;
+        if result.is_simple_infer_arg() || result.is_common_infer_arg() {
+            return None;
+        }
+        if self
+            .overloads
+            .iter()
+            .all(|overload| overload.scaler_ret_type().as_ref() == Some(&result))
+        {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn returns_set(
         &self,
         context: &impl BaseParseContext,

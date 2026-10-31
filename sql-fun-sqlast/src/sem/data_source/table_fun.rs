@@ -108,7 +108,7 @@ impl TableFunctionDataSource {
         context: &mut impl ParseContext,
         output: &TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
-        self.output = output.clone();
+        self.output.replace_definition(output);
         self.output.apply(context, &self.function, &self.alias)
     }
     pub(super) fn column_names(&self) -> Vec<ColumnName> {
@@ -232,5 +232,45 @@ impl TableFunctionDataSource {
 impl TableFunctionDataSource {
     pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         self.function.table_output_depends_on_table(context)
+    }
+}
+
+impl DataSource {
+    pub(crate) fn validate_table_function(
+        &mut self,
+        context: &mut impl ParseContext,
+        invalid_arguments: bool,
+    ) -> Result<(), AnalysisError> {
+        let invalid = match self {
+            Self::CallTableFunc(source) => source.invalid_from(context),
+            Self::DeferredTableFunc(source) => source.call().invalid_from(context, true),
+            _ => false,
+        };
+        if invalid {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::table_function(
+                TableFunctionProblem::invalid_expression(),
+            ))?;
+        }
+        if invalid || invalid_arguments {
+            match self {
+                Self::CallTableFunc(source) => source.output.retain_invalid_expression(),
+                Self::DeferredTableFunc(source) => source.retain_invalid_expression(),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TableFunctionDataSource {
+    fn invalid_from(&self, context: &impl ParseContext) -> bool {
+        if let Some(requested) = self.function_name()
+            && let Some(name) = requested.resolution().function_identity()
+        {
+            !context.function_returns_set(name, self.function())
+                && !context.function_preserves_view_rows(name, self.function())
+        } else {
+            false
+        }
     }
 }

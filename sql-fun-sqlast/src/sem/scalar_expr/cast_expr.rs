@@ -57,6 +57,24 @@ pub struct TypeCastExpr {
 }
 
 impl TypeCastExpr {
+    // Keep the possible top-level call depth and whether identity is still pending.
+    pub(super) fn table_root_depth(&self) -> (usize, bool) {
+        let (depth, pending) = self.arg.table_root_depth();
+        if depth == 0 {
+            return (0, false);
+        }
+        let Some(source) = self.arg.placement_result_type() else {
+            return (depth + 1, true);
+        };
+        if source == self.target_type {
+            (depth + 1, pending)
+        } else {
+            (0, false)
+        }
+    }
+}
+
+impl TypeCastExpr {
     pub(crate) fn rename_relation(
         &mut self,
         old: &crate::sem::TableName,

@@ -256,6 +256,7 @@ impl DiagnosticMessage for QueryProblem {
 impl DiagnosticMessage for TableFunctionProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::InvalidExpression => "aggregate, window or nested set-returning expression is not allowed in a FROM function".to_owned(),
             Self::InvalidTypmod(message) => format!("invalid table-function column type modifier: {message}"),
             Self::InvalidPlacement => "outer column definitions require one function, no per-function definitions, and no WITH ORDINALITY".to_owned(),
             Self::DefinitionRequired => "a column definition list is required for functions returning record".to_owned(),

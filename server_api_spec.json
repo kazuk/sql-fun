@@ -2912,8 +2912,13 @@
               ]
             },
             "TableFunctionProblem": {
-              "description": "Invalid caller-supplied table-function output definitions.",
+              "description": "Invalid table-function invocations or caller-supplied output definitions.",
               "oneOf": [
+                {
+                  "description": "Aggregate/window or nested set-returning expression in a FROM element.",
+                  "type": "string",
+                  "const": "InvalidExpression"
+                },
                 {
                   "description": "A record result needs a caller-supplied shape.",
                   "type": "string",
@@ -6924,8 +6929,13 @@
               ]
             },
             "TableFunctionProblem": {
-              "description": "Invalid caller-supplied table-function output definitions.",
+              "description": "Invalid table-function invocations or caller-supplied output definitions.",
               "oneOf": [
+                {
+                  "description": "Aggregate/window or nested set-returning expression in a FROM element.",
+                  "type": "string",
+                  "const": "InvalidExpression"
+                },
                 {
                   "description": "A record result needs a caller-supplied shape.",
                   "type": "string",

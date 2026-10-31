@@ -174,6 +174,9 @@ impl ColumnReferenceExpr {
 impl SemScalarExpr {
     pub(crate) fn with_function_source_nullability(self, nullable: bool) -> Self {
         match self {
+            Self::SourceColumn(value) => {
+                Self::SourceColumn(Box::new(value.with_nullability(nullable)))
+            }
             Self::ColumnRef(reference) => {
                 Self::column_reference(reference.with_function_source_nullability(nullable))
             }

@@ -11,6 +11,9 @@ pub struct DeferredTableFunction {
     output: super::TableFunctionOutput,
 }
 impl DeferredTableFunction {
+    pub(super) fn retain_invalid_expression(&mut self) {
+        self.output.retain_invalid_expression();
+    }
     pub(super) fn new(call: &FuncCallExpr, alias: &AliasSpec) -> Self {
         Self {
             call: call.clone(),
@@ -66,7 +69,7 @@ impl DeferredTableFunction {
         context: &mut impl ParseContext,
         output: &super::TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
-        self.output = output.clone();
+        self.output.replace_definition(output);
         if let Some(overload) = self.call.overload() {
             self.output.apply(context, overload, &self.alias)?;
         } else if let Some(candidates) = self.call.candidates()

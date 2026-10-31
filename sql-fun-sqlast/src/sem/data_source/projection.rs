@@ -637,6 +637,28 @@ impl<'a> ProjectionColumns<'a> {
         self
     }
 
+    pub(super) fn append_expression(
+        &mut self,
+        value: &SemScalarExpr,
+        name: &str,
+        context: &impl ParseContext,
+    ) {
+        let alias = AliasName::from(name);
+        if let Some(fields) = value.composite_columns(context) {
+            for (name, member) in fields.project_expression(value) {
+                self.0.push(ProjectionColumn::expression(
+                    &name,
+                    &SemScalarExpr::source_column(&member, &alias, &name),
+                ));
+            }
+        } else {
+            let name = ColumnName::from(name);
+            self.0.push(ProjectionColumn::expression(
+                &name,
+                &SemScalarExpr::source_column(value, &alias, &name),
+            ));
+        }
+    }
     pub(super) fn append_source(
         &mut self,
         source: &'a DataSource,

@@ -10,10 +10,9 @@ use self::clauses::ClauseBinding;
 
 use crate::{
     ast::{
-        Alias, Call, CallKind, CteBody, Delete, DerivedTable, Dialect, Expr, FromGroup, FromItem,
-        Grouping, Insert, Into, Join, JoinKind, Lock, Merge, Name, Order, Query, QueryBody,
-        Relation, Select, SetOperation, SetQuery, TableFunctions, Target, TypedColumn, Update,
-        Window, With,
+        Alias, Call, CteBody, Delete, DerivedTable, Dialect, Expr, FromGroup, FromItem, Grouping,
+        Insert, Into, Join, JoinKind, Lock, Merge, Name, Order, Query, QueryBody, Relation, Select,
+        SetOperation, SetQuery, TableFunctions, Target, TypedColumn, Update, Window, With,
     },
     context::ParseContext,
     sem::{
@@ -737,6 +736,15 @@ impl TypedColumns<'_> {
     }
 }
 
+impl Alias {
+    fn without_column_aliases(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            columns: Vec::new(),
+        }
+    }
+}
+
 impl TableFunctions {
     fn resolve(
         &self,
@@ -744,43 +752,7 @@ impl TableFunctions {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         if self.rows_from {
-            let mut outer_output =
-                TypedColumns::from(self.columns.as_slice()).resolve_function_output(context)?;
-            let outer_allowed =
-                self.calls.len() == 1 && !self.ordinality && self.calls[0].columns.is_empty();
-            if !self.columns.is_empty() && !outer_allowed {
-                outer_output.reject_placement(context)?;
-            }
-            let mut functions = Vec::new();
-            for function in &self.calls {
-                let local_output = TypedColumns::from(function.columns.as_slice())
-                    .resolve_function_output(context)?;
-                let output = if outer_allowed && !self.columns.is_empty() {
-                    &outer_output
-                } else {
-                    &local_output
-                };
-                let mut source = function
-                    .expression
-                    .resolve_table_call(context, scope, None)?;
-                source.apply_function_output(context, output)?;
-                functions.push(DataSourceRowsFromFunc::invocation(&source));
-            }
-            let alias = self.alias.as_ref().map(Alias::resolve).unwrap_or_else(|| {
-                AliasSpec::from_local_name(
-                    &functions
-                        .first()
-                        .map(|function| function.default_alias())
-                        .unwrap_or_default(),
-                )
-            });
-            let mut source = DataSource::resolved_rows(&functions, &alias);
-            source.retain_rows_definition(&outer_output);
-            if self.ordinality {
-                source.append_function_ordinality();
-            }
-            source.validate_function_aliases(context)?;
-            return Ok(source);
+            return self.resolve_rows_from(context, scope);
         }
         let [function] = self.calls.as_slice() else {
             return AnalysisError::raise_unexpected_input("table function count");
@@ -801,6 +773,55 @@ impl TableFunctions {
         source.validate_function_aliases(context)?;
         Ok(source)
     }
+    fn resolve_rows_from(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<DataSource, AnalysisError> {
+        let mut outer_output =
+            TypedColumns::from(self.columns.as_slice()).resolve_function_output(context)?;
+        let outer_allowed =
+            self.calls.len() == 1 && !self.ordinality && self.calls[0].columns.is_empty();
+        if !self.columns.is_empty() && !outer_allowed {
+            outer_output.reject_placement(context)?;
+        }
+        let invocation_alias = if self.calls.len() == 1 {
+            self.alias.as_ref().map(Alias::without_column_aliases)
+        } else {
+            None
+        };
+        let mut functions = Vec::new();
+        for function in &self.calls {
+            let local_output =
+                TypedColumns::from(function.columns.as_slice()).resolve_function_output(context)?;
+            let output = if outer_allowed && !self.columns.is_empty() {
+                &outer_output
+            } else {
+                &local_output
+            };
+            let mut function =
+                function
+                    .expression
+                    .resolve_rows_call(context, scope, invocation_alias.as_ref())?;
+            function.apply_output(context, output)?;
+            functions.push(function);
+        }
+        let alias = self.alias.as_ref().map(Alias::resolve).unwrap_or_else(|| {
+            AliasSpec::from_local_name(
+                &functions
+                    .first()
+                    .map(|function| function.default_alias())
+                    .unwrap_or_default(),
+            )
+        });
+        let mut source = DataSource::resolved_rows(&functions, &alias);
+        source.retain_rows_definition(&outer_output);
+        if self.ordinality {
+            source.append_function_ordinality();
+        }
+        source.validate_function_aliases(context)?;
+        Ok(source)
+    }
 }
 
 impl Expr {
@@ -810,29 +831,73 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSourceRowsFromFunc, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_rows_call(context, scope);
+        let result = self
+            .resolve_rows_call(context, scope, None)
+            .and_then(|mut source| {
+                source.apply_output(context, &TableFunctionOutput::default())?;
+                Ok(source)
+            });
         context.finish_analysis(result)
     }
     fn resolve_rows_call(
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
+        alias: Option<&Alias>,
     ) -> Result<DataSourceRowsFromFunc, AnalysisError> {
+        if let Self::Call(call) = self
+            && call.kind.is_ordinary()
+        {
+            return Ok(DataSourceRowsFromFunc::invocation(
+                &call.resolve_table(context, scope, alias)?,
+            ));
+        }
+        let value = self.resolve_from_expression(context, scope)?;
+        let name = if let Some(alias) = alias {
+            alias.name.clone()
+        } else {
+            self.table_output_name(&value)?
+        };
+        DataSourceRowsFromFunc::expression(&value, &name, context)
+    }
+    fn resolve_from_expression(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
-            Self::Call(call) => {
-                call.kind.require_table_function()?;
-                let arguments = Self::resolve_list(&call.arguments, context, scope)?;
-                if call.defers_function_signature() {
-                    let mut function = call.resolve_supplied_call(context, &arguments)?;
-                    function.set_modifiers(call.resolve_modifiers(context, scope)?);
-                    return Ok(DataSourceRowsFromFunc::deferred(&function));
-                }
-                DataSourceRowsFromFunc::resolve(context, &call.name.full_name()?, &arguments)
+            Self::Call(_) | Self::SqlValue(_) | Self::Cast(_) => self.resolve_in(context, scope),
+            Self::Operator(operator) if operator.kind.is_null_if() => {
+                self.resolve_in(context, scope)
             }
-            Self::SqlValue(_) => todo!("ROWS FROM expression analysis"),
             _ => AnalysisError::raise_unexpected_input("ROWS FROM expression"),
         }
     }
+    fn table_output_name(&self, value: &SemScalarExpr) -> Result<String, AnalysisError> {
+        match self {
+            Self::Call(call) => call.table_output_name(),
+            Self::SqlValue(value) => Ok(value.table_output_name()),
+            Self::Column(name) => name.table_output_name(),
+            Self::Operator(operator) if operator.kind.is_null_if() => {
+                Ok(operator.table_output_name())
+            }
+            Self::Cast(cast) => cast.table_output_name(value),
+            _ => Ok(value.table_output_name()),
+        }
+    }
+    fn resolve_expression_table(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        alias: Option<&Alias>,
+    ) -> Result<DataSource, AnalysisError> {
+        let function = self.resolve_rows_call(context, scope, alias)?;
+        let alias = alias
+            .map(Alias::resolve)
+            .unwrap_or_else(|| AliasSpec::from_local_name(&function.default_alias()));
+        Ok(DataSource::resolved_rows(&[function], &alias))
+    }
+
     pub(in crate::ast) fn resolve_table_call(
         &self,
         context: &mut impl ParseContext,
@@ -840,8 +905,10 @@ impl Expr {
         alias: Option<&Alias>,
     ) -> Result<DataSource, AnalysisError> {
         match self {
-            Self::Call(call) => call.resolve_table(context, scope, alias),
-            _ => AnalysisError::raise_unexpected_none("table expression is not FuncCall"),
+            Self::Call(call) if call.kind.is_ordinary() => {
+                call.resolve_table(context, scope, alias)
+            }
+            _ => self.resolve_expression_table(context, scope, alias),
         }
     }
 }
@@ -856,8 +923,11 @@ impl Call {
         if context.dialect() == Dialect::sqlite() {
             todo!("SQLite table function affinity and overload semantics");
         }
-        self.kind.require_table_function()?;
-        let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
+        let mut arguments = Expr::resolve_list(&self.arguments, context, scope)?;
+        let mut invalid_arguments = false;
+        for argument in &mut arguments {
+            invalid_arguments |= DataSourceRowsFromFunc::validate_argument(context, argument)?;
+        }
         let name = self.name.full_name()?;
         let alias = alias
             .map(Alias::resolve)
@@ -865,21 +935,19 @@ impl Call {
         if self.defers_function_signature() {
             let mut call = self.resolve_supplied_call(context, &arguments)?;
             call.set_modifiers(self.resolve_modifiers(context, scope)?);
-            return Ok(DataSource::deferred_table_function(&call, &alias));
+            let mut source = DataSource::deferred_table_function(&call, &alias);
+            source.validate_table_function(context, invalid_arguments)?;
+            return Ok(source);
         }
-        DataSource::resolve_function(context, &name, &arguments, &alias)
+        let mut source = DataSource::resolve_function(context, &name, &arguments, &alias)?;
+        source.validate_table_function(context, invalid_arguments)?;
+        Ok(source)
     }
 }
 
-impl CallKind {
-    fn require_table_function(&self) -> Result<(), AnalysisError> {
-        match self {
-            Self::Ordinary => Ok(()),
-            // The old FROM boundary accepted FuncCall, not special scalar forms.
-            Self::Coalesce | Self::MinMax => {
-                AnalysisError::raise_unexpected_input("table expression is not FuncCall")
-            }
-        }
+impl crate::ast::OperatorKind {
+    const fn is_null_if(self) -> bool {
+        matches!(self, Self::NullIf)
     }
 }
 
@@ -1162,5 +1230,43 @@ impl crate::ast::TableSample {
             &repeatable,
         )?;
         Ok(DataSource::sampled(&sample))
+    }
+}
+
+impl crate::ast::Cast {
+    fn table_output_name(&self, value: &SemScalarExpr) -> Result<String, AnalysisError> {
+        let name = self
+            .argument
+            .table_output_name(value.explicit_cast_operand().unwrap_or(value))?;
+        if name.is_empty() {
+            Ok(self.target.reference()?.full_name().local_name())
+        } else {
+            Ok(name)
+        }
+    }
+}
+impl Call {
+    fn table_output_name(&self) -> Result<String, AnalysisError> {
+        self.name.table_output_name()
+    }
+}
+impl Name {
+    fn table_output_name(&self) -> Result<String, AnalysisError> {
+        Ok(self.full_name()?.local_name())
+    }
+}
+impl crate::ast::SqlValue {
+    fn table_output_name(&self) -> String {
+        self.name.clone()
+    }
+}
+impl crate::ast::OperatorExpr {
+    fn table_output_name(&self) -> String {
+        "nullif".to_owned()
+    }
+}
+impl SemScalarExpr {
+    fn table_output_name(&self) -> String {
+        self.get_column_name()
     }
 }

@@ -1,9 +1,11 @@
 use super::DiagnosticMetadata;
 
-/// Invalid caller-supplied table-function output definitions.
+/// Invalid table-function invocations or caller-supplied output definitions.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum TableFunctionProblem {
+    /// Aggregate/window or nested set-returning expression in a FROM element.
+    InvalidExpression,
     /// A record result needs a caller-supplied shape.
     DefinitionRequired,
     /// Outer definitions conflict with ROWS FROM placement or WITH ORDINALITY.
@@ -22,6 +24,11 @@ pub enum TableFunctionProblem {
     InvalidTypmod(String),
 }
 impl TableFunctionProblem {
+    /// Illegal aggregate, window or nested set-returning expression.
+    #[must_use]
+    pub const fn invalid_expression() -> Self {
+        Self::InvalidExpression
+    }
     /// Invalid placement of outer record definitions.
     #[must_use]
     pub const fn invalid_placement() -> Self {
@@ -64,6 +71,7 @@ impl TableFunctionProblem {
     }
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::InvalidExpression => "table_function_invalid_expression",
             Self::InvalidTypmod(_) => "table_function_invalid_typmod",
             Self::DefinitionRequired => "table_function_definition_required",
             Self::InvalidPlacement => "table_function_definition_placement",
@@ -76,6 +84,7 @@ impl TableFunctionProblem {
     }
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         DiagnosticMetadata::from(match self {
+            Self::InvalidExpression => "aggregate, window or nested set-returning expression is not allowed in a FROM function".to_owned(),
             Self::InvalidTypmod(message) => format!("invalid table-function column type modifier: {message}"),
             Self::InvalidPlacement => "outer column definitions require one function, no per-function definitions, and no WITH ORDINALITY".to_owned(),
             Self::DefinitionRequired => "a column definition list is required for functions returning record".to_owned(),

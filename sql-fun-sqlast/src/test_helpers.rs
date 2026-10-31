@@ -15,6 +15,7 @@ pub(crate) mod foreign_keys;
 pub(crate) mod membership;
 pub(crate) mod ownership;
 pub(crate) mod parameter_calls;
+pub(crate) mod rows_from;
 pub(crate) mod sampling;
 mod syn_builder;
 mod test_parse_context;

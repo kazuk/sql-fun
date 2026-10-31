@@ -377,6 +377,7 @@ impl DataSource {
         match self {
             Self::CallTableFunc(source) => source.apply_output(context, output),
             Self::DeferredTableFunc(source) => source.apply_output(context, output),
+            Self::RowFunctions(source) => source.apply_output(context, output),
             Self::UndefinedTableFunc(source) => {
                 source.retain_output(output);
                 Ok(())

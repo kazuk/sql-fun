@@ -830,6 +830,12 @@ impl TestParseContext {
     /// setup function overload collection with variants
     pub fn setup_function(&mut self, name: &str, overloads: &[OverloadVariant]) -> FullName {
         let name = FullName::with_schema("public", name);
+        // This helper declares ordinary scalar routines; SRF/kind fixtures override
+        // these properties explicitly when registering their intended behavior.
+        for overload in overloads {
+            self.set_function_returns_set(&name, overload, false);
+            self.set_function_row_property(&name, overload, true);
+        }
         let overloads = FunctionOverloadCollection::new(overloads);
         self.set_get_function_impl_result(&name, &overloads);
         name

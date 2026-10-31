@@ -165,6 +165,29 @@ also outside the currently modeled schema behavior. The semantic API exposes
 completed column bindings, requested settings, validation outcomes, and statement
 applicability for the implemented operations.
 
+## PostgreSQL ROWS FROM sources
+
+`ROWS FROM` combines function outputs in written order. Analysis also supports
+SQL value expressions such as `CURRENT_DATE`, and scalar SQL forms such as
+`COALESCE`, `GREATEST`, `LEAST`, `NULLIF` and `CAST` as FROM elements:
+
+```sql
+SELECT r.value, r.today, r.position
+FROM ROWS FROM (generate_series(1, 2), CURRENT_DATE)
+WITH ORDINALITY AS r(value, today, position);
+```
+
+Shorter element results are padded with NULL, so combined columns are treated
+as nullable. The final ordinality column is a non-null `bigint` unless an outer
+join can null-extend the source. Column aliases rename outputs by position;
+qualified and unqualified references must identify a unique visible column.
+For a single scalar element, a source alias also supplies its default column
+name. Named-composite elements expose their fields.
+
+Aggregate calls and nested set-returning calls in FROM elements produce
+errors. Aggregates inside a scalar subquery keep that subquery's own scope.
+Analysis does not execute the supplied expressions.
+
 ## PostgreSQL record-returning table functions
 
 For a table function that returns an unnamed `record`, provide the output column

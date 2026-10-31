@@ -25,6 +25,19 @@ struct RecordColumn {
 }
 
 impl TableFunctionOutput {
+    pub(super) fn replace_definition(&mut self, output: &Self) {
+        let invalid = self
+            .problems
+            .contains(&TableFunctionProblem::invalid_expression());
+        *self = output.clone();
+        if invalid {
+            self.retain_invalid_expression();
+        }
+    }
+    pub(super) fn retain_invalid_expression(&mut self) {
+        self.problems
+            .push(TableFunctionProblem::invalid_expression());
+    }
     pub(crate) fn declared(overload: &OverloadVariant) -> Self {
         Self {
             columns: overload.returning_table(),
@@ -249,6 +262,9 @@ impl OutputColumnNames {
             .any(|(index, name)| self.0[..index].contains(name))
     }
 
+    pub(super) fn append_names(&mut self, names: &[ColumnName]) {
+        self.0.extend_from_slice(names);
+    }
     pub(super) fn append_function_columns(
         &mut self,
         source: &crate::sem::DataSource,

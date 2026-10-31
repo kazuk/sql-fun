@@ -1,0 +1,1064 @@
+[
+  {
+    "name": "rows_from::sql_values",
+    "sql": "SELECT * FROM ROWS FROM (CURRENT_DATE, CURRENT_USER, USER, CURRENT_ROLE, CURRENT_TIME(2), CURRENT_TIMESTAMP(2), LOCALTIME, LOCALTIMESTAMP, SESSION_USER, CURRENT_SCHEMA, CURRENT_CATALOG)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_user",
+          "type": {
+            "schema_name": "",
+            "local_name": "name",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "user",
+          "type": {
+            "schema_name": "",
+            "local_name": "name",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_role",
+          "type": {
+            "schema_name": "",
+            "local_name": "name",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_time",
+          "type": {
+            "schema_name": "",
+            "local_name": "timetz",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_timestamp",
+          "type": {
+            "schema_name": "",
+            "local_name": "timestamptz",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "localtime",
+          "type": {
+            "schema_name": "",
+            "local_name": "time",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "localtimestamp",
+          "type": {
+            "schema_name": "",
+            "local_name": "timestamp",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "session_user",
+          "type": {
+            "schema_name": "",
+            "local_name": "name",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_schema",
+          "type": {
+            "schema_name": "",
+            "local_name": "name",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_catalog",
+          "type": {
+            "schema_name": "",
+            "local_name": "name",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::current_date",
+    "sql": "SELECT * FROM ROWS FROM (CURRENT_DATE)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::direct_sql_value",
+    "sql": "SELECT * FROM CURRENT_DATE d(value)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::special_calls",
+    "sql": "SELECT * FROM ROWS FROM (COALESCE(NULL::int,2), GREATEST(1,2), LEAST(3,4), NULLIF(1,2), CAST(1 AS int), EXTRACT(YEAR FROM DATE '2020-01-01'))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "coalesce",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "greatest",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "least",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "nullif",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "int4",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "extract",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::direct_coalesce",
+    "sql": "SELECT t.value FROM COALESCE(NULL::int, 2) AS t(value)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::cast_preserves_name",
+    "sql": "SELECT * FROM ROWS FROM (CAST(COALESCE(NULL::int,2) AS bigint))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "coalesce",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::alias_qualified",
+    "sql": "SELECT r.b,r.a FROM ROWS FROM(COALESCE(NULL::int,2), CURRENT_DATE) AS r(a,b)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::alias_unqualified",
+    "sql": "SELECT b,a FROM ROWS FROM(COALESCE(NULL::int,2), CURRENT_DATE) AS r(a,b)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::mixed_ordinality",
+    "sql": "SELECT r.* FROM ROWS FROM(generate_series(1,2),CURRENT_DATE) WITH ORDINALITY r(a,b,n)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::ordinary_zip",
+    "sql": "SELECT a,b,n FROM ROWS FROM(generate_series(1,2),generate_series(1,1)) WITH ORDINALITY r(a,b,n)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::left_join",
+    "sql": "SELECT r.* FROM (SELECT 1 AS id) s LEFT JOIN ROWS FROM(CURRENT_DATE) WITH ORDINALITY r(d,n) ON true",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::single_ordinality",
+    "sql": "SELECT d,n FROM ROWS FROM(CURRENT_DATE) WITH ORDINALITY r(d,n)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::parameters",
+    "sql": "SELECT r.value FROM ROWS FROM(COALESCE(${p:int4},1)) r(value)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::parameter_later_constraint",
+    "sql": "SELECT r.value,$1::int FROM ROWS FROM(COALESCE($1,1)) r(value)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "value",
+          "type": null,
+          "nullability": "nullable"
+        },
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::lateral",
+    "sql": "SELECT r.value FROM (SELECT NULL::int AS id) s, ROWS FROM(COALESCE(s.id,2)) r(value)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::duplicate_unqualified",
+    "sql": "SELECT \"current_date\" FROM ROWS FROM(CURRENT_DATE,CURRENT_DATE) r",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::duplicate_qualified",
+    "sql": "SELECT r.current_date FROM ROWS FROM(CURRENT_DATE,CURRENT_DATE) r",
+    "expected": {
+      "diagnostics": [
+        "ambiguous_column"
+      ],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::duplicate_star",
+    "sql": "SELECT r.* FROM ROWS FROM(CURRENT_DATE,CURRENT_DATE) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "current_date",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::hidden_name",
+    "sql": "SELECT r.current_date FROM ROWS FROM(CURRENT_DATE) r(d)",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table_function"
+      ],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::missing_column",
+    "sql": "SELECT r.missing FROM ROWS FROM(CURRENT_DATE) r",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table_function"
+      ],
+      "columns": [
+        {
+          "name": "missing",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::too_many_aliases",
+    "sql": "SELECT r.d FROM ROWS FROM(CURRENT_DATE) r(d,extra)",
+    "expected": {
+      "diagnostics": [
+        "table_function_too_many_aliases"
+      ],
+      "columns": [
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::nested_srf_coalesce",
+    "sql": "SELECT * FROM ROWS FROM(COALESCE(generate_series(1,2),0))",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "coalesce",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::nested_srf_ordinary",
+    "sql": "SELECT * FROM ROWS FROM(abs(generate_series(1,2)))",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "abs",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::aggregate",
+    "sql": "SELECT * FROM ROWS FROM(sum(1))",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "sum",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::window",
+    "sql": "SELECT * FROM ROWS FROM(row_number() OVER ())",
+    "expected": {
+      "diagnostics": [
+        "query_parse"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "rows_from::cast_srf_identity",
+    "sql": "SELECT * FROM ROWS FROM(CAST(generate_series(1,2) AS int))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "generate_series",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::cast_srf_conversion",
+    "sql": "SELECT * FROM ROWS FROM(CAST(generate_series(1,2) AS bigint))",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "generate_series",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::composite",
+    "sql": "SELECT r.* FROM ROWS FROM(CAST(ROW(1,'a'::text) AS rows508_pair)) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::composite_coalesce",
+    "sql": "SELECT r.label,r.id FROM ROWS FROM(COALESCE(NULL::rows508_pair, CAST(ROW(1,'a'::text) AS rows508_pair))) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::bad_definitions",
+    "sql": "SELECT * FROM ROWS FROM(CURRENT_DATE AS(d int))",
+    "expected": {
+      "diagnostics": [
+        "table_function_definition_not_allowed"
+      ],
+      "columns": [
+        {
+          "name": "current_date",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::single_scalar_alias",
+    "sql": "SELECT d.d FROM ROWS FROM(CURRENT_DATE) d",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::ordinary_scalar_alias",
+    "sql": "SELECT a.a FROM ROWS FROM(abs(1)) a",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::single_alias_ordinality",
+    "sql": "SELECT * FROM ROWS FROM(CURRENT_DATE) WITH ORDINALITY d",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "ordinality",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::cast_array_name",
+    "sql": "SELECT * FROM ROWS FROM(CAST(ARRAY[1,2] AS int[]))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::cast_subquery_name",
+    "sql": "SELECT * FROM ROWS FROM(CAST((SELECT 1 AS n) AS int))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::composite_parameter",
+    "sql": "SELECT r.* FROM ROWS FROM(COALESCE(${p:rows508_pair},NULL::rows508_pair)) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::nested_srf_minmax",
+    "sql": "SELECT * FROM ROWS FROM(GREATEST(generate_series(1,2),0))",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::window_without_over",
+    "sql": "SELECT * FROM ROWS FROM(row_number())",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "row_number",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::subquery_aggregate",
+    "sql": "SELECT * FROM ROWS FROM(COALESCE((SELECT max(n) FROM (VALUES(1),(2)) s(n)),0))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "coalesce",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::lateral_bound_srf",
+    "sql": "SELECT * FROM ROWS FROM(CAST(generate_series(1,2) AS int)) s(n), ROWS FROM(COALESCE(s.n,0)) r(v)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::lateral_bound_srf_ordinary",
+    "sql": "SELECT r.v FROM ROWS FROM(CAST(generate_series(1,2) AS int)) s(n), ROWS FROM(abs(s.n)) r(v)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::named_srf_identity",
+    "sql": "SELECT * FROM ROWS FROM(CAST(rows508_srf(n => 1) AS int)) r(v)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::named_srf_conversion",
+    "sql": "SELECT * FROM ROWS FROM(CAST(rows508_srf(n => 1) AS bigint)) r(v)",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::recovery",
+    "sql": "SELECT d FROM ROWS FROM(CURRENT_DATE) r(d)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "",
+            "local_name": "date",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

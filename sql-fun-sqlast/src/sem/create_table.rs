@@ -29,6 +29,21 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn project_expression(
+        &self,
+        base: &crate::sem::SemScalarExpr,
+    ) -> Vec<(ColumnName, crate::sem::SemScalarExpr)> {
+        self.0
+            .iter()
+            .map(|field| {
+                (
+                    field.name().as_ref().expect("composite field name").clone(),
+                    crate::sem::IndirectionExpr::projected_member(base, field),
+                )
+            })
+            .collect()
+    }
+
     pub(crate) fn find_rename_column(
         &self,
         name: &ColumnName,

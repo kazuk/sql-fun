@@ -275,6 +275,7 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 
 // Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 9398769e.
 // Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 4b785462.
+// The remaining owned-array cases were deleted in 2803641d.
 
 
 // Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 9398769e.

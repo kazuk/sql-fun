@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 #[rstest::rstest]
 #[case::seventeen("17")]
+// PostgreSQL 18 case timed out; restore from deletion commit 579e08d18395c9ae3b1af9aa844deafe30af7419.
 fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()

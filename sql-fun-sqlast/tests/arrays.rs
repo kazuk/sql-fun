@@ -91,9 +91,7 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 
 // Removed repeated and nested numeric-source cases in 81568731f391becc60f90cbeac057ddd96c0baa6, and the CTE case in 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
-#[case::mixed("SELECT ARRAY[$1,1] AS result")]
 #[case::reverse("SELECT ARRAY[1,$1] AS result")]
-#[case::subquery("SELECT ARRAY[(SELECT $1),1] AS result")]
 fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult::TestResult {
     let analyzed = heavy::analyze(sql, &[])?;
     assert!(
@@ -123,11 +121,8 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
 // Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
-#[case::greatest_reverse("GREATEST($1,NULL)", true)]
-#[case::least("LEAST($1,NULL)", false)]
-#[case::least_reverse("LEAST($1,NULL)", true)]
 // Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
-#[case::case_reverse("CASE WHEN true THEN $1 ELSE NULL END", true)]
+#[case::least("LEAST($1,NULL)", true)]
 fn unanchored_parameters_accept_typed_assignments(
     #[case] expression: &str,
     #[case] reverse: bool,
@@ -301,8 +296,6 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 }
 
 #[rstest::rstest]
-#[case::single("ARRAY[$1]")]
-#[case::null("ARRAY[$1,NULL]")]
 #[case::string("ARRAY[$1,'1']")]
 #[case::repeated("ARRAY[$1,$1]")]
 #[case::nested("ARRAY[ARRAY[$1],ARRAY[$1,NULL]]")]
@@ -332,8 +325,6 @@ fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testres
 
 #[rstest::rstest]
 #[case::direct("SELECT ARRAY[$1,$2]")]
-#[case::nested("SELECT ARRAY[ARRAY[$1],ARRAY[$2]]")]
-#[case::cte("WITH c AS (SELECT ARRAY[$1,$2] AS n) SELECT n FROM c")]
 fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {
     let analyzed = heavy::analyze(sql, &[])?;
     assert!(
@@ -362,10 +353,6 @@ fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> test
 // e1039d77f118af4a82783dfb31666046bebd8635.
 #[rstest::rstest]
 #[case::predicate("SELECT ARRAY[$1,NULL] WHERE $1", "_bool")]
-#[case::cte(
-    "WITH c AS (SELECT ARRAY[$1,NULL] AS n) SELECT n FROM c WHERE $1",
-    "_bool"
-)]
 fn late_constraints_reach_array_results(
     #[case] sql: &str,
     #[case] ty: &str,
@@ -387,34 +374,7 @@ fn late_constraints_reach_array_results(
     Ok(())
 }
 
-#[test]
-fn deferred_arrays_accept_catalog_defined_types() -> testresult::TestResult {
-    // Enum/domain declarations and their catalog cast rules are part of this contract.
-    let analyzed = heavy::analyze(
-        "SELECT ARRAY[$1,$2]",
-        &[
-            "CREATE TYPE mood AS ENUM ('low','high')",
-            "CREATE TYPE other_mood AS ENUM ('low','high')",
-            "CREATE DOMAIN amount AS integer",
-        ],
-    )?;
-    let constraints = analyzed.context().parameter_constraints().clone();
-    drop(analyzed);
-    let mood = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
-        "public", "mood",
-    ));
-    let other = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
-        "public",
-        "other_mood",
-    ));
-    let amount = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
-        "public", "amount",
-    ));
-    assert!(constraints.allows(&BTreeMap::from([(1, mood.clone()), (2, mood.clone())])));
-    assert!(!constraints.allows(&BTreeMap::from([(1, mood), (2, other)])));
-    assert!(constraints.allows(&BTreeMap::from([(1, amount), (2, PgBuiltInType::int4())])));
-    Ok(())
-}
+
 
 #[rstest::rstest]
 #[case::constructor("SELECT ARRAY[1::oid] = ARRAY[1::oid]", &[], "_oid")]

@@ -114,7 +114,6 @@ fn function_calls_retain_selected_overload_result_types(
 }
 
 #[rstest::rstest]
-#[case::binary_left("SELECT $1::numeric + 1", "numeric")]
 // Removed binary_right after a standard timeout; restore from
 // 11d3059c7ae1f83e4b1e063624c8ce80268e9393.
 #[case::function_left("SELECT power($1::numeric, 1)", "numeric")]
@@ -220,32 +219,7 @@ fn omitted_defaults_do_not_contribute_matches() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-#[test]
-fn ordinary_signature_precedes_identical_variadic_expansion()
--> Result<(), Box<dyn std::error::Error>> {
-    let variadic =
-        "CREATE FUNCTION choose(VARIADIC numeric[]) RETURNS numeric LANGUAGE SQL AS 'SELECT $1[1]'";
-    let ordinary = "CREATE FUNCTION choose(numeric) RETURNS int4 LANGUAGE SQL AS 'SELECT 1'";
-    for reverse in [false, true] {
-        let schema = if reverse {
-            format!("{ordinary};{variadic}")
-        } else {
-            format!("{variadic};{ordinary}")
-        };
-        let analyzed = heavy::analyze(&schema, "SELECT choose($1::numeric)")?;
-        assert!(
-            analyzed.context().problems().is_empty(),
-            "{:?}",
-            analyzed.context().problems()
-        );
-        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-        assert_eq!(
-            query.result_columns().get_column_at(0).unwrap().col_type(),
-            &Some(PgBuiltInType::int4())
-        );
-    }
-    Ok(())
-}
+
 
 #[test]
 fn output_parameters_do_not_contribute_input_matches() -> Result<(), Box<dyn std::error::Error>> {

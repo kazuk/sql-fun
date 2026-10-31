@@ -242,6 +242,8 @@ propagation before preparing finite witnesses, including equality and structural
 projection constraints. Only unseeded placeholder inputs receive the seven
 candidates; an unresolved expression node does not inherit them. Common-type
 facts are prepared for encountered types instead of enumerating the catalog.
+Entering the default phase does not authorize adding default witnesses to a
+relation already seeded by SQL-established types.
 Keep the bounded-default phase through nested propagation: a result derived
 from defaults must not expand another placeholder back to catalog cast sources.
 The original effective catalog is retained through `ParseContext::retain_catalog`:

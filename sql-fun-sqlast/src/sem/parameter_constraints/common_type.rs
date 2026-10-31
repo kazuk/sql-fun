@@ -233,15 +233,13 @@ impl CommonTypeFacts {
     }
 
     /// Retain the same semantic calculations for newly supplied assignments.
-    fn choices(&mut self, seeds: Vec<TypeReference>, defaults: bool) -> InputTypeConstraint {
+    fn choices(&mut self, seeds: Vec<TypeReference>, expand_sources: bool) -> InputTypeConstraint {
         let context = self.environment.context();
         let mut types: HashSet<_> = seeds
             .into_iter()
             .filter(|ty| *ty != MinMaxExpr::unknown())
             .collect();
-        if defaults {
-            types.extend(super::default_types());
-        } else {
+        if expand_sources {
             // A concrete SQL/assignment target justifies its incoming conversions.
             for target in types.clone() {
                 types.extend(context.declared_implicit_cast_sources(&target));
@@ -347,7 +345,7 @@ impl CommonTypeConstraint {
         facts: &mut CommonTypeFacts,
         defaults: bool,
     ) -> Option<InputTypeConstraint> {
-        let seeds = self
+        let mut seeds = self
             .inputs
             .iter()
             .chain(std::iter::once(&self.result))
@@ -356,18 +354,20 @@ impl CommonTypeConstraint {
             .cloned()
             .collect::<Vec<_>>();
         let unseeded = seeds.iter().all(|ty| *ty == MinMaxExpr::unknown());
-        if unseeded
-            && (!defaults
+        if unseeded {
+            if !defaults
                 || !facts.permits_defaults()
                 || !self.inputs.iter().any(|node| graph.is_parameter(*node))
                 || !self
                     .inputs
                     .iter()
-                    .all(|node| graph.is_parameter(*node) || !graph.domain(*node).is_any()))
-        {
-            return None;
+                    .all(|node| graph.is_parameter(*node) || !graph.domain(*node).is_any())
+            {
+                return None;
+            }
+            seeds.extend(super::default_types());
         }
-        let choices = facts.choices(seeds, defaults);
+        let choices = facts.choices(seeds, !defaults);
         if choices.is_empty() {
             return None;
         }
@@ -475,6 +475,32 @@ mod tests {
     };
     use crate::sem::{MinMaxExpr, PgBuiltInType, TypeReference};
     use std::collections::BTreeMap;
+
+    #[rstest::rstest]
+    fn sql_established_domain_is_not_broadened(
+        #[values(false, true)] defaults: bool,
+        #[values(false, true)] provisional: bool,
+    ) {
+        let context = test_helpers::inspection_context();
+        let mut graph = ConstraintGraph::default();
+        let left = graph.parameter(1);
+        let right = graph.parameter(2);
+        let result = graph.common_type(&context, &[left, right], false, "CASE");
+        drop(context);
+        if provisional {
+            graph.solve().unwrap();
+            assert_eq!(graph.domain(left), &test_helpers::protocol_candidates());
+        }
+        let domain = InputTypeConstraint::exact(&"public.amount".parse().unwrap());
+        graph.restrict(right, &domain);
+        // A relation can acquire SQL context while deferred. Its witnesses
+        // must obey that context even during the bounded-default phase.
+        assert!(graph.instantiate_common_types(defaults));
+        assert!(graph.propagate(false));
+        assert_eq!(graph.domain(left), &domain);
+        assert_eq!(graph.domain(right), &domain);
+        assert_eq!(graph.domain(result), &domain);
+    }
 
     #[rstest::rstest]
     #[case::promoted("int8", true)]

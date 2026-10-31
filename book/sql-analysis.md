@@ -449,13 +449,13 @@ link in the child, preserving parent and sibling catalogs.
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion
 supports tables, ordinary views, derived queries, nonrecursive CTEs, and joins.
-The PostgreSQL parser accepts PostgreSQL 18 grammar. Analysis checks new syntax
-against the explicitly configured engine version: a PostgreSQL 17 target reports
-`incompatible_engine_version`. Recognized syntax whose analysis is not yet
-implemented reports `feature_analysis_unsupported` on PostgreSQL 18. This includes
+The PostgreSQL parser accepts PostgreSQL 18 grammar. Implemented conversion paths
+check new syntax against the explicitly configured engine version: a PostgreSQL
+17 target reports `incompatible_engine_version`. Missing conversion or analysis
+is marked with `todo!()` and panics, including utility statement conversion,
 renamed RETURNING row images, INSERT/UPDATE destination row images, temporal
 constraints, and new constraint enforcement/inheritance transitions. Parsing a
-statement does not establish that its semantics are supported.
+statement does not establish that its semantics are implemented.
 
 ## PostgreSQL truth predicates
 

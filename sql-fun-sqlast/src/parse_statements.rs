@@ -22,7 +22,6 @@ pub struct ParseStatementError {
     kind: FailureKind,
     position: Option<StringSpan>,
     statement_kind: Option<StatementKind>,
-    engine_features: Vec<crate::engine_specific::Postgres18Syntax>,
 }
 
 impl ParseStatementError {
@@ -33,7 +32,6 @@ impl ParseStatementError {
             kind: FailureKind::syntax(),
             position: None,
             statement_kind: None,
-            engine_features: Vec::new(),
         }
     }
 
@@ -44,7 +42,6 @@ impl ParseStatementError {
             kind: FailureKind::boundary_discovery(),
             position: None,
             statement_kind: None,
-            engine_features: Vec::new(),
         }
     }
 
@@ -60,7 +57,6 @@ impl ParseStatementError {
             kind: FailureKind::unavailable_dialect(),
             position: None,
             statement_kind: None,
-            engine_features: Vec::new(),
         }
     }
 
@@ -71,7 +67,6 @@ impl ParseStatementError {
             kind: FailureKind::conversion(),
             position: None,
             statement_kind: None,
-            engine_features: Vec::new(),
         }
     }
 
@@ -79,36 +74,6 @@ impl ParseStatementError {
     pub(crate) const fn with_position(mut self, position: StringSpan) -> Self {
         self.position = Some(position);
         self
-    }
-
-    pub(crate) fn with_engine_features(
-        mut self,
-        features: Vec<crate::engine_specific::Postgres18Syntax>,
-    ) -> Self {
-        self.engine_features = features;
-        self
-    }
-
-    /// Report recognized version-specific syntax when common-AST conversion failed.
-    ///
-    /// Returns whether a specific diagnostic was reported. This lets analysis
-    /// clients distinguish an incompatible engine from an unimplemented syntax
-    /// interpreter, instead of misclassifying recognized SQL as a parser error.
-    pub fn report_engine_features(
-        &self,
-        context: &mut impl crate::context::ParseContext,
-    ) -> Result<bool, AnalysisError> {
-        use crate::engine_specific::Postgres18Feature;
-        for feature in &self.engine_features {
-            if context.postgres18_syntax_used(*feature)? {
-                context.report_analysis_problem(
-                    crate::sem::AnalysisProblem::FeatureAnalysisUnsupported {
-                        feature: feature.description().to_owned(),
-                    },
-                )?;
-            }
-        }
-        Ok(!self.engine_features.is_empty())
     }
 
     /// Parsed statement category retained when common-AST conversion fails.

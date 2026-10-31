@@ -323,3 +323,10 @@ for scalar grouping, invalid row projection/scalar operands, and legal row
 membership and IS comparisons. Existing UPDATE tests cover
 legal SQLite tuple assignments. Bare relation-name whole-row binding remains
 [#614](https://github.com/kazuk/sql-fun/issues/614); nested explicit rows use the existing qualified-star expansion.
+
+Issue #885 adds paired `postgres18-syntax-17.json` and
+`postgres18-syntax-18.json` fixtures for implemented behavior and engine-version
+diagnostics (36 cases on 17, 13 on 18). Missing common-AST conversion or analysis
+retains explicit `todo!()` panics; focused Rust tests verify those markers rather
+than terminating the shared CLI regression server. Utility implementation is
+tracked in #891 and remaining constraint semantics in #887.

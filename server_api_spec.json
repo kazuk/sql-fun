@@ -474,56 +474,11 @@
                   "type": "object",
                   "properties": {
                     "IncompatibleEngineVersion": {
-                      "type": "object",
-                      "properties": {
-                        "feature": {
-                          "description": "Syntax feature used by the statement.",
-                          "type": "string"
-                        },
-                        "required": {
-                          "description": "Minimum supported PostgreSQL major version.",
-                          "type": "integer",
-                          "format": "uint32",
-                          "minimum": 0
-                        },
-                        "selected": {
-                          "description": "Explicitly configured engine version, if supplied.",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "feature",
-                        "required"
-                      ]
+                      "$ref": "#/$defs/EngineVersionProblem"
                     }
                   },
                   "required": [
                     "IncompatibleEngineVersion"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "Recognized syntax whose semantic analysis is not implemented.",
-                  "type": "object",
-                  "properties": {
-                    "FeatureAnalysisUnsupported": {
-                      "type": "object",
-                      "properties": {
-                        "feature": {
-                          "description": "Recognized feature and the tracked semantic limitation.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "feature"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "FeatureAnalysisUnsupported"
                   ],
                   "additionalProperties": false
                 },
@@ -1214,6 +1169,30 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "EngineVersionProblem": {
+              "description": "Syntax version requirement and the explicitly selected target.",
+              "type": "object",
+              "properties": {
+                "feature": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "feature",
+                "required"
               ]
             },
             "QueryAnalysisProblem": {
@@ -4359,56 +4338,11 @@
                   "type": "object",
                   "properties": {
                     "IncompatibleEngineVersion": {
-                      "type": "object",
-                      "properties": {
-                        "feature": {
-                          "description": "Syntax feature used by the statement.",
-                          "type": "string"
-                        },
-                        "required": {
-                          "description": "Minimum supported PostgreSQL major version.",
-                          "type": "integer",
-                          "format": "uint32",
-                          "minimum": 0
-                        },
-                        "selected": {
-                          "description": "Explicitly configured engine version, if supplied.",
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "feature",
-                        "required"
-                      ]
+                      "$ref": "#/$defs/EngineVersionProblem"
                     }
                   },
                   "required": [
                     "IncompatibleEngineVersion"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "description": "Recognized syntax whose semantic analysis is not implemented.",
-                  "type": "object",
-                  "properties": {
-                    "FeatureAnalysisUnsupported": {
-                      "type": "object",
-                      "properties": {
-                        "feature": {
-                          "description": "Recognized feature and the tracked semantic limitation.",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "feature"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "FeatureAnalysisUnsupported"
                   ],
                   "additionalProperties": false
                 },
@@ -5099,6 +5033,30 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "EngineVersionProblem": {
+              "description": "Syntax version requirement and the explicitly selected target.",
+              "type": "object",
+              "properties": {
+                "feature": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "feature",
+                "required"
               ]
             },
             "QueryAnalysisProblem": {

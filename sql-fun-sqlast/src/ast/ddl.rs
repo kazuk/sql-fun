@@ -2267,46 +2267,45 @@ impl super::AlterCommand {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
         match self {
-            Self::Postgres(command) => match &command.definition {
-                AlterDefinition::Constraint(constraint) => {
-                    constraint.check_engine_features(context, false)
-                }
-                AlterDefinition::Column(column) => {
-                    let mut valid = true;
-                    for constraint in &column.constraints {
-                        valid &= constraint.check_engine_features(context, true)?;
-                    }
-                    Ok(valid)
-                }
-                AlterDefinition::ConstraintFlags(flags) => {
-                    let mut recognized = true;
-                    let mut unsupported = false;
-                    if flags.enforced.is_some() {
-                        recognized &= context
-                            .postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
-                        unsupported = true;
-                    }
-                    if flags.no_inherit.is_some() {
-                        recognized &= context
-                            .postgres18_syntax_used(Postgres18Syntax::ConstraintInheritance)?;
-                        unsupported = true;
-                    }
-                    if recognized && unsupported {
-                        context.report_analysis_problem(
-                            AnalysisProblem::FeatureAnalysisUnsupported {
-                                feature: "ALTER CONSTRAINT enforcement/inheritance".to_owned(),
-                            },
-                        )?;
-                    }
-                    Ok(recognized && !unsupported)
-                }
-                _ => Ok(true),
-            },
+            Self::Postgres(command) => command.definition.check_engine_features(context),
             Self::Constraint(constraint) => constraint.check_engine_features(context, false),
             _ => Ok(true),
         }
+    }
+}
+
+impl AlterDefinition {
+    fn check_engine_features(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        match self {
+            Self::Constraint(constraint) => constraint.check_engine_features(context, false),
+            Self::Column(column) => column.check_engine_features(context),
+            Self::ConstraintFlags(flags) => flags.check_engine_features(context),
+            _ => Ok(true),
+        }
+    }
+}
+
+impl AlterConstraintFlags {
+    fn check_engine_features(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+        let mut valid = true;
+        if self.enforced.is_some() {
+            valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
+        }
+        if self.no_inherit.is_some() {
+            valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintInheritance)?;
+        }
+        if valid && (self.enforced.is_some() || self.no_inherit.is_some()) {
+            todo!("ALTER CONSTRAINT enforcement/inheritance (#887)");
+        }
+        Ok(valid)
     }
 }
 
@@ -2327,10 +2326,7 @@ impl Domain {
                 )
             })
         {
-            context.report_analysis_problem(AnalysisProblem::FeatureAnalysisUnsupported {
-                feature: "domain constraint analysis (#548)".to_owned(),
-            })?;
-            valid = false;
+            todo!("domain constraint analysis (#548)");
         }
         Ok(valid)
     }

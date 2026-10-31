@@ -142,8 +142,7 @@ fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatem
             .map_err(|error| ParseStatementError::conversion(span, &error));
     };
     let statement = StatementNode::try_from_with_tokens(&node, &tokens).map_err(|error| {
-        let failure = ParseStatementError::conversion(span, &error)
-            .with_engine_features(utility_features(&node));
+        let failure = ParseStatementError::conversion(span, &error);
         if node.as_select_stmt().as_inner().is_some() {
             failure.with_statement_kind(crate::ast::StatementKind::query())
         } else if node.as_insert_stmt().as_inner().is_some() {
@@ -174,33 +173,4 @@ mod test_parse_statement {
         assert!(!error.is_recoverable());
         assert_eq!(error.span().get_from(sql), Some(sql));
     }
-}
-
-// These utility statements already lack common-AST interpreters. Preserve their
-// recognized syntax requirements on the conversion error so analysis can still
-// apply target-version policy before reporting that separate limitation.
-fn utility_features(node: &crate::syn::Node) -> Vec<crate::engine_specific::Postgres18Syntax> {
-    use crate::engine_specific::Postgres18Syntax;
-    let mut features = Vec::new();
-    if matches!(
-        node.as_alter_default_privileges_stmt()
-            .get_action()
-            .get_objtype()
-            .as_inner(),
-        Some(crate::syn::ObjectType::ObjectLargeobject)
-    ) {
-        features.push(Postgres18Syntax::LargeObjectDefaultPrivileges);
-    }
-    if node
-        .as_create_foreign_table_stmt()
-        .get_base_stmt()
-        .get_table_elts()
-        .as_inner()
-        .unwrap_or_default()
-        .iter()
-        .any(|element| element.as_table_like_clause().as_inner().is_some())
-    {
-        features.push(Postgres18Syntax::ForeignTableLike);
-    }
-    features
 }

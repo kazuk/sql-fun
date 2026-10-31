@@ -139,10 +139,6 @@ pub enum Postgres18Syntax {
     NotNullConstraint,
     /// ALTER CONSTRAINT INHERIT / NO INHERIT.
     ConstraintInheritance,
-    /// Default privileges for large objects.
-    LargeObjectDefaultPrivileges,
-    /// LIKE clauses in foreign-table definitions.
-    ForeignTableLike,
 }
 
 impl Postgres18Syntax {
@@ -156,8 +152,6 @@ impl Postgres18Syntax {
             Self::ConstraintEnforcement => "constraint ENFORCED/NOT ENFORCED",
             Self::NotNullConstraint => "PostgreSQL 18 NOT NULL constraints",
             Self::ConstraintInheritance => "ALTER CONSTRAINT inheritance",
-            Self::LargeObjectDefaultPrivileges => "default privileges on large objects",
-            Self::ForeignTableLike => "CREATE FOREIGN TABLE LIKE",
         }
     }
 }
@@ -182,11 +176,13 @@ impl<T: crate::context::ParseContext> Postgres18Feature for T {
                     .is_ok_and(|version| version.major() >= 18)
             });
         if !compatible {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::IncompatibleEngineVersion {
-                feature: syntax.description().to_owned(),
-                required: 18,
-                selected,
-            })?;
+            self.report_analysis_problem(
+                crate::sem::AnalysisProblem::incompatible_engine_version(
+                    syntax.description(),
+                    18,
+                    selected.as_deref(),
+                ),
+            )?;
         }
         Ok(compatible)
     }

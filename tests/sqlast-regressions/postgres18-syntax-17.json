@@ -200,26 +200,6 @@
     }
   },
   {
-    "name": "large-object-default-privileges",
-    "sql": "ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC",
-    "expected": {
-      "diagnostics": [
-        "incompatible_engine_version"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "foreign-table-like",
-    "sql": "CREATE FOREIGN TABLE foreign_sample (LIKE migration_rows) SERVER test_server",
-    "expected": {
-      "diagnostics": [
-        "incompatible_engine_version"
-      ],
-      "columns": []
-    }
-  },
-  {
     "name": "insert-old-column",
     "sql": "INSERT INTO migration_rows VALUES (1) RETURNING old.id",
     "expected": {

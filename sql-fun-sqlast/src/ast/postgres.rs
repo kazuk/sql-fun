@@ -374,6 +374,16 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         value: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
+        if value
+            .as_alter_default_privileges_stmt()
+            .as_inner()
+            .is_some()
+        {
+            todo!("common-AST conversion for ALTER DEFAULT PRIVILEGES (#891)");
+        }
+        if value.as_create_foreign_table_stmt().as_inner().is_some() {
+            todo!("common-AST conversion for CREATE FOREIGN TABLE (#891)");
+        }
         if let Some(query) = value.as_select_stmt().as_inner() {
             return Ok(Self::query(Query::try_from_with_tokens(&query, tokens)?));
         }
@@ -518,6 +528,17 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+#[cfg(test)]
+mod unimplemented_utility_conversion_tests {
+    #[rstest::rstest]
+    #[case::large_objects("ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC")]
+    #[case::foreign_like("CREATE FOREIGN TABLE f (LIKE t) SERVER s")]
+    #[should_panic(expected = "common-AST conversion")]
+    fn retains_explicit_todo(#[case] sql: &str) {
+        let _ = crate::parse_statements(sql, crate::ast::Dialect::postgres()).next();
     }
 }
 

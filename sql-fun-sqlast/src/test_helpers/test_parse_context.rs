@@ -91,6 +91,18 @@ impl TestParseContext {
         self
     }
 
+    /// Select a PostgreSQL target without loading a builtin catalog.
+    pub(crate) fn with_postgres_version(mut self, version: &str) -> Self {
+        self.metadata = Some(
+            ::serde_json::from_value(::serde_json::json!({
+                "engine": "postgres", "dialect": "postgres", "version": version,
+                "search_path": ["public"]
+            }))
+            .unwrap(),
+        );
+        self
+    }
+
     pub(crate) fn with_metadata(mut self, metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
         self.metadata = Some(metadata.clone());
         self

@@ -1,55 +1,5 @@
 [
   {
-    "name": "returning-alias-insert",
-    "sql": "INSERT INTO migration_rows VALUES (1) RETURNING WITH (NEW AS n) n.id",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "returning-alias-update",
-    "sql": "UPDATE migration_rows SET id=2 RETURNING WITH (OLD AS o) o.id",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "returning-alias-delete",
-    "sql": "DELETE FROM migration_rows RETURNING WITH (OLD AS o) o.id",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "returning-alias-merge",
-    "sql": "MERGE INTO migration_rows t USING (VALUES (1)) s(id) ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING WITH (OLD AS o) o.id",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "returning-alias-cte",
-    "sql": "WITH changed AS (DELETE FROM migration_rows RETURNING WITH (OLD AS o) o.id) SELECT * FROM changed",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
     "name": "virtual-generated-column",
     "sql": "CREATE TABLE generated_sample (id int, computed int GENERATED ALWAYS AS (1) VIRTUAL)",
     "expected": {
@@ -66,50 +16,10 @@
     }
   },
   {
-    "name": "temporal-primary-key",
-    "sql": "CREATE TABLE temporal_sample (id int, valid_at int4range, PRIMARY KEY (id, valid_at WITHOUT OVERLAPS))",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "temporal-unique",
-    "sql": "CREATE TABLE temporal_sample (id int, valid_at int4range, UNIQUE (id, valid_at WITHOUT OVERLAPS))",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "period-foreign-key",
-    "sql": "CREATE TABLE temporal_child (id int, valid_at int4range, FOREIGN KEY (id, PERIOD valid_at) REFERENCES temporal_sample (id, PERIOD valid_at))",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
     "name": "table-check-enforced",
     "sql": "CREATE TABLE check_sample (id int, CHECK (id>0) ENFORCED)",
     "expected": {
       "diagnostics": [],
-      "columns": []
-    }
-  },
-  {
-    "name": "table-check-not-enforced",
-    "sql": "CREATE TABLE check_sample (id int, CHECK (id>0) NOT ENFORCED)",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
       "columns": []
     }
   },
@@ -119,161 +29,6 @@
     "expected": {
       "diagnostics": [],
       "columns": []
-    }
-  },
-  {
-    "name": "column-check-not-enforced",
-    "sql": "CREATE TABLE check_sample (id int CHECK (id>0) NOT ENFORCED)",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "table-not-null",
-    "sql": "CREATE TABLE not_null_sample (id int, NOT NULL id)",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "not-null-no-inherit",
-    "sql": "CREATE TABLE not_null_sample (id int NOT NULL NO INHERIT)",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "alter-constraint-enforced",
-    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id ENFORCED",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "alter-constraint-not-enforced",
-    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id NOT ENFORCED",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "alter-constraint-inherit",
-    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id INHERIT",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "alter-constraint-no-inherit",
-    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id NO INHERIT",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "large-object-default-privileges",
-    "sql": "ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "foreign-table-like",
-    "sql": "CREATE FOREIGN TABLE foreign_sample (LIKE migration_rows) SERVER test_server",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "insert-old-column",
-    "sql": "INSERT INTO migration_rows VALUES (1) RETURNING old.id",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": [
-        {
-          "name": "id",
-          "nullability": "unknown"
-        }
-      ]
-    }
-  },
-  {
-    "name": "update-new-column",
-    "sql": "UPDATE migration_rows SET id=2 RETURNING new.id",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": [
-        {
-          "name": "id",
-          "nullability": "unknown"
-        }
-      ]
-    }
-  },
-  {
-    "name": "update-old-star",
-    "sql": "UPDATE migration_rows SET id=2 RETURNING old.*",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "insert-new-star",
-    "sql": "INSERT INTO migration_rows VALUES (1) RETURNING new.*",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
-    "name": "update-whole-old",
-    "sql": "UPDATE migration_rows SET id=2 RETURNING old",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": [
-        {
-          "name": "old",
-          "nullability": "unknown"
-        }
-      ]
     }
   },
   {
@@ -339,30 +94,10 @@
     }
   },
   {
-    "name": "table-not-null-not-valid",
-    "sql": "ALTER TABLE migration_rows ADD CONSTRAINT id_required NOT NULL id NOT VALID",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
-      "columns": []
-    }
-  },
-  {
     "name": "foreign-key-enforced",
     "sql": "CREATE TABLE child_enforced (id int, FOREIGN KEY (id) REFERENCES migration_rows(id) ENFORCED)",
     "expected": {
       "diagnostics": [],
-      "columns": []
-    }
-  },
-  {
-    "name": "domain-check-enforced",
-    "sql": "CREATE DOMAIN positive_int AS int CHECK (VALUE>0) ENFORCED",
-    "expected": {
-      "diagnostics": [
-        "feature_analysis_unsupported"
-      ],
       "columns": []
     }
   },

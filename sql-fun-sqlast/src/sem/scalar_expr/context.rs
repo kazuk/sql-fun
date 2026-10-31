@@ -44,6 +44,41 @@ struct RuleScope {
     forbidden: Option<&'static str>,
 }
 
+impl ScalarAnalysisContext<'_> {
+    fn notify_unbound_row_image(
+        &self,
+        context: &mut impl ParseContext,
+        alias: &AliasName,
+    ) -> Result<bool, AnalysisError> {
+        if self.postgres_returning
+            && matches!(alias.as_str(), "old" | "new")
+            && !self.in_rule_definition()
+        {
+            use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+            if context.postgres18_syntax_used(Postgres18Syntax::ReturningRowImages)? {
+                todo!("RETURNING destination row-image expressions (#621/#614)");
+            }
+            return Ok(true);
+        }
+        Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod unimplemented_returning_image_tests {
+    #[rstest::rstest]
+    #[should_panic(expected = "RETURNING destination row-image expressions")]
+    fn unbound_images_reach_todo(#[values("old", "new")] name: &str) {
+        let mut context =
+            crate::test_helpers::TestParseContext::default().with_postgres_version("18");
+        let with_clause = crate::sem::WithClause::default();
+        let from_clause = crate::sem::FromClause::default();
+        let mut scope = super::ScalarAnalysisContext::new(&with_clause, &from_clause);
+        scope.set_postgres_returning(&context);
+        let _ = scope.notify_unbound_row_image(&mut context, &crate::sem::AliasName::from(name));
+    }
+}
+
 impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) const fn grouping_scope(&self) -> &super::grouping::GroupingScope {
         &self.grouping
@@ -451,26 +486,6 @@ impl<'a> ScalarAnalysisContext<'a> {
             .is_ok_and(|source| source.is_none())
         {
             return self.notify_unbound_row_image(context, alias);
-        }
-        Ok(false)
-    }
-
-    fn notify_unbound_row_image(
-        &self,
-        context: &mut impl ParseContext,
-        alias: &AliasName,
-    ) -> Result<bool, AnalysisError> {
-        if self.postgres_returning
-            && matches!(alias.as_str(), "old" | "new")
-            && !self.in_rule_definition()
-        {
-            use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
-            if context.postgres18_syntax_used(Postgres18Syntax::ReturningRowImages)? {
-                context.report_analysis_problem(AnalysisProblem::FeatureAnalysisUnsupported {
-                    feature: "INSERT/UPDATE RETURNING destination row images (#621)".to_owned(),
-                })?;
-            }
-            return Ok(true);
         }
         Ok(false)
     }

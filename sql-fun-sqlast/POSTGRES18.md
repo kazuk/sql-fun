@@ -22,8 +22,8 @@ run through the shared source-tree and installed-distribution manifest.
 | Constraint `ENFORCED` / `NOT ENFORCED` | Inline attributes remain separate constraint nodes; table attributes remain on their owner. Token positions distinguish explicit table `ENFORCED` from the parser's default `is_enforced = true`. |
 | Table `NOT NULL column`, inline `NOT NULL NO INHERIT`, new nullability validation attributes | Nullability constraints retain keys, inheritance and validation flags; statement/ALTER analysis gates the new forms. Plain inline NOT NULL remains valid on 17. |
 | `ALTER CONSTRAINT` enforcement and `INHERIT` / `NO INHERIT` | `ATAlterConstraint` retains independent optional deferrability, enforcement and inheritance changes. Only the new attributes trigger version notifications. |
-| `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` | Existing utility conversion limitation retains the recognized feature on `ParseStatementError`; its analysis notification runs through `ParseContext` before the server reports the conversion limitation. |
-| `CREATE FOREIGN TABLE (... LIKE ...)` | Same conversion-error notification path; detects `TableLikeClause` inside `CreateForeignTableStmt.base`. PostgreSQL 17 explicitly prohibited this combination. |
+| `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` | Common-AST conversion explicitly panics with `todo!()`; conversion and interpretation are tracked in #891. |
+| `CREATE FOREIGN TABLE (... LIKE ...)` | Common-AST conversion explicitly panics with `todo!()` (#891). PostgreSQL 17 explicitly prohibited this combination. |
 
 Keyword additions (`ENFORCED`, `OBJECTS`, `PERIOD`, `VIRTUAL`) and parser source
 location changes are not independent feature choices. Their containing constructs
@@ -41,11 +41,12 @@ large-object default privileges and foreign-table LIKE. An ordinary target alias
 
 ## Remaining semantic work
 
-Version acceptance is separate from semantic support. Recognized syntax on 17
-reports `incompatible_engine_version`; recognized but unimplemented analysis on
-18 reports `feature_analysis_unsupported`. These diagnostics are structured
-`AnalysisProblem` values carried by the existing analysis protocol; no protocol
-or driver row metadata extension is required for version checking.
+On implemented conversion paths, syntax on a PostgreSQL 17 target reports
+`incompatible_engine_version` through `ParseContext`. Compatible syntax whose
+analysis is missing reaches an explicit `todo!()` panic. Missing utility
+conversion also panics directly; no conversion-error feature metadata,
+alternative unsupported diagnostic or success-shaped placeholder is used.
+The version diagnostic uses the existing analysis protocol.
 
 The migration retains parse/edit/deparse syntax but does not implement:
 
@@ -59,13 +60,10 @@ The migration retains parse/edit/deparse syntax but does not implement:
 - Common-AST interpreters for the two utility statement families above, which
   were already unsupported before this upgrade.
 
-Constraint and utility gaps are tracked by #887; domain-constraint analysis is
-tracked by #548. Callers consuming
-conversion errors directly can use `ParseStatementError::report_engine_features`
-with their analysis context; parsing alone remains independent of a catalog or
-engine target. The server uses that API to preserve the version diagnostic even
-when a utility interpreter is absent. No utility syntax is replaced by a generic
-common-AST fallback.
+Constraint gaps are tracked by #887. Utility conversion and interpretation are
+tracked by #891, and domain-constraint analysis by #548. Paired CLI cases cover
+implemented paths and target-version diagnostics; focused Rust tests verify explicit
+unimplemented panics without terminating the shared CLI regression server.
 
 ## Independent existing limitation observed during acceptance
 

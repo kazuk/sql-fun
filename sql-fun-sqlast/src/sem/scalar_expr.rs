@@ -58,7 +58,7 @@ pub use self::{
     truth_test::TruthTestExpr,
     whole_row::WholeRowExpr,
 };
-pub(crate) use self::{case_expr::CaseExprAnalysisContext, whole_row::WholeRowFields};
+pub(crate) use self::{case_expr::SqliteCaseBuilder, whole_row::WholeRowFields};
 
 use crate::sem::{
     AnalysisError, AnalysisProblem, ColumnName, ParseContext, PgBuiltInType, TypeReference,

@@ -226,7 +226,7 @@ pub(crate) use self::{
     data_source::{AliasName, JoinUsingClause},
     delete_statement::{DeleteDestination, DeletePredicate},
     parameter_constraints::{ConstraintGraph, SignatureAlternative, array_cast_ranks},
-    scalar_expr::{CaseExprAnalysisContext, WholeRowFields, grouping::ReferenceCapture},
+    scalar_expr::{SqliteCaseBuilder, WholeRowFields, grouping::ReferenceCapture},
     select_statement::{ResultColumn, SelectStatementNode},
     update_statement::{UpdateDestination, UpdatePredicate},
 };

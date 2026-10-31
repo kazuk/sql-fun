@@ -265,5 +265,113 @@
         }
       ]
     }
+  },
+  {
+    "name": "case_common_types::bidirectional_else_bpchar",
+    "sql": "SELECT CASE WHEN true THEN NULL::varchar ELSE NULL::bpchar END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bpchar",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "case_common_types::bidirectional_else_varchar",
+    "sql": "SELECT CASE WHEN true THEN NULL::bpchar ELSE NULL::varchar END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "varchar",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "case_common_types::preferred_float8_else",
+    "sql": "SELECT CASE WHEN true THEN NULL::numeric ELSE NULL::float8 END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "float8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "case_common_types::preferred_float8_then",
+    "sql": "SELECT CASE WHEN true THEN NULL::float8 ELSE NULL::numeric END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "float8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "case_common_types::bidirectional_simple_multiple",
+    "sql": "SELECT CASE 1 WHEN 1 THEN NULL::varchar WHEN 2 THEN NULL::bpchar ELSE NULL::bpchar END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bpchar",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "case_common_types::bidirectional_bound_results",
+    "sql": "SELECT CASE WHEN ${condition:bool} THEN ${value:varchar} ELSE NULL::bpchar END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bpchar",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
   }
 ]

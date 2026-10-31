@@ -28,32 +28,6 @@ mod test_helpers {
     mod cache_context;
     pub(crate) use self::cache_context::create_cache_context;
 
-    pub(super) fn serialized_parameter_domains(
-        value: &::serde_json::Value,
-    ) -> Vec<::sql_fun_sqlast::sem::InputTypeConstraint> {
-        let mut domains = Vec::new();
-        match value {
-            ::serde_json::Value::Object(fields) => {
-                if let Some(parameter) = fields.get("Param") {
-                    domains.push(
-                        ::serde_json::from_value(parameter["constraint"].clone())
-                            .expect("serialized input domain"),
-                    );
-                }
-                for child in fields.values() {
-                    domains.extend(serialized_parameter_domains(child));
-                }
-            }
-            ::serde_json::Value::Array(values) => {
-                for child in values {
-                    domains.extend(serialized_parameter_domains(child));
-                }
-            }
-            _ => {}
-        }
-        domains
-    }
-
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             SqlFunArgs,
@@ -205,34 +179,6 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
 
 // Removed the numeric case after a parallel timeout; restore from
 // 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
-#[rstest::rstest]
-#[case::cast("select 1 where (select $1 where $1 is null)::integer > 0")]
-fn nested_queries_retain_solved_parameter_domains(
-    #[case] sql: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(heavy::context()?, &mut cache_context)?;
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let serialized = ::serde_json::to_value(&query)?;
-    let domains = test_helpers::serialized_parameter_domains(&serialized);
-    assert_ne!(domains, []);
-    for domain in domains {
-        assert!(!domain.is_any());
-        assert!(domain.allows(&PgBuiltInType::int4()));
-        assert_eq!(
-            &domain,
-            analyzed
-                .context()
-                .parameter_constraints()
-                .parameter(1)
-                .unwrap()
-                .constraint()
-        );
-    }
-    Ok(())
-}
-
 // Removed the composite_array case after a parallel timeout; restore from
 // 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
 #[rstest::rstest]

@@ -1003,7 +1003,10 @@ nullability follows the analyzer's conservative catalog-based policy.
 SQLite analysis supports `LIKE` and `NOT LIKE`, with an optional `ESCAPE`
 expression. Results have integer truth values, and operands follow SQLite's
 coercion rules rather than PostgreSQL text constraints. An omitted escape and
-an explicit NULL escape remain distinct. SQLite GLOB, MATCH and REGEXP semantic
+an explicit NULL escape remain distinct. Result nullability remains unknown
+because applications can override either the two- or three-argument `like()`
+function, and analysis does not establish the replacement function's return
+contract. SQLite GLOB, MATCH and REGEXP semantic
 analysis remains unimplemented.
 
 Analysis does not execute patterns or validate runtime pattern contents.

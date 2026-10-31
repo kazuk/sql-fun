@@ -44,16 +44,11 @@ impl SemScalarExprNode for SqliteLikeExpr {
         Some(PgBuiltInType::int4())
     }
     fn is_not_null(&self) -> Option<bool> {
-        let inputs = [Some(&self.value), Some(&self.pattern), self.escape.as_ref()];
-        let mut known = true;
-        for input in inputs.into_iter().flatten() {
-            match input.is_not_null() {
-                Some(false) => return Some(false),
-                Some(true) => {}
-                None => known = false,
-            }
-        }
-        if known { Some(true) } else { None }
+        // TODO: Resolve user-defined overrides of both like(pattern, value) and
+        // like(pattern, value, escape), including their return/nullability contracts.
+        // sqlite3_create_function() can replace either arity independently; input
+        // nullability cannot establish the result's nullability without that binding.
+        None
     }
 }
 
@@ -97,17 +92,16 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[rstest::rstest]
-    #[case::plain("SELECT 'abc' LIKE 'a%'", Some(1), true, false, false)]
-    #[case::negative("SELECT 'abc' NOT LIKE 'a%'", Some(0), true, true, false)]
-    #[case::escape("SELECT 'a_' LIKE 'a!_' ESCAPE '!'", Some(1), true, false, true)]
-    #[case::numeric("SELECT 123 LIKE '12%'", Some(1), true, false, false)]
-    #[case::null_value("SELECT NULL LIKE 'a%'", None, false, false, false)]
-    #[case::null_pattern("SELECT 'a' NOT LIKE NULL", None, false, true, false)]
-    #[case::null_escape("SELECT 'a' LIKE 'a' ESCAPE NULL", None, false, false, true)]
+    #[case::plain("SELECT 'abc' LIKE 'a%'", Some(1), false, false)]
+    #[case::negative("SELECT 'abc' NOT LIKE 'a%'", Some(0), true, false)]
+    #[case::escape("SELECT 'a_' LIKE 'a!_' ESCAPE '!'", Some(1), false, true)]
+    #[case::numeric("SELECT 123 LIKE '12%'", Some(1), false, false)]
+    #[case::null_value("SELECT NULL LIKE 'a%'", None, false, false)]
+    #[case::null_pattern("SELECT 'a' NOT LIKE NULL", None, true, false)]
+    #[case::null_escape("SELECT 'a' LIKE 'a' ESCAPE NULL", None, false, true)]
     fn sqlite_like_retains_semantics(
         #[case] sql: &str,
         #[case] expected: Option<i64>,
-        #[case] not_null: bool,
         #[case] negated: bool,
         #[case] escape: bool,
     ) -> testresult::TestResult {
@@ -120,7 +114,8 @@ mod tests {
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         let expression = expression(&query);
         assert_eq!(expression.get_type(), Some(PgBuiltInType::int4()));
-        assert_eq!(expression.is_not_null(), Some(not_null));
+        // Even non-NULL constants cannot prove a replacement like() is non-NULL.
+        assert_eq!(expression.is_not_null(), None);
         assert!(expression.operator_binding().is_none());
         let encoded = ::serde_json::to_value(expression)?;
         let decoded: SemScalarExpr = ::serde_json::from_value(encoded.clone())?;

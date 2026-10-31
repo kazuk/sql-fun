@@ -1,5 +1,9 @@
 //! Memoized calculation facts for an immutable analysis base.
 
+mod argument_rank;
+
+use self::argument_rank::{ArgumentRankInput, ArgumentRanks};
+
 use crate::context::BaseParseContext;
 use crate::sem::parameter_resolution::Signature;
 use crate::sem::{OverloadRank, TypeReference};
@@ -19,7 +23,7 @@ pub struct CacheContext {
     array_cast_ranks: HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>,
     assignment_sources: HashMap<TypeReference, HashSet<TypeReference>>,
     cast_sources: HashMap<(TypeReference, bool), HashSet<TypeReference>>,
-    argument_ranks: HashMap<(Signature, usize, TypeReference), Option<OverloadRank>>,
+    argument_ranks: ArgumentRanks,
     #[cfg(test)]
     cast_source_computations: usize,
     #[cfg(test)]
@@ -45,7 +49,7 @@ impl CacheContext {
             array_cast_ranks: HashMap::new(),
             assignment_sources: HashMap::new(),
             cast_sources: HashMap::new(),
-            argument_ranks: HashMap::new(),
+            argument_ranks: ArgumentRanks::default(),
             #[cfg(test)]
             cast_source_computations: 0,
             #[cfg(test)]
@@ -148,16 +152,14 @@ impl CacheContext {
         index: usize,
         source: &TypeReference,
     ) -> Option<OverloadRank> {
-        *self
-            .argument_ranks
-            .entry((signature.clone(), index, source.clone()))
-            .or_insert_with(|| {
-                #[cfg(test)]
-                {
-                    self.rank_computations += 1;
-                }
-                signature.cast_score(context, source, index)
-            })
+        let input = ArgumentRankInput::new(signature, index, source);
+        self.argument_ranks.get_or_compute(&input, || {
+            #[cfg(test)]
+            {
+                self.rank_computations += 1;
+            }
+            signature.cast_score(context, source, index)
+        })
     }
 }
 

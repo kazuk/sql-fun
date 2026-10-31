@@ -61,7 +61,7 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
 fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
 -> testresult::TestResult {
     use crate::context::{BaseParseContext, ParseContext};
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let base = crate::test_helpers::TestParseContext::default().freeze();
     let selected = test_helpers::selected_metadata("selected-sqlite.toml")?;
     let context = test_helpers::context_over_catalog(&base, &selected)?;
@@ -112,7 +112,7 @@ fn selected_dialect_does_not_depend_on_the_engine_name() -> testresult::TestResu
 #[cfg(feature = "sqlite")]
 #[test]
 fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let context = crate::test_helpers::TestParseContext::default();
     let statement = crate::parse_statements("select 1", crate::ast::Dialect::sqlite())
         .next()

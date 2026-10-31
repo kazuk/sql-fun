@@ -193,7 +193,7 @@ impl ArrayExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if self.types.admissible_types() == Some(&[]) {

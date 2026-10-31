@@ -170,7 +170,7 @@ impl BooleanExprBody {
 impl BooleanExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &impl crate::sem::ParseContext,
     ) -> Option<SemScalarExpr> {
         let arguments = self.body.inference_arguments();
@@ -193,7 +193,7 @@ impl BooleanExpr {
 impl NullTestExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
     ) -> Option<SemScalarExpr> {
         self.arg_expr.constraint_node()?;
         Some(parameters.operation(

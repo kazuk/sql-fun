@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! test helper types
 
+pub(crate) mod analysis_cache;
 pub(crate) mod column_rename;
 
 pub(crate) mod between;
@@ -29,6 +30,11 @@ pub use self::{
     syn_builder::SynBuilder,
     test_parse_context::{TestParseContext, test_context},
 };
+
+/// Create independent cache state for a test-owned analysis base.
+pub(crate) fn create_cache_context() -> crate::CacheContext {
+    crate::CacheContext::new()
+}
 
 #[cfg(feature = "sqlite")]
 #[expect(missing_docs)]

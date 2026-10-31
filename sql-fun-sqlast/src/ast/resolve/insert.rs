@@ -19,6 +19,7 @@ impl Insert {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<Option<InsertStatement>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|value| {
@@ -28,8 +29,12 @@ impl Insert {
             let implicit_targets =
                 self.columns.is_empty() && context.dialect() == Dialect::postgres();
             let expanded = if context.parameter_inference_needed() {
-                let (constraints, changed) =
-                    ParameterResolution::infer_insert(&mut statement, context, implicit_targets)?;
+                let (constraints, changed) = ParameterResolution::infer_insert(
+                    &mut statement,
+                    context,
+                    cache,
+                    implicit_targets,
+                )?;
                 context.set_parameter_constraints(&constraints);
                 changed
             } else {

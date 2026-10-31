@@ -104,7 +104,10 @@ fn ddl_resolution_uses_common_context(#[case] sql: &str) -> testresult::TestResu
     let syntax =
         StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
     let mut catalog = test_helpers::AnalysisFixture::with_index_table();
-    syntax.resolve(&mut catalog)?;
+    syntax.resolve(
+        &mut catalog,
+        &mut crate::test_helpers::create_cache_context(),
+    )?;
     assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
@@ -316,7 +319,10 @@ fn shared_resolution_preserves_result_metadata(
     #[case] not_null: bool,
 ) -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    let query = postgres(sql)?.resolve(&mut catalog)?;
+    let query = postgres(sql)?.resolve(
+        &mut catalog,
+        &mut crate::test_helpers::create_cache_context(),
+    )?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -332,7 +338,10 @@ fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
     let query =
         postgres("select (select outer_query.n) as result from (select 42 as n) outer_query")?
-            .resolve(&mut catalog)?;
+            .resolve(
+                &mut catalog,
+                &mut crate::test_helpers::create_cache_context(),
+            )?;
     assert!(
         query
             .result_columns()
@@ -348,7 +357,10 @@ fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
 #[test]
 fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::with_qualified_addition();
-    let query = postgres("select 1 operator(pg_catalog.+) 2 as n")?.resolve(&mut catalog)?;
+    let query = postgres("select 1 operator(pg_catalog.+) 2 as n")?.resolve(
+        &mut catalog,
+        &mut crate::test_helpers::create_cache_context(),
+    )?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -363,8 +375,10 @@ fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult 
 #[test]
 fn non_lateral_query_does_not_see_sibling_from_item() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    postgres("select q.n as result from (select 42 as n) a, (select a.n) q")?
-        .resolve(&mut catalog)?;
+    postgres("select q.n as result from (select 42 as n) a, (select a.n) q")?.resolve(
+        &mut catalog,
+        &mut crate::test_helpers::create_cache_context(),
+    )?;
     assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }
@@ -395,9 +409,15 @@ mod sqlite {
     fn sqlite_case_does_not_use_postgres_implicit_casts() -> testresult::TestResult {
         let sql = "select case when true then 1 else '2' end as n";
         let mut catalog = AnalysisFixture::with_integer_to_text_cast();
-        let pg = postgres(sql)?.resolve(&mut catalog)?;
+        let pg = postgres(sql)?.resolve(
+            &mut catalog,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
-        let sqlite = sqlite(sql)?.resolve(&mut catalog)?;
+        let sqlite = sqlite(sql)?.resolve(
+            &mut catalog,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         let name = ColumnName::from("n");
         assert_eq!(
             pg.result_columns()
@@ -427,9 +447,15 @@ mod sqlite {
     #[case("select 1 as n union all select 2 as n union select 3 as n")]
     fn both_frontends_use_the_same_resolver(#[case] sql: &str) -> testresult::TestResult {
         let mut catalog = AnalysisFixture::context();
-        let pg = postgres(sql)?.resolve(&mut catalog)?;
+        let pg = postgres(sql)?.resolve(
+            &mut catalog,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
-        let sqlite = sqlite(sql)?.resolve(&mut catalog)?;
+        let sqlite = sqlite(sql)?.resolve(
+            &mut catalog,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         assert_eq!(pg, sqlite);
         assert_eq!(catalog.reported_problem_count(), 0);
         Ok(())
@@ -615,7 +641,10 @@ fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
         &IVec::default(),
     )?;
     let mut catalog = test_helpers::AnalysisFixture::context();
-    syntax.resolve(&mut catalog)?;
+    syntax.resolve(
+        &mut catalog,
+        &mut crate::test_helpers::create_cache_context(),
+    )?;
     assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }

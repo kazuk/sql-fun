@@ -34,7 +34,8 @@ pub(crate) fn apply_ownership_sql<C: ParseContext>(
     context: C,
     sql: &str,
 ) -> Result<AstAndContextPair<C>, AnalysisError> {
-    ownership_statement(sql)?.resolve_and_apply(context)
+    ownership_statement(sql)?
+        .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())
 }
 
 pub(crate) fn known_owner_count(definitions: &[crate::sem::OwnedObjectDefinition]) -> usize {

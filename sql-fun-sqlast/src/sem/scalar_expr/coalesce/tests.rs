@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 #[case::unreachable_mixed("SELECT COALESCE(1,$1,true)")]
 #[case::contradictory("SELECT COALESCE($1,1) WHERE $1")]
 fn failures_retain_operands_and_allow_next_statement(#[case] sql: &str) -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
@@ -61,7 +61,7 @@ fn failures_retain_operands_and_allow_next_statement(#[case] sql: &str) -> testr
 
 #[test]
 fn an_unreachable_parameter_still_constrains_the_result() -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements("SELECT COALESCE(1,$1)", Dialect::postgres())
         .next()
         .unwrap()?
@@ -98,7 +98,7 @@ fn an_unreachable_parameter_still_constrains_the_result() -> testresult::TestRes
 #[case::case_insensitive("SELECT coalesce(?1,1)")]
 #[case::null("SELECT COALESCE(?1,NULL)")]
 fn sqlite_does_not_impose_postgres_common_types(#[case] sql: &str) -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(sql, Dialect::sqlite())
         .next()
         .unwrap()?
@@ -149,7 +149,7 @@ fn sqlite_does_not_impose_postgres_common_types(#[case] sql: &str) -> testresult
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_requires_two_arguments_without_losing_the_expression() -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements("SELECT COALESCE(?1)", Dialect::sqlite())
         .next()
         .unwrap()?
@@ -187,7 +187,7 @@ fn untyped_operands_retain_the_semantic_expression(
     #[case] sql: &str,
     #[case] count: usize,
 ) -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
@@ -215,7 +215,7 @@ fn untyped_operands_retain_the_semantic_expression(
 
 #[test]
 fn incompatible_concrete_operands_retain_a_failed_type_domain() -> testresult::TestResult {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = parse_statements("SELECT COALESCE(1,true)", Dialect::postgres())
         .next()
         .unwrap()?

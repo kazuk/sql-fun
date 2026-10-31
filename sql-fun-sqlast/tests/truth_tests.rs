@@ -1,5 +1,8 @@
 //! Public truth-test analysis with the shipped `PostgreSQL` cast catalog.
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy;
 }
 

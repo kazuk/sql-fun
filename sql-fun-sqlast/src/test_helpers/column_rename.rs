@@ -50,7 +50,7 @@ pub(crate) fn sqlite(
     context: SchemaFileContext,
     sql: &str,
 ) -> Result<crate::AstAndContextPair<SchemaFileContext>, AnalysisError> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     crate::parse_statements(sql, crate::ast::Dialect::sqlite())
         .next()
         .unwrap()

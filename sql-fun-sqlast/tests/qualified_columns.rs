@@ -212,6 +212,9 @@ fn sqlite_row_images_do_not_expose_database_qualified_relations() -> testresult:
 }
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) fn assert_problem_code(
         context: &::sql_fun_sqlast::context::SchemaFileContext,
         code: &str,
@@ -239,7 +242,7 @@ mod test_helpers {
         pub(crate) fn analyze_sqlite(
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",
                 "--sql-fun-home",
@@ -279,7 +282,7 @@ mod test_helpers {
             sql: &str,
             database: Option<&str>,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let metadata = ::tempfile::NamedTempFile::new()?;
             let database = database
                 .map(|name| format!("database-name = {name:?}\n"))

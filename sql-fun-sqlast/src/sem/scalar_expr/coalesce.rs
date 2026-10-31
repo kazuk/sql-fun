@@ -167,7 +167,7 @@ impl CoalesceExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut ParameterResolution,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if context.dialect() == crate::ast::Dialect::sqlite() {

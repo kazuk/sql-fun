@@ -94,5 +94,8 @@ fn invalid_all_keeps_operands_and_failure(
 // Removed shipped_catalog_all_clauses_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy;
 }

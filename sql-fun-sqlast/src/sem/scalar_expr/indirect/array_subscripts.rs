@@ -154,7 +154,7 @@ impl ArraySubscripts {
 
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> SemScalarExpr {
         let mut result =

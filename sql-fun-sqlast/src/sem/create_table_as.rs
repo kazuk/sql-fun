@@ -134,7 +134,10 @@ impl CreateTableAs {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::TableAs::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply_at(context, source_span)
+        crate::ast::TableAs::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
+            context,
+            &mut crate::CacheContext::new(),
+            source_span,
+        )
     }
 }

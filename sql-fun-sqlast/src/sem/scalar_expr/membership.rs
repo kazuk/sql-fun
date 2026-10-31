@@ -138,7 +138,7 @@ impl MembershipComparison {
         right: &SemScalarExpr,
         operator: Option<&MembershipOperator>,
         name: &OperatorName,
-        mut parameters: Option<&mut ParameterResolution>,
+        mut parameters: Option<&mut ParameterResolution<'_>>,
     ) -> Result<Self, AnalysisError> {
         let (mut left, mut right) = if let Some(operator) = operator {
             SemScalarExpr::comparison_literal_operands(
@@ -373,7 +373,7 @@ impl MembershipExpr {
     fn analyze(
         &mut self,
         context: &mut impl ParseContext,
-        parameters: Option<&mut ParameterResolution>,
+        parameters: Option<&mut ParameterResolution<'_>>,
     ) -> Result<(), AnalysisError> {
         if self.invalid || self.right.pending() {
             return Ok(());
@@ -390,7 +390,7 @@ impl MembershipExpr {
         &mut self,
         context: &mut impl ParseContext,
         values: &[SemScalarExpr],
-        mut parameters: Option<&mut ParameterResolution>,
+        mut parameters: Option<&mut ParameterResolution<'_>>,
     ) -> Result<(), AnalysisError> {
         let left_fields = self.left.membership_fields().to_vec();
         if left_fields.len() != values.len() {
@@ -409,7 +409,7 @@ impl MembershipExpr {
         &mut self,
         context: &mut impl ParseContext,
         values: &[SemScalarExpr],
-        mut parameters: Option<&mut ParameterResolution>,
+        mut parameters: Option<&mut ParameterResolution<'_>>,
     ) -> Result<(), AnalysisError> {
         // PostgreSQL groups multiple non-Var scalar RHS values under one
         // common-type selection, including the LHS as its first type input.
@@ -476,7 +476,7 @@ impl MembershipExpr {
         context: &mut impl ParseContext,
         left: &SemScalarExpr,
         right: &SemScalarExpr,
-        parameters: Option<&mut ParameterResolution>,
+        parameters: Option<&mut ParameterResolution<'_>>,
     ) -> Result<(), AnalysisError> {
         // Row comparisons use semantic field operations, retaining the
         // original rows on the membership node.
@@ -504,7 +504,7 @@ impl MembershipExpr {
         context: &mut impl ParseContext,
         left: &SemScalarExpr,
         right: &SemScalarExpr,
-        parameters: Option<&mut ParameterResolution>,
+        parameters: Option<&mut ParameterResolution<'_>>,
     ) -> Result<(), AnalysisError> {
         let name = OperatorName::from_parts(None, if self.negated { "<>" } else { "=" });
         let comparison = MembershipComparison::resolve(
@@ -556,7 +556,7 @@ impl MembershipExpr {
     }
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut ParameterResolution,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         self.analyze(context, Some(parameters))?;

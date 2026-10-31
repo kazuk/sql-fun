@@ -32,7 +32,7 @@ pub(super) fn analyze(
     sql: &str,
     context: SchemaFileContext,
 ) -> crate::AstAndContextPair<SchemaFileContext> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     crate::parse_statements(sql, context.dialect())
         .next()
         .unwrap()

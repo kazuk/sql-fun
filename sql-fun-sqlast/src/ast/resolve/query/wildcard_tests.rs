@@ -65,7 +65,7 @@ fn aliased_merged_projection_retains_visible_reference() {
 
 #[test]
 fn next_analysis_resets_previous_groups() {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let analyzed = source_namespace_statement("SELECT * FROM a.t");
     assert_eq!(
         analyzed
@@ -350,7 +350,7 @@ fn duplicate_base_aliases_keep_physical_column_ordinals(#[case] sql: &str) {
 #[case::table("SELECT j.*, $1::int4 AS parameter FROM a.mixed j(x,x)")]
 #[case::function("SELECT j.*, $1::int4 AS parameter FROM mixed_fun() j(x,x)")]
 fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let original = source_namespace_statement(sql);
     let mut statement = crate::parse_statements(sql, crate::ast::Dialect::postgres())
         .next()

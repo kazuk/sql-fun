@@ -157,6 +157,9 @@ for operational details.
   plan. Discovering a pre-existing defect, missing shared capability, or
   unexpected constraint does not authorize choosing or implementing a workaround
   or fix outside that scope.
+- The mandatory timeout-test deletion policy in [Pull Requests](#pull-requests)
+  is standing authorization for that maintenance within the current task. It
+  takes precedence over the scope-decision requirements in this section.
 - Prioritize completing the original task. When another problem is found,
   record concrete evidence, reproduction conditions, affected existing
   consumers, and its possible impact on the approved plan. Surface
@@ -351,11 +354,20 @@ directly:
   gaps.
 - A CI `SLOW` warning for a test introduced by the current implementation must
   be fixed before merge; a passing CI job alone does not satisfy merge readiness.
-- If a pre-existing test reaches the CI timeout during otherwise unrelated
-  implementation work, delete that test. In a subsequent commit, add a comment
-  at its former location recording the SHA of the deletion commit so it can be
-  recovered from Git history. Do not combine the deletion and provenance comment
-  in one commit.
+- If a pre-existing test reaches the timeout under standard local verification
+  or CI during otherwise unrelated implementation work, delete the timed-out
+  case, or the entire test if it is not parameterized. The timeout itself is a
+  development-workflow obstruction; deletion is mandatory, not a choice to
+  refer to the maintainer. Do not request additional approval, a scope decision,
+  or a separate prerequisite issue or PR for this deletion. Apply the same rule
+  to further pre-existing cases that time out while completing verification.
+- Do not retain a timed-out case by increasing timeout limits, reducing
+  parallelism, filtering or skipping tests, retrying until a run passes, or
+  proposing a repair instead of deletion. A later successful run does not
+  cancel the deletion requirement.
+- In a subsequent commit, add a comment at the deleted case's former location
+  recording the SHA of the deletion commit so it can be recovered from Git
+  history. Do not combine the deletion and provenance comment in one commit.
 - If explicitly required new tests cannot reasonably meet merge requirements,
   retain them in the PR for review. After review passes and a merge decision is
   made, delete those tests to make the PR merge-ready. Add a comment at each

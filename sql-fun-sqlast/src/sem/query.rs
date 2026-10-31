@@ -881,7 +881,7 @@ impl ResolvedOperator {
     }
     pub(crate) fn infer(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl crate::sem::ParseContext,
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,

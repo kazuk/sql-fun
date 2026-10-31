@@ -2,7 +2,7 @@ use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
 
 /// Explicit small composite fixtures; no builtin catalog or live database.
 pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileContext> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut base = super::super::super::test_helpers::catalog();
     for name in ["singleton", "pair", "container"] {
         let ty = crate::sem::TypeReference::concrete_type_ref(

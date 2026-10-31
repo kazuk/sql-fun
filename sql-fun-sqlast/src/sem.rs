@@ -82,6 +82,7 @@ pub use self::create_trigger::{
 pub(crate) use self::data_source::{ProjectionColumn, WildcardProjection};
 pub use self::drop_rule::DropRule;
 pub(crate) use self::foreign_key_target::ForeignKeyTarget;
+pub(crate) use self::overload_rank::OverloadRank;
 pub use self::view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption};
 pub use self::view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport};
 pub(crate) use self::wildcard_expansion::{

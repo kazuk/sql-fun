@@ -553,7 +553,8 @@ mod test_helpers {
         context: SchemaFileContext,
         sql: &str,
     ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        crate::test_helpers::ownership::ownership_statement(sql)?.resolve_and_apply(context)
+        crate::test_helpers::ownership::ownership_statement(sql)?
+            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())
     }
     pub(super) fn seed(sql: &str, version: &str) -> Result<SchemaFileContext, AnalysisError> {
         Ok(apply(context(version), sql)?.into_context())

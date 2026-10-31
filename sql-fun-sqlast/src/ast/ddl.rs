@@ -1276,19 +1276,21 @@ impl TableAs {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let Some(source) = context.get_source_path_with_span().cloned() else {
             return AnalysisError::raise_unexpected_none("source span");
         };
-        self.resolve_and_apply_at(context, &source)
+        self.resolve_and_apply_at(context, cache, &source)
     }
 
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
         mut context: TContext,
+        cache: &mut crate::CacheContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let mut query = self.query.resolve(&mut context)?;
+        let mut query = self.query.resolve(&mut context, cache)?;
         let name = self.into.relation.name.full_name()?;
         if self.into.columns.len() > query.result_columns().len() {
             context.report_problem(AnalysisProblem::creation(CreationProblem::named(
@@ -1522,12 +1524,14 @@ impl Schema {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        context.apply_creation_group(|context| self.resolve_group(context))
+        context.apply_creation_group(|context| self.resolve_group(context, cache))
     }
     fn resolve_group<TContext: ParseContext>(
         &self,
         mut context: TContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         if context.schema_definition(&self.name).is_some() {
             let schema = CreateSchema::new(&self.name, &[]).with_if_not_exists(self.if_not_exists);
@@ -1552,7 +1556,7 @@ impl Schema {
         context.set_search_path(&schema_path);
         let mut elements = Vec::new();
         for element in &self.elements {
-            let AstAndContextPair(element, next) = element.resolve_and_apply(context)?;
+            let AstAndContextPair(element, next) = element.resolve_and_apply(context, cache)?;
             context = next;
             elements.push(element);
         }
@@ -2116,7 +2120,10 @@ mod domain_tests {
             &IVec::default(),
         )?;
         let mut context = TestParseContext::default();
-        let domain = syntax.resolve(&mut context)?;
+        let domain = syntax.resolve(
+            &mut context,
+            &mut crate::test_helpers::create_cache_context(),
+        )?;
         assert!(matches!(domain, SemAst::CreateDomain(_)));
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())

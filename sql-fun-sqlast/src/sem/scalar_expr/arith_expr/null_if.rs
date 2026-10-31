@@ -63,7 +63,7 @@ impl NullIfExpr {
 impl NullIfExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
     ) {
         if self.return_value.constraint_node().is_some()
             || self.comparison_value.constraint_node().is_some()

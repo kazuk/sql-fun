@@ -80,14 +80,19 @@ impl SessionWrapper {
 
 /// Lives inside the connection future, strictly shorter than its schema owners.
 struct SessionState<'ctx> {
-    cache_context: ::sql_fun_sqlast::CacheContext,
+    // A registration selects one immutable base for the lifetime of the session.
+    // Each handle owns its analysis cache; SQLAST trusts this association.
+    cache_contexts: std::collections::HashMap<
+        ::sql_fun_server_api::payloads::ContextHandle,
+        ::sql_fun_sqlast::CacheContext,
+    >,
     collections: CollectionRegistry<'ctx>,
 }
 
 impl SessionState<'_> {
     fn new(page_limit: NonZeroUsize) -> Self {
         Self {
-            cache_context: ::sql_fun_sqlast::CacheContext::new(),
+            cache_contexts: std::collections::HashMap::new(),
             collections: CollectionRegistry::new(page_limit),
         }
     }

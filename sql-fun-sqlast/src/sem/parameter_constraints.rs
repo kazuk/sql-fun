@@ -412,6 +412,7 @@ impl ConstraintGraph {
     pub(crate) fn call(
         &mut self,
         context: &impl crate::sem::ParseContext,
+        cache: &mut crate::CacheContext,
         nodes: &[usize],
         signatures: &[crate::sem::parameter_resolution::Signature],
         operation: &str,
@@ -429,6 +430,7 @@ impl ConstraintGraph {
             .collect();
         self.calls.push(call::CallConstraint::prepare(
             context,
+            cache,
             nodes,
             signatures,
             &inputs,
@@ -475,7 +477,11 @@ impl ConstraintGraph {
             .push(StructuralConstraint::new(source, result, projection));
     }
 
-    pub(crate) fn prepare_projections(&mut self, context: &impl crate::sem::ParseContext) {
+    pub(crate) fn prepare_projections(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        cache: &mut crate::CacheContext,
+    ) {
         self.resume_collection();
         if let Some(facts) = &mut self.common_facts {
             let facts = Arc::make_mut(facts);
@@ -508,7 +514,7 @@ impl ConstraintGraph {
             visited.push(ty);
         }
         for relation in &mut self.calls {
-            relation.retain(context, visited.iter());
+            relation.retain(context, cache, visited.iter());
         }
     }
 

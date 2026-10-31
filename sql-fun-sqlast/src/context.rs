@@ -278,11 +278,12 @@ where
     fn infer_query_parameter_types(
         &mut self,
         result: Result<crate::sem::SelectStatement, AnalysisError>,
+        cache: &mut crate::CacheContext,
     ) -> Result<crate::sem::SelectStatement, AnalysisError> {
         let mut query = result?;
         if self.parameter_inference_needed() {
             let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
-                &mut query, self,
+                &mut query, self, cache,
             )?;
             self.set_parameter_constraints(&constraints);
         } else {
@@ -298,6 +299,7 @@ where
     fn infer_expression_parameter_types(
         &mut self,
         result: Result<SemScalarExpr, AnalysisError>,
+        cache: &mut crate::CacheContext,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut expression = result?;
         expression.complete_grouping(self)?;
@@ -306,6 +308,7 @@ where
                 crate::sem::parameter_resolution::ParameterResolution::infer_expression(
                     &mut expression,
                     self,
+                    cache,
                 )?;
             self.set_parameter_constraints(&constraints);
         }

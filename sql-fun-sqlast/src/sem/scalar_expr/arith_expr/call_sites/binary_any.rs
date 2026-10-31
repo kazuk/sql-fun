@@ -156,7 +156,7 @@ impl UndefinedOperatorAnyCallSite {
 impl AnyBinaryCallSite {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
     ) {
         if self.left_arg.constraint_node().is_some() || self.right_arg.constraint_node().is_some() {
             parameters.special_operator("ANY", &[&self.left_arg, &self.right_arg]);
@@ -167,7 +167,7 @@ impl AnyBinaryCallSite {
 impl UndefinedOperatorAnyCallSite {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
     ) {
         if self.larg.constraint_node().is_some() || self.rarg.constraint_node().is_some() {
             parameters.special_operator("ANY", &[&self.larg, &self.rarg]);

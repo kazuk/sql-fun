@@ -358,23 +358,31 @@ impl StatementNode {
         Self::Table(value)
     }
 
-    pub(crate) fn resolve(&self, context: &mut impl ParseContext) -> Result<SemAst, AnalysisError> {
+    pub(crate) fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        cache: &mut crate::CacheContext,
+    ) -> Result<SemAst, AnalysisError> {
         match self {
-            Self::Query(query) => query.resolve(context).map(|query| SemAst::select(&query)),
-            Self::Insert(insert) => insert.resolve(context).map(|value| {
+            Self::Query(query) => query
+                .resolve(context, cache)
+                .map(|query| SemAst::select(&query)),
+            Self::Insert(insert) => insert.resolve(context, cache).map(|value| {
                 value
                     .as_ref()
                     .map_or_else(SemAst::unresolved_statement, SemAst::insert)
             }),
-            Self::Update(update) => update.resolve(context).map(|value| {
+            Self::Update(update) => update.resolve(context, cache).map(|value| {
                 value
                     .as_ref()
                     .map_or_else(SemAst::unresolved_statement, SemAst::update)
             }),
             Self::Delete(delete) => delete
-                .resolve(context)
+                .resolve(context, cache)
                 .map(|delete| SemAst::delete(&delete)),
-            Self::Merge(merge) => merge.resolve(context).map(|merge| SemAst::merge(&merge)),
+            Self::Merge(merge) => merge
+                .resolve(context, cache)
+                .map(|merge| SemAst::merge(&merge)),
             Self::CreateRule(rule) => rule.resolve(context).map(|value| {
                 value
                     .as_ref()
@@ -452,6 +460,7 @@ impl StatementNode {
     pub(crate) fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
@@ -463,7 +472,7 @@ impl StatementNode {
             Self::DropTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::CreateRule(rule) => rule.resolve_and_apply(context),
             Self::DropRule(rule) => rule.resolve_and_apply(context),
-            Self::View(view) => view.resolve_and_apply(context),
+            Self::View(view) => view.resolve_and_apply(context, cache),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),
             Self::EnumType(enum_type) => enum_type.apply(context),
@@ -476,12 +485,12 @@ impl StatementNode {
             Self::AlterRelation(statement) => statement.resolve_and_apply(context),
             Self::Domain(domain) => domain.resolve_and_apply(context),
             Self::Function(function) => function.resolve_and_apply(context),
-            Self::Schema(schema) => schema.resolve_and_apply(context),
+            Self::Schema(schema) => schema.resolve_and_apply(context, cache),
             Self::Index(index) => index.resolve_and_apply(context),
-            Self::TableAs(table_as) => table_as.resolve_and_apply(context),
+            Self::TableAs(table_as) => table_as.resolve_and_apply(context, cache),
             Self::Table(table) => table.resolve_and_apply(context),
             _ => {
-                let outcome = self.resolve(&mut context);
+                let outcome = self.resolve(&mut context, cache);
                 let statement = outcome?;
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
@@ -912,6 +921,7 @@ impl View {
     fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
@@ -940,7 +950,7 @@ impl View {
                 context,
             ));
         }
-        let outcome = self.query.resolve(&mut context);
+        let outcome = self.query.resolve(&mut context, cache);
         let mut query = outcome?;
         query.rename_columns(&self.aliases);
         let lineage = self.query.view_lineage(&context, &query)?;

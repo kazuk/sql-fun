@@ -190,6 +190,9 @@ fn vector_operator_binding_keeps_named_inputs(#[case] vector: &str) -> testresul
 }
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
@@ -205,7 +208,7 @@ mod test_helpers {
             sql: &str,
             definitions: &[&str],
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",

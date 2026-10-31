@@ -144,6 +144,9 @@ fn parameter_cast_preserves_admissible_inputs_and_domain_output(
 // Removed shipped_postgres18_catalog_domain_casts_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy {
         use ::sql_fun_core::SqlFunArgs;
         use ::sql_fun_sqlast::{
@@ -160,7 +163,7 @@ mod test_helpers {
             version: &str,
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",

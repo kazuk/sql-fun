@@ -812,7 +812,7 @@ impl Session<'_, '_> {
             &source,
             schema,
             self.expand_asterisk(args.context_handle()),
-            self.cache_context(),
+            self.cache_context(args.context_handle()),
         );
         let mut handles = Vec::new();
         let response = (|| {

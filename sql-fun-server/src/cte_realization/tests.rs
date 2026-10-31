@@ -261,7 +261,7 @@ fn realized_query_analysis_ignores_parameter_hints(
     #[case] cte_parameter: &str,
     #[case] base_parameter: &str,
 ) {
-    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let project = crate::schema_cache::test_helpers::SchemaProject::new();
     let cte = format!("select ${{{cte_parameter}}} + 1 as n");
     let base = format!("select n, ${{{base_parameter}}} + 2 as m from chosen");
@@ -419,7 +419,7 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
         context::ParameterTypeHintWrite,
         sem::{FullName, PgBuiltInType, TypeReference},
     };
-    let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
 
     let project = crate::schema_cache::test_helpers::SchemaProject::new();
     let realized = realize_cte_catalog(

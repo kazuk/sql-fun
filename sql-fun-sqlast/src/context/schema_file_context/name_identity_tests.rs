@@ -128,7 +128,9 @@ mod test_helpers {
             &SynBuilder::new().parse(sql),
             &::sql_fun_core::IVec::default(),
         )?;
-        Ok(statement.resolve_and_apply(context)?.into_context())
+        Ok(statement
+            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
+            .into_context())
     }
 
     pub(super) fn assert_definition(

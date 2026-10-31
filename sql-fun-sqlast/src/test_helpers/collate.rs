@@ -32,7 +32,7 @@ pub(crate) fn query(
     context: &mut TestParseContext,
 ) -> Result<SelectStatement, Box<dyn std::error::Error>> {
     use crate::context::ParseContext;
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let statement = crate::parse_statements(sql, context.dialect())
         .next()
         .expect("one query")?;

@@ -265,6 +265,9 @@ fn output_parameters_do_not_contribute_input_matches() -> Result<(), Box<dyn std
 }
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
@@ -312,7 +315,7 @@ mod test_helpers {
             schema: &str,
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = ::sql_fun_sqlast::CacheContext::new();
+            let mut cache_context = crate::test_helpers::create_cache_context();
             let base = catalog(schema)?;
             let (args, selected) = environment()?;
             let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);

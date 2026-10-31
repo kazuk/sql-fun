@@ -17,6 +17,7 @@ impl Update {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<Option<UpdateStatement>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|value| {
@@ -24,7 +25,8 @@ impl Update {
                 return Ok(None);
             };
             if context.parameter_inference_needed() {
-                let constraints = ParameterResolution::infer_update(&mut statement, context)?;
+                let constraints =
+                    ParameterResolution::infer_update(&mut statement, context, cache)?;
                 context.set_parameter_constraints(&constraints);
             }
             Ok(Some(statement))

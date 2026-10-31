@@ -313,7 +313,14 @@ fn rejects_invalid_grouping_through_diagnostic_policy() {
     };
     let mut context = super::test_helpers::catalog();
     context.reject_diagnostics_after(0);
-    assert!(query.resolve(&mut context).is_err());
+    assert!(
+        query
+            .resolve(
+                &mut context,
+                &mut crate::test_helpers::create_cache_context()
+            )
+            .is_err()
+    );
     assert_eq!(context.reported_problem_count(), 0);
 }
 
@@ -351,7 +358,7 @@ fn grouping_result_type_does_not_constrain_argument_type() {
 #[case::delete_where("DELETE FROM t WHERE GROUPING(a) IS NULL")]
 #[case::delete_returning("DELETE FROM t RETURNING GROUPING(a)")]
 fn rejects_grouping_outside_select(#[case] sql: &str) {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let context = super::test_helpers::grouping_table_context();
     let analysis = crate::parse_statements(sql, Dialect::postgres())
         .next()

@@ -299,7 +299,7 @@ impl MinMaxExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if self
@@ -345,7 +345,8 @@ mod comparison_knowledge_tests {
     #[test]
     fn absent_comparison_knowledge_does_not_eliminate_parameter_types() {
         let mut context = TestParseContext::default();
-        let mut parameters = crate::sem::parameter_resolution::ParameterResolution::default();
+        let mut cache = crate::test_helpers::create_cache_context();
+        let mut parameters = crate::sem::parameter_resolution::ParameterResolution::new(&mut cache);
         let arguments = [
             parameters.parameter(1, &crate::sem::InputTypeConstraint::any()),
             SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),

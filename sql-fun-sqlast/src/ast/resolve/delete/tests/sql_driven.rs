@@ -10,7 +10,7 @@ use crate::{
 #[test]
 fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
 -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = test_helpers::context();
     for statement in parse_statements(
         "CREATE TABLE items(id integer NOT NULL, label text); CREATE TABLE sources(id integer, label text)",

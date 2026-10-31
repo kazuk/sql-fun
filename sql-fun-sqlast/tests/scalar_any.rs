@@ -90,5 +90,8 @@ fn invalid_any_keeps_operands_and_failure(
 // the standalone variadic_any.rs format test; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 
 mod test_helpers {
+    mod cache_context;
+    pub(crate) use self::cache_context::create_cache_context;
+
     pub(super) mod heavy;
 }

@@ -32,10 +32,11 @@ impl Query {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<SelectStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None);
-        let result = context.infer_query_parameter_types(result);
+        let result = context.infer_query_parameter_types(result, cache);
         context.finish_analysis(result)
     }
 

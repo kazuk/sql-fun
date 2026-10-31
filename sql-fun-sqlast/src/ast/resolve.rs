@@ -153,7 +153,8 @@ impl Expr {
     ) -> Result<SemScalarExpr, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, scope);
-        let result = context.infer_expression_parameter_types(result);
+        let result =
+            context.infer_expression_parameter_types(result, &mut crate::CacheContext::new());
         context.finish_analysis(result)
     }
 

@@ -40,7 +40,7 @@ pub(super) fn schema(
     sql: &str,
     frozen: bool,
 ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::CacheContext::new();
+    let mut cache_context = crate::test_helpers::create_cache_context();
     let mut context = context();
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",

@@ -14,11 +14,12 @@ impl Merge {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
+        cache: &mut crate::CacheContext,
     ) -> Result<MergeStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|mut merge| {
             if context.parameter_inference_needed() {
-                let constraints = ParameterResolution::infer_merge(&mut merge, context)?;
+                let constraints = ParameterResolution::infer_merge(&mut merge, context, cache)?;
                 context.set_parameter_constraints(&constraints);
             }
             Ok(merge)

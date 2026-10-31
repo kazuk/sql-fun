@@ -126,6 +126,7 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 #[case::greatest_reverse("GREATEST($1,NULL)", true)]
 #[case::least("LEAST($1,NULL)", false)]
 #[case::least_reverse("LEAST($1,NULL)", true)]
+// Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
 #[case::case_reverse("CASE WHEN true THEN $1 ELSE NULL END", true)]
 fn unanchored_parameters_accept_typed_assignments(
     #[case] expression: &str,

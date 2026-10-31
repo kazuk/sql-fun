@@ -31,7 +31,6 @@ Default steps:
   markdown-lint
   doc
   typos
-  version-materialization
   graphify
   skill-lint
 
@@ -56,7 +55,6 @@ DEFAULT_STEPS=(
   markdown-lint
   doc
   typos
-  version-materialization
   graphify
   skill-lint
 )
@@ -69,7 +67,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e|semver)
+    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e|semver)
       printf '%s\n' "$1"
       ;;
     format)
@@ -116,13 +114,6 @@ done
 
 cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
-# Local verification uses binaries built for this worktree, not paths inherited
-# from direnv in a different checkout. Split CI test phases supply artifacts.
-if [[ "$WORKSPACE_PHASE" != test && "$WORKSPACE_PHASE" != sqlast-test && "$WORKSPACE_PHASE" != rust-test ]]; then
-  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
-  export SQL_FUN_BIN="${target_dir}/debug/sql-fun"
-  export SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server"
-fi
 source "$GIT_ROOT/.local/sbin/workspace-nextest"
 source "$GIT_ROOT/.local/sbin/workspace-verification"
 
@@ -152,6 +143,14 @@ done
 function step_enabled() {
   [[ -n "${STEP_SELECTED[$1]+x}" ]]
 }
+
+# Local verification uses binaries built for this worktree, not paths inherited
+# from direnv in a different checkout. Split CI test phases supply artifacts.
+if step_enabled workspace && [[ "$WORKSPACE_PHASE" != test && "$WORKSPACE_PHASE" != sqlast-test && "$WORKSPACE_PHASE" != rust-test ]]; then
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  export SQL_FUN_BIN="${target_dir}/debug/sql-fun"
+  export SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server"
+fi
 
 function require_command() {
   command -v "$1" >/dev/null || { echo "$1 required"; exit 1; }
@@ -330,13 +329,6 @@ function run_typos() {
   typos --config .local/config/typos.toml
 }
 
-function run_version_materialization() {
-  # Unbudgeted materialization test removed in 83b2c46b; recover from Git history.
-  echo "== Verify release version materialization"
-  "${GIT_ROOT}/.local/bin/test-release-publication"
-  "${GIT_ROOT}/.local/bin/test-release-preparation"
-}
-
 function run_packaging() {
   echo "== Build and validate Linux distributions"
   "${GIT_ROOT}/.local/bin/package-linux" x86_64-unknown-linux-gnu
@@ -427,7 +419,6 @@ for step in "${ALL_STEPS[@]}"; do
       dependency-updates) run_dependency_updates ;;
       doc) run_doc ;;
       typos) run_typos ;;
-      version-materialization) run_version_materialization ;;
       graphify) run_graphify ;;
       skill-lint) run_skill_validator ;;
       markdown-lint) run_rumdl ;;

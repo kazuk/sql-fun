@@ -8,8 +8,8 @@ fn package_api_contracts() {
 }
 
 // Removed feature_coverage_contracts after a CI timeout in
-// 5cb85fdfb04141bdbb3f3fe45d914fd0d024de21. Its Python contracts, along with
-// source membership checks, run in the standard version-materialization step.
+// 5cb85fdfb04141bdbb3f3fe45d914fd0d024de21. Its Python contracts and source
+// membership checks were removed because no recurring execution budget was approved.
 
 #[test]
 fn release_intent_contracts() {

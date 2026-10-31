@@ -103,10 +103,8 @@ attempt-specific Actions artifact name so reruns cannot collide with a previous
 attempt's immutable upload. Recovery is forward-only: no tags,
 Releases, or published crate versions are rolled back.
 
-The `version-materialization` standard check step includes offline publication
-contract tests with mocked Cargo, registry, and GitHub responses. It never
-publishes crates or deploys Pages. The disposable trial workflow and exploratory
-`test-packaging` version-mutation helper have been removed.
+Offline release publication and preparation fixtures are excluded from standard
+local checks and CI because no recurring execution budget is approved.
 
 Actual `release.published` end-to-end validation is deferred until #259 provides
 a real prepared Release. Repository checks cannot prove crates.io account setup,

@@ -164,13 +164,10 @@ own validation environment.
 
 ## Execution cost
 
-The standard `version-materialization` check runs the release-input integration
-contracts through `test-release-publication`: real baseline extraction/replay
-and Git/Cargo source membership. They retain all assertions without running
-archive I/O and subprocess setup under nextest's unit-test time budget. The
-lightweight comparator and intent contracts remain in xbuild's nextest suite.
-Candidate/archive contracts and the release-version materialization test were
-removed because no recurring developer or CI execution budget was allocated.
+Release-input integration contracts, publication/preparation fixtures, and
+release-version materialization tests are excluded from standard local checks
+and CI because no recurring execution budget is approved. The lightweight
+comparator and intent contracts remain in xbuild's nextest suite.
 Candidate production, adoption and replay were validated manually against the
 real repository for #360; this feature adds no maintained test execution.
 

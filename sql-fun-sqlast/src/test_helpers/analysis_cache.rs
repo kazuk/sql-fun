@@ -72,7 +72,11 @@ pub(crate) fn assert_equivalent(
     ] {
         let single = BTreeMap::from([(1, left.clone())]);
         assert_eq!(expected.allows(&single), actual.allows(&single));
-        for right in [PgBuiltInType::int4(), PgBuiltInType::bool()] {
+        for right in [
+            PgBuiltInType::int4(),
+            PgBuiltInType::bool(),
+            PgBuiltInType::int4().array_type(),
+        ] {
             let pair = BTreeMap::from([(1, left.clone()), (2, right)]);
             assert_eq!(expected.allows(&pair), actual.allows(&pair));
         }

@@ -63,9 +63,8 @@ rather than only a failed job so its preparation and deployment share the same
 attempt. Runs serialize with the existing Pages deployment lock and do not
 cancel an active deployment.
 
-The maintained `version-materialization` standard check runs the prototype's
-offline contracts, including invalid input, missing/expired artifact, extraction,
-and content comparison. Live deployment must also succeed at the final tested
-revision. Remove disposable validation refs when no longer needed; retain run
-links as evidence. A successful prototype does not establish that the complete
-production release chain has been exercised.
+The prototype's offline contracts are excluded from standard local checks and
+CI because no recurring execution budget is approved. Live deployment must
+succeed at the final tested revision. Remove disposable validation refs when no
+longer needed; retain run links as evidence. A successful prototype does not
+establish that the complete production release chain has been exercised.

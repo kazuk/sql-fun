@@ -91,10 +91,12 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 
 // Removed repeated and nested numeric-source cases in 81568731f391becc60f90cbeac057ddd96c0baa6, and the CTE case in 22cf48f9b8718c8f344f40158c272d052a844340.
 // Timed-out parameters_retain_correlated_numeric_sources cases were deleted in 9398769e.
+// Further timed-out parameters_retain_correlated_numeric_sources cases were deleted in 4b785462.
 
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 // Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 9398769e.
+// Further timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 4b785462.
 #[rstest::rstest]
 // Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
 // Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
@@ -272,6 +274,7 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 }
 
 // Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 9398769e.
+// Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 4b785462.
 #[rstest::rstest]
 #[case::string("ARRAY[$1,'1']")]
 #[case::nested("ARRAY[ARRAY[$1],ARRAY[$1,NULL]]")]
@@ -299,6 +302,7 @@ fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testres
 }
 
 // Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 9398769e.
+// Further timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 4b785462.
 
 
 // Removed the subscript case after parallel timeouts; restore from

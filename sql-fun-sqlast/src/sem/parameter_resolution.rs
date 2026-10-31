@@ -160,6 +160,14 @@ pub(crate) struct ParameterResolution<'cache> {
     completed: Outputs,
 }
 
+// Memoized graph combinations belong to this inference, including provisional
+// solves, not to the lifetime of the retained immutable catalog base.
+impl Drop for ParameterResolution<'_> {
+    fn drop(&mut self) {
+        self.cache.clear_constraint_memo();
+    }
+}
+
 impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn new(cache: &'cache mut crate::CacheContext) -> Self {
         Self {
@@ -178,8 +186,9 @@ impl<'cache> ParameterResolution<'cache> {
 
     fn solve(&mut self, context: &mut impl crate::sem::ParseContext) -> Result<(), AnalysisError> {
         self.graph.prepare_projections(context, self.cache);
-        self.graph.report_projection_problems(context)?;
-        if let Err(problem) = self.graph.solve() {
+        self.graph
+            .report_projection_problems(context, self.cache.constraint_memo())?;
+        if let Err(problem) = self.graph.solve_with(self.cache.constraint_memo()) {
             crate::sem::ParseContext::report_analysis_problem(
                 context,
                 crate::sem::AnalysisProblem::parameter_constraint(problem.message()),
@@ -204,7 +213,7 @@ impl<'cache> ParameterResolution<'cache> {
         // UPDATE/DELETE subqueries resolve unknown projected parameters before
         // surrounding expressions or assignments constrain them. Keep solver failure
         // in the graph for the final diagnostic-producing solve.
-        let _ = self.graph.solve();
+        let _ = self.graph.solve_with(self.cache.constraint_memo());
         if let Some(scope) = self.scopes.last() {
             for output in &scope.outputs.0 {
                 if let Some(node) = output.node

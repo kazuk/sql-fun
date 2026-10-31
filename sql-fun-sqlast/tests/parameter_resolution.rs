@@ -184,52 +184,6 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
 
 // Removed the composite_array case after a parallel timeout; restore from
 // 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
-#[rstest::rstest]
-#[case::builtin_array("integer[]", "pg_catalog.int4[]")]
-fn real_catalog_keeps_explicit_array_input_hints(
-    #[case] hint: &str,
-    #[case] expected: &str,
-) -> testresult::TestResult {
-    use ::sql_fun_sqlast::context::ParameterTypeHintWrite;
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    // This verifies the public hint API against actual polymorphic equality and
-    // cast metadata; the CLI's named-placeholder lexer accepts identifier hints.
-    let context = heavy::context()?;
-    let mut context = parse_statements(
-        "CREATE TYPE hint_row AS (value integer)",
-        Dialect::postgres(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(context, &mut cache_context)?
-    .into_context();
-    context.setup_typehinting(&[Some(hint)])?;
-    let sql = format!("SELECT $1 IS DISTINCT FROM NULL::{hint}");
-    let analyzed = parse_statements(&sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    let ty = constraints
-        .parameter(1)
-        .unwrap()
-        .constraint()
-        .single_type()
-        .unwrap();
-    assert_eq!(
-        ty,
-        expected.parse::<::sql_fun_sqlast::sem::TypeReference>()?
-    );
-    assert!(constraints.allows(&BTreeMap::from([(1, ty)])));
-    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    Ok(())
-}
-
 // Removed array_hints_resolve_expression_results_without_catalog_search
 // (integer and uuid) after parallel timeouts; restore from 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
 

@@ -122,12 +122,14 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
-#[case::greatest("GREATEST($1,NULL)")]
-#[case::least("LEAST($1,NULL)")]
-#[case::case("CASE WHEN true THEN $1 ELSE NULL END")]
+#[case::greatest("GREATEST($1,NULL)", false)]
+#[case::greatest_reverse("GREATEST($1,NULL)", true)]
+#[case::least("LEAST($1,NULL)", false)]
+#[case::least_reverse("LEAST($1,NULL)", true)]
+#[case::case_reverse("CASE WHEN true THEN $1 ELSE NULL END", true)]
 fn unanchored_parameters_accept_typed_assignments(
     #[case] expression: &str,
-    #[values(false, true)] reverse: bool,
+    #[case] reverse: bool,
 ) -> testresult::TestResult {
     // Real builtin casts and comparison facts determine the admissible sources.
     let sql = if reverse {

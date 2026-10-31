@@ -179,6 +179,9 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
 
 // Removed the numeric case after a parallel timeout; restore from
 // 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
+// Removed nested_queries_retain_solved_parameter_domains::cast after a standard timeout;
+// restore from cde0e0fc3a4df9dbab8f9b9f5e4f09b394e2be57.
+
 // Removed the composite_array case after a parallel timeout; restore from
 // 6c8282fafc5f7b72e86b3c5c5acaf6f5f6031613.
 #[rstest::rstest]

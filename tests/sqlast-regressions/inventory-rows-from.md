@@ -1,10 +1,11 @@
 # ROWS FROM semantic sources (#508)
 
-The `rows-from` project-schema fixture runs 40 cases against the bundled
+The `rows-from` project-schema fixture runs 44 cases against the bundled
 PostgreSQL 17 and 18 catalogs. The shared manifest selects it for both source
-verification and installed-distribution verification. Its only project object
-is `rows508_pair`, a two-field named composite. PostgreSQL is not a dependency
-of these maintained tests.
+verification and installed-distribution verification. Its project objects
+are `rows508_pair`, a two-field named composite, and `rows508_srf`, a small
+set-returning function used for named-argument placement checks. PostgreSQL
+is not a dependency of these maintained tests.
 
 The observable contracts are ordered result names, types, conservative
 nullability, and complete diagnostics. Cases cover SQL value forms, COALESCE,
@@ -48,3 +49,11 @@ serialization (including the existing ordinary-invocation wire shape), legacy
 analysis entry points, unselected-operand traversal, and correlated parameter
 constraints. They use small explicit catalogs via crate-root helpers, without
 loading builtin catalogs per test.
+
+Review regressions distinguish lateral bound columns from nested SRF invocations,
+and identity casts from converting casts for named-argument SRFs. Placement uses
+an agreed concrete return type only when every retained overload candidate has
+that type; differing or polymorphic candidates retain a pending placement outcome
+alongside the existing deferred signature, rather than selecting an overload.
+Ordinary semantic traversal continues through bound source values for constraint
+and parameter consumers; only placement validation treats those bindings as opaque.

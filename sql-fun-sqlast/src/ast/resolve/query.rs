@@ -875,22 +875,27 @@ impl Expr {
     }
     fn table_output_name(&self, value: &SemScalarExpr) -> Result<String, AnalysisError> {
         match self {
-            Self::Call(call) => Ok(call.name.full_name()?.local_name()),
-            Self::SqlValue(value) => Ok(value.name.clone()),
-            Self::Column(name) => Ok(name.full_name()?.local_name()),
-            Self::Operator(operator) if operator.kind.is_null_if() => Ok("nullif".to_owned()),
-            Self::Cast(cast) => {
-                let name = cast
-                    .argument
-                    .table_output_name(value.explicit_cast_operand().unwrap_or(value))?;
-                if name.is_empty() {
-                    Ok(cast.target.reference()?.full_name().local_name())
-                } else {
-                    Ok(name)
-                }
+            Self::Call(call) => call.table_output_name(),
+            Self::SqlValue(value) => Ok(value.table_output_name()),
+            Self::Column(name) => name.table_output_name(),
+            Self::Operator(operator) if operator.kind.is_null_if() => {
+                Ok(operator.table_output_name())
             }
-            _ => Ok(value.get_column_name()),
+            Self::Cast(cast) => cast.table_output_name(value),
+            _ => Ok(value.table_output_name()),
         }
+    }
+    fn resolve_expression_table(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        alias: Option<&Alias>,
+    ) -> Result<DataSource, AnalysisError> {
+        let function = self.resolve_rows_call(context, scope, alias)?;
+        let alias = alias
+            .map(Alias::resolve)
+            .unwrap_or_else(|| AliasSpec::from_local_name(&function.default_alias()));
+        Ok(DataSource::resolved_rows(&[function], &alias))
     }
 
     pub(in crate::ast) fn resolve_table_call(
@@ -903,13 +908,7 @@ impl Expr {
             Self::Call(call) if call.kind.is_ordinary() => {
                 call.resolve_table(context, scope, alias)
             }
-            _ => {
-                let function = self.resolve_rows_call(context, scope, alias)?;
-                let alias = alias
-                    .map(Alias::resolve)
-                    .unwrap_or_else(|| AliasSpec::from_local_name(&function.default_alias()));
-                Ok(DataSource::resolved_rows(&[function], &alias))
-            }
+            _ => self.resolve_expression_table(context, scope, alias),
         }
     }
 }
@@ -1231,5 +1230,43 @@ impl crate::ast::TableSample {
             &repeatable,
         )?;
         Ok(DataSource::sampled(&sample))
+    }
+}
+
+impl crate::ast::Cast {
+    fn table_output_name(&self, value: &SemScalarExpr) -> Result<String, AnalysisError> {
+        let name = self
+            .argument
+            .table_output_name(value.explicit_cast_operand().unwrap_or(value))?;
+        if name.is_empty() {
+            Ok(self.target.reference()?.full_name().local_name())
+        } else {
+            Ok(name)
+        }
+    }
+}
+impl Call {
+    fn table_output_name(&self) -> Result<String, AnalysisError> {
+        self.name.table_output_name()
+    }
+}
+impl Name {
+    fn table_output_name(&self) -> Result<String, AnalysisError> {
+        Ok(self.full_name()?.local_name())
+    }
+}
+impl crate::ast::SqlValue {
+    fn table_output_name(&self) -> String {
+        self.name.clone()
+    }
+}
+impl crate::ast::OperatorExpr {
+    fn table_output_name(&self) -> String {
+        "nullif".to_owned()
+    }
+}
+impl SemScalarExpr {
+    fn table_output_name(&self) -> String {
+        self.get_column_name()
     }
 }

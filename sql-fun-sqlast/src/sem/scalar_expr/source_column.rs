@@ -10,6 +10,15 @@ pub struct SourceColumnExpr {
 }
 
 impl SourceColumnExpr {
+    pub(super) fn definition(&self) -> crate::sem::ColumnDefinition {
+        crate::sem::ColumnDefinition::new(
+            &Some(self.name.clone()),
+            self.value.get_type().as_ref(),
+            self.is_not_null(),
+            &[],
+        )
+    }
+
     /// Analyzed source value; its type domain remains linked to the column.
     pub const fn value(&self) -> &SemScalarExpr {
         &self.value
@@ -42,7 +51,10 @@ impl SourceColumnExpr {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        self.value.walk(visitor)
+        if visitor.walk_source_column_values() {
+            self.value.walk(visitor)?;
+        }
+        Ok(())
     }
 }
 impl SemScalarExpr {

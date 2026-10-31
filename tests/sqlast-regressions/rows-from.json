@@ -961,6 +961,89 @@
     }
   },
   {
+    "name": "rows_from::lateral_bound_srf",
+    "sql": "SELECT * FROM ROWS FROM(CAST(generate_series(1,2) AS int)) s(n), ROWS FROM(COALESCE(s.n,0)) r(v)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::lateral_bound_srf_ordinary",
+    "sql": "SELECT r.v FROM ROWS FROM(CAST(generate_series(1,2) AS int)) s(n), ROWS FROM(abs(s.n)) r(v)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::named_srf_identity",
+    "sql": "SELECT * FROM ROWS FROM(CAST(rows508_srf(n => 1) AS int)) r(v)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_from::named_srf_conversion",
+    "sql": "SELECT * FROM ROWS FROM(CAST(rows508_srf(n => 1) AS bigint)) r(v)",
+    "expected": {
+      "diagnostics": [
+        "table_function_invalid_expression"
+      ],
+      "columns": [
+        {
+          "name": "v",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
     "name": "rows_from::recovery",
     "sql": "SELECT d FROM ROWS FROM(CURRENT_DATE) r(d)",
     "expected": {

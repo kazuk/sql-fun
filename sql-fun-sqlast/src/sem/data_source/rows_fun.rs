@@ -94,6 +94,8 @@ struct RowsFromExpression {
     value: SemScalarExpr,
     name: String,
     invalid_expression: bool,
+    #[serde(default)]
+    placement_pending: bool,
     columns: Vec<crate::sem::ColumnName>,
     output: super::TableFunctionOutput,
 }
@@ -138,6 +140,7 @@ impl DataSourceRowsFromFunc {
     ) -> Result<Self, AnalysisError> {
         let mut value = value.clone();
         let invalid_expression = Self::validate_expression(context, &mut value)?;
+        let placement_pending = value.table_root_depth().1;
         let columns = value
             .composite_columns(context)
             .map(|columns| columns.names())
@@ -147,6 +150,7 @@ impl DataSourceRowsFromFunc {
                 value,
                 name: name.to_owned(),
                 invalid_expression,
+                placement_pending,
                 columns,
                 output: super::TableFunctionOutput::default(),
             })),
@@ -159,19 +163,12 @@ impl DataSourceRowsFromFunc {
     ) -> Result<(), AnalysisError> {
         match &mut self.source {
             RowsFromSource::Invocation(source) => source.apply_function_output(context, output),
-            RowsFromSource::Expression(source) => {
-                source.output = output.clone();
-                source.output.validate_requirement(context, false)
-            }
+            RowsFromSource::Expression(source) => source.apply_output(context, output),
         }
     }
     pub(crate) fn default_alias(&self) -> String {
         match &self.source {
-            RowsFromSource::Invocation(source) => source
-                .get_aliases()
-                .first()
-                .map(|alias| alias.name().as_str().to_owned())
-                .unwrap_or_default(),
+            RowsFromSource::Invocation(source) => source.default_function_alias(),
             RowsFromSource::Expression(source) => source.name.clone(),
         }
     }
@@ -186,6 +183,14 @@ impl DataSourceRowsFromFunc {
         match &self.source {
             RowsFromSource::Invocation(source) => Some(source),
             _ => None,
+        }
+    }
+    /// Whether a cast's FROM placement still depends on an unresolved call result.
+    pub fn has_pending_placement(&self) -> bool {
+        if let RowsFromSource::Expression(source) = &self.source {
+            source.placement_pending
+        } else {
+            false
         }
     }
     /// Whether expression placement validation rejected this special element.
@@ -320,6 +325,29 @@ mod test_expression_sources {
             source.functions()[0].value().unwrap(),
             crate::sem::SemScalarExpr::Coalesce(_)
         ));
+        let restored: DataSourceRowFunctions =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+    }
+
+    #[rstest::rstest]
+    #[case::plain("1", false)]
+    #[case::nested_set("set507(1)", true)]
+    fn deferred_placement_retains_uncertainty_and_known_violations(
+        #[case] argument: &str,
+        #[case] invalid: bool,
+    ) {
+        let mut context = rows_from::deferred_returns_context();
+        let query = sampling::query(
+            &format!("SELECT 1 FROM ROWS FROM(CAST(pending508(n => {argument}) AS int)) r"),
+            &mut context,
+        )
+        .unwrap();
+        let source = rows_from::source(&query, "r");
+        let element = &source.functions()[0];
+        assert!(element.has_pending_placement());
+        assert_eq!(element.has_invalid_expression(), invalid);
+        assert_eq!(context.reported_problem_count(), usize::from(invalid));
         let restored: DataSourceRowFunctions =
             ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
         assert_eq!(&restored, source);
@@ -486,10 +514,7 @@ impl DataSourceRowsFromFunc {
     ) -> Result<(), AnalysisError> {
         match &self.source {
             RowsFromSource::Invocation(source) => columns.append_source(source, context, with),
-            RowsFromSource::Expression(source) => {
-                columns.append_expression(&source.value, &source.name, context);
-                Ok(())
-            }
+            RowsFromSource::Expression(source) => source.append_projection(context, columns),
         }
     }
 }
@@ -513,10 +538,7 @@ impl DataSourceRowsFromFunc {
     ) -> Option<()> {
         match &self.source {
             RowsFromSource::Invocation(source) => names.append_function_columns(source),
-            RowsFromSource::Expression(source) => {
-                names.append_names(&source.columns);
-                Some(())
-            }
+            RowsFromSource::Expression(source) => source.append_known_column_names(names),
         }
     }
 }
@@ -559,6 +581,9 @@ struct FromExpressionValidator<'a, C> {
     invalid: bool,
 }
 impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for FromExpressionValidator<'_, C> {
+    fn walk_source_column_values(&self) -> bool {
+        false
+    }
     fn enter_expression(&mut self, _: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         self.expression_depth += 1;
         Ok(())
@@ -584,7 +609,7 @@ impl DataSourceRowsFromFunc {
         context: &mut impl ParseContext,
         value: &mut SemScalarExpr,
     ) -> Result<bool, AnalysisError> {
-        Self::validate_value(context, value, value.table_root_depth())
+        Self::validate_value(context, value, value.table_root_depth().0)
     }
     pub(crate) fn validate_argument(
         context: &mut impl ParseContext,
@@ -612,5 +637,40 @@ impl DataSourceRowsFromFunc {
             ))?;
         }
         Ok(invalid)
+    }
+}
+
+impl DataSource {
+    fn default_function_alias(&self) -> String {
+        self.get_aliases()
+            .first()
+            .map(|alias| alias.name().as_str().to_owned())
+            .unwrap_or_default()
+    }
+}
+
+impl RowsFromExpression {
+    fn apply_output(
+        &mut self,
+        context: &mut impl ParseContext,
+        output: &super::TableFunctionOutput,
+    ) -> Result<(), AnalysisError> {
+        self.output = output.clone();
+        self.output.validate_requirement(context, false)
+    }
+    fn append_projection(
+        &self,
+        context: &impl ParseContext,
+        columns: &mut super::projection::ProjectionColumns<'_>,
+    ) -> Result<(), AnalysisError> {
+        columns.append_expression(&self.value, &self.name, context);
+        Ok(())
+    }
+    fn append_known_column_names(
+        &self,
+        names: &mut super::function_columns::OutputColumnNames,
+    ) -> Option<()> {
+        names.append_names(&self.columns);
+        Some(())
     }
 }

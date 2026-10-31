@@ -2,6 +2,10 @@
 use crate::sem::{AnalysisError, SemScalarExpr};
 
 pub(crate) trait SemanticVisitor {
+    // Placement validators inspect written operands, not definitions behind bindings.
+    fn walk_source_column_values(&self) -> bool {
+        true
+    }
     fn enter_join(&mut self) {}
     fn join_right(&mut self) {}
     fn leave_join(

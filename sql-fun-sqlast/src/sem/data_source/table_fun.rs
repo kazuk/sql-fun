@@ -242,16 +242,7 @@ impl DataSource {
         invalid_arguments: bool,
     ) -> Result<(), AnalysisError> {
         let invalid = match self {
-            Self::CallTableFunc(source) => {
-                if let Some(requested) = source.function_name()
-                    && let Some(name) = requested.resolution().function_identity()
-                {
-                    !context.function_returns_set(name, source.function())
-                        && !context.function_preserves_view_rows(name, source.function())
-                } else {
-                    false
-                }
-            }
+            Self::CallTableFunc(source) => source.invalid_from(context),
             Self::DeferredTableFunc(source) => source.call().invalid_from(context, true),
             _ => false,
         };
@@ -268,5 +259,18 @@ impl DataSource {
             }
         }
         Ok(())
+    }
+}
+
+impl TableFunctionDataSource {
+    fn invalid_from(&self, context: &impl ParseContext) -> bool {
+        if let Some(requested) = self.function_name()
+            && let Some(name) = requested.resolution().function_identity()
+        {
+            !context.function_returns_set(name, self.function())
+                && !context.function_preserves_view_rows(name, self.function())
+        } else {
+            false
+        }
     }
 }

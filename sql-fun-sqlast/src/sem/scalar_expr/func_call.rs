@@ -818,3 +818,13 @@ impl FuncCallExpr {
                 })
     }
 }
+
+impl FuncCallExpr {
+    pub(crate) fn placement_result_type(&self) -> Option<TypeReference> {
+        if let Some(result) = self.get_type() {
+            Some(result)
+        } else {
+            self.candidates()?.common_scalar_result()
+        }
+    }
+}

@@ -57,3 +57,31 @@ pub(crate) fn legacy_element(
     .unwrap()
     .0
 }
+
+pub(crate) fn deferred_returns_context() -> crate::test_helpers::TestParseContext {
+    let mut context = crate::test_helpers::sampling::context();
+    let overloads: Vec<_> = [
+        crate::sem::PgBuiltInType::int4(),
+        crate::sem::PgBuiltInType::bool(),
+    ]
+    .into_iter()
+    .map(|ty| {
+        crate::sem::OverloadVariant::new(
+            &Some(ty.clone()),
+            &vec![crate::sem::FunctionParam::new_input_param(
+                &Some("n".to_owned()),
+                &Some(ty),
+                &None,
+            )],
+            false,
+            false,
+        )
+    })
+    .collect();
+    let name = context.setup_function("pending508", &overloads);
+    for overload in &overloads {
+        context.set_function_returns_set(&name, overload, true);
+        context.set_function_row_property(&name, overload, false);
+    }
+    context
+}

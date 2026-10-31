@@ -886,12 +886,7 @@ impl SemScalarExpr {
     #[must_use]
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
         match self {
-            Self::SourceColumn(value) => Some(crate::sem::ColumnDefinition::new(
-                &Some(value.name().clone()),
-                value.value().get_type().as_ref(),
-                value.is_not_null(),
-                &[],
-            )),
+            Self::SourceColumn(value) => Some(value.definition()),
             Self::ColumnRef(c) => c.get_column_def().clone(),
             Self::TypeCast(_)
             | Self::FuncCall(_)
@@ -1639,18 +1634,11 @@ impl SemScalarExpr {
 }
 
 impl SemScalarExpr {
-    pub(crate) fn table_root_depth(&self) -> usize {
+    pub(crate) fn table_root_depth(&self) -> (usize, bool) {
         match self {
-            Self::TypeCast(cast) => {
-                let (value, target) = cast.projection_operand();
-                if value.get_type().as_ref() == Some(target) {
-                    1 + value.table_root_depth()
-                } else {
-                    0
-                }
-            }
-            Self::FuncCall(_) => 1,
-            _ => 0,
+            Self::TypeCast(cast) => cast.table_root_depth(),
+            Self::FuncCall(_) => (1, false),
+            _ => (0, false),
         }
     }
 }
@@ -1661,6 +1649,15 @@ impl SemScalarExpr {
             Some(cast.projection_operand().0)
         } else {
             None
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn placement_result_type(&self) -> Option<TypeReference> {
+        match self {
+            Self::FuncCall(call) => call.placement_result_type(),
+            _ => self.get_type(),
         }
     }
 }

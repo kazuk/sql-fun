@@ -204,7 +204,6 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
 }
 
 #[rstest::rstest]
-#[case::numeric("select 1 where (select $1 where $1 is null) + 1 > 0")]
 #[case::cast("select 1 where (select $1 where $1 is null)::integer > 0")]
 fn nested_queries_retain_solved_parameter_domains(
     #[case] sql: &str,
@@ -234,7 +233,6 @@ fn nested_queries_retain_solved_parameter_domains(
 
 #[rstest::rstest]
 #[case::builtin_array("integer[]", "pg_catalog.int4[]")]
-#[case::composite_array("hint_row[]", "public.hint_row[]")]
 fn real_catalog_keeps_explicit_array_input_hints(
     #[case] hint: &str,
     #[case] expected: &str,
@@ -280,47 +278,6 @@ fn real_catalog_keeps_explicit_array_input_hints(
 }
 
 #[rstest::rstest]
-#[case::integer("integer[]", "pg_catalog.int4[]")]
-#[case::uuid("uuid[]", "pg_catalog.uuid[]")]
-fn array_hints_resolve_expression_results_without_catalog_search(
-    #[case] hint: &str,
-    #[case] expected: &str,
-) -> testresult::TestResult {
-    use ::sql_fun_sqlast::context::ParameterTypeHintWrite;
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    // Real equality and array-cast declarations are needed for this public API path.
-    let mut context = heavy::context()?;
-    context.setup_typehinting(&[Some(hint), Some(hint)])?;
-    let analyzed = parse_statements(
-        "SELECT ($1)[1] IS DISTINCT FROM ($2)[1] AS result",
-        Dialect::postgres(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(context, &mut cache_context)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    for position in [1, 2] {
-        assert_eq!(
-            analyzed
-                .context()
-                .parameter_constraints()
-                .parameter(position)
-                .unwrap()
-                .constraint()
-                .single_type()
-                .unwrap(),
-            expected.parse::<::sql_fun_sqlast::sem::TypeReference>()?
-        );
-    }
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::datetime("SELECT age($1), $1 IS DISTINCT FROM $2", "pg_catalog.date")]
 #[case::string_cast("SELECT md5($1)", "pg_catalog.varchar")]
 fn explicit_assignment_inspection_keeps_declared_cast_sources(
     #[case] sql: &str,

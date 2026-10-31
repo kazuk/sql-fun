@@ -122,6 +122,7 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 #[rstest::rstest]
+// Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
 #[case::greatest_reverse("GREATEST($1,NULL)", true)]
 #[case::least("LEAST($1,NULL)", false)]
 #[case::least_reverse("LEAST($1,NULL)", true)]

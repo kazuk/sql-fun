@@ -2744,6 +2744,32 @@
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
                 {
+                  "description": "A binary operation has unequal operand widths.",
+                  "type": "object",
+                  "properties": {
+                    "SetWidth": {
+                      "$ref": "#/$defs/SetWidthProblem"
+                    }
+                  },
+                  "required": [
+                    "SetWidth"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A positional result has no legal common type.",
+                  "type": "object",
+                  "properties": {
+                    "SetType": {
+                      "$ref": "#/$defs/SetTypeProblem"
+                    }
+                  },
+                  "required": [
+                    "SetType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An internal list or dialect-specific row value cannot be consumed as a scalar.",
                   "type": "string",
                   "const": "ScalarValueRequired"
@@ -2909,6 +2935,52 @@
                   "type": "string",
                   "const": "InvalidStarProjectionPlacement"
                 }
+              ]
+            },
+            "SetWidthProblem": {
+              "description": "Operand shape retained for a rejected set operation.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "left": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "right": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "operation",
+                "left",
+                "right"
+              ]
+            },
+            "SetTypeProblem": {
+              "description": "Common-type failure retained with its positional output identity.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "column": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "problem": {
+                  "$ref": "#/$defs/MinMaxProblem"
+                }
+              },
+              "required": [
+                "operation",
+                "column",
+                "problem"
               ]
             },
             "TableFunctionProblem": {
@@ -6761,6 +6833,32 @@
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
                 {
+                  "description": "A binary operation has unequal operand widths.",
+                  "type": "object",
+                  "properties": {
+                    "SetWidth": {
+                      "$ref": "#/$defs/SetWidthProblem"
+                    }
+                  },
+                  "required": [
+                    "SetWidth"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A positional result has no legal common type.",
+                  "type": "object",
+                  "properties": {
+                    "SetType": {
+                      "$ref": "#/$defs/SetTypeProblem"
+                    }
+                  },
+                  "required": [
+                    "SetType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An internal list or dialect-specific row value cannot be consumed as a scalar.",
                   "type": "string",
                   "const": "ScalarValueRequired"
@@ -6926,6 +7024,52 @@
                   "type": "string",
                   "const": "InvalidStarProjectionPlacement"
                 }
+              ]
+            },
+            "SetWidthProblem": {
+              "description": "Operand shape retained for a rejected set operation.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "left": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "right": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "operation",
+                "left",
+                "right"
+              ]
+            },
+            "SetTypeProblem": {
+              "description": "Common-type failure retained with its positional output identity.",
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "column": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "problem": {
+                  "$ref": "#/$defs/MinMaxProblem"
+                }
+              },
+              "required": [
+                "operation",
+                "column",
+                "problem"
               ]
             },
             "TableFunctionProblem": {

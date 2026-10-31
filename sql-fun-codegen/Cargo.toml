@@ -34,7 +34,7 @@ tracing.workspace = true
 [dev-dependencies]
 derive_builder.workspace = true
 rstest.workspace = true
-rusqlite = { version = "0.40.2", features = ["bundled", "hooks"] }
+rusqlite = { version = "0.41.0", features = ["bundled", "hooks"] }
 tempfile.workspace = true
 testresult.workspace = true
 tokio.workspace = true

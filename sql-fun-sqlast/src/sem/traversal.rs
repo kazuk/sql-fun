@@ -25,6 +25,13 @@ pub(crate) trait SemanticVisitor {
     fn expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
     }
+    fn sampling_input(&mut self, _value: &SemScalarExpr, _target: &crate::sem::TypeReference) {}
+    fn table_sample(
+        &mut self,
+        _sample: &mut crate::sem::TableSampleSource,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
     fn assignment(
         &mut self,
         _value: &mut SemScalarExpr,

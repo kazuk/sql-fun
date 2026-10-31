@@ -13,6 +13,7 @@ mod projection;
 mod qualified;
 mod resolved;
 mod rows_fun;
+mod sample;
 mod sub_query;
 mod table;
 mod table_fun;
@@ -28,6 +29,7 @@ pub use self::{
     join_kind::JoinKind,
     merge_record::{MergeRecordDataSource, MergeRecordRole},
     rows_fun::{DataSourceRowFunctions, DataSourceRowsFromFunc},
+    sample::{SamplingInput, TableSampleSource},
     sub_query::SubQueryDataSource,
     table::TableDataSource,
     table_fun::TableFunctionDataSource,
@@ -77,7 +79,7 @@ pub enum DataSource {
     /// ROWS clause
     RowFunctions(DataSourceRowFunctions),
     /// range table sampling
-    RangeTableSample(), // todo modeling
+    RangeTableSample(Box<TableSampleSource>),
     /// view or table or CTE not found
     Unknown(String, AliasSpec),
 }
@@ -85,6 +87,7 @@ pub enum DataSource {
 impl DataSource {
     pub(crate) fn projection_shape_is_resolved(&self) -> bool {
         crate::sem::with_stack(|| match self {
+            Self::RangeTableSample(sample) => sample.source().projection_shape_is_resolved(),
             Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
             Self::DeferredTableFunc(source) => source.projection_shape_is_resolved(),
             Self::RowFunctions(source) => source.projection_shape_is_resolved(),
@@ -97,6 +100,9 @@ impl DataSource {
 
     pub(crate) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         match self {
+            Self::RangeTableSample(sample) => {
+                sample.source().projection_is_table_dependent(context)
+            }
             Self::Table(_) => true,
             Self::JoinExpr(join) => join.projection_is_table_dependent(context),
             Self::Group(group) => group.projection_is_table_dependent(context),
@@ -155,7 +161,11 @@ impl DataSource {
             Self::UndefinedTableFunc(_) => {
                 ColumnReferenceExpr::unknown_function_source_ref(context, alias, column)
             }
-            Self::RangeTableSample() => todo!(),
+            Self::RangeTableSample(sample) => {
+                sample
+                    .source()
+                    .create_column_ref(context, with_clause, alias, column, nullability)
+            }
             Self::RowFunctions(source) => {
                 source.bind_column(context, with_clause, alias, column, nullability)
             }
@@ -179,7 +189,7 @@ impl DataSource {
             Self::DeferredTableFunc(d) => d.push_alias_names(names),
             Self::UndefinedTableFunc(d) => d.push_alias_names(names),
             Self::RowFunctions(functions) => names.extend(functions.get_aliases()),
-            Self::RangeTableSample() => todo!(),
+            Self::RangeTableSample(sample) => sample.source().push_alias_names(names),
             Self::Unknown(_, alias) => names.push(alias.clone()),
         }
     }
@@ -207,7 +217,7 @@ impl DataSource {
             Self::CallTableFunc(d) => d.resolve_alias(self, name),
             Self::DeferredTableFunc(d) => d.resolve_alias(self, name),
             Self::UndefinedTableFunc(d) => d.resolve_alias(self, name),
-            Self::RangeTableSample() => todo!(),
+            Self::RangeTableSample(sample) => sample.source().resolve_alias(name),
             Self::Unknown(_, alias) => {
                 if alias.name() == name {
                     Some((self, false))
@@ -258,7 +268,11 @@ impl DataSource {
             }
             Self::UndefinedTableFunc(_) => return ColumnCandidates::unknown(),
             Self::DeferredTableFunc(d) => return d.candidates(column),
-            Self::RangeTableSample() => todo!(),
+            Self::RangeTableSample(sample) => {
+                return sample
+                    .source()
+                    .aliases_for_column_resolved(column, context, with_clause);
+            }
             Self::Unknown(_, _) => return ColumnCandidates::unknown(),
             Self::RowFunctions(source) => {
                 return source.candidates(column);
@@ -328,7 +342,8 @@ impl DataSource {
             Self::DeferredTableFunc(value) => value.walk(visitor)?,
             Self::UndefinedTableFunc(value) => value.walk(visitor)?,
             Self::RowFunctions(value) => value.walk(visitor)?,
-            Self::RangeTableSample() | Self::Unknown(_, _) => {}
+            Self::RangeTableSample(sample) => sample.walk(visitor)?,
+            Self::Unknown(_, _) => {}
         }
         Ok(())
     }

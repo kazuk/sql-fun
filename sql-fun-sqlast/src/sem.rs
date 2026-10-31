@@ -54,6 +54,7 @@ pub mod problem;
 mod query;
 mod query_metadata;
 mod resolution;
+mod sampling_method;
 mod scalar_expr;
 pub(crate) mod search_path;
 mod select_statement;
@@ -162,6 +163,7 @@ pub use self::{
     data_source::{
         AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc,
         DeferredTableFunction, JoinKind, MergeRecordDataSource, MergeRecordRole, Nullable,
+        SamplingInput, TableSampleSource,
     },
     def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
     delete_statement::{
@@ -193,6 +195,7 @@ pub use self::{
         QueryName, QueryNameResolution, QueryOrder, QueryWindow, ResolvedOperator, SelectClauses,
         SelectDestination, SemanticQuery, SemanticValues,
     },
+    sampling_method::{SamplingMethod, SamplingMethodLookup},
     scalar_expr::{
         ArithExpr, ArrayExpr, ArraySubqueryExpr, ArraySubscript, ArraySubscripts, BooleanExpr,
         CaseExpr, CaseWhen, CoalesceExpr, CollateExpr, ColumnReferenceExpr, ConstrainedExpr,

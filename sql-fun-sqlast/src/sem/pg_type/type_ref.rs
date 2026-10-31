@@ -226,6 +226,20 @@ impl TypeReference {
         self.definition_from_catalog(context)?.row_columns(context)
     }
 
+    pub(crate) fn assignment_match_context(
+        &self,
+        target: &Self,
+        context: &impl BaseParseContext,
+    ) -> Option<crate::sem::CastContext> {
+        if self.is_dynamic() || target.is_dynamic() {
+            self.implicit_match_context(target, context)
+        } else {
+            context
+                .get_assignment_cast(self, target)
+                .map(|cast| cast.context())
+        }
+    }
+
     pub(crate) fn implicit_match_context(
         &self,
         target: &Self,

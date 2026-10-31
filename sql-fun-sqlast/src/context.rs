@@ -191,6 +191,14 @@ where
         crate::ast::Dialect::from(self.metadata())
     }
 
+    /// Resolve a TABLESAMPLE handler using the active qualification/search path rules.
+    /// Providers must distinguish conclusive absence from unavailable metadata and
+    /// return verified `(internal) RETURNS tsm_handler` facts on success. No source
+    /// discovery is authorized here. Production acquisition is tracked by #895.
+    fn lookup_sampling_method(&self, _name: &FullName) -> crate::sem::SamplingMethodLookup {
+        crate::sem::SamplingMethodLookup::unavailable()
+    }
+
     /// Resolve an explicit SQLite COLLATE name from the loaded analysis metadata.
     /// This is separate from conflict-target catalog services. Registration is
     /// not implemented yet, so every name is currently absent, including builtins.

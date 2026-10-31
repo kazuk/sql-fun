@@ -205,6 +205,7 @@ impl DataSource {
         name: &FullName,
     ) -> Result<Option<QualifiedSource<'a>>, ()> {
         match self {
+            Self::RangeTableSample(sample) => sample.source().qualified_source(context, name),
             Self::Table(table) => Ok(table.qualified_source(self, context, name, None)),
             Self::View(view) => Ok(view.qualified_source(self, context, name, None)),
             Self::JoinExpr(join) => join.qualified_source(context, name),
@@ -303,6 +304,7 @@ impl DataSource {
 
     const fn whole_row_relation(&self) -> Option<&FullName> {
         match self {
+            Self::RangeTableSample(sample) => sample.source().whole_row_relation(),
             Self::Table(table) => Some(table.name().full_name()),
             Self::View(view) => Some(view.view_name().full_name()),
             _ => None,

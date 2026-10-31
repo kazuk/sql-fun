@@ -19,6 +19,7 @@ mod parameter_constraint;
 mod query;
 mod rule;
 mod table_function;
+mod table_sample;
 mod trigger;
 mod truth_test;
 mod update;
@@ -44,6 +45,7 @@ pub use self::parameter_constraint::ParameterConstraintProblem;
 pub use self::query::QueryProblem;
 pub use self::rule::{RuleDefinitionProblem, RuleProblem};
 pub use self::table_function::TableFunctionProblem;
+pub use self::table_sample::TableSampleProblem;
 pub use self::trigger::TriggerProblem;
 pub use self::truth_test::TruthTestProblem;
 pub use self::update::{UpdateProblem, UpdateProblemKind};
@@ -85,6 +87,8 @@ pub enum AnalysisProblem {
     TruthTest(TruthTestProblem),
     /// Explicit COLLATE binding or operand applicability failed.
     Collate(CollateProblem),
+    /// TABLESAMPLE binding or validation failed.
+    TableSample(TableSampleProblem),
     /// Invalid null-safe distinctness predicate.
     Distinct(DistinctProblem),
     /// Invalid membership predicate.
@@ -397,6 +401,12 @@ impl AnalysisProblem {
         Self::Distinct(problem)
     }
 
+    /// Report a TABLESAMPLE semantic problem.
+    #[must_use]
+    pub const fn table_sample(problem: TableSampleProblem) -> Self {
+        Self::TableSample(problem)
+    }
+
     /// Report an explicit collation binding or applicability failure.
     #[must_use]
     pub const fn collate(problem: CollateProblem) -> Self {
@@ -461,6 +471,7 @@ impl AnalysisProblem {
             Self::Array(problem) => problem.code(),
             Self::TruthTest(problem) => problem.code(),
             Self::Collate(problem) => problem.code(),
+            Self::TableSample(problem) => problem.code(),
             Self::Distinct(problem) => problem.code(),
             Self::Membership(problem) => problem.code(),
             Self::ParameterConstraint(_) => "parameter_constraint",
@@ -534,6 +545,7 @@ impl AnalysisProblem {
             Self::Array(problem) => problem.render_metadata(),
             Self::TruthTest(problem) => problem.render_metadata(),
             Self::Collate(problem) => problem.render_metadata(),
+            Self::TableSample(problem) => problem.render_metadata(),
             Self::Distinct(problem) => problem.render_metadata(),
             Self::Membership(problem) => problem.render_metadata(),
             Self::ParameterConstraint(problem) => problem.render_metadata(),
@@ -559,6 +571,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::Array(problem) => problem.diagnostic_message(),
             Self::TruthTest(problem) => problem.diagnostic_message(),
             Self::Collate(problem) => problem.diagnostic_message(),
+            Self::TableSample(problem) => problem.diagnostic_message(),
             Self::Distinct(problem) => problem.diagnostic_message(),
             Self::Membership(problem) => problem.diagnostic_message(),
             Self::Index(problem) => problem.diagnostic_message(),

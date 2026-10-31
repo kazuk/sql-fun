@@ -162,12 +162,14 @@ impl DataSource {
         match self {
             Self::Table(table) => Some(table.name().full_name().clone()),
             Self::View(view) => Some(view.view_name().full_name().clone()),
+            Self::RangeTableSample(sample) => sample.source().unaliased_relation(alias),
             _ => None,
         }
     }
 
     pub(crate) fn namespace(&self) -> SourceNamespace<'_> {
         match self {
+            Self::RangeTableSample(sample) => sample.source().namespace(),
             Self::JoinExpr(join) => join.namespace(self),
             Self::Group(group) => group.namespace(self),
             Self::MergeRecord(record) => record

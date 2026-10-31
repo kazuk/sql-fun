@@ -572,6 +572,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "TABLESAMPLE binding or validation failed.",
+                  "type": "object",
+                  "properties": {
+                    "TableSample": {
+                      "$ref": "#/$defs/TableSampleProblem"
+                    }
+                  },
+                  "required": [
+                    "TableSample"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid null-safe distinctness predicate.",
                   "type": "object",
                   "properties": {
@@ -1381,6 +1394,141 @@
                   },
                   "required": [
                     "UndefinedCapability"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TableSampleProblem": {
+              "description": "A TABLESAMPLE binding, input, or capability problem.",
+              "oneOf": [
+                {
+                  "description": "sampling method does not exist.",
+                  "type": "object",
+                  "properties": {
+                    "MethodNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MethodNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MetadataUnavailable": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MetadataUnavailable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method is ambiguous.",
+                  "type": "object",
+                  "properties": {
+                    "MethodAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MethodAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid sampling handler.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidHandler": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidHandler"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "TABLESAMPLE requires a table or materialized view.",
+                  "type": "object",
+                  "properties": {
+                    "Relation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Relation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid sampling argument count.",
+                  "type": "object",
+                  "properties": {
+                    "Arity": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Arity"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method does not support REPEATABLE.",
+                  "type": "object",
+                  "properties": {
+                    "Repeatable": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Repeatable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid TABLESAMPLE argument type.",
+                  "type": "object",
+                  "properties": {
+                    "ArgumentType": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ArgumentType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid REPEATABLE seed type.",
+                  "type": "object",
+                  "properties": {
+                    "SeedType": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "SeedType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling expression cannot use aggregate, window or set-returning functions.",
+                  "type": "object",
+                  "properties": {
+                    "Expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Expression"
                   ],
                   "additionalProperties": false
                 }
@@ -4436,6 +4584,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "TABLESAMPLE binding or validation failed.",
+                  "type": "object",
+                  "properties": {
+                    "TableSample": {
+                      "$ref": "#/$defs/TableSampleProblem"
+                    }
+                  },
+                  "required": [
+                    "TableSample"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid null-safe distinctness predicate.",
                   "type": "object",
                   "properties": {
@@ -5245,6 +5406,141 @@
                   },
                   "required": [
                     "UndefinedCapability"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TableSampleProblem": {
+              "description": "A TABLESAMPLE binding, input, or capability problem.",
+              "oneOf": [
+                {
+                  "description": "sampling method does not exist.",
+                  "type": "object",
+                  "properties": {
+                    "MethodNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MethodNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MetadataUnavailable": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MetadataUnavailable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method is ambiguous.",
+                  "type": "object",
+                  "properties": {
+                    "MethodAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "MethodAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid sampling handler.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidHandler": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidHandler"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "TABLESAMPLE requires a table or materialized view.",
+                  "type": "object",
+                  "properties": {
+                    "Relation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Relation"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid sampling argument count.",
+                  "type": "object",
+                  "properties": {
+                    "Arity": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Arity"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling method does not support REPEATABLE.",
+                  "type": "object",
+                  "properties": {
+                    "Repeatable": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Repeatable"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid TABLESAMPLE argument type.",
+                  "type": "object",
+                  "properties": {
+                    "ArgumentType": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ArgumentType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "invalid REPEATABLE seed type.",
+                  "type": "object",
+                  "properties": {
+                    "SeedType": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "SeedType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "sampling expression cannot use aggregate, window or set-returning functions.",
+                  "type": "object",
+                  "properties": {
+                    "Expression": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Expression"
                   ],
                   "additionalProperties": false
                 }

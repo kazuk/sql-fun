@@ -546,6 +546,7 @@ impl DataSource {
         with: &WithClause,
     ) -> Result<Vec<ColumnName>, AnalysisError> {
         match self {
+            Self::RangeTableSample(sample) => sample.source().column_names(context, with),
             Self::Table(table) => table.projection_column_names(context),
             Self::CteQuery(cte) => cte.projection_column_names(with),
             Self::View(view) => view.projection_column_names(context),
@@ -557,9 +558,6 @@ impl DataSource {
             Self::RowFunctions(source) => source.column_names(context, with),
             Self::MergeRecord(record) => record.column_names(context, with),
             Self::SubQuery(query) => Ok(query.projection_column_names()),
-            _ => AnalysisError::raise_unexpected_input(
-                "star source has no enumerable result columns",
-            ),
         }
     }
 }

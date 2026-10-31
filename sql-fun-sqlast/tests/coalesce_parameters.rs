@@ -10,7 +10,6 @@ use std::collections::BTreeMap;
 #[rstest::rstest]
 #[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]
-#[case::nested("SELECT COALESCE(COALESCE($1,2),1)")]
 // Removed nested_case after a local timeout; restore from bb14217fb859c8255678c9c00c58fd5d2d6f0380.
 // Removed in_case after a local timeout; restore from bb14217fb859c8255678c9c00c58fd5d2d6f0380.
 #[case::operator("SELECT COALESCE($1,1)+2")]

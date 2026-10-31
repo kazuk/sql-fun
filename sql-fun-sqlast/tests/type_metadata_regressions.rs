@@ -113,6 +113,7 @@ fn function_calls_retain_selected_overload_result_types(
     Ok(())
 }
 
+// Timed-out parameter_dependent_overloads_match_concrete_calls cases were deleted in 9398769e.
 #[rstest::rstest]
 // Removed binary_right after a standard timeout; restore from
 // 11d3059c7ae1f83e4b1e063624c8ce80268e9393.
@@ -219,6 +220,9 @@ fn omitted_defaults_do_not_contribute_matches() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+
+
+// Timed-out ordinary_signature_precedes_identical_variadic_expansion cases were deleted in 9398769e.
 
 
 #[test]

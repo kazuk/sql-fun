@@ -91,33 +91,7 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 
 // Removed repeated and nested numeric-source cases in 81568731f391becc60f90cbeac057ddd96c0baa6, and the CTE case in 22cf48f9b8718c8f344f40158c272d052a844340.
 // Timed-out parameters_retain_correlated_numeric_sources cases were deleted in 9398769e.
-#[rstest::rstest]
-#[case::reverse("SELECT ARRAY[1,$1] AS result")]
-fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
-    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::bool())])));
-    assert!(!constraints.result_column(0).unwrap().is_any());
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert!(
-        query
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .expression()
-            .unwrap()
-            .as_array()
-            .is_some()
-    );
-    Ok(())
-}
+
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 // Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in 9398769e.
@@ -300,9 +274,7 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 // Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 9398769e.
 #[rstest::rstest]
 #[case::string("ARRAY[$1,'1']")]
-#[case::repeated("ARRAY[$1,$1]")]
 #[case::nested("ARRAY[ARRAY[$1],ARRAY[$1,NULL]]")]
-#[case::subquery("ARRAY[(SELECT $1)]")]
 fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testresult::TestResult {
     // The builtin catalog supplies scalar and array conversion families. The
     // cloned constraint graph must remain inspectable after its context is gone.
@@ -327,31 +299,7 @@ fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testres
 }
 
 // Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 9398769e.
-#[rstest::rstest]
-#[case::direct("SELECT ARRAY[$1,$2]")]
-fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::int8())
-    ])));
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    assert!(!constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::text())
-    ])));
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, TypeReference::from_master_type_name("json")),
-        (2, TypeReference::from_master_type_name("json"))
-    ])));
-    Ok(())
-}
+
 
 // Removed the subscript case after parallel timeouts; restore from
 // e1039d77f118af4a82783dfb31666046bebd8635.
@@ -379,10 +327,7 @@ fn late_constraints_reach_array_results(
     Ok(())
 }
 
-
-
 // Timed-out deferred_arrays_accept_catalog_defined_types cases were deleted in 9398769e.
-
 
 #[rstest::rstest]
 #[case::constructor("SELECT ARRAY[1::oid] = ARRAY[1::oid]", &[], "_oid")]

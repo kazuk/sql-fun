@@ -578,3 +578,81 @@ impl ResultColumnCollection {
         }
     }
 }
+
+impl ResultColumnCollection {
+    // A set boundary consumes the operand's SQL type before unknown literals
+    // acquire a standalone projection's text representation.
+    pub(crate) fn set_operand(&self, index: usize) -> Option<SemScalarExpr> {
+        let column = self.0.get(index)?;
+        if let Some(expression) = column.expression() {
+            Some(expression.clone())
+        } else {
+            self.output_reference(index)
+        }
+    }
+
+    pub(crate) fn retain_set_names(&mut self, left: &Self) {
+        for (index, source) in left.0.iter().enumerate() {
+            if let Some(column) = self.0.get_mut(index) {
+                if !column.explicit_name.get() {
+                    column.col_name = source.col_name.clone();
+                }
+            } else {
+                self.0
+                    .push(ResultColumn::new(&source.col_name, &None, &None));
+            }
+        }
+        self.0.truncate(left.len());
+    }
+
+    pub(crate) fn set_output(
+        &mut self,
+        index: usize,
+        types: &crate::sem::InputTypeConstraint,
+        not_null: Option<bool>,
+        expression: Option<SemScalarExpr>,
+    ) {
+        if let Some(column) = self.0.get_mut(index) {
+            column.col_type = types.single_type();
+            column.is_not_null = not_null;
+            if let Some(expression) = expression {
+                column.expression = Some(Box::new(expression));
+            }
+        }
+    }
+
+    pub(crate) fn finalize_set_output(
+        &mut self,
+        index: usize,
+        constraints: &crate::sem::ParameterConstraints,
+        not_null: Option<bool>,
+    ) {
+        if let Some(column) = self.0.get_mut(index) {
+            if let Some(expression) = &mut column.expression {
+                expression.apply_constraints(constraints);
+                column.col_type = expression.get_type();
+            }
+            column.is_not_null = not_null;
+        }
+    }
+
+    pub(crate) fn walk_set_outputs<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        for (index, column) in self.0.iter_mut().enumerate() {
+            if let Some(expression) = &mut column.expression {
+                if let Some(target) = targets.get(index) {
+                    visitor.assignment(expression, target)?;
+                }
+                visitor.output(
+                    column.col_name.as_ref().map_or("", ColumnName::as_str),
+                    expression,
+                );
+                column.col_type = expression.get_type();
+            }
+        }
+        Ok(())
+    }
+}

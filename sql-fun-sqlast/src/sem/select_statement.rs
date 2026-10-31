@@ -1,4 +1,7 @@
 mod result_column;
+mod set_operation;
+
+pub use self::set_operation::{SetOperationKind, SetOperationQuery};
 
 pub(crate) use self::result_column::ResultColumn;
 pub use self::result_column::ResultColumnCollection;
@@ -25,28 +28,24 @@ pub enum SelectStatement {
     Values(crate::sem::SemanticValues),
     /// simple query
     Simple(SelectStatementNode),
-    /// union
-    Union(Box<Self>, Box<Self>),
-    /// intersect
-    Intersect(Box<Self>, Box<Self>),
-    /// except
-    Except(Box<Self>, Box<Self>),
+    /// Binary set operation with analyzed output semantics.
+    Set(Box<SetOperationQuery>),
 }
 
 impl SelectStatement {
+    pub(crate) fn set_operations_valid(&self) -> Result<bool, AnalysisError> {
+        let mut validity = SetOperationValidity(true);
+        self.clone().walk(&mut validity)?;
+        Ok(validity.0)
+    }
+
     pub(crate) fn has_pending_stars(&self) -> bool {
         match self {
             Self::Simple(query) => query.result_columns.has_pending_stars(),
             Self::Query(query) => query.body().has_pending_stars(),
-            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
-                Self::set_has_pending_stars(left, right)
-            }
+            Self::Set(query) => query.has_pending_stars(),
             Self::Values(_) => false,
         }
-    }
-
-    fn set_has_pending_stars(left: &Self, right: &Self) -> bool {
-        left.has_pending_stars() || right.has_pending_stars()
     }
 
     pub(crate) fn expand_pending_stars(
@@ -56,21 +55,9 @@ impl SelectStatement {
         match self {
             Self::Simple(query) => query.result_columns.expand_pending_stars(context),
             Self::Query(query) => query.body_mut().expand_pending_stars(context),
-            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
-                Self::expand_set_pending_stars(left, right, context)
-            }
+            Self::Set(query) => query.expand_pending_stars(context),
             Self::Values(_) => Ok(false),
         }
-    }
-
-    fn expand_set_pending_stars(
-        left: &mut Self,
-        right: &mut Self,
-        context: &mut impl ParseContext,
-    ) -> Result<bool, AnalysisError> {
-        let left_changed = left.expand_pending_stars(context)?;
-        let right_changed = right.expand_pending_stars(context)?;
-        Ok(left_changed || right_changed)
     }
 
     pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
@@ -85,10 +72,7 @@ impl SelectStatement {
                 .assign_update_output(visitor, index, ty),
             Self::Query(query) => query.body_mut().assign_update_output(visitor, index, ty),
             Self::Values(values) => values.assign_update_output(visitor, index, ty),
-            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
-                left.assign_update_output(visitor, index, ty)?;
-                right.assign_update_output(visitor, index, ty)
-            }
+            Self::Set(query) => query.assign_update_output(visitor, index, ty),
         }
     }
 
@@ -97,9 +81,7 @@ impl SelectStatement {
             Self::Simple(query) => query.result_columns.len() == width,
             Self::Query(query) => query.body().has_width(width),
             Self::Values(values) => values.rows().iter().all(|row| row.len() == width),
-            Self::Union(left, right) | Self::Except(left, right) | Self::Intersect(left, right) => {
-                left.has_width(width) && right.has_width(width)
-            }
+            Self::Set(query) => query.has_width(width),
         }
     }
     pub(crate) fn rename_columns(&mut self, names: &[String]) {
@@ -107,9 +89,7 @@ impl SelectStatement {
             Self::Simple(query) => query.result_columns.rename(names),
             Self::Query(query) => query.body_mut().rename_columns(names),
             Self::Values(values) => values.rename(names),
-            Self::Union(left, _) | Self::Intersect(left, _) | Self::Except(left, _) => {
-                left.rename_columns(names)
-            }
+            Self::Set(query) => query.rename_columns(names),
         }
     }
 
@@ -119,22 +99,16 @@ impl SelectStatement {
         Self::Simple(node.clone())
     }
 
-    /// create a union node
-    #[must_use]
-    pub fn union(left: Self, right: Self) -> Self {
-        Self::Union(Box::new(left), Box::new(right))
-    }
-
-    /// create a intersect node
-    #[must_use]
-    pub fn intersect(left: Self, right: Self) -> Self {
-        Self::Intersect(Box::new(left), Box::new(right))
-    }
-
-    /// create except node
-    #[must_use]
-    pub fn except(left: Self, right: Self) -> Self {
-        Self::Except(Box::new(left), Box::new(right))
+    /// Analyze a binary set operation in the selected dialect.
+    pub fn set_operation(
+        context: &mut impl ParseContext,
+        kind: SetOperationKind,
+        left: Self,
+        right: Self,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::Set(Box::new(SetOperationQuery::resolve(
+            context, kind, left, right,
+        )?)))
     }
 
     /// get column definition by name
@@ -144,9 +118,7 @@ impl SelectStatement {
             Self::Simple(query) => query.get_result_column_def(column),
             Self::Query(query) => query.body().get_result_column_def(column),
             Self::Values(values) => values.columns().get_result_column_def(column),
-            Self::Union(l, _r) => l.get_result_column_def(column),
-            Self::Intersect(l, _r) => l.get_result_column_def(column),
-            Self::Except(l, _r) => l.get_result_column_def(column),
+            Self::Set(query) => query.columns().get_result_column_def(column),
         }
     }
 
@@ -157,9 +129,7 @@ impl SelectStatement {
             Self::Simple(query) => query.has_column(column),
             Self::Query(query) => query.body().has_column(column),
             Self::Values(values) => values.columns().has_column(column),
-            Self::Union(l, _r) => l.has_column(column),
-            Self::Intersect(l, _r) => l.has_column(column),
-            Self::Except(l, _r) => l.has_column(column),
+            Self::Set(query) => query.columns().has_column(column),
         }
     }
 
@@ -170,9 +140,7 @@ impl SelectStatement {
             Self::Simple(query) => &query.result_columns,
             Self::Query(query) => query.body().result_columns(),
             Self::Values(values) => values.columns(),
-            Self::Union(l, _r) => l.result_columns(),
-            Self::Intersect(l, _r) => l.result_columns(),
-            Self::Except(l, _r) => l.result_columns(),
+            Self::Set(query) => query.columns(),
         }
     }
 
@@ -187,9 +155,12 @@ impl SelectStatement {
                     CreateCompositeType::from_fields(&fields),
                 )))
             }
-            Self::Union(l, _r) => l.returning_composite_type(),
-            Self::Intersect(l, _r) => l.returning_composite_type(),
-            Self::Except(l, _r) => l.returning_composite_type(),
+            Self::Set(query) => {
+                let fields = query.columns().composite_field_collection()?;
+                Ok(TypeReference::dynamic(&TypeDefinition::CompositeType(
+                    CreateCompositeType::from_fields(&fields),
+                )))
+            }
         }
     }
 
@@ -206,6 +177,18 @@ impl SelectStatement {
         let outcome = syntax.resolve(&mut context, &mut crate::CacheContext::new());
         let query = outcome?;
         Ok(AstAndContextPair::new(SemAst::select(&query), context))
+    }
+}
+
+struct SetOperationValidity(bool);
+impl crate::sem::traversal::SemanticVisitor for SetOperationValidity {
+    fn walk_source_column_values(&self) -> bool {
+        false
+    }
+
+    fn set_operation(&mut self, query: &mut SetOperationQuery) -> Result<(), AnalysisError> {
+        self.0 &= query.can_apply();
+        Ok(())
     }
 }
 
@@ -381,11 +364,7 @@ impl SelectStatement {
             Self::Simple(query) => query.walk_assigned(visitor, targets),
             Self::Query(query) => query.walk_assigned(visitor, targets),
             Self::Values(values) => values.walk_assigned(visitor, targets),
-            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
-                left.walk_assigned(visitor, targets)?;
-                visitor.retain_set_outputs();
-                right.walk_assigned(visitor, targets)
-            }
+            Self::Set(query) => query.walk_assigned(visitor, targets),
         }
     }
 }

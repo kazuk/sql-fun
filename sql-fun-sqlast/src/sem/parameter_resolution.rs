@@ -169,6 +169,24 @@ impl Drop for ParameterResolution<'_> {
 }
 
 impl<'cache> ParameterResolution<'cache> {
+    pub(crate) fn unify_set_types(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        operation: &str,
+        inputs: &[SemScalarExpr],
+    ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
+        self.common_type(context, operation, inputs, false)
+    }
+
+    pub(crate) fn retain_output_node(&mut self, previous: Option<usize>, current: usize) -> usize {
+        if let Some(previous) = previous {
+            self.graph.equal(previous, current);
+            previous
+        } else {
+            current
+        }
+    }
+
     pub(crate) fn new(cache: &'cache mut crate::CacheContext) -> Self {
         Self {
             cache,
@@ -820,12 +838,6 @@ impl<'cache> ParameterResolution<'cache> {
         Some(result)
     }
 
-    pub(crate) fn retain_completed_outputs(&mut self) {
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.outputs = self.completed.clone();
-        }
-    }
-
     pub(crate) fn enter_query(&mut self) {
         let scope = self
             .scopes
@@ -976,7 +988,33 @@ impl Signature {
     }
 }
 
+// Only the direct projection of a set operand defers standalone text
+// defaulting. Nested derived queries retain their own projection boundary.
+#[derive(Default)]
+struct SetOperandScopes {
+    depth: usize,
+    operands: Vec<usize>,
+}
+impl SetOperandScopes {
+    const fn enter_query(&mut self) {
+        self.depth += 1;
+    }
+    const fn leave_query(&mut self) {
+        self.depth -= 1;
+    }
+    fn enter_operand(&mut self) {
+        self.operands.push(self.depth + 1);
+    }
+    fn leave_operand(&mut self) {
+        self.operands.pop();
+    }
+    fn is_operand(&self) -> bool {
+        self.operands.last() == Some(&self.depth)
+    }
+}
+
 struct Collector<'context, 'cache, C: crate::sem::ParseContext> {
+    set_scopes: SetOperandScopes,
     dml_depth: usize,
     parameters: ParameterResolution<'cache>,
     context: &'context mut C,
@@ -1075,14 +1113,25 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
     fn leave_dml(&mut self) {
         self.dml_depth -= 1;
     }
+    fn enter_set_operand(&mut self) {
+        self.set_scopes.enter_operand();
+    }
+    fn leave_set_operand(&mut self) {
+        self.set_scopes.leave_operand();
+    }
     fn enter_query(&mut self) {
+        self.set_scopes.enter_query();
         self.parameters.enter_query();
     }
     fn leave_query(&mut self) {
-        if self.dml_depth > 0 && self.context.dialect() == Dialect::postgres() {
+        if self.dml_depth > 0
+            && !self.set_scopes.is_operand()
+            && self.context.dialect() == Dialect::postgres()
+        {
             self.parameters.default_query_outputs(self.context);
         }
         self.parameters.leave_query();
+        self.set_scopes.leave_query();
     }
     fn cte(&mut self, name: &str) {
         self.parameters.cte(name, &[]);
@@ -1098,6 +1147,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
             name,
             expression,
             self.context.dialect() == Dialect::postgres()
+                && !self.set_scopes.is_operand()
                 && expression.is_unconstrained_parameter(),
         );
     }
@@ -1190,26 +1240,52 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
             self.parameters.require(self.context, value, &target, false);
         }
     }
-    fn retain_set_outputs(&mut self) {
-        self.parameters.retain_completed_outputs();
+    fn set_operation(
+        &mut self,
+        query: &mut crate::sem::SetOperationQuery,
+    ) -> Result<(), AnalysisError> {
+        query.collect_constraints(&mut self.parameters, self.context)
     }
 }
 
 struct Finalizer<'a, C: crate::sem::ParseContext> {
+    set_scopes: SetOperandScopes,
     constraints: &'a ParameterConstraints,
     context: &'a mut C,
     expanded_arrays: bool,
 }
 impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
-    const fn new(constraints: &'a ParameterConstraints, context: &'a mut C) -> Self {
+    fn new(constraints: &'a ParameterConstraints, context: &'a mut C) -> Self {
         Self {
             constraints,
             context,
+            set_scopes: SetOperandScopes::default(),
             expanded_arrays: false,
         }
     }
 }
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
+    fn enter_set_operand(&mut self) {
+        self.set_scopes.enter_operand();
+    }
+    fn leave_set_operand(&mut self) {
+        self.set_scopes.leave_operand();
+    }
+    fn enter_query(&mut self) {
+        self.set_scopes.enter_query();
+    }
+    fn leave_query(&mut self) {
+        self.set_scopes.leave_query();
+    }
+
+    fn set_operation(
+        &mut self,
+        query: &mut crate::sem::SetOperationQuery,
+    ) -> Result<(), AnalysisError> {
+        query.apply_constraints(self.constraints);
+        Ok(())
+    }
+
     fn table_sample(
         &mut self,
         sample: &mut crate::sem::TableSampleSource,
@@ -1238,7 +1314,9 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Fin
         expression.validate_collation(self.context)
     }
     fn output(&mut self, _name: &str, expression: &mut SemScalarExpr) {
-        if self.context.dialect() == Dialect::postgres() && expression.is_unconstrained_parameter()
+        if self.context.dialect() == Dialect::postgres()
+            && !self.set_scopes.is_operand()
+            && expression.is_unconstrained_parameter()
         {
             *expression =
                 SemScalarExpr::wrap_implicit_cast(&crate::sem::PgBuiltInType::text(), expression);
@@ -1255,6 +1333,7 @@ impl<'cache> ParameterResolution<'cache> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            set_scopes: SetOperandScopes::default(),
             dml_depth: 0,
             parameters: Self::new(cache),
             context,
@@ -1289,6 +1368,7 @@ impl<'cache> ParameterResolution<'cache> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            set_scopes: SetOperandScopes::default(),
             dml_depth: 0,
             parameters: Self::new(cache),
             context,
@@ -1330,6 +1410,7 @@ impl<'cache> ParameterResolution<'cache> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            set_scopes: SetOperandScopes::default(),
             dml_depth: 0,
             parameters: Self::new(cache),
             context,
@@ -1356,6 +1437,7 @@ impl<'cache> ParameterResolution<'cache> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            set_scopes: SetOperandScopes::default(),
             dml_depth: 0,
             parameters: Self::new(cache),
             context,
@@ -1382,6 +1464,7 @@ impl<'cache> ParameterResolution<'cache> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            set_scopes: SetOperandScopes::default(),
             dml_depth: 0,
             parameters: Self::new(cache),
             context,
@@ -1408,6 +1491,7 @@ impl<'cache> ParameterResolution<'cache> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            set_scopes: SetOperandScopes::default(),
             dml_depth: 0,
             parameters: Self::new(cache),
             context,

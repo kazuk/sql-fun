@@ -4,6 +4,10 @@ use super::DiagnosticMetadata;
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum QueryProblem {
+    /// A binary operation has unequal operand widths.
+    SetWidth(SetWidthProblem),
+    /// A positional result has no legal common type.
+    SetType(SetTypeProblem),
     /// An internal list or dialect-specific row value cannot be consumed as a scalar.
     ScalarValueRequired,
     /// Database-name metadata is required for column reference.
@@ -41,7 +45,44 @@ pub enum QueryProblem {
     InvalidStarProjectionPlacement,
 }
 
+/// Operand shape retained for a rejected set operation.
+#[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct SetWidthProblem {
+    operation: String,
+    left: usize,
+    right: usize,
+}
+
+/// Common-type failure retained with its positional output identity.
+#[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct SetTypeProblem {
+    operation: String,
+    column: usize,
+    problem: super::MinMaxProblem,
+}
+
 impl QueryProblem {
+    /// Report unequal operand column counts.
+    #[must_use]
+    pub fn set_width(operation: &str, left: usize, right: usize) -> Self {
+        Self::SetWidth(SetWidthProblem {
+            operation: operation.to_owned(),
+            left,
+            right,
+        })
+    }
+    /// Report a column's common-type failure without discarding its cause.
+    #[must_use]
+    pub fn set_type(operation: &str, column: usize, problem: &super::MinMaxProblem) -> Self {
+        Self::SetType(SetTypeProblem {
+            operation: operation.to_owned(),
+            column,
+            problem: problem.clone(),
+        })
+    }
+
     /// Reports a non-scalar expression operand.
     #[must_use]
     pub const fn scalar_value_required() -> Self {
@@ -132,6 +173,8 @@ impl QueryProblem {
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::SetWidth(_) => "query_set_column_count",
+            Self::SetType(_) => "query_set_column_type",
             Self::ScalarValueRequired => "query_scalar_value_required",
             Self::ColumnDatabaseNameRequired(_) => "column_database_name_required",
             Self::ColumnCrossDatabase(_) => "column_cross_database",
@@ -156,6 +199,8 @@ impl QueryProblem {
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         let message = match self {
+            Self::SetWidth(problem) => format!("{} requires equal column counts (left {}, right {})", problem.operation, problem.left, problem.right),
+            Self::SetType(problem) => format!("{} column {}: {}", problem.operation, problem.column, problem.problem.message_for(&problem.operation)),
             Self::ScalarValueRequired => "expression requires a scalar value".to_owned(),
             Self::ColumnDatabaseNameRequired(reference) => format!("database-name metadata is required for column reference: {reference}"),
             Self::ColumnCrossDatabase(reference) => format!("cross-database column reference is not supported: {reference}"),

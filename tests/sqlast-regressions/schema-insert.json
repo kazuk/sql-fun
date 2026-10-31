@@ -358,7 +358,8 @@
     "sql": "INSERT INTO items(id) SELECT 1 UNION ALL SELECT 1, 2",
     "expected": {
       "diagnostics": [
-        "insert_semantics"
+        "insert_semantics",
+        "query_set_column_count"
       ],
       "columns": []
     }

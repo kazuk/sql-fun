@@ -24,6 +24,13 @@ pub struct CreateTableAs {
 }
 
 impl CreateTableAs {
+    pub(crate) fn set_operations_valid(&self) -> Result<bool, AnalysisError> {
+        self.query
+            .select_statement()
+            .expect("CREATE AS query is a SELECT")
+            .set_operations_valid()
+    }
+
     pub(crate) fn walk_column_dependencies(
         &mut self,
         visitor: &mut impl crate::sem::traversal::SemanticVisitor,

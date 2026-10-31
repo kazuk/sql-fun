@@ -48,6 +48,7 @@ mod operators;
 mod overload_rank;
 pub(crate) mod ownership;
 mod parameter_constraints;
+pub(crate) use self::parameter_constraints::ConstraintMemo;
 pub(crate) mod parameter_resolution;
 pub(crate) mod pg_type;
 pub mod problem;

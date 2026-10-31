@@ -389,7 +389,8 @@ impl<'cache> ParameterResolution<'cache> {
             self.graph.restrict(
                 node,
                 &InputTypeConstraint::types(
-                    context.assignment_sources(&crate::sem::PgBuiltInType::int4()),
+                    self.cache
+                        .assignment_sources(context, &crate::sem::PgBuiltInType::int4()),
                 ),
             );
         }

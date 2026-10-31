@@ -122,6 +122,34 @@ impl RankedSignature {
     }
 }
 
+/// Original per-source array cast calculation, shared with the session cache.
+pub(crate) fn array_cast_ranks(
+    context: &impl crate::context::BaseParseContext,
+    source: &TypeReference,
+) -> HashMap<TypeReference, OverloadRank> {
+    let mut targets = context.get_implicit_castable(source);
+    if source.is_array() == Some(true) {
+        targets.insert(source.clone());
+        targets.extend(
+            context
+                .get_implicit_castable(&source.element_type())
+                .into_iter()
+                .map(|ty| ty.array_type()),
+        );
+    }
+    targets
+        .into_iter()
+        .filter(|target| target.is_array() == Some(true))
+        .filter_map(|target| {
+            Some((
+                target.clone(),
+                OverloadRank::argument(context, Some(source), Some(&target))?
+                    .instantiated_operator(),
+            ))
+        })
+        .collect()
+}
+
 /// Cast ranks indexed by source; all storage queries stay with this collection.
 #[derive(Clone, Debug, Default)]
 struct ArrayCastRanks(HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>);
@@ -145,31 +173,16 @@ impl ArrayCastRanks {
         targets
     }
 
-    fn retain_source(&mut self, context: &impl ParseContext, source: &TypeReference) {
+    fn retain_source(
+        &mut self,
+        context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
+        source: &TypeReference,
+    ) {
         if self.0.contains_key(source) {
             return;
         }
-        let mut targets = context.get_implicit_castable(source);
-        if source.is_array() == Some(true) {
-            targets.insert(source.clone());
-            targets.extend(
-                context
-                    .get_implicit_castable(&source.element_type())
-                    .into_iter()
-                    .map(|ty| ty.array_type()),
-            );
-        }
-        let ranks = targets
-            .into_iter()
-            .filter(|target| target.is_array() == Some(true))
-            .filter_map(|target| {
-                Some((
-                    target.clone(),
-                    OverloadRank::argument(context, Some(source), Some(&target))?
-                        .instantiated_operator(),
-                ))
-            })
-            .collect();
+        let ranks = cache.array_cast_ranks(context, source);
         self.0.insert(source.clone(), ranks);
     }
 }
@@ -338,7 +351,7 @@ impl CallFacts {
             .chain(
                 targets
                     .iter()
-                    .flat_map(|target| context.declared_implicit_cast_sources(target)),
+                    .flat_map(|target| cache.declared_implicit_cast_sources(context, target)),
             )
             .collect();
         let concrete = declarations
@@ -359,7 +372,7 @@ impl CallFacts {
         // Preserve actual array casts for the finite declared/default types so
         // explicit assignment inspection can outlive the borrowed context.
         for source in &candidates {
-            facts.retain_array_source(context, &source.array_type());
+            facts.retain_array_source(context, cache, &source.array_type());
         }
         facts.retain(
             context,
@@ -372,9 +385,14 @@ impl CallFacts {
         facts
     }
 
-    fn retain_array_source(&mut self, context: &impl ParseContext, source: &TypeReference) {
+    fn retain_array_source(
+        &mut self,
+        context: &impl ParseContext,
+        cache: &mut crate::CacheContext,
+        source: &TypeReference,
+    ) {
         if !self.arrays.is_empty() {
-            self.array_casts.retain_source(context, source);
+            self.array_casts.retain_source(context, cache, source);
         }
     }
 
@@ -389,12 +407,12 @@ impl CallFacts {
             sources.insert(ty.clone());
             // A specific SQL-established type justifies its incoming casts.
             // Never enumerate all catalog types to find an initial seed.
-            sources.extend(context.declared_implicit_cast_sources(ty));
-            self.retain_array_source(context, ty);
+            sources.extend(cache.declared_implicit_cast_sources(context, ty));
+            self.retain_array_source(context, cache, ty);
         }
         self.concrete.retain_sources(context, cache, &sources);
         for source in sources {
-            self.retain_array_source(context, &source);
+            self.retain_array_source(context, cache, &source);
         }
     }
 

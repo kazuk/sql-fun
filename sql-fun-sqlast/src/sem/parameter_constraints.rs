@@ -4,6 +4,8 @@ mod call;
 mod common_type;
 mod structural;
 
+pub(crate) use self::call::array_cast_ranks;
+
 use self::common_type::{CommonTypeConstraint, CommonTypeFacts};
 use std::sync::Arc;
 

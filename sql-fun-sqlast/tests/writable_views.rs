@@ -736,7 +736,7 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN
     Ok(())
 }
 
-
+// Timed-out bound_names_do_not_reselect_shadowed_views was deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
 
 #[test]
 fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::error::Error>> {

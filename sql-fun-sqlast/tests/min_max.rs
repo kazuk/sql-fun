@@ -1,10 +1,6 @@
 //! `PostgreSQL` common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::{
-    context::{ParseContext, TypeInfoRead},
-    sem::{PgBuiltInType, TypeReference},
-};
-use std::collections::BTreeMap;
+use ::sql_fun_sqlast::{context::TypeInfoRead, sem::TypeReference};
 
 #[rstest::rstest]
 #[case::single("greatest(1)")]
@@ -83,8 +79,8 @@ fn invalid_operands_render_specific_diagnostics(
 // Removed nested after a local timeout; restore from bacb3e5757e0e61b6a8860d0d7645be129129adf.
 // Removed cte after a local timeout; restore from bacb3e5757e0e61b6a8860d0d7645be129129adf.
 
-
-
+// Timed-out parameter_sources_allow_numeric_promotion cases were deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
+// Timed-out unanchored_parameters_retain_alternatives_and_keep_minmax was deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
 
 #[test]
 fn later_operands_retain_column_bindings() -> Result<(), Box<dyn std::error::Error>> {

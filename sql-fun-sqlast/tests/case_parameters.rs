@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 #[rstest::rstest]
 #[case::then_parameter("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
 #[case::else_parameter("SELECT CASE WHEN true THEN 1 ELSE $1 END")]
+// Timed-out outer_operator case removed in 654110eb7c1ade58dbe1327f579b18932c3e605a.
 #[case::outer_call("SELECT abs(CASE WHEN true THEN $1 ELSE 1 END)")]
 #[case::cte("WITH c AS (SELECT CASE WHEN true THEN $1 ELSE 1 END AS n) SELECT n FROM c")]
 fn numeric_inputs_retain_admissible_alternatives(#[case] sql: &str) -> testresult::TestResult {

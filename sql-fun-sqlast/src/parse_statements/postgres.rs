@@ -126,7 +126,7 @@ mod test_postgres_statements {
 }
 
 fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatementError> {
-    let parsed = ::pg_query::parse(sql)
+    let parsed = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
         .map_err(|error| ParseStatementError::syntax(span, &error.to_string()))?;
     if parsed.protobuf.stmts.len() != 1 {
         return Err(ParseStatementError::boundary_discovery(

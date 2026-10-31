@@ -203,7 +203,7 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
             .map(|nodes| nodes.as_constraint())
             .unwrap_or_default()
         {
-            constraints.push(TableConstraint::try_from_with_tokens(&constraint, tokens)?);
+            constraints.push(TableConstraint::from_postgres_inline(&constraint, tokens)?);
         }
         Ok(Self {
             collation,
@@ -253,6 +253,8 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ColumnConstraint {
         use crate::sem::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity};
         let kind = required(value.get_contype().as_inner(), "constraint.contype")?;
         Ok(match kind {
+            syn::ConstrType::ConstrAttrEnforced => Self::Enforcement(true),
+            syn::ConstrType::ConstrAttrNotEnforced => Self::Enforcement(false),
             syn::ConstrType::ConstrNull => {
                 Self::Nullability(false, None, Some(Validity::from_constraint(value)))
             }
@@ -279,8 +281,8 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ColumnConstraint {
                     &required(value.get_raw_expr().as_inner(), "constraint.raw_expr")?,
                     tokens,
                 )?,
-                Some(match value.get_generated_when().as_str() {
-                    "a" | "s" => GeneratedColumnMode::stored(),
+                Some(match value.get_generated_kind().as_str() {
+                    "s" => GeneratedColumnMode::stored(),
                     "v" => GeneratedColumnMode::r#virtual(),
                     _ => return AnalysisError::raise_unexpected_input("raw generated-column mode"),
                 }),
@@ -826,11 +828,12 @@ impl crate::ast::ddl::AlterOperation {
                     tokens,
                 )?)
             }
-            Self::AlterConstraint => {
-                AlterDefinition::constraint_flags(crate::ast::ddl::AlterConstraintFlags::try_from(
-                    &required(definition.as_constraint().as_inner(), "altered constraint")?,
-                )?)
-            }
+            Self::AlterConstraint => AlterDefinition::constraint_flags(
+                crate::ast::ddl::AlterConstraintFlags::try_from(&required(
+                    definition.as_atalter_constraint().as_inner(),
+                    "altered constraint",
+                )?)?,
+            ),
             Self::Owner => AlterDefinition::role(crate::ast::Role::try_from(&required(
                 value.get_newowner().as_inner(),
                 "new owner",
@@ -894,14 +897,27 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::ddl::AlterColumnType {
     }
 }
 
-impl TryFrom<&syn::Constraint> for crate::ast::ddl::AlterConstraintFlags {
+impl TryFrom<&syn::AtAlterConstraint> for crate::ast::ddl::AlterConstraintFlags {
     type Error = AnalysisError;
-    fn try_from(value: &syn::Constraint) -> Result<Self, Self::Error> {
-        Ok(Self::new(
-            &value.get_conname(),
-            value.get_deferrable(),
-            value.get_initdeferred(),
-        ))
+    fn try_from(value: &syn::AtAlterConstraint) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: value.get_conname(),
+            deferrability: if value.get_alter_deferrability() {
+                Some((value.get_deferrable(), value.get_initdeferred()))
+            } else {
+                None
+            },
+            enforced: if value.get_alter_enforceability() {
+                Some(value.get_is_enforced())
+            } else {
+                None
+            },
+            no_inherit: if value.get_alter_inheritability() {
+                Some(value.get_noinherit())
+            } else {
+                None
+            },
+        })
     }
 }
 
@@ -1163,6 +1179,10 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ConstraintExtras {
             )?);
         }
         Ok(Self {
+            enforced: Self::explicit_enforcement(v, tokens),
+            without_overlaps: v.get_without_overlaps(),
+            fk_with_period: v.get_fk_with_period(),
+            pk_with_period: v.get_pk_with_period(),
             deferrable: v.get_deferrable(),
             initially_deferred: v.get_initdeferred(),
             skip_validation: v.get_skip_validation(),
@@ -1221,5 +1241,17 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for crate::ast::PartitionDatum {
             .iter()
             .map(|node| Self::try_from_with_tokens(node, tokens))
             .collect()
+    }
+}
+
+impl crate::ast::TableConstraint {
+    pub(in crate::ast) fn from_postgres_inline(
+        constraint: &syn::Constraint,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let mut converted = Self::try_from_with_tokens(constraint, tokens)?;
+        // Inline enforcement is represented by a separate attribute node.
+        converted.extras.enforced = None;
+        Ok(converted)
     }
 }

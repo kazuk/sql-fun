@@ -1,6 +1,5 @@
 //! DB Engine specific syntax hooks
 
-#[cfg(feature = "sqlite")]
 use crate::sem::AnalysisError;
 
 #[cfg(feature = "sqlite")]
@@ -121,4 +120,70 @@ pub trait TursoFtsMergeThresholdFeature {
 pub trait TursoArrayTypeFeature {
     /// Notify that a type has parser-provided array dimensions.
     fn array_type_used(&mut self, ty: &crate::syn::sqlite::Type) -> Result<(), AnalysisError>;
+}
+
+/// PostgreSQL 18 syntax recognized independently of the selected target engine.
+#[derive(Clone, Copy, Debug)]
+pub enum Postgres18Syntax {
+    /// Explicit OLD/NEW aliases in RETURNING WITH.
+    ReturningAliases,
+    /// Special OLD/NEW destination row images in RETURNING.
+    ReturningRowImages,
+    /// Virtual generated column, including the omitted storage kind.
+    VirtualGeneratedColumn,
+    /// Temporal primary/unique or foreign-key constraint.
+    TemporalConstraint,
+    /// Explicit constraint enforcement attributes.
+    ConstraintEnforcement,
+    /// Table-level NOT NULL and new nullability attributes.
+    NotNullConstraint,
+    /// ALTER CONSTRAINT INHERIT / NO INHERIT.
+    ConstraintInheritance,
+}
+
+impl Postgres18Syntax {
+    /// SQL construct named by the version diagnostic.
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::ReturningAliases => "RETURNING WITH row aliases",
+            Self::ReturningRowImages => "RETURNING OLD/NEW row images",
+            Self::VirtualGeneratedColumn => "virtual generated columns",
+            Self::TemporalConstraint => "temporal constraints",
+            Self::ConstraintEnforcement => "constraint ENFORCED/NOT ENFORCED",
+            Self::NotNullConstraint => "PostgreSQL 18 NOT NULL constraints",
+            Self::ConstraintInheritance => "ALTER CONSTRAINT inheritance",
+        }
+    }
+}
+
+/// Feature notification after PostgreSQL syntax recognition.
+pub trait Postgres18Feature {
+    /// Report incompatible target versions; return whether analysis can proceed.
+    fn postgres18_syntax_used(&mut self, syntax: Postgres18Syntax) -> Result<bool, AnalysisError>;
+}
+
+impl<T: crate::context::ParseContext> Postgres18Feature for T {
+    fn postgres18_syntax_used(&mut self, syntax: Postgres18Syntax) -> Result<bool, AnalysisError> {
+        let selected = self
+            .metadata()
+            .engine_version()
+            .as_ref()
+            .map(ToString::to_string);
+        let compatible = self.dialect() == crate::ast::Dialect::postgres()
+            && selected.as_deref().is_some_and(|version| {
+                version
+                    .parse::<::sql_fun_core::PostgresVersion>()
+                    .is_ok_and(|version| version.major() >= 18)
+            });
+        if !compatible {
+            self.report_analysis_problem(
+                crate::sem::AnalysisProblem::incompatible_engine_version(
+                    syntax.description(),
+                    18,
+                    selected.as_deref(),
+                ),
+            )?;
+        }
+        Ok(compatible)
+    }
 }

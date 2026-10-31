@@ -519,6 +519,9 @@ impl CteBody {
         scope: &ScalarAnalysisContext<'_>,
         columns: &[String],
     ) -> Result<CteStatement, AnalysisError> {
+        if !self.check_engine_features(context)? {
+            return Ok(CteStatement::unresolved());
+        }
         match self {
             Self::Query(query) => Query::resolve_cte_body(context, scope, columns, query),
             Self::Insert(insert) => Insert::resolve_cte_body(context, scope, columns, insert),

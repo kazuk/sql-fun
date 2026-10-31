@@ -470,6 +470,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Syntax is unavailable on the explicitly selected engine version.",
+                  "type": "object",
+                  "properties": {
+                    "IncompatibleEngineVersion": {
+                      "$ref": "#/$defs/EngineVersionProblem"
+                    }
+                  },
+                  "required": [
+                    "IncompatibleEngineVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "SQL analysis could not establish a finalized parameter type.",
                   "type": "object",
                   "properties": {
@@ -1156,6 +1169,30 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "EngineVersionProblem": {
+              "description": "Syntax version requirement and the explicitly selected target.",
+              "type": "object",
+              "properties": {
+                "feature": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "feature",
+                "required"
               ]
             },
             "QueryAnalysisProblem": {
@@ -4297,6 +4334,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Syntax is unavailable on the explicitly selected engine version.",
+                  "type": "object",
+                  "properties": {
+                    "IncompatibleEngineVersion": {
+                      "$ref": "#/$defs/EngineVersionProblem"
+                    }
+                  },
+                  "required": [
+                    "IncompatibleEngineVersion"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "SQL analysis could not establish a finalized parameter type.",
                   "type": "object",
                   "properties": {
@@ -4983,6 +5033,30 @@
                   ],
                   "additionalProperties": false
                 }
+              ]
+            },
+            "EngineVersionProblem": {
+              "description": "Syntax version requirement and the explicitly selected target.",
+              "type": "object",
+              "properties": {
+                "feature": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "selected": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "feature",
+                "required"
               ]
             },
             "QueryAnalysisProblem": {

@@ -14,6 +14,7 @@ mod ddl;
 mod deparse;
 mod document;
 mod drop_behavior;
+mod engine_features;
 mod mutation;
 mod ownership;
 mod postgres;
@@ -21,6 +22,7 @@ mod projection;
 mod public;
 mod query_construction;
 mod resolve;
+mod returning_options;
 mod rows_from;
 mod rule;
 #[cfg(feature = "sqlite")]
@@ -103,6 +105,10 @@ pub(crate) enum PartitionDatum {
 }
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ConstraintExtras {
+    enforced: Option<bool>,
+    without_overlaps: bool,
+    fk_with_period: bool,
+    pk_with_period: bool,
     deferrable: bool,
     initially_deferred: bool,
     skip_validation: bool,
@@ -159,6 +165,7 @@ pub(crate) struct TableConstraint {
 
 #[derive(Clone, Debug)]
 pub(crate) enum ColumnConstraint {
+    Enforcement(bool),
     Nullability(bool, Option<ConflictClause>, Option<Validity>),
     Default(Expr),
     Check(Expr),
@@ -363,6 +370,9 @@ impl StatementNode {
         context: &mut impl ParseContext,
         cache: &mut crate::CacheContext,
     ) -> Result<SemAst, AnalysisError> {
+        if !self.check_engine_features(context)? {
+            return Ok(SemAst::unresolved_statement());
+        }
         match self {
             Self::Query(query) => query
                 .resolve(context, cache)
@@ -467,6 +477,12 @@ impl StatementNode {
     {
         let mut context = context;
         context.set_parameter_constraints(&ParameterConstraints::default());
+        if !self.check_engine_features(&mut context)? {
+            return Ok(crate::AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         match self {
             Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::DropTrigger(trigger) => trigger.resolve_and_apply(context),
@@ -1791,6 +1807,12 @@ pub(crate) struct Assignment {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct ReturningOption {
+    old: bool,
+    alias: String,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct Insert {
     with: With,
     relation: Relation,
@@ -1800,6 +1822,7 @@ pub(crate) struct Insert {
     conflict: Option<Conflict>,
     or_conflict: Option<ConflictClause>,
     returning: Vec<Target>,
+    returning_options: Vec<ReturningOption>,
 }
 
 #[derive(Clone, Debug)]
@@ -1858,6 +1881,7 @@ pub(crate) struct Update {
     from: Vec<FromItem>,
     predicate: Option<Expr>,
     returning: Vec<Target>,
+    returning_options: Vec<ReturningOption>,
     or_conflict: Option<ConflictClause>,
 }
 
@@ -1868,6 +1892,7 @@ pub(crate) struct Delete {
     using: Vec<FromItem>,
     predicate: Option<Expr>,
     returning: Vec<Target>,
+    returning_options: Vec<ReturningOption>,
 }
 
 #[derive(Clone, Copy, Debug)]

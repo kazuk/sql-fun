@@ -1,0 +1,424 @@
+[
+  {
+    "name": "returning-alias-insert",
+    "sql": "INSERT INTO migration_rows VALUES (1) RETURNING WITH (NEW AS n) n.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "returning-alias-update",
+    "sql": "UPDATE migration_rows SET id=2 RETURNING WITH (OLD AS o) o.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "returning-alias-delete",
+    "sql": "DELETE FROM migration_rows RETURNING WITH (OLD AS o) o.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "returning-alias-merge",
+    "sql": "MERGE INTO migration_rows t USING (VALUES (1)) s(id) ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING WITH (OLD AS o) o.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "returning-alias-cte",
+    "sql": "WITH changed AS (DELETE FROM migration_rows RETURNING WITH (OLD AS o) o.id) SELECT * FROM changed",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "virtual-generated-column",
+    "sql": "CREATE TABLE generated_sample (id int, computed int GENERATED ALWAYS AS (1) VIRTUAL)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "implicit-virtual-column",
+    "sql": "CREATE TABLE generated_sample (id int, computed int GENERATED ALWAYS AS (1))",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "temporal-primary-key",
+    "sql": "CREATE TABLE temporal_sample (id int, valid_at int4range, PRIMARY KEY (id, valid_at WITHOUT OVERLAPS))",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "temporal-unique",
+    "sql": "CREATE TABLE temporal_sample (id int, valid_at int4range, UNIQUE (id, valid_at WITHOUT OVERLAPS))",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "period-foreign-key",
+    "sql": "CREATE TABLE temporal_child (id int, valid_at int4range, FOREIGN KEY (id, PERIOD valid_at) REFERENCES temporal_sample (id, PERIOD valid_at))",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-check-enforced",
+    "sql": "CREATE TABLE check_sample (id int, CHECK (id>0) ENFORCED)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-check-not-enforced",
+    "sql": "CREATE TABLE check_sample (id int, CHECK (id>0) NOT ENFORCED)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "column-check-enforced",
+    "sql": "CREATE TABLE check_sample (id int CHECK (1>0) ENFORCED)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "column-check-not-enforced",
+    "sql": "CREATE TABLE check_sample (id int CHECK (id>0) NOT ENFORCED)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null",
+    "sql": "CREATE TABLE not_null_sample (id int, NOT NULL id)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "not-null-no-inherit",
+    "sql": "CREATE TABLE not_null_sample (id int NOT NULL NO INHERIT)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-constraint-enforced",
+    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id ENFORCED",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-constraint-not-enforced",
+    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id NOT ENFORCED",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-constraint-inherit",
+    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id INHERIT",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-constraint-no-inherit",
+    "sql": "ALTER TABLE migration_rows ALTER CONSTRAINT check_id NO INHERIT",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert-old-column",
+    "sql": "INSERT INTO migration_rows VALUES (1) RETURNING old.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "update-new-column",
+    "sql": "UPDATE migration_rows SET id=2 RETURNING new.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "update-old-star",
+    "sql": "UPDATE migration_rows SET id=2 RETURNING old.*",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert-new-star",
+    "sql": "INSERT INTO migration_rows VALUES (1) RETURNING new.*",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "update-whole-old",
+    "sql": "UPDATE migration_rows SET id=2 RETURNING old",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": [
+        {
+          "name": "old",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary-returning",
+    "sql": "UPDATE migration_rows SET id=2 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary-old-alias",
+    "sql": "UPDATE migration_rows AS old SET id=2 RETURNING old.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary-new-alias",
+    "sql": "DELETE FROM migration_rows AS new RETURNING new.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "stored-generated-column",
+    "sql": "CREATE TABLE stored_sample (id int, computed int GENERATED ALWAYS AS (1) STORED)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-not-null-not-valid",
+    "sql": "ALTER TABLE migration_rows ADD CONSTRAINT id_required NOT NULL id NOT VALID",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "foreign-key-enforced",
+    "sql": "CREATE TABLE child_enforced (id int, FOREIGN KEY (id) REFERENCES migration_rows(id) ENFORCED)",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "domain-check-enforced",
+    "sql": "CREATE DOMAIN positive_int AS int CHECK (VALUE>0) ENFORCED",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "delete-old-column",
+    "sql": "DELETE FROM migration_rows RETURNING old.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete-old-star",
+    "sql": "DELETE FROM migration_rows RETURNING old.*",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge-old-column",
+    "sql": "MERGE INTO migration_rows t USING (VALUES (1)) s(id) ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING old.id",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge-old-star",
+    "sql": "MERGE INTO migration_rows t USING (VALUES (1)) s(id) ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING old.*",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  }
+]

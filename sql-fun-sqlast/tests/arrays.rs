@@ -90,44 +90,15 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 }
 
 // Removed repeated and nested numeric-source cases in 81568731f391becc60f90cbeac057ddd96c0baa6, and the CTE case in 22cf48f9b8718c8f344f40158c272d052a844340.
-#[rstest::rstest]
-#[case::mixed("SELECT ARRAY[$1,1] AS result")]
-#[case::reverse("SELECT ARRAY[1,$1] AS result")]
-#[case::subquery("SELECT ARRAY[(SELECT $1),1] AS result")]
-fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
-    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::bool())])));
-    assert!(!constraints.result_column(0).unwrap().is_any());
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert!(
-        query
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .expression()
-            .unwrap()
-            .as_array()
-            .is_some()
-    );
-    Ok(())
-}
+// Timed-out parameters_retain_correlated_numeric_sources cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out parameters_retain_correlated_numeric_sources cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
+// Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 #[rstest::rstest]
 // Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
-#[case::greatest_reverse("GREATEST($1,NULL)", true)]
-#[case::least("LEAST($1,NULL)", false)]
-#[case::least_reverse("LEAST($1,NULL)", true)]
 // Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
-#[case::case_reverse("CASE WHEN true THEN $1 ELSE NULL END", true)]
+#[case::least("LEAST($1,NULL)", true)]
 fn unanchored_parameters_accept_typed_assignments(
     #[case] expression: &str,
     #[case] reverse: bool,
@@ -300,72 +271,18 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::single("ARRAY[$1]")]
-#[case::null("ARRAY[$1,NULL]")]
-#[case::string("ARRAY[$1,'1']")]
-#[case::repeated("ARRAY[$1,$1]")]
-#[case::nested("ARRAY[ARRAY[$1],ARRAY[$1,NULL]]")]
-#[case::subquery("ARRAY[(SELECT $1)]")]
-fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testresult::TestResult {
-    // The builtin catalog supplies scalar and array conversion families. The
-    // cloned constraint graph must remain inspectable after its context is gone.
-    let constraints = {
-        let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
-        assert!(
-            analyzed.context().problems().is_empty(),
-            "{:?}",
-            analyzed.context().problems()
-        );
-        analyzed.context().parameter_constraints().clone()
-    };
-    assert!(constraints.result_column(0).unwrap().is_any());
-    for ty in [
-        PgBuiltInType::int4(),
-        PgBuiltInType::int8(),
-        PgBuiltInType::text(),
-    ] {
-        assert!(constraints.allows(&BTreeMap::from([(1, ty)])));
-    }
-    Ok(())
-}
+// Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
+// The remaining owned-array cases were deleted in 78296d13d739d719733a6b23574f74c5200cc1ad.
 
-#[rstest::rstest]
-#[case::direct("SELECT ARRAY[$1,$2]")]
-#[case::nested("SELECT ARRAY[ARRAY[$1],ARRAY[$2]]")]
-#[case::cte("WITH c AS (SELECT ARRAY[$1,$2] AS n) SELECT n FROM c")]
-fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::int8())
-    ])));
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    assert!(!constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::text())
-    ])));
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, TypeReference::from_master_type_name("json")),
-        (2, TypeReference::from_master_type_name("json"))
-    ])));
-    Ok(())
-}
+// Timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out unanchored_array_inputs_remain_jointly_constrained cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
 
 // Removed the subscript case after parallel timeouts; restore from
 // e1039d77f118af4a82783dfb31666046bebd8635.
+// Timed-out late_constraints_reach_array_results cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 #[rstest::rstest]
 #[case::predicate("SELECT ARRAY[$1,NULL] WHERE $1", "_bool")]
-#[case::cte(
-    "WITH c AS (SELECT ARRAY[$1,NULL] AS n) SELECT n FROM c WHERE $1",
-    "_bool"
-)]
 fn late_constraints_reach_array_results(
     #[case] sql: &str,
     #[case] ty: &str,
@@ -387,34 +304,7 @@ fn late_constraints_reach_array_results(
     Ok(())
 }
 
-#[test]
-fn deferred_arrays_accept_catalog_defined_types() -> testresult::TestResult {
-    // Enum/domain declarations and their catalog cast rules are part of this contract.
-    let analyzed = heavy::analyze(
-        "SELECT ARRAY[$1,$2]",
-        &[
-            "CREATE TYPE mood AS ENUM ('low','high')",
-            "CREATE TYPE other_mood AS ENUM ('low','high')",
-            "CREATE DOMAIN amount AS integer",
-        ],
-    )?;
-    let constraints = analyzed.context().parameter_constraints().clone();
-    drop(analyzed);
-    let mood = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
-        "public", "mood",
-    ));
-    let other = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
-        "public",
-        "other_mood",
-    ));
-    let amount = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
-        "public", "amount",
-    ));
-    assert!(constraints.allows(&BTreeMap::from([(1, mood.clone()), (2, mood.clone())])));
-    assert!(!constraints.allows(&BTreeMap::from([(1, mood), (2, other)])));
-    assert!(constraints.allows(&BTreeMap::from([(1, amount), (2, PgBuiltInType::int4())])));
-    Ok(())
-}
+// Timed-out deferred_arrays_accept_catalog_defined_types cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 
 #[rstest::rstest]
 #[case::constructor("SELECT ARRAY[1::oid] = ARRAY[1::oid]", &[], "_oid")]

@@ -31,7 +31,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 142 groups are split 10/66/66.
+in the committed file. The current 144 groups are split 10/67/67.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -323,3 +323,10 @@ for scalar grouping, invalid row projection/scalar operands, and legal row
 membership and IS comparisons. Existing UPDATE tests cover
 legal SQLite tuple assignments. Bare relation-name whole-row binding remains
 [#614](https://github.com/kazuk/sql-fun/issues/614); nested explicit rows use the existing qualified-star expansion.
+
+Issue #885 adds paired `postgres18-syntax-17.json` and
+`postgres18-syntax-18.json` fixtures for implemented behavior and engine-version
+diagnostics (36 cases on 17, 13 on 18). Missing common-AST conversion or analysis
+retains explicit `todo!()` panics; focused Rust tests verify those markers rather
+than terminating the shared CLI regression server. Utility implementation is
+tracked in #891 and remaining constraint semantics in #887.

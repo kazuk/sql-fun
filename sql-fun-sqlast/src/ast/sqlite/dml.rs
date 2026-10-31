@@ -18,6 +18,7 @@ impl TryFrom<&syn::InsertStatement> for Insert {
             overriding: None,
             conflict: source.conflict,
             or_conflict: ConflictClause::from_opt(value.or_conflict().as_ref()),
+            returning_options: Vec::new(),
             returning: Target::try_from_list(value.returning())?,
         })
     }
@@ -62,6 +63,7 @@ impl TryFrom<&syn::Update> for Update {
             from: FromItem::try_from_clause_opt(value.from_clause().as_ref())?,
             predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
             or_conflict: ConflictClause::from_opt(value.or_conflict().as_ref()),
+            returning_options: Vec::new(),
             returning: Target::try_from_list(value.returning())?,
         })
     }
@@ -117,6 +119,7 @@ impl TryFrom<&syn::DeleteStatement> for Delete {
             relation: Relation::sqlite_target(value.table_name(), value.indexed().as_ref()),
             using: Vec::new(),
             predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
+            returning_options: Vec::new(),
             returning: Target::try_from_list(value.returning())?,
         })
     }
@@ -351,6 +354,7 @@ impl TryFrom<&syn::TriggerCmdUpdate> for Update {
             from: FromItem::try_from_clause_opt(value.from().as_ref())?,
             predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
             or_conflict: ConflictClause::from_opt(value.or_conflict().as_ref()),
+            returning_options: Vec::new(),
             returning: Vec::new(),
         })
     }
@@ -368,6 +372,7 @@ impl TryFrom<&syn::TriggerCmdInsert> for Insert {
             overriding: None,
             conflict: Conflict::try_from_opt(value.upsert().as_deref())?,
             or_conflict: ConflictClause::from_opt(value.or_conflict().as_ref()),
+            returning_options: Vec::new(),
             returning: Target::try_from_list(value.returning())?,
         })
     }
@@ -412,6 +417,7 @@ impl TryFrom<&syn::TriggerCmdDelete> for Delete {
             relation: Relation::sqlite_trigger_target(value.table_name()),
             using: Vec::new(),
             predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
+            returning_options: Vec::new(),
             returning: Vec::new(),
         })
     }

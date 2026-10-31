@@ -204,15 +204,18 @@ fn exercise_case(dialect: Dialect, carrier: Carrier, existing: bool, position: u
     assert_eq!(reparsed.deparse_sql(dialect).unwrap(), emitted);
 
     if dialect == Dialect::postgres() {
-        let native = pg_query::parse(&emitted)
+        let native = pg_query::parse(&emitted, ::pg_query::ParserOptions::default())
             .expect("independent PostgreSQL parser accepts emitted SQL")
-            .deparse()
+            .deparse(::pg_query::DeparseOptions::default())
             .expect("native PostgreSQL canonical deparse");
         let common = parse_owned(native.clone(), dialect);
         assert_cte_attributes(&common, existing, position);
         let common_sql = common.deparse_sql(dialect).unwrap();
         assert_eq!(
-            pg_query::parse(&common_sql).unwrap().deparse().unwrap(),
+            pg_query::parse(&common_sql, ::pg_query::ParserOptions::default())
+                .unwrap()
+                .deparse(::pg_query::DeparseOptions::default())
+                .unwrap(),
             native,
             "{} carrier at insertion index {position}: {common_sql}",
             carrier.name()

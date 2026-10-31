@@ -394,6 +394,7 @@ impl RetainSqliteTypes for ColumnConstraint {
             | Self::Exclusion
             | Self::Deferrability(_)
             | Self::Deferred
+            | Self::Enforcement(_)
             | Self::Immediate
             | Self::Collate(_) => Ok(()),
         }

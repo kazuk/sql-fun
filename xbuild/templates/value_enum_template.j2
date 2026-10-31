@@ -93,7 +93,7 @@ impl From<Option<{{ enum_type_name }}>> for {{ enum_type_name }}
 impl {{ enum_type_name }}ListOpt {
     /// returns Some(None) valiant
     #[must_use]
-    pub fn none() -> Self {
+    pub const fn none() -> Self {
       Self(None)
     }
 }
@@ -132,7 +132,7 @@ impl {{ enum_type_name }}
 {
   /// returns None variant
   #[must_use]
-  pub fn none() -> Self {
+  pub const fn none() -> Self {
     Self(self::inner::{{ enum_type_name }}::None)
   }
 }
@@ -231,7 +231,7 @@ impl {{ enum_type_name }}
 
   /// test variant kind
   #[must_use]
-  pub fn {{ field.variant_is_fn_name() }}(&self) -> bool {
+  pub const fn {{ field.variant_is_fn_name() }}(&self) -> bool {
     matches!( self, Self( self::inner::{{enum_type_name}}::{{ field.enum_variant_name() }}(_) ) )
   }
 }

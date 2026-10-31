@@ -739,14 +739,20 @@ mod test_statistics_emission {
         r#"ALTER TABLE "t" ALTER COLUMN "a" SET STATISTICS -1"#
     )]
     fn keeps_column_and_statistics_target_distinct(#[case] sql: &str, #[case] expected: &str) {
-        let original = pg_query::parse(sql).unwrap().deparse().unwrap();
+        let original = pg_query::parse(sql, ::pg_query::ParserOptions::default())
+            .unwrap()
+            .deparse(::pg_query::DeparseOptions::default())
+            .unwrap();
         let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap();
         let emitted = statement.deparse_sql(Dialect::postgres()).unwrap();
         assert_eq!(expected, emitted);
-        let reparsed = pg_query::parse(&emitted).unwrap().deparse().unwrap();
+        let reparsed = pg_query::parse(&emitted, ::pg_query::ParserOptions::default())
+            .unwrap()
+            .deparse(::pg_query::DeparseOptions::default())
+            .unwrap();
         assert_eq!(original, reparsed, "emitted SQL: {emitted}");
     }
 }
@@ -829,8 +835,14 @@ mod test_alter_emission {
             .unwrap()
             .unwrap();
         let emitted = statement.deparse_sql(Dialect::postgres()).unwrap();
-        let original = pg_query::parse(sql).unwrap().deparse().unwrap();
-        let reparsed = pg_query::parse(&emitted).unwrap().deparse().unwrap();
+        let original = pg_query::parse(sql, ::pg_query::ParserOptions::default())
+            .unwrap()
+            .deparse(::pg_query::DeparseOptions::default())
+            .unwrap();
+        let reparsed = pg_query::parse(&emitted, ::pg_query::ParserOptions::default())
+            .unwrap()
+            .deparse(::pg_query::DeparseOptions::default())
+            .unwrap();
         assert_eq!(original, reparsed, "emitted SQL: {emitted}");
     }
 }
@@ -1080,16 +1092,32 @@ impl SqlEmit for AlterColumnType {
 impl SqlEmit for AlterConstraintFlags {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.ident(&self.name)?;
-        writer.sql(if self.deferrable {
-            " DEFERRABLE"
-        } else {
-            " NOT DEFERRABLE"
-        });
-        writer.sql(if self.initially_deferred {
-            " INITIALLY DEFERRED"
-        } else {
-            " INITIALLY IMMEDIATE"
-        });
+        if let Some((deferrable, deferred)) = self.deferrability {
+            writer.sql(if deferrable {
+                " DEFERRABLE"
+            } else {
+                " NOT DEFERRABLE"
+            });
+            writer.sql(if deferred {
+                " INITIALLY DEFERRED"
+            } else {
+                " INITIALLY IMMEDIATE"
+            });
+        }
+        if let Some(enforced) = self.enforced {
+            writer.sql(if enforced {
+                " ENFORCED"
+            } else {
+                " NOT ENFORCED"
+            });
+        }
+        if let Some(no_inherit) = self.no_inherit {
+            writer.sql(if no_inherit {
+                " NO INHERIT"
+            } else {
+                " INHERIT"
+            });
+        }
         Ok(())
     }
 }

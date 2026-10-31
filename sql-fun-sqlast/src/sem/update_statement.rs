@@ -355,11 +355,7 @@ pub fn analyze_update_statement<T: ParseContext>(
 ) -> Result<(SemAst, T), AnalysisError> {
     AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
     let syntax = crate::ast::Update::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let update = syntax.resolve(&mut context, &mut crate::CacheContext::new())?;
-    Ok((
-        update
-            .as_ref()
-            .map_or_else(SemAst::unresolved_statement, SemAst::update),
-        context,
-    ))
+    let statement = crate::ast::StatementNode::Update(syntax)
+        .resolve(&mut context, &mut crate::CacheContext::new())?;
+    Ok((statement, context))
 }

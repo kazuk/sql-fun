@@ -96,7 +96,7 @@ impl PostgresDialect {
     /// - [`pg_query::Error`] : syntax error
     ///
     pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
-        let parse_result = ::pg_query::parse(sql)?;
+        let parse_result = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())?;
         Ok(ParseResult::from(parse_result.protobuf))
     }
 
@@ -320,7 +320,7 @@ impl StringSpan {
         self.len == 0
     }
 
-    fn from_scan_token(tok: &crate::syn::ScanToken) -> Self {
+    const fn from_scan_token(tok: &crate::syn::ScanToken) -> Self {
         Self {
             offset: tok.get_start() as usize,
             len: (tok.get_end() - tok.get_start()) as usize,

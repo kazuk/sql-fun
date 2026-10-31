@@ -67,7 +67,7 @@ impl From<&{{ enum_type_name }}> for {{ enum_type_name }}Opt
 impl {{ enum_type_name }}Opt {
     /// returns None variant
     #[must_use]
-    pub fn none() -> Self {
+    pub const fn none() -> Self {
         Self(None)
     }
 }

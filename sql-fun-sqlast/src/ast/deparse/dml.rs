@@ -50,6 +50,7 @@ impl SqlEmit for Insert {
         }
         if !self.returning.is_empty() {
             writer.sql(" RETURNING ");
+            crate::ast::ReturningOption::emit_options(&self.returning_options, writer)?;
             writer.list(&self.returning, ", ")?;
         }
         Ok(())
@@ -87,6 +88,7 @@ impl SqlEmit for Update {
         }
         if !self.returning.is_empty() {
             writer.sql(" RETURNING ");
+            crate::ast::ReturningOption::emit_options(&self.returning_options, writer)?;
             writer.list(&self.returning, ", ")?;
         }
         Ok(())
@@ -109,6 +111,7 @@ impl SqlEmit for Delete {
         }
         if !self.returning.is_empty() {
             writer.sql(" RETURNING ");
+            crate::ast::ReturningOption::emit_options(&self.returning_options, writer)?;
             writer.list(&self.returning, ", ")?;
         }
         Ok(())
@@ -349,5 +352,43 @@ impl Relation {
             alias.emit(writer)?;
         }
         Ok(())
+    }
+}
+
+impl crate::ast::ReturningOption {
+    pub(in crate::ast) fn emit_options(
+        options: &[Self],
+        writer: &mut SqlWriter,
+    ) -> Result<(), super::DeparseError> {
+        if !options.is_empty() {
+            writer.postgres_only("RETURNING row aliases")?;
+            writer.sql("WITH (");
+            for (index, option) in options.iter().enumerate() {
+                if index != 0 {
+                    writer.sql(", ");
+                }
+                writer.sql(if option.old { "OLD AS " } else { "NEW AS " });
+                writer.ident(&option.alias)?;
+            }
+            writer.sql(") ");
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_returning_options {
+    #[rstest::rstest]
+    #[case::insert("INSERT INTO t VALUES (1) RETURNING WITH (OLD AS o, NEW AS n) o.id, n.id")]
+    #[case::update("UPDATE t SET id = 1 RETURNING WITH (NEW AS n, OLD AS o) o.id, n.id")]
+    #[case::delete("DELETE FROM t RETURNING WITH (OLD AS prior) prior.*")]
+    #[case::merge(
+        "MERGE INTO t USING s ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING WITH (OLD AS o) o.id"
+    )]
+    #[case::nested(
+        "WITH changed AS (DELETE FROM t RETURNING WITH (OLD AS o) o.id) SELECT * FROM changed"
+    )]
+    fn preserves_row_aliases_and_expressions(#[case] sql: &str) {
+        crate::test_helpers::assert_postgres_structure(sql);
     }
 }

@@ -6,6 +6,7 @@ mod collate;
 mod creation;
 mod delete;
 mod distinct;
+mod engine_version;
 mod index;
 mod insert;
 mod membership;
@@ -31,6 +32,7 @@ pub use self::delete::{
     CursorNameProblem, CursorTargetMismatchProblem, DeleteProblem, DeleteProblemKind,
 };
 pub use self::distinct::DistinctProblem;
+pub use self::engine_version::EngineVersionProblem;
 pub use self::index::{IndexProblem, IndexProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::membership::MembershipProblem;
@@ -64,6 +66,9 @@ pub trait DiagnosticMessage {
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// Syntax is unavailable on the explicitly selected engine version.
+    IncompatibleEngineVersion(EngineVersionProblem),
+
     /// SQL analysis could not establish a finalized parameter type.
     ParameterTypeUnresolved(u32),
     /// Inference would need an unsupported catalog-wide candidate search.
@@ -180,6 +185,16 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Report syntax unavailable on the explicitly selected engine version.
+    #[must_use]
+    pub fn incompatible_engine_version(
+        feature: &str,
+        required: u32,
+        selected: Option<&str>,
+    ) -> Self {
+        Self::IncompatibleEngineVersion(EngineVersionProblem::new(feature, required, selected))
+    }
+
     /// Invalid table-function output declaration.
     #[must_use]
     pub const fn table_function(problem: TableFunctionProblem) -> Self {
@@ -423,6 +438,7 @@ impl AnalysisProblem {
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
+            Self::IncompatibleEngineVersion(_) => "incompatible_engine_version",
             Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
             Self::InferenceCandidateSpaceUnsupported { .. } => {
                 "inference_candidate_space_unsupported"
@@ -489,7 +505,9 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
-            Self::ParameterTypeUnresolved(_) | Self::InferenceCandidateSpaceUnsupported { .. } => {
+            Self::IncompatibleEngineVersion(_)
+            | Self::ParameterTypeUnresolved(_)
+            | Self::InferenceCandidateSpaceUnsupported { .. } => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
@@ -528,6 +546,7 @@ impl AnalysisProblem {
 impl DiagnosticMessage for AnalysisProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::IncompatibleEngineVersion(problem) => problem.diagnostic_message(),
             Self::InferenceCandidateSpaceUnsupported { operation } => format!(
                 "type inference for {operation} would require a catalog-wide candidate search; this inference strategy is unsupported, not evidence of invalid SQL; provide SQL type context or an explicit input type hint"
             ),

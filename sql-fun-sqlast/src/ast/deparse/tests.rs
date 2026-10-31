@@ -8,37 +8,7 @@ fn statement(sql: &str, dialect: Dialect) -> Statement {
         .expect(sql)
 }
 
-fn normalize_locations(value: &mut serde_json::Value) {
-    match value {
-        serde_json::Value::Object(fields) => {
-            fields.remove("location");
-            fields.remove("name_location");
-            fields.remove("stmt_location");
-            fields.remove("stmt_len");
-            for child in fields.values_mut() {
-                normalize_locations(child);
-            }
-        }
-        serde_json::Value::Array(values) => {
-            for child in values {
-                normalize_locations(child);
-            }
-        }
-        _ => {}
-    }
-}
-
-pub(super) fn assert_postgres_structure(sql: &str) {
-    let rendered = statement(sql, Dialect::postgres())
-        .deparse_sql(Dialect::postgres())
-        .expect(sql);
-    let mut original = serde_json::to_value(pg_query::parse(sql).expect(sql).protobuf).unwrap();
-    let mut emitted =
-        serde_json::to_value(pg_query::parse(&rendered).expect(&rendered).protobuf).unwrap();
-    normalize_locations(&mut original);
-    normalize_locations(&mut emitted);
-    assert_eq!(original, emitted, "{sql}\n=> {rendered}");
-}
+use crate::test_helpers::assert_postgres_structure;
 
 #[rstest::rstest]
 #[case(

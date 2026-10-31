@@ -22,7 +22,7 @@ fn zips_fixed_function_projections_without_exposing_helper_columns(#[case] ordin
     let frozen = freeze(&resolved, source).unwrap();
     let sql = rendered(frozen);
     assert!(sql.ends_with(r#") AS "r""#), "{sql}");
-    ::pg_query::parse(&sql).unwrap();
+    ::pg_query::parse(&sql, ::pg_query::ParserOptions::default()).unwrap();
     assert_eq!(
         sql.matches(r#""generate_series"(1, 2)"#).count(),
         1,
@@ -48,7 +48,7 @@ fn retains_per_function_record_definitions() {
     );
     let resolved = layout(&[&["id"], &["generate_series"]], &["id", "id"], false);
     let sql = rendered(freeze(&resolved, source).unwrap());
-    ::pg_query::parse(&sql).unwrap();
+    ::pg_query::parse(&sql, ::pg_query::ParserOptions::default()).unwrap();
     assert!(sql.contains(r#"AS ("id" "int4")"#), "{sql}");
 }
 

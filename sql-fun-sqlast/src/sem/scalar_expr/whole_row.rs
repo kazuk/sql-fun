@@ -241,6 +241,14 @@ impl RowFailure {
     }
 }
 impl WholeRowExpr {
+    pub(crate) fn not_found_after_notification(qualifier: &FullName) -> SemScalarExpr {
+        SemScalarExpr::whole_row(&Self {
+            qualifier: qualifier.clone(),
+            lookup: RowLookup::failed(RowFailure::not_found()),
+            fields: WholeRowFields::default(),
+        })
+    }
+
     pub(crate) fn not_found(
         context: &mut impl ParseContext,
         qualifier: &FullName,

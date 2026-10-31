@@ -293,7 +293,7 @@ impl QueryBody {
 }
 
 fn postgres_rule_syntax(sql: &str) -> ::pg_query::protobuf::RuleStmt {
-    let node = ::pg_query::parse(sql)
+    let node = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
         .expect("rule fixture")
         .protobuf
         .stmts

@@ -30,6 +30,7 @@ pub struct ScalarAnalysisContext<'a> {
     grouping: super::grouping::GroupingScope,
     output_aliases: Option<ResultColumnCollection>,
     delete_returning_target: Option<AliasName>,
+    postgres_returning: bool,
     qualified_only: bool,
     rule: Option<RuleScope>,
     trigger_namespace: Option<SchemaName>,
@@ -41,6 +42,41 @@ struct RuleScope {
     identity: RuleIdentity,
     event: RuleEvent,
     forbidden: Option<&'static str>,
+}
+
+impl ScalarAnalysisContext<'_> {
+    fn notify_unbound_row_image(
+        &self,
+        context: &mut impl ParseContext,
+        alias: &AliasName,
+    ) -> Result<bool, AnalysisError> {
+        if self.postgres_returning
+            && matches!(alias.as_str(), "old" | "new")
+            && !self.in_rule_definition()
+        {
+            use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+            if context.postgres18_syntax_used(Postgres18Syntax::ReturningRowImages)? {
+                todo!("RETURNING destination row-image expressions (#621/#614)");
+            }
+            return Ok(true);
+        }
+        Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod unimplemented_returning_image_tests {
+    #[rstest::rstest]
+    #[should_panic(expected = "RETURNING destination row-image expressions")]
+    fn unbound_images_reach_todo(#[values("old", "new")] name: &str) {
+        let mut context =
+            crate::test_helpers::TestParseContext::default().with_postgres_version("18");
+        let with_clause = crate::sem::WithClause::default();
+        let from_clause = crate::sem::FromClause::default();
+        let mut scope = super::ScalarAnalysisContext::new(&with_clause, &from_clause);
+        scope.set_postgres_returning(&context);
+        let _ = scope.notify_unbound_row_image(&mut context, &crate::sem::AliasName::from(name));
+    }
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
@@ -312,6 +348,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             grouping: self.grouping.clone(),
             output_aliases: self.output_aliases.clone(),
             delete_returning_target: self.delete_returning_target.clone(),
+            postgres_returning: self.postgres_returning,
             qualified_only: self.qualified_only,
             rule: self.rule.clone(),
             trigger_namespace: self.trigger_namespace.clone(),
@@ -335,6 +372,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             grouping: super::grouping::GroupingScope::new(),
             output_aliases: None,
             delete_returning_target: None,
+            postgres_returning: false,
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
@@ -355,6 +393,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             grouping: super::grouping::GroupingScope::nested(parent.map(|scope| &scope.grouping)),
             output_aliases: None,
             delete_returning_target: None,
+            postgres_returning: false,
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
@@ -395,7 +434,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         old_nullable: bool,
         new_nullable: bool,
     ) -> Self {
-        Self::with_owned_from_clause(
+        let mut scope = Self::with_owned_from_clause(
             with_clause,
             FromClause::for_merge_returning(
                 target,
@@ -405,7 +444,9 @@ impl<'a> ScalarAnalysisContext<'a> {
                 new_nullable,
                 postgres_18_or_later(context),
             ),
-        )
+        );
+        scope.set_postgres_returning(context);
+        scope
     }
 
     pub(crate) fn sources(&self) -> &FromClause {
@@ -421,6 +462,34 @@ impl<'a> ScalarAnalysisContext<'a> {
             false
         }
     }
+    pub(crate) fn set_postgres_returning(&mut self, context: &impl ParseContext) {
+        self.postgres_returning = context.dialect() == crate::ast::Dialect::postgres();
+    }
+
+    pub(crate) fn check_returning_star(
+        &self,
+        context: &mut impl ParseContext,
+        alias: Option<&AliasName>,
+    ) -> Result<bool, AnalysisError> {
+        let Some(alias) = alias else {
+            return Ok(false);
+        };
+        if self.delete_row_target(alias).is_some() || self.merge_row_target(alias).is_some() {
+            use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+            context.postgres18_syntax_used(Postgres18Syntax::ReturningRowImages)?;
+            return Ok(false);
+        }
+        if self
+            .from_clause
+            .namespace()
+            .resolve_name(alias)
+            .is_ok_and(|source| source.is_none())
+        {
+            return self.notify_unbound_row_image(context, alias);
+        }
+        Ok(false)
+    }
+
     pub(crate) fn set_delete_returning_target(
         &mut self,
         target: &AliasName,
@@ -432,18 +501,8 @@ impl<'a> ScalarAnalysisContext<'a> {
         if context.dialect() != crate::ast::Dialect::postgres() {
             return;
         }
-        let Some(version) = context.metadata().engine_version() else {
-            return;
-        };
-        let Ok(version) = version
-            .to_string()
-            .parse::<::sql_fun_core::PostgresVersion>()
-        else {
-            return;
-        };
-        if version.major() >= 18 {
-            self.delete_returning_target = Some(target.clone());
-        }
+        self.postgres_returning = true;
+        self.delete_returning_target = Some(target.clone());
     }
 
     pub(crate) fn delete_row_target(
@@ -548,6 +607,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             grouping: super::grouping::GroupingScope::new(),
             output_aliases: None,
             delete_returning_target: None,
+            postgres_returning: false,
             qualified_only: false,
             rule: None,
             trigger_namespace: None,
@@ -641,6 +701,30 @@ impl ScalarAnalysisContext<'_> {
         Ok((value, context))
     }
 
+    fn resolve_returning_image_column(
+        &self,
+        context: &mut impl ParseContext,
+        alias: &AliasName,
+        column: &ColumnName,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
+        if let Some((target, role, nullable)) = self.merge_row_target(alias) {
+            if matches!(alias.as_str(), "old" | "new") {
+                context.postgres18_syntax_used(Postgres18Syntax::ReturningRowImages)?;
+            }
+            let (value, _) = self.resolve_source_column_ref(context, target, column)?;
+            return Ok(Some(value.merge_record_column(role, nullable)));
+        }
+        if let Some((target, version)) = self.delete_row_target(alias)
+            && let Some(source) = self.from_clause.destination_source(target)
+        {
+            context.postgres18_syntax_used(Postgres18Syntax::ReturningRowImages)?;
+            let (value, _) = self.bind_source(context, &source, column)?;
+            return Ok(Some(value.delete_row_column(version)));
+        }
+        Ok(None)
+    }
+
     pub(crate) fn resolve_column<'context, TContext: ParseContext>(
         &self,
         context: &'context mut TContext,
@@ -657,15 +741,8 @@ impl ScalarAnalysisContext<'_> {
                     return self.resolve_source_column_ref(context, &normalized, &canonical);
                 }
             }
-            if let Some((target, role, nullable)) = self.merge_row_target(alias) {
-                let (value, context) = self.resolve_source_column_ref(context, target, column)?;
-                return Ok((value.merge_record_column(role, nullable), context));
-            }
-            if let Some((target, version)) = self.delete_row_target(alias)
-                && let Some(source) = self.from_clause.destination_source(target)
-            {
-                let (value, context) = self.bind_source(context, &source, column)?;
-                return Ok((value.delete_row_column(version), context));
+            if let Some(value) = self.resolve_returning_image_column(context, alias, column)? {
+                return Ok((value, context));
             }
 
             match self.from_clause.namespace().resolve_name(alias) {
@@ -679,6 +756,9 @@ impl ScalarAnalysisContext<'_> {
                 }
                 Ok(Some(source)) => return self.bind_source(context, &source, column),
                 Ok(None) => {
+                    if self.notify_unbound_row_image(context, alias)? {
+                        return Ok((UndefinedAliasColumnRef::unreported(alias, column), context));
+                    }
                     if let Some(parent) = &self.parent {
                         return parent.resolve_column(context, Some(alias), column);
                     }
@@ -729,6 +809,21 @@ impl ScalarAnalysisContext<'_> {
                         }
                         Ok(None) => {}
                     }
+                }
+                let alias = AliasName::from(column.as_str());
+                if self
+                    .from_clause
+                    .namespace()
+                    .resolve_name(&alias)
+                    .is_ok_and(|source| source.is_none())
+                    && self.notify_unbound_row_image(context, &alias)?
+                {
+                    return Ok((
+                        WholeRowExpr::not_found_after_notification(&FullName::from_local_name(
+                            alias.as_str(),
+                        )),
+                        context,
+                    ));
                 }
                 if let Some(parent) = &self.parent {
                     return parent.resolve_column(context, None, column);
@@ -961,6 +1056,14 @@ impl ScalarAnalysisContext<'_> {
             }
             Err(()) => WholeRowExpr::ambiguous(context, requested),
             Ok(None) => {
+                if relation.schema().is_none()
+                    && self.notify_unbound_row_image(
+                        context,
+                        &AliasName::from(relation.name().as_str()),
+                    )?
+                {
+                    return Ok(WholeRowExpr::not_found_after_notification(requested));
+                }
                 if let Some(parent) = &self.parent {
                     parent.resolve_whole_row_in_scope(context, relation, requested, levels_up + 1)
                 } else {

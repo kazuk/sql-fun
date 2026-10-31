@@ -746,7 +746,7 @@ impl Validity {
     }
 
     /// create from [`crate::syn::Constraint`]
-    pub fn from_constraint(syn: &crate::syn::Constraint) -> Self {
+    pub const fn from_constraint(syn: &crate::syn::Constraint) -> Self {
         Self::new(syn.get_skip_validation(), syn.get_initially_valid())
     }
 }

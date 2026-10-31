@@ -254,8 +254,9 @@ impl Insert {
         } else {
             None
         };
-        let returning_scope =
+        let mut returning_scope =
             ScalarAnalysisContext::nested(&with, &returning_from, rule_returning.as_ref());
+        returning_scope.set_postgres_returning(context);
         let returning = ResultColumnCollection::resolve_for_insert(
             &self.returning,
             context,

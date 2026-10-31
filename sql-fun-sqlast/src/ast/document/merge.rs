@@ -317,6 +317,9 @@ impl ResultColumnCollection {
         for target in targets {
             if let Some(name) = target.source_star_name() {
                 let qualifier = name.star_qualifier()?;
+                if scope.check_returning_star(context, qualifier.as_ref())? {
+                    continue;
+                }
                 let projection_qualifier = qualifier.as_ref().map(|alias| {
                     scope
                         .merge_row_target(alias)

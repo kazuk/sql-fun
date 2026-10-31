@@ -72,7 +72,7 @@ mod {{ module_name }} {
     {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -115,7 +115,7 @@ mod {{ module_name }} {
     impl {{ struct_name }}ListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -211,7 +211,7 @@ mod {{ module_name }} {
     {
         /// get `{{ name }}`
         #[must_use]
-        pub fn {{ getter }}(& self) -> {{ ty }} {
+        pub const fn {{ getter }}(& self) -> {{ ty }} {
             self.{{ name }}
         }
     }
@@ -248,7 +248,7 @@ mod {{ module_name }} {
     {
         /// get `{{ field.field_name() }}`
         #[must_use]
-        pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
+        pub {% if field.struct_field_no_from() && field.getter_return_type(false) != "Vec<u64>" %}const {% endif %}fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
             self.0.{{ field.getter_fn_name() }}()
         }
     }

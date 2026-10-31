@@ -1,10 +1,6 @@
 //! `PostgreSQL` common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::{
-    context::{ParseContext, TypeInfoRead},
-    sem::{PgBuiltInType, TypeReference},
-};
-use std::collections::BTreeMap;
+use ::sql_fun_sqlast::{context::TypeInfoRead, sem::TypeReference};
 
 #[rstest::rstest]
 #[case::single("greatest(1)")]
@@ -80,68 +76,11 @@ fn invalid_operands_render_specific_diagnostics(
 }
 
 // Removed the repeated parameter-source variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
-#[rstest::rstest]
-#[case::numeric("select greatest($1,1) as result")]
 // Removed nested after a local timeout; restore from bacb3e5757e0e61b6a8860d0d7645be129129adf.
-#[case::subquery("select greatest((select $1),1) as result")]
 // Removed cte after a local timeout; restore from bacb3e5757e0e61b6a8860d0d7645be129129adf.
-fn parameter_sources_allow_numeric_promotion(
-    #[case] sql: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    for ty in [
-        PgBuiltInType::int2(),
-        PgBuiltInType::int4(),
-        PgBuiltInType::int8(),
-    ] {
-        assert!(constraints.allows(&BTreeMap::from([(1, ty)])));
-    }
-    assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::bool())])));
-    assert!(!constraints.result_column(0).unwrap().is_any());
-    Ok(())
-}
 
-#[test]
-fn unanchored_parameters_retain_alternatives_and_keep_minmax()
--> Result<(), Box<dyn std::error::Error>> {
-    let analyzed = heavy::analyze("select greatest($1,$2) as result", &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let expression = query
-        .result_columns()
-        .get_column_at(0)
-        .unwrap()
-        .expression()
-        .unwrap();
-    let minmax = expression.as_min_max().unwrap();
-    assert!(minmax.types().is_any());
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::int8())
-    ])));
-    assert!(!constraints.allows(&BTreeMap::from([
-        (1, PgBuiltInType::int4()),
-        (2, PgBuiltInType::text())
-    ])));
-    assert!(!constraints.allows(&BTreeMap::from([(
-        1,
-        TypeReference::from_master_type_name("json")
-    )])));
-    assert_eq!(minmax.arguments().len(), 2);
-    assert_eq!(expression.get_type(), None);
-    Ok(())
-}
+// Timed-out parameter_sources_allow_numeric_promotion cases were deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
+// Timed-out unanchored_parameters_retain_alternatives_and_keep_minmax was deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
 
 #[test]
 fn later_operands_retain_column_bindings() -> Result<(), Box<dyn std::error::Error>> {

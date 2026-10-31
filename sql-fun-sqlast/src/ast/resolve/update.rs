@@ -278,7 +278,8 @@ impl Update {
             )
             .map_err(Into::into)
         } else {
-            let scope = ScalarAnalysisContext::nested(with, from, Some(outer));
+            let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
+            scope.set_postgres_returning(context);
             ResultColumnCollection::resolve_for_update(&self.returning, context, from, &scope)
                 .map_err(Into::into)
         }

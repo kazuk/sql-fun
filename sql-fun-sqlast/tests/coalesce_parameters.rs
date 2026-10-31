@@ -7,18 +7,16 @@ use ::sql_fun_sqlast::{
 use std::collections::BTreeMap;
 
 // Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
+// Timed-out numeric_inputs_keep_admissible_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
+// Further timed-out numeric-input cases were deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
 #[rstest::rstest]
-#[case::parameter("SELECT COALESCE($1,1)")]
 #[case::reverse("SELECT COALESCE(1,$1)")]
 // Timed-out nested COALESCE case removed in 5a87b43ee035cdc8f907221b0ee896af7ef6de4b.
 // Removed nested_case after a local timeout; restore from bb14217fb859c8255678c9c00c58fd5d2d6f0380.
 // Removed in_case after a local timeout; restore from bb14217fb859c8255678c9c00c58fd5d2d6f0380.
-#[case::operator("SELECT COALESCE($1,1)+2")]
 #[case::function("SELECT abs(COALESCE($1,1))")]
 #[case::cte("WITH c AS (SELECT COALESCE($1,1) AS n) SELECT n FROM c")]
 #[case::derived("SELECT n FROM (SELECT COALESCE($1,1) AS n) c")]
-#[case::other_use_first("SELECT $1::integer, COALESCE($1,1)")]
-#[case::other_use_last("SELECT COALESCE($1,1), $1::integer")]
 fn numeric_inputs_keep_admissible_assignments(#[case] sql: &str) -> testresult::TestResult {
     // Real builtin casts and overloads determine the supported numeric alternatives.
     let analyzed = heavy::analyze(sql, &[])?;

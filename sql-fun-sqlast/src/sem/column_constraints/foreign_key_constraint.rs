@@ -126,7 +126,7 @@ impl Deferrability {
             init_deferred,
         }
     }
-    fn from_postgres_constraint(syn: &crate::syn::Constraint) -> Self {
+    const fn from_postgres_constraint(syn: &crate::syn::Constraint) -> Self {
         let deferrable = syn.get_deferrable();
         let init_deferred = syn.get_initdeferred();
         Self {

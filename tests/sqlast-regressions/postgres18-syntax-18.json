@@ -1,0 +1,176 @@
+[
+  {
+    "name": "virtual-generated-column",
+    "sql": "CREATE TABLE generated_sample (id int, computed int GENERATED ALWAYS AS (1) VIRTUAL)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "implicit-virtual-column",
+    "sql": "CREATE TABLE generated_sample (id int, computed int GENERATED ALWAYS AS (1))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-check-enforced",
+    "sql": "CREATE TABLE check_sample (id int, CHECK (id>0) ENFORCED)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "column-check-enforced",
+    "sql": "CREATE TABLE check_sample (id int CHECK (1>0) ENFORCED)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "ordinary-returning",
+    "sql": "UPDATE migration_rows SET id=2 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary-old-alias",
+    "sql": "UPDATE migration_rows AS old SET id=2 RETURNING old.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary-new-alias",
+    "sql": "DELETE FROM migration_rows AS new RETURNING new.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "stored-generated-column",
+    "sql": "CREATE TABLE stored_sample (id int, computed int GENERATED ALWAYS AS (1) STORED)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "foreign-key-enforced",
+    "sql": "CREATE TABLE child_enforced (id int, FOREIGN KEY (id) REFERENCES migration_rows(id) ENFORCED)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "delete-old-column",
+    "sql": "DELETE FROM migration_rows RETURNING old.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "delete-old-star",
+    "sql": "DELETE FROM migration_rows RETURNING old.*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge-old-column",
+    "sql": "MERGE INTO migration_rows t USING (VALUES (1)) s(id) ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING old.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge-old-star",
+    "sql": "MERGE INTO migration_rows t USING (VALUES (1)) s(id) ON t.id=s.id WHEN MATCHED THEN DELETE RETURNING old.*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

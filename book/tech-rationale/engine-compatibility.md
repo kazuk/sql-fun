@@ -9,7 +9,7 @@ parser.
 
 The parser choices are:
 
-- **PostgreSQL:** [`pg_query`](https://docs.rs/crate/pg_query/6.2.0) uses the
+- **PostgreSQL:** [`pg_query`](https://docs.rs/crate/pg_query/18.1.0) uses the
   actual PostgreSQL server source and returns its parse tree. This preserves
   full syntax acceptance for the PostgreSQL version represented by the parser,
   including engine-specific tuning options.

@@ -396,7 +396,8 @@ pub(crate) struct Merge {
     join_condition: Expr,
     merge_when_clauses: Vec<MergeWhen>,
     returning_list: Vec<Target>,
-    with_clause: With,
+    pub(super) returning_options: Vec<super::ReturningOption>,
+    pub(super) with_clause: With,
 }
 
 impl Merge {

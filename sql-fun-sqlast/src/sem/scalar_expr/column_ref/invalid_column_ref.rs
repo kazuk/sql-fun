@@ -29,6 +29,13 @@ impl ColumnReference for UndefinedAliasColumnRef {
 }
 
 impl UndefinedAliasColumnRef {
+    pub(crate) fn unreported(alias: &AliasName, column: &ColumnName) -> SemScalarExpr {
+        SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedAlias(Self {
+            alias: alias.clone(),
+            column: column.clone(),
+        }))
+    }
+
     pub(crate) fn new_with_report<TParseContext>(
         context: &mut TParseContext,
         alias: &AliasName,
@@ -39,12 +46,7 @@ impl UndefinedAliasColumnRef {
     {
         context.report_analysis_problem(AnalysisProblem::undefined_alias(alias.as_str()))?;
 
-        Ok(SemScalarExpr::ColumnRef(
-            ColumnReferenceExpr::UndefinedAlias(Self {
-                alias: alias.clone(),
-                column: column.clone(),
-            }),
-        ))
+        Ok(Self::unreported(alias, column))
     }
 }
 

@@ -885,8 +885,11 @@ impl TryFromWithTokens<&syn::MergeStmt> for Merge {
                 value.get_merge_when_clauses(),
                 tokens,
             )?,
+            returning_options: crate::ast::ReturningOption::from_postgres(
+                &value.get_returning_clause(),
+            )?,
             returning_list: Target::try_collect_from_with_tokens(
-                value.get_returning_list(),
+                value.get_returning_clause().get_exprs(),
                 tokens,
             )?,
             with_clause: With::try_from_with_tokens(value.get_with_clause(), tokens)?,

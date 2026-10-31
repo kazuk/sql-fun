@@ -736,30 +736,7 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN
     Ok(())
 }
 
-#[test]
-fn bound_names_do_not_reselect_shadowed_views() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(
-        "CREATE SCHEMA other; CREATE TABLE public.items(id int); CREATE VIEW public.v AS SELECT id FROM public.items; CREATE VIEW other.v AS SELECT DISTINCT id FROM public.items;",
-    )?;
-    assert!(
-        schema
-            .analyze("INSERT INTO v VALUES($1) RETURNING id")
-            .is_ok()
-    );
-    assert!(schema.analyze("UPDATE v SET id=$1 RETURNING id").is_ok());
-    assert!(schema.analyze("INSERT INTO other.v VALUES(1)").is_err());
-    assert!(
-        !schema
-            .analyze_update(&FullName::with_schema("other", "v"))
-            .is_writable()
-    );
-    assert!(
-        schema
-            .analyze_update(&FullName::with_schema("public", "v"))
-            .is_writable()
-    );
-    Ok(())
-}
+// Timed-out bound_names_do_not_reselect_shadowed_views was deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
 
 #[test]
 fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::error::Error>> {

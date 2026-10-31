@@ -493,7 +493,8 @@ mod test_helpers {
     }
     pub(super) fn seed(sql: &str) -> Result<SchemaFileContext, AnalysisError> {
         let mut context = crate::test_helpers::ownership::ownership_context();
-        let parsed = ::pg_query::parse(sql).expect("valid fixture");
+        let parsed =
+            ::pg_query::parse(sql, ::pg_query::ParserOptions::default()).expect("valid fixture");
         for raw in parsed.protobuf.stmts {
             let node = crate::syn::Node::from(raw.stmt.expect("statement").as_ref().clone());
             let syntax =

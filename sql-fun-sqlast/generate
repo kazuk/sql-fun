@@ -1,7 +1,38 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-cargo x enum-types ./sql-fun-sqlast/schema.json > ./sql-fun-sqlast/src/syn/generated.rs
-cargo x struct-types ./sql-fun-sqlast/schema.json >> ./sql-fun-sqlast/src/syn/generated.rs
+# Run from the repository root. Requires HTTPS access to GitHub at execution
+# time; Buf is checksum-verified and used only from this temporary directory.
+# No preinstalled Buf or Docker daemon is required.
+buf_version=1.75.0
+case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64)
+        buf_sha256=fad1e38d6909bbb583a4da81d8c02a01046e2cd663bde7e337dd24277393764b
+        ;;
+    Linux-aarch64)
+        buf_sha256=00eb190aa82df17f393e05b04889cc60a0b13b3259d336e21a87d5f23ab4fd26
+        ;;
+    *)
+        echo "Unsupported Buf generation platform: $(uname -s)-$(uname -m)" >&2
+        exit 1
+        ;;
+esac
 
-cargo fmt
+generation_tmp=$(mktemp -d)
+trap 'rm -rf "$generation_tmp"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+curl --fail --location --proto '=https' --tlsv1.2 \
+    --output "$generation_tmp/buf" \
+    "https://github.com/bufbuild/buf/releases/download/v${buf_version}/buf-$(uname -s)-$(uname -m)"
+printf '%s  %s\n' "$buf_sha256" "$generation_tmp/buf" | sha256sum --check --strict -
+chmod +x "$generation_tmp/buf"
 
+# Buf resolves the module relative to its proto directory. Stage both outputs
+# until the complete descriptor-to-Rust generation and formatting have succeeded.
+(cd sql-fun-sqlast && "$generation_tmp/buf" build --output "$generation_tmp/schema.json")
+cargo x enum-types "$generation_tmp/schema.json" > "$generation_tmp/generated.rs"
+cargo x struct-types "$generation_tmp/schema.json" >> "$generation_tmp/generated.rs"
+rustfmt --edition 2024 "$generation_tmp/generated.rs"
+cp "$generation_tmp/schema.json" sql-fun-sqlast/schema.json
+cp "$generation_tmp/generated.rs" sql-fun-sqlast/src/syn/generated.rs

@@ -41,7 +41,7 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str
             .is_some()
     );
     let schema = std::fs::read_to_string(catalog.join("schema.sql")).unwrap();
-    ::pg_query::parse(&schema).unwrap();
+    ::pg_query::parse(&schema, ::pg_query::ParserOptions::default()).unwrap();
     let mut extensions: ::sql_fun_core::PostgresExtensionsCollection =
         "uuid-ossp@1.1".parse().unwrap();
     extensions

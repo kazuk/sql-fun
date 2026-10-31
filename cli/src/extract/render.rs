@@ -82,7 +82,14 @@ mod tests {
         assert!(sql.contains("DEFAULT '<&>'::text"));
         assert!(sql.contains("\"a\"\"b\" numeric(10,2)"));
         assert!(sql.contains("OUT \"OUT name\" text"));
-        assert_eq!(pg_query::parse(&sql).unwrap().protobuf.stmts.len(), 3);
+        assert_eq!(
+            pg_query::parse(&sql, ::pg_query::ParserOptions::default())
+                .unwrap()
+                .protobuf
+                .stmts
+                .len(),
+            3
+        );
     }
 
     #[test]

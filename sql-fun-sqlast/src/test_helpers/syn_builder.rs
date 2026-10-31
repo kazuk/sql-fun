@@ -103,6 +103,7 @@ impl SynBuilder {
             .name(String::from(parameter_name))
             .arg_type(arg_type)
             .mode(mode.into())
+            .location(0)
             .defexpr(NodeInner::None.into())
             .build()
             .unwrap()
@@ -229,7 +230,11 @@ impl SynBuilder {
             .raw_expr(Node::none())
             .cooked_expr(String::default())
             .generated_when(String::default())
-            .inhcount(0)
+            .is_enforced(true)
+            .generated_kind(String::default())
+            .without_overlaps(false)
+            .fk_with_period(false)
+            .pk_with_period(false)
             .nulls_not_distinct(false)
             .keys(NodeList::default())
             .including(NodeList::default())
@@ -300,7 +305,8 @@ impl SynBuilder {
     pub fn constraint_generated(&self, generated_when: &str) -> Constraint {
         let expr = NodeInner::AConst(self.const_int4(0)).into();
         Self::constraint_builder(ConstrType::ConstrGenerated.into())
-            .generated_when(String::from(generated_when))
+            .generated_when(String::from("a"))
+            .generated_kind(String::from(generated_when))
             .raw_expr(expr)
             .build()
             .unwrap()
@@ -483,6 +489,7 @@ impl SynBuilder {
             .nulls_not_distinct(false)
             .primary(false)
             .isconstraint(false)
+            .iswithoutoverlaps(false)
             .deferrable(false)
             .initdeferred(false)
             .transformed(false)
@@ -649,6 +656,8 @@ impl SynBuilder {
             .name(name)
             .lexpr(left)
             .rexpr(right)
+            .rexpr_list_start(-1)
+            .rexpr_list_end(-1)
             .location(0)
             .build()
             .unwrap()
@@ -759,7 +768,7 @@ impl SynBuilder {
 
     /// parse sql to statement node
     pub fn parse(&self, sql: &str) -> crate::syn::Node {
-        let parse_result = pg_query::parse(sql).unwrap();
+        let parse_result = pg_query::parse(sql, ::pg_query::ParserOptions::default()).unwrap();
         let parse_result = ParseResult::from(parse_result.protobuf);
         parse_result.get_stmts().get(0).get_stmt()
     }

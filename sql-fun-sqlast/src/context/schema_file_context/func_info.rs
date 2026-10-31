@@ -51,6 +51,23 @@ impl FunctionInfoRead for SchemaCatalog {
             false
         }
     }
+    fn function_returns_set(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        let arguments = overload.input_bindings();
+        for definition in self.functions.definitions(name) {
+            let selected = definition
+                .overloads()
+                .resolve_from_catalog(self, &arguments);
+            if selected.as_ref() == Some(overload) {
+                return definition.is_table_function();
+            }
+        }
+        self.base.function_returns_set(name, overload)
+    }
+
     fn function_preserves_view_rows(
         &self,
         name: &FullName,
@@ -94,6 +111,40 @@ impl FunctionInfoRead for SchemaCatalog {
         } else {
             Some(overloads)
         }
+    }
+}
+
+#[cfg(test)]
+mod test_expression_classification {
+    use crate::context::{BaseParseContext, FunctionInfoRead, ParseContext};
+    use crate::sem::FullName;
+    use crate::test_helpers::{ownership::apply_ownership_sql, sampling::schema_context};
+
+    #[rstest::rstest]
+    #[case::scalar("integer", "", false, true)]
+    #[case::set("SETOF integer", "", true, false)]
+    #[case::window("integer", "WINDOW", false, false)]
+    fn declared_return_shape_is_independent_of_view_rows(
+        #[case] result: &str,
+        #[case] options: &str,
+        #[case] returns_set: bool,
+        #[case] preserves_rows: bool,
+    ) -> testresult::TestResult {
+        let context = apply_ownership_sql(
+            schema_context(),
+            &format!("CREATE FUNCTION public.property507(integer) RETURNS {result} {options} LANGUAGE internal AS 'abs'"),
+        )?.into_context();
+        let name = FullName::with_schema("public", "property507");
+        let overloads = context.get_function_by_name(&name).unwrap();
+        let overload = overloads.get_at(0).unwrap();
+        assert_eq!(context.function_returns_set(&name, overload), returns_set);
+        assert_eq!(
+            context.function_preserves_view_rows(&name, overload),
+            preserves_rows
+        );
+        let frozen = context.freeze();
+        assert_eq!(frozen.function_returns_set(&name, overload), returns_set);
+        Ok(())
     }
 }
 

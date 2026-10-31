@@ -28,6 +28,23 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    pub(crate) fn returns_set(
+        &self,
+        context: &impl BaseParseContext,
+        name: &FullName,
+    ) -> Option<bool> {
+        let first = context.function_returns_set(name, self.overloads.first()?);
+        if self
+            .overloads
+            .iter()
+            .all(|overload| context.function_returns_set(name, overload) == first)
+        {
+            Some(first)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn same_signatures(&self, other: &Self) -> bool {
         self.overloads == other.overloads
     }

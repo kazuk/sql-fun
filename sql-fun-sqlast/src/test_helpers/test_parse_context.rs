@@ -32,6 +32,8 @@ pub struct TestParseContext {
     ownership: crate::context::ownership::OwnershipCatalog,
     triggers: HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
     masters: Option<crate::context::ConflictMasters>,
+    function_set_properties: HashMap<(FullName, crate::sem::OverloadVariant), bool>,
+    sampling_methods: Option<HashMap<FullName, crate::sem::SamplingMethodLookup>>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
     expected_conflict_target: Option<TableName>,
@@ -75,6 +77,26 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
+    pub(crate) fn set_function_returns_set(
+        &mut self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+        returns_set: bool,
+    ) {
+        self.function_set_properties
+            .insert((name.clone(), overload.clone()), returns_set);
+    }
+
+    pub(crate) fn set_sampling_method(
+        &mut self,
+        name: &FullName,
+        method: &crate::sem::SamplingMethodLookup,
+    ) {
+        self.sampling_methods
+            .get_or_insert_default()
+            .insert(name.clone(), method.clone());
+    }
+
     /// Select this fixture's analysis environment explicitly.
     pub(crate) fn with_dialect(mut self, dialect: crate::ast::Dialect) -> Self {
         let selected = if dialect == crate::ast::Dialect::sqlite() {
@@ -376,6 +398,16 @@ impl FunctionInfoRead for TestParseContext {
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
         self.aggregate_functions.contains(name)
     }
+    fn function_returns_set(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        self.function_set_properties
+            .get(&(name.clone(), overload.clone()))
+            .copied()
+            .expect("explicit mock returns_set metadata")
+    }
     fn function_preserves_view_rows(
         &self,
         name: &FullName,
@@ -627,6 +659,16 @@ impl crate::context::ParameterTypeHintWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn lookup_sampling_method(&self, name: &FullName) -> crate::sem::SamplingMethodLookup {
+        let Some(methods) = &self.sampling_methods else {
+            return crate::sem::SamplingMethodLookup::unavailable();
+        };
+        crate::sem::search_path::expand_search_path_inst(self, name, |key| {
+            methods.get(key).cloned()
+        })
+        .unwrap_or_else(crate::sem::SamplingMethodLookup::not_found)
+    }
+
     fn apply_creation_group<F>(
         self,
         operation: F,

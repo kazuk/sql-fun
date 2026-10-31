@@ -539,6 +539,21 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) fn is_invalid_sampling_function(
+        &self,
+        context: &impl crate::context::BaseParseContext,
+    ) -> bool {
+        if let Self::FuncCall(call) = self {
+            call.modifiers().over().is_some() || call.returns_set(context) == Some(true)
+        } else if let Self::Constrained(value) = self {
+            value
+                .function_binding()
+                .is_some_and(|binding| binding.modifiers().over().is_some())
+        } else {
+            false
+        }
+    }
+
     pub(crate) fn preserves_view_rows(
         &self,
         context: &impl crate::context::BaseParseContext,

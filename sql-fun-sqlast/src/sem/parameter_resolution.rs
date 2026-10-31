@@ -462,6 +462,20 @@ impl<'cache> ParameterResolution<'cache> {
         ))
     }
 
+    fn require_assignment(
+        &mut self,
+        context: &impl BaseParseContext,
+        value: &SemScalarExpr,
+        target: &TypeReference,
+    ) {
+        if let Some(node) = value.constraint_node() {
+            self.graph.restrict(
+                node,
+                &InputTypeConstraint::types(context.assignment_sources(target)),
+            );
+        }
+    }
+
     pub(crate) fn require(
         &mut self,
         catalog: &impl BaseParseContext,
@@ -982,6 +996,11 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.collect_constraints(&mut self.parameters, self.context)
     }
+    fn sampling_input(&mut self, value: &SemScalarExpr, target: &TypeReference) {
+        self.parameters
+            .require_assignment(self.context, value, target);
+    }
+
     fn assignment(
         &mut self,
         value: &mut SemScalarExpr,
@@ -998,11 +1017,8 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
         ty: &TypeReference,
     ) -> Result<(), AnalysisError> {
         if self.context.dialect() == Dialect::postgres() {
-            if let Some(node) = value.constraint_node() {
-                self.parameters.graph.restrict(
-                    node,
-                    &InputTypeConstraint::types(self.context.assignment_sources(ty)),
-                );
+            if value.constraint_node().is_some() {
+                self.parameters.require_assignment(self.context, value, ty);
             } else if let Some(source) = value.get_type()
                 && &source != ty
                 && self.context.get_assignment_cast(&source, ty).is_none()
@@ -1185,6 +1201,12 @@ impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
     }
 }
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
+    fn table_sample(
+        &mut self,
+        sample: &mut crate::sem::TableSampleSource,
+    ) -> Result<(), AnalysisError> {
+        sample.validate_inputs(self.context)
+    }
     fn membership(&mut self, value: &mut crate::sem::MembershipExpr) -> Result<(), AnalysisError> {
         if value.expand_pending_stars(self.context)? {
             self.expanded_arrays = true;

@@ -24,12 +24,6 @@ fn unsupported_raw_syntax_retains_analysis_error(#[case] sql: &str) {
     assert!(heavy::analyze(sql).is_err(), "{sql}");
 }
 
-#[test]
-#[should_panic(expected = "not yet implemented")]
-fn table_sample_retains_explicit_unimplemented_marker() {
-    let _ = heavy::analyze("select 1 from missing tablesample system(1)");
-}
-
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{

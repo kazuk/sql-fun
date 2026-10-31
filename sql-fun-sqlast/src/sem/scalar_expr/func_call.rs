@@ -191,6 +191,17 @@ mod implementation {
         pub(crate) fn set_candidates(&mut self, candidates: Option<Vec<OverloadVariant>>) {
             self.candidates = candidates;
         }
+        pub(crate) fn returns_set(
+            &self,
+            context: &impl crate::context::BaseParseContext,
+        ) -> Option<bool> {
+            let name = self.name_resolution().function_identity()?;
+            if let Some(overload) = self.overload() {
+                Some(context.function_returns_set(name, overload))
+            } else {
+                self.candidates()?.returns_set(context, name)
+            }
+        }
         pub(crate) fn candidates(&self) -> Option<crate::sem::FunctionOverloadCollection> {
             self.candidates
                 .as_deref()

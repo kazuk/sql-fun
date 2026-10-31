@@ -723,7 +723,8 @@ impl Call {
         let mut expression = self.kind.resolve(self, context, argument_scope)?;
         let modifiers = self.resolve_modifiers(context, argument_scope)?;
         if let Some(capture) = &capture {
-            let (owner, levels_up, _) = capture.owner(scope.grouping_scope());
+            let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
+            crate::sem::SamplingInput::validate_aggregate_placement(context, &placement)?;
             scope.grouping_scope().aggregate(owner, levels_up);
         } else if self.over.is_some() {
             scope.grouping_scope().window();

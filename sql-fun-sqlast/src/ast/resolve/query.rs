@@ -687,7 +687,7 @@ impl FromItem {
             Self::Functions(functions) => functions.resolve(context, scope),
             Self::Group(group) => group.resolve(context, with, scope),
             Self::Xml(table) => table.resolve(context, scope),
-            Self::Sample(_) => todo!("table expression semantic analysis"),
+            Self::Sample(sample) => sample.resolve(context, with, scope),
             Self::Json(_) => AnalysisError::raise_unexpected_none("from_clause inner node"),
         }
     }
@@ -1132,5 +1132,35 @@ impl Into {
             &self.relation.name.full_name()?,
             &self.relation.persistence,
         ))
+    }
+}
+
+impl crate::ast::TableSample {
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<DataSource, AnalysisError> {
+        let source = self.relation.resolve_in_scope(context, with, scope)?;
+        let expression_scope = scope.with_from_clause(&FromClause::default());
+        let arguments = Expr::resolve_list(
+            &self.arguments,
+            context,
+            &expression_scope.with_grouping_placement("TABLESAMPLE"),
+        )?;
+        let repeatable = Expr::resolve_optional(
+            &self.repeatable,
+            context,
+            &expression_scope.with_grouping_placement("REPEATABLE"),
+        )?;
+        let sample = crate::sem::TableSampleSource::resolve(
+            context,
+            &source,
+            &self.method.full_name()?,
+            &arguments,
+            &repeatable,
+        )?;
+        Ok(DataSource::sampled(&sample))
     }
 }

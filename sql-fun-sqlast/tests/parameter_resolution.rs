@@ -4,7 +4,7 @@ use ::sql_fun_sqlast::{ast::Dialect, context::ParseContext, parse_statements, se
 use std::collections::BTreeMap;
 
 // Removed real_postgres_catalog_preserves_numeric_source_types after a standard timeout;
-// restore from edeab66dee578ee56d8c3ae29ead8d442c494fa4.
+// restore from 379f1ef4a1ac9b54a19263976d6b269a86d60709.
 
 mod test_helpers {
     mod cache_context;
@@ -80,7 +80,7 @@ fn real_catalog_contexts_produce_constraints(
 }
 
 // Removed parser_adapter_retains_the_same_constraints after a standard timeout;
-// restore from edeab66dee578ee56d8c3ae29ead8d442c494fa4.
+// restore from 379f1ef4a1ac9b54a19263976d6b269a86d60709.
 
 #[test]
 fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::error::Error>> {

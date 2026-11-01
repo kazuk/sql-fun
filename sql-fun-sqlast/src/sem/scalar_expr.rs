@@ -783,7 +783,9 @@ impl SemScalarExpr {
 
     fn builtin_boolean_type() -> Option<TypeReference> {
         Some(TypeReference::concrete_type_ref(
-            PgBuiltInType::bool().full_name(),
+            PgBuiltInType::bool()
+                .full_name()
+                .expect("nominal type identity"),
             false,
         ))
     }
@@ -1139,9 +1141,7 @@ impl SemScalarExpr {
 #[cfg(test)]
 mod test_require_array {
     use crate::sem::PgBuiltInType;
-    use crate::sem::scalar_expr::{
-        ImplicitCastExpr, ScalarConstExpr, SemScalarExpr, TypeReference,
-    };
+    use crate::sem::scalar_expr::{ImplicitCastExpr, ScalarConstExpr, SemScalarExpr};
     use crate::test_helpers::TestParseContext;
 
     #[test]
@@ -1157,7 +1157,7 @@ mod test_require_array {
     fn require_array_accepts_array_type() {
         let mut context = TestParseContext::default();
         let base_expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(5));
-        let array_type = TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+        let array_type = PgBuiltInType::int4().array_type();
         let expr = SemScalarExpr::ImplicitCast(ImplicitCastExpr::new(&base_expr, &array_type));
 
         expr.require_array(&mut context).expect("require array");

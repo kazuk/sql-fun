@@ -124,9 +124,12 @@ pub trait BaseParseContext:
         .unwrap_or_else(|| fun_name.clone())
     }
 
-    /// Canonicalize a reference to the catalog key selected by the search path.
+    /// Canonicalize a concrete reference through the search path; preserve owned definitions.
     fn canonicalize_type_ref(&self, type_ref: &TypeReference) -> Option<TypeReference> {
-        let full_name = self.resolve_type_name(type_ref.full_name())?;
+        if type_ref.is_dynamic() {
+            return Some(type_ref.clone());
+        }
+        let full_name = self.resolve_type_name(type_ref.full_name()?)?;
         Some(TypeReference::concrete_type_ref(
             &full_name,
             type_ref.is_array().unwrap_or(false),
@@ -135,7 +138,55 @@ pub trait BaseParseContext:
 }
 
 #[cfg(test)]
-mod canonicalization_tests;
+mod canonicalization_tests {
+    use crate::context::{BaseParseContext, ParseContext};
+    use crate::sem::{FullName, SchemaName, TypeDefinition, TypeReference};
+    use crate::test_helpers::TestParseContext;
+
+    #[rstest::rstest]
+    #[case::first_schema(&["a", "b", "pg_catalog"], None, Some("a"))]
+    #[case::reversed_path(&["b", "a", "pg_catalog"], None, Some("b"))]
+    #[case::qualified_outside_path(&["a"], Some("b"), Some("b"))]
+    #[case::empty_path(&[], None, Some("pg_catalog"))]
+    #[case::implicit_catalog_first(&["a", "b"], None, Some("pg_catalog"))]
+    #[case::explicit_catalog_last(&["a", "pg_catalog"], None, Some("a"))]
+    #[case::missing_schema(&["a"], Some("absent"), None)]
+    #[case::quoted_schema(&["a.b"], Some("a.b"), Some("a.b"))]
+    fn canonicalization_retains_the_matched_key(
+        #[case] path: &[&str],
+        #[case] qualifier: Option<&str>,
+        #[case] expected_schema: Option<&str>,
+        #[values(false, true)] array: bool,
+    ) {
+        let mut context = TestParseContext::default();
+        let schemas: Vec<_> = path.iter().map(|name| SchemaName::from(name)).collect();
+        context.set_search_path(&schemas);
+        let declaration = TypeDefinition::builtin(&FullName::from_local_name("item"), None);
+        for schema in ["a", "b", "a.b", "pg_catalog"] {
+            context.set_get_type_impl_result(&FullName::with_schema(schema, "item"), &declaration);
+        }
+        let name = match qualifier {
+            Some(schema) => FullName::with_schema(schema, "item"),
+            None => FullName::from_local_name("item"),
+        };
+        let expected = expected_schema.map(|schema| {
+            TypeReference::concrete_type_ref(&FullName::with_schema(schema, "item"), array)
+        });
+        assert_eq!(
+            context.canonicalize_type_ref(&TypeReference::concrete_type_ref(&name, array)),
+            expected
+        );
+    }
+
+    #[test]
+    fn canonicalization_preserves_owned_anonymous_identity() {
+        let context = TestParseContext::default();
+        let row = crate::test_helpers::dynamic_types::record(&crate::sem::PgBuiltInType::int4());
+        assert_eq!(context.canonicalize_type_ref(&row), Some(row.clone()));
+        let array = row.array_type();
+        assert_eq!(context.canonicalize_type_ref(&array), Some(array));
+    }
+}
 
 fn relation_name_at(
     context: &(impl BaseParseContext + ?Sized),

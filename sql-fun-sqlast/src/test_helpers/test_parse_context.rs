@@ -165,7 +165,7 @@ impl TestParseContext {
 
     /// setup type for TypeReference
     pub fn setup_type(&mut self, type_ref: TypeReference) {
-        let type_name = type_ref.full_name();
+        let type_name = type_ref.full_name().expect("nominal type identity");
         let type_definition = TypeDefinition::builtin(type_name, None);
         self.set_get_type_impl_result(type_name, &type_definition);
 

@@ -29,6 +29,7 @@ impl CompositeFieldCollection {
             .all(CompositeFieldDefinition::declaration_can_apply)
     }
 
+    /// Append a field in declaration order.
     pub fn push(&mut self, item: CompositeFieldDefinition) {
         self.0.push(item);
     }
@@ -100,7 +101,11 @@ impl CreateCompositeType {
     /// When instance is dynamic type and no-name , returns None
     #[must_use]
     pub fn name(&self) -> Option<&FullName> {
-        self.type_ref.as_ref().map(|f| f.full_name())
+        if let Some(reference) = &self.type_ref {
+            reference.full_name()
+        } else {
+            None
+        }
     }
 
     /// get concrete type reference

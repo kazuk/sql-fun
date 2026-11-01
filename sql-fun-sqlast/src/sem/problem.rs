@@ -26,11 +26,7 @@ impl From<&crate::sem::TableName> for diagnostic::TableName {
 }
 impl From<&crate::sem::TypeReference> for diagnostic::TypeReference {
     fn from(value: &crate::sem::TypeReference) -> Self {
-        Self::new(&if value.is_dynamic() {
-            "record".to_owned()
-        } else {
-            value.to_string()
-        })
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::TypeDefinition> for diagnostic::TypeDefinition {

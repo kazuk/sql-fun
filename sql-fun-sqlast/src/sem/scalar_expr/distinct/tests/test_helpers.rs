@@ -23,9 +23,9 @@ pub(super) fn context_for(dialect: Dialect) -> SchemaFileContext {
     ] {
         base.setup_type(ty.clone());
         base.set_get_type_impl_result(
-            ty.full_name(),
+            ty.full_name().expect("nominal type identity"),
             &TypeDefinition::builtin_with_category(
-                ty.full_name(),
+                ty.full_name().expect("nominal type identity"),
                 Some(TypeCategory::try_from(category).unwrap()),
                 None,
             ),

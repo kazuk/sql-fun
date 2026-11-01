@@ -29,6 +29,21 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn fmt_type_shape(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "row(")?;
+        for (index, column) in self.0.iter().enumerate() {
+            if index > 0 {
+                write!(f, ", ")?;
+            }
+            if let Some(ty) = column.get_type() {
+                write!(f, "{ty}")?;
+            } else {
+                write!(f, "?")?;
+            }
+        }
+        write!(f, ")")
+    }
+
     pub(crate) fn project_expression(
         &self,
         base: &crate::sem::SemScalarExpr,

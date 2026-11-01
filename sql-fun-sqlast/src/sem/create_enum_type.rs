@@ -39,7 +39,9 @@ impl CreateEnum {
     /// get name
     #[must_use]
     pub fn name(&self) -> &FullName {
-        self.type_ref.full_name()
+        self.type_ref
+            .full_name()
+            .expect("enum identity is constructed from its declared name")
     }
 
     /// Reference identifying this enum type.

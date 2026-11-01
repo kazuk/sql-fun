@@ -13,7 +13,10 @@ impl TypeInfoRead for SchemaCatalog {
         let mut types = self.base.type_references();
         types.extend(self.types.cast_source_types());
         types.retain(|ty| {
-            ty.type_definition().is_some() || !self.renamed_types.contains(ty.full_name())
+            ty.type_definition().is_some()
+                || ty
+                    .full_name()
+                    .is_none_or(|name| !self.renamed_types.contains(name))
         });
         types.sort_by_cached_key(|ty| format!("{ty:?}"));
         types.dedup();

@@ -371,3 +371,11 @@ nested/derived/CTE consumers, domains, arrays, explicit parameter inputs and
 INSERT/UPDATE assignments from parameter-free set results.
 Rust retains coercion, serialization, parameter-domain, catalog-application and
 SQLite contracts; see [the set-operation inventory](inventory-set-operations.md).
+
+Issue #516 extends `rows.json` with GREATEST over anonymous rows, nested
+anonymous-record arrays, and COALESCE over structural arrays on PostgreSQL
+17/18. Both source and installed paths retain the existing nominal-only output
+payload while checking successful analysis and nullability. Rust tests inspect
+the owned definitions, field types, array elements, optional names, inference
+substitution, compatibility, canonicalization and trigger dependency identities.
+Range construction and subtype metadata remain tracked separately in #914.

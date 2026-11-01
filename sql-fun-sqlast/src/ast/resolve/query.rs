@@ -1245,7 +1245,12 @@ impl crate::ast::Cast {
             .argument
             .table_output_name(value.explicit_cast_operand().unwrap_or(value))?;
         if name.is_empty() {
-            Ok(self.target.reference()?.full_name().local_name())
+            Ok(self
+                .target
+                .reference()?
+                .full_name()
+                .expect("SQL type syntax constructs a concrete reference")
+                .local_name())
         } else {
             Ok(name)
         }

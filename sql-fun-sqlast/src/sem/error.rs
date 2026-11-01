@@ -117,7 +117,7 @@ impl AnalysisError {
     pub fn raise_register_dynamic_type(
         _create_comp_type: &super::CreateCompositeType,
     ) -> Result<Infallible, Self> {
-        todo!()
+        Self::raise_unexpected_input("anonymous composite cannot be registered in the catalog")
     }
 
     /// file not found

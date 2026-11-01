@@ -1220,7 +1220,7 @@ mod test_search_path {
             && let Some(overload) = overloads.get_at(0)
             && let Some(ret_type) = overload.ret_type().as_ref()
         {
-            Some(ret_type.full_name())
+            ret_type.full_name()
         } else {
             None
         };

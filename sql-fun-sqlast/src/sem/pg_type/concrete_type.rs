@@ -168,55 +168,11 @@ impl ConcreteTypeReference {
 
     /// convert to range type
     pub fn get_range_type(&self) -> TypeReference {
-        todo!()
+        todo!("range construction requires catalog semantics: #914")
     }
 
     /// convert to multi range type
     pub fn get_multi_range_type(&self) -> TypeReference {
-        todo!()
-    }
-
-    /// apply simple inference result
-    pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
-        if self.is_any_element() {
-            self.base = infer_result_type.full_name().clone();
-            self.is_array = infer_result_type.is_array().unwrap_or(false);
-        } else if self.is_any_array() {
-            self.base = infer_result_type.full_name().clone();
-            self.is_array = true;
-        } else if self.is_any_non_array() {
-            self.base = infer_result_type.full_name().clone();
-            self.is_array = false;
-        } else if self.is_any_range() {
-            let range_type = infer_result_type.into_range_type();
-            self.base = range_type.full_name().clone();
-            self.is_array = range_type.is_array().unwrap_or(false);
-        } else if self.is_any_multi_range() {
-            let multi_range = infer_result_type.into_multi_range_type();
-            self.base = multi_range.full_name().clone();
-            self.is_array = multi_range.is_array().unwrap_or(false);
-        }
-    }
-
-    /// apply common inference result
-    pub fn apply_common_infer_result(&mut self, infer_result_type: &TypeReference) {
-        if self.is_any_compatible() {
-            self.base = infer_result_type.full_name().clone();
-            self.is_array = infer_result_type.is_array().unwrap_or(false);
-        } else if self.is_any_compatible_array() {
-            self.base = infer_result_type.full_name().clone();
-            self.is_array = true;
-        } else if self.is_any_compatible_non_array() {
-            self.base = infer_result_type.full_name().clone();
-            self.is_array = false;
-        } else if self.is_any_compatible_range() {
-            let range_type = infer_result_type.into_range_type();
-            self.base = range_type.full_name().clone();
-            self.is_array = range_type.is_array().unwrap_or(false);
-        } else if self.is_any_compatible_multi_range() {
-            let multi_range_type = infer_result_type.into_multi_range_type();
-            self.base = multi_range_type.full_name().clone();
-            self.is_array = multi_range_type.is_array().unwrap_or(false);
-        }
+        todo!("range construction requires catalog semantics: #914")
     }
 }

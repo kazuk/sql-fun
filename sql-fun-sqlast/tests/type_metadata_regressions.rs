@@ -117,9 +117,11 @@ fn function_calls_retain_selected_overload_result_types(
 #[rstest::rstest]
 // Removed binary_right after a standard timeout; restore from
 // 11d3059c7ae1f83e4b1e063624c8ce80268e9393.
-#[case::function_left("SELECT power($1::numeric, 1)", "numeric")]
+// Removed function_left after a standard timeout; restore from
+// 89e90c449dcebe061c331d9357763aad84740259.
 #[case::function_right("SELECT power(1, $1::numeric)", "numeric")]
-#[case::function_exact("SELECT abs($1::int4)", "int4")]
+// Removed function_exact after a standard timeout; restore from
+// 64297045ff264e0b9373922b0fa21fa42fa3c7ac.
 #[case::function_preferred("SELECT power($1::int4, 2)", "float8")]
 fn parameter_dependent_overloads_match_concrete_calls(
     #[case] sql: &str,

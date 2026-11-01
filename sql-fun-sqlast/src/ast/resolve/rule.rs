@@ -399,7 +399,9 @@ impl TypeReference {
         if self.is_dynamic() {
             return false;
         }
-        let name = self.full_name();
+        let Some(name) = self.full_name() else {
+            return false;
+        };
         name.schema()
             .is_some_and(|schema| schema.as_str() == "pg_catalog")
             && matches!(

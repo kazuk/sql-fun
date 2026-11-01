@@ -24,8 +24,7 @@ fn insert_target_subscripts_use_when_visibility(#[case] index: &str, #[case] acc
 
 fn array_catalog() -> crate::test_helpers::TestParseContext {
     let mut context = catalog(17);
-    let array =
-        crate::sem::TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+    let array = PgBuiltInType::int4().array_type();
     context.setup_type(array.clone());
     context.setup_table(
         "arrays",

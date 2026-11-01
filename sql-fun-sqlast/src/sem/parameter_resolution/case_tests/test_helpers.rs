@@ -33,9 +33,9 @@ fn context_for(dialect: Dialect) -> SchemaFileContext {
             'S'
         };
         base.set_get_type_impl_result(
-            ty.full_name(),
+            ty.full_name().expect("nominal type identity"),
             &crate::sem::TypeDefinition::builtin_with_category(
-                ty.full_name(),
+                ty.full_name().expect("nominal type identity"),
                 Some(crate::sem::TypeCategory::try_from(category).unwrap()),
                 None,
             ),
@@ -50,7 +50,7 @@ fn context_for(dialect: Dialect) -> SchemaFileContext {
         ));
         let definition =
             crate::sem::TypeDefinition::from(&crate::sem::CreateDomain::new(&ty, &Some(target)));
-        base.set_get_type_impl_result(ty.full_name(), &definition);
+        base.set_get_type_impl_result(ty.full_name().expect("nominal type identity"), &definition);
     }
     base.setup_binary("+", "int4", "int4", "int4", true);
     base.setup_binary("=", "int4", "int4", "bool", true);

@@ -96,7 +96,9 @@ impl CreateDomain {
     /// get name
     #[must_use]
     pub fn name(&self) -> &FullName {
-        self.type_ref.full_name()
+        self.type_ref
+            .full_name()
+            .expect("domain identity is constructed from its declared name")
     }
 
     /// Resolved base type, including array qualification, when lookup succeeded.

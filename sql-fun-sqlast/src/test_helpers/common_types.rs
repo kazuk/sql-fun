@@ -18,9 +18,9 @@ pub(crate) fn context() -> TestParseContext {
             'N'
         };
         context.set_get_type_impl_result(
-            ty.full_name(),
+            ty.full_name().expect("nominal type identity"),
             &TypeDefinition::builtin_with_category(
-                ty.full_name(),
+                ty.full_name().expect("nominal type identity"),
                 Some(TypeCategory::try_from(category).unwrap()),
                 None,
             ),
@@ -49,7 +49,8 @@ pub(crate) fn domain_context() -> TestParseContext {
     ] {
         let ty = TypeReference::from_full_name(FullName::with_schema("public", name));
         let definition = TypeDefinition::from(&CreateDomain::new(&ty, &Some(base)));
-        context.set_get_type_impl_result(ty.full_name(), &definition);
+        context
+            .set_get_type_impl_result(ty.full_name().expect("nominal type identity"), &definition);
     }
     context
 }

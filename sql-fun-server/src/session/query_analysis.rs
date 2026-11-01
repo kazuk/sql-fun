@@ -664,7 +664,7 @@ fn named_type(ty: &SqlType) -> Option<TypeReference> {
     if ty.type_definition().is_some() {
         return None;
     }
-    let name = ty.full_name();
+    let name = ty.full_name()?;
     Some(TypeReference::new(
         name.schema().map_or("", |schema| schema.as_str()),
         &name.local_name(),

@@ -49,7 +49,10 @@ pub(crate) fn domain(
 ) -> TypeReference {
     let reference = reference(name);
     let definition = CreateDomain::new(&reference, &base.cloned());
-    context.insert_create_domain(reference.full_name(), &definition);
+    context.insert_create_domain(
+        reference.full_name().expect("nominal type identity"),
+        &definition,
+    );
     reference
 }
 

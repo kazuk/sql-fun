@@ -44,11 +44,29 @@ scope.
 
 ### Operation boundaries
 
-Do not assume every `TypeReference` method supports both variants. Several
-dynamic branches currently use `todo!()`, including `full_name()`, display,
-and some polymorphic-type operations. Inspect the method before using it on a
-potentially dynamic reference. Concrete canonical text parsing and formatting
-do not provide a text representation for dynamic definitions.
+`TypeReference::full_name()` exposes optional nominal identity. Concrete
+references return their name; owned named definitions return their retained name.
+Anonymous composites and structural arrays have no standalone catalog name.
+`TypeDefinition::full_name()` and its borrowed `type_reference()` return `None`
+for implicit composites. Use the retained definition and row/structural APIs
+instead of fabricating a `record` binding or sending anonymous values through
+catalog-key lookup. Canonicalization preserves owned definitions.
+
+Display is diagnostic text: anonymous rows show ordered field types as
+`row(type, ...)`, including `?` for an unresolved field, and structural arrays
+append `[]`. This is not a canonical SQL spelling or a dynamic `FromStr`
+round-trip contract. Concrete canonical parsing/formatting remains unchanged.
+The server query-result type payload remains nominal-only; its absent type field
+does not erase the SQLAST's owned fields.
+
+Dynamic rows/arrays are not polymorphic placeholders or ranges. Owned nominal
+references reuse the represented type's predicates. Simple/common substitution
+retains the complete inferred element or array definition; fixed types remain
+unchanged. Range/multirange construction and subtype metadata extraction remain
+unfinished in the existing common nominal implementation and are tracked by
+[#914](https://github.com/kazuk/sql-fun/issues/914). They are not implemented by
+optional name access or anonymous structural matching. Extraction requires the
+corresponding range receiver, just as element extraction requires an array.
 
 `TypeReference::array_type()` constructs either a concrete array qualifier or a
 dynamic `TypeDefinition::Array`. On a dynamic array, `element_type()` returns the

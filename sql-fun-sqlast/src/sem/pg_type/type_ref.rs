@@ -9,7 +9,8 @@ use super::{
 /// A concrete named type (optionally an array), or an inferred dynamic type.
 ///
 /// Concrete types display their canonical [`FullName`] followed by `[]` for
-/// an array. `FromStr` reads that canonical spelling without SQL case folding
+/// an array. Anonymous display is diagnostic structural text, not a catalog name.
+/// `FromStr` reads that canonical spelling without SQL case folding
 /// or type-alias interpretation; dynamic types have no canonical text form.
 /// Use [`crate::sem::parse_client_type`] for SQL client parameter type spelling.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -106,9 +107,15 @@ mod collation_capability_tests {
         let second =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "second"), false);
         let first_definition = TypeDefinition::from(&CreateDomain::new(&first, &Some(base)));
-        context.set_get_type_impl_result(first.full_name(), &first_definition);
+        context.set_get_type_impl_result(
+            first.full_name().expect("nominal type identity"),
+            &first_definition,
+        );
         let second_definition = TypeDefinition::from(&CreateDomain::new(&second, &Some(first)));
-        context.set_get_type_impl_result(second.full_name(), &second_definition);
+        context.set_get_type_impl_result(
+            second.full_name().expect("nominal type identity"),
+            &second_definition,
+        );
         let reference = if dynamic {
             TypeReference::dynamic(&second_definition)
         } else {
@@ -134,7 +141,10 @@ mod collation_capability_tests {
             TypeReference::concrete_type_ref(&FullName::with_schema("public", name), false)
         });
         let domain = TypeDefinition::from(&CreateDomain::new(&reference, &base));
-        context.set_get_type_impl_result(reference.full_name(), &domain);
+        context.set_get_type_impl_result(
+            reference.full_name().expect("nominal type identity"),
+            &domain,
+        );
         assert_eq!(reference.collation_capability(&context), None);
         assert_eq!(
             TypeReference::dynamic(&domain).collation_capability(&context),
@@ -176,13 +186,13 @@ impl TypeReference {
         Self::Dynamic(DynamicTypeReference::new(type_def))
     }
 
-    /// type full name
-    #[track_caller]
+    /// Nominal identity, or `None` for an anonymous row or structural array.
+    /// Owned named definitions retain their actual catalog name.
     #[must_use]
-    pub fn full_name(&self) -> &FullName {
+    pub fn full_name(&self) -> Option<&FullName> {
         match self {
-            Self::Concrete(c) => c.full_name(),
-            Self::Dynamic(_) => todo!(),
+            Self::Concrete(c) => Some(c.full_name()),
+            Self::Dynamic(d) => d.type_definition().full_name(),
         }
     }
 
@@ -215,7 +225,7 @@ impl TypeReference {
         if let Some(definition) = self.type_definition() {
             Some(definition)
         } else {
-            context.get_type(self.full_name())
+            context.get_type(self.full_name()?)
         }
     }
 
@@ -275,7 +285,7 @@ impl TypeReference {
         self.matches_owned_structure(target)
     }
 
-    fn matches_owned_structure(&self, other: &Self) -> bool {
+    pub(super) fn matches_owned_structure(&self, other: &Self) -> bool {
         if self == other {
             return true;
         }
@@ -352,7 +362,13 @@ impl TypeReference {
     pub fn is_record(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_record(),
-            Self::Dynamic(value) => value.is_array() != Some(true),
+            Self::Dynamic(value) => {
+                value.type_definition().is_anonymous_record()
+                    || value
+                        .type_definition()
+                        .type_reference()
+                        .is_some_and(Self::is_record)
+            }
         }
     }
 
@@ -379,16 +395,28 @@ impl TypeReference {
     pub fn is_range(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_range(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_range),
         }
     }
 
-    /// get subtype from range type
+    /// Get the subtype of a range. Nominal subtype metadata remains pending #914.
+    ///
+    /// # Panics
+    /// Requires a range receiver; existing nominal metadata extraction is unimplemented.
     #[must_use]
     pub fn range_subtype(&self) -> Self {
         match self {
             Self::Concrete(c) => c.range_subtype(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => {
+                assert!(self.is_range(), "requires a range reference");
+                d.type_definition()
+                    .type_reference()
+                    .expect("named range definition")
+                    .range_subtype()
+            }
         }
     }
 
@@ -397,16 +425,28 @@ impl TypeReference {
     pub fn is_multi_range(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_multi_range(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_multi_range),
         }
     }
 
-    /// get base element type from multi range type
+    /// Get the subtype of a multirange. Nominal subtype metadata remains pending #914.
+    ///
+    /// # Panics
+    /// Requires a multirange receiver; existing nominal metadata extraction is unimplemented.
     #[must_use]
     pub fn multi_range_base_element(&self) -> Self {
         match self {
             Self::Concrete(c) => c.multi_range_base_element(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => {
+                assert!(self.is_multi_range(), "requires a multirange reference");
+                d.type_definition()
+                    .type_reference()
+                    .expect("named range definition")
+                    .multi_range_base_element()
+            }
         }
     }
 
@@ -415,7 +455,10 @@ impl TypeReference {
     pub fn is_simple_infer_arg(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_simple_infer_arg(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_simple_infer_arg),
         }
     }
 
@@ -424,7 +467,10 @@ impl TypeReference {
     pub fn is_common_infer_arg(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_common_infer_arg(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_common_infer_arg),
         }
     }
 
@@ -433,7 +479,10 @@ impl TypeReference {
     pub fn is_any_element(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_element(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_element),
         }
     }
 
@@ -442,7 +491,10 @@ impl TypeReference {
     pub fn is_any_array(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_array(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_array),
         }
     }
 
@@ -451,7 +503,10 @@ impl TypeReference {
     pub fn is_any_non_array(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_non_array(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_non_array),
         }
     }
 
@@ -460,7 +515,10 @@ impl TypeReference {
     pub fn is_any_range(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_range(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_range),
         }
     }
 
@@ -469,7 +527,10 @@ impl TypeReference {
     pub fn is_any_multi_range(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_multi_range(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_multi_range),
         }
     }
 
@@ -478,7 +539,10 @@ impl TypeReference {
     pub fn is_any_compatible(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_compatible(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_compatible),
         }
     }
 
@@ -487,7 +551,10 @@ impl TypeReference {
     pub fn is_any_compatible_array(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_compatible_array(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_compatible_array),
         }
     }
 
@@ -496,7 +563,10 @@ impl TypeReference {
     pub fn is_any_compatible_non_array(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_compatible_non_array(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_compatible_non_array),
         }
     }
 
@@ -505,7 +575,10 @@ impl TypeReference {
     pub fn is_any_compatible_range(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_compatible_range(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_compatible_range),
         }
     }
 
@@ -514,7 +587,10 @@ impl TypeReference {
     pub fn is_any_compatible_multi_range(&self) -> bool {
         match self {
             Self::Concrete(c) => c.is_any_compatible_multi_range(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d
+                .type_definition()
+                .type_reference()
+                .is_some_and(Self::is_any_compatible_multi_range),
         }
     }
 
@@ -523,7 +599,7 @@ impl TypeReference {
     pub fn into_range_type(&self) -> Self {
         match self {
             Self::Concrete(c) => c.get_range_type(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(_d) => todo!("range construction requires catalog semantics: #914"),
         }
     }
 
@@ -532,43 +608,35 @@ impl TypeReference {
     pub fn into_multi_range_type(&self) -> Self {
         match self {
             Self::Concrete(c) => c.get_multi_range_type(),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(_d) => todo!("range construction requires catalog semantics: #914"),
         }
     }
 
-    /// apply simple inference result
+    /// Substitute a simple-family placeholder, retaining owned result definitions.
+    /// Fixed types are unchanged.
     pub fn apply_simple_infer_result(&mut self, infer_result_type: &Self) {
-        match self {
-            Self::Concrete(c) => {
-                if infer_result_type.is_dynamic() && c.is_any_array() {
-                    *self = infer_result_type.array_type();
-                } else if infer_result_type.is_dynamic()
-                    && (c.is_any_element() || c.is_any_non_array())
-                {
-                    *self = infer_result_type.clone();
-                } else {
-                    c.apply_simple_infer_result(infer_result_type);
-                }
-            }
-            Self::Dynamic(_d) => todo!(),
+        if self.is_any_element() || self.is_any_non_array() {
+            *self = infer_result_type.clone();
+        } else if self.is_any_array() {
+            *self = infer_result_type.array_type();
+        } else if self.is_any_range() {
+            *self = infer_result_type.into_range_type();
+        } else if self.is_any_multi_range() {
+            *self = infer_result_type.into_multi_range_type();
         }
     }
 
-    /// apply common inference result
+    /// Substitute a common-family placeholder, retaining owned result definitions.
+    /// Fixed types are unchanged.
     pub fn apply_common_infer_result(&mut self, infer_result_type: &Self) {
-        match self {
-            Self::Concrete(c) => {
-                if infer_result_type.is_dynamic() && c.is_any_compatible_array() {
-                    *self = infer_result_type.array_type();
-                } else if infer_result_type.is_dynamic()
-                    && (c.is_any_compatible() || c.is_any_compatible_non_array())
-                {
-                    *self = infer_result_type.clone();
-                } else {
-                    c.apply_common_infer_result(infer_result_type);
-                }
-            }
-            Self::Dynamic(_d) => todo!(),
+        if self.is_any_compatible() || self.is_any_compatible_non_array() {
+            *self = infer_result_type.clone();
+        } else if self.is_any_compatible_array() {
+            *self = infer_result_type.array_type();
+        } else if self.is_any_compatible_range() {
+            *self = infer_result_type.into_range_type();
+        } else if self.is_any_compatible_multi_range() {
+            *self = infer_result_type.into_multi_range_type();
         }
     }
 
@@ -580,22 +648,116 @@ impl TypeReference {
 }
 
 #[cfg(test)]
+mod dynamic_accessor_tests {
+    use crate::sem::{FullName, PgBuiltInType, TypeDefinition, TypeReference};
+    use crate::test_helpers::{TestParseContext, dynamic_types::record};
+
+    #[rstest::rstest]
+    fn anonymous_identity_retains_definition_and_elements(#[values(false, true)] array: bool) {
+        let row = record(&PgBuiltInType::int4());
+        let reference = if array { row.array_type() } else { row.clone() };
+        assert_eq!(reference.full_name(), None);
+        assert_eq!(reference.is_array(), Some(array));
+        assert_eq!(reference.is_record(), !array);
+        assert_eq!(reference.type_definition().unwrap().type_reference(), None);
+        let restored: TypeReference =
+            ::serde_json::from_str(&::serde_json::to_string(&reference).unwrap()).unwrap();
+        assert_eq!(restored, reference);
+        if array {
+            assert_eq!(reference.element_type(), row);
+        } else {
+            let context = TestParseContext::default();
+            let columns = reference.row_columns(&context).unwrap();
+            assert_eq!(
+                columns.column_at(0).unwrap().get_type(),
+                Some(&PgBuiltInType::int4())
+            );
+            let implicit = TypeDefinition::implicit_composite(&columns);
+            assert_eq!(implicit.full_name(), None);
+            assert_eq!(implicit.type_reference(), None);
+            assert!(reference.matches_structure(&TypeReference::dynamic(&implicit), &context));
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::row(false)]
+    #[case::array(true)]
+    fn anonymous_types_are_neither_ranges_nor_placeholders(#[case] array: bool) {
+        let row = record(&PgBuiltInType::int4());
+        let reference = if array { row.array_type() } else { row };
+        assert!(!reference.is_range());
+        assert!(!reference.is_multi_range());
+        assert!(!reference.is_simple_infer_arg());
+        assert!(!reference.is_common_infer_arg());
+        assert!(!reference.is_any_element());
+        assert!(!reference.is_any_array());
+        assert!(!reference.is_any_non_array());
+        assert!(!reference.is_any_range());
+        assert!(!reference.is_any_multi_range());
+        assert!(!reference.is_any_compatible());
+        assert!(!reference.is_any_compatible_array());
+        assert!(!reference.is_any_compatible_non_array());
+        assert!(!reference.is_any_compatible_range());
+        assert!(!reference.is_any_compatible_multi_range());
+        let mut fixed = reference.clone();
+        fixed.apply_simple_infer_result(&PgBuiltInType::text());
+        fixed.apply_common_infer_result(&PgBuiltInType::text());
+        assert_eq!(fixed, reference);
+    }
+
+    #[rstest::rstest]
+    #[case::scalar("int4", false, false, false)]
+    #[case::record("record", true, false, false)]
+    #[case::range("int4range", false, true, false)]
+    #[case::multirange("int4multirange", false, false, true)]
+    fn owned_nominal_classification_uses_its_definition(
+        #[case] name: &str,
+        #[case] record: bool,
+        #[case] range: bool,
+        #[case] multirange: bool,
+    ) {
+        let name = FullName::with_schema("pg_catalog", name);
+        let reference = TypeReference::dynamic(&TypeDefinition::builtin(&name, None));
+        assert_eq!(reference.full_name(), Some(&name));
+        assert_eq!(reference.to_string(), name.to_string());
+        assert_eq!(reference.is_record(), record);
+        assert_eq!(reference.is_range(), range);
+        assert_eq!(reference.is_multi_range(), multirange);
+    }
+
+    #[rstest::rstest]
+    #[case::simple_element("anyelement", false, false)]
+    #[case::simple_array("anyarray", false, true)]
+    #[case::simple_nonarray("anynonarray", false, false)]
+    #[case::common_element("anycompatible", true, false)]
+    #[case::common_array("anycompatiblearray", true, true)]
+    #[case::common_nonarray("anycompatiblenonarray", true, false)]
+    fn owned_placeholders_preserve_structural_substitution(
+        #[case] placeholder: &str,
+        #[case] common: bool,
+        #[case] array: bool,
+    ) {
+        let name = FullName::with_schema("pg_catalog", placeholder);
+        let mut reference = TypeReference::dynamic(&TypeDefinition::builtin(&name, None));
+        assert_eq!(reference.is_common_infer_arg(), common);
+        assert_eq!(reference.is_simple_infer_arg(), !common);
+        let row = record(&PgBuiltInType::int4());
+        if common {
+            reference.apply_common_infer_result(&row);
+        } else {
+            reference.apply_simple_infer_result(&row);
+        }
+        assert_eq!(reference, if array { row.array_type() } else { row });
+    }
+}
+
+#[cfg(test)]
 mod array_identity_tests {
     use super::TypeReference;
     use crate::sem::create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition};
     use crate::sem::{CreateCompositeType, PgBuiltInType, TypeDefinition};
 
-    fn record(field_type: &TypeReference) -> TypeReference {
-        let mut fields = CompositeFieldCollection::default();
-        fields.push(CompositeFieldDefinition::new(
-            "n",
-            &Some(field_type.clone()),
-            &None,
-        ));
-        TypeReference::dynamic(&TypeDefinition::from(&CreateCompositeType::from_fields(
-            &fields,
-        )))
-    }
+    use crate::test_helpers::dynamic_types::record;
 
     #[test]
     fn anonymous_record_accepts_generic_record_without_cast_master() {
@@ -787,8 +949,26 @@ impl std::fmt::Display for TypeReference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Concrete(c) => write!(f, "{c}"),
-            Self::Dynamic(_d) => todo!(),
+            Self::Dynamic(d) => d.type_definition().fmt(f),
         }
+    }
+}
+
+#[cfg(test)]
+mod dynamic_display_tests {
+    use crate::sem::{ColumnCollection, PgBuiltInType, TypeDefinition, TypeReference};
+    use crate::test_helpers::dynamic_types::record;
+
+    #[rstest::rstest]
+    #[case::row(false, "row(pg_catalog.int4)")]
+    #[case::array(true, "row(pg_catalog.int4)[]")]
+    fn structural_display_is_diagnostic_text(#[case] array: bool, #[case] expected: &str) {
+        let row = record(&PgBuiltInType::int4());
+        let reference = if array { row.array_type() } else { row };
+        assert_eq!(reference.to_string(), expected);
+        assert_eq!(record(&reference).to_string(), format!("row({expected})"));
+        let empty = TypeDefinition::implicit_composite(&ColumnCollection::default());
+        assert_eq!(TypeReference::dynamic(&empty).to_string(), "row()");
     }
 }
 
@@ -857,7 +1037,7 @@ impl TypeReference {
             if !seen.insert(base.clone()) {
                 return None;
             }
-            let Some(definition) = context.get_type_impl(base.full_name()) else {
+            let Some(definition) = context.get_type_impl(base.full_name()?) else {
                 // Ordinary names may be handled by cast lookup; a declared
                 // domain, however, must reference an existing base definition.
                 return if base == *self { Some(base) } else { None };

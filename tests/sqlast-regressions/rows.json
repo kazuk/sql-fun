@@ -546,5 +546,49 @@
         }
       ]
     }
+  },
+  {
+    "name": "rows::dynamic_greatest",
+    "sql": "SELECT GREATEST(ROW(1), ROW(2)) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::dynamic_nested_array",
+    "sql": "SELECT ARRAY[ROW(1, ROW(true))] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows::dynamic_coalesce_array",
+    "sql": "SELECT COALESCE(ARRAY[ROW(1)], ARRAY[ROW(2)]) AS result",
+    "expected": {
+      "diagnostics": [
+        "unreachable_coalesce_argument"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
   }
 ]

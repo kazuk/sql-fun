@@ -468,10 +468,11 @@ fn retains_resolved_old_new_bindings_and_body_dependencies() -> testresult::Test
             .contains(&FullName::with_schema("main", "other"))
     );
     assert!(
-        trigger
-            .dependencies()
-            .types()
-            .contains(crate::sem::PgBuiltInType::int4().full_name())
+        trigger.dependencies().types().contains(
+            crate::sem::PgBuiltInType::int4()
+                .full_name()
+                .expect("builtin identity")
+        )
     );
     Ok(())
 }

@@ -50,7 +50,9 @@ fn parameterized_array_access_links_results(
     );
     let constraints = analyzed.context().parameter_constraints();
     let expected = crate::sem::TypeReference::concrete_type_ref(
-        PgBuiltInType::int4().full_name(),
+        PgBuiltInType::int4()
+            .full_name()
+            .expect("nominal type identity"),
         array_result,
     );
     assert!(
@@ -81,8 +83,7 @@ fn underconstrained_array_access_preserves_structure(
     assert!(constraints.parameter(1).unwrap().constraint().is_any());
     assert!(constraints.result_column(0).unwrap().is_any());
     assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    let array =
-        crate::sem::TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+    let array = PgBuiltInType::int4().array_type();
     assert!(constraints.allows(&BTreeMap::from([(1, array)])));
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let expression = query
@@ -147,8 +148,7 @@ fn surrounding_context_constrains_array_access(
         analyzed.context().problems()
     );
     let constraints = analyzed.context().parameter_constraints();
-    let array =
-        crate::sem::TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+    let array = PgBuiltInType::int4().array_type();
     assert!(constraints.allows(&BTreeMap::from([(1, array)])));
     assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
     assert!(
@@ -437,7 +437,9 @@ fn declared_composite_array_fields_retain_result_types(
     assert_eq!(
         query.result_columns().get_column_at(0).unwrap().col_type(),
         &Some(crate::sem::TypeReference::concrete_type_ref(
-            PgBuiltInType::int4().full_name(),
+            PgBuiltInType::int4()
+                .full_name()
+                .expect("nominal type identity"),
             is_array,
         ))
     );
@@ -494,7 +496,9 @@ fn consecutive_subscript_result_matches_postgres(
     );
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let expected = crate::sem::TypeReference::concrete_type_ref(
-        PgBuiltInType::int4().full_name(),
+        PgBuiltInType::int4()
+            .full_name()
+            .expect("nominal type identity"),
         array_result,
     );
     assert_eq!(
@@ -595,7 +599,9 @@ fn consecutive_subscripts_share_deferred_constraints(
     );
     let constraints = analyzed.context().parameter_constraints();
     let expected = crate::sem::TypeReference::concrete_type_ref(
-        PgBuiltInType::int4().full_name(),
+        PgBuiltInType::int4()
+            .full_name()
+            .expect("nominal type identity"),
         array_result,
     );
     let domain = constraints.result_column(result).unwrap();

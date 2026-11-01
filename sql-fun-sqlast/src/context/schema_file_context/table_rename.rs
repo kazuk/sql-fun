@@ -145,13 +145,14 @@ impl RenameUpdates {
     fn collect_types(&mut self, context: &SchemaFileContext, old: &TableName, new: &TableName) {
         for reference in context.type_references() {
             if reference.is_array() == Some(false)
-                && reference.full_name() != old.full_name()
-                && let Some(mut definition) = context.get_type_impl(reference.full_name()).cloned()
+                && let Some(name) = reference.full_name()
+                && name != old.full_name()
+                && let Some(mut definition) = context.get_type_impl(name).cloned()
             {
                 let before = definition.clone();
                 definition.rename_relation(old, new);
                 if definition != before {
-                    self.types.push((reference.full_name().clone(), definition));
+                    self.types.push((name.clone(), definition));
                 }
             }
         }

@@ -268,7 +268,10 @@ impl SemScalarExpr {
         }
         let expression = self.projection_expression(bindings)?;
         let target = TypeName::projection(
-            &target.full_name().projection_name(),
+            &target
+                .full_name()
+                .expect("owned cast targets rejected above")
+                .projection_name(),
             target.is_array() == Some(true),
         );
         Ok(Expr::projection_cast(&expression, &target))

@@ -87,7 +87,10 @@ impl MinMaxExpr {
         let mut base = ty.clone();
         let mut seen = std::collections::HashSet::new();
         while !base.is_dynamic() && base.is_array() != Some(true) && seen.insert(base.clone()) {
-            let Some(definition) = context.get_type_impl(base.full_name()) else {
+            let Some(definition) = context.get_type_impl(
+                base.full_name()
+                    .expect("owned definitions are handled before nominal lookup"),
+            ) else {
                 break;
             };
             let Some(reference) = definition.domain_base() else {
@@ -108,7 +111,10 @@ impl MinMaxExpr {
         let definition = if let Some(definition) = ty.type_definition() {
             Some(definition)
         } else {
-            context.get_type_impl(ty.full_name())
+            context.get_type_impl(
+                ty.full_name()
+                    .expect("owned definitions are handled before nominal lookup"),
+            )
         };
         let category = if let Some(definition) = definition {
             definition.category(context)
@@ -205,14 +211,21 @@ impl MinMaxExpr {
         let definition = if let Some(definition) = base.type_definition() {
             Some(definition)
         } else {
-            context.get_type_impl(base.full_name())
+            context.get_type_impl(
+                base.full_name()
+                    .expect("owned definitions are handled before nominal lookup"),
+            )
         };
         if definition.is_some_and(|definition| definition.has_structural_ordering()) {
             return Some(true);
         }
         // PostgreSQL's default B-tree classes for these concrete families
         // have polymorphic input types, not the concrete result type's name.
-        let direct = context.builtin_type_ordered(base.full_name());
+        let direct = if let Some(name) = base.full_name() {
+            context.builtin_type_ordered(name)
+        } else {
+            None
+        };
         if direct == Some(true) {
             return direct;
         }
@@ -230,8 +243,11 @@ impl MinMaxExpr {
             None
         };
         if let Some(family) = family {
-            return context
-                .builtin_type_ordered(TypeReference::from_master_type_name(family).full_name());
+            return context.builtin_type_ordered(
+                TypeReference::from_master_type_name(family)
+                    .full_name()
+                    .expect("owned definitions are handled before nominal lookup"),
+            );
         }
         direct
     }

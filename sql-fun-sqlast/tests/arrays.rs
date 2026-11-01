@@ -97,6 +97,8 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 // Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 // Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
 // Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
+// The remaining LEAST typed-assignment case was removed after a timeout in
+// e4fccc5d7cd83e82308d0cbde88391bb03a55845.
 
 #[rstest::rstest]
 #[case::domain("ARRAY[NULL::amount,NULL::amount]")]

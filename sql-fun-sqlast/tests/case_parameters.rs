@@ -176,6 +176,8 @@ fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestRe
 // Removed repeated_inputs_remain_jointly_constrained::simple_comparison after a
 // parallel timeout; restore from 32821bde6474fd62d2cf5ae6919d1ef2d6be0ed4.
 
+// Timed-out other_output_first and other_output_last cases were removed in
+// e4fccc5d7cd83e82308d0cbde88391bb03a55845.
 #[rstest::rstest]
 #[case::typed_branch("SELECT CASE WHEN true THEN $1::smallint ELSE 1 END", 0)]
 fn finalization_preserves_case_structure_and_branch_coercions(

@@ -52,10 +52,17 @@ impl ForeignKeyTarget {
         pending: &crate::sem::CreateTable,
     ) -> Result<(Self, Option<Vec<ColumnName>>, bool), AnalysisError> {
         let identity = context.creation_name(pending.name().full_name(), pending.temporary())?;
-        let canonical = crate::sem::search_path::expand_relation_search_path(
-            context,
-            requested.full_name(),
-            |key| {
+        let lookup = if context.dialect() == crate::ast::Dialect::sqlite() {
+            let Some(schema) = identity.schema() else {
+                AnalysisError::raise_unexpected_none("SQLite creation schema")?;
+                AnalysisError::never();
+            };
+            requested.full_name().replace_schema(schema)
+        } else {
+            requested.full_name().clone()
+        };
+        let canonical =
+            crate::sem::search_path::expand_relation_search_path(context, &lookup, |key| {
                 let matches = if context.dialect() == crate::ast::Dialect::sqlite() {
                     key.sqlite_eq(&identity)
                 } else {
@@ -66,8 +73,7 @@ impl ForeignKeyTarget {
                 } else {
                     context.resolve_table_name(&TableName::from(key.clone()))
                 }
-            },
-        );
+            });
         let target = Self(canonical.map(|name| Self::canonical_relation(context, name)));
         if target.relation().is_none() && context.dialect() == crate::ast::Dialect::postgres() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;

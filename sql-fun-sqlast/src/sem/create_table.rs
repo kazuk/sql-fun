@@ -67,11 +67,7 @@ impl ColumnCollection {
             .collect()
     }
 
-    pub(crate) fn find_rename_column(
-        &self,
-        name: &ColumnName,
-        sqlite: bool,
-    ) -> Option<&ColumnDefinition> {
+    pub(crate) fn find_column(&self, name: &ColumnName, sqlite: bool) -> Option<&ColumnDefinition> {
         self.0.iter().find(|column| {
             column.name().as_ref().is_some_and(|candidate| {
                 if sqlite {
@@ -371,12 +367,8 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
-    pub(crate) fn find_rename_column(
-        &self,
-        name: &ColumnName,
-        sqlite: bool,
-    ) -> Option<&ColumnDefinition> {
-        self.columns.find_rename_column(name, sqlite)
+    pub(crate) fn find_column(&self, name: &ColumnName, sqlite: bool) -> Option<&ColumnDefinition> {
+        self.columns.find_column(name, sqlite)
     }
     pub(crate) fn rename_column_dependencies(
         &mut self,
@@ -1126,6 +1118,12 @@ impl CreateTable {
         };
         // SQLite checks parent-key validity when preparing DML, not CREATE TABLE.
         let valid = if context.dialect() == crate::ast::Dialect::postgres() {
+            if explicit.is_none() && columns.is_empty() {
+                context.report_analysis_problem(
+                    AnalysisProblem::foreign_key_referenced_primary_key_missing(requested),
+                )?;
+                return Ok((columns, false));
+            }
             self.check_reference_columns(context, requested, &columns)?
         } else {
             true
@@ -1141,7 +1139,10 @@ impl CreateTable {
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
         for column in columns {
-            if !self.has_column(column) {
+            if self
+                .find_column(column, context.dialect() == crate::ast::Dialect::sqlite())
+                .is_none()
+            {
                 valid = false;
                 context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     requested, column,

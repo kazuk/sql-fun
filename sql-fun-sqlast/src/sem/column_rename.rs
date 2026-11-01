@@ -41,8 +41,8 @@ impl ColumnRename {
         let sqlite = context.dialect() == Dialect::sqlite();
         let (binding, duplicate) = if let Some(table) = &definition {
             (
-                table.find_rename_column(from, sqlite),
-                table.find_rename_column(to, sqlite),
+                table.find_column(from, sqlite),
+                table.find_column(to, sqlite),
             )
         } else {
             (None, None)

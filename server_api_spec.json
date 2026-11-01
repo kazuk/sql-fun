@@ -832,6 +832,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "An omitted foreign-key column list requires a referenced primary key.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignKeyReferencedPrimaryKeyMissing": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "ForeignKeyReferencedPrimaryKeyMissing"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "extension not found",
                   "type": "object",
                   "properties": {
@@ -4917,6 +4930,19 @@
                   },
                   "required": [
                     "OverloadResolution"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An omitted foreign-key column list requires a referenced primary key.",
+                  "type": "object",
+                  "properties": {
+                    "ForeignKeyReferencedPrimaryKeyMissing": {
+                      "$ref": "#/$defs/TableName"
+                    }
+                  },
+                  "required": [
+                    "ForeignKeyReferencedPrimaryKeyMissing"
                   ],
                   "additionalProperties": false
                 },

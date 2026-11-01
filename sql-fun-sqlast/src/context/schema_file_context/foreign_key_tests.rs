@@ -364,6 +364,7 @@ fn create_foreign_key_column_renames_update_owned_and_incoming_columns() {
 
 #[rstest::rstest]
 #[case::source("absent", "parent(id)", "column_not_found_in_table", true)]
+#[case::postgres_case_sensitive("\"ID\"", "parent(id)", "column_not_found_in_table", true)]
 #[case::target_column("id", "parent(absent)", "column_not_found_in_table", true)]
 #[case::target_relation("id", "missing(id)", "relation_not_found", false)]
 fn rejected_create_retains_analysis_without_publishing_table(
@@ -488,6 +489,111 @@ fn in_progress_self_reference_respects_an_earlier_search_path_relation() {
         Some(&fk::name("a", "child"))
     );
     assert!(context.problems().is_empty(), "{:?}", context.problems());
+}
+
+#[test]
+fn omitted_reference_columns_require_a_postgres_primary_key() -> testresult::TestResult {
+    let context = fk::apply(fk::context(), "CREATE TABLE a.parent(id integer)");
+    let pair = crate::test_helpers::ownership::apply_ownership_sql(
+        context,
+        "CREATE TABLE a.child(parent_id integer, FOREIGN KEY(parent_id) REFERENCES parent)",
+    )?;
+    let context = pair.into_context();
+    assert_eq!(
+        context.problems().len(),
+        1,
+        "missing primary key must produce a structured diagnostic"
+    );
+    assert_eq!(
+        context.problems()[0].code(),
+        "foreign_key_referenced_primary_key_missing"
+    );
+    assert!(
+        context
+            .get_table_impl(fk::name("a", "child").full_name())
+            .is_none()
+    );
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::main("main", "temp")]
+#[case::temporary("temp", "main")]
+fn sqlite_foreign_key_uses_its_own_database(
+    #[case] own: &str,
+    #[case] other: &str,
+) -> testresult::TestResult {
+    let context = fk::apply_sqlite(
+        fk::sqlite_context(),
+        "CREATE TABLE main.parent(id PRIMARY KEY)",
+    );
+    let context = fk::apply_sqlite(context, "CREATE TEMP TABLE parent(id PRIMARY KEY)");
+    let sql = format!(
+        "CREATE TABLE {own}.child(id, CONSTRAINT fk FOREIGN KEY(id) REFERENCES parent(id))"
+    );
+    let context = fk::apply_sqlite(context, &sql);
+    let child_name = fk::name(own, "child");
+    let child = context.get_table_impl(child_name.full_name()).unwrap();
+    assert_eq!(
+        child
+            .constraint("fk")
+            .unwrap()
+            .as_foreign_key()
+            .unwrap()
+            .target_table(),
+        Some(&fk::name(own, "parent"))
+    );
+    let rename = format!("ALTER TABLE {other}.parent RENAME TO unrelated");
+    let context = fk::apply_sqlite(context, &rename);
+    let child = context.get_table_impl(child_name.full_name()).unwrap();
+    assert_eq!(
+        child
+            .constraint("fk")
+            .unwrap()
+            .as_foreign_key()
+            .unwrap()
+            .target_table(),
+        Some(&fk::name(own, "parent"))
+    );
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let oracle = ::rusqlite::Connection::open_in_memory()?;
+    oracle.execute_batch(
+        "CREATE TABLE main.parent(id PRIMARY KEY); CREATE TEMP TABLE parent(id PRIMARY KEY)",
+    )?;
+    oracle.execute_batch(&sql)?;
+    oracle.execute_batch(&rename)?;
+    let target: String = oracle.query_row(
+        r#"SELECT "table" FROM pragma_foreign_key_list('child', ?1)"#,
+        [own],
+        |row| row.get(0),
+    )?;
+    assert_eq!(target, "parent");
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_foreign_key_source_columns_ignore_ascii_case() -> testresult::TestResult {
+    let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE parent(id PRIMARY KEY)");
+    let sql = r#"CREATE TABLE child("ID", CONSTRAINT fk FOREIGN KEY("id") REFERENCES parent(id))"#;
+    let context = fk::apply_sqlite(context, sql);
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let child = context
+        .get_table_impl(fk::name("main", "child").full_name())
+        .unwrap();
+    assert!(
+        child
+            .constraint("fk")
+            .unwrap()
+            .as_foreign_key()
+            .unwrap()
+            .references_can_apply()
+    );
+    let oracle = ::rusqlite::Connection::open_in_memory()?;
+    oracle.execute_batch("CREATE TABLE parent(id PRIMARY KEY)")?;
+    oracle.execute_batch(sql)?;
+    Ok(())
 }
 
 #[rstest::rstest]

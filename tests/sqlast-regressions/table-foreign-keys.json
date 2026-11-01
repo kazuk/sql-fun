@@ -68,5 +68,15 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "omitted-target-columns-without-primary-key",
+    "sql": "CREATE TABLE fk_child (parent_id integer, FOREIGN KEY(parent_id) REFERENCES fk_parent_without_key)",
+    "expected": {
+      "diagnostics": [
+        "foreign_key_referenced_primary_key_missing"
+      ],
+      "columns": []
+    }
   }
 ]

@@ -67,6 +67,27 @@ exact target rather than reuse partial output. Currently, the materializer
 requires stable current crate versions: a target already containing snapshot
 versions fails. That existing limitation is tracked separately in #364.
 
+## Versioned manual asset
+
+After crate-version materialization succeeds, preparation packages the adopted
+manual as `sql-fun_vX.Y.Z_user-manual.tar.gz`,
+`sql-fun_vX.Y.Z-snapshot_user-manual.tar.gz`, or
+`sql-fun_vX.Y.Z-snapshotN_user-manual.tar.gz`, matching the selected project
+release identity. It preserves the adopted output at the archive root without
+rebuilding mdBook or modifying its files.
+
+Download the archive from the preparation run's `release-manual-<attempt>`
+Actions artifact. The job summary records the archive filename alongside the
+release target and selected normal-CI run. If the adopted manual directory is
+missing, packaging fails with its path; archive creation and upload failures
+also stop preparation.
+
+Both the adopted input and archive remain outside the checkout. Later draft
+Release assembly can attach this archive unchanged. Stable and snapshot releases
+both carry the manual asset; only stable releases publish that same asset to
+Pages after the Release is published. Preparation itself does not create a
+GitHub Release or deploy Pages.
+
 ## Maintainer tooling and permissions
 
 The workflow runs on Ubuntu in the adopted pinned CI-builder container. It

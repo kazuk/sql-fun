@@ -229,11 +229,63 @@ impl TypeReference {
         }
     }
 
-    pub(crate) fn row_columns<P: ParseContext>(
+    pub(crate) fn row_columns(
         &self,
-        context: &P,
+        context: &impl BaseParseContext,
     ) -> Option<crate::sem::ColumnCollection> {
-        self.definition_from_catalog(context)?.row_columns(context)
+        let base = self.member_base(context)?;
+        if base.is_array() == Some(true) {
+            return None;
+        }
+        base.definition_from_catalog(context)?.row_columns(context)
+    }
+
+    pub(crate) fn owned_row_columns(&self) -> Option<crate::sem::ColumnCollection> {
+        if self.is_array() == Some(true) {
+            return None;
+        }
+        self.type_definition()?.owned_row_columns()
+    }
+
+    fn member_base<'a>(&'a self, context: &'a impl BaseParseContext) -> Option<&'a Self> {
+        let mut base = self;
+        let mut visited = std::collections::HashSet::new();
+        loop {
+            if base.is_array() == Some(true) {
+                return Some(base);
+            }
+            if !visited.insert(base.clone()) {
+                return None;
+            }
+            let definition = base.definition_from_catalog(context)?;
+            if !definition.is_domain() {
+                return Some(base);
+            }
+            base = definition.domain_base()?;
+        }
+    }
+
+    /// Classify an invalid member access without replacing the original type.
+    pub(crate) fn member_access_problem(
+        &self,
+        context: &impl ParseContext,
+        member: &str,
+    ) -> Option<crate::sem::AnalysisProblem> {
+        let base = self.member_base(context)?;
+        if self.row_columns(context).is_some()
+            || (base.is_array() != Some(true) && base.is_record())
+        {
+            Some(crate::sem::AnalysisProblem::composite_type_field_not_found(
+                self, member,
+            ))
+        } else {
+            Some(
+                crate::sem::AnalysisProblem::member_access_requires_composite_type(
+                    sql_fun_core::analysis_problem::FullName::new(&self.to_string()),
+                    member,
+                ),
+            )
+        }
     }
 
     pub(crate) fn assignment_match_context(

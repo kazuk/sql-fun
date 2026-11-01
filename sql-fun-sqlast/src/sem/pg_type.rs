@@ -516,15 +516,20 @@ impl TypeDefinition {
         }
     }
 
-    pub(crate) fn row_columns(&self, context: &impl ParseContext) -> Option<ColumnCollection> {
+    pub(crate) fn row_columns(&self, context: &impl BaseParseContext) -> Option<ColumnCollection> {
+        match self {
+            Self::TableRef(name, _) => Some(context.get_table(name)?.function_row_columns()),
+            Self::Domain(domain) => domain.base_type()?.row_columns(context),
+            _ => self.owned_row_columns(),
+        }
+    }
+
+    /// Row fields carried entirely by owned definitions, without catalog lookup.
+    pub(crate) fn owned_row_columns(&self) -> Option<ColumnCollection> {
         match self {
             Self::CompositeType(composite) => Some(composite.get_column_collection()),
             Self::ImplicitComposite(columns) => Some(columns.clone()),
-            Self::TableRef(name, _) => Some(context.get_table(name)?.function_row_columns()),
-            Self::Domain(domain) => domain
-                .base_type()?
-                .definition_from_catalog(context)?
-                .row_columns(context),
+            Self::Domain(domain) => domain.base_type()?.owned_row_columns(),
             _ => None,
         }
     }
@@ -546,23 +551,98 @@ impl TypeDefinition {
         context: &TCatalog,
         member: &str,
     ) -> Option<TypeReference> {
-        match self {
-            Self::Array(_) => None,
-            Self::Enum(_) => None,
-            Self::CompositeType(create_composite_type) => {
-                create_composite_type.get_member(member)?.get_type()
-            }
-            Self::Domain(_create_domain) => todo!(),
-            Self::Builtin(_type_reference) => None,
-            Self::TableRef(table_name, _type_reference) => context
-                .get_table(table_name)?
-                .get_column_def(&ColumnName::from(member))?
-                .get_type_cloned(),
-            Self::ImplicitComposite(cols) => {
-                let cd = cols.get_column_def(&ColumnName::from(member))?;
-                cd.get_type_cloned()
-            }
-        }
+        self.row_columns(context)?
+            .get_column_def(&ColumnName::from(member))?
+            .get_type_cloned()
+    }
+}
+
+#[cfg(test)]
+mod domain_member_tests {
+    use crate::{
+        sem::{CreateDomain, CreateEnum, FullName, TypeDefinition, TypeReference},
+        test_helpers::{composite_domains, domain_casts},
+    };
+
+    #[rstest::rstest]
+    #[case::direct("leaf_d", "n", Some("scalar_d"))]
+    #[case::nested("leaf_dd", "n", Some("scalar_d"))]
+    #[case::domain_field("outer_d", "item", Some("leaf_dd"))]
+    #[case::table_row("table_d", "n", Some("scalar_d"))]
+    #[case::missing("leaf_dd", "missing", None)]
+    #[case::scalar("scalar_d", "n", None)]
+    #[case::array("arr_d", "n", None)]
+    fn shared_member_lookup_preserves_field_identity(
+        #[case] source: &str,
+        #[case] member: &str,
+        #[case] expected: Option<&str>,
+    ) {
+        let context = composite_domains::context(false).unwrap();
+        let source = composite_domains::reference(source);
+        let definition = source.definition_from_catalog(&context).unwrap();
+        assert_eq!(
+            definition.get_member_type(&context, member),
+            expected.map(composite_domains::reference)
+        );
+    }
+
+    #[test]
+    fn owned_domain_layers_resolve_without_a_catalog_name() {
+        let context = crate::test_helpers::TestParseContext::default();
+        let field = composite_domains::reference("scalar_d");
+        let record = crate::test_helpers::dynamic_types::record(&field);
+        let inner = TypeReference::dynamic(&TypeDefinition::from(&CreateDomain::new(
+            &composite_domains::reference("inner"),
+            &Some(record),
+        )));
+        let outer = TypeDefinition::from(&CreateDomain::new(
+            &composite_domains::reference("outer"),
+            &Some(inner),
+        ));
+        assert_eq!(outer.get_member_type(&context, "n"), Some(field));
+    }
+
+    #[rstest::rstest]
+    fn incomplete_and_cyclic_bases_do_not_resolve_or_fabricate_diagnostics(
+        #[values(false, true)] cyclic: bool,
+    ) {
+        let mut context = domain_casts::context();
+        let first = composite_domains::reference("first");
+        let second = domain_casts::domain(&mut context, "second", Some(&first));
+        domain_casts::domain(&mut context, "first", Some(&second));
+        let missing = domain_casts::domain(&mut context, "missing", None);
+        let source = if cyclic { first } else { missing };
+        assert!(source.row_columns(&context).is_none());
+        assert!(source.member_access_problem(&context, "n").is_none());
+        assert!(
+            source
+                .definition_from_catalog(&context)
+                .unwrap()
+                .get_member_type(&context, "n")
+                .is_none()
+        );
+    }
+
+    #[rstest::rstest]
+    fn enum_and_enum_domain_use_the_non_composite_diagnostic(#[values(false, true)] wrapped: bool) {
+        let mut context = domain_casts::context();
+        let enumeration = TypeReference::dynamic(&TypeDefinition::from(&CreateEnum::new(
+            &FullName::with_schema("public", "mood"),
+            &["ok".to_owned()],
+        )));
+        let domain = domain_casts::domain(&mut context, "mood_d", Some(&enumeration));
+        let source = if wrapped { domain } else { enumeration };
+        assert_eq!(
+            source.member_access_problem(&context, "n").unwrap().code(),
+            "member_access_requires_composite_type"
+        );
+        assert!(
+            source
+                .definition_from_catalog(&context)
+                .unwrap()
+                .get_member_type(&context, "n")
+                .is_none()
+        );
     }
 }
 

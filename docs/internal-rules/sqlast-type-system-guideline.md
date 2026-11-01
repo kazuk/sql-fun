@@ -33,8 +33,13 @@ Use it for anonymous types as well as definitions retained from the catalog.
 Ownership is not recursive catalog capture. Fields may still contain named
 references, and `TypeDefinition::TableRef` refers to a table whose columns live
 in the catalog. Determine which definitions the consumer actually needs.
-For example, member projection materializes table columns into an
-inference-owned `ImplicitComposite` without modifying the shared catalog model.
+For example, member projection materializes table and domain-base row columns
+into an inference-owned `ImplicitComposite`, keyed by the original input type,
+without modifying the shared catalog model. Member lookup follows nested domain
+bases while retaining the source and declared field identities. Arrays remain
+non-composite values; unresolved or cyclic bases do not establish a row shape.
+Owned domain definitions can also project entirely owned row fields without a
+live catalog.
 
 Before adding a snapshot or a second owned representation, check whether
 `Dynamic` and the existing definition variants meet the lifetime requirement.

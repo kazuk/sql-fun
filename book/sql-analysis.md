@@ -849,6 +849,12 @@ outside a projection target, or on a scalar value, produces a diagnostic.
 When a composite input's type is still unresolved, the result retains an
 explicit pending expansion until parameter inference determines its fields.
 
+PostgreSQL member access follows domains over composite types and table row
+types, including nested domains. For example, `(value::address_domain).city`
+returns the declared type of `city`. If that field is itself a domain, its domain
+identity is preserved. A missing field and member access on a non-composite base
+(such as an integer or an array) produce distinct diagnostics.
+
 For PostgreSQL `FULL JOIN ... USING` and NATURAL FULL JOIN, the merged keys
 appear first, followed by the remaining left and right columns. Each merged key
 uses the common type of both inputs and retains the value present on an

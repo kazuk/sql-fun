@@ -118,7 +118,8 @@ for that integration.
 The workflow runs on Ubuntu in the adopted pinned CI-builder container. It
 provides Bash, Git, GitHub CLI (`gh`), `jq`, Cargo, `cargo set-version` (cargo-edit),
 Taplo, uv/Python 3.12 for baseline adoption, and GNU `realpath` (coreutils);
-no separate runner tool installation is required. For local contract tests, use the contributor setup linked below.
+no separate runner tool installation is required. For local contract tests, use
+the contributor setup linked below.
 
 For live local API diagnostics, install [GitHub CLI](https://cli.github.com/),
 authenticate with `gh auth login`, and provide repository Actions read access.

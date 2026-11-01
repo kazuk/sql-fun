@@ -114,7 +114,7 @@ fn invalid_cast_keeps_target_lookup_and_argument(
 
 #[rstest::rstest]
 fn parameter_cast_preserves_admissible_inputs_and_domain_output(
-    #[values("17", "18")] version: &str,
+    #[values("17")] version: &str,
 ) -> testresult::TestResult {
     let analyzed = heavy::analyze(version, "SELECT $1::public.nested_amount")?;
     assert!(

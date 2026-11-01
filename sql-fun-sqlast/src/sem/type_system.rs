@@ -274,3 +274,77 @@ impl OverloadVariant {
         Ok(results)
     }
 }
+
+#[cfg(test)]
+mod test_output_return_shape {
+    use crate::sem::{ColumnName, FunctionParam, OverloadVariant, TypeReference};
+    use crate::test_helpers::TestParseContext;
+
+    #[rstest::rstest]
+    fn ordered_record_fields_match_table_output(#[values(false, true)] table: bool) {
+        let first_name = Some("Mixed Name".to_owned());
+        let second_name = Some("label".to_owned());
+        let first_type = Some(TypeReference::from_master_type_name("int4"));
+        let second_type = Some(TypeReference::from_master_type_name("text"));
+        let input = FunctionParam::new_input_param(&Some("input".to_owned()), &first_type, &None);
+        let outputs = if table {
+            vec![
+                input,
+                FunctionParam::new_table_param(&first_name, &first_type),
+                FunctionParam::new_table_param(&second_name, &second_type),
+            ]
+        } else {
+            vec![
+                input,
+                FunctionParam::new_in_out_param(&first_name, &first_type, &None),
+                FunctionParam::new_output_param(&second_name, &second_type),
+            ]
+        };
+        let overload = OverloadVariant::new(
+            &Some(TypeReference::from_master_type_name("record")),
+            &outputs,
+            false,
+            false,
+        );
+        let result = overload.scaler_ret_type().unwrap();
+        let columns = result.row_columns(&TestParseContext::default()).unwrap();
+        let table_columns = overload.returning_table();
+        let expected_names = vec![ColumnName::from("Mixed Name"), ColumnName::from("label")];
+        assert_eq!(columns.names(), expected_names);
+        assert_eq!(table_columns.names(), expected_names);
+        for (index, (name, ty)) in [("Mixed Name", first_type), ("label", second_type)]
+            .into_iter()
+            .enumerate()
+        {
+            let field = columns.column_at(index).unwrap();
+            assert_eq!(field.name(), &Some(ColumnName::from(name)));
+            assert_eq!(table_columns.column_at(index).unwrap().name(), field.name());
+            assert_eq!(field.get_type(), ty.as_ref());
+            assert_eq!(field.is_not_null(), Some(false));
+            assert_eq!(
+                table_columns
+                    .get_column_def(&ColumnName::from(name))
+                    .unwrap()
+                    .get_type(),
+                field.get_type(),
+            );
+        }
+        assert!(columns.get_column_def(&ColumnName::from("input")).is_none());
+    }
+
+    #[test]
+    fn single_inout_keeps_scalar_return_type() {
+        let ty = Some(TypeReference::from_master_type_name("int4"));
+        let overload = OverloadVariant::new(
+            &ty,
+            &vec![FunctionParam::new_in_out_param(
+                &Some("value".to_owned()),
+                &ty,
+                &None,
+            )],
+            false,
+            false,
+        );
+        assert_eq!(overload.scaler_ret_type(), ty);
+    }
+}

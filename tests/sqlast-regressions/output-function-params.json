@@ -1,0 +1,128 @@
+[
+  {
+    "name": "output_params::table_from",
+    "sql": "SELECT * FROM public.output520_table()",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "Mixed Name",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_params::inout_from",
+    "sql": "SELECT * FROM public.output520_inout(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "Mixed Name",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_params::table_members",
+    "sql": "SELECT (public.output520_table()).\"Mixed Name\" AS id, (public.output520_table()).label AS label",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_params::inout_members",
+    "sql": "SELECT (public.output520_inout(1)).\"Mixed Name\" AS id, (public.output520_inout(1)).label AS label",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_params::single_scalar",
+    "sql": "SELECT public.output520_scalar(1) AS value",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

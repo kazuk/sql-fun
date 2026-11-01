@@ -114,6 +114,7 @@ fn invalid_cast_keeps_target_lookup_and_argument(
 
 #[rstest::rstest]
 fn parameter_cast_preserves_admissible_inputs_and_domain_output(
+    // PostgreSQL 18 timeout case removed in 38b17ef1df2c2a2e5fb4e010cdadb28efd7bd52b.
     #[values("17")] version: &str,
 ) -> testresult::TestResult {
     let analyzed = heavy::analyze(version, "SELECT $1::public.nested_amount")?;

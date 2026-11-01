@@ -46,6 +46,32 @@ clean tracked worktree/index and a new external state-output directory. It
 rejects any materializer edit outside workspace manifests and the lockfile;
 unrelated untracked files are not included in the changed-path output.
 
+## Baseline state handoff
+
+After materialization and manual preparation, the same `prepare` job invokes
+`.local/sbin/adopt-semver-baseline` with the parsed classification and the
+candidate downloaded from the already selected exact-SHA normal-CI run. The
+candidate remains at
+`$RUNNER_TEMP/release-inputs/sql-fun-semver-baseline/semver_baseline.tar.gz`.
+Archive validation and stable/snapshot semantics belong to the existing
+[adoption contract](semver-repository-integration.md#explicit-adoption).
+
+After successful adoption, `steps.baseline.outputs.paths` names
+`$RUNNER_TEMP/release-state/baseline-paths.txt`. For stable releases it contains
+only `.local/semver_baseline.tar.gz`, followed by a newline; for snapshots it is
+empty. A stable entry is intentional even when idempotent adoption leaves no
+Git diff. `steps.baseline.outputs.status` carries the adopter's result for the
+job summary. Failed adoption exposes no successful handoff.
+
+Finalization (#330) must combine this separate explicit path list with
+`steps.materialize.outputs.paths`, staging only intended repository state.
+Materialization's manifest/lockfile allowlist is unchanged. Do not stage the
+downloaded candidate, external path lists, or release assets. These outputs
+serve subsequent steps in the same job; they neither transport state across
+jobs nor commit/back-push it. Adoption errors stop dependent finalization;
+a later failure requires discarding runner-local state and rerunning from
+the original target rather than committing the baseline independently.
+
 ## Failure and current limitation
 
 Any identity inconsistency, materializer failure, or unexpected changed path

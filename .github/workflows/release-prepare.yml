@@ -61,7 +61,7 @@ jobs:
         run: |
           .local/sbin/adopt-release-ci-inputs "$GITHUB_REPOSITORY" "$CI_RUN_ID" \
             "$RUNNER_TEMP/release-inputs" \
-            sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual
+            sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual sql-fun-semver-baseline
       - name: Materialize crate versions
         id: materialize
         env:
@@ -99,6 +99,29 @@ jobs:
           name: release-manual-${{ github.run_attempt }}
           path: ${{ steps.manual.outputs.path }}
           if-no-files-found: error
+      - name: Adopt SemVer baseline candidate
+        id: baseline
+        env:
+          RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
+        run: |
+          result="$(uv run --no-project --no-config --python 3.12 \
+            .local/sbin/adopt-semver-baseline \
+            --candidate "$RUNNER_TEMP/release-inputs/sql-fun-semver-baseline/semver_baseline.tar.gz" \
+            --active "$GITHUB_WORKSPACE/.local/semver_baseline.tar.gz" \
+            --release-kind "$RELEASE_CLASSIFICATION")" || {
+            echo "$result" >&2
+            exit 1
+          }
+          echo "$result"
+          paths="$RUNNER_TEMP/release-state/baseline-paths.txt"
+          : > "$paths"
+          if [[ "$RELEASE_CLASSIFICATION" == stable ]]; then
+            echo '.local/semver_baseline.tar.gz' > "$paths"
+          fi
+          {
+            echo "status=$(jq -r '.status' <<<"$result")"
+            echo "paths=$paths"
+          } >> "$GITHUB_OUTPUT"
       - name: Record adopted release inputs
         env:
           CI_RUN_URL: ${{ steps.ci.outputs.run_url }}
@@ -106,13 +129,20 @@ jobs:
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
           CRATE_VERSIONS: ${{ steps.materialize.outputs.versions }}
           MANUAL_ARCHIVE: ${{ steps.manual.outputs.archive }}
+          BASELINE_STATUS: ${{ steps.baseline.outputs.status }}
+          BASELINE_PATHS: ${{ steps.baseline.outputs.paths }}
         run: |
           {
             echo "Product release: $RELEASE_TAG ($RELEASE_CLASSIFICATION)"
             echo "Release target: $RELEASE_SHA"
             echo "Normal CI: $CI_RUN_URL"
-            echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual"
+            echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual, sql-fun-semver-baseline"
             echo "Manual asset: $MANUAL_ARCHIVE (Actions artifact: release-manual-$GITHUB_RUN_ATTEMPT)"
+            echo "SemVer baseline: $BASELINE_STATUS ($RELEASE_CLASSIFICATION)"
+            echo 'Baseline paths for release-state finalization (empty for snapshots):'
+            echo '```text'
+            cat "$BASELINE_PATHS"
+            echo '```'
             echo 'Materialized crate versions:'
             echo '```text'
             cat "$CRATE_VERSIONS"

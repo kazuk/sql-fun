@@ -30,10 +30,11 @@ starts preparation for that new target, which must meet the same CI requirement.
 
 Preparation selects the newest successful eligible normal-CI run, ordered by
 run creation time and then run number/ID. Rerunning an older run does not make
-it a newly created run. Both required inputs come from the selected run:
+it a newly created run. All three required inputs come from the selected run:
 
 - `sql-fun-x86_64-unknown-linux-gnu`
 - `sql-fun-user-manual`
+- `sql-fun-semver-baseline` (internal `semver_baseline.tar.gz`)
 
 Missing or expired required inputs fail preparation. It does not fall back
 to an older run. The job summary links the selected run and records the target
@@ -42,11 +43,11 @@ cannot be downloaded, then retry with eligible CI state or a new target.
 
 Binary/package and manual contents are adopted as produced by CI, without
 rebuilding or repeating producer validation. Preparation does not publish,
-create tags, push source changes, or require a future SemVer input.
+create tags, or push source changes.
 
 ## Materialized crate versions
 
-After both CI inputs have been adopted, preparation materializes each
+After all three CI inputs have been adopted, preparation materializes each
 publishable workspace crate's version from its current version and
 `workspace.metadata.next-release`. Ensure that every publishable crate has a
 valid release-intent entry before selecting the release target. Project release
@@ -88,12 +89,37 @@ both carry the manual asset; only stable releases publish that same asset to
 Pages after the Release is published. Preparation itself does not create a
 GitHub Release or deploy Pages.
 
+## SemVer baseline adoption
+
+After version materialization and manual asset preparation succeed, preparation
+passes the selected CI candidate to the existing baseline adoption operation.
+Stable preparation replaces `.local/semver_baseline.tar.gz` in the runner
+checkout; snapshot preparation preserves the active baseline, including its
+modification time. The summary reports the adoption outcome and the baseline
+path intended for release-state finalization (empty for snapshots).
+
+The candidate is required from the same selected normal-CI run for both kinds
+of release. A missing or expired artifact fails input adoption before version
+materialization. A stable adoption failure stops preparation and leaves the
+previous active baseline intact. Discard partial runner state and rerun from
+the original exact target after correcting the reported input or CI state.
+Preparation never selects an older candidate or builds a replacement.
+
+The downloaded candidate remains outside the checkout and is never a GitHub
+Release asset. Only the adopted active baseline is repository release state.
+The later release-state finalization/back-commit step (#330) owns committing
+that state together with materialized versions; preparation alone does not
+advance `main`. See the internal
+[baseline handoff contract](../docs/internal-rules/release-materialization.md#baseline-state-handoff)
+for that integration.
+
 ## Maintainer tooling and permissions
 
 The workflow runs on Ubuntu in the adopted pinned CI-builder container. It
 provides Bash, Git, GitHub CLI (`gh`), `jq`, Cargo, `cargo set-version` (cargo-edit),
-Taplo, and GNU `realpath` (coreutils); no separate runner tool installation is
-required. For local contract tests, use the contributor setup linked below.
+Taplo, uv/Python 3.12 for baseline adoption, and GNU `realpath` (coreutils);
+no separate runner tool installation is required. For local contract tests, use
+the contributor setup linked below.
 
 For live local API diagnostics, install [GitHub CLI](https://cli.github.com/),
 authenticate with `gh auth login`, and provide repository Actions read access.
@@ -101,7 +127,7 @@ The workflow authenticates using its GitHub token with `contents: read`,
 `actions: read`, and `packages: read`. Package read access authenticates the
 CI-builder image pull from GHCR; no write or publication credentials are needed.
 
-Offline preparation contract tests are included in
-`check-test-flow --step=version-materialization`. See
+Release preparation contracts have no approved recurring execution budget;
+they are not part of the standard local checks or CI. See
 [contributor workflow validation](../CONTRIBUTING.md#release-workflow-validation)
 for optional workflow linting.

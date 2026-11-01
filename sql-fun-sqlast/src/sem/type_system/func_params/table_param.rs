@@ -41,14 +41,61 @@ impl FunctionParamTable {
             param_type: param_type.cloned(),
         }
     }
+    /// Returns a nullable output field when both its name and type are known.
+    /// Returns `None` if either is absent; no name or type is synthesized.
     pub fn composite_field_definition(&self) -> Option<CompositeFieldDefinition> {
-        todo!()
+        super::output_field_definition(self.name.as_ref(), self.param_type.as_ref())
     }
 
     pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {
         let col_name = self.name.as_ref().map(|v| ColumnName::from(v.as_str()));
         let col_def = ColumnDefinition::new(&col_name, self.param_type.as_ref(), None, &[]);
         column_collection.push(&col_def);
+    }
+}
+
+#[cfg(test)]
+mod test_output_field_definition {
+    use super::FunctionParamTable;
+    use crate::sem::{CompositeFieldDefinition, FunctionParam, TypeReference};
+    use crate::test_helpers::dynamic_types;
+
+    #[rstest::rstest]
+    #[case::named_scalar(true, true, false)]
+    #[case::named_owned_array(true, true, true)]
+    #[case::unnamed(false, true, false)]
+    #[case::unresolved(true, false, false)]
+    #[case::absent(false, false, false)]
+    fn preserves_known_output(
+        #[case] has_name: bool,
+        #[case] has_type: bool,
+        #[case] owned_array: bool,
+    ) {
+        let name = if has_name {
+            Some("Mixed Name".to_owned())
+        } else {
+            None
+        };
+        let scalar = TypeReference::from_master_type_name("int4");
+        let param_type = if !has_type {
+            None
+        } else if owned_array {
+            Some(dynamic_types::record(&scalar).array_type())
+        } else {
+            Some(scalar)
+        };
+        let parameter = FunctionParamTable::new(name.as_ref(), param_type.as_ref());
+        let expected = if has_name && has_type {
+            Some(CompositeFieldDefinition::new(
+                "Mixed Name",
+                &param_type,
+                &Some(false),
+            ))
+        } else {
+            None
+        };
+        assert_eq!(parameter.composite_field_definition(), expected);
+        assert_eq!(FunctionParam::from(&parameter).field_definition(), expected);
     }
 }
 

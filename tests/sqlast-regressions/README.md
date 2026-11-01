@@ -379,3 +379,10 @@ payload while checking successful analysis and nullability. Rust tests inspect
 the owned definitions, field types, array elements, optional names, inference
 substitution, compatibility, canonicalization and trigger dependency identities.
 Range construction and subtype metadata remain tracked separately in #914.
+
+Issue #520 adds `output-function-params.json` with an explicitly selected
+`output-function-params.sql` schema for PostgreSQL 17/18 in both source and
+installed checks. It verifies TABLE and INOUT/OUT output order, quoted names,
+scalar member types, nullable outputs and a single scalar INOUT result. Rust
+unit tests retain incomplete-parameter contracts, owned field types and the
+ordered composite return definition.

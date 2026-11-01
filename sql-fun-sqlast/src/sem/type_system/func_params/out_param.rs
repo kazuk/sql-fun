@@ -63,18 +63,10 @@ impl FunctionParamOut {
         }
     }
 
+    /// Returns a nullable output field when both its name and type are known.
+    /// Returns `None` if either is absent; no name or type is synthesized.
     pub fn composite_field_definition(&self) -> Option<CompositeFieldDefinition> {
-        if let Some(name) = &self.name
-            && let Some(type_ref) = &self.param_type
-        {
-            Some(CompositeFieldDefinition::new(
-                name,
-                &Some(type_ref.clone()),
-                &Some(false),
-            ))
-        } else {
-            None
-        }
+        super::output_field_definition(self.name.as_ref(), self.param_type.as_ref())
     }
 
     pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {

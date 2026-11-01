@@ -26,6 +26,20 @@ use crate::{
 
 use ::sql_fun_core::IVec;
 
+// Output declarations share the named, resolved field contract used by OUT.
+fn output_field_definition(
+    name: Option<&String>,
+    param_type: Option<&TypeReference>,
+) -> Option<CompositeFieldDefinition> {
+    let name = name?;
+    let param_type = param_type?;
+    Some(CompositeFieldDefinition::new(
+        name,
+        &Some(param_type.clone()),
+        &Some(false),
+    ))
+}
+
 pub trait FunctionParameterTrait: std::fmt::Display
 where
     Self: Sized,

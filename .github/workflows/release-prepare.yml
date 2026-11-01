@@ -74,18 +74,45 @@ jobs:
             echo "versions=$state/crates.tsv"
             echo "paths=$state/changed-paths.txt"
           } >> "$GITHUB_OUTPUT"
+      - name: Package adopted manual
+        id: manual
+        env:
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          manual="$RUNNER_TEMP/release-inputs/sql-fun-user-manual"
+          [[ -d "$manual" ]] || {
+            echo "Required adopted manual input missing: $manual" >&2
+            exit 1
+          }
+          archive="sql-fun_${RELEASE_TAG}_user-manual.tar.gz"
+          directory="$RUNNER_TEMP/release-assets"
+          mkdir -p "$directory"
+          tar -czf "$directory/$archive" -C "$manual" .
+          # Later release assembly consumes this archive without repackaging.
+          {
+            echo "archive=$archive"
+            echo "path=$directory/$archive"
+          } >> "$GITHUB_OUTPUT"
+      - name: Retain versioned manual asset
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-manual-${{ github.run_attempt }}
+          path: ${{ steps.manual.outputs.path }}
+          if-no-files-found: error
       - name: Record adopted release inputs
         env:
           CI_RUN_URL: ${{ steps.ci.outputs.run_url }}
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
           CRATE_VERSIONS: ${{ steps.materialize.outputs.versions }}
+          MANUAL_ARCHIVE: ${{ steps.manual.outputs.archive }}
         run: |
           {
             echo "Product release: $RELEASE_TAG ($RELEASE_CLASSIFICATION)"
             echo "Release target: $RELEASE_SHA"
             echo "Normal CI: $CI_RUN_URL"
             echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual"
+            echo "Manual asset: $MANUAL_ARCHIVE (Actions artifact: release-manual-$GITHUB_RUN_ATTEMPT)"
             echo 'Materialized crate versions:'
             echo '```text'
             cat "$CRATE_VERSIONS"

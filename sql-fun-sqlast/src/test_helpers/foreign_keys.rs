@@ -47,26 +47,76 @@ pub(crate) fn parents() -> SchemaFileContext {
     )
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Declaration {
+    Inline,
+    Create,
+    Alter,
+}
+
+impl Declaration {
+    pub(crate) const fn inline() -> Self {
+        Self::Inline
+    }
+
+    pub(crate) const fn create() -> Self {
+        Self::Create
+    }
+
+    pub(crate) const fn alter() -> Self {
+        Self::Alter
+    }
+
+    pub(crate) const fn is_table(self) -> bool {
+        !matches!(self, Self::Inline)
+    }
+
+    pub(crate) fn bind(
+        self,
+        context: SchemaFileContext,
+        child: &str,
+        reference: &str,
+    ) -> SchemaFileContext {
+        match self {
+            Self::Inline => apply(
+                context,
+                &format!("CREATE TABLE a.{child}(id integer REFERENCES {reference})"),
+            ),
+            Self::Create => apply(
+                context,
+                &format!(
+                    "CREATE TABLE a.{child}(id integer, CONSTRAINT fk FOREIGN KEY(id) REFERENCES {reference})"
+                ),
+            ),
+            Self::Alter => {
+                let context = apply(context, &format!("CREATE TABLE a.{child}(id integer)"));
+                apply(
+                    context,
+                    &format!(
+                        "ALTER TABLE a.{child} ADD CONSTRAINT fk FOREIGN KEY(id) REFERENCES {reference}"
+                    ),
+                )
+            }
+        }
+    }
+
+    pub(crate) fn target(self, context: &impl BaseParseContext, child: &str) -> Option<TableName> {
+        target(context, child, self.is_table())
+    }
+}
+
 pub(crate) fn bind(
     context: SchemaFileContext,
     child: &str,
     reference: &str,
     table_constraint: bool,
 ) -> SchemaFileContext {
-    if table_constraint {
-        let context = apply(context, &format!("CREATE TABLE a.{child}(id integer)"));
-        apply(
-            context,
-            &format!(
-                "ALTER TABLE a.{child} ADD CONSTRAINT fk FOREIGN KEY(id) REFERENCES {reference}"
-            ),
-        )
+    let declaration = if table_constraint {
+        Declaration::alter()
     } else {
-        apply(
-            context,
-            &format!("CREATE TABLE a.{child}(id integer REFERENCES {reference})"),
-        )
-    }
+        Declaration::inline()
+    };
+    declaration.bind(context, child, reference)
 }
 
 pub(crate) fn inline(

@@ -44,6 +44,14 @@ impl ColumnCollection {
         write!(f, ")")
     }
 
+    fn inline_primary_key_columns(&self) -> Vec<&ColumnName> {
+        self.0
+            .iter()
+            .filter(|column| column.has_inline_primary_key())
+            .filter_map(|column| column.name().as_ref())
+            .collect()
+    }
+
     pub(crate) fn project_expression(
         &self,
         base: &crate::sem::SemScalarExpr,
@@ -59,11 +67,7 @@ impl ColumnCollection {
             .collect()
     }
 
-    pub(crate) fn find_rename_column(
-        &self,
-        name: &ColumnName,
-        sqlite: bool,
-    ) -> Option<&ColumnDefinition> {
+    pub(crate) fn find_column(&self, name: &ColumnName, sqlite: bool) -> Option<&ColumnDefinition> {
         self.0.iter().find(|column| {
             column.name().as_ref().is_some_and(|candidate| {
                 if sqlite {
@@ -363,12 +367,8 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
-    pub(crate) fn find_rename_column(
-        &self,
-        name: &ColumnName,
-        sqlite: bool,
-    ) -> Option<&ColumnDefinition> {
-        self.columns.find_rename_column(name, sqlite)
+    pub(crate) fn find_column(&self, name: &ColumnName, sqlite: bool) -> Option<&ColumnDefinition> {
+        self.columns.find_column(name, sqlite)
     }
     pub(crate) fn rename_column_dependencies(
         &mut self,
@@ -384,9 +384,13 @@ impl CreateTable {
         Ok(())
     }
 
-    /// Whether all analyzed column declarations permit catalog application.
+    /// Whether analyzed column and foreign-key declarations permit catalog application.
     pub(crate) fn declarations_can_apply(&self) -> bool {
         self.columns.declarations_can_apply()
+            && self
+                .constraints
+                .values()
+                .all(Constraint::references_can_apply)
     }
 
     pub(crate) fn rename_expressions(
@@ -630,7 +634,7 @@ impl CreateTable {
         }
     }
 
-    pub(crate) fn record_declared_key(
+    pub(crate) fn record_declared_constraint(
         &mut self,
         constraint: &Constraint,
     ) -> Result<(), AnalysisError> {
@@ -650,8 +654,17 @@ impl CreateTable {
         Ok(())
     }
 
+    /// Inspect retained table-level foreign keys, including unnamed declarations.
+    ///
+    /// Iteration order is unspecified; column order within each key is retained.
+    pub fn foreign_keys(&self) -> impl Iterator<Item = &crate::sem::ForeignKeyConstraint> {
+        self.constraints
+            .values()
+            .filter_map(Constraint::as_foreign_key)
+    }
+
     /// Look up an explicitly named table constraint.
-    pub(crate) fn constraint(&self, name: &str) -> Option<&Constraint> {
+    pub fn constraint(&self, name: &str) -> Option<&Constraint> {
         self.constraints
             .get(name)
             .filter(|constraint| constraint.name() == name)
@@ -690,10 +703,40 @@ impl CreateTable {
         {
             pk.keys().iter().collect()
         } else {
-            Vec::new()
+            self.columns.inline_primary_key_columns()
         }
     }
+}
 
+#[cfg(test)]
+mod test_primary_key_columns {
+    use crate::{context::TableInfoRead, sem::ColumnName, test_helpers::foreign_keys as fk};
+
+    #[rstest::rstest]
+    #[case::unnamed_inline("id integer PRIMARY KEY", vec![ColumnName::from("id")])]
+    #[case::named_inline("id integer CONSTRAINT pk PRIMARY KEY", vec![ColumnName::from("id")])]
+    #[case::unnamed_table("id integer, PRIMARY KEY(id)", vec![ColumnName::from("id")])]
+    #[case::named_table("id integer, CONSTRAINT pk PRIMARY KEY(id)", vec![ColumnName::from("id")])]
+    #[case::composite("id integer, other integer, PRIMARY KEY(other, id)", vec![ColumnName::from("other"), ColumnName::from("id")])]
+    #[case::absent("id integer", Vec::<ColumnName>::new())]
+    fn primary_key_columns_cover_inline_and_table_declarations(
+        #[case] definition: &str,
+        #[case] expected: Vec<ColumnName>,
+    ) {
+        let context = fk::apply(
+            fk::context(),
+            &format!("CREATE TABLE a.parent({definition})"),
+        );
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let table = context
+            .get_table_impl(fk::name("a", "parent").full_name())
+            .unwrap();
+        let actual: Vec<_> = table.primary_key_columns().into_iter().cloned().collect();
+        assert_eq!(actual, expected);
+    }
+}
+
+impl CreateTable {
     /// analyze [`crate::syn::CreateStmt`]
     #[tracing::instrument(skip(context))]
     pub fn analyze_create_stmt<TParseContext>(
@@ -1087,6 +1130,110 @@ mod test_drop_table_analyze_drop_table {
         table_name.assert_table_name("table_one");
         assert_eq!(result_context.reported_problem_count(), 1);
 
+        Ok(())
+    }
+}
+
+impl CreateTable {
+    pub(crate) fn resolve_reference_columns(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &TableName,
+        explicit: Option<&[ColumnName]>,
+    ) -> Result<(Vec<ColumnName>, bool), AnalysisError> {
+        let columns = if let Some(columns) = explicit {
+            columns.to_vec()
+        } else {
+            self.primary_key_columns().into_iter().cloned().collect()
+        };
+        // SQLite checks parent-key validity when preparing DML, not CREATE TABLE.
+        let valid = if context.dialect() == crate::ast::Dialect::postgres() {
+            if explicit.is_none() && columns.is_empty() {
+                context.report_analysis_problem(
+                    AnalysisProblem::foreign_key_referenced_primary_key_missing(requested),
+                )?;
+                return Ok((columns, false));
+            }
+            self.check_reference_columns(context, requested, &columns)?
+        } else {
+            true
+        };
+        Ok((columns, valid))
+    }
+
+    pub(crate) fn check_reference_columns(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &TableName,
+        columns: &[ColumnName],
+    ) -> Result<bool, AnalysisError> {
+        let mut valid = true;
+        for column in columns {
+            if self
+                .find_column(column, context.dialect() == crate::ast::Dialect::sqlite())
+                .is_none()
+            {
+                valid = false;
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
+                    requested, column,
+                ))?;
+            }
+        }
+        Ok(valid)
+    }
+}
+
+#[cfg(test)]
+mod test_foreign_key_reference_columns {
+    use crate::{context::TableInfoRead, test_helpers::foreign_keys as fk};
+
+    #[test]
+    fn omitted_reference_columns_require_a_postgres_primary_key() -> testresult::TestResult {
+        let context = fk::apply(fk::context(), "CREATE TABLE a.parent(id integer)");
+        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+            context,
+            "CREATE TABLE a.child(parent_id integer, FOREIGN KEY(parent_id) REFERENCES parent)",
+        )?;
+        let context = pair.into_context();
+        assert_eq!(
+            context.problems().len(),
+            1,
+            "missing primary key must produce a structured diagnostic"
+        );
+        assert_eq!(
+            context.problems()[0].code(),
+            "foreign_key_referenced_primary_key_missing"
+        );
+        assert!(
+            context
+                .get_table_impl(fk::name("a", "child").full_name())
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_foreign_key_source_columns_ignore_ascii_case() -> testresult::TestResult {
+        let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE parent(id PRIMARY KEY)");
+        let sql =
+            r#"CREATE TABLE child("ID", CONSTRAINT fk FOREIGN KEY("id") REFERENCES parent(id))"#;
+        let context = fk::apply_sqlite(context, sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let child = context
+            .get_table_impl(fk::name("main", "child").full_name())
+            .unwrap();
+        assert!(
+            child
+                .constraint("fk")
+                .unwrap()
+                .as_foreign_key()
+                .unwrap()
+                .references_can_apply()
+        );
+        let oracle = ::rusqlite::Connection::open_in_memory()?;
+        oracle.execute_batch("CREATE TABLE parent(id PRIMARY KEY)")?;
+        oracle.execute_batch(sql)?;
         Ok(())
     }
 }

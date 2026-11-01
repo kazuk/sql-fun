@@ -394,3 +394,14 @@ preserved source/field domain types, parameter consumers, missing fields,
 non-composite scalar/array bases and a later independent successful input.
 Rust tests retain shared member API outcomes, dynamic definitions, cycle/missing
 base safety, semantic operands and correlated parameter assignments.
+
+Issue #858 adds `table-foreign-keys.json` with an explicitly selected parent
+schema for PostgreSQL 17/18 through both source and installed checks. Cases
+cover named and unnamed CREATE-table foreign keys, omitted referenced columns,
+self-reference, attributes, missing source/target columns or relations, and
+omitted referenced columns when the parent has no primary key.
+Rust schema-chain tests inspect the returned semantic table and catalog,
+creation-time bindings, column order, attributes, rename propagation and frozen
+schema layers. SQLite feature tests use the embedded oracle for CREATE-table
+retention and permitted forward references; SQLite has no ALTER ADD CONSTRAINT
+counterpart.

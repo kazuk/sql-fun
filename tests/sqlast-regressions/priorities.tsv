@@ -4,9 +4,9 @@ heavy	between-18
 heavy	between-symmetric-17
 heavy	between-symmetric-18
 heavy	case-common-types-17
-heavy	case-common-types-18
+heavy	project-roles-17
+heavy	project-roles-18
 heavy	project-roles-empty-17
-heavy	project-roles-empty-18
 heavy	truth-tests-17
 heavy	truth-tests-18
 medium	array-subqueries-17
@@ -19,6 +19,8 @@ medium	arrays-parameters-17
 medium	arrays-parameters-18
 medium	bounded-parameter-inference-17
 medium	bounded-parameter-inference-18
+medium	case-common-types-18
+medium	coalesce_semantic-17
 medium	collate-17
 medium	collate-18
 medium	column-renames-17
@@ -33,15 +35,14 @@ medium	domain-operators-17
 medium	domain-operators-18
 medium	membership-17
 medium	membership-18
+medium	minmax-metadata-17
 medium	minmax-metadata-18
 medium	parameter-bindings-17
 medium	parameter-bindings-18
 medium	patterns-17
 medium	patterns-18
 medium	postgres18-syntax-17-17
-medium	project-roles-17
-medium	project-roles-18
-medium	rows-17
+medium	project-roles-empty-18
 medium	rows-18
 medium	rows-from-17
 medium	rows-from-18
@@ -94,7 +95,6 @@ light	case_semantic-17
 light	case_semantic-18
 light	casts-17
 light	casts-18
-light	coalesce_semantic-17
 light	coalesce_semantic-18
 light	domain-operators-default-17
 light	domain-operators-default-18
@@ -104,7 +104,6 @@ light	metadata-overloads-17
 light	metadata-overloads-18
 light	minmax-diagnostics-17
 light	minmax-diagnostics-18
-light	minmax-metadata-17
 light	output-function-params-17
 light	output-function-params-18
 light	output-names-17
@@ -114,6 +113,7 @@ light	pilot-18
 light	postgres18-syntax-18-18
 light	project-roles-omitted-17
 light	project-roles-omitted-18
+light	rows-17
 light	schema-delete-17
 light	schema-delete-18
 light	schema-domains-builtin-17
@@ -150,6 +150,8 @@ light	schema-views-mechanisms-17
 light	schema-views-mechanisms-18
 light	schema-views-special-17
 light	schema-views-special-18
+light	table-foreign-keys-17
+light	table-foreign-keys-18
 light	vectors-18
 light	view-conflict-rules-17
 light	view-conflict-rules-18

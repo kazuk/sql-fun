@@ -731,19 +731,8 @@ impl super::TableConstraint {
         if self.extras.deferrable {
             todo!("deferrable unique-key catalog representation");
         }
-        let keys: Vec<_> = self
-            .keys
-            .iter()
-            .map(|key| ColumnName::from(key.as_str()))
-            .collect();
-        for key in &keys {
-            if !table.has_column(key) {
-                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
-                    table.name(),
-                    key,
-                ))?;
-            }
-        }
+        let keys = self.column_names();
+        table.check_reference_columns(context, table.name(), &keys)?;
         self.constraint
             .resolve_table(
                 context,
@@ -761,11 +750,7 @@ impl super::TableConstraint {
         context: &mut impl ParseContext,
         table: &TableName,
     ) -> Result<Constraint, AnalysisError> {
-        let keys = self
-            .keys
-            .iter()
-            .map(|key| ColumnName::from(key.as_str()))
-            .collect::<Vec<_>>();
+        let keys = self.column_names();
         if context.get_table(table).is_none() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(table))?;
         }
@@ -776,7 +761,9 @@ impl super::TableConstraint {
             todo!("deferrable unique-key catalog representation");
         }
         let name = self.name.as_deref().unwrap_or_default();
-        self.constraint.resolve_table(context, table, name, &keys)
+        let mut constraint = self.constraint.resolve_table(context, table, name, &keys)?;
+        constraint.set_foreign_key_delete_columns(&self.delete_column_names());
+        Ok(constraint)
     }
 }
 impl super::ColumnConstraint {
@@ -840,27 +827,80 @@ impl super::ForeignReference {
         name: &str,
         keys: &[ColumnName],
     ) -> Result<Constraint, AnalysisError> {
-        let target = TableName::from(self.table.full_name()?);
-        let binding = crate::sem::ForeignKeyTarget::resolve_relation(context, &target)?;
-        let explicit_columns = if self.columns.is_empty() {
+        self.resolve_table_in(context, table, name, keys, None)
+    }
+
+    fn resolve_table_in(
+        &self,
+        context: &mut impl ParseContext,
+        table: &TableName,
+        name: &str,
+        keys: &[ColumnName],
+        pending: Option<&CreateTable>,
+    ) -> Result<Constraint, AnalysisError> {
+        #[cfg(feature = "sqlite")]
+        for column in keys {
+            self.report_ignored_matches(context, table, column)?;
+        }
+        let requested = TableName::from(self.table.full_name()?);
+        let explicit = self.referenced_columns();
+        let (binding, target_columns, target_valid) = if let Some(pending) = pending {
+            crate::sem::ForeignKeyTarget::resolve_declared_reference(
+                context,
+                &requested,
+                explicit.as_deref(),
+                pending,
+            )?
+        } else {
+            let binding = crate::sem::ForeignKeyTarget::resolve_relation(context, &requested)?;
+            let (columns, valid) =
+                binding.referenced_columns(context, &requested, explicit.as_deref())?;
+            (binding, columns, valid)
+        };
+        let source_valid = if let Some(pending) = pending {
+            pending.check_reference_columns(context, table, keys)?
+        } else {
+            true
+        };
+        let mut constraint =
+            ForeignKeyConstraint::new(name, Some(table), binding.relation(), keys, &target_columns)
+                .with_attributes(
+                    self.match_type.as_ref(),
+                    self.delete_action.as_ref(),
+                    self.update_action.as_ref(),
+                    self.deferrability.as_ref(),
+                    self.validity.as_ref(),
+                );
+        constraint.restrict_reference_application(source_valid && target_valid);
+        Ok(Constraint::foreign(&constraint))
+    }
+
+    #[cfg(feature = "sqlite")]
+    fn report_ignored_matches(
+        &self,
+        context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+    ) -> Result<(), AnalysisError> {
+        for name in &self.ignored_matches {
+            context.report_analysis_problem(
+                AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(table, column, name),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn referenced_columns(&self) -> Option<Vec<ColumnName>> {
+        if self.columns.is_empty() {
             None
         } else {
             Some(
                 self.columns
                     .iter()
                     .map(|key| ColumnName::from(key.as_str()))
-                    .collect::<Vec<_>>(),
+                    .collect(),
             )
-        };
-        let target_keys =
-            binding.referenced_columns(context, &target, explicit_columns.as_deref())?;
-        Ok(Constraint::foreign(&ForeignKeyConstraint::new(
-            name,
-            Some(table),
-            binding.relation(),
-            keys,
-            &target_keys,
-        )))
+        }
     }
 }
 
@@ -975,7 +1015,7 @@ impl super::Table {
         let mut table = CreateTable::new(&name, columns, self.mode, self.temporary, source);
         for definition in &self.constraints {
             if let Some(constraint) = definition.resolve_declared_key(context, &table)? {
-                table.record_declared_key(&constraint)?;
+                table.record_declared_constraint(&constraint)?;
             }
         }
         for column in &self.columns {
@@ -988,14 +1028,217 @@ impl super::Table {
                         definition.name.as_deref().expect("named inline key"),
                         &keys,
                     )?;
-                    table.record_declared_key(&constraint)?;
+                    table.record_declared_constraint(&constraint)?;
                 }
             }
         }
+        self.resolve_foreign_keys(context, &mut table)?;
         if context.dialect() == crate::ast::Dialect::postgres() {
             table.apply_primary_key_nullability();
         }
         Ok(table)
+    }
+}
+
+impl super::Table {
+    fn resolve_foreign_keys(
+        &self,
+        context: &mut impl ParseContext,
+        table: &mut CreateTable,
+    ) -> Result<(), AnalysisError> {
+        for definition in &self.constraints {
+            if let Some(constraint) = definition.resolve_declared_foreign_key(context, table)? {
+                table.record_declared_constraint(&constraint)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_create_table_foreign_keys {
+    use crate::{context::TableInfoRead, sem::ColumnName, test_helpers::foreign_keys as fk};
+
+    #[test]
+    fn create_result_and_catalog_retain_composite_and_unnamed_foreign_keys()
+    -> testresult::TestResult {
+        let context = fk::apply(
+            fk::context(),
+            "CREATE TABLE a.parent(x integer, y integer, PRIMARY KEY(x,y), UNIQUE(y,x))",
+        );
+        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+            context,
+            "CREATE TABLE a.child(x integer, y integer, CONSTRAINT fk FOREIGN KEY(y,x) REFERENCES parent(y,x), FOREIGN KEY(x,y) REFERENCES parent, FOREIGN KEY(y,x) REFERENCES parent(y,x))",
+        )?;
+        let result = pair.ast().as_create_table().unwrap();
+        assert_eq!(result.foreign_keys().count(), 3);
+        let constraint = result.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert_eq!(
+            constraint.source_columns(),
+            &[ColumnName::from("y"), ColumnName::from("x")]
+        );
+        assert_eq!(
+            constraint.target_columns(),
+            Some([ColumnName::from("y"), ColumnName::from("x")].as_slice())
+        );
+        let context = pair.into_context();
+        let child = context
+            .get_table_impl(fk::name("a", "child").full_name())
+            .unwrap();
+        assert_eq!(child.foreign_keys().count(), 3);
+        assert_eq!(
+            child
+                .foreign_keys()
+                .filter(|key| key.name().is_empty())
+                .count(),
+            2
+        );
+        assert!(child.foreign_keys().any(|key| key.target_columns()
+            == Some([ColumnName::from("x"), ColumnName::from("y")].as_slice())));
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::source("absent", "parent(id)", "column_not_found_in_table", true)]
+    #[case::postgres_case_sensitive("\"ID\"", "parent(id)", "column_not_found_in_table", true)]
+    #[case::target_column("id", "parent(absent)", "column_not_found_in_table", true)]
+    #[case::target_relation("id", "missing(id)", "relation_not_found", false)]
+    fn rejected_create_retains_analysis_without_publishing_table(
+        #[case] source: &str,
+        #[case] reference: &str,
+        #[case] code: &str,
+        #[case] bound: bool,
+    ) -> testresult::TestResult {
+        let context = fk::parents();
+        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+            context,
+            &format!(
+                "CREATE TABLE a.child(id integer, CONSTRAINT fk FOREIGN KEY({source}) REFERENCES {reference})"
+            ),
+        )?;
+        let table = pair.ast().as_create_table().unwrap();
+        let constraint = table.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert!(!constraint.references_can_apply());
+        assert_eq!(
+            constraint.target_table(),
+            if bound {
+                Some(fk::name("a", "parent"))
+            } else {
+                None
+            }
+            .as_ref()
+        );
+        let context = pair.into_context();
+        assert!(
+            context
+                .get_table_impl(fk::name("a", "child").full_name())
+                .is_none()
+        );
+        assert_eq!(context.problems().len(), 1);
+        assert_eq!(context.problems()[0].code(), code);
+        let context = fk::apply(context, "SELECT id FROM a.parent");
+        assert_eq!(context.problems().len(), 1);
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::existing("Parent(id)", true)]
+    #[case::forward("later(id)", false)]
+    fn sqlite_create_table_foreign_keys_retain_declarations(
+        #[case] reference: &str,
+        #[case] resolved: bool,
+    ) -> testresult::TestResult {
+        let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE Parent(id PRIMARY KEY)");
+        let sql = format!(
+            "CREATE TABLE child(id, CONSTRAINT fk FOREIGN KEY(id) REFERENCES {reference} ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED)"
+        );
+        let context = fk::apply_sqlite(context, &sql);
+        let child = context
+            .get_table_impl(fk::name("main", "child").full_name())
+            .unwrap();
+        let constraint = child.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert_eq!(
+            constraint.target_table(),
+            if resolved {
+                Some(fk::name("main", "parent"))
+            } else {
+                None
+            }
+            .as_ref()
+        );
+        assert_eq!(
+            ::serde_json::to_value(constraint.delete_action())?,
+            "Cascade"
+        );
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let oracle = ::rusqlite::Connection::open_in_memory()?;
+        oracle.execute_batch("CREATE TABLE Parent(id PRIMARY KEY)")?;
+        oracle.execute_batch(&sql)?;
+        let target: String = oracle.query_row(
+            r#"SELECT "table" FROM pragma_foreign_key_list('child')"#,
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(target, if resolved { "Parent" } else { "later" });
+        Ok(())
+    }
+}
+
+impl super::TableConstraint {
+    fn resolve_declared_foreign_key(
+        &self,
+        context: &mut impl ParseContext,
+        table: &CreateTable,
+    ) -> Result<Option<Constraint>, AnalysisError> {
+        let result = self.constraint.resolve_declared_foreign_key(
+            context,
+            table,
+            self.name.as_deref().unwrap_or_default(),
+            &self.column_names(),
+        )?;
+        if let Some(mut constraint) = result {
+            let columns = self.delete_column_names();
+            let valid = table.check_reference_columns(context, table.name(), &columns)?;
+            constraint.restrict_reference_application(valid);
+            constraint.set_foreign_key_delete_columns(&columns);
+            Ok(Some(constraint))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn delete_column_names(&self) -> Vec<ColumnName> {
+        self.extras
+            .delete_columns
+            .iter()
+            .map(|key| ColumnName::from(key.as_str()))
+            .collect()
+    }
+
+    fn column_names(&self) -> Vec<ColumnName> {
+        self.keys
+            .iter()
+            .map(|key| ColumnName::from(key.as_str()))
+            .collect()
+    }
+}
+
+impl super::ColumnConstraint {
+    fn resolve_declared_foreign_key(
+        &self,
+        context: &mut impl ParseContext,
+        table: &CreateTable,
+        name: &str,
+        keys: &[ColumnName],
+    ) -> Result<Option<Constraint>, AnalysisError> {
+        let Self::ForeignKey(reference) = self else {
+            return Ok(None);
+        };
+        reference
+            .resolve_table_in(context, table.name(), name, keys, Some(table))
+            .map(Some)
     }
 }
 
@@ -1232,11 +1475,7 @@ impl super::ForeignReference {
     ) -> Result<ColumnConstraint, AnalysisError> {
         let target = TableName::from(self.table.full_name()?);
         #[cfg(feature = "sqlite")]
-        for name in &self.ignored_matches {
-            context.report_analysis_problem(
-                AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(table, column, name),
-            )?;
-        }
+        self.report_ignored_matches(context, table, column)?;
         let [target_column] = self.columns.as_slice() else {
             return AnalysisError::raise_unexpected_input("foreign key target column count != 1");
         };

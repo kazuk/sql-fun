@@ -1,0 +1,82 @@
+[
+  {
+    "name": "named",
+    "sql": "CREATE TABLE fk_child (id integer, CONSTRAINT fk FOREIGN KEY(id) REFERENCES fk_parent(id))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "omitted-target-columns",
+    "sql": "CREATE TABLE fk_child (id integer, FOREIGN KEY(id) REFERENCES fk_parent)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "self-reference",
+    "sql": "CREATE TABLE fk_child (id integer, parent_id integer, FOREIGN KEY(parent_id) REFERENCES fk_child, PRIMARY KEY(id))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "two-unnamed",
+    "sql": "CREATE TABLE fk_child (id integer, other integer, FOREIGN KEY(id) REFERENCES fk_parent(id), FOREIGN KEY(other) REFERENCES fk_parent(id))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "attributes",
+    "sql": "CREATE TABLE fk_child (id integer, FOREIGN KEY(id) REFERENCES fk_parent(id) MATCH FULL ON DELETE CASCADE ON UPDATE SET NULL DEFERRABLE INITIALLY DEFERRED)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-target",
+    "sql": "CREATE TABLE fk_child (id integer, FOREIGN KEY(id) REFERENCES fk_absent(id))",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-target-column",
+    "sql": "CREATE TABLE fk_child (id integer, FOREIGN KEY(id) REFERENCES fk_parent(absent))",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-source-column",
+    "sql": "CREATE TABLE fk_child (id integer, FOREIGN KEY(absent) REFERENCES fk_parent(id))",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "omitted-target-columns-without-primary-key",
+    "sql": "CREATE TABLE fk_child (parent_id integer, FOREIGN KEY(parent_id) REFERENCES fk_parent_without_key)",
+    "expected": {
+      "diagnostics": [
+        "foreign_key_referenced_primary_key_missing"
+      ],
+      "columns": []
+    }
+  }
+]

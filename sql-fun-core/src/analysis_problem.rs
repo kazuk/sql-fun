@@ -128,6 +128,9 @@ pub enum AnalysisProblem {
     /// Overload resolution problems
     OverloadResolution(OverloadResolution),
 
+    /// An omitted foreign-key column list requires a referenced primary key.
+    ForeignKeyReferencedPrimaryKeyMissing(TableName),
+
     /// extension not found
     ExtensionNotFound(String),
 
@@ -189,6 +192,12 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Report an omitted foreign-key column list without a referenced primary key.
+    #[must_use]
+    pub fn foreign_key_referenced_primary_key_missing(table: impl Into<TableName>) -> Self {
+        Self::ForeignKeyReferencedPrimaryKeyMissing(table.into())
+    }
+
     /// Report syntax unavailable on the explicitly selected engine version.
     #[must_use]
     pub fn incompatible_engine_version(
@@ -477,6 +486,9 @@ impl AnalysisProblem {
             Self::ParameterConstraint(_) => "parameter_constraint",
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
+            Self::ForeignKeyReferencedPrimaryKeyMissing(_) => {
+                "foreign_key_referenced_primary_key_missing"
+            }
             Self::ExtensionNotFound(..) => "extension_not_found",
             Self::NullabilityUnknown(..) => "nullability_unknown",
             Self::ArgumentTypeMismatch(..) => "argument_type_mismatch",
@@ -517,6 +529,7 @@ impl AnalysisProblem {
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
             Self::IncompatibleEngineVersion(_)
+            | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ParameterTypeUnresolved(_)
             | Self::InferenceCandidateSpaceUnsupported { .. } => {
                 DiagnosticMetadata::from(self.diagnostic_message())
@@ -591,6 +604,9 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::ParameterConstraint(problem) => problem.diagnostic_message(),
             Self::NameResolution(problem) => problem.diagnostic_message(),
             Self::OverloadResolution(problem) => problem.diagnostic_message(),
+            Self::ForeignKeyReferencedPrimaryKeyMissing(table) => {
+                format!("referenced table {table} has no primary key")
+            }
             Self::ExtensionNotFound(name) => format!("extension not found: {name}"),
             Self::NullabilityUnknown(name) => {
                 format!("nullability could not be determined for {name}")

@@ -44,6 +44,14 @@ impl ColumnCollection {
         write!(f, ")")
     }
 
+    fn inline_primary_key_columns(&self) -> Vec<&ColumnName> {
+        self.0
+            .iter()
+            .filter(|column| column.has_inline_primary_key())
+            .filter_map(|column| column.name().as_ref())
+            .collect()
+    }
+
     pub(crate) fn project_expression(
         &self,
         base: &crate::sem::SemScalarExpr,
@@ -703,7 +711,7 @@ impl CreateTable {
         {
             pk.keys().iter().collect()
         } else {
-            Vec::new()
+            self.columns.inline_primary_key_columns()
         }
     }
 

@@ -489,3 +489,26 @@ fn in_progress_self_reference_respects_an_earlier_search_path_relation() {
     );
     assert!(context.problems().is_empty(), "{:?}", context.problems());
 }
+
+#[rstest::rstest]
+#[case::unnamed_inline("id integer PRIMARY KEY", vec![ColumnName::from("id")])]
+#[case::named_inline("id integer CONSTRAINT pk PRIMARY KEY", vec![ColumnName::from("id")])]
+#[case::unnamed_table("id integer, PRIMARY KEY(id)", vec![ColumnName::from("id")])]
+#[case::named_table("id integer, CONSTRAINT pk PRIMARY KEY(id)", vec![ColumnName::from("id")])]
+#[case::composite("id integer, other integer, PRIMARY KEY(other, id)", vec![ColumnName::from("other"), ColumnName::from("id")])]
+#[case::absent("id integer", Vec::<ColumnName>::new())]
+fn primary_key_columns_cover_inline_and_table_declarations(
+    #[case] definition: &str,
+    #[case] expected: Vec<ColumnName>,
+) {
+    let context = fk::apply(
+        fk::context(),
+        &format!("CREATE TABLE a.parent({definition})"),
+    );
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let table = context
+        .get_table_impl(fk::name("a", "parent").full_name())
+        .unwrap();
+    let actual: Vec<_> = table.primary_key_columns().into_iter().cloned().collect();
+    assert_eq!(actual, expected);
+}

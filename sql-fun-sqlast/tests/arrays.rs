@@ -228,6 +228,9 @@ fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::Test
     Ok(())
 }
 
+// Removed public_array_parameter_domains_do_not_select_an_untyped_prepare_signature
+// after a standard timeout; restore from 0577691ebd1a0ac31c11fdeac28c0e218f470319.
+
 // Timed-out unanchored_arrays_keep_owned_constraints cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 // Further timed-out unanchored_arrays_keep_owned_constraints cases were deleted in 5080eb6827bb81e34547e9968fd6a59170e1338f.
 // The remaining owned-array cases were deleted in 78296d13d739d719733a6b23574f74c5200cc1ad.

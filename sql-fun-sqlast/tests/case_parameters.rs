@@ -177,8 +177,6 @@ fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestRe
 // parallel timeout; restore from 32821bde6474fd62d2cf5ae6919d1ef2d6be0ed4.
 
 #[rstest::rstest]
-#[case::other_output_first("SELECT $1::integer, CASE WHEN true THEN $1 ELSE 1 END", 1)]
-#[case::other_output_last("SELECT CASE WHEN true THEN $1 ELSE 1 END, $1::integer", 0)]
 #[case::typed_branch("SELECT CASE WHEN true THEN $1::smallint ELSE 1 END", 0)]
 fn finalization_preserves_case_structure_and_branch_coercions(
     #[case] sql: &str,

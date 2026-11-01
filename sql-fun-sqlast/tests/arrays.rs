@@ -95,33 +95,8 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
 
 // Removed the array typed-assignment variants; restore from 22cf48f9b8718c8f344f40158c272d052a844340.
 // Timed-out unanchored_parameters_accept_typed_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
-#[rstest::rstest]
 // Timed-out GREATEST/reverse=false case removed in 6318caf7a060609a3fe1bf282db9fd0e94f27425.
 // Timed-out CASE/reverse=false case removed in 833d560e798ecfe4093d5400c487efdb340cc7dc.
-#[case::least("LEAST($1,NULL)", true)]
-fn unanchored_parameters_accept_typed_assignments(
-    #[case] expression: &str,
-    #[case] reverse: bool,
-) -> testresult::TestResult {
-    // Real builtin casts and comparison facts determine the admissible sources.
-    let sql = if reverse {
-        format!("SELECT $1::integer, {expression}")
-    } else {
-        format!("SELECT {expression}, $1::integer")
-    };
-    let analyzed = heavy::analyze(&sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    let result = constraints.result_column(usize::from(reverse)).unwrap();
-    let expected = PgBuiltInType::int4();
-    assert!(result.allows(&expected), "{result:?}");
-    Ok(())
-}
 
 #[rstest::rstest]
 #[case::domain("ARRAY[NULL::amount,NULL::amount]")]

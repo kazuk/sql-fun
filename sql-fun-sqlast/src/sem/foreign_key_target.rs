@@ -18,15 +18,20 @@ impl ForeignKeyTarget {
         self.0.as_ref()
     }
 
+    fn canonical_relation(context: &impl ParseContext, name: TableName) -> TableName {
+        if context.dialect() == crate::ast::Dialect::sqlite() {
+            TableName::from(name.full_name().sqlite_identity())
+        } else {
+            name
+        }
+    }
+
     fn resolve(context: &impl ParseContext, requested: &TableName) -> Self {
-        let canonical = context.resolve_table_name(requested).map(|name| {
-            if context.dialect() == crate::ast::Dialect::sqlite() {
-                TableName::from(name.full_name().sqlite_identity())
-            } else {
-                name
-            }
-        });
-        Self(canonical)
+        Self(
+            context
+                .resolve_table_name(requested)
+                .map(|name| Self::canonical_relation(context, name)),
+        )
     }
 
     pub(crate) fn resolve_relation(
@@ -38,6 +43,57 @@ impl ForeignKeyTarget {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
         }
         Ok(target)
+    }
+
+    pub(crate) fn resolve_declared_reference(
+        context: &mut impl ParseContext,
+        requested: &TableName,
+        explicit: Option<&[ColumnName]>,
+        pending: &crate::sem::CreateTable,
+    ) -> Result<(Self, Option<Vec<ColumnName>>, bool), AnalysisError> {
+        let identity = context.creation_name(pending.name().full_name(), pending.temporary())?;
+        let canonical = crate::sem::search_path::expand_relation_search_path(
+            context,
+            requested.full_name(),
+            |key| {
+                let matches = if context.dialect() == crate::ast::Dialect::sqlite() {
+                    key.sqlite_eq(&identity)
+                } else {
+                    key == &identity
+                };
+                if matches {
+                    Some(TableName::from(identity.clone()))
+                } else {
+                    context.resolve_table_name(&TableName::from(key.clone()))
+                }
+            },
+        );
+        let target = Self(canonical.map(|name| Self::canonical_relation(context, name)));
+        if target.relation().is_none() && context.dialect() == crate::ast::Dialect::postgres() {
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
+        }
+        let (columns, valid) = if target.references_identity(context, &identity) {
+            let (columns, valid) =
+                pending.resolve_reference_columns(context, requested, explicit)?;
+            (Some(columns), valid)
+        } else {
+            target.referenced_columns(context, requested, explicit)?
+        };
+        Ok((target, columns, valid))
+    }
+
+    fn references_identity(
+        &self,
+        context: &impl ParseContext,
+        identity: &crate::sem::FullName,
+    ) -> bool {
+        self.relation().is_some_and(|name| {
+            if context.dialect() == crate::ast::Dialect::sqlite() {
+                name.full_name().sqlite_eq(identity)
+            } else {
+                name.full_name() == identity
+            }
+        })
     }
 
     pub(crate) fn resolve_column(
@@ -69,32 +125,22 @@ impl ForeignKeyTarget {
         context: &mut impl ParseContext,
         requested: &TableName,
         explicit: Option<&[ColumnName]>,
-    ) -> Result<Option<Vec<ColumnName>>, AnalysisError> {
+    ) -> Result<(Option<Vec<ColumnName>>, bool), AnalysisError> {
         let definition = if let Some(name) = self.relation() {
-            context.get_table_impl(name.full_name())
+            context.get_table_impl(name.full_name()).cloned()
         } else {
             None
         };
-        let columns = if let Some(columns) = explicit {
-            Some(columns.to_vec())
+        if let Some(definition) = definition {
+            let (columns, valid) =
+                definition.resolve_reference_columns(context, requested, explicit)?;
+            Ok((Some(columns), valid))
         } else {
-            definition.map(|table| table.primary_key_columns().into_iter().cloned().collect())
-        };
-        if let Some(relation) = self.relation()
-            && let Some(columns) = &columns
-        {
-            for column in columns {
-                if !context
-                    .get_table_impl(relation.full_name())
-                    .is_some_and(|table| table.has_column(column))
-                {
-                    context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
-                        requested, column,
-                    ))?;
-                }
-            }
+            Ok((
+                explicit.map(<[ColumnName]>::to_vec),
+                context.dialect() == crate::ast::Dialect::sqlite(),
+            ))
         }
-        Ok(columns)
     }
 
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {

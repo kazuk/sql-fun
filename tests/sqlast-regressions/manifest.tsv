@@ -78,3 +78,4 @@ patterns	builtin	-	39	17,18
 set-operations	project	set-operations.sql	76	17,18
 output-function-params	project	output-function-params.sql	5	17,18
 composite-domains	project	composite-domains.sql	19	17,18
+table-foreign-keys	project	table-foreign-keys.sql	8	17,18

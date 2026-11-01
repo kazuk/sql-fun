@@ -38,6 +38,26 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) const fn references_can_apply(&self) -> bool {
+        if let Self::Foreign(value) = self {
+            value.references_can_apply()
+        } else {
+            true
+        }
+    }
+
+    pub(crate) const fn restrict_reference_application(&mut self, valid: bool) {
+        if let Self::Foreign(value) = self {
+            value.restrict_reference_application(valid);
+        }
+    }
+
+    pub(crate) fn set_foreign_key_delete_columns(&mut self, columns: &[crate::sem::ColumnName]) {
+        if let Self::Foreign(value) = self {
+            value.set_delete_columns(columns);
+        }
+    }
+
     pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
         match self {
             Self::PrimaryKey(value) => value.rename_column(rename, owned),

@@ -384,9 +384,13 @@ impl CreateTable {
         Ok(())
     }
 
-    /// Whether all analyzed column declarations permit catalog application.
+    /// Whether analyzed column and foreign-key declarations permit catalog application.
     pub(crate) fn declarations_can_apply(&self) -> bool {
         self.columns.declarations_can_apply()
+            && self
+                .constraints
+                .values()
+                .all(Constraint::references_can_apply)
     }
 
     pub(crate) fn rename_expressions(
@@ -630,7 +634,7 @@ impl CreateTable {
         }
     }
 
-    pub(crate) fn record_declared_key(
+    pub(crate) fn record_declared_constraint(
         &mut self,
         constraint: &Constraint,
     ) -> Result<(), AnalysisError> {
@@ -650,8 +654,17 @@ impl CreateTable {
         Ok(())
     }
 
+    /// Inspect retained table-level foreign keys, including unnamed declarations.
+    ///
+    /// Iteration order is unspecified; column order within each key is retained.
+    pub fn foreign_keys(&self) -> impl Iterator<Item = &crate::sem::ForeignKeyConstraint> {
+        self.constraints
+            .values()
+            .filter_map(Constraint::as_foreign_key)
+    }
+
     /// Look up an explicitly named table constraint.
-    pub(crate) fn constraint(&self, name: &str) -> Option<&Constraint> {
+    pub fn constraint(&self, name: &str) -> Option<&Constraint> {
         self.constraints
             .get(name)
             .filter(|constraint| constraint.name() == name)
@@ -1088,5 +1101,45 @@ mod test_drop_table_analyze_drop_table {
         assert_eq!(result_context.reported_problem_count(), 1);
 
         Ok(())
+    }
+}
+
+impl CreateTable {
+    pub(crate) fn resolve_reference_columns(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &TableName,
+        explicit: Option<&[ColumnName]>,
+    ) -> Result<(Vec<ColumnName>, bool), AnalysisError> {
+        let columns = if let Some(columns) = explicit {
+            columns.to_vec()
+        } else {
+            self.primary_key_columns().into_iter().cloned().collect()
+        };
+        // SQLite checks parent-key validity when preparing DML, not CREATE TABLE.
+        let valid = if context.dialect() == crate::ast::Dialect::postgres() {
+            self.check_reference_columns(context, requested, &columns)?
+        } else {
+            true
+        };
+        Ok((columns, valid))
+    }
+
+    pub(crate) fn check_reference_columns(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &TableName,
+        columns: &[ColumnName],
+    ) -> Result<bool, AnalysisError> {
+        let mut valid = true;
+        for column in columns {
+            if !self.has_column(column) {
+                valid = false;
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
+                    requested, column,
+                ))?;
+            }
+        }
+        Ok(valid)
     }
 }

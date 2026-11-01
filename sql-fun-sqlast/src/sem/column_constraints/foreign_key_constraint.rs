@@ -113,10 +113,12 @@ pub struct Deferrability {
 }
 
 impl Deferrability {
-    pub(crate) const fn is_deferrable(&self) -> bool {
+    /// Whether the constraint may be deferred.
+    pub const fn is_deferrable(&self) -> bool {
         self.deferrable
     }
-    pub(crate) const fn is_initially_deferred(&self) -> bool {
+    /// Whether the constraint is initially deferred.
+    pub const fn is_initially_deferred(&self) -> bool {
         self.init_deferred
     }
 

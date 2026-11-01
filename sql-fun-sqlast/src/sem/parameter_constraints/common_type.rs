@@ -71,7 +71,10 @@ impl CommonTypeFacts {
             ty.clone()
         } else {
             context
-                .resolve_type_name(ty.full_name())
+                .resolve_type_name(
+                    ty.full_name()
+                        .expect("owned type facts are handled before catalog lookup"),
+                )
                 .map(|name| TypeReference::concrete_type_ref(&name, ty.is_array() == Some(true)))
                 .unwrap_or_else(|| ty.clone())
         };
@@ -115,7 +118,10 @@ impl CommonTypeFacts {
         let mut base = ty.clone();
         let mut seen = HashSet::new();
         while !base.is_dynamic() && seen.insert(base.clone()) {
-            let Some(definition) = context.get_type(base.full_name()) else {
+            let Some(definition) = context.get_type(
+                base.full_name()
+                    .expect("owned type facts are handled before catalog lookup"),
+            ) else {
                 break;
             };
             let Some(next) = definition.domain_base() else {

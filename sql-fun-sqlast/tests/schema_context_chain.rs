@@ -16,6 +16,26 @@ use ::sql_fun_sqlast::{
     sem::{ColumnName, FullName, PgBuiltInType, TableName, TypeReference},
 };
 
+#[test]
+fn anonymous_registration_returns_an_error_and_preserves_the_parent_catalog()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{AnalysisError, CompositeFieldCollection, CreateCompositeType};
+    let root = builtin_root()?;
+    let before = root.type_references();
+    let builder = test_helpers::schema_builder(&root)?;
+    let definition = CreateCompositeType::from_fields(&CompositeFieldCollection::default());
+    let error = builder.apply_create_comp_type(&definition).unwrap_err();
+    assert!(matches!(error, AnalysisError::UnexpectedInput(_)));
+    assert_eq!(root.type_references(), before);
+    let named = load_schema(&root, "CREATE TYPE public.pair516 AS (n integer);")?;
+    assert_type_exists(&named, "public.pair516");
+    assert!(
+        root.get_type(&FullName::with_schema("public", "pair516"))
+            .is_none()
+    );
+    Ok(())
+}
+
 #[rstest::rstest]
 #[case::no_extension(0, TypeReference::from_master_type_name("float8"))]
 #[case::one_extension(1, PgBuiltInType::int4())]
@@ -141,7 +161,8 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
         row_type
             .type_reference()
             .expect("named row reference")
-            .full_name(),
+            .full_name()
+            .expect("nominal type identity"),
         &FullName::with_schema("a", "items")
     );
     assert!(
@@ -338,7 +359,7 @@ fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
         .expect("composite result type");
     assert!(
         extension
-            .get_type(returned_type.full_name())
+            .get_type(returned_type.full_name().expect("nominal type identity"))
             .expect("resolved composite result type")
             .is_composite_type()
     );

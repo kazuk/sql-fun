@@ -81,8 +81,9 @@ mod unresolved_parameter_tests {
         #[case] candidate_count: Option<usize>,
         #[case] unresolved: bool,
     ) -> Result<(), crate::sem::AnalysisError> {
-        let types = [PgBuiltInType::int4(), PgBuiltInType::text()]
-            .map(|ty| TypeReference::concrete_type_ref(ty.full_name(), false));
+        let types = [PgBuiltInType::int4(), PgBuiltInType::text()].map(|ty| {
+            TypeReference::concrete_type_ref(ty.full_name().expect("nominal type identity"), false)
+        });
         let domain = if let Some(count) = candidate_count {
             InputTypeConstraint::types(types[..count].to_vec())
         } else {

@@ -68,7 +68,11 @@ impl TypeProjection {
         }
         if source.is_dynamic() {
             self.retain_owned(source);
-        } else if let Some(definition) = context.get_type(source.full_name()) {
+        } else if let Some(definition) = context.get_type(
+            source
+                .full_name()
+                .expect("owned structural types are handled before catalog lookup"),
+        ) {
             // Table row definitions reference their catalog table. Materialize
             // its columns only in this inference-owned representation.
             let owned = if let TypeDefinition::TableRef(table, _) = definition {
@@ -134,9 +138,7 @@ impl TypeProjection {
             return None;
         }
         match self {
-            Self::ArrayElement if result.is_array() == Some(false) => {
-                Some(TypeReference::concrete_type_ref(result.full_name(), true))
-            }
+            Self::ArrayElement if result.is_array() == Some(false) => Some(result.array_type()),
             Self::Array if result.is_array() == Some(true) => Some(result.clone()),
             _ => None,
         }
@@ -180,7 +182,11 @@ impl StructuralConstraint {
                 let problem = if !source.is_dynamic()
                     && (source.is_array() == Some(true)
                         || context
-                            .get_type(source.full_name())
+                            .get_type(
+                                source.full_name().expect(
+                                    "owned structural types are handled before catalog lookup",
+                                ),
+                            )
                             .is_none_or(|definition| {
                                 !matches!(
                                     definition,
@@ -190,7 +196,9 @@ impl StructuralConstraint {
                                 )
                             })) {
                     crate::sem::AnalysisProblem::member_access_requires_composite_type(
-                        source.full_name(),
+                        source
+                            .full_name()
+                            .expect("owned structural types are handled before catalog lookup"),
                         name,
                     )
                 } else {
@@ -241,7 +249,7 @@ mod tests {
         let mut graph = ConstraintGraph::default();
         let source = graph.parameter(1);
         let result = graph.parameter(2);
-        let array = TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+        let array = PgBuiltInType::int4().array_type();
         graph.project(source, result, TypeProjection::array_element());
         if forward {
             graph.restrict(source, &InputTypeConstraint::exact(&array));
@@ -265,7 +273,7 @@ mod tests {
         graph.solve().unwrap();
         let constraints = ParameterConstraints::from_graph(&graph);
         assert!(constraints.parameter(1).unwrap().constraint().is_any());
-        let array = TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+        let array = PgBuiltInType::int4().array_type();
         assert!(constraints.allows(&BTreeMap::from([
             (1, array.clone()),
             (2, PgBuiltInType::int4())

@@ -182,9 +182,9 @@ pub(super) fn source_namespace_statement_at_version(
     // Merged FULL JOIN keys use PostgreSQL's common-type selection.
     for ty in [PgBuiltInType::int4(), PgBuiltInType::int8()] {
         context.set_get_type_impl_result(
-            ty.full_name(),
+            ty.full_name().expect("nominal type identity"),
             &crate::sem::TypeDefinition::builtin_with_category(
-                ty.full_name(),
+                ty.full_name().expect("nominal type identity"),
                 Some(crate::sem::TypeCategory::try_from('N').unwrap()),
                 None,
             ),

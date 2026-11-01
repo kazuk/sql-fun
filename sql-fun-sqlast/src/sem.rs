@@ -144,7 +144,7 @@ pub use self::{
         OperatorClassDefinition, OperatorFamilyIdentity,
     },
     constraint::{AnalyzeConstraint, Constraint, PrimaryKeyConstraint},
-    create_comp_type::CreateCompositeType,
+    create_comp_type::{CompositeFieldCollection, CreateCompositeType},
     create_domain::CreateDomain,
     create_enum_type::CreateEnum,
     create_extension::CreateExtension,
@@ -224,7 +224,7 @@ pub use crate::AstAndContextPair;
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,
     constraint::{ForeignKeyConstraint, UniqueConstraint},
-    create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+    create_comp_type::CompositeFieldDefinition,
     create_index::IndexElementCollection,
     data_source::{AliasName, JoinUsingClause},
     delete_statement::{DeleteDestination, DeletePredicate},

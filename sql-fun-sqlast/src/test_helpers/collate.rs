@@ -14,8 +14,12 @@ pub(crate) fn context(dialect: Dialect) -> TestParseContext {
     ] {
         context.setup_type(ty.clone());
         context.set_get_type_impl_result(
-            ty.full_name(),
-            &TypeDefinition::builtin_with_category(ty.full_name(), None, Some(collatable)),
+            ty.full_name().expect("nominal type identity"),
+            &TypeDefinition::builtin_with_category(
+                ty.full_name().expect("nominal type identity"),
+                None,
+                Some(collatable),
+            ),
         );
     }
     for local in ["C", "POSIX"] {

@@ -216,7 +216,7 @@ fn comparison_catalog_distinguishes_absence_from_negative_answers(
     assert_eq!(
         analyzed
             .context()
-            .builtin_type_ordered(reference.full_name()),
+            .builtin_type_ordered(reference.full_name().expect("nominal type identity")),
         expected
     );
     Ok(())

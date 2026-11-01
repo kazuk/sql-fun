@@ -23,8 +23,7 @@ mod test_helpers {
 
     pub(super) fn catalog() -> TestParseContext {
         let mut context = super::super::test_helpers::catalog(Dialect::postgres());
-        let array =
-            crate::sem::TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+        let array = PgBuiltInType::int4().array_type();
         context.setup_type(array.clone());
         context.setup_table(
             "arrays",

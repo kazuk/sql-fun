@@ -631,13 +631,35 @@ impl crate::sem::traversal::SemanticVisitor for TriggerDependencies {
             self.add_function(name);
         }
         if let Some(ty) = expression.get_type()
-            && !self.types.contains(ty.full_name())
+            && let Some(name) = ty.full_name()
+            && !self.types.contains(name)
         {
-            self.types.push(ty.full_name().clone());
+            self.types.push(name.clone());
         }
         Ok(())
     }
 }
+#[cfg(test)]
+mod anonymous_dependency_tests {
+    use super::TriggerDependencies;
+    use crate::sem::{FullName, ScalarConstExpr, SemScalarExpr};
+
+    #[test]
+    fn row_dependency_collection_keeps_field_dependencies_without_a_fake_row_name() {
+        let field = SemScalarExpr::literal(&ScalarConstExpr::new_integer(1));
+        let mut expression = SemScalarExpr::row(&[field]);
+        let original = expression.clone();
+        let mut dependencies = TriggerDependencies::default();
+        expression.walk(&mut dependencies).unwrap();
+        assert_eq!(expression, original);
+        assert_eq!(
+            dependencies.types(),
+            &[FullName::with_schema("pg_catalog", "int4")]
+        );
+        assert!(expression.get_type().unwrap().is_dynamic());
+    }
+}
+
 impl TriggerBody {
     fn collect_dependencies(
         &mut self,

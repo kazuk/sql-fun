@@ -546,7 +546,7 @@ impl TriggerFunction {
         let Some(return_type) = candidate.ret_type() else {
             return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         };
-        if return_type.full_name() != &FullName::with_schema("pg_catalog", "trigger") {
+        if return_type.full_name() != Some(&FullName::with_schema("pg_catalog", "trigger")) {
             return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         }
         if !context.function_preserves_view_rows(&name, candidate) {

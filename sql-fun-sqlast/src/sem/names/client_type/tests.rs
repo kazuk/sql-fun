@@ -232,7 +232,10 @@ fn rejects_invalid_sqlite_input(#[case] input: &str) {
 #[test]
 fn canonical_parsing_keeps_its_separate_contract() {
     let canonical: TypeReference = "INTEGER".parse().unwrap();
-    assert_eq!(canonical.full_name(), &FullName::from_local_name("INTEGER"));
+    assert_eq!(
+        canonical.full_name().expect("nominal type identity"),
+        &FullName::from_local_name("INTEGER")
+    );
     let encoded = ::serde_json::to_string(&canonical).unwrap();
     assert_eq!(
         ::serde_json::from_str::<TypeReference>(&encoded).unwrap(),

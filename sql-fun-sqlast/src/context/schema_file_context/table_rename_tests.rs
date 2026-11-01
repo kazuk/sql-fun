@@ -356,7 +356,7 @@ fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresul
             .get_type()
             .unwrap()
             .full_name(),
-        &test_helpers::name("after_name")
+        Some(&test_helpers::name("after_name"))
     );
     let overloads = context
         .get_function_impl(&test_helpers::name("retain_row"))
@@ -369,7 +369,7 @@ fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresul
             .as_ref()
             .unwrap()
             .full_name(),
-        &test_helpers::name("after_name")
+        Some(&test_helpers::name("after_name"))
     );
     test_helpers::assert_select(context, "SELECT (row_value).id FROM dependent")?;
     Ok(())

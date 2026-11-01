@@ -48,6 +48,26 @@ pub struct BuiltinTypeDefinition {
     collatable: Option<bool>,
 }
 
+impl std::fmt::Display for TypeDefinition {
+    /// Diagnostic spelling; anonymous structures have no canonical catalog text.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Array(array) => write!(f, "{}[]", array.element()),
+            Self::ImplicitComposite(columns) => columns.fmt_type_shape(f),
+            Self::CompositeType(composite) if composite.name().is_none() => {
+                composite.get_column_collection().fmt_type_shape(f)
+            }
+            _ => {
+                if let Some(reference) = self.type_reference() {
+                    write!(f, "{reference}")
+                } else {
+                    write!(f, "{self:?}")
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod builtin_type_definition_tests {
     use super::TypeDefinition;
@@ -379,9 +399,9 @@ impl TypeDefinition {
         Self::TableRef(table_name.clone(), tr)
     }
 
-    /// get reference of type
+    /// Borrowed declaration reference; anonymous rows and structural arrays have none.
     #[must_use]
-    pub fn type_reference(&self) -> Option<&TypeReference> {
+    pub const fn type_reference(&self) -> Option<&TypeReference> {
         match self {
             Self::Array(_) => None,
             Self::Enum(definition) => Some(definition.type_ref()),
@@ -389,11 +409,11 @@ impl TypeDefinition {
             Self::Domain(ct) => Some(ct.type_ref()),
             Self::CompositeType(ct) => ct.type_ref().as_ref(),
             Self::TableRef(_, tr) => Some(tr),
-            _ => todo!("self:?"),
+            Self::ImplicitComposite(_) => None,
         }
     }
 
-    /// get a name of type
+    /// Nominal catalog name; anonymous rows and structural arrays have none.
     #[must_use]
     pub fn full_name(&self) -> Option<&FullName> {
         match self {
@@ -401,9 +421,9 @@ impl TypeDefinition {
             Self::Enum(create_enum) => Some(create_enum.name()),
             Self::CompositeType(create_composite_type) => create_composite_type.name(),
             Self::Domain(create_domain) => Some(create_domain.name()),
-            Self::Builtin(definition) => Some(definition.reference.full_name()),
+            Self::Builtin(definition) => definition.reference.full_name(),
             Self::TableRef(t, _) => Some(t.full_name()),
-            Self::ImplicitComposite(_) => todo!(),
+            Self::ImplicitComposite(_) => None,
         }
     }
 
@@ -419,13 +439,60 @@ impl TypeDefinition {
         if matches!(self, Self::Array(_)) || matches!(other, Self::Array(_)) {
             return self == other;
         }
-        if self.full_name() == other.full_name() {
-            true
-        } else {
-            todo!()
+        match (self.full_name(), other.full_name()) {
+            (Some(left), Some(right)) => left == right,
+            (None, None) => {
+                self.matches_structure_with(other, TypeReference::matches_owned_structure)
+            }
+            _ => false,
         }
     }
+}
 
+#[cfg(test)]
+mod anonymous_compatibility_tests {
+    use crate::sem::{ColumnCollection, FullName, PgBuiltInType, TypeDefinition};
+    use crate::test_helpers::dynamic_types::record;
+
+    #[rstest::rstest]
+    #[case::same("int4", true)]
+    #[case::different("text", false)]
+    fn optional_names_do_not_establish_structural_compatibility(
+        #[case] field: &str,
+        #[case] expected: bool,
+    ) {
+        let left = record(&PgBuiltInType::int4());
+        let right = record(&crate::sem::TypeReference::from_master_type_name(field));
+        let left = left.type_definition().unwrap();
+        let right = right.type_definition().unwrap();
+        assert_eq!(left.compatible_with(right), expected);
+        assert_eq!(right.compatible_with(left), expected);
+        let empty = TypeDefinition::implicit_composite(&ColumnCollection::default());
+        assert!(!left.compatible_with(&empty));
+        let nominal = TypeDefinition::builtin(&FullName::with_schema("public", "pair"), None);
+        assert!(!left.compatible_with(&nominal));
+        assert!(!nominal.compatible_with(left));
+    }
+    #[test]
+    fn named_and_anonymous_composites_keep_distinct_identity() {
+        use crate::sem::{CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType};
+        let mut fields = CompositeFieldCollection::default();
+        fields.push(CompositeFieldDefinition::new(
+            "n",
+            &Some(PgBuiltInType::int4()),
+            &None,
+        ));
+        let named = TypeDefinition::from(&CreateCompositeType::new(
+            &FullName::with_schema("public", "pair"),
+            &fields,
+        ));
+        let anonymous = TypeDefinition::from(&CreateCompositeType::from_fields(&fields));
+        assert!(!named.compatible_with(&anonymous));
+        assert!(!anonymous.compatible_with(&named));
+    }
+}
+
+impl TypeDefinition {
     /// test a type is composite type
     #[must_use]
     pub const fn is_composite_type(&self) -> bool {
@@ -514,7 +581,12 @@ mod array_definition_tests {
         let right = TypeDefinition::array(&TypeReference::from_master_type_name(element));
         assert_eq!(left.compatible_with(&right), compatible);
         assert_eq!(right.compatible_with(&left), compatible);
-        let scalar = TypeDefinition::builtin(PgBuiltInType::int4().full_name(), None);
+        let scalar = TypeDefinition::builtin(
+            PgBuiltInType::int4()
+                .full_name()
+                .expect("nominal type identity"),
+            None,
+        );
         assert!(!left.compatible_with(&scalar));
         assert!(!scalar.compatible_with(&left));
     }

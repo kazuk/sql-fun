@@ -12,6 +12,7 @@ pub(crate) mod common_types;
 pub(crate) mod conflict_masters;
 pub(crate) mod declaration_collation;
 pub(crate) mod domain_casts;
+pub(crate) mod dynamic_types;
 pub(crate) mod foreign_keys;
 pub(crate) mod membership;
 pub(crate) mod ownership;

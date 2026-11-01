@@ -1041,7 +1041,9 @@ impl super::Column {
                         .as_ref()
                         .is_some_and(|syntax| !syntax.array_bounds.is_empty());
                     Some(TypeReference::concrete_type_ref(
-                        type_ref.full_name(),
+                        type_ref
+                            .full_name()
+                            .expect("catalog declaration has a nominal type identity"),
                         array,
                     ))
                 } else {
@@ -1984,7 +1986,9 @@ impl CompositeField {
             context.report_analysis_problem(AnalysisProblem::column_type_not_found(
                 composite,
                 &ColumnName::from(self.name.as_str()),
-                requested.full_name(),
+                requested
+                    .full_name()
+                    .expect("SQL type syntax constructs a concrete reference"),
             ))?;
         }
         let mut field =
@@ -2039,7 +2043,9 @@ mod test_composite_field_resolution {
         assert_eq!(
             field.get_type(),
             Some(TypeReference::concrete_type_ref(
-                PgBuiltInType::int4().full_name(),
+                PgBuiltInType::int4()
+                    .full_name()
+                    .expect("catalog declaration has a nominal type identity"),
                 is_array,
             ))
         );

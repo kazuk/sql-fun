@@ -354,9 +354,16 @@ impl SemanticVisitor for RuleDependencies {
         }
         if let Some(ty) = expression.get_type()
             && !ty.is_dynamic()
-            && !self.types.contains(ty.full_name())
+            && !self.types.contains(
+                ty.full_name()
+                    .expect("owned expression types are excluded above"),
+            )
         {
-            self.types.push(ty.full_name().clone());
+            self.types.push(
+                ty.full_name()
+                    .expect("owned expression types are excluded above")
+                    .clone(),
+            );
         }
         Ok(())
     }

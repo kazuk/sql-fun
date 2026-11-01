@@ -89,7 +89,9 @@ impl WithTypmod<TypeReference> {
         }
         // Extension types may define arbitrary typmod input functions. Retain
         // their arguments without claiming that a builtin rule validates them.
-        let name = resolved.full_name();
+        let Some(name) = resolved.full_name() else {
+            return;
+        };
         if name
             .schema()
             .is_none_or(|schema| schema.as_str() != "pg_catalog")

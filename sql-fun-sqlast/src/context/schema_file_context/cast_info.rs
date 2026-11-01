@@ -233,8 +233,8 @@ impl SchemaCatalog {
     }
 
     fn io_cast(&self, source: &TypeReference, target: &TypeReference) -> Option<CastDefinition> {
-        self.get_type_impl(source.full_name())?;
-        self.get_type_impl(target.full_name())?;
+        self.get_type_impl(source.full_name()?)?;
+        self.get_type_impl(target.full_name()?)?;
         let strings = Self::io_string_types();
         if strings.contains(source) || strings.contains(target) {
             return Some(CastDefinition::new(CastContext::explicit()));

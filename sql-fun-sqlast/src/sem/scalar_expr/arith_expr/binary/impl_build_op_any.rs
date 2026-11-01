@@ -377,7 +377,7 @@ mod test_build_op_any {
                 (&chain, array.clone()),
             ] {
                 context.set_get_type_impl_result(
-                    domain.full_name(),
+                    domain.full_name().expect("nominal type identity"),
                     &TypeDefinition::from(&CreateDomain::new(domain, &Some(base))),
                 );
             }
@@ -423,7 +423,10 @@ mod test_build_op_any {
             Some(&OperatorDefinition::binary(&[operator])),
         );
         let left = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
-        let dynamic = TypeReference::dynamic(&TypeDefinition::builtin(source.full_name(), None));
+        let dynamic = TypeReference::dynamic(&TypeDefinition::builtin(
+            source.full_name().expect("nominal type identity"),
+            None,
+        ));
         let right = SemScalarExpr::wrap_implicit_cast(&dynamic, &left);
         let (value, context) = ArithExpr::build_op_any(context, &name, Some(left), Some(right))?;
         assert_eq!(value.get_type(), None);

@@ -14,8 +14,11 @@ pub(crate) fn context(fact: Option<bool>) -> SchemaFileContext {
     base.set_conflict_masters(&masters.load().unwrap());
     let varchar = crate::sem::TypeReference::from_master_type_name("varchar");
     base.set_get_type_impl_result(
-        varchar.full_name(),
-        &TypeDefinition::builtin(varchar.full_name(), Some(true)),
+        varchar.full_name().expect("nominal type identity"),
+        &TypeDefinition::builtin(
+            varchar.full_name().expect("nominal type identity"),
+            Some(true),
+        ),
     );
     base.set_search_path(&[crate::sem::SchemaName::from("public")]);
     let mut context = schema_layer(

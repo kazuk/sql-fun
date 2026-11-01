@@ -251,7 +251,7 @@ impl super::BaseContext {
         if ty.is_dynamic() {
             return None;
         }
-        let name = ty.full_name();
+        let name = ty.full_name()?;
         if name.catalog().is_some()
             || name
                 .schema()

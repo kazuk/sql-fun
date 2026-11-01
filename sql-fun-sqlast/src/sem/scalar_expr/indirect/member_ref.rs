@@ -114,9 +114,13 @@ impl MemberRef {
             if ty.definition_from_catalog(context).is_some() {
                 Self::test_member_exist(&member, context, &source, ty)?
             } else {
-                context.report_analysis_problem(
-                    AnalysisProblem::member_access_requires_composite_type(ty.full_name(), &member),
-                )?;
+                context
+                    .report_analysis_problem(AnalysisProblem::member_access_requires_composite_type(
+                    ty.full_name().expect(
+                        "owned references always have a definition and take the preceding branch",
+                    ),
+                    &member,
+                ))?;
                 (None, None)
             }
         } else {

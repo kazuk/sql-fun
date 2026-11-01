@@ -706,7 +706,37 @@ impl CreateTable {
             self.columns.inline_primary_key_columns()
         }
     }
+}
 
+#[cfg(test)]
+mod test_primary_key_columns {
+    use crate::{context::TableInfoRead, sem::ColumnName, test_helpers::foreign_keys as fk};
+
+    #[rstest::rstest]
+    #[case::unnamed_inline("id integer PRIMARY KEY", vec![ColumnName::from("id")])]
+    #[case::named_inline("id integer CONSTRAINT pk PRIMARY KEY", vec![ColumnName::from("id")])]
+    #[case::unnamed_table("id integer, PRIMARY KEY(id)", vec![ColumnName::from("id")])]
+    #[case::named_table("id integer, CONSTRAINT pk PRIMARY KEY(id)", vec![ColumnName::from("id")])]
+    #[case::composite("id integer, other integer, PRIMARY KEY(other, id)", vec![ColumnName::from("other"), ColumnName::from("id")])]
+    #[case::absent("id integer", Vec::<ColumnName>::new())]
+    fn primary_key_columns_cover_inline_and_table_declarations(
+        #[case] definition: &str,
+        #[case] expected: Vec<ColumnName>,
+    ) {
+        let context = fk::apply(
+            fk::context(),
+            &format!("CREATE TABLE a.parent({definition})"),
+        );
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let table = context
+            .get_table_impl(fk::name("a", "parent").full_name())
+            .unwrap();
+        let actual: Vec<_> = table.primary_key_columns().into_iter().cloned().collect();
+        assert_eq!(actual, expected);
+    }
+}
+
+impl CreateTable {
     /// analyze [`crate::syn::CreateStmt`]
     #[tracing::instrument(skip(context))]
     pub fn analyze_create_stmt<TParseContext>(
@@ -1150,5 +1180,60 @@ impl CreateTable {
             }
         }
         Ok(valid)
+    }
+}
+
+#[cfg(test)]
+mod test_foreign_key_reference_columns {
+    use crate::{context::TableInfoRead, test_helpers::foreign_keys as fk};
+
+    #[test]
+    fn omitted_reference_columns_require_a_postgres_primary_key() -> testresult::TestResult {
+        let context = fk::apply(fk::context(), "CREATE TABLE a.parent(id integer)");
+        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+            context,
+            "CREATE TABLE a.child(parent_id integer, FOREIGN KEY(parent_id) REFERENCES parent)",
+        )?;
+        let context = pair.into_context();
+        assert_eq!(
+            context.problems().len(),
+            1,
+            "missing primary key must produce a structured diagnostic"
+        );
+        assert_eq!(
+            context.problems()[0].code(),
+            "foreign_key_referenced_primary_key_missing"
+        );
+        assert!(
+            context
+                .get_table_impl(fk::name("a", "child").full_name())
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_foreign_key_source_columns_ignore_ascii_case() -> testresult::TestResult {
+        let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE parent(id PRIMARY KEY)");
+        let sql =
+            r#"CREATE TABLE child("ID", CONSTRAINT fk FOREIGN KEY("id") REFERENCES parent(id))"#;
+        let context = fk::apply_sqlite(context, sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let child = context
+            .get_table_impl(fk::name("main", "child").full_name())
+            .unwrap();
+        assert!(
+            child
+                .constraint("fk")
+                .unwrap()
+                .as_foreign_key()
+                .unwrap()
+                .references_can_apply()
+        );
+        let oracle = ::rusqlite::Connection::open_in_memory()?;
+        oracle.execute_batch("CREATE TABLE parent(id PRIMARY KEY)")?;
+        oracle.execute_batch(sql)?;
+        Ok(())
     }
 }

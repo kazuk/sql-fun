@@ -235,6 +235,44 @@ impl ForeignKeyColumnConstraint {
     }
 }
 
+#[cfg(test)]
+mod test_foreign_key_serialization {
+    use crate::{
+        sem::{ColumnName, FullName, PgBuiltInType},
+        test_helpers::foreign_keys as fk,
+    };
+
+    #[test]
+    fn inline_type_and_current_serialization_preserve_completed_outcomes() -> testresult::TestResult
+    {
+        let context = fk::bind(
+            fk::parents(),
+            "child",
+            "parent(id) ON DELETE CASCADE NOT DEFERRABLE",
+            false,
+        );
+        let constraint = fk::inline(&context, &FullName::with_schema("a", "child"));
+        assert_eq!(
+            constraint.primary_key_column_type(),
+            Some(&PgBuiltInType::int4())
+        );
+        assert_eq!(constraint.primary_key_column(), &ColumnName::from("id"));
+        let json = ::serde_json::to_value(&constraint)?;
+        assert_eq!(json["delete_action"], "Cascade");
+        assert_eq!(json["deferrablity"]["deferrable"], false);
+        let restored: crate::sem::ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
+        assert_eq!(restored, constraint);
+        let context = fk::bind(context, "unresolved", "missing(id)", false);
+        let unresolved = fk::inline(&context, &FullName::with_schema("a", "unresolved"));
+        assert!(unresolved.primary_key_table().is_none());
+        let json = ::serde_json::to_value(&unresolved)?;
+        assert!(json["primary_key_table"].is_null());
+        let restored: crate::sem::ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
+        assert_eq!(restored, unresolved);
+        Ok(())
+    }
+}
+
 impl ColumnConstraintTrait for ForeignKeyColumnConstraint {
     fn kind(&self) -> ColumnConstraintKind {
         ColumnConstraintKind::ForeignKey

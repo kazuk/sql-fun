@@ -1055,6 +1055,137 @@ impl super::Table {
     }
 }
 
+#[cfg(test)]
+mod test_create_table_foreign_keys {
+    use crate::{context::TableInfoRead, sem::ColumnName, test_helpers::foreign_keys as fk};
+
+    #[test]
+    fn create_result_and_catalog_retain_composite_and_unnamed_foreign_keys()
+    -> testresult::TestResult {
+        let context = fk::apply(
+            fk::context(),
+            "CREATE TABLE a.parent(x integer, y integer, PRIMARY KEY(x,y), UNIQUE(y,x))",
+        );
+        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+            context,
+            "CREATE TABLE a.child(x integer, y integer, CONSTRAINT fk FOREIGN KEY(y,x) REFERENCES parent(y,x), FOREIGN KEY(x,y) REFERENCES parent, FOREIGN KEY(y,x) REFERENCES parent(y,x))",
+        )?;
+        let result = pair.ast().as_create_table().unwrap();
+        assert_eq!(result.foreign_keys().count(), 3);
+        let constraint = result.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert_eq!(
+            constraint.source_columns(),
+            &[ColumnName::from("y"), ColumnName::from("x")]
+        );
+        assert_eq!(
+            constraint.target_columns(),
+            Some([ColumnName::from("y"), ColumnName::from("x")].as_slice())
+        );
+        let context = pair.into_context();
+        let child = context
+            .get_table_impl(fk::name("a", "child").full_name())
+            .unwrap();
+        assert_eq!(child.foreign_keys().count(), 3);
+        assert_eq!(
+            child
+                .foreign_keys()
+                .filter(|key| key.name().is_empty())
+                .count(),
+            2
+        );
+        assert!(child.foreign_keys().any(|key| key.target_columns()
+            == Some([ColumnName::from("x"), ColumnName::from("y")].as_slice())));
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::source("absent", "parent(id)", "column_not_found_in_table", true)]
+    #[case::postgres_case_sensitive("\"ID\"", "parent(id)", "column_not_found_in_table", true)]
+    #[case::target_column("id", "parent(absent)", "column_not_found_in_table", true)]
+    #[case::target_relation("id", "missing(id)", "relation_not_found", false)]
+    fn rejected_create_retains_analysis_without_publishing_table(
+        #[case] source: &str,
+        #[case] reference: &str,
+        #[case] code: &str,
+        #[case] bound: bool,
+    ) -> testresult::TestResult {
+        let context = fk::parents();
+        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+            context,
+            &format!(
+                "CREATE TABLE a.child(id integer, CONSTRAINT fk FOREIGN KEY({source}) REFERENCES {reference})"
+            ),
+        )?;
+        let table = pair.ast().as_create_table().unwrap();
+        let constraint = table.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert!(!constraint.references_can_apply());
+        assert_eq!(
+            constraint.target_table(),
+            if bound {
+                Some(fk::name("a", "parent"))
+            } else {
+                None
+            }
+            .as_ref()
+        );
+        let context = pair.into_context();
+        assert!(
+            context
+                .get_table_impl(fk::name("a", "child").full_name())
+                .is_none()
+        );
+        assert_eq!(context.problems().len(), 1);
+        assert_eq!(context.problems()[0].code(), code);
+        let context = fk::apply(context, "SELECT id FROM a.parent");
+        assert_eq!(context.problems().len(), 1);
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::existing("Parent(id)", true)]
+    #[case::forward("later(id)", false)]
+    fn sqlite_create_table_foreign_keys_retain_declarations(
+        #[case] reference: &str,
+        #[case] resolved: bool,
+    ) -> testresult::TestResult {
+        let context = fk::apply_sqlite(fk::sqlite_context(), "CREATE TABLE Parent(id PRIMARY KEY)");
+        let sql = format!(
+            "CREATE TABLE child(id, CONSTRAINT fk FOREIGN KEY(id) REFERENCES {reference} ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED)"
+        );
+        let context = fk::apply_sqlite(context, &sql);
+        let child = context
+            .get_table_impl(fk::name("main", "child").full_name())
+            .unwrap();
+        let constraint = child.constraint("fk").unwrap().as_foreign_key().unwrap();
+        assert_eq!(
+            constraint.target_table(),
+            if resolved {
+                Some(fk::name("main", "parent"))
+            } else {
+                None
+            }
+            .as_ref()
+        );
+        assert_eq!(
+            ::serde_json::to_value(constraint.delete_action())?,
+            "Cascade"
+        );
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let oracle = ::rusqlite::Connection::open_in_memory()?;
+        oracle.execute_batch("CREATE TABLE Parent(id PRIMARY KEY)")?;
+        oracle.execute_batch(&sql)?;
+        let target: String = oracle.query_row(
+            r#"SELECT "table" FROM pragma_foreign_key_list('child')"#,
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(target, if resolved { "Parent" } else { "later" });
+        Ok(())
+    }
+}
+
 impl super::TableConstraint {
     fn resolve_declared_foreign_key(
         &self,

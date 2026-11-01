@@ -6,8 +6,6 @@ mod column_rename;
 mod column_rename_tests;
 #[cfg(test)]
 mod creation_tests;
-#[cfg(test)]
-mod foreign_key_tests;
 mod func_info;
 #[cfg(test)]
 mod name_identity_tests;

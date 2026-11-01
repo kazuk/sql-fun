@@ -1,6 +1,4 @@
-use crate::sem::{
-    ColumnCollection, ColumnName, InputTypeConstraint, ParseContext, TypeDefinition, TypeReference,
-};
+use crate::sem::{ColumnName, InputTypeConstraint, ParseContext, TypeDefinition, TypeReference};
 
 /// A functional type relationship, evaluated in the graph's common fixed point.
 #[derive(Clone, Debug)]
@@ -53,12 +51,13 @@ impl TypeProjection {
     }
 
     pub(super) fn identity(source: &TypeReference) -> TypeReference {
-        match source.type_definition() {
-            Some(TypeDefinition::CompositeType(definition)) => definition
-                .name()
-                .map(|name| TypeReference::concrete_type_ref(name, false))
-                .unwrap_or_else(|| source.clone()),
-            _ => source.clone(),
+        if let Some(definition) = source.type_definition()
+            && (definition.is_composite_type() || definition.is_domain())
+            && let Some(reference) = definition.type_reference()
+        {
+            reference.clone()
+        } else {
+            source.clone()
         }
     }
 
@@ -66,32 +65,16 @@ impl TypeProjection {
         if !matches!(self, Self::Member { .. }) || source.is_array() != Some(false) {
             return;
         }
-        if source.is_dynamic() {
-            self.retain_owned(source);
-        } else if let Some(definition) = context.get_type(
-            source
-                .full_name()
-                .expect("owned structural types are handled before catalog lookup"),
-        ) {
-            // Table row definitions reference their catalog table. Materialize
-            // its columns only in this inference-owned representation.
-            let owned = if let TypeDefinition::TableRef(table, _) = definition {
-                let Some(table) = context.get_table(table) else {
-                    return;
-                };
-                let columns = (0..)
-                    .map_while(|index| table.get_column_at(index).cloned())
-                    .collect();
-                TypeReference::dynamic(&TypeDefinition::ImplicitComposite(ColumnCollection::new(
-                    columns,
-                )))
-            } else {
-                TypeReference::dynamic(definition)
-            };
-            if let Self::Member { definitions, .. } = self
-                && !definitions.iter().any(|(ty, _)| ty == source)
-            {
-                definitions.push((source.clone(), owned));
+        if let Some(columns) = source.row_columns(context) {
+            // Resolve domain/table row fields while the catalog is available,
+            // retaining the source identity for correlated input assignments.
+            let owned = TypeReference::dynamic(&TypeDefinition::implicit_composite(&columns));
+            if let Self::Member { definitions, .. } = self {
+                if let Some((_, retained)) = definitions.iter_mut().find(|(ty, _)| ty == source) {
+                    *retained = owned;
+                } else {
+                    definitions.push((source.clone(), owned));
+                }
             }
         }
     }
@@ -106,15 +89,10 @@ impl TypeProjection {
                 .find(|(ty, _)| ty == source)
                 .map(|(_, owned)| owned)
                 .unwrap_or(source);
-            return match owned.type_definition()? {
-                TypeDefinition::CompositeType(definition) => {
-                    definition.get_member(name)?.get_type()
-                }
-                TypeDefinition::ImplicitComposite(columns) => columns
-                    .get_column_def(&ColumnName::from(name.as_str()))?
-                    .get_type_cloned(),
-                _ => None,
-            };
+            return owned
+                .owned_row_columns()?
+                .get_column_def(&ColumnName::from(name.as_str()))?
+                .get_type_cloned();
         }
         if matches!(self, Self::ConstructArray) {
             return Some(source.array_type());
@@ -179,32 +157,9 @@ impl StructuralConstraint {
                 .all(|source| self.projection.project(source).is_none())
         {
             for source in sources {
-                let problem = if !source.is_dynamic()
-                    && (source.is_array() == Some(true)
-                        || context
-                            .get_type(
-                                source.full_name().expect(
-                                    "owned structural types are handled before catalog lookup",
-                                ),
-                            )
-                            .is_none_or(|definition| {
-                                !matches!(
-                                    definition,
-                                    TypeDefinition::CompositeType(_)
-                                        | TypeDefinition::TableRef(_, _)
-                                        | TypeDefinition::ImplicitComposite(_)
-                                )
-                            })) {
-                    crate::sem::AnalysisProblem::member_access_requires_composite_type(
-                        source
-                            .full_name()
-                            .expect("owned structural types are handled before catalog lookup"),
-                        name,
-                    )
-                } else {
-                    crate::sem::AnalysisProblem::composite_type_field_not_found(source, name)
-                };
-                context.report_analysis_problem(problem)?;
+                if let Some(problem) = source.member_access_problem(context, name) {
+                    context.report_analysis_problem(problem)?;
+                }
             }
         }
         Ok(())

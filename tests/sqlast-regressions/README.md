@@ -386,3 +386,11 @@ installed checks. It verifies TABLE and INOUT/OUT output order, quoted names,
 scalar member types, nullable outputs and a single scalar INOUT result. Rust
 unit tests retain incomplete-parameter contracts, owned field types and the
 ordered composite return definition.
+
+Issue #518 adds `composite-domains.json` with the explicitly selected
+`composite-domains.sql` project schema for PostgreSQL 17/18 through both source
+and installed checks. Cases cover domain chains, nested fields, table-row bases,
+preserved source/field domain types, parameter consumers, missing fields,
+non-composite scalar/array bases and a later independent successful input.
+Rust tests retain shared member API outcomes, dynamic definitions, cycle/missing
+base safety, semantic operands and correlated parameter assignments.

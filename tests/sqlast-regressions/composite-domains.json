@@ -1,0 +1,334 @@
+[
+  {
+    "name": "direct",
+    "sql": "SELECT (NULL::leaf_d).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_domains",
+    "sql": "SELECT (NULL::leaf_dd).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_members",
+    "sql": "SELECT ((NULL::outer_d).item).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_field",
+    "sql": "SELECT (NULL::outer_d).item AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "leaf_dd",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "source_identity",
+    "sql": "SELECT NULL::outer_d AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "outer_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "table_row_domain",
+    "sql": "SELECT (NULL::table_d).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "plain_composite",
+    "sql": "SELECT (NULL::leaf).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing",
+    "sql": "SELECT (NULL::leaf_dd).missing AS result",
+    "expected": {
+      "diagnostics": [
+        "composite_type_field_not_found"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_missing",
+    "sql": "SELECT ((NULL::outer_d).item).missing AS result",
+    "expected": {
+      "diagnostics": [
+        "composite_type_field_not_found"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "scalar",
+    "sql": "SELECT (NULL::scalar_d).n AS result",
+    "expected": {
+      "diagnostics": [
+        "member_access_requires_composite_type"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array_domain",
+    "sql": "SELECT (NULL::arr_d).n AS result",
+    "expected": {
+      "diagnostics": [
+        "member_access_requires_composite_type"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "composite_array",
+    "sql": "SELECT (NULL::leaf[]).n AS result",
+    "expected": {
+      "diagnostics": [
+        "member_access_requires_composite_type"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array",
+    "sql": "SELECT (NULL::leaf_d[]).n AS result",
+    "expected": {
+      "diagnostics": [
+        "member_access_requires_composite_type"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "builtin",
+    "sql": "SELECT (NULL::integer).n AS result",
+    "expected": {
+      "diagnostics": [
+        "member_access_requires_composite_type"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "typed_parameter",
+    "sql": "SELECT ($1::leaf_dd).n AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_typed_parameter",
+    "sql": "SELECT (($1::outer_d).item).n AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "later_recovery",
+    "sql": "SELECT (NULL::leaf_dd).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "explicit_binding",
+    "sql": "SELECT (${src:leaf_dd}).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested_explicit_binding",
+    "sql": "SELECT ((${src:outer_d}).item).n AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "scalar_d",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

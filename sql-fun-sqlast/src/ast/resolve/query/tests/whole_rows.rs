@@ -437,7 +437,7 @@ fn renamed_parameter_fields_retain_constraints(#[case] sql: &str) {
 #[rstest::rstest]
 #[case::member(
     "SELECT (r.*).x FROM identity(1) r(x)",
-    "composite_type_field_not_found"
+    "member_access_requires_composite_type"
 )]
 #[case::star(
     "SELECT (r.*).* FROM identity(1) r(x)",

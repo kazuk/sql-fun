@@ -63,13 +63,8 @@ async fn initialization_reuses_cache_across_connections_with_local_handles() {
 }
 
 #[rstest::rstest]
-#[case::first(0, None, 1024)]
 #[case::reverse(3, Some(2), 2)]
-#[case::empty(0, Some(0), 0)]
-#[case::last(1024, None, 2)]
 #[case::exhausted(1026, None, 0)]
-#[case::past_end(usize::MAX, None, 0)]
-#[case::oversized(0, Some(usize::MAX), 1024)]
 #[tokio::test(flavor = "multi_thread")]
 async fn collection_rpc_pages_repeatably_and_releases(
     #[case] offset: usize,

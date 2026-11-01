@@ -77,7 +77,7 @@ fn find_user_by_id(connection: &Connection, id: i64) -> Result<UserRow, QueryErr
 }
 
 fn find_user_by_id_with_interrupt(
-    connection: &Connection,
+    connection: &mut Connection,
     id: i64,
     interrupt: Arc<Mutex<Receiver<QueryError>>>,
 ) -> Result<UserRow, QueryError> {

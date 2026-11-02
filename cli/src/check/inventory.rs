@@ -58,6 +58,7 @@ struct Access {
     statement: usize,
 }
 
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct QueryFacts {
     fingerprint: String,
     statements: usize,
@@ -135,7 +136,6 @@ mod test_query_facts {
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct QueryRecord {
-    id: usize,
     #[serde(flatten)]
     source: QueryIdentity,
     fingerprint: String,
@@ -145,8 +145,9 @@ struct QueryRecord {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Reference {
-    kind: String,
-    query: usize,
+    #[serde(flatten)]
+    source: QueryIdentity,
+    fingerprint: String,
     statement: usize,
 }
 
@@ -154,7 +155,7 @@ struct Reference {
 #[serde(deny_unknown_fields)]
 struct ColumnRecord {
     name: String,
-    accesses: BTreeSet<Reference>,
+    accesses: BTreeMap<String, BTreeSet<Reference>>,
 }
 
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -162,27 +163,35 @@ struct ColumnRecord {
 struct RelationRecord {
     #[serde(flatten)]
     identity: RelationIdentity,
-    accesses: BTreeSet<Reference>,
+    accesses: BTreeMap<String, BTreeSet<Reference>>,
     columns: Vec<ColumnRecord>,
 }
 
 #[derive(Default)]
 struct RelationFacts {
-    accesses: BTreeSet<Reference>,
-    columns: BTreeMap<String, BTreeSet<Reference>>,
+    accesses: BTreeMap<String, BTreeSet<Reference>>,
+    columns: BTreeMap<String, BTreeMap<String, BTreeSet<Reference>>>,
 }
 
 impl RelationFacts {
-    fn receive(&mut self, access: Access, query: usize) {
+    fn receive(&mut self, access: Access, source: &QueryIdentity, fingerprint: &str) {
         let reference = Reference {
-            kind: access.kind,
-            query,
+            source: source.clone(),
+            fingerprint: fingerprint.to_owned(),
             statement: access.statement,
         };
         if let Some(column) = access.column {
-            self.columns.entry(column).or_default().insert(reference);
+            self.columns
+                .entry(column)
+                .or_default()
+                .entry(access.kind)
+                .or_default()
+                .insert(reference);
         } else {
-            self.accesses.insert(reference);
+            self.accesses
+                .entry(access.kind)
+                .or_default()
+                .insert(reference);
         }
     }
 
@@ -214,19 +223,20 @@ impl Document {
     fn build(target: Target) -> Self {
         let mut queries = Vec::new();
         let mut relations = BTreeMap::<RelationIdentity, RelationFacts>::new();
-        for (index, (source, facts)) in target.queries.into_iter().enumerate() {
-            let id = index + 1;
-            queries.push(QueryRecord {
-                id,
-                source,
-                fingerprint: facts.fingerprint,
-                statements: facts.statements,
-            });
-            for access in facts.accesses {
-                relations
-                    .entry(access.relation.clone())
-                    .or_default()
-                    .receive(access, id);
+        for (source, mut responses) in target.queries {
+            responses.sort();
+            for facts in responses {
+                for access in facts.accesses {
+                    relations
+                        .entry(access.relation.clone())
+                        .or_default()
+                        .receive(access, &source, &facts.fingerprint);
+                }
+                queries.push(QueryRecord {
+                    source: source.clone(),
+                    fingerprint: facts.fingerprint,
+                    statements: facts.statements,
+                });
             }
         }
         Self {
@@ -268,26 +278,51 @@ mod test_document {
     fn preserves_composite_identities_roles_and_quoted_names() {
         let project = Project::new();
         let mut target = Target::new(&project.args(), "first", false, false).unwrap();
-        for source_line in [20, 10] {
-            target.queries.insert(
-                QueryIdentity {
+        for (source_line, fingerprint) in [(20, "hash"), (10, "other hash"), (10, "hash")] {
+            target
+                .queries
+                .entry(QueryIdentity {
                     function: "same_name".to_owned(),
                     source_file: "src/query.rs".to_owned(),
                     source_line,
-                },
-                QueryFacts::collect("hash", &access_response(false)).unwrap(),
-            );
+                })
+                .or_default()
+                .push(QueryFacts::collect(fingerprint, &access_response(false)).unwrap());
         }
         let document = Document::build(target);
-        assert_eq!(document.queries.len(), 2);
+        assert_eq!(document.queries.len(), 3);
+        assert_eq!(document.queries[0].fingerprint, "hash");
+        assert_eq!(document.queries[1].fingerprint, "other hash");
         assert_eq!(document.queries[0].source.source_line, 10);
         assert_eq!(document.relations.len(), 1);
-        assert_eq!(document.relations[0].accesses.len(), 4);
-        assert_eq!(document.relations[0].columns[0].accesses.len(), 6);
+        assert_eq!(document.relations[0].accesses.len(), 2);
+        assert_eq!(document.relations[0].columns[0].accesses.len(), 3);
+        let rows = &document.relations[0].accesses["ReadRows"];
+        assert_eq!(rows.len(), 3);
+        let inputs = &document.relations[0].columns[0].accesses["UpdateInput"];
+        assert_eq!(inputs.len(), 3);
+        assert_eq!(inputs.first().unwrap().statement, 1);
         let encoded = ::toml::to_string_pretty(&document).unwrap();
         let restored: Document = ::toml::from_str(&encoded).unwrap();
         assert_eq!(restored, document);
         assert_eq!(::toml::to_string_pretty(&restored).unwrap(), encoded);
+    }
+    #[test]
+    fn published_inventory_renders_as_a_matrix_without_data_transformation() {
+        let inventory: ::toml::Value =
+            ::toml::from_str(include_str!("../../../tests/postgres-e2e/inventory.toml")).unwrap();
+        // Only format conversion: the template enumerates the published model directly.
+        let json = ::serde_json::to_value(inventory).unwrap();
+        let rendered = ::handlebars::Handlebars::new()
+            .render_template(
+                include_str!("../../../tests/postgres-e2e/inventory.hbs"),
+                &json,
+            )
+            .unwrap();
+        assert_eq!(
+            rendered,
+            include_str!("../../../tests/postgres-e2e/inventory.md")
+        );
     }
 }
 
@@ -297,7 +332,7 @@ struct Target {
     datasource: String,
     schema_variant: String,
     schema_hash: String,
-    queries: BTreeMap<QueryIdentity, QueryFacts>,
+    queries: BTreeMap<QueryIdentity, Vec<QueryFacts>>,
 }
 
 impl Target {
@@ -338,7 +373,7 @@ impl Target {
             source_line: analysis.source_line(),
         };
         let facts = QueryFacts::collect(analysis.query_finger_print(), analysis.response())?;
-        self.queries.insert(identity, facts);
+        self.queries.entry(identity).or_default().push(facts);
         Ok(())
     }
 }

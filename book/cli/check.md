@@ -63,21 +63,33 @@ The TOML contains:
 
 - `inventory_version`, `datasource`, `schema_variant`, `schema_dump_hash`: artifact
   format and selected input identity.
-- `[[queries]]`: a document-local one-based `id`, Rust `function`, `source_file`,
-  `source_line`, query/CTE `fingerprint`, and statement count `statements`.
-  Equal function names at different source locations remain separate queries.
-  Source fields preserve extractor values, including `<unknown>` when a file
-  name is unavailable.
+- `[[queries]]`: Rust `function`, `source_file`, `source_line`, query/CTE
+  `fingerprint`, and statement count `statements`. This also lists queries with
+  no object accesses. Source fields preserve extractor values, including
+  `<unknown>` when a file name is unavailable.
 - `[[relations]]`: SQL object `kind`, optional `catalog`/`schema`, and `name`.
   Names are logical identifier components; embedded dots are not separators.
-- `[[relations.accesses]]`: relation-level `kind`, `query` ID and one-based
-  `statement` index within that query.
-- `[[relations.columns]]` and `[[relations.columns.accesses]]`: column `name` and
-  its access purposes with the same query/statement references.
+- Each relation's `accesses` is a mapping from an exact AccessKind name to an
+  array of responsible query references. For example,
+  `[[relations.accesses.DeleteRows]]` identifies a query deleting rows.
+- `[[relations.columns]]` gives the column `name`. Its `accesses` uses the same
+  access-kind → query-list mapping, such as
+  `[[relations.columns.accesses.UpdateInput]]` for assignment-expression reads.
+- Every reference directly contains `function`, `source_file`, `source_line`,
+  `fingerprint` and a one-based `statement` index within that query. There are no
+  numeric query IDs to look up. Different source locations remain distinct;
+  fingerprints also distinguish different SQL/CTE inputs when extracted source
+  locations collide. All analyzed queries are retained rather than overwritten
+  when their extracted source identities coincide. Identical access references
+  within one kind are deduplicated; different roles remain separate.
 
-Query IDs are local to one generated document and may change when its selected
-query set changes. Empty access lists are valid. Query records remain present
-when SQL accesses no schema objects or Rust generation lacks required types.
+Empty access mappings are valid. The nested structure can be enumerated directly
+as relation → access purpose → queries, or relation → column → access purpose →
+queries. Converting TOML to JSON and applying an ordinary presentation template
+is sufficient to render a CRUD matrix or impact report: no SQL interpretation,
+ID joins or data reshaping is required. See the [tested template and rendered
+matrix](../introduction.md#rendering-a-crud-matrix).
+
 The inventory does not duplicate executable SQL or Rust type metadata; lockfiles
 continue to serve code generation.
 

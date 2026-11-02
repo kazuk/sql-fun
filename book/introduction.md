@@ -129,9 +129,16 @@ Its inventory query record looks like this (excerpt from the tested fixture):
 ```
 
 The source fields preserve the extracted Rust location; `<unknown>` means the
-extractor did not supply a file name. Query IDs are local to this document.
-For `public.e2e_items.id`, the column access list includes all four purposes of
-that query, with one-based query/statement references:
+extractor did not supply a file name. The relation groups its responsible Rust
+queries by access purpose, with function and source identity directly available:
+
+```toml
+{{#include ../tests/postgres-e2e/inventory.toml:relation-accesses}}
+```
+
+For `public.e2e_items.id`, each of the four update purposes has its own query
+list. Each reference includes the one-based SQL statement number within the
+function:
 
 ```toml
 {{#include ../tests/postgres-e2e/inventory.toml:update-id-accesses}}
@@ -154,3 +161,25 @@ certify access-control correctness or map queries to business functions.
 Executable SQL and code-generation metadata remain in the lockfile. See
 [`check`](cli/check.md#crudquery-inventory) for the complete field definitions,
 validation options and failure behavior.
+
+### Rendering a CRUD matrix
+
+The inventory is organized for the developer's question: which Rust queries
+access this relation or column, and for which purpose? Detailed purposes remain
+visible rather than being collapsed into four letters. A report can enumerate
+the access-kind → responsible-query-list mappings directly.
+
+After converting TOML to JSON, this ordinary Handlebars template produces a
+Markdown matrix. It uses only nested iteration and field access; it does not
+interpret SQL, resolve numeric IDs or reshape the data:
+
+```handlebars
+{{#include ../tests/postgres-e2e/inventory.hbs}}
+```
+
+The beginning of the rendered matrix from the same tested fixture is:
+
+{{#include ../tests/postgres-e2e/inventory.md:1:8}}
+
+Use the column-access rows in the same template for a column matrix. A renderer
+may choose a different presentation while consuming the same nested mappings.

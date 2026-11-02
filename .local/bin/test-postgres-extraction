@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import sys
 import shutil
 import subprocess
 import time
@@ -46,10 +47,22 @@ def owned():
     return set(run("docker", "ps", "-aq", "--filter", "label=io.sql-fun.extraction=owned").stdout.split())
 
 
+def theme_tools(project):
+    """Exercise the downloader process offline using the canonical theme payload."""
+    tools = project / "theme-tools"
+    tools.mkdir(exist_ok=True)
+    source = Path(__file__).resolve().parents[2] / "sql-fun-home/highlighter/default.toml"
+    program = tools / "curl"
+    program.write_text(f"#!{sys.executable}\nimport pathlib, sys\n"
+                       f"pathlib.Path(sys.argv[sys.argv.index('--output') + 1]).write_bytes(pathlib.Path({str(source)!r}).read_bytes())\nprint('200')\n")
+    program.chmod(0o755)
+    return tools
+
+
 class InitTerminal:
     """Exercise the installed CLI with a controlling terminal and fresh-output waits."""
 
-    def __init__(self, binary, project, home, arguments=(), tools=False, metadata=None, common=()):
+    def __init__(self, binary, project, home, arguments=(), tools=False, metadata=None, common=(), theme_choice=False):
         self.master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
         env = dict(os.environ, SQL_FUN_HOME=str(home), TERM="xterm")
@@ -57,8 +70,10 @@ class InitTerminal:
         env.pop("SQL_FUN_METADATA_FILE", None)
         if metadata is not None:
             env["SQL_FUN_METADATA_FILE"] = str(metadata)
-        if not tools:
-            env["PATH"] = str(project / "no-tools")
+        downloader = theme_tools(project)
+        env["PATH"] = str(downloader) + (os.pathsep + env["PATH"] if tools else "")
+        if not theme_choice:
+            arguments = [*arguments, "--install-default-theme"]
 
         def terminal_session():
             os.setsid()
@@ -152,6 +167,66 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
     print(f"Interactive init ({fixture}): explicit choices and final authorization passed", flush=True)
 
 
+def validate_theme_navigation(binary, destination):
+    project = destination / "theme-navigation"
+    project.mkdir()
+    home = project / "home"
+    terminal = InitTerminal(binary, project, home, ["--engines", "sqlite"], theme_choice=True)
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose highlighter theme operation")
+        terminal.send(b"\r", "Select at least one option explicitly")
+        terminal.send(b" \r", "Initialize sql-fun development support?")
+        assert not home.exists()
+        terminal.send(b"\x1b", "Choose highlighter theme operation")
+        terminal.send(b"\r", "Initialize sql-fun development support?")
+        assert not home.exists()
+        terminal.finish(b" \r", 0)
+        theme = home / "highlighter/default.toml"
+        source = Path(__file__).resolve().parents[2] / "sql-fun-home/highlighter/default.toml"
+        assert theme.read_bytes() == source.read_bytes()
+    finally:
+        terminal.close()
+    # Cancel at the added theme question, with no filesystem effects.
+    other = project / "cancel-home"
+    terminal = InitTerminal(binary, project, other, ["--engines", "sqlite"], theme_choice=True)
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {other}")
+        terminal.send(b"y\r", "Choose highlighter theme operation")
+        terminal.finish(b"\x03", 1)
+        assert not other.exists()
+    finally:
+        terminal.close()
+    print("Theme init: explicit choice, retained Back, pre-confirmation isolation and cancellation passed", flush=True)
+
+
+def validate_theme_editor(binary, destination):
+    project = destination / "theme-editor"
+    project.mkdir()
+    home = project / "home"
+    editor = project / "editor"
+    editor.write_text("#!/bin/sh\nprintf \"keyword = { foreground = 'blue' }\" > \"$1\"\n")
+    editor.chmod(0o755)
+    terminal = InitTerminal(binary, project, home, ["--engines", "sqlite"], theme_choice=True)
+    try:
+        terminal.prompt("home directory")
+        terminal.send(b"\r", f"Use {home}")
+        terminal.send(b"y\r", "Choose highlighter theme operation")
+        terminal.send(b"\x1b[B \r", "Theme editor executable")
+        terminal.send(str(editor).encode() + b"\r", "Initialize sql-fun development support?")
+        assert not home.exists(), "editor must not run before final authorization"
+        terminal.send(b"\x1b", "Theme editor executable")
+        terminal.send(b"\r", "Initialize sql-fun development support?")
+        assert not home.exists()
+        terminal.finish(b" \r", 0)
+        assert (home / "highlighter/default.toml").read_text() == "keyword = { foreground = 'blue' }"
+    finally:
+        terminal.close()
+    print("Theme editor: explicit executable, retained Back and post-confirmation validated installation passed", flush=True)
+
+
 def home_snapshot(home):
     if not home.exists():
         return None
@@ -175,6 +250,8 @@ def validate_init_navigation(binary, destination, existing=False):
         home.mkdir()
         (home / "user-file").write_bytes(b"preserve this data")
         (home / "metadata.json").write_text('{"user": "preserve this too"}')
+        (home / "highlighter").mkdir()
+        (home / "highlighter/default.toml").write_text("keyword = { foreground = 'green' }")
     before = home_snapshot(home)
     terminal = InitTerminal(binary, project, home)
     try:
@@ -571,14 +648,14 @@ def validate(binary, major, image, destination, host, bind):
         existing.mkdir()  # Existing empty output is supported.
         run(binary, "extract", "catalog", "--output", str(existing), env=connection_env)
         init_home = destination / f"{major}-initialized-connection"
-        run(binary, "init", "--yes", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
+        run(binary, "init", "--yes", "--install-default-theme", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
         installed = init_home / "postgres" / major
         assert payload(installed) == payload(existing), "init must install the same catalog used by extraction"
         previous_install = payload(installed)
-        run(binary, "init", "--yes", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
+        run(binary, "init", "--yes", "--install-default-theme", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
         assert payload(installed) == previous_install, "rerun modified a valid installation"
         other = "18" if major == "17" else "17"
-        run(binary, "init", "--yes", "--sql-fun-home", str(init_home),
+        run(binary, "init", "--yes", "--install-default-theme", "--sql-fun-home", str(init_home),
             "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", other, env=connection_env, success=False)
         script = run(binary, "extract", "export-script").stdout
         bundle = run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
@@ -681,6 +758,7 @@ def main():
     destination = Path(args.output).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     args.binary = str(Path(args.binary).resolve())
+    os.environ["PATH"] = str(theme_tools(destination)) + os.pathsep + os.environ["PATH"]
     # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
     os.chdir(destination)
     validate_interactive_init(args.binary, destination, "connector",
@@ -689,6 +767,8 @@ def main():
                               "[package.metadata.database.private]\nengine = 'PostgreSQL'\n")
     validate_interactive_init(args.binary, destination, "malformed", "not valid TOML [")
     validate_interactive_init(args.binary, destination, "ambient", "not valid TOML [", True)
+    validate_theme_navigation(args.binary, destination)
+    validate_theme_editor(args.binary, destination)
     validate_init_navigation(args.binary, destination)
     validate_init_navigation(args.binary, destination, existing=True)
     validate_init_cancellation(args.binary, destination)
@@ -700,7 +780,7 @@ def main():
         validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)
     validate_init_unchanged_install(args.binary, destination)
     init_home = destination / "initialized-docker"
-    run(args.binary, "init", "--yes", "--docker", "--sql-fun-home", str(init_home),
+    run(args.binary, "init", "--yes", "--install-default-theme", "--docker", "--sql-fun-home", str(init_home),
         "--engines", "postgres", "--engine-versions", ",".join(IMAGES),
         "--docker-host-address", args.host, "--docker-bind-address", args.bind)
     for major in IMAGES:

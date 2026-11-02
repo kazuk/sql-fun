@@ -8,6 +8,7 @@ initialization targets in `PostgresVersionInventory`.
 
 ```scrut
 $ mkdir "$TMPDIR/postgres-initialization-contract" && cd "$TMPDIR/postgres-initialization-contract"
+$ mkdir -p home/highlighter && cp "$SQL_FUN_TEST_THEME" home/highlighter/default.toml
 ```
 
 ## Initialize every supported PostgreSQL version

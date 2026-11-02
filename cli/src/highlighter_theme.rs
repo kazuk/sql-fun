@@ -69,7 +69,27 @@ impl HighlighterTheme {
     ///
     /// [`HighlighterThemeError`] when deserialize error
     pub fn from_toml_str(toml: &str) -> Result<Self, HighlighterThemeError> {
-        Ok(toml::from_str(toml)?)
+        let theme: Self = toml::from_str(toml)?;
+        theme.validate()?;
+        Ok(theme)
+    }
+
+    /// Validate every style consumed by the diagnostic renderer.
+    ///
+    /// # Errors
+    /// Returns the renderer's error for an invalid foreground or background color.
+    fn validate(&self) -> Result<(), HighlighterThemeError> {
+        for style in [
+            &self.identifier,
+            &self.constant,
+            &self.operator,
+            &self.keyword,
+            &self.delimiter,
+            &self.comment,
+        ] {
+            style.style()?;
+        }
+        Ok(())
     }
 
     /// get identifier style
@@ -114,6 +134,18 @@ mod test_highlighter_theme_from_toml_str {
     use ::testresult::TestResult;
 
     use super::HighlighterTheme;
+
+    #[rstest::rstest]
+    #[case::identifier("identifier")]
+    #[case::constant("constant")]
+    #[case::operator("operator")]
+    #[case::keyword("keyword")]
+    #[case::delimiter("delimiter")]
+    #[case::comment("comment")]
+    fn rejects_invalid_colors_for_every_renderer_style(#[case] style: &str) {
+        let text = format!("{style} = {{ foreground = 'invalid-color' }}");
+        assert!(HighlighterTheme::from_toml_str(&text).is_err());
+    }
 
     #[rstest::rstest]
     #[case(

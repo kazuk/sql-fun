@@ -7,3 +7,4 @@ output="${2:?output directory is required}"
 mkdir -p "$output"
 tar -xzf "$archive" -C "$output"
 [[ -f "$output/index.html" ]] || { echo 'manual archive has no root index.html' >&2; exit 1; }
+[[ -f "$output/highlighter/default.toml" ]] || { echo 'manual archive has no default theme' >&2; exit 1; }

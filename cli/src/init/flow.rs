@@ -21,7 +21,7 @@ use super::{
         ConfirmHomeStep, ConfirmInstallStep, ConnectionStep, DatasourceSelectionStep, Direction,
         EditHomeStep, EngineSelectionStep, EngineSteps, HomeDirectoryStep, HomeStep, InitStep,
         PostgresSourceStep, PostgresSteps, SelectionStep, SourceDetails, SqliteStep,
-        StepCompletion, VersionsStep,
+        StepCompletion, ThemeEditorStep, ThemeStep, VersionsStep,
     },
 };
 
@@ -32,6 +32,8 @@ pub(super) fn conversation(yes: bool) -> Conversation {
             Box::new(SelectionStep),
             Box::new(EngineSteps),
             Box::new(HomeStep),
+            Box::new(ThemeStep),
+            Box::new(ThemeEditorStep),
             Box::new(ConfirmInstallStep),
         ]
     } else {
@@ -39,6 +41,8 @@ pub(super) fn conversation(yes: bool) -> Conversation {
             Box::new(HomeStep),
             Box::new(SelectionStep),
             Box::new(EngineSteps),
+            Box::new(ThemeStep),
+            Box::new(ThemeEditorStep),
             Box::new(ConfirmInstallStep),
         ]
     };

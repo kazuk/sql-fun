@@ -18,6 +18,8 @@ mod postgres_steps;
 mod selection_step;
 mod source_details;
 mod sqlite_step;
+mod theme_editor_step;
+mod theme_step;
 mod versions_step;
 
 pub(super) use self::confirm_home_step::ConfirmHomeStep;
@@ -34,6 +36,8 @@ pub(super) use self::postgres_steps::PostgresSteps;
 pub(super) use self::selection_step::SelectionStep;
 pub(super) use self::source_details::SourceDetails;
 pub(super) use self::sqlite_step::SqliteStep;
+pub(super) use self::theme_editor_step::ThemeEditorStep;
+pub(super) use self::theme_step::ThemeStep;
 pub(super) use self::versions_step::VersionsStep;
 
 use super::{

@@ -18,9 +18,14 @@ pub(super) fn common_args() -> SqlFunArgs {
 }
 
 pub(super) fn state<'a>(common: &'a SqlFunArgs, options: &[&str]) -> InitializationState<'a> {
-    let args =
-        InitializeArgs::try_parse_from(std::iter::once("init").chain(options.iter().copied()))
-            .unwrap();
+    // These scripts exercise engine/home navigation; theme-specific tests collect
+    // the new operation separately without this supplied download choice.
+    let args = InitializeArgs::try_parse_from(
+        std::iter::once("init")
+            .chain(options.iter().copied())
+            .chain(["--install-default-theme"]),
+    )
+    .unwrap();
     InitializationState::new(common, &args, false)
 }
 

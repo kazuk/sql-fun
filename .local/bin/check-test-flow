@@ -318,7 +318,7 @@ function run_doc() {
   require_command mdbook
   echo "== Document build"
   cargo doc --workspace --no-deps
-  mdbook build
+  "${GIT_ROOT}/.local/sbin/build-user-manual"
   echo "== Documentation tests (default and all features)"
   cargo test --doc -p sql-fun-sqlast -p sql-fun-client
   cargo test --doc -p sql-fun-sqlast -p sql-fun-client --all-features

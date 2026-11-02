@@ -1,86 +1,109 @@
 # Release version materialization
 
-Release preparation runs materialization in the existing `prepare` job, after
-release identity parsing, successful exact-target-SHA normal CI selection, and
-required CI-input adoption. The job uses the adopted pinned CI-builder image
-for Cargo, cargo-edit, Taplo, Git, Bash, and jq.
+## Source identity and responsibilities
 
-## Identity and version ownership
+`S` is the explicitly selected release-branch source with successful exact-SHA
+required normal CI. `R` is a direct child recording the materialized release
+state on that same branch. Preparation never writes to `main`.
 
-`.local/sbin/materialize-release-state` is an internal workflow adapter. Its
-classification and snapshot suffix are explicit outputs of the shared project
-release parser used by release preparation and distribution. Stable identities
-map to the existing materializer's `--release` operation; snapshot identities
-map to `--snapshot=<parsed suffix>`. No second operator mode is introduced.
+The shared project parser supplies product tag, classification and snapshot
+suffix. `.local/sbin/materialize-release-state` maps those explicit values to
+`.local/bin/materialize-release-versions`; it does not introduce another mode
+or version algorithm. Each publishable crate uses its own current version and
+`workspace.metadata.next-release`, not the numeric product tag. Workspace
+non-publishable versions stay unchanged; dependency requirements can change.
 
-The existing materializer owns crate version calculations. Each publishable
-crate uses its own current version and `workspace.metadata.next-release`.
-Project tag numbers never select crate versions. Non-publishable package
-versions stay unchanged; their local dependency requirements may be updated.
-This step does not consume/reset release intent or advance a SemVer baseline.
+Responsibility boundaries:
 
-## State handoff and Git boundary
+- #325 materializes versions once in the exact-`S` checkout.
+- #329 invokes the existing selected-candidate baseline adopter.
+- #330 resets stable intent, explicitly stages owned state, commits/pushes `R`
+  and resolves recorded state on reruns.
+- #331's planned integration builds/validates release packages from committed
+  `R`, retains prepared assets and tags `R` only after success.
+- #259's planned integration creates a draft after tagging and attaches assets.
+  A maintainer reviews and publishes it.
+- #260 publishes exact tagged crate versions. Stable-only full-branch merge
+  into main remains downstream integration work; stable Pages uses the existing
+  manual. Prereleases never merge into main or update Pages.
 
-The workflow checks out the exact release target, then materializes once in
-that worktree. Subsequent producer steps must use that same worktree. Do not
-check out the original revision again or rerun the version bump to reconstruct
-state. The original target SHA remains the identity of the adopted normal-CI
-inputs, independently of the eventual materialized source commit.
+Normal-CI packages from `S` verify that source; they are not release packages
+for materialized versions at `R`.
 
-The materialization step exposes these step outputs for later same-job consumers:
+## Explicit paths and stable state
 
-- `versions`: `$RUNNER_TEMP/release-state/crates.tsv`, one package/version TSV
-  row per publishable package, in package-name order.
-- `paths`: `$RUNNER_TEMP/release-state/changed-paths.txt`, changed repository
-  paths, one per line, restricted to workspace manifests and `Cargo.lock`.
+Materialization exposes external `versions` and `paths` files under
+`$RUNNER_TEMP/release-state`: `crates.tsv` and `changed-paths.txt`. The latter
+contains only workspace manifests and `Cargo.lock`, including non-publishable
+member dependency edits from cargo-edit. The adapter rejects other tracked
+changes and requires an initially clean tracked worktree/index.
 
-Finalization (#330) owns staging and committing this state, together with any
-other explicitly owned release-state updates. It must stage explicit paths;
-never broadly stage the worktree. This step creates no intermediate commit and
-makes no remote Git changes. A later job boundary must transport/pin the
-materialized source state explicitly rather than recalculate versions.
+After materialization/manual preparation, the existing baseline operation
+receives the candidate from the single selected CI run. Downloaded inputs stay
+under `$RUNNER_TEMP/release-inputs`; the active baseline path alone is Git state.
+`steps.baseline.outputs.paths` names external `baseline-paths.txt`: exactly
+`.local/semver_baseline.tar.gz` for stable, empty for prerelease. The adopter
+owns archive validation and atomic replacement; snapshots preserve baseline
+bytes and modification time.
 
-CI inputs remain under `$RUNNER_TEMP/release-inputs`. Both that directory and
-materialization outputs stay outside the Git worktree. The adapter requires a
-clean tracked worktree/index and a new external state-output directory. It
-rejects any materializer edit outside workspace manifests and the lockfile;
-unrelated untracked files are not included in the changed-path output.
+`.local/sbin/release-state commit` combines those explicit lists. Stable intent
+reset also owns root `Cargo.toml` even when its path is absent from the
+materializer list. After calculating versions, reset existing publishable crate
+entries to `patch`, preserving unrelated metadata and comments. The repository
+uses an explicit `[workspace.metadata.next-release]` table with scalar entries;
+an unsupported representation fails without writing the reset. TOML parsing
+checks the intended semantic change before writing. Prereleases preserve intent
+and baseline. Unexpected tracked/index changes fail, rather than broad staging.
+Untracked incidental files, external inputs, handoffs and public assets never
+enter the commit. No `git add -A` is used.
 
-## Baseline state handoff
+## Commit and rerun handoff
 
-After materialization and manual preparation, the same `prepare` job invokes
-`.local/sbin/adopt-semver-baseline` with the parsed classification and the
-candidate downloaded from the already selected exact-SHA normal-CI run. The
-candidate remains at
-`$RUNNER_TEMP/release-inputs/sql-fun-semver-baseline/semver_baseline.tar.gz`.
-Archive validation and stable/snapshot semantics belong to the existing
-[adoption contract](semver-repository-integration.md#explicit-adoption).
+`.local/sbin/release-state resolve` runs before producer mutation. It fetches
+only the explicitly selected release ref and returns `source`, `revision` and
+`status` (`new` or `reused`). A fresh attempt continues the original CI gate;
+a recorded attempt checks out `R` and bypasses materialization/adoption/reset
+mutations. The current workflow still selects CI for recorded `S` and adopts
+reusable inputs/manual; #331 must bypass the whole producer path when a
+matching immutable tag exists.
 
-After successful adoption, `steps.baseline.outputs.paths` names
-`$RUNNER_TEMP/release-state/baseline-paths.txt`. For stable releases it contains
-only `.local/semver_baseline.tar.gz`, followed by a newline; for snapshots it is
-empty. A stable entry is intentional even when idempotent adoption leaves no
-Git diff. `steps.baseline.outputs.status` carries the adopter's result for the
-job summary. Failed adoption exposes no successful handoff.
+The release commit has subject `chore(release): materialize <product-tag>` and
+unique trailers `Release-Source: <S>` and `Release-Tag: <product-tag>`. Its single
+parent is `S`. These fields serve rerun identity, not independent artifact
+provenance. Validation checks matching identity, direct ancestry, owned changed
+paths and stable/prerelease intent semantics. A moved branch without the exact
+matching record is a conflict. Do not guess identity from a commit subject alone.
 
-Finalization (#330) must combine this separate explicit path list with
-`steps.materialize.outputs.paths`, staging only intended repository state.
-Materialization's manifest/lockfile allowlist is unchanged. Do not stage the
-downloaded candidate, external path lists, or release assets. These outputs
-serve subsequent steps in the same job; they neither transport state across
-jobs nor commit/back-push it. Adoption errors stop dependent finalization;
-a later failure requires discarding runner-local state and rerunning from
-the original target rather than committing the baseline independently.
+Finalization requires an empty index, HEAD at `S` and the remote release tip
+still at `S`. It records `R` with explicit GitHub Actions bot identity and pushes
+normally to that exact release ref. An intervening incompatible update or push
+rejection fails; no force, reset, amend or conflict recovery. If push transport
+reports failure, accept only a subsequent fetch confirming exact `R` remotely.
+Job-scoped `contents: write` on `GITHUB_TOKEN` supplies release-ref access and
+avoids recursive push-triggered preparation. No main bypass actor is needed.
 
-## Failure and current limitation
+A rerun of the original source run can find remote child `R`; a run explicitly
+selected at `R` recognizes the same record. Both reuse `R` without recalculating
+versions. Other remote revisions or malformed records fail. Outputs distinguish
+original `S` from committed `R`; `materialized-revision` and the final Cargo-derived
+version TSV hand off the committed checkout to later build steps. Do not
+re-check out `S` or rematerialize to reconstruct later job state.
 
-Any identity inconsistency, materializer failure, or unexpected changed path
-fails the step and stops later release operations. A failure during manifest
-updates may leave a partial runner-local worktree; discard it and rerun from
-the original exact target. Do not consume partial output as successful state.
+## Failures and history
 
-The materializer currently requires stable current crate versions. A target
-whose manifests already contain snapshot versions cannot yet be materialized
-again; prerelease-current-version lifecycle support is tracked separately in
-issue #364. Preparation propagates this failure. It does not strip suffixes,
-infer a pending version, or implement a second lifecycle model.
+Before a successful commit/push, a failed mutation may leave partial runner
+state; do not consume it as a successful handoff. Once `R` is recorded, preserve
+it even if downstream build, tag, draft or distribution fails. Stable baseline
+and reset intent remain on that branch, reaching main only through a published
+stable full-branch merge. Preparation and all prerelease processing leave main
+unchanged. No pre-publication patch back-commit is permitted.
+
+Recovery need not succeed for every failure. Reuse recorded state when safe;
+otherwise fail and let the operator explicitly abandon that version for a new
+version/tag. Never delete/move tags, reset branches, force-update, erase release
+commits or rewrite failed-attempt history. Do not delete recorded release
+branches as routine producer cleanup.
+
+A newly selected source with current prerelease crate versions is still subject
+to #364's existing materializer limitation. Recorded-state reuse bypasses a
+second bump; it does not introduce a prerelease lifecycle workaround.

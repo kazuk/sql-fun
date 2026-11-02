@@ -23,6 +23,20 @@ pub(in crate::ast) fn required<T>(value: Option<T>, field: &str) -> Result<T, An
     }
 }
 
+#[cfg(test)]
+mod test_required {
+    #[test]
+    fn preserves_value_and_reports_missing_field() {
+        assert_eq!(super::required(Some(42), "answer").unwrap(), 42);
+        assert!(
+            super::required::<i32>(None, "answer")
+                .unwrap_err()
+                .to_string()
+                .contains("answer")
+        );
+    }
+}
+
 fn nonempty(value: String) -> Option<String> {
     if value.is_empty() { None } else { Some(value) }
 }
@@ -39,6 +53,22 @@ impl TryFrom<syn::NodeListOpt> for Name {
     }
 }
 
+#[cfg(test)]
+mod test_name_from_nodes {
+    use crate::{ast::Name, syn::NodeListOpt, test_helpers::SynBuilder};
+
+    #[test]
+    fn rejects_non_string_name_components() {
+        let nodes = SynBuilder::new().as_node_list(&[crate::syn::Node::none()]);
+        assert!(Name::try_from(NodeListOpt::from(&nodes)).is_err());
+    }
+
+    #[test]
+    fn absent_list_is_an_empty_name() {
+        assert!(Name::try_from(NodeListOpt::none()).unwrap().0.is_empty());
+    }
+}
+
 impl From<&syn::RangeVar> for Name {
     fn from(value: &syn::RangeVar) -> Self {
         let mut parts = Vec::new();
@@ -50,6 +80,33 @@ impl From<&syn::RangeVar> for Name {
         }
         parts.push(value.get_relname());
         Self::from_parts(&parts)
+    }
+}
+
+#[cfg(test)]
+mod test_name_from_range_var {
+    use crate::{
+        ast::{FromOpt, Name},
+        sem::{FullName, LocalName},
+        syn::AliasOpt,
+        test_helpers::SynBuilder,
+    };
+
+    #[rstest::rstest]
+    #[case(FullName::new(&None, &None, &LocalName::from("items")))]
+    #[case(FullName::with_schema("app", "items"))]
+    #[case(FullName::with_catalog("catalog", "app", "items"))]
+    fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
+        let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
+        assert_eq!(Name::from(&source).full_name()?, expected);
+        let optional = Name::from_opt(Some(&source)).expect("present relation");
+        assert_eq!(optional.full_name()?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn absent_relation_remains_absent() {
+        assert!(Name::from_opt(None::<&crate::syn::RangeVar>).is_none());
     }
 }
 
@@ -104,7 +161,33 @@ impl ObjectTarget {
             AnalysisError::raise_unexpected_input("database object target")
         }
     }
+}
 
+#[cfg(test)]
+mod test_object_target {
+    use crate::{ast::ObjectTarget, syn::Opt, test_helpers::postgres_node};
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::unspecified("COMMENT ON FUNCTION app.f IS 'function'", None)]
+    #[case::no_arguments("COMMENT ON FUNCTION app.f() IS 'function'", Some(0))]
+    #[case::typed_arguments("COMMENT ON FUNCTION app.f(integer, text) IS 'function'", Some(2))]
+    fn distinguishes_unspecified_and_explicit_signatures(
+        #[case] sql: &str,
+        #[case] argument_count: Option<usize>,
+    ) {
+        let node = postgres_node(sql)
+            .as_comment_stmt()
+            .get_object()
+            .as_inner()
+            .unwrap();
+        let target = ObjectTarget::try_from_node(&node, &IVec::default()).unwrap();
+        assert_eq!(target.name, ["app", "f"]);
+        assert_eq!(target.argument_types.as_ref().map(Vec::len), argument_count);
+    }
+}
+
+impl ObjectTarget {
     fn try_from_cast_node(
         object: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
@@ -112,7 +195,9 @@ impl ObjectTarget {
         let cast = CastTarget::try_from_node(object, tokens)?;
         Ok(Self::with_cast(&cast))
     }
+}
 
+impl ObjectTarget {
     fn try_from_domain_constraint_node(
         object: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
@@ -120,7 +205,9 @@ impl ObjectTarget {
         let target = DomainConstraintTarget::try_from_node(object, tokens)?;
         Ok(Self::with_domain_constraint(&target))
     }
+}
 
+impl ObjectTarget {
     fn try_from_transform_node(
         object: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
@@ -128,7 +215,9 @@ impl ObjectTarget {
         let target = TransformTarget::try_from_node(object, tokens)?;
         Ok(Self::with_transform(&target))
     }
+}
 
+impl ObjectTarget {
     fn new(name: &[String], argument_types: Option<&[ObjectArgument]>) -> Self {
         Self {
             name: name.to_vec(),
@@ -139,7 +228,9 @@ impl ObjectTarget {
             transform: None,
         }
     }
+}
 
+impl ObjectTarget {
     fn with_type_name(type_name: &TypeName) -> Self {
         Self {
             name: type_name.name.0.clone(),
@@ -150,7 +241,9 @@ impl ObjectTarget {
             transform: None,
         }
     }
+}
 
+impl ObjectTarget {
     fn with_cast(cast: &CastTarget) -> Self {
         Self {
             name: Vec::new(),
@@ -161,7 +254,9 @@ impl ObjectTarget {
             transform: None,
         }
     }
+}
 
+impl ObjectTarget {
     fn with_domain_constraint(domain_constraint: &DomainConstraintTarget) -> Self {
         Self {
             name: Vec::new(),
@@ -172,7 +267,9 @@ impl ObjectTarget {
             transform: None,
         }
     }
+}
 
+impl ObjectTarget {
     fn with_transform(transform: &TransformTarget) -> Self {
         Self {
             name: Vec::new(),
@@ -205,7 +302,51 @@ impl ObjectArgument {
         };
         Ok(Self::new(None, None, type_name.as_ref()))
     }
+}
 
+#[cfg(test)]
+mod test_object_argument {
+    use crate::{
+        ast::ObjectArgument,
+        syn::{Node, NodeInner},
+        test_helpers::SynBuilder,
+    };
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::absent(None)]
+    #[case::none(Some("none"))]
+    #[case::mixed_case(Some("NoNe"))]
+    fn preserves_absent_argument_type(#[case] spelling: Option<&str>) {
+        let builder = SynBuilder::new();
+        let node = spelling.map_or_else(Node::none, |text| {
+            builder.as_string_node(builder.string(text))
+        });
+        let argument = ObjectArgument::try_from_node(&node, &IVec::default()).unwrap();
+        assert!(argument.type_name.is_none());
+        assert!(argument.name.is_none());
+        assert!(argument.mode.is_none());
+    }
+
+    #[test]
+    fn retains_qualified_type() {
+        let node = Node::from(NodeInner::from(
+            SynBuilder::new().type_name(&["app", "amount"]),
+        ));
+        let argument = ObjectArgument::try_from_node(&node, &IVec::default()).unwrap();
+        assert_eq!(argument.type_name.unwrap().name.0, ["app", "amount"]);
+    }
+
+    #[test]
+    #[should_panic(expected = "unexpected input object_with_args.objargs.type_name")]
+    fn rejects_non_type_argument() {
+        let builder = SynBuilder::new();
+        let node = builder.as_string_node(builder.string("integer"));
+        assert!(ObjectArgument::try_from_node(&node, &IVec::default()).is_err());
+    }
+}
+
+impl ObjectArgument {
     fn try_from_function_parameter(
         argument: &syn::FunctionParameter,
         tokens: &IVec<crate::syn::ScanToken>,
@@ -234,7 +375,48 @@ impl ObjectArgument {
             Some(&type_name),
         ))
     }
+}
 
+#[cfg(test)]
+mod test_object_function_parameter {
+    use crate::{
+        ast::ObjectArgument,
+        syn::{FunctionParameterMode, TypeNameOpt},
+        test_helpers::SynBuilder,
+    };
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::input(FunctionParameterMode::FuncParamIn, "IN")]
+    #[case::output(FunctionParameterMode::FuncParamOut, "OUT")]
+    #[case::inout(FunctionParameterMode::FuncParamInout, "INOUT")]
+    #[case::variadic(FunctionParameterMode::FuncParamVariadic, "VARIADIC")]
+    fn retains_mode_name_and_type(#[case] mode: FunctionParameterMode, #[case] expected: &str) {
+        let builder = SynBuilder::new();
+        let parameter = builder.function_parameter(
+            "value",
+            TypeNameOpt::from(builder.type_name(&["int4"])),
+            mode,
+        );
+        let argument =
+            ObjectArgument::try_from_function_parameter(&parameter, &IVec::default()).unwrap();
+        assert_eq!(argument.mode.as_deref(), Some(expected));
+        assert_eq!(argument.name.as_deref(), Some("value"));
+        assert_eq!(argument.type_name.unwrap().name.0, ["int4"]);
+    }
+
+    #[test]
+    fn rejects_missing_parameter_type() {
+        let parameter = SynBuilder::new().function_parameter(
+            "",
+            TypeNameOpt::none(),
+            FunctionParameterMode::FuncParamIn,
+        );
+        assert!(ObjectArgument::try_from_function_parameter(&parameter, &IVec::default()).is_err());
+    }
+}
+
+impl ObjectArgument {
     fn new(mode: Option<&str>, name: Option<&str>, type_name: Option<&TypeName>) -> Self {
         Self {
             mode: mode.map(str::to_owned),
@@ -269,7 +451,38 @@ impl CastTarget {
         let target = TypeName::try_from_with_tokens(&target, tokens)?;
         Ok(Self::new(&source, &target))
     }
+}
 
+#[cfg(test)]
+mod test_cast_target {
+    use crate::{ast::CastTarget, syn::Node, test_helpers::SynBuilder};
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    #[should_panic(expected = "unexpected input COMMENT ON")]
+    fn rejects_non_list_target() {
+        assert!(CastTarget::try_from_node(&Node::none(), &IVec::default()).is_err());
+    }
+
+    #[rstest::rstest]
+    #[case::empty(0)]
+    #[case::one(1)]
+    #[case::three(3)]
+    #[should_panic(expected = "unexpected input COMMENT ON")]
+    fn rejects_wrong_target_arity(#[case] count: usize) {
+        let node = SynBuilder::new().build_list_node(vec![Node::none(); count]);
+        assert!(CastTarget::try_from_node(&node, &IVec::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_first_component() {
+        let node = SynBuilder::new().build_list_node(vec![Node::none(), Node::none()]);
+        let error = CastTarget::try_from_node(&node, &IVec::default()).unwrap_err();
+        assert!(error.to_string().contains("comment_stmt.object"));
+    }
+}
+
+impl CastTarget {
     fn new(source: &TypeName, target: &TypeName) -> Self {
         Self {
             source: source.clone(),
@@ -300,7 +513,38 @@ impl DomainConstraintTarget {
         let domain = TypeName::try_from_with_tokens(&domain, tokens)?;
         Ok(Self::new(&domain, &constraint))
     }
+}
 
+#[cfg(test)]
+mod test_domain_constraint_target {
+    use crate::{ast::DomainConstraintTarget, syn::Node, test_helpers::SynBuilder};
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    #[should_panic(expected = "unexpected input COMMENT ON")]
+    fn rejects_non_list_target() {
+        assert!(DomainConstraintTarget::try_from_node(&Node::none(), &IVec::default()).is_err());
+    }
+
+    #[rstest::rstest]
+    #[case::empty(0)]
+    #[case::one(1)]
+    #[case::three(3)]
+    #[should_panic(expected = "unexpected input COMMENT ON")]
+    fn rejects_wrong_target_arity(#[case] count: usize) {
+        let node = SynBuilder::new().build_list_node(vec![Node::none(); count]);
+        assert!(DomainConstraintTarget::try_from_node(&node, &IVec::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_first_component() {
+        let node = SynBuilder::new().build_list_node(vec![Node::none(), Node::none()]);
+        let error = DomainConstraintTarget::try_from_node(&node, &IVec::default()).unwrap_err();
+        assert!(error.to_string().contains("comment_stmt.object"));
+    }
+}
+
+impl DomainConstraintTarget {
     fn new(domain: &TypeName, constraint: &str) -> Self {
         Self {
             domain: domain.clone(),
@@ -331,39 +575,43 @@ impl TransformTarget {
         let type_name = TypeName::try_from_with_tokens(&type_name, tokens)?;
         Ok(Self::new(&type_name, &language))
     }
+}
 
+#[cfg(test)]
+mod test_transform_target {
+    use crate::{ast::TransformTarget, syn::Node, test_helpers::SynBuilder};
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    #[should_panic(expected = "unexpected input COMMENT ON")]
+    fn rejects_non_list_target() {
+        assert!(TransformTarget::try_from_node(&Node::none(), &IVec::default()).is_err());
+    }
+
+    #[rstest::rstest]
+    #[case::empty(0)]
+    #[case::one(1)]
+    #[case::three(3)]
+    #[should_panic(expected = "unexpected input COMMENT ON")]
+    fn rejects_wrong_target_arity(#[case] count: usize) {
+        let node = SynBuilder::new().build_list_node(vec![Node::none(); count]);
+        assert!(TransformTarget::try_from_node(&node, &IVec::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_first_component() {
+        let node = SynBuilder::new().build_list_node(vec![Node::none(), Node::none()]);
+        let error = TransformTarget::try_from_node(&node, &IVec::default()).unwrap_err();
+        assert!(error.to_string().contains("comment_stmt.object"));
+    }
+}
+
+impl TransformTarget {
     fn new(type_name: &TypeName, language: &str) -> Self {
         Self {
             type_name: type_name.clone(),
             language: language.to_owned(),
         }
-    }
-}
-
-#[cfg(test)]
-mod test_name_from_range_var {
-    use crate::{
-        ast::{FromOpt, Name},
-        sem::{FullName, LocalName},
-        syn::AliasOpt,
-        test_helpers::SynBuilder,
-    };
-
-    #[rstest::rstest]
-    #[case(FullName::new(&None, &None, &LocalName::from("items")))]
-    #[case(FullName::with_schema("app", "items"))]
-    #[case(FullName::with_catalog("catalog", "app", "items"))]
-    fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
-        let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
-        assert_eq!(Name::from(&source).full_name()?, expected);
-        let optional = Name::from_opt(Some(&source)).expect("present relation");
-        assert_eq!(optional.full_name()?, expected);
-        Ok(())
-    }
-
-    #[test]
-    fn absent_relation_remains_absent() {
-        assert!(Name::from_opt(None::<&crate::syn::RangeVar>).is_none());
     }
 }
 
@@ -652,6 +900,53 @@ impl TryFromWithTokens<&syn::CommentStmt> for Comment {
     }
 }
 
+#[cfg(test)]
+mod test_comment_target_conversion {
+    use crate::{
+        ast::{Comment, TryFromWithTokens},
+        syn::Opt,
+        test_helpers::postgres_node,
+    };
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    fn preserves_cast_source_and_target_types() {
+        let node = postgres_node("COMMENT ON CAST (app.source AS app.target) IS 'conversion'")
+            .as_comment_stmt()
+            .as_inner()
+            .unwrap();
+        let comment = Comment::try_from_with_tokens(&node, &IVec::default()).unwrap();
+        let cast = comment.target.cast.unwrap();
+        assert_eq!(cast.source.name.0, ["app", "source"]);
+        assert_eq!(cast.target.name.0, ["app", "target"]);
+    }
+
+    #[test]
+    fn preserves_domain_constraint_identity() {
+        let node =
+            postgres_node("COMMENT ON CONSTRAINT positive ON DOMAIN app.amount IS 'constraint'")
+                .as_comment_stmt()
+                .as_inner()
+                .unwrap();
+        let comment = Comment::try_from_with_tokens(&node, &IVec::default()).unwrap();
+        let target = comment.target.domain_constraint.unwrap();
+        assert_eq!(target.domain.name.0, ["app", "amount"]);
+        assert_eq!(target.constraint, "positive");
+    }
+
+    #[test]
+    fn preserves_transform_type_and_language() {
+        let node = postgres_node("COMMENT ON TRANSFORM FOR app.amount LANGUAGE sql IS 'transform'")
+            .as_comment_stmt()
+            .as_inner()
+            .unwrap();
+        let comment = Comment::try_from_with_tokens(&node, &IVec::default()).unwrap();
+        let target = comment.target.transform.unwrap();
+        assert_eq!(target.type_name.name.0, ["app", "amount"]);
+        assert_eq!(target.language, "sql");
+    }
+}
+
 impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
     type Error = AnalysisError;
 
@@ -660,16 +955,8 @@ impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         let sequence = required(value.get_sequence().as_inner(), "alter_seq.sequence")?;
-        let mut parts = Vec::new();
-        if let Some(catalog) = nonempty(sequence.get_catalogname()) {
-            parts.push(catalog);
-        }
-        if let Some(schema) = nonempty(sequence.get_schemaname()) {
-            parts.push(schema);
-        }
-        parts.push(sequence.get_relname());
         Ok(Self::new(
-            Name::from_parts(&parts),
+            Name::from(&sequence),
             SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
             value.get_for_identity(),
             value.get_missing_ok(),
@@ -712,16 +999,8 @@ impl TryFromWithTokens<&syn::CreateSeqStmt> for Sequence {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         let sequence = required(value.get_sequence().as_inner(), "create_seq.sequence")?;
-        let mut parts = Vec::new();
-        if let Some(catalog) = nonempty(sequence.get_catalogname()) {
-            parts.push(catalog);
-        }
-        if let Some(schema) = nonempty(sequence.get_schemaname()) {
-            parts.push(schema);
-        }
-        parts.push(sequence.get_relname());
         Ok(Self::new(
-            Name::from_parts(&parts),
+            Name::from(&sequence),
             SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
             value.get_owner_id(),
             value.get_for_identity(),
@@ -816,20 +1095,12 @@ impl TryFromWithTokens<&syn::ViewStmt> for View {
             value.get_query().as_select_stmt().as_inner(),
             "view_stmt.query",
         )?;
-        let mut parts = Vec::new();
-        if let Some(catalog) = nonempty(view.get_catalogname()) {
-            parts.push(catalog);
-        }
-        if let Some(schema) = nonempty(view.get_schemaname()) {
-            parts.push(schema);
-        }
-        parts.push(view.get_relname());
         let mut aliases = Vec::new();
         for alias in value.get_aliases().as_inner().unwrap_or_default() {
             aliases.push(required(alias.as_string().get_sval(), "view alias")?);
         }
         Ok(Self::new(
-            Name::from_parts(&parts),
+            Name::from(&view),
             aliases,
             Query::try_from_with_tokens(&query, tokens)?,
             value.get_replace(),
@@ -852,17 +1123,6 @@ impl From<Option<syn::ViewCheckOption>> for ViewCheckOption {
             | Some(syn::ViewCheckOption::OptionNone)
             | None => Self::None,
         }
-    }
-}
-
-impl Name {
-    #[deprecated = "use try_from"]
-    pub(in crate::ast) fn postgres(nodes: syn::NodeListOpt) -> Result<Self, AnalysisError> {
-        let mut parts = Vec::new();
-        for node in nodes.as_inner().unwrap_or_default() {
-            parts.push(required(node.as_string().get_sval(), "name component")?);
-        }
-        Ok(Self::from_parts(&parts))
     }
 }
 
@@ -1421,42 +1681,6 @@ impl TryFromWithTokensOpt<syn::Node> for Expr {
     }
 }
 
-impl Expr {
-    #[deprecated = "use try_from_with_tokens"]
-    pub(crate) fn postgres_function(
-        value: &syn::FuncCall,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Call(Box::new(Call::try_from_with_tokens(
-            value, tokens,
-        )?)))
-    }
-
-    #[deprecated = "use try_from_with_tokens"]
-    pub(crate) fn postgres(
-        node: &syn::Node,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Self::try_from_with_tokens(node, tokens)
-    }
-
-    #[deprecated = "use try_from_with_tokens_opt"]
-    pub(in crate::ast) fn postgres_optional(
-        node: syn::Node,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Option<Self>, AnalysisError> {
-        Self::try_from_with_tokens_opt(node, tokens)
-    }
-
-    #[deprecated = "use try_collect_from_with_token"]
-    pub(in crate::ast) fn postgres_list(
-        nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
-        Self::try_collect_from_with_tokens(nodes, tokens)
-    }
-}
-
 impl From<&syn::AConst> for Literal {
     fn from(value: &syn::AConst) -> Self {
         if let Some(value) = value.as_ival().get_ival() {
@@ -1472,13 +1696,6 @@ impl From<&syn::AConst> for Literal {
         } else {
             Self::Null
         }
-    }
-}
-
-impl Literal {
-    #[deprecated = "use from"]
-    pub(in crate::ast) fn postgres(value: &syn::AConst) -> Self {
-        Self::from(value)
     }
 }
 
@@ -1506,13 +1723,6 @@ impl TryFrom<syn::AExprKind> for OperatorKind {
     }
 }
 
-impl OperatorKind {
-    #[deprecated = "use try_from"]
-    pub(in crate::ast) fn postgres(kind: syn::AExprKind) -> Result<Self, AnalysisError> {
-        Self::try_from(kind)
-    }
-}
-
 impl TryFrom<syn::BoolExprType> for BooleanOperator {
     type Error = AnalysisError;
 
@@ -1523,13 +1733,6 @@ impl TryFrom<syn::BoolExprType> for BooleanOperator {
             syn::BoolExprType::NotExpr => Ok(Self::Not),
             _ => AnalysisError::raise_unexpected_input("boolean operator"),
         }
-    }
-}
-
-impl BooleanOperator {
-    #[deprecated = "use try_from"]
-    pub(in crate::ast) fn postgres(kind: syn::BoolExprType) -> Result<Self, AnalysisError> {
-        Self::try_from(kind)
     }
 }
 
@@ -1547,13 +1750,6 @@ impl TryFrom<syn::SubLinkType> for SubqueryKind {
             syn::SubLinkType::ArraySublink => Ok(Self::Array),
             _ => AnalysisError::raise_unexpected_input("subquery kind"),
         }
-    }
-}
-
-impl SubqueryKind {
-    #[deprecated = "use try_from"]
-    pub(in crate::ast) fn postgres(kind: syn::SubLinkType) -> Result<Self, AnalysisError> {
-        Self::try_from(kind)
     }
 }
 
@@ -1583,13 +1779,28 @@ impl TryFromWithTokens<&syn::TypeName> for TypeName {
     }
 }
 
-impl TypeName {
-    #[deprecated = "use try_from_with_tokens"]
-    pub(in crate::ast) fn postgres(
-        value: &syn::TypeName,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Self::try_from_with_tokens(value, tokens)
+#[cfg(test)]
+mod test_type_name_conversion {
+    use crate::{
+        ast::{TryFromWithTokens, TypeName},
+        syn::Opt,
+        test_helpers::postgres_expression,
+    };
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    fn preserves_modifiers_and_array_dimensions() {
+        let node = postgres_expression("NULL::numeric(8, 2)[3][]")
+            .as_type_cast()
+            .get_type_name()
+            .as_inner()
+            .unwrap();
+        let name = TypeName::try_from_with_tokens(&node, &IVec::default()).unwrap();
+        assert_eq!(name.name.0, ["pg_catalog", "numeric"]);
+        assert_eq!(name.array_bounds, [Some(3), None]);
+        assert_eq!(name.modifiers.len(), 2);
+        assert!(!name.set_of);
+        assert!(!name.percent_type);
     }
 }
 
@@ -1692,6 +1903,36 @@ fn call_argument_span(node: &syn::Node, tokens: &IVec<syn::ScanToken>) -> Option
     None
 }
 
+#[cfg(test)]
+mod test_call_argument_span {
+    use crate::{PostgresDialect, test_helpers::postgres_expression};
+
+    #[rstest::rstest]
+    #[case::column("column_name", Some("column_name"))]
+    #[case::parameter("$1", Some("$1"))]
+    #[case::call("f(1)", Some("f"))]
+    #[case::operator("1 + 2", Some("+"))]
+    #[case::cast("1::int", Some("::"))]
+    #[case::array("ARRAY[1]", Some("ARRAY"))]
+    #[case::row("ROW(1)", Some("ROW"))]
+    #[case::case("CASE WHEN true THEN 1 END", Some("CASE"))]
+    #[case::literal("42", None)]
+    fn uses_parser_anchor(#[case] expression: &str, #[case] expected: Option<&str>) {
+        let sql = format!("SELECT {expression}");
+        let tokens = PostgresDialect::scan(&sql).unwrap();
+        let node = postgres_expression(expression);
+        let span = super::call_argument_span(&node, &tokens);
+        let text = if let Some(span) = span {
+            span.get_from(&sql)
+        } else {
+            None
+        };
+        assert_eq!(text, expected);
+        assert!(super::call_argument_token_span(-1, &tokens).is_none());
+        assert!(super::call_argument_token_span(sql.len() as i32, &tokens).is_none());
+    }
+}
+
 impl TryFromWithTokens<&syn::FuncCall> for Call {
     type Error = AnalysisError;
 
@@ -1750,14 +1991,6 @@ impl Call {
             within_order: Vec::new(),
         }
     }
-
-    #[deprecated = "use try_from_with_tokens"]
-    pub(in crate::ast) fn postgres(
-        value: &syn::FuncCall,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Self::try_from_with_tokens(value, tokens)
-    }
 }
 
 impl TryCollectFromWithTokens<syn::NodeListOpt> for Access {
@@ -1766,34 +1999,124 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Access {
         nodes: syn::NodeListOpt,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
-        let mut items = Vec::new();
-        for node in nodes.as_inner().unwrap_or_default() {
-            items.push(if let Some(indices) = node.as_a_indices().as_inner() {
-                if indices.get_is_slice() {
-                    Self::Slice(Slice {
-                        lower: Expr::try_from_with_tokens_opt(indices.get_lidx(), tokens)?,
-                        upper: Expr::try_from_with_tokens_opt(indices.get_uidx(), tokens)?,
-                    })
-                } else {
-                    Self::Index(Expr::try_from_with_tokens(&indices.get_uidx(), tokens)?)
-                }
-            } else if node.is_a_star() {
-                Self::Star
-            } else {
-                Self::Field(required(node.as_string().get_sval(), "field name")?)
-            });
-        }
-        Ok(items)
+        nodes
+            .as_inner()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|node| Self::try_from_with_tokens(&node, tokens))
+            .collect()
     }
 }
 
-impl Access {
-    #[deprecated = "use try_collect_from_with_tokens"]
-    pub(in crate::ast) fn postgres_list(
-        nodes: syn::NodeListOpt,
+impl TryFromWithTokens<&syn::AIndices> for Slice {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        indices: &syn::AIndices,
         tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
-        Self::try_collect_from_with_tokens(nodes, tokens)
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            lower: Expr::try_from_with_tokens_opt(indices.get_lidx(), tokens)?,
+            upper: Expr::try_from_with_tokens_opt(indices.get_uidx(), tokens)?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::Node> for Access {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        node: &syn::Node,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        if let Some(indices) = node.as_a_indices().as_inner() {
+            if indices.get_is_slice() {
+                Ok(Self::Slice(Slice::try_from_with_tokens(&indices, tokens)?))
+            } else {
+                Ok(Self::Index(Expr::try_from_with_tokens(
+                    &indices.get_uidx(),
+                    tokens,
+                )?))
+            }
+        } else if node.is_a_star() {
+            Ok(Self::Star)
+        } else {
+            Ok(Self::Field(required(
+                node.as_string().get_sval(),
+                "field name",
+            )?))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_access_conversion {
+    use crate::{
+        ast::{Access, TryFromWithTokens},
+        syn::{ListOpt, Node},
+        test_helpers::postgres_expression,
+    };
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::closed("(items)[1:3]", true, true)]
+    #[case::open_lower("(items)[:3]", false, true)]
+    #[case::open_upper("(items)[1:]", true, false)]
+    #[case::open_both("(items)[:]", false, false)]
+    fn preserves_slice_bounds(#[case] sql: &str, #[case] lower: bool, #[case] upper: bool) {
+        let node = postgres_expression(sql)
+            .as_a_indirection()
+            .get_indirection()
+            .get(0);
+        let Access::Slice(slice) = Access::try_from_with_tokens(&node, &IVec::default()).unwrap()
+        else {
+            panic!("slice")
+        };
+        assert_eq!(slice.lower.is_some(), lower);
+        assert_eq!(slice.upper.is_some(), upper);
+    }
+
+    #[test]
+    fn preserves_index_expression() {
+        let node = postgres_expression("(items)[2]")
+            .as_a_indirection()
+            .get_indirection()
+            .get(0);
+        let access = Access::try_from_with_tokens(&node, &IVec::default()).unwrap();
+        assert!(matches!(
+            access,
+            Access::Index(crate::ast::Expr::Literal(crate::ast::Literal::Integer(2)))
+        ));
+    }
+
+    #[test]
+    fn preserves_field_name() {
+        let node = postgres_expression("(item).field")
+            .as_a_indirection()
+            .get_indirection()
+            .get(0);
+        let Access::Field(name) = Access::try_from_with_tokens(&node, &IVec::default()).unwrap()
+        else {
+            panic!("field access")
+        };
+        assert_eq!(name, "field");
+    }
+
+    #[test]
+    fn preserves_star() {
+        let node = postgres_expression("(item).*")
+            .as_a_indirection()
+            .get_indirection()
+            .get(0);
+        assert!(matches!(
+            Access::try_from_with_tokens(&node, &IVec::default()).unwrap(),
+            Access::Star
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_field() {
+        assert!(Access::try_from_with_tokens(&Node::none(), &IVec::default()).is_err());
     }
 }
 
@@ -1830,10 +2153,38 @@ impl TryFrom<&syn::SqlValueFunction> for SqlValue {
     }
 }
 
-impl SqlValue {
-    #[deprecated = "use SqlValue::try_from"]
-    pub(in crate::ast) fn postgres(value: &syn::SqlValueFunction) -> Result<Self, AnalysisError> {
-        Self::try_from(value)
+#[cfg(test)]
+mod test_sql_value_conversion {
+    use crate::{ast::SqlValue, syn::Opt, test_helpers::postgres_expression};
+
+    #[rstest::rstest]
+    #[case("current_date", "current_date", None)]
+    #[case("current_time", "current_time", None)]
+    #[case("current_time(2)", "current_time", Some(2))]
+    #[case("current_timestamp", "current_timestamp", None)]
+    #[case("current_timestamp(3)", "current_timestamp", Some(3))]
+    #[case("localtime", "localtime", None)]
+    #[case("localtime(0)", "localtime", Some(0))]
+    #[case("localtimestamp", "localtimestamp", None)]
+    #[case("localtimestamp(6)", "localtimestamp", Some(6))]
+    #[case("current_role", "current_role", None)]
+    #[case("current_user", "current_user", None)]
+    #[case("user", "user", None)]
+    #[case("session_user", "session_user", None)]
+    #[case("current_catalog", "current_catalog", None)]
+    #[case("current_schema", "current_schema", None)]
+    fn preserves_name_and_explicit_precision(
+        #[case] sql: &str,
+        #[case] name: &str,
+        #[case] precision: Option<i32>,
+    ) {
+        let node = postgres_expression(sql)
+            .as_sqlvalue_function()
+            .as_inner()
+            .unwrap();
+        let value = SqlValue::try_from(&node).unwrap();
+        assert_eq!(value.name, name);
+        assert_eq!(value.precision, precision);
     }
 }
 
@@ -1848,13 +2199,6 @@ impl From<&syn::Node> for Option<Literal> {
         } else {
             node.as_boolean().get_boolval().map(Literal::Boolean)
         }
-    }
-}
-
-impl Literal {
-    #[deprecated = "use Option::<Literal>::from"]
-    fn postgres_option(node: &syn::Node) -> Option<Self> {
-        Option::<Self>::from(node)
     }
 }
 
@@ -1880,16 +2224,6 @@ impl TryFromWithTokens<&syn::CaseExpr> for Expr {
     }
 }
 
-impl Expr {
-    #[deprecated = "use try_from_with_tokens"]
-    pub(crate) fn postgres_case(
-        case: &syn::CaseExpr,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Self::try_from_with_tokens(case, tokens)
-    }
-}
-
 impl TryFromWithTokens<&syn::CoalesceExpr> for Expr {
     type Error = AnalysisError;
 
@@ -1901,15 +2235,5 @@ impl TryFromWithTokens<&syn::CoalesceExpr> for Expr {
             "coalesce",
             Self::try_collect_from_with_tokens(value.get_args(), tokens)?,
         ))))
-    }
-}
-
-impl Expr {
-    #[deprecated = "use try_from_with_tokens"]
-    pub(crate) fn postgres_coalesce(
-        value: &syn::CoalesceExpr,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Self::try_from_with_tokens(value, tokens)
     }
 }

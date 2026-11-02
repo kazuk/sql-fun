@@ -1,6 +1,6 @@
 [package]
 name = "sql-fun-core"
-version = "0.1.1"
+version = "0.2.0-snapshot33102"
 edition = "2024"
 license = "MIT"
 description = "common dependencies for sql-fun"

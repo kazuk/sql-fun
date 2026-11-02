@@ -2,7 +2,7 @@
 [package]
 name = "sql-fun"
 license = "MIT"
-version = "0.1.0"
+version = "0.1.1-snapshot33102"
 edition = "2024"
 authors = ["kazuk"]
 description = "SQL query/statement execution code generator"
@@ -130,12 +130,12 @@ sha2 = "0.11"
 sha256 = "1.6.0"
 shellexpand = "3.1"
 smallvec = "1.15"
-sql-fun = { path = ".", version = "0.1.0" }
-sql-fun-client = { path = "./sql-fun-client", version = "0.1.0" }
-sql-fun-codegen = { path = "./sql-fun-codegen", version = "0.1.0" }
-sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
-sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
-sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
+sql-fun = { path = ".", version = "0.1.1-snapshot33102" }
+sql-fun-client = { path = "./sql-fun-client", version = "0.2.0-snapshot33102" }
+sql-fun-codegen = { path = "./sql-fun-codegen", version = "0.1.1-snapshot33102" }
+sql-fun-core = { path = "./sql-fun-core", version = "0.2.0-snapshot33102" }
+sql-fun-server-api = { path = "sql-fun-server-api", version = "0.2.0-snapshot33102" }
+sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.2.0-snapshot33102", features = [] }
 stacker = "0.1.23"
 syn = { version = "3.0", features = ["extra-traits", "full", "visit"] }
 sysinfo = "0.38.4"

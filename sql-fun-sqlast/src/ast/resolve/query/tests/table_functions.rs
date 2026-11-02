@@ -248,7 +248,7 @@ fn retains_failed_or_ambiguous_binding(#[case] sql: &str, #[case] ambiguous: boo
         ambiguous: bool,
         found: bool,
     }
-    impl crate::sem::traversal::SemanticVisitor for BindingFailure {
+    impl crate::sem::traversal::SemanticVisitorMut for BindingFailure {
         fn expression(
             &mut self,
             value: &mut SemScalarExpr,
@@ -515,7 +515,7 @@ fn retains_and_interprets_record_typmods(
         expected: i32,
         found: bool,
     }
-    impl crate::sem::traversal::SemanticVisitor for Modifiers {
+    impl crate::sem::traversal::SemanticVisitorMut for Modifiers {
         fn expression(
             &mut self,
             value: &mut SemScalarExpr,

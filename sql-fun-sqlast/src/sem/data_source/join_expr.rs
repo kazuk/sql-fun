@@ -220,7 +220,7 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -239,6 +239,29 @@ impl JoinExprDataSource {
         if let Some(value) = &self.qualifications {
             visitor.predicate(value);
         }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.enter_join();
+        self.left.visit(visitor)?;
+        visitor.join_right();
+        self.right.visit(visitor)?;
+        visitor.access_join(self);
+        visitor.leave_join(
+            self.using_clause
+                .as_ref()
+                .map_or(&[], |using| using.using_columns.as_slice()),
+            self.natural,
+            self.alias.as_ref(),
+        );
+        crate::sem::traversal::visit_optional(&self.qualifications, visitor)?;
+        if let Some(value) = &self.qualifications {
+            visitor.predicate(value);
+        }
+        visitor.leave_access_join();
         Ok(())
     }
 }
@@ -294,7 +317,17 @@ impl JoinExprDataSource {
     ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
         let original_left = self.left.projection_names(context, with, None)?;
         let original_right = self.right.projection_names(context, with, None)?;
-        let merged = self.merged_projection_names(&original_left, &original_right);
+        let layout = self.projection_layout(
+            context.dialect(),
+            &original_left
+                .iter()
+                .map(|column| column.name().clone())
+                .collect::<Vec<_>>(),
+            &original_right
+                .iter()
+                .map(|column| column.name().clone())
+                .collect::<Vec<_>>(),
+        );
         let left = original_left
             .iter()
             .cloned()
@@ -305,104 +338,77 @@ impl JoinExprDataSource {
             .cloned()
             .map(|column| column.with_nullability(self.kind.right_nullable(false)))
             .collect::<Vec<_>>();
-        if merged.is_empty() {
-            return Ok(left.into_iter().chain(right).collect());
-        }
-        if context.dialect() == crate::ast::Dialect::postgres() {
-            Ok(self.postgres_projection(&original_left, &original_right, left, right, &merged))
-        } else {
-            Ok(self.sqlite_projection(&original_left, &original_right, left, right, &merged))
-        }
+        Ok(layout.project(&left, &right, |left, right| {
+            super::ProjectionColumn::merged(&original_left[left], &original_right[right])
+        }))
     }
 
-    fn merged_projection_names(
+    pub(crate) const fn alias(&self) -> Option<&AliasSpec> {
+        self.alias.as_ref()
+    }
+
+    // The same semantic output wiring serves column binding and access lineage.
+    // No catalog lookup, type solving or expression interpretation occurs here.
+    pub(crate) fn projection_layout(
         &self,
-        left: &[super::ProjectionColumn<'_>],
-        right: &[super::ProjectionColumn<'_>],
-    ) -> Vec<ColumnName> {
-        if let Some(using) = &self.using_clause {
+        dialect: crate::ast::Dialect,
+        left: &[ColumnName],
+        right: &[ColumnName],
+    ) -> JoinProjection {
+        let keys = if let Some(using) = &self.using_clause {
             using.using_columns.clone()
         } else if self.natural {
             left.iter()
-                .filter(|column| right.iter().any(|other| column.name() == other.name()))
-                .map(|column| column.name().clone())
+                .filter(|name| right.contains(name))
+                .cloned()
                 .collect()
         } else {
             Vec::new()
-        }
-    }
-
-    fn full_join_key<'a>(
-        name: &ColumnName,
-        left: &[super::ProjectionColumn<'a>],
-        right: &[super::ProjectionColumn<'a>],
-    ) -> Option<super::ProjectionColumn<'a>> {
-        let left = left.iter().find(|column| column.name() == name)?;
-        let right = right.iter().find(|column| column.name() == name)?;
-        Some(super::ProjectionColumn::merged(left, right))
-    }
-
-    fn postgres_projection<'a>(
-        &self,
-        original_left: &[super::ProjectionColumn<'a>],
-        original_right: &[super::ProjectionColumn<'a>],
-        left: Vec<super::ProjectionColumn<'a>>,
-        right: Vec<super::ProjectionColumn<'a>>,
-        merged: &[ColumnName],
-    ) -> Vec<super::ProjectionColumn<'a>> {
-        let mut columns = Vec::new();
-        for name in merged {
-            let key = if self.kind.is_full() {
-                Self::full_join_key(name, original_left, original_right)
-            } else {
-                let source = if self.kind.uses_right_join_column() {
-                    &right
-                } else {
-                    &left
-                };
-                source.iter().find(|column| column.name() == name).cloned()
-            };
-            if let Some(key) = key {
-                columns.push(key);
-            }
-        }
-        columns.extend(
-            left.into_iter()
-                .filter(|column| !merged.contains(column.name())),
-        );
-        columns.extend(
-            right
-                .into_iter()
-                .filter(|column| !merged.contains(column.name())),
-        );
-        columns
-    }
-
-    fn sqlite_projection<'a>(
-        &self,
-        original_left: &[super::ProjectionColumn<'a>],
-        original_right: &[super::ProjectionColumn<'a>],
-        left: Vec<super::ProjectionColumn<'a>>,
-        right: Vec<super::ProjectionColumn<'a>>,
-        merged: &[ColumnName],
-    ) -> Vec<super::ProjectionColumn<'a>> {
-        let mut columns = Vec::new();
-        for column in left {
-            if self.kind.is_full() && merged.contains(column.name()) {
-                if let Some(key) = Self::full_join_key(column.name(), original_left, original_right)
-                {
-                    columns.push(key);
+        };
+        let mut output = Vec::new();
+        if dialect == crate::ast::Dialect::postgres() {
+            for name in &keys {
+                let left_index = left.iter().position(|column| column == name);
+                let right_index = right.iter().position(|column| column == name);
+                if self.kind.is_full() {
+                    if let (Some(left), Some(right)) = (left_index, right_index) {
+                        output.push(JoinColumnInput::both(left, right));
+                    }
+                } else if self.kind.uses_right_join_column() {
+                    if let Some(right) = right_index {
+                        output.push(JoinColumnInput::right(right));
+                    }
+                } else if let Some(left) = left_index {
+                    output.push(JoinColumnInput::left(left));
                 }
-            } else {
-                columns.push(column);
+            }
+            output.extend(
+                left.iter()
+                    .enumerate()
+                    .filter(|(_, name)| !keys.contains(name))
+                    .map(|(index, _)| JoinColumnInput::left(index)),
+            );
+        } else {
+            for (index, name) in left.iter().enumerate() {
+                if self.kind.is_full() && keys.contains(name) {
+                    if let Some(left) = left.iter().position(|column| column == name)
+                        && let Some(right) = right.iter().position(|column| column == name)
+                    {
+                        output.push(JoinColumnInput::both(left, right));
+                    }
+                } else {
+                    output.push(JoinColumnInput::left(index));
+                }
             }
         }
-        columns.extend(
+        output.extend(
             right
-                .into_iter()
-                .filter(|column| !merged.contains(column.name())),
+                .iter()
+                .enumerate()
+                .filter(|(_, name)| !keys.contains(name))
+                .map(|(index, _)| JoinColumnInput::right(index)),
         );
-        columns
+        JoinProjection { keys, output }
     }
 }
 
@@ -414,5 +420,50 @@ impl JoinExprDataSource {
     ) -> Result<Vec<ColumnName>, crate::sem::AnalysisError> {
         let columns = self.project(context, with, None)?;
         Ok(super::projection::ProjectionColumns::from(columns).names())
+    }
+}
+
+/// SQL output positions and the input positions contributing to each one.
+pub(crate) struct JoinProjection {
+    keys: Vec<ColumnName>,
+    output: Vec<JoinColumnInput>,
+}
+impl JoinProjection {
+    pub(crate) const fn keys(&self) -> &[ColumnName] {
+        self.keys.as_slice()
+    }
+    pub(crate) fn project<T: Clone>(
+        &self,
+        left: &[T],
+        right: &[T],
+        merge: impl Fn(usize, usize) -> T,
+    ) -> Vec<T> {
+        self.output
+            .iter()
+            .map(|input| input.project(left, right, &merge))
+            .collect()
+    }
+}
+enum JoinColumnInput {
+    Left(usize),
+    Right(usize),
+    Both(usize, usize),
+}
+impl JoinColumnInput {
+    const fn left(index: usize) -> Self {
+        Self::Left(index)
+    }
+    const fn right(index: usize) -> Self {
+        Self::Right(index)
+    }
+    const fn both(left: usize, right: usize) -> Self {
+        Self::Both(left, right)
+    }
+    fn project<T: Clone>(&self, left: &[T], right: &[T], merge: &impl Fn(usize, usize) -> T) -> T {
+        match self {
+            Self::Left(index) => left[*index].clone(),
+            Self::Right(index) => right[*index].clone(),
+            Self::Both(left, right) => merge(*left, *right),
+        }
     }
 }

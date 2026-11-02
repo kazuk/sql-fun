@@ -36,7 +36,6 @@ pub(super) fn statement(
         Collection::completed(bindings),
         Collection::completed(outputs),
         Collection::completed(Vec::new()),
-        Collection::completed(Vec::new()),
     )
 }
 

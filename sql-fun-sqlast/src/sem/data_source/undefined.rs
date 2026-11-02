@@ -70,7 +70,7 @@ impl UndefinedTableFuncDataSource {
 }
 
 impl UndefinedTableFuncDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -79,6 +79,15 @@ impl UndefinedTableFuncDataSource {
             argument.walk(visitor)?;
         }
         self.args = args.into();
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for argument in self.args.iter() {
+            argument.visit(visitor)?;
+        }
         Ok(())
     }
 }

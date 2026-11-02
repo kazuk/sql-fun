@@ -597,3 +597,93 @@ async fn query_rpc_rejects_invalid_request_shape(#[case] params: &str) {
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn access_analysis_is_opt_in_and_uses_the_single_paged_collection() {
+    let project = query_project();
+    let mut connection = heavy::Connection::start(16384, 2).await;
+    connection.authenticate().await;
+    let initialized = connection
+        .rpc(
+            "initialize_schema_context",
+            &project.rpc_request("CREATE TABLE entries(id int4, value int4);"),
+        )
+        .await;
+    let handle = &initialized["result"]["context_handle"];
+    for option in [None, Some(false), Some(true)] {
+        let mut request = json!({"context_handle":handle,"query":{"Text":"SELECT id FROM entries WHERE id = 1; SELECT 1"}});
+        if let Some(option) = option {
+            request["analyze_access"] = option.into();
+        }
+        let response = connection.rpc("analyze_query", &request).await;
+        let items = response["result"]["queries"]["items"].as_array().unwrap();
+        assert!(items[0].get("accessing_relations").is_none());
+        assert_eq!(items[1]["column_access"]["total_length"], 0);
+        let collection = &items[0]["column_access"];
+        assert_eq!(
+            collection["total_length"],
+            if option == Some(true) { 3 } else { 0 },
+            "{response}"
+        );
+        if option == Some(true) {
+            let first = connection
+                .rpc(
+                    "read_collection",
+                    &json!({"collection_handle":collection["handle"], "start_offset":0, "count":2}),
+                )
+                .await;
+            assert_eq!(first["result"]["items"].as_array().unwrap().len(), 2);
+            let page = connection
+                .rpc(
+                    "read_collection",
+                    &json!({"collection_handle":collection["handle"],"start_offset":2,"count":2}),
+                )
+                .await;
+            assert_eq!(page["result"]["items"][0]["access_kind"], "SelectOutput");
+            for access in first["result"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .chain(page["result"]["items"].as_array().unwrap())
+            {
+                assert_eq!(access.as_object().unwrap().len(), 4);
+                assert_eq!(
+                    access["relation"],
+                    json!({"catalog":null,"schema":"public","name":"entries"})
+                );
+                assert_eq!(access["relation_kind"], "Table");
+            }
+        }
+        connection
+            .rpc(
+                "release_collection",
+                &json!({"collection_handle":collection["handle"]}),
+            )
+            .await;
+        let read = connection
+            .rpc(
+                "read_collection",
+                &json!({"collection_handle":collection["handle"],"start_offset":0,"count":null}),
+            )
+            .await;
+        assert_eq!(read["error"]["data"], "InvalidCollectionHandle");
+    }
+    let response = connection.rpc("analyze_query", &json!({"context_handle":handle,"analyze_access":true,"query":{"Text":"SELECT id FROM chosen"},"resolved_cte_catalog":catalog(&[("chosen", "SELECT id FROM entries")])})).await;
+    let item = &response["result"]["queries"]["items"][0];
+    assert_eq!(item["column_access"]["total_length"], 3, "{response}");
+    assert!(
+        item["column_access"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|access| access["relation"]["name"] == "entries")
+    );
+    // An unresolved parameter domain prevents code generation, but cannot erase
+    // already resolved SQL accesses.
+    let response = connection.rpc("analyze_query", &json!({"context_handle":handle,"analyze_access":true,"query":{"Text":"SELECT id, $1 FROM entries"}})).await;
+    let item = &response["result"]["queries"]["items"][0];
+    assert_eq!(item["complete"], false, "{response}");
+    assert_eq!(item["column_access"]["total_length"], 2, "{response}");
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}

@@ -10,7 +10,7 @@ pub(crate) use self::destination::InsertDestination;
 pub use self::view_support::ViewInsertSupport;
 
 use crate::ast::TryFromWithTokens;
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AnalysisError, AnalysisProblem, ColumnDefinition, ParseContext, QueryCte,
     ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TableName, TypeReference,
@@ -124,7 +124,7 @@ impl InsertStatement {
     ) -> Result<(), AnalysisError> {
         self.walk(&mut AssignmentChecker { context })
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -134,7 +134,17 @@ impl InsertStatement {
         visitor.leave_query();
         result
     }
-    fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.relation_identity(self.target().full_name());
+        visitor.enter_query();
+        let result = self.visit_body(visitor);
+        visitor.leave_query();
+        result
+    }
+    fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.table_binding(&mut self.target);
         for entry in &mut self.with {
             entry.walk(visitor)?;
@@ -144,6 +154,27 @@ impl InsertStatement {
             conflict.walk(visitor)?;
         }
         self.returning.walk(visitor)
+    }
+    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_action(
+            self.target.full_name(),
+            crate::sem::AccessKind::insert_rows(),
+        );
+        visitor.access_purpose(crate::sem::AccessKind::insert_input());
+        visitor.table_binding(&self.target);
+        for entry in &self.with {
+            entry.visit(visitor)?;
+        }
+        self.source.visit(visitor, self.columns.as_slice())?;
+        visitor.access_purpose(crate::sem::AccessKind::insert_conflict());
+        for conflict in &self.conflicts {
+            conflict.visit(visitor)?;
+        }
+        visitor.access_purpose(crate::sem::AccessKind::insert_returning());
+        self.returning.visit(visitor)
     }
 }
 
@@ -167,10 +198,20 @@ impl InsertTargetCollection {
     pub(crate) fn get(&self, index: usize) -> Option<&InsertTarget> {
         self.0.get(index)
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for target in &mut self.0 {
             target.destination.walk_assignment_target(visitor)?;
             visitor.bound_definition(&mut target.column, &target.destination);
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for target in &self.0 {
+            target.destination.visit_assignment_target(visitor)?;
+            visitor.bound_definition(&target.column, &target.destination);
         }
         Ok(())
     }
@@ -190,7 +231,7 @@ impl InsertValueCollection {
     pub(crate) const fn len(&self) -> usize {
         self.0.len()
     }
-    fn walk<V: SemanticVisitor>(
+    fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &InsertTargetCollection,
@@ -200,6 +241,20 @@ impl InsertValueCollection {
                 value.walk(visitor, target)?;
             } else if let Some(expression) = value.expression_mut() {
                 expression.walk(visitor)?;
+            }
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &InsertTargetCollection,
+    ) -> Result<(), AnalysisError> {
+        for (index, value) in self.0.iter().enumerate() {
+            if let Some(target) = targets.get(index) {
+                value.visit(visitor, target)?;
+            } else if let Some(expression) = value.as_expression() {
+                expression.visit(visitor)?;
             }
         }
         Ok(())
@@ -255,13 +310,25 @@ impl InsertClauseSemantics {
     ) -> Result<(), AnalysisError> {
         self.walk(&mut AssignmentChecker { context })
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.targets.walk(visitor)?;
         if let Some(values) = self.values.values_mut() {
             values.walk(visitor, &self.targets)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::insert_target());
+        self.targets.visit(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::insert_input());
+        if let Some(values) = self.values.values() {
+            values.visit(visitor, &self.targets)?;
         }
         Ok(())
     }
@@ -342,7 +409,7 @@ impl InsertSource {
             Self::Query(query) => query.result_columns().len(),
         }
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &mut [InsertTarget],
@@ -368,7 +435,35 @@ impl InsertSource {
             Self::Query(query) => Self::walk_query(query, visitor, targets),
         }
     }
-    fn walk_query<V: SemanticVisitor>(
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::insert_target());
+        for target in targets.iter() {
+            target.destination.visit_assignment_target(visitor)?;
+            visitor.bound_definition(&target.column, &target.destination);
+        }
+        visitor.access_purpose(crate::sem::AccessKind::insert_input());
+        match self {
+            Self::DefaultValues => Ok(()),
+            Self::Values(rows) => {
+                for row in rows {
+                    for (index, value) in row.iter().enumerate() {
+                        if let Some(target) = targets.get(index) {
+                            value.visit(visitor, target)?;
+                        } else if let Some(value) = value.as_expression() {
+                            value.visit(visitor)?;
+                        }
+                    }
+                }
+                Ok(())
+            }
+            Self::Query(query) => Self::visit_query(query, visitor, targets),
+        }
+    }
+    fn walk_query<V: SemanticVisitorMut>(
         query: &mut SelectStatement,
         visitor: &mut V,
         targets: &[InsertTarget],
@@ -379,6 +474,18 @@ impl InsertSource {
             targets
         };
         query.walk_assigned(visitor, targets)
+    }
+    fn visit_query<V: crate::sem::traversal::SemanticVisitor>(
+        query: &SelectStatement,
+        visitor: &mut V,
+        targets: &[InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        let targets = if query.has_pending_stars() {
+            &[]
+        } else {
+            targets
+        };
+        query.visit_assigned(visitor, targets)
     }
 }
 
@@ -414,13 +521,24 @@ impl InsertValue {
             Self::Default => None,
         }
     }
-    fn walk<V: SemanticVisitor>(
+    fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         target: &InsertTarget,
     ) -> Result<(), AnalysisError> {
         if let Self::Expression(value) = self {
             value.walk(visitor)?;
+            visitor.assignment(value, target)?;
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        target: &InsertTarget,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Expression(value) = self {
+            value.visit(visitor)?;
             visitor.assignment(value, target)?;
         }
         Ok(())
@@ -436,7 +554,7 @@ pub struct InsertConflict {
     arbiter: InsertArbiterLookup,
 }
 impl InsertConflict {
-    pub(crate) fn map_view_expressions<V: SemanticVisitor>(
+    pub(crate) fn map_view_expressions<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -488,11 +606,24 @@ impl InsertConflict {
     pub(crate) fn set_arbiter(&mut self, arbiter: InsertArbiterLookup) {
         self.arbiter = arbiter;
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for expression in &mut self.inference {
             expression.walk(visitor)?;
         }
         crate::sem::traversal::optional(&mut self.predicate, visitor)?;
+        if let Some(predicate) = &self.predicate {
+            visitor.predicate(predicate);
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for expression in &self.inference {
+            expression.visit(visitor)?;
+        }
+        crate::sem::traversal::visit_optional(&self.predicate, visitor)?;
         if let Some(predicate) = &self.predicate {
             visitor.predicate(predicate);
         }
@@ -551,7 +682,7 @@ impl InsertInferenceModifiers {
 struct AssignmentChecker<'a, C> {
     context: &'a mut C,
 }
-impl<C: ParseContext> SemanticVisitor for AssignmentChecker<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
     fn assignment(
         &mut self,
         value: &mut SemScalarExpr,

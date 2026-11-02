@@ -101,7 +101,7 @@ impl ConstrainedExpr {
 }
 
 impl ConstrainedExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -113,6 +113,21 @@ impl ConstrainedExpr {
         }
         for value in &mut self.arguments {
             value.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        if let Some(indirection) = &self.indirection {
+            indirection.visit(visitor)?;
+        }
+        if let Some(call) = &self.semantic_call {
+            call.visit(visitor)?;
+        }
+        for value in &self.arguments {
+            value.visit(visitor)?;
         }
         Ok(())
     }

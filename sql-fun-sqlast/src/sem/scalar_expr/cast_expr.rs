@@ -155,21 +155,35 @@ impl TypeCastExpr {
 }
 
 impl TypeCastExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         self.arg.walk(visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg.visit(visitor)?;
+        Ok(())
+    }
 }
 
 impl ImplicitCastExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         self.value.walk(visitor)?;
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.value.visit(visitor)?;
         Ok(())
     }
 }

@@ -134,11 +134,21 @@ impl TableDataSource {
 mod tests;
 
 impl TableDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         visitor.table_binding(&mut self.name);
+        visitor.source_binding(self.name.full_name(), &self.alias);
+        visitor.relation_identity(self.name.full_name());
+        visitor.relation(None, self.alias.name().as_str(), &[]);
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.table_binding(&self.name);
         visitor.source_binding(self.name.full_name(), &self.alias);
         visitor.relation_identity(self.name.full_name());
         visitor.relation(None, self.alias.name().as_str(), &[]);

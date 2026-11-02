@@ -136,7 +136,7 @@ impl DistinctComparison {
         }
     }
 
-    fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -151,6 +151,26 @@ impl DistinctComparison {
             Self::Operands(values) | Self::Rows(values) | Self::Invalid(values) => {
                 for value in values {
                     value.walk(visitor)?;
+                }
+                Ok(())
+            }
+        }
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Equality(value) => value.visit(visitor),
+            Self::Deferred(value) => {
+                for operand in &value.operands {
+                    operand.visit(visitor)?;
+                }
+                Ok(())
+            }
+            Self::Operands(values) | Self::Rows(values) | Self::Invalid(values) => {
+                for value in values {
+                    value.visit(visitor)?;
                 }
                 Ok(())
             }
@@ -289,11 +309,17 @@ impl DistinctExpr {
         &self.types
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.comparison.walk(visitor)
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.comparison.visit(visitor)
     }
 
     pub(crate) fn collect_constraints(

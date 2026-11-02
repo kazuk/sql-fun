@@ -33,7 +33,7 @@ impl CreateTableAs {
 
     pub(crate) fn walk_column_dependencies(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.query.walk_nested_command(visitor)
     }

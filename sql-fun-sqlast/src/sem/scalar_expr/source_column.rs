@@ -47,12 +47,21 @@ impl SourceColumnExpr {
         self.nullable |= nullable;
         self
     }
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         if visitor.walk_source_column_values() {
             self.value.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if visitor.walk_source_column_values() {
+            self.value.visit(visitor)?;
         }
         Ok(())
     }

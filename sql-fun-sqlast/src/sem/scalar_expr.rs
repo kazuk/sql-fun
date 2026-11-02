@@ -137,12 +137,21 @@ impl RowExpr {
         ))
     }
 
-    fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for field in &mut self.0 {
             field.walk(visitor)?;
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for field in &self.0 {
+            field.visit(visitor)?;
         }
         Ok(())
     }
@@ -1228,7 +1237,7 @@ mod test_fits_array_index {
 }
 
 impl ListExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -1237,20 +1246,36 @@ impl ListExpr {
         }
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for expression in &self.0 {
+            expression.visit(visitor)?;
+        }
+        Ok(())
+    }
 }
 
 impl SemScalarExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         crate::sem::with_stack(|| self.walk_body(visitor))?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        crate::sem::with_stack(|| self.visit_body(visitor))?;
+        Ok(())
+    }
 }
 
 impl SemScalarExpr {
-    fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk_body<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -1281,6 +1306,46 @@ impl SemScalarExpr {
             Self::Indirection(v) => v.walk(visitor)?,
             Self::ImplicitCast(v) => v.walk(visitor)?,
             Self::List(v) => v.walk(visitor)?,
+            Self::Const(_)
+            | Self::ColumnRef(_)
+            | Self::SqlValue(_)
+            | Self::Param(_)
+            | Self::MergeAction
+            | Self::Unexpected(_) => {}
+        }
+        visitor.expression(self)
+    }
+    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_expression(self)?;
+        match self {
+            Self::SourceColumn(value) => value.visit(visitor)?,
+            Self::Grouping(v) => v.visit(visitor)?,
+            Self::Array(v) => v.visit(visitor)?,
+            Self::FuncCall(v) => v.visit(visitor)?,
+            Self::NamedArg(v) => v.visit(visitor)?,
+            Self::Arith(v) => v.visit(visitor)?,
+            Self::TypeCast(v) => v.visit(visitor)?,
+            Self::Case(v) => v.visit(visitor)?,
+            Self::Boolean(v) => v.visit(visitor)?,
+            Self::NullTest(v) => v.visit(visitor)?,
+            Self::TruthTest(value) => value.visit(visitor)?,
+            Self::Distinct(value) => value.visit(visitor)?,
+            Self::Membership(value) => value.visit(visitor)?,
+            Self::SubLink(v) => v.visit(visitor)?,
+            Self::Exists(value) => value.visit(visitor)?,
+            Self::ArraySubquery(value) => value.visit(visitor)?,
+            Self::Coalesce(v) => v.visit(visitor)?,
+            Self::Collate(v) => v.visit(visitor)?,
+            Self::Row(v) => v.visit(visitor)?,
+            Self::WholeRow(v) => v.visit(visitor)?,
+            Self::MinMax(v) => v.visit(visitor)?,
+            Self::Constrained(v) => v.visit(visitor)?,
+            Self::Indirection(v) => v.visit(visitor)?,
+            Self::ImplicitCast(v) => v.visit(visitor)?,
+            Self::List(v) => v.visit(visitor)?,
             Self::Const(_)
             | Self::ColumnRef(_)
             | Self::SqlValue(_)
@@ -1500,12 +1565,22 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         if let Self::Indirection(target) = self {
             target.walk_assignment_target(visitor)?;
+        }
+        visitor.assignment_target(self);
+        Ok(())
+    }
+    pub(crate) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Indirection(target) = self {
+            target.visit_assignment_target(visitor)?;
         }
         visitor.assignment_target(self);
         Ok(())
@@ -1666,6 +1741,16 @@ impl SemScalarExpr {
         match self {
             Self::FuncCall(call) => call.placement_result_type(),
             _ => self.get_type(),
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) const fn access_reference(&self) -> Option<&ColumnReferenceExpr> {
+        if let Self::ColumnRef(reference) = self {
+            Some(reference)
+        } else {
+            None
         }
     }
 }

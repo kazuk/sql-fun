@@ -42,7 +42,6 @@ pub(super) async fn verify_query_collection_lifecycle(
         &items[0]["parameters"],
         &items[0]["result_columns"],
         &items[0]["probrems"],
-        &items[0]["accessing_relations"],
         &items[0]["column_access"],
         &items[1]["parameters"],
     ] {

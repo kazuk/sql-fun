@@ -479,7 +479,7 @@ mod test_helpers {
     pub(super) fn row_levels(mut query: SelectStatement) -> Vec<usize> {
         #[derive(Default)]
         struct RowReferences(Vec<usize>);
-        impl crate::sem::traversal::SemanticVisitor for RowReferences {
+        impl crate::sem::traversal::SemanticVisitorMut for RowReferences {
             fn expression(
                 &mut self,
                 value: &mut SemScalarExpr,

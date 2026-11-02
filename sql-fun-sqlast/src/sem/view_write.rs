@@ -586,7 +586,7 @@ struct ViewColumnMapper<'a, C> {
     source: &'a FullName,
     complete: bool,
 }
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for ViewColumnMapper<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for ViewColumnMapper<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         let Some(column) = expression.bound_view_column(&self.view.name) else {
             return Ok(());
@@ -690,7 +690,7 @@ struct ProjectionRows<'a, C> {
     preserves: bool,
     depth: usize,
 }
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for ProjectionRows<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for ProjectionRows<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }

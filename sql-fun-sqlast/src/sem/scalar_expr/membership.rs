@@ -1,7 +1,7 @@
 use crate::ast::Dialect;
 use crate::sem::parameter_resolution::ParameterResolution;
 use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
     MinMaxExpr, OperatorDefinition, OperatorName, ParameterConstraints, ParseContext,
@@ -80,7 +80,7 @@ impl MembershipOperands {
         self.as_query()
             .is_some_and(SelectStatement::has_pending_stars)
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::List(values) => {
                 for value in values {
@@ -89,6 +89,20 @@ impl MembershipOperands {
                 Ok(())
             }
             Self::Query(query) => query.walk(visitor),
+        }
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::List(values) => {
+                for value in values {
+                    value.visit(visitor)?;
+                }
+                Ok(())
+            }
+            Self::Query(query) => query.visit(visitor),
         }
     }
     fn expand(&mut self, context: &mut impl ParseContext) -> Result<bool, AnalysisError> {
@@ -259,7 +273,7 @@ impl MembershipComparison {
 struct ApplyConstraints<'a> {
     constraints: &'a ParameterConstraints,
 }
-impl SemanticVisitor for ApplyConstraints<'_> {
+impl SemanticVisitorMut for ApplyConstraints<'_> {
     fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         value.apply_constraints(self.constraints);
         Ok(())
@@ -540,12 +554,20 @@ impl MembershipExpr {
         self.comparisons.push(comparison);
         Ok(())
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.left.walk(visitor)?;
         self.right.walk(visitor)?;
+        visitor.membership(self)
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.left.visit(visitor)?;
+        self.right.visit(visitor)?;
         visitor.membership(self)
     }
     pub(crate) fn expand_pending_stars(
@@ -731,7 +753,7 @@ fn contains_variable(value: &SemScalarExpr) -> bool {
             }
         }
     }
-    impl SemanticVisitor for Variables {
+    impl SemanticVisitorMut for Variables {
         fn enter_query(&mut self) {
             self.scopes.push(Default::default());
         }
@@ -772,7 +794,7 @@ struct UnknownOutput<'a, C: ParseContext> {
     context: &'a C,
     depth: usize,
 }
-impl<C: ParseContext> SemanticVisitor for UnknownOutput<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for UnknownOutput<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }

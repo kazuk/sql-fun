@@ -118,7 +118,7 @@ fn preserves_failed_column_resolution(#[case] sql: &str, #[case] ambiguous: bool
         missing: usize,
         ambiguous: usize,
     }
-    impl crate::sem::traversal::SemanticVisitor for Failures {
+    impl crate::sem::traversal::SemanticVisitorMut for Failures {
         fn expression(
             &mut self,
             expression: &mut SemScalarExpr,
@@ -167,7 +167,7 @@ fn records_window_resolution(
     let (mut query, context) = resolve(sql, Dialect::postgres(), false).unwrap();
     assert_eq!(context.reported_problem_count(), problems);
     struct Windows(Vec<QueryNameResolution>);
-    impl crate::sem::traversal::SemanticVisitor for Windows {
+    impl crate::sem::traversal::SemanticVisitorMut for Windows {
         fn expression(
             &mut self,
             expression: &mut SemScalarExpr,
@@ -226,7 +226,7 @@ fn ctes_are_owned_once_in_declaration_order() {
     assert_eq!(first.name(), "a");
     assert_eq!(second.name(), "b");
     struct Parameters(usize);
-    impl crate::sem::traversal::SemanticVisitor for Parameters {
+    impl crate::sem::traversal::SemanticVisitorMut for Parameters {
         fn expression(
             &mut self,
             expression: &mut SemScalarExpr,
@@ -310,7 +310,7 @@ fn retains_function_modifiers_after_inference_without_duplicate_operands() {
         functions: usize,
         parameters: Vec<u32>,
     }
-    impl crate::sem::traversal::SemanticVisitor for Calls {
+    impl crate::sem::traversal::SemanticVisitorMut for Calls {
         fn expression(
             &mut self,
             expression: &mut SemScalarExpr,
@@ -525,7 +525,7 @@ fn failed_function_name_lookup_survives_inference() {
     let (mut query, context) = resolve("SELECT absent($1)", Dialect::postgres(), true).unwrap();
     assert_eq!(context.reported_problem_count(), 1);
     struct Bindings(usize);
-    impl crate::sem::traversal::SemanticVisitor for Bindings {
+    impl crate::sem::traversal::SemanticVisitorMut for Bindings {
         fn expression(
             &mut self,
             expression: &mut SemScalarExpr,

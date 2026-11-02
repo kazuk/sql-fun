@@ -3,7 +3,7 @@ use crate::{
     context::ParseContext,
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, ColumnName, ColumnRename, FullName,
-        QueryProblem, SemScalarExpr, ViewLike, traversal::SemanticVisitor,
+        QueryProblem, SemScalarExpr, ViewLike, traversal::SemanticVisitorMut,
     },
 };
 use std::collections::HashMap;
@@ -232,7 +232,7 @@ impl<'a, C: ParseContext> RenameNamespaces<'a, C> {
         }
     }
 }
-impl<C: ParseContext> SemanticVisitor for RenameNamespaces<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for RenameNamespaces<'_, C> {
     fn source_outputs(&mut self, columns: &[ColumnName]) {
         self.source_outputs.push(columns.to_vec());
     }
@@ -478,7 +478,7 @@ struct OutputReferenceChanges<'a> {
     rename: &'a ColumnRename,
     changed: bool,
 }
-impl SemanticVisitor for OutputReferenceChanges<'_> {
+impl SemanticVisitorMut for OutputReferenceChanges<'_> {
     fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         let original = value.namespace_reference().map(|(_, name, _)| name.clone());
         value.rename_bound_column(self.rename);

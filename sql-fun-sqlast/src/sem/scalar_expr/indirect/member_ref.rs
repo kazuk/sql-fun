@@ -326,11 +326,18 @@ mod domain_member_tests {
 }
 
 impl MemberRef {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         self.base.walk(visitor)?;
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.base.visit(visitor)?;
         Ok(())
     }
 }
@@ -369,11 +376,18 @@ impl MemberRef {
 }
 
 impl MemberRef {
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.base.walk_assignment_target(visitor)?;
+        Ok(())
+    }
+    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.base.visit_assignment_target(visitor)?;
         Ok(())
     }
 }

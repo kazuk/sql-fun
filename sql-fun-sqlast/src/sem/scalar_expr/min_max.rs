@@ -309,12 +309,21 @@ impl MinMaxExpr {
         }
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for argument in &mut self.arguments {
             argument.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for argument in &self.arguments {
+            argument.visit(visitor)?;
         }
         Ok(())
     }

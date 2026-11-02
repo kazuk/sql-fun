@@ -116,7 +116,7 @@ impl ColumnDefinition {
 
     pub(super) fn rename_expressions(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), crate::sem::AnalysisError> {
         for constraint in &mut self.constraints {
             constraint.rename_expression(visitor)?;

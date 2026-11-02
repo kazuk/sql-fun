@@ -8,8 +8,9 @@ use ::sql_fun_server_api::{
     Collection, SqlFunServerApiError,
     payloads::{
         AnalysisProbrem, AnalyzeQueryArgs, AnalyzeQueryItem, AnalyzeQueryResponse,
-        CollectionHandle, ColumnAccess, DiagnosticSeverity, Nullability, ObjectSummary,
-        ParameterDescribe, QueryKind, ResultSetColumn, StatementByteRange, TextSpan, TypeReference,
+        CollectionHandle, ColumnAccess, DiagnosticSeverity, Nullability, ObjectKind,
+        ParameterDescribe, QueryKind, RelationName, ResultSetColumn, StatementByteRange, TextSpan,
+        TypeReference,
     },
 };
 use ::sql_fun_sqlast::{
@@ -260,7 +261,7 @@ struct QueryResult {
     problems: Vec<AnalysisProbrem>,
     parameters: Vec<ParameterDescribe>,
     columns: Vec<ResultSetColumn>,
-    relations: Vec<ObjectSummary>,
+    accesses: Vec<ColumnAccess>,
 }
 
 impl QueryResult {
@@ -284,7 +285,7 @@ impl QueryResult {
             )],
             parameters: Vec::new(),
             columns: Vec::new(),
-            relations: Vec::new(),
+            accesses: Vec::new(),
         }
     }
     fn parse_failure(
@@ -343,19 +344,6 @@ impl QueryResult {
             ..Self::default()
         }
     }
-
-    fn analyze(
-        statement: &Statement,
-        bindings: &Bindings,
-        source: &QuerySource,
-        schema: &InitializedSchema,
-        mapping: &SourceMap,
-        expand_asterisk: bool,
-        cache_context: &mut CacheContext,
-    ) -> Self {
-        StatementAnalysis::new(statement, bindings, source, schema, mapping)
-            .run(expand_asterisk, cache_context)
-    }
 }
 
 /// Coordinates query-local output preparation without replacing the shared parse context.
@@ -384,7 +372,12 @@ impl<'a> StatementAnalysis<'a> {
         }
     }
 
-    fn run(&self, expand_asterisk: bool, cache_context: &mut CacheContext) -> QueryResult {
+    fn run(
+        &self,
+        expand_asterisk: bool,
+        analyze_access: bool,
+        cache_context: &mut CacheContext,
+    ) -> QueryResult {
         let base = self.schema.base_context();
         let mut result = QueryResult::for_statement(self.statement, self.mapping);
         let mut context =
@@ -400,18 +393,22 @@ impl<'a> StatementAnalysis<'a> {
             Ok(sql) => result.sql = Some(sql),
             Err(error) => result.report(self, QueryAnalysisStage::deparse(), &error.to_string()),
         }
-        if expand_asterisk && result.sql.is_none() {
+        if expand_asterisk && result.sql.is_none() && !analyze_access {
             return result;
         }
         // Imported catalog CTEs need one projection coordinate space. Keep the
         // original expression spans for diagnostics and query/parameter mapping.
         let mut output = match self.prepare_output(&result, expand_asterisk) {
             Ok(output) => output,
+            Err(error) if analyze_access => {
+                result.clear_output(self, QueryAnalysisStage::parse(), &error);
+                None
+            }
             Err(error) => return self.output_failure(result, QueryAnalysisStage::parse(), &error),
         };
         let statement = output.as_ref().unwrap_or(self.statement);
         match statement.analyze(context, cache_context) {
-            Ok(pair) => self.complete(&mut result, pair, output.as_mut()),
+            Ok(pair) => self.complete(&mut result, pair, output.as_mut(), analyze_access),
             Err(error) => result.report(self, QueryAnalysisStage::analysis(), &error.to_string()),
         }
         result
@@ -441,7 +438,18 @@ impl<'a> StatementAnalysis<'a> {
         result: &mut QueryResult,
         pair: ::sql_fun_sqlast::AstAndContextPair<SchemaFileContext>,
         output: Option<&mut Statement>,
+        analyze_access: bool,
     ) {
+        if let Some(accesses) = collect_requested_accesses(analyze_access, || {
+            ::sql_fun_sqlast::sem::QueryAccess::from_statement(pair.context(), pair.ast())
+        }) {
+            match accesses {
+                Ok(accesses) => result.describe_accesses(&accesses),
+                Err(error) => {
+                    result.report(self, QueryAnalysisStage::analysis(), &error.to_string());
+                }
+            }
+        }
         if let Some(output) = output {
             let expansions = pair.context().analysis_state().wildcard_expansions();
             match rewrite_executable_sql(output, expansions) {
@@ -541,7 +549,6 @@ impl QueryResult {
         let diagnostic_source = if mapping.expanded { None } else { Some(text) };
 
         self.describe_columns(pair.ast());
-        self.describe_relations(&pair);
         let mut context = pair.into_context();
         if let Err(error) = QueryMetadata::report_unresolved_parameters(&mut context) {
             self.problems.push(diagnostic(
@@ -620,33 +627,33 @@ impl QueryResult {
         }
     }
 
-    fn describe_relations(
-        &mut self,
-        pair: &::sql_fun_sqlast::AstAndContextPair<SchemaFileContext>,
-    ) {
-        if let Ok(metadata) = QueryMetadata::from_statement(pair.ast()) {
-            for name in metadata.relations() {
-                let kind = if pair
-                    .context()
-                    .get_table(&::sql_fun_sqlast::sem::TableName::from(name.clone()))
-                    .is_some()
-                {
-                    ::sql_fun_server_api::payloads::ObjectKind::Table
-                } else if pair
-                    .context()
-                    .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(name))
-                    .is_some()
-                {
-                    ::sql_fun_server_api::payloads::ObjectKind::View
-                } else {
-                    continue;
-                };
-                self.relations.push(ObjectSummary::relation(
-                    name.schema().map_or("", |schema| schema.as_str()),
-                    &name.local_name(),
-                    kind,
-                ));
-            }
+    fn describe_accesses(&mut self, accesses: &::sql_fun_sqlast::sem::QueryAccess) {
+        for access in accesses.records() {
+            let object = if access.relation_kind().is_table() {
+                ObjectKind::table()
+            } else if access.relation_kind().is_materialized_view() {
+                ObjectKind::materialized_view()
+            } else if access.relation_kind().is_view() {
+                ObjectKind::view()
+            } else {
+                ObjectKind::function()
+            };
+            let name = access.relation();
+            let relation = RelationName::new(
+                name.catalog()
+                    .map(::sql_fun_sqlast::sem::CatalogName::as_str),
+                name.schema().map(::sql_fun_sqlast::sem::SchemaName::as_str),
+                name.name().as_str(),
+            );
+            self.accesses.push(ColumnAccess::new(
+                *access.access_kind(),
+                object,
+                &relation,
+                access
+                    .column_name()
+                    .as_ref()
+                    .map(::sql_fun_sqlast::sem::ColumnName::as_str),
+            ));
         }
     }
 }
@@ -753,15 +760,20 @@ fn analyze(
                     match bindings.spans(&query, dialect) {
                         Ok(mut mapping) => {
                             mapping.expanded = true;
-                            vec![QueryResult::analyze(
-                                realized.statement(),
-                                &bindings,
-                                source,
-                                schema,
-                                &mapping,
-                                expand_asterisk,
-                                cache_context,
-                            )]
+                            vec![
+                                StatementAnalysis::new(
+                                    realized.statement(),
+                                    &bindings,
+                                    source,
+                                    schema,
+                                    &mapping,
+                                )
+                                .run(
+                                    expand_asterisk,
+                                    *args.analyze_access(),
+                                    cache_context,
+                                ),
+                            ]
                         }
                         Err(error) => fail(QueryAnalysisStage::realization(), &error),
                     }
@@ -784,15 +796,10 @@ fn analyze(
     };
     parse_statements(&mapping.rendered, dialect)
         .map(|statement| match statement {
-            Ok(statement) => QueryResult::analyze(
-                &statement,
-                &bindings,
-                source,
-                schema,
-                &mapping,
-                expand_asterisk,
-                cache_context,
-            ),
+            Ok(statement) => StatementAnalysis::new(
+                &statement, &bindings, source, schema, &mapping,
+            )
+            .run(expand_asterisk, *args.analyze_access(), cache_context),
             Err(error) => QueryResult::parse_failure(&error, source, schema, &mapping),
         })
         .collect()
@@ -826,8 +833,7 @@ impl Session<'_, '_> {
                     self.query_page(result.problems, &mut handles)?,
                     self.query_page(result.parameters, &mut handles)?,
                     self.query_page(result.columns, &mut handles)?,
-                    self.query_page(result.relations, &mut handles)?,
-                    self.query_page(Vec::<ColumnAccess>::new(), &mut handles)?,
+                    self.query_page(result.accesses, &mut handles)?,
                 ));
             }
             Ok(AnalyzeQueryResponse::new(
@@ -862,5 +868,39 @@ impl Session<'_, '_> {
         )?;
         ::serde_json::from_value(page)
             .map_err(|error| SqlFunServerApiError::new_unexpected(&error.to_string()))
+    }
+}
+
+// Keep the actual traversal behind request intent, including its allocation cost.
+fn collect_requested_accesses(
+    requested: bool,
+    collect: impl FnOnce() -> Result<
+        ::sql_fun_sqlast::sem::QueryAccess,
+        ::sql_fun_sqlast::sem::AnalysisError,
+    >,
+) -> Option<Result<::sql_fun_sqlast::sem::QueryAccess, ::sql_fun_sqlast::sem::AnalysisError>> {
+    if requested { Some(collect()) } else { None }
+}
+
+#[cfg(test)]
+mod test_access_invocation {
+    #[test]
+    fn default_and_false_never_invoke_the_collector() {
+        let omitted = ::serde_json::json!({"context_handle":"c", "query":{"Text":"SELECT 1"}});
+        for option in [None, Some(false), Some(true)] {
+            let mut value = omitted.clone();
+            if let Some(option) = option {
+                value["analyze_access"] = option.into();
+            }
+            let args: ::sql_fun_server_api::payloads::AnalyzeQueryArgs =
+                ::serde_json::from_value(value).unwrap();
+            let calls = std::cell::Cell::new(0);
+            let result = super::collect_requested_accesses(*args.analyze_access(), || {
+                calls.set(calls.get() + 1);
+                Ok(::sql_fun_sqlast::sem::QueryAccess::default())
+            });
+            assert_eq!(result.is_some(), option == Some(true));
+            assert_eq!(calls.get(), usize::from(option == Some(true)));
+        }
     }
 }

@@ -220,7 +220,7 @@ impl UndefinedOperatorCallSite {
 }
 
 impl BinaryOpCallSite {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -228,15 +228,31 @@ impl BinaryOpCallSite {
         self.right_arg.walk(visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left_arg.visit(visitor)?;
+        self.right_arg.visit(visitor)?;
+        Ok(())
+    }
 }
 
 impl UndefinedOperatorCallSite {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         crate::sem::traversal::optional(&mut self.larg, visitor)?;
         crate::sem::traversal::optional(&mut self.rarg, visitor)?;
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        crate::sem::traversal::visit_optional(&self.larg, visitor)?;
+        crate::sem::traversal::visit_optional(&self.rarg, visitor)?;
         Ok(())
     }
 }

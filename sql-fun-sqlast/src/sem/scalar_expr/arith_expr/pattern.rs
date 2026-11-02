@@ -12,12 +12,21 @@ pub struct PatternExpr {
 }
 
 impl PatternExpr {
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for operand in &mut self.operands {
             operand.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for operand in &self.operands {
+            operand.visit(visitor)?;
         }
         Ok(())
     }

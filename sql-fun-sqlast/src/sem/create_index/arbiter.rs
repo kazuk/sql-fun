@@ -74,7 +74,7 @@ fn canonical(expression: &SemScalarExpr) -> Result<SemScalarExpr, AnalysisError>
 }
 
 struct Canonicalizer;
-impl crate::sem::traversal::SemanticVisitor for Canonicalizer {
+impl crate::sem::traversal::SemanticVisitorMut for Canonicalizer {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.canonicalize_index_binding();
         Ok(())

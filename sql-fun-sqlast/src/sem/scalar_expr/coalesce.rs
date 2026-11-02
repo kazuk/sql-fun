@@ -4,7 +4,7 @@ use crate::{
         AnalysisError, AnalysisProblem, ColumnName, InputTypeConstraint, MinMaxExpr,
         ParameterConstraints, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution, scalar_expr::SemScalarExprNode,
-        traversal::SemanticVisitor,
+        traversal::SemanticVisitorMut,
     },
 };
 
@@ -155,12 +155,21 @@ impl CoalesceExpr {
         }
     }
 
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for value in &mut self.arg_exprs {
             value.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for value in &self.arg_exprs {
+            value.visit(visitor)?;
         }
         Ok(())
     }

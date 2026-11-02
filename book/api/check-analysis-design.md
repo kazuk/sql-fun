@@ -186,6 +186,12 @@ resolver, including its documented syntax and type-modifier limitations; see
 [parameter analysis](../sql-analysis.md#parameter-analysis). No Rust type
 inference is performed by this API.
 
+Set `analyze_access: true` on an `analyze_query` request to collect SQL-visible
+relation and column accesses. Omission and `false` disable this additional
+analysis. Existing request constructors leave it disabled; typed clients can
+call `AnalyzeQueryArgs::with_access_analysis()` to enable it. The same option
+applies when `resolved_cte_catalog` is supplied.
+
 ### 3. Read the analysis result
 
 `result.queries` is the existing `Collection<AnalyzeQueryItem>`. Each item has:
@@ -199,8 +205,62 @@ inference is performed by this API.
 | `probrems` | Structured diagnostics (the existing wire spelling is retained) |
 | `parameters` | Binding names, actual one-based `parameter_index`, optional finalized `parameter_type`, base-input spans and nullability |
 | `result_columns` | Zero-based ordinal, name, optional `column_type` and three-state nullability |
-| `accessing_relations` | Available resolved relation identities |
-| `column_access` | Reserved collection; detailed CRUD/provenance is separate work (#425) |
+| `column_access` | SQL-visible access records when explicitly requested; otherwise empty |
+
+Each `column_access` record has exactly four semantic fields:
+
+```json
+{
+  "access_kind": "SelectOutput",
+  "relation_kind": "Table",
+  "relation": {"catalog": null, "schema": "public", "name": "entries"},
+  "column_name": "id"
+}
+```
+
+`relation` preserves resolved logical identifier components, including quoted
+case and embedded punctuation. It is not a dotted string to split. `relation_kind`
+is `Table`, `View`, `MaterializedView`, or `Function`. A null `column_name` denotes
+a relation-level action; a string denotes a resolved column. Both are returned in
+this single collection, with identical records deduplicated and distinct
+purposes retained.
+The collection uses the same paging, ownership and release protocol as other
+query collections.
+
+| Top-level purpose | `access_kind` values |
+| --- | --- |
+| Relation actions | `InsertRows`, `ReadRows`, `UpdateRows`, `DeleteRows` |
+| SELECT output, source expressions, filtering, joins | `SelectOutput`, `SelectSource`, `SelectFilter`, `SelectJoin` |
+| SELECT grouping, HAVING, ordering, DISTINCT | `SelectGrouping`, `SelectGroupFilter`, `SelectOrdering`, `SelectDistinct` |
+| Named SELECT windows, LIMIT, OFFSET | `SelectWindow`, `SelectLimit`, `SelectOffset` |
+| INSERT destination, input, RETURNING, conflict selection | `InsertTarget`, `InsertInput`, `InsertReturning`, `InsertConflict` |
+| UPDATE destination, input, sources, filtering, joins, RETURNING | `UpdateTarget`, `UpdateInput`, `UpdateSource`, `UpdateFilter`, `UpdateJoin`, `UpdateReturning` |
+| DELETE sources, filtering, joins, RETURNING | `DeleteSource`, `DeleteFilter`, `DeleteJoin`, `DeleteReturning` |
+| MERGE sources, matching, action conditions, RETURNING | `MergeSource`, `MergeJoin`, `MergeCondition`, `MergeReturning` |
+
+MERGE action destinations and values use the corresponding INSERT/UPDATE kinds;
+its relation actions reflect the actions present in the statement. `InsertRows`
+means row insertion, not schema-object creation. A source read exists even in
+`SELECT 1 FROM entries`; DELETE does not manufacture column writes.
+
+A purpose describes why the **top-level statement** needs a column. Nested
+expressions, aggregate/window modifiers and subqueries retain the enclosing
+purpose. For `SELECT (SELECT b.value FROM b WHERE b.id = a.id) FROM a`, all
+three column references have `SelectOutput`, including the inner WHERE and
+correlated `a.id`. The same nesting in an outer WHERE uses `SelectFilter`.
+Multiple uses in different top-level clauses retain separate records.
+
+Aliases, CTEs and derived tables refer back to their resolved inputs within the
+submitted SQL. View columns belong to the SQL-visible view; table-function outputs
+belong to the resolved function. Neither view definitions nor function bodies
+are expanded. Function argument expressions in the submitted SQL are analyzed.
+The records describe static SQL references, including clauses that might never execute.
+
+An unrequested analysis and a requested query with no accesses both return an
+empty collection. Interpret that using your request choice. Accesses do not
+use `complete`, executable SQL availability or Rust parameter eligibility as a
+completeness indicator. Existing semantic errors remain ordinary diagnostics;
+unresolved names do not acquire invented object identities.
 
 The `parameter_index` is the SQL `$n` identity, not a collection ordinal. For
 `SELECT $3::int4, $1::int4, $3::int4`, the binding metadata describes slots 1 and

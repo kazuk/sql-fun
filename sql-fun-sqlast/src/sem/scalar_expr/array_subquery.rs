@@ -75,13 +75,21 @@ impl ArraySubqueryExpr {
         Ok(changed)
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.query.walk(visitor)?;
         visitor.array_subquery(self)?;
         self.refresh_type();
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.query.visit(visitor)?;
+        visitor.array_subquery(self)?;
         Ok(())
     }
 
@@ -146,7 +154,7 @@ struct UnknownOutput<'a, C: ParseContext> {
     depth: usize,
 }
 
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for UnknownOutput<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for UnknownOutput<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }

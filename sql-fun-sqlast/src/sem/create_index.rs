@@ -56,7 +56,7 @@ impl IndexElement {
 
     fn rename_relation(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         if let Self::Expr(expression) = self {
             expression.walk(visitor)?;
@@ -108,7 +108,7 @@ pub struct IndexElementCollection(Vec<IndexElementWithOrder>);
 impl IndexElementCollection {
     fn rename_relation(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.0 {
             column.element.rename_relation(visitor)?;

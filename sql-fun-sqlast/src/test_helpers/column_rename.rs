@@ -77,7 +77,7 @@ pub(crate) fn bound_columns(expression: &crate::sem::SemScalarExpr) -> Vec<Strin
 }
 #[derive(Default)]
 struct BoundColumns(Vec<String>);
-impl crate::sem::traversal::SemanticVisitor for BoundColumns {
+impl crate::sem::traversal::SemanticVisitorMut for BoundColumns {
     fn expression(
         &mut self,
         expression: &mut crate::sem::SemScalarExpr,
@@ -105,7 +105,7 @@ struct WholeRowColumns<'a, C> {
     context: &'a C,
     columns: Vec<Vec<crate::sem::ColumnName>>,
 }
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for WholeRowColumns<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for WholeRowColumns<'_, C> {
     fn expression(
         &mut self,
         expression: &mut crate::sem::SemScalarExpr,

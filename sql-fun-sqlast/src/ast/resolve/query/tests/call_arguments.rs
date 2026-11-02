@@ -129,7 +129,7 @@ fn traversal_and_serialization_preserve_parameters(#[case] infer: bool) {
     let (mut query, context) = resolve(sql, Dialect::postgres(), infer).unwrap();
     assert_eq!(context.reported_problem_count(), 0);
     struct Parameters(Vec<u32>);
-    impl crate::sem::traversal::SemanticVisitor for Parameters {
+    impl crate::sem::traversal::SemanticVisitorMut for Parameters {
         fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::Param(value) = expression {
                 self.0.push(value.position());
@@ -210,7 +210,7 @@ fn retains_table_call_without_return_signature(#[case] name: &str, #[case] found
     let restored: SelectStatement = ::serde_json::from_value(serialized.clone()).unwrap();
     assert_eq!(::serde_json::to_value(&restored).unwrap(), serialized);
     struct Parameters(usize);
-    impl crate::sem::traversal::SemanticVisitor for Parameters {
+    impl crate::sem::traversal::SemanticVisitorMut for Parameters {
         fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::Param(value) = expression {
                 assert_eq!(value.position(), 4);

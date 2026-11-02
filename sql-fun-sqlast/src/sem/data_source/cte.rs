@@ -96,8 +96,20 @@ impl CteDataSource {
 }
 
 impl CteDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.cte_source(&self.name, &self.alias);
+        visitor.relation(
+            Some(&self.name),
+            self.alias.name().as_str(),
+            &self.alias.inference_columns(),
+        );
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         visitor.cte_source(&self.name, &self.alias);

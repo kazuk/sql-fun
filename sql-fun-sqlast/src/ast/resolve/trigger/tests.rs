@@ -648,7 +648,7 @@ mod test_helpers {
     ) -> Result<Vec<String>, AnalysisError> {
         #[derive(Default)]
         struct BoundSources(Vec<String>);
-        impl crate::sem::traversal::SemanticVisitor for BoundSources {
+        impl crate::sem::traversal::SemanticVisitorMut for BoundSources {
             fn relation_identity(&mut self, name: &FullName) {
                 self.0.push(name.to_string());
             }

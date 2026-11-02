@@ -43,11 +43,20 @@ impl DeferredTableFunction {
             None
         }
     }
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.call.walk(visitor)
+    }
+    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(name) = self.call.name_resolution().function_identity() {
+            visitor.function_binding(name, &self.alias, &self.output.names());
+        }
+        self.call.visit(visitor)
     }
 }
 impl DataSource {

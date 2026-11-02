@@ -51,12 +51,19 @@ impl ArithExpr {
 }
 
 impl NullIfExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.return_value.walk(visitor)?;
         self.comparison_value.walk(visitor)
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.return_value.visit(visitor)?;
+        self.comparison_value.visit(visitor)
     }
 }
 

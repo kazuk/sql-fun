@@ -636,7 +636,8 @@ fn an_unresolved_join_input_blocks_qualified_binding() {
 
 mod test_helpers {
     use crate::sem::{
-        AnalysisError, FullName, ResultColumnCollection, SemScalarExpr, traversal::SemanticVisitor,
+        AnalysisError, FullName, ResultColumnCollection, SemScalarExpr,
+        traversal::SemanticVisitorMut,
     };
 
     pub(super) fn result_columns(ast: &crate::sem::SemAst) -> ResultColumnCollection {
@@ -662,7 +663,7 @@ mod test_helpers {
             assert_eq!(self.relations.as_slice(), std::slice::from_ref(relation));
         }
     }
-    impl SemanticVisitor for TableBindings {
+    impl SemanticVisitorMut for TableBindings {
         fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let Some(binding) = expression.table_column_reference() {
                 self.relations.push(binding.relation().clone());
@@ -679,7 +680,7 @@ mod test_helpers {
             assert_eq!(self.codes, ["column_source_ambiguous"]);
         }
     }
-    impl SemanticVisitor for SourceFailures {
+    impl SemanticVisitorMut for SourceFailures {
         fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let Some(failure) = expression.qualification_failure() {
                 self.codes.push(failure.code());

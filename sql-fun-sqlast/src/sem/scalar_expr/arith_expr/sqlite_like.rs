@@ -29,13 +29,21 @@ impl SqliteLikeExpr {
         self.negated
     }
 
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.value.walk(visitor)?;
         self.pattern.walk(visitor)?;
         crate::sem::traversal::optional(&mut self.escape, visitor)
+    }
+    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.value.visit(visitor)?;
+        self.pattern.visit(visitor)?;
+        crate::sem::traversal::visit_optional(&self.escape, visitor)
     }
 }
 

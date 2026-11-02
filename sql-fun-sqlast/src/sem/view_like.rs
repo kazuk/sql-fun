@@ -30,7 +30,7 @@ impl ViewLike {
     pub(crate) fn rename_column_with(
         &mut self,
         rename: &crate::sem::ColumnRename,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::View(view) => view.rename_column_with(rename, visitor),

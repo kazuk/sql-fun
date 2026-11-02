@@ -169,7 +169,7 @@ fn projection(query: &SelectStatement) -> &SemScalarExpr {
 }
 
 struct Parameters(Vec<Option<TypeReference>>);
-impl crate::sem::traversal::SemanticVisitor for Parameters {
+impl crate::sem::traversal::SemanticVisitorMut for Parameters {
     fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), crate::sem::AnalysisError> {
         if matches!(value, SemScalarExpr::Param(_)) {
             self.0.push(value.get_type());

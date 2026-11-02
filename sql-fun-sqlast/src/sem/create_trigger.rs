@@ -1,5 +1,5 @@
 use crate::context::BaseParseContext;
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AnalysisError, ColumnDefinition, ColumnName, FullName, ParseContext, SemAst, SemScalarExpr,
     TypeReference,
@@ -240,7 +240,7 @@ pub enum TriggerBody {
 impl TriggerBody {
     fn rename_relation(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         if let Self::Commands(commands) = self {
             for command in commands {
@@ -366,7 +366,7 @@ impl CreateTrigger {
     pub(crate) fn rename_column_with(
         &mut self,
         rename: &crate::sem::ColumnRename,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         if &self.target == rename.table().full_name() {
             for event in &mut self.events {
@@ -620,7 +620,7 @@ impl TriggerDependencies {
         }
     }
 }
-impl crate::sem::traversal::SemanticVisitor for TriggerDependencies {
+impl crate::sem::traversal::SemanticVisitorMut for TriggerDependencies {
     fn relation_identity(&mut self, name: &FullName) {
         if !self.relations.contains(name) {
             self.relations.push(name.clone());

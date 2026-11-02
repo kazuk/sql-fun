@@ -66,7 +66,6 @@ For the motivating native query, the public result body was:
   Result columns (2):
     [0] a: pg_catalog.int4; unknown
     [1] b: pg_catalog.text; unknown
-  Relations (0):
   Column access (0):
 ```
 

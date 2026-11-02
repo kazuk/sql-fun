@@ -48,13 +48,26 @@ impl ArraySubscript {
         bounds.extend(self.upper.as_ref());
     }
 
-    fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         assignment: bool,
     ) -> Result<(), AnalysisError> {
         for bound in [&mut self.lower, &mut self.upper].into_iter().flatten() {
             bound.walk(visitor)?;
+            if assignment {
+                visitor.subscript(bound);
+            }
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        assignment: bool,
+    ) -> Result<(), AnalysisError> {
+        for bound in [&self.lower, &self.upper].into_iter().flatten() {
+            bound.visit(visitor)?;
             if assignment {
                 visitor.subscript(bound);
             }
@@ -130,7 +143,7 @@ impl ArraySubscripts {
         bounds
     }
 
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -140,14 +153,34 @@ impl ArraySubscripts {
         }
         Ok(())
     }
+    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.array.visit(visitor)?;
+        for subscript in &self.subscripts {
+            subscript.visit(visitor, false)?;
+        }
+        Ok(())
+    }
 
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.array.walk_assignment_target(visitor)?;
         for subscript in &mut self.subscripts {
             subscript.walk(visitor, true)?;
+        }
+        Ok(())
+    }
+    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.array.visit_assignment_target(visitor)?;
+        for subscript in &self.subscripts {
+            subscript.visit(visitor, true)?;
         }
         Ok(())
     }

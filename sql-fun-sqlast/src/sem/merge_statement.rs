@@ -4,7 +4,7 @@ mod view_support;
 pub(crate) use self::destination::MergeDestination;
 pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue, ParseContext,
     QueryCte, ResultColumnCollection, SemScalarExpr, TableName, UpdateAssignment,
@@ -128,10 +128,28 @@ impl MergeAction {
     pub const fn is_nothing(&self) -> bool {
         matches!(self, Self::Nothing)
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    const fn access_action(&self) -> Option<crate::sem::AccessKind> {
+        match self {
+            Self::Update(_) => Some(crate::sem::AccessKind::update_rows()),
+            Self::Insert(_) => Some(crate::sem::AccessKind::insert_rows()),
+            Self::Delete => Some(crate::sem::AccessKind::delete_rows()),
+            Self::Nothing | Self::Unresolved => None,
+        }
+    }
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Update(value) => value.0.walk(visitor),
             Self::Insert(value) => value.clause.walk(visitor),
+            Self::Unresolved | Self::Delete | Self::Nothing => Ok(()),
+        }
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Update(value) => value.0.visit(visitor),
+            Self::Insert(value) => value.clause.visit(visitor),
             Self::Unresolved | Self::Delete | Self::Nothing => Ok(()),
         }
     }
@@ -197,13 +215,27 @@ impl MergeWhenCollection {
             .iter()
             .any(|c| !c.kind.has_source() && !c.action.is_nothing())
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for clause in &mut self.0 {
             if let Some(condition) = &mut clause.condition {
                 condition.walk(visitor)?;
                 visitor.predicate(condition);
             }
             clause.action.walk(visitor)?;
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for clause in &self.0 {
+            visitor.access_purpose(crate::sem::AccessKind::merge_condition());
+            if let Some(condition) = &clause.condition {
+                condition.visit(visitor)?;
+                visitor.predicate(condition);
+            }
+            clause.action.visit(visitor)?;
         }
         Ok(())
     }
@@ -312,7 +344,7 @@ impl MergeStatement {
     ) -> Result<(), AnalysisError> {
         self.clauses.validate(context)
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -323,7 +355,18 @@ impl MergeStatement {
         visitor.leave_dml();
         result
     }
-    fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_dml();
+        visitor.enter_query();
+        let result = self.visit_body(visitor);
+        visitor.leave_query();
+        visitor.leave_dml();
+        result
+    }
+    fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }
@@ -333,6 +376,29 @@ impl MergeStatement {
         // PostgreSQL transforms RETURNING before WHEN action expressions.
         visitor.dml_returning(&mut self.returning)?;
         self.clauses.walk(visitor)
+    }
+    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::merge_source());
+        for cte in &self.with {
+            cte.visit(visitor)?;
+        }
+        for clause in &self.clauses.0 {
+            let kind = clause.action.access_action();
+            if let Some(kind) = kind {
+                visitor.access_action(self.target.full_name(), kind);
+            }
+        }
+        self.from.visit(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::merge_join());
+        self.on.visit(visitor)?;
+        visitor.predicate(&self.on);
+        // PostgreSQL transforms RETURNING before WHEN action expressions.
+        visitor.access_purpose(crate::sem::AccessKind::merge_returning());
+        visitor.dml_returning(&self.returning)?;
+        self.clauses.visit(visitor)
     }
 }
 

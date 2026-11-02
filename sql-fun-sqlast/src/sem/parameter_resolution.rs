@@ -1020,7 +1020,9 @@ struct Collector<'context, 'cache, C: crate::sem::ParseContext> {
     context: &'context mut C,
 }
 
-impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, '_, C> {
+impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
+    for Collector<'_, '_, C>
+{
     fn enter_expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.resolve_between(self.context)
     }
@@ -1264,7 +1266,7 @@ impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
         }
     }
 }
-impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
+impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut for Finalizer<'_, C> {
     fn enter_set_operand(&mut self) {
         self.set_scopes.enter_operand();
     }

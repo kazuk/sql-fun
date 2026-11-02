@@ -34,8 +34,10 @@
 //! in core lets arguments and metadata evolve without duplicating their handling
 //! in server initialization or other consumers.
 
+mod access_kind;
 /// Structured semantic diagnostics without terminal presentation.
 pub mod analysis_problem;
+pub use self::access_kind::AccessKind;
 mod args;
 mod builtin;
 mod codegen_options;

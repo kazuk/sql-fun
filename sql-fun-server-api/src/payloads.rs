@@ -23,8 +23,8 @@ use std::path::PathBuf;
 
 pub use self::{
     analyze_query::{
-        AnalyzeQueryArgs, AnalyzeQueryInput, AnalyzeQueryItem, AnalyzeQueryResponse, ColumnAccess,
-        ColumnAccessKind, ParameterDescribe, QueryKind, ResultSetColumn,
+        AccessKind, AnalyzeQueryArgs, AnalyzeQueryInput, AnalyzeQueryItem, AnalyzeQueryResponse,
+        ColumnAccess, ParameterDescribe, QueryKind, RelationName, ResultSetColumn,
     },
     describe_table::{
         ColumnConstraint, ColumnDefinition, DescribeTableArgs, DescribeTableResponse,

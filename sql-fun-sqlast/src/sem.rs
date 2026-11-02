@@ -53,6 +53,7 @@ pub(crate) mod parameter_resolution;
 pub(crate) mod pg_type;
 pub mod problem;
 mod query;
+mod query_access;
 mod query_metadata;
 mod resolution;
 mod sampling_method;
@@ -63,8 +64,10 @@ mod top_level_statement;
 pub(crate) mod traversal;
 mod wildcard_expansion;
 pub use self::declaration_collation::DeclarationCollation;
+pub use self::query_access::{AccessObjectKind, AccessRecord, QueryAccess};
 pub use self::query_metadata::QueryMetadata;
 pub use self::with_typmod::WithTypmod;
+pub use ::sql_fun_core::AccessKind;
 
 pub(crate) mod type_system;
 mod update_statement;
@@ -385,13 +388,14 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitor>(
+    pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::SelectStatement(query) => query.walk(visitor),
             Self::InsertStatement(insert) => insert.walk(visitor),
+            Self::MergeStatement(merge) => merge.walk(visitor),
             Self::UpdateStatement(update) => {
                 visitor.relation_identity(update.target().full_name());
                 update.walk(visitor)
@@ -399,6 +403,25 @@ impl SemAst {
             Self::DeleteStatement(delete) => {
                 visitor.relation_identity(delete.target().full_name());
                 delete.walk(visitor)
+            }
+            _ => unreachable!("only resolved common query/DML actions are traversed here"),
+        }
+    }
+    pub(crate) fn visit_nested_command<V: self::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::SelectStatement(query) => query.visit(visitor),
+            Self::InsertStatement(insert) => insert.visit(visitor),
+            Self::MergeStatement(merge) => merge.visit(visitor),
+            Self::UpdateStatement(update) => {
+                visitor.relation_identity(update.target().full_name());
+                update.visit(visitor)
+            }
+            Self::DeleteStatement(delete) => {
+                visitor.relation_identity(delete.target().full_name());
+                delete.visit(visitor)
             }
             _ => unreachable!("only resolved common query/DML actions are traversed here"),
         }

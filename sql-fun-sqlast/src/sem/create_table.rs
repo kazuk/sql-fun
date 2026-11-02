@@ -90,7 +90,7 @@ impl ColumnCollection {
 
     fn rename_expressions(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.0 {
             column.rename_expressions(visitor)?;

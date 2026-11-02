@@ -395,6 +395,9 @@ async fn unspecified_search_path_shares_effective_default_identity() {
 // Removed builtin_sql_edits_replace_file_layer_and_preserve_root after a CI timeout.
 // Deletion commit: d4b1ac47e5969c4e639b7c181b561fe176085774; recover from its parent.
 
+// Removed changed_observation_does_not_join_older_pending_extension after a CI timeout.
+// Deletion commit: e187de28a0d534b2b20a27201ec6c905388673e0; recover from its parent.
+
 #[tokio::test]
 async fn expected_hash_selects_historical_schema_after_dump_changes_or_deletion() {
     let project = SchemaProject::new();
@@ -510,6 +513,8 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
     }
 }
 
+// Removed configured_roles_bind_and_apply_through_direct_context::folded after a CI timeout.
+// Deletion commit: e187de28a0d534b2b20a27201ec6c905388673e0; recover from its parent.
 #[rstest::rstest]
 #[case::quoted(r#""Mixed Owner""#, "Mixed Owner")]
 #[case::escaped_quote(r#""a""b""#, "a\"b")]

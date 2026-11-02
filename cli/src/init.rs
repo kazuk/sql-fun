@@ -13,6 +13,7 @@ mod step;
 mod test_helpers;
 #[cfg(test)]
 mod tests;
+mod theme;
 
 use self::{
     error::InitError,
@@ -54,9 +55,16 @@ pub async fn initialize(
         return Ok(ExitCode::FAILURE);
     }
     state.home.create_directory()?;
+    state
+        .theme
+        .as_ref()
+        .expect("collected theme plan")
+        .install()
+        .await?;
     for plan in &state.plans {
         plan.install(state.home.home()).await?;
     }
+    theme::validate_installed(state.home.home())?;
     Ok(ExitCode::SUCCESS)
 }
 
@@ -72,6 +80,7 @@ struct InitializationState<'a> {
     input: Box<dyn PromptInput>,
     source: Option<bool>,
     connection: Option<String>,
+    theme: Option<theme::ThemePlan>,
 }
 
 impl<'a> InitializationState<'a> {
@@ -93,6 +102,7 @@ impl<'a> InitializationState<'a> {
             input: Box::new(TerminalInput),
             source: None,
             connection: None,
+            theme: None,
         }
     }
 }

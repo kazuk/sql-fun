@@ -57,24 +57,55 @@ with status 1. Existing user data is never deleted as cancellation cleanup.
 Installation errors after Ok may leave a created home and completed engine
 versions in place; cancellation before Ok and installation failure are distinct.
 
+## Diagnostic theme
+
+Successful initialization requires a valid diagnostic theme at
+`<chosen-home>/highlighter/default.toml`. A valid existing theme, including your
+customizations, is preserved without downloading. The theme is validated using
+the diagnostic renderer's color rules; invalid TOML or colors are errors.
+
+For a missing theme, explicitly choose **Download default theme** or
+**Create/Edit theme**. Downloading requires `curl` (preferred) or `wget` with TLS
+support and trusted certificates on `PATH`. The default is downloaded from the
+[published manual](https://kazuk.github.io/sql-fun/highlighter/default.toml).
+Downloads use bounded timeouts and fail on TLS, HTTP, process or validation errors.
+
+For creation or correction, select Create/Edit and supply an editor executable
+name or path (without shell arguments). The editor opens a temporary working
+copy after final Ok. It must finish successfully and produce a valid theme.
+An invalid existing theme is replaced only through this explicitly authorized
+edit; directories, symlinks and unsupported destinations are rejected.
+There is no Skip option. On failure, init reports failure and preserves existing
+user data. Correct the reported problem and rerun.
+
+The final review shows the action, path, and download URL or editor. No theme is
+downloaded, staged, edited or installed before final Ok. Back retains the chosen
+action for editing; changing home requires checking the new destination.
+
 ## Automatic setup
 
 `--yes` completes setup without prompts only when all required choices are
 supplied through CLI parameters. It does not choose omitted values for you.
 An incomplete request reports a missing parameter before setup begins.
+A valid existing theme is retained. If the theme is missing, explicitly pass
+`--install-default-theme` to authorize downloading it. This option never
+overwrites an existing theme. Correct invalid existing themes before using
+`--yes`; it cannot choose an editor or a download on your behalf.
 
 For PostgreSQL, supply an engine or datasource selection, the home directory,
 the source (`--docker` or `--database-url`), and `--engine-versions`:
 
 ```sh
-sql-fun init --yes --engines postgres --sql-fun-home "$HOME/.sql-fun" \
+sql-fun init --yes --install-default-theme --engines postgres \
+  --sql-fun-home "$HOME/.sql-fun" \
   --docker --engine-versions 17,18
 ```
 
 For a configured datasource:
 
 ```sh
-sql-fun init --datasource main --yes --sql-fun-home "$HOME/.sql-fun" \
+sql-fun init --datasource main --yes --install-default-theme \
+  --sql-fun-home "$HOME/.sql-fun" \
   --docker --engine-versions 17
 ```
 
@@ -119,7 +150,8 @@ connection string or URL, or choose this source and enter the connection string
 interactively. Prefer a password file to inline credentials:
 
 ```sh
-sql-fun init --yes --engines postgres --sql-fun-home "$HOME/.sql-fun" \
+sql-fun init --yes --install-default-theme --engines postgres \
+  --sql-fun-home "$HOME/.sql-fun" \
   --database-url 'host=db.example.org user=catalog_reader sslmode=verify-full' \
   --engine-versions 17
 ```

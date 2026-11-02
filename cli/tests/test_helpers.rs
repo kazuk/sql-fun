@@ -6,3 +6,9 @@ pub(crate) fn cli_executable() -> std::ffi::OsString {
     }
     std::env::var_os("SQL_FUN_BIN").expect("nextest CLI binary or SQL_FUN_BIN must be set")
 }
+
+// Shared integration suites compile only the fixture operations they use.
+#[allow(dead_code)]
+// Also loaded as api_helpers::executable via #[path], so resolve from this file.
+#[path = "test_helpers/initialization.rs"]
+pub(crate) mod initialization;

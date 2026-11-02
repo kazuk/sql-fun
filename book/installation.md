@@ -190,12 +190,17 @@ install Docker CLI and provide access to a Docker daemon, then run:
 sql-fun init
 ```
 
+Initialization also requires a valid diagnostic theme. Downloading the default
+requires `curl` or `wget` with TLS support and trusted certificates. See
+[initialization](cli/init.md#diagnostic-theme) for retaining or editing a theme.
+
 Choose the PostgreSQL engine or a configured PostgreSQL datasource, the home
 directory, a source, and the versions you need (currently 17 and 18). For a
 non-interactive initialization of a specific version:
 
 ```console
-sql-fun init --yes --engines postgres --sql-fun-home "$HOME/.sql-fun" \
+sql-fun init --yes --install-default-theme --engines postgres \
+  --sql-fun-home "$HOME/.sql-fun" \
   --docker --engine-versions 17
 ```
 

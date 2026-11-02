@@ -94,8 +94,8 @@ psql -X -w "$SQL_FUN_E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_dir/schem
 export SQL_FUN_HOME="$run_dir/home"
 mkdir -p "$SQL_FUN_HOME/postgres" "$SQL_FUN_HOME/highlighter"
 cp -R "$repo_root/sql-fun-home/postgres/18" "$SQL_FUN_HOME/postgres/18"
-# Temporary workaround for known issue #718: check expects this theme path.
-cp "$repo_root/sql-fun-home/highlighter/theme/default.toml" "$SQL_FUN_HOME/highlighter/default.toml"
+# Preserve the canonical post-init fixture's relative home layout.
+cp -R "$repo_root/sql-fun-home/highlighter/." "$SQL_FUN_HOME/highlighter/"
 export USER="${run_dir##*/}"
 export SQL_FUN_SERVER="$server_binary"
 export SQL_FUN_METADATA_FILE="$fixture_dir/Cargo.toml"

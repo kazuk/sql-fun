@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# The canonical post-init image owns theme content. The manual only distributes it.
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$root"
+mdbook build
+mkdir -p user_manual/highlighter
+cp sql-fun-home/highlighter/default.toml user_manual/highlighter/default.toml
+cmp sql-fun-home/highlighter/default.toml user_manual/highlighter/default.toml
+[[ -f user_manual/index.html ]] || { echo 'manual has no root index.html' >&2; exit 1; }

@@ -62,7 +62,7 @@ Repeated runs preserve valid installations. Incomplete installations must be mov
     sql-fun init
 
   PostgreSQL setup without prompts (all required choices supplied):
-    sql-fun init --yes --sql-fun-home /absolute/path/to/sql-fun-home --engines postgres --docker --engine-versions 17,18
+    sql-fun init --yes --install-default-theme --sql-fun-home /absolute/path/to/sql-fun-home --engines postgres --docker --engine-versions 17,18
 
   Docker setup requires Docker CLI access to a running daemon and psql.
   --engines and --datasource are alternative selections; do not combine them."#,

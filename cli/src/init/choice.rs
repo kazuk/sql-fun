@@ -57,3 +57,19 @@ mod test_select {
         assert_eq!(selection, ["sqlite"]);
     }
 }
+
+/// Collect one explicit operation through the shared retained-choice prompt.
+pub(super) fn select_one_retained(
+    title: &str,
+    options: &[String],
+    retained: &[String],
+    mut answer: impl FnMut(&PromptRequest) -> Result<PromptResponse, InitError>,
+) -> Result<String, InitError> {
+    loop {
+        let selected = select_retained(title, options, retained, &mut answer)?;
+        if selected.len() == 1 {
+            return Ok(selected[0].clone());
+        }
+        eprintln!("Choose exactly one operation explicitly.");
+    }
+}

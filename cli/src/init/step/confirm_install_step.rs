@@ -12,6 +12,11 @@ impl InitStep for ConfirmInstallStep {
         Box::pin(async move {
             state.prepare_plans()?;
             state.validate_complete()?;
+            state
+                .theme
+                .as_ref()
+                .expect("collected theme plan")
+                .review()?;
             if state.args.assume_yes() {
                 return Ok(StepCompletion::next());
             }

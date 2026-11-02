@@ -11,7 +11,8 @@ pub struct InitializeArgs {
     /// are errors; this flag does not select defaults. Existing installations
     /// are never overwritten. Supply --sql-fun-home and either --engines or
     /// --datasource. `PostgreSQL` also requires --docker or --database-url, and
-    /// --engine-versions.
+    /// --engine-versions. A missing theme requires --install-default-theme;
+    /// a valid installed theme is retained without downloading.
     ///
     ///
     #[arg(long = "yes", short = 'y')]
@@ -31,6 +32,11 @@ pub struct InitializeArgs {
     ///
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,
+
+    /// Download the published default theme when no installed theme exists.
+    /// Never overwrites an existing theme. Required with --yes if the theme is missing.
+    #[arg(long)]
+    install_default_theme: bool,
 
     /// Engines whose development support should be initialized.
     /// If omitted, ask for engines interactively unless project access was requested.
@@ -83,6 +89,12 @@ pub struct InitializeArgs {
 }
 
 impl InitializeArgs {
+    /// Whether downloading the missing default theme was explicitly authorized.
+    #[must_use]
+    pub const fn install_default_theme(&self) -> bool {
+        self.install_default_theme
+    }
+
     /// returns `assume_yes` value
     #[must_use]
     pub const fn assume_yes(&self) -> bool {

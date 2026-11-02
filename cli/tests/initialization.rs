@@ -1,173 +1,7 @@
 //! Generic setup dispatch and initialization followed by normal `PostgreSQL` bootstrap.
 mod test_helpers;
 
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
-
-struct InitializedProject {
-    directory: tempfile::TempDir,
-}
-impl InitializedProject {
-    fn new() -> Self {
-        Self {
-            directory: tempfile::tempdir().unwrap(),
-        }
-    }
-    fn home(&self) -> PathBuf {
-        self.directory.path().join("home")
-    }
-    fn command(&self) -> Command {
-        let mut command = Command::new(test_helpers::cli_executable());
-        command
-            .current_dir(self.directory.path())
-            .env_remove("SQL_FUN_DATABASE_URL")
-            .env_remove("SQL_FUN_HOME")
-            .env_remove("SQL_FUN_DATASOURCE")
-            .env_remove("SQL_FUN_METADATA_FILE");
-        command
-    }
-    fn init(&self, extra: &[&str]) -> std::process::Output {
-        self.command()
-            .args([
-                "init",
-                "--yes",
-                "--engines",
-                "postgres",
-                "--docker",
-                "--sql-fun-home",
-            ])
-            .arg(self.home())
-            .args(extra)
-            .output()
-            .unwrap()
-    }
-    fn init_with_environment_home(&self) -> std::process::Output {
-        self.command()
-            .env("SQL_FUN_HOME", self.home())
-            .args(["init", "--yes", "--engine-versions", "17"])
-            .output()
-            .unwrap()
-    }
-    fn init_for_global_version(&self, version: &str) -> std::process::Output {
-        self.command()
-            .args([
-                "--postgres-version",
-                version,
-                "init",
-                "--yes",
-                "--sql-fun-home",
-            ])
-            .arg(self.home())
-            .args([
-                "--engines",
-                "postgres",
-                "--docker",
-                "--engine-versions",
-                "17",
-            ])
-            .output()
-            .unwrap()
-    }
-    fn init_with_missing_metadata(&self) -> std::process::Output {
-        self.command()
-            .arg("--metadata-file")
-            .arg(self.directory.path().join("missing.toml"))
-            .args([
-                "init",
-                "--yes",
-                "--engines",
-                "postgres",
-                "--docker",
-                "--sql-fun-home",
-            ])
-            .arg(self.home())
-            .args(["--engine-versions", "17"])
-            .output()
-            .unwrap()
-    }
-    fn write_project_metadata(&self, declarations: &str) {
-        std::fs::write(self.directory.path().join("Cargo.toml"), declarations).unwrap();
-    }
-    fn datasource_without_engine(&self) {
-        std::fs::write(
-            self.directory.path().join("Cargo.toml"),
-            "[package.metadata.database.only]\ndialect = 'postgres'\nversion = '17'\n",
-        )
-        .unwrap();
-    }
-    fn mixed_project(&self) {
-        std::fs::write(self.directory.path().join("Cargo.toml"), "[package.metadata.database.pg]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '17'\n[package.metadata.database.local]\nengine = 'sqlite'\ndialect = 'sqlite'\n[package.metadata.database.other]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '18'\n").unwrap();
-    }
-    fn sqlite_project(&self) {
-        std::fs::write(
-            self.directory.path().join("Cargo.toml"),
-            "[package.metadata.database.only]\nengine = 'sqlite'\ndialect = 'sqlite'\n",
-        )
-        .unwrap();
-    }
-    fn init_scope(&self, scope: &[&str], options: &[&str]) -> std::process::Output {
-        self.command()
-            .arg("init")
-            .args(scope)
-            .args(["--yes", "--sql-fun-home"])
-            .arg(self.home())
-            .args(options)
-            .output()
-            .unwrap()
-    }
-    fn install_fixture(&self, version: &str) {
-        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("sql-fun-home/postgres")
-            .join(version);
-        let target = self.home().join("postgres").join(version);
-        std::fs::create_dir_all(&target).unwrap();
-        for name in [
-            "metadata.json",
-            "schema.sql",
-            "pg_type.json",
-            "functions.json",
-            "func_detail.json",
-            "binary_op.json",
-            "left_unary_op.json",
-            "right_unary_op.json",
-            "casts.json",
-            "collations.json",
-            "operator_classes.json",
-        ] {
-            std::fs::copy(source.join(name), target.join(name)).unwrap();
-        }
-    }
-    fn assert_installed_catalog(&self, version: &str) {
-        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("sql-fun-home/postgres")
-            .join(version);
-        for name in [
-            "metadata.json",
-            "schema.sql",
-            "pg_type.json",
-            "functions.json",
-            "func_detail.json",
-            "binary_op.json",
-            "left_unary_op.json",
-            "right_unary_op.json",
-            "casts.json",
-            "collations.json",
-            "operator_classes.json",
-        ] {
-            assert_eq!(
-                std::fs::read(self.home().join("postgres").join(version).join(name)).unwrap(),
-                std::fs::read(source.join(name)).unwrap(),
-                "installed {name}"
-            );
-        }
-    }
-}
+use test_helpers::initialization::InitializedProject;
 
 #[test]
 fn initialization_preserves_and_loads_an_existing_valid_generation() {
@@ -221,7 +55,7 @@ fn initialization_ignores_a_historical_lock_for_the_same_version() {
 fn initialization_diagnoses_a_configured_datasource_version_outside_the_selection() {
     let project = InitializedProject::new();
     project.install_fixture("17");
-    std::fs::write(project.directory.path().join("Cargo.toml"), "[package.metadata.database.default]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '18'\n").unwrap();
+    std::fs::write(project.directory().join("Cargo.toml"), "[package.metadata.database.default]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '18'\n").unwrap();
     let result = project
         .command()
         .args([
@@ -229,6 +63,7 @@ fn initialization_diagnoses_a_configured_datasource_version_outside_the_selectio
             "--datasource",
             "default",
             "--yes",
+            "--install-default-theme",
             "--docker",
             "--engine-versions",
             "17",
@@ -273,6 +108,7 @@ fn noninteractive_relative_home_uses_command_working_directory() {
         .args([
             "init",
             "--yes",
+            "--install-default-theme",
             "--engines",
             "sqlite",
             "--sql-fun-home",
@@ -280,7 +116,7 @@ fn noninteractive_relative_home_uses_command_working_directory() {
         ])
         .output()
         .unwrap();
-    let home = project.directory.path().join("relative-home");
+    let home = project.directory().join("relative-home");
     assert!(
         result.status.success(),
         "{}",
@@ -297,6 +133,7 @@ fn noninteractive_relative_home_uses_command_working_directory() {
         .args([
             "init",
             "--yes",
+            "--install-default-theme",
             "--engines",
             "sqlite",
             "--sql-fun-home",
@@ -316,10 +153,11 @@ fn noninteractive_home_relative_option_expands_home_directory() {
     let project = InitializedProject::new();
     let result = project
         .command()
-        .env("HOME", project.directory.path())
+        .env("HOME", project.directory())
         .args([
             "init",
             "--yes",
+            "--install-default-theme",
             "--engines",
             "sqlite",
             "--sql-fun-home",
@@ -327,7 +165,7 @@ fn noninteractive_home_relative_option_expands_home_directory() {
         ])
         .output()
         .unwrap();
-    let home = project.directory.path().join("expanded-home");
+    let home = project.directory().join("expanded-home");
     assert!(
         result.status.success(),
         "{}",
@@ -396,7 +234,14 @@ fn ambient_postgres_connection_does_not_select_sqlite_setup_source() {
     let result = project
         .command()
         .env("SQL_FUN_DATABASE_URL", "host=must-not-connect.invalid")
-        .args(["init", "--yes", "--engines", "sqlite", "--sql-fun-home"])
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+        ])
         .arg(project.home())
         .output()
         .unwrap();
@@ -459,10 +304,18 @@ fn selected_datasources_do_not_select_other_project_tasks() {
 fn sqlite_only_datasource_requires_no_postgres_runtime_tools() {
     let project = InitializedProject::new();
     project.mixed_project();
+    test_helpers::initialization::retain_theme(&project.home());
     let result = project
         .command()
-        .env("PATH", project.directory.path())
-        .args(["init", "--yes", "--datasource", "local", "--sql-fun-home"])
+        .env("PATH", project.directory())
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--datasource",
+            "local",
+            "--sql-fun-home",
+        ])
         .arg(project.home())
         .output()
         .unwrap();
@@ -494,7 +347,7 @@ fn an_ambient_datasource_is_not_a_noninteractive_cli_selection() {
     let result = project
         .command()
         .env("SQL_FUN_DATASOURCE", "only")
-        .args(["init", "--yes", "--sql-fun-home"])
+        .args(["init", "--yes", "--install-default-theme", "--sql-fun-home"])
         .arg(project.home())
         .output()
         .unwrap();
@@ -514,17 +367,25 @@ fn engine_setup_ignores_unrequested_project_metadata(
 ) {
     let project = InitializedProject::new();
     project.write_project_metadata(declarations);
+    test_helpers::initialization::retain_theme(&project.home());
     let mut command = project.command();
     if ambient_metadata {
         command.env(
             "SQL_FUN_METADATA_FILE",
-            project.directory.path().join("Cargo.toml"),
+            project.directory().join("Cargo.toml"),
         );
     }
     let result = command
-        .args(["init", "--yes", "--engines", "sqlite", "--sql-fun-home"])
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+        ])
         .arg(project.home())
-        .env("PATH", project.directory.path().join("no-tools"))
+        .env("PATH", project.directory().join("no-tools"))
         .output()
         .unwrap();
     assert!(
@@ -545,4 +406,159 @@ fn incomplete_master_generation_is_rejected(#[case] artifact: &str) {
     let result = project.init(&["--engine-versions", "17"]);
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains(artifact));
+}
+
+#[test]
+fn a_missing_theme_requires_explicit_download_authorization() {
+    let project = InitializedProject::new();
+    let output = project
+        .command()
+        .args(["init", "--yes", "--engines", "sqlite", "--sql-fun-home"])
+        .arg(project.home())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--install-default-theme"));
+    assert!(!project.home().exists());
+    assert!(!project.directory().join("downloads").exists());
+}
+
+#[test]
+fn downloaded_theme_is_retained_without_downloader_on_rerun() {
+    let project = InitializedProject::new();
+    let output = project.init_scope(&["--engines", "sqlite"], &[]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let theme = project.home().join("highlighter/default.toml");
+    let customized = "keyword = { foreground = 'magenta' }";
+    std::fs::write(&theme, customized).unwrap();
+    let before = std::fs::read(project.directory().join("downloads")).unwrap();
+    let output = project
+        .command()
+        .args(["init", "--yes", "--engines", "sqlite", "--sql-fun-home"])
+        .arg(project.home())
+        .env("PATH", project.directory().join("missing-tools"))
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(std::fs::read_to_string(theme).unwrap(), customized);
+    assert_eq!(
+        std::fs::read(project.directory().join("downloads")).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn uses_wget_when_curl_is_absent() {
+    let project = InitializedProject::new();
+    let mut command = project.command();
+    let tools = project.directory().join("theme-tools");
+    std::fs::rename(tools.join("curl"), tools.join("wget")).unwrap();
+    let output = command
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+        ])
+        .arg(project.home())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        std::fs::read_to_string(project.directory().join("downloads"))
+            .unwrap()
+            .contains("--output-document")
+    );
+}
+
+#[test]
+fn reports_missing_download_tools_without_claiming_success() {
+    let project = InitializedProject::new();
+    let output = project
+        .command()
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+        ])
+        .arg(project.home())
+        .env("PATH", project.directory().join("missing-tools"))
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("requires curl or wget"));
+    assert!(!project.home().join("highlighter/default.toml").exists());
+}
+
+#[test]
+fn curl_failure_never_falls_back_or_claims_success() {
+    let project = InitializedProject::new();
+    let mut command = project.command();
+    test_helpers::initialization::reject_curl_download(project.directory());
+    let output = command
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+        ])
+        .arg(project.home())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("theme download from"));
+    assert!(
+        !project.directory().join("downloads").exists(),
+        "wget fallback must not run"
+    );
+    assert!(!project.home().join("highlighter/default.toml").exists());
+}
+
+#[test]
+fn invalid_download_is_never_published() {
+    let project = InitializedProject::new();
+    let invalid = project.directory().join("invalid.toml");
+    std::fs::write(&invalid, "keyword = { foreground = 'invalid-color' }").unwrap();
+    let output = project
+        .command()
+        .args([
+            "init",
+            "--yes",
+            "--install-default-theme",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+        ])
+        .arg(project.home())
+        .env("SQL_FUN_TEST_THEME", invalid)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("downloaded/edited theme is invalid"));
+    assert!(!project.home().join("highlighter/default.toml").exists());
+    assert_eq!(
+        std::fs::read_dir(project.home().join("highlighter"))
+            .unwrap()
+            .count(),
+        0
+    );
 }

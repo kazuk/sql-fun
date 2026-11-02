@@ -205,10 +205,43 @@ def commit(args):
     return dict(source=args.source, revision=revision, status='created')
 
 
+def remote_tag(tag):
+    ref = f'refs/tags/{tag}'
+    # ls-remote fails on transport errors; an empty successful response is absence.
+    refs = dict(line.split()[::-1] for line in
+                git('ls-remote', 'origin', ref, ref + '^{}').splitlines())
+    return refs.get(ref + '^{}', refs.get(ref))
+
+
+def tag_state(args):
+    release = identity(args.ref, args.source)
+    remote = remote_tag(release['tag'])
+    if remote is None:
+        return dict(status='absent')
+    require(remote == args.source, f'Conflicting remote tag {release["tag"]}: {remote}')
+    validate_record(args.source, release)
+    return dict(status='matching')
+
+
+def push_tag(args):
+    clean()
+    require(git('rev-parse', 'HEAD') == args.source, 'Tag checkout must match recorded release source')
+    release = identity(args.ref, args.source)
+    validate_record(args.source, release)
+    if tag_state(args)['status'] == 'absent':
+        # Create only this local lightweight tag; never replace an existing ref.
+        subprocess.run(['git', 'tag', release['tag'], args.source], check=True)
+        pushed = subprocess.run(['git', 'push', 'origin', f'refs/tags/{release["tag"]}'],
+                                stdout=sys.stderr)
+        require(remote_tag(release['tag']) == args.source,
+                f'Tag push not confirmed (exit {pushed.returncode}); preserve release history')
+    return dict(status='matching', revision=args.source, tag=release['tag'])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='operation', required=True)
-    for operation in ('resolve', 'commit'):
+    for operation in ('resolve', 'commit', 'tag-status', 'tag-push'):
         command = sub.add_parser(operation)
         command.add_argument('ref')
         command.add_argument('source')
@@ -217,7 +250,9 @@ def main():
             command.add_argument('baseline')
     args = parser.parse_args()
     os.chdir(git('rev-parse', '--show-toplevel'))
-    result = resolve(args) if args.operation == 'resolve' else commit(args)
+    operations = {'resolve': resolve, 'commit': commit,
+                  'tag-status': tag_state, 'tag-push': push_tag}
+    result = operations[args.operation](args)
     for key, value in result.items():
         print(f'{key}={value}')
 

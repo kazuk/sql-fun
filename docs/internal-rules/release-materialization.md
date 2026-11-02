@@ -19,7 +19,7 @@ Responsibility boundaries:
 - #329 invokes the existing selected-candidate baseline adopter.
 - #330 resets stable intent, explicitly stages owned state, commits/pushes `R`
   and resolves recorded state on reruns.
-- #331's planned integration builds/validates release packages from committed
+- #331 builds/validates release packages from committed
   `R`, retains prepared assets and tags `R` only after success.
 - #259's planned integration creates a draft after tagging and attaches assets.
   A maintainer reviews and publishes it.
@@ -63,9 +63,12 @@ enter the commit. No `git add -A` is used.
 only the explicitly selected release ref and returns `source`, `revision` and
 `status` (`new` or `reused`). A fresh attempt continues the original CI gate;
 a recorded attempt checks out `R` and bypasses materialization/adoption/reset
-mutations. The current workflow still selects CI for recorded `S` and adopts
-reusable inputs/manual; #331 must bypass the whole producer path when a
-matching immutable tag exists.
+mutations. Before CI lookup, `release-state tag-status` inspects the exact
+remote tag.
+A matching tag must resolve to validated recorded `R`; it bypasses the whole
+producer path. With no tag, the workflow still selects CI for original `S` and
+adopts reusable inputs/manual before building from `R`. Remote-query errors
+are failures, never absence. Annotated tags are compared by peeled commit.
 
 The release commit has subject `chore(release): materialize <product-tag>` and
 unique trailers `Release-Source: <S>` and `Release-Tag: <product-tag>`. Its single
@@ -107,3 +110,36 @@ branches as routine producer cleanup.
 A newly selected source with current prerelease crate versions is still subject
 to #364's existing materializer limitation. Recorded-state reuse bypasses a
 second bump; it does not introduce a prerelease lifecycle workaround.
+
+## Prepared assets and tag handoff
+
+`release-assets build` uses the committed checkout at `R`, a fresh external Cargo
+target directory, and the already packaged manual. `package-linux` owns the
+release build and package checks; assembly copies only the expected validated
+outputs, renaming checksum metadata without changing its bytes. The CLI crate
+version owns package names; project identity owns the manual name. The complete
+external directory contains exactly four nonempty public files; internal
+baseline/state data is excluded.
+
+The complete directory is uploaded before `release-state tag-push` runs. That
+operation revalidates recorded `R`, checks the remote again, creates only the
+selected local tag, pushes only its ref without force and confirms the remote
+commit. A concurrent matching tag is accepted; a conflict or unconfirmed push
+fails without rollback. Existing annotated and lightweight tags are recognized.
+
+For an existing matching tag, `release-assets restore` locates artifacts using
+Actions metadata for this repository's `release-prepare.yml` push runs on the
+explicit release branch, whose head is original `S` or recorded `R`. Transport
+names encode tag, `R`, run ID and attempt; no additional provenance manifest is
+introduced. A run need not have finished successfully: retention precedes tag
+push, which may have failed after the upload. The newest matching artifact is
+selected; expiration, unavailable download or incomplete inventory fails without
+falling back to different evidence or rebuilding. Restore checks availability,
+not package validity. No producer validation is repeated.
+
+`steps.assets.outputs` supplies `tag`, `source`, `revision`, `status`
+(`produced`/`recovered`), `directory`, comma-separated `inventory`, `artifact-id`,
+`artifact-name` and `run-id` to #259's later same-job Draft integration. Existing
+job-level source/revision outputs retain their meanings. Paths are runner-local;
+artifact locators provide cross-run recovery within ordinary retention. Missing
+retained assets never authorize erasing the tag or rematerializing the version.

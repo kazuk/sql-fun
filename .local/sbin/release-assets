@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Build or restore the complete prepared public assets for a recorded release."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+TARGET = 'x86_64-unknown-linux-gnu'
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def run(*args):
+    return subprocess.check_output(args, text=True).strip()
+
+
+def api(endpoint):
+    return json.loads(run('gh', 'api', endpoint))
+
+
+def pages(endpoint, key):
+    page = 1
+    while True:
+        values = api(f'{endpoint}{"&" if "?" in endpoint else "?"}per_page=100&page={page}')[key]
+        yield from values
+        if len(values) < 100:
+            break
+        page += 1
+
+
+def outside(path):
+    path = Path(path).resolve()
+    require(not path.is_relative_to(Path.cwd()), f'Asset/build path must be outside checkout: {path}')
+    return path
+
+
+def inventory(tag):
+    metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps', '--format-version=1'))
+    version = next(p['version'] for p in metadata['packages'] if p['name'] == 'sql-fun-cli')
+    stem = f'sql-fun-{version}-{TARGET}'
+    return [f'{stem}.tar.gz', f'sql-fun_{version.replace("-", "~", 1)}_amd64.deb',
+            f'{stem}-SHA256SUMS', f'sql-fun_{tag}_user-manual.tar.gz']
+
+
+def check_inventory(directory, names):
+    require(set(p.name for p in directory.iterdir()) == set(names),
+            f'Incomplete or unexpected public asset inventory in {directory}; expected {names}')
+    require(all((directory / name).is_file() and not (directory / name).is_symlink()
+                and (directory / name).stat().st_size > 0 for name in names),
+            f'Missing or empty required release assets in {directory}')
+
+
+def build(args, names):
+    target = outside(args.target)
+    require(not target.exists(), f'Release target directory must be fresh: {target}')
+    require(not run('git', 'diff', '--name-only') and not run('git', 'diff', '--cached', '--name-only'),
+            'Release build requires a clean tracked worktree/index')
+    environment = dict(os.environ, CARGO_TARGET_DIR=str(target))
+    subprocess.run(['.local/bin/package-linux', TARGET], env=environment, check=True, stdout=sys.stderr)
+    # package-linux validates these exact outputs before exposing them.
+    output = target / 'distributions' / TARGET
+    args.directory.mkdir(parents=True)
+    for source, destination in zip([names[0], names[1], 'SHA256SUMS'], names[:3]):
+        shutil.copyfile(output / source, args.directory / destination)
+    manual = outside(args.manual)
+    require(manual.name == names[3], f'Unexpected manual asset: {manual}')
+    shutil.copyfile(manual, args.directory / names[3])
+    check_inventory(args.directory, names)
+    require(not run('git', 'diff', '--name-only') and not run('git', 'diff', '--cached', '--name-only'),
+            'Release build modified tracked release state')
+    return {}
+
+
+def restore(args, names):
+    # Only this workflow, explicit release branch, and original/recorded source
+    # are eligible. A failed post-upload run can still contain valid assets.
+    from urllib.parse import quote
+    endpoint = (f'repos/{args.repository}/actions/workflows/release-prepare.yml/runs'
+                f'?branch={quote(args.ref.removeprefix("refs/heads/"), safe="")}&event=push')
+    candidates = []
+    prefix = f'release-assets-{args.tag}-{args.revision}-'
+    for workflow in pages(endpoint, 'workflow_runs'):
+        if workflow['head_sha'] not in (args.source, args.revision):
+            continue
+        run_id = workflow['id']
+        for artifact in pages(f'repos/{args.repository}/actions/runs/{run_id}/artifacts', 'artifacts'):
+            if re.fullmatch(re.escape(prefix + str(run_id)) + r'-[1-9][0-9]*', artifact['name']):
+                candidates.append((artifact, run_id))
+    require(candidates, f'No prepared assets retained for {args.tag} at {args.revision}')
+    artifact, run_id = max(candidates, key=lambda entry: entry[0]['id'])
+    print(f'Restoring prepared artifact {artifact["id"]} ({artifact["name"]}, run {run_id})',
+          file=sys.stderr)
+    require(not artifact['expired'], f'Prepared artifact {artifact["id"]} has expired (run {run_id})')
+    subprocess.run(['gh', 'run', 'download', str(run_id), '--repo', args.repository,
+                    '--name', artifact['name'], '--dir', str(args.directory)], check=True, stdout=sys.stderr)
+    check_inventory(args.directory, names)
+    return {'artifact-id': artifact['id'], 'artifact-name': artifact['name'], 'run-id': run_id}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('operation', choices=('build', 'restore'))
+    for name in ('tag', 'revision', 'directory'):
+        parser.add_argument('--' + name, required=True)
+    for name in ('target', 'manual', 'repository', 'source', 'ref'):
+        parser.add_argument('--' + name)
+    args = parser.parse_args()
+    os.chdir(run('git', 'rev-parse', '--show-toplevel'))
+    require(run('git', 'rev-parse', 'HEAD') == args.revision, 'Assets must use committed release source')
+    # Reuse the project release parser before using the tag in filenames.
+    run('.local/bin/parse-release-version', args.tag)
+    args.directory = outside(args.directory)
+    require(not args.directory.exists(), f'Asset directory must be fresh: {args.directory}')
+    required = ('target', 'manual') if args.operation == 'build' else ('repository', 'source', 'ref')
+    require(all(getattr(args, field) for field in required), f'{args.operation} requires {required}')
+    names = inventory(args.tag)
+    result = build(args, names) if args.operation == 'build' else restore(args, names)
+    result.update(directory=args.directory, inventory=','.join(names))
+    for key, value in result.items():
+        print(f'{key}={value}')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, KeyError, OSError, StopIteration, subprocess.CalledProcessError) as error:
+        print(f'Release assets failed: {error}', file=sys.stderr)
+        sys.exit(1)

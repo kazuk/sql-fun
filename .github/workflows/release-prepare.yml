@@ -63,7 +63,17 @@ jobs:
           uv run --no-project --no-config --python 3.12 \
             .local/sbin/release-state resolve "$RELEASE_REF" "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve immutable remote tag
+        id: tag
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RECORDED_REVISION: ${{ steps.state.outputs.revision }}
+        run: |
+          uv run --no-project --no-config --python 3.12 \
+            .local/sbin/release-state tag-status "$RELEASE_REF" "$RECORDED_REVISION" >> "$GITHUB_OUTPUT"
+
       - name: Require successful exact-SHA normal CI
+        if: steps.tag.outputs.status == 'absent'
         id: ci
         env:
           SOURCE_SHA: ${{ steps.state.outputs.source }}
@@ -74,6 +84,7 @@ jobs:
             echo "run_url=$(jq -r '.html_url' <<<"$selected")"
           } >> "$GITHUB_OUTPUT"
       - name: Adopt required CI release inputs
+        if: steps.tag.outputs.status == 'absent'
         env:
           CI_RUN_ID: ${{ steps.ci.outputs.run_id }}
         run: |
@@ -82,7 +93,7 @@ jobs:
             sql-fun-user-manual sql-fun-semver-baseline
       - name: Materialize crate versions
         id: materialize
-        if: steps.state.outputs.status == 'new'
+        if: steps.tag.outputs.status == 'absent' && steps.state.outputs.status == 'new'
         env:
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
           RELEASE_SNAPSHOT: ${{ steps.identity.outputs.snapshot }}
@@ -94,6 +105,7 @@ jobs:
             echo "paths=$state/changed-paths.txt"
           } >> "$GITHUB_OUTPUT"
       - name: Package adopted manual
+        if: steps.tag.outputs.status == 'absent'
         id: manual
         env:
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
@@ -113,6 +125,7 @@ jobs:
             echo "path=$directory/$archive"
           } >> "$GITHUB_OUTPUT"
       - name: Retain versioned manual asset
+        if: steps.tag.outputs.status == 'absent'
         uses: actions/upload-artifact@v7
         with:
           name: release-manual-${{ github.run_attempt }}
@@ -120,7 +133,7 @@ jobs:
           if-no-files-found: error
       - name: Adopt SemVer baseline candidate
         id: baseline
-        if: steps.state.outputs.status == 'new'
+        if: steps.tag.outputs.status == 'absent' && steps.state.outputs.status == 'new'
         env:
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
         run: |
@@ -144,7 +157,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Commit release state on the release branch
         id: committed
-        if: steps.state.outputs.status == 'new'
+        if: steps.tag.outputs.status == 'absent' && steps.state.outputs.status == 'new'
         env:
           RELEASE_REF: ${{ github.ref }}
           SOURCE_SHA: ${{ steps.state.outputs.source }}
@@ -180,12 +193,105 @@ jobs:
             echo "Original source: $SOURCE_SHA"
             echo "Recorded release source: $revision ($RELEASE_STATUS attempt)"
             echo "Release branch: $GITHUB_REF"
-            echo "Normal CI: $CI_RUN_URL"
-            echo 'Adopted: sql-fun-user-manual, sql-fun-semver-baseline'
-            echo "Manual asset: $MANUAL_ARCHIVE (Actions artifact: release-manual-$GITHUB_RUN_ATTEMPT)"
-            echo 'main was not modified. Release build, immutable tag and draft integration remain downstream work.'
+            echo "Tag preflight: ${{ steps.tag.outputs.status }}"
+            if [[ -n "$CI_RUN_URL" ]]; then
+              echo "Normal CI: $CI_RUN_URL"
+              echo 'Adopted: sql-fun-user-manual, sql-fun-semver-baseline'
+              echo "Manual asset: $MANUAL_ARCHIVE (Actions artifact: release-manual-$GITHUB_RUN_ATTEMPT)"
+            else
+              echo 'Matching-tag recovery: CI inputs and all producer work skipped.'
+            fi
+            echo 'main was not modified. Draft integration remains downstream work.'
             echo 'Materialized crate versions:'
             echo '```text'
             cat "$versions"
             echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build and assemble committed release assets
+        id: build
+        if: steps.tag.outputs.status == 'absent'
+        env:
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+          RECORDED_REVISION: ${{ steps.final.outputs.revision }}
+          MANUAL_PATH: ${{ steps.manual.outputs.path }}
+        run: |
+          uv run --no-project --no-config --python 3.12 .local/sbin/release-assets build \
+            --tag "$RELEASE_TAG" --revision "$RECORDED_REVISION" \
+            --target "$RUNNER_TEMP/release-target-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --directory "$RUNNER_TEMP/prepared-release-assets" --manual "$MANUAL_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Retain complete prepared release assets before tagging
+        id: retained
+        if: steps.tag.outputs.status == 'absent'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets-${{ steps.identity.outputs.tag }}-${{ steps.final.outputs.revision }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.build.outputs.directory }}/*
+          if-no-files-found: error
+
+      - name: Record retained asset locator before tag push
+        if: steps.tag.outputs.status == 'absent'
+        env:
+          ARTIFACT_ID: ${{ steps.retained.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.retained.outputs.artifact-url }}
+        run: |
+          echo "Complete prepared assets retained: artifact $ARTIFACT_ID, $ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create and push immutable release tag
+        if: steps.tag.outputs.status == 'absent'
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RECORDED_REVISION: ${{ steps.final.outputs.revision }}
+        run: |
+          uv run --no-project --no-config --python 3.12 \
+            .local/sbin/release-state tag-push "$RELEASE_REF" "$RECORDED_REVISION"
+
+      - name: Restore available prepared assets for existing tag
+        id: restored
+        if: steps.tag.outputs.status == 'matching'
+        env:
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+          RECORDED_REVISION: ${{ steps.final.outputs.revision }}
+          SOURCE_SHA: ${{ steps.state.outputs.source }}
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          uv run --no-project --no-config --python 3.12 .local/sbin/release-assets restore \
+            --tag "$RELEASE_TAG" --revision "$RECORDED_REVISION" --source "$SOURCE_SHA" \
+            --repository "$GITHUB_REPOSITORY" --ref "$RELEASE_REF" \
+            --directory "$RUNNER_TEMP/prepared-release-assets" >> "$GITHUB_OUTPUT"
+
+      - name: Hand off prepared assets for downstream Draft integration
+        id: assets
+        env:
+          ASSET_DIRECTORY: ${{ steps.build.outputs.directory || steps.restored.outputs.directory }}
+          ASSET_INVENTORY: ${{ steps.build.outputs.inventory || steps.restored.outputs.inventory }}
+          ARTIFACT_ID: ${{ steps.retained.outputs.artifact-id || steps.restored.outputs.artifact-id }}
+          ARTIFACT_NAME: release-assets-${{ steps.identity.outputs.tag }}-${{ steps.final.outputs.revision }}-${{ github.run_id }}-${{ github.run_attempt }}
+          RESTORED_NAME: ${{ steps.restored.outputs.artifact-name }}
+          PRODUCER_RUN: ${{ steps.restored.outputs.run-id || github.run_id }}
+          TAG_STATUS: ${{ steps.tag.outputs.status }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+          RECORDED_REVISION: ${{ steps.final.outputs.revision }}
+          SOURCE_SHA: ${{ steps.state.outputs.source }}
+        run: |
+          mode=produced
+          [[ "$TAG_STATUS" != matching ]] || mode=recovered
+          name="${RESTORED_NAME:-$ARTIFACT_NAME}"
+          {
+            echo "directory=$ASSET_DIRECTORY"
+            echo "inventory=$ASSET_INVENTORY"
+            echo "artifact-id=$ARTIFACT_ID"
+            echo "artifact-name=$name"
+            echo "run-id=$PRODUCER_RUN"
+            echo "status=$mode"
+            echo "tag=$RELEASE_TAG"
+            echo "source=$SOURCE_SHA"
+            echo "revision=$RECORDED_REVISION"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "Immutable remote tag: $RELEASE_TAG at $RECORDED_REVISION ($mode)"
+            echo "Prepared assets: $ASSET_INVENTORY"
+            echo "Actions artifact: $name (ID $ARTIFACT_ID, run $PRODUCER_RUN)"
+            echo 'Complete assets are available for downstream Draft integration; no Release was created.'
           } >> "$GITHUB_STEP_SUMMARY"

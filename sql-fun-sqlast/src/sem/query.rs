@@ -918,15 +918,13 @@ impl SemanticValues {
                 if let Some(target) = targets.get(index) {
                     visitor.assignment(value, target)?;
                 }
-                let column = self
-                    .columns
-                    .get_column_at(index)
-                    .expect("VALUES output position");
-                let name = column
-                    .column_name()
-                    .as_ref()
-                    .map_or("", crate::sem::ColumnName::as_str);
-                visitor.values_output(index, name, value);
+                if let Some(column) = self.columns.get_column_at(index) {
+                    let name = column
+                        .column_name()
+                        .as_ref()
+                        .map_or("", crate::sem::ColumnName::as_str);
+                    visitor.values_output(index, name, value);
+                }
             }
         }
         Ok(())

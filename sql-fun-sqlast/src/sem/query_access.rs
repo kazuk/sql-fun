@@ -538,6 +538,12 @@ mod tests {
     }
 
     #[test]
+    fn values_observation_only_publishes_bound_output_positions() {
+        let (accesses, _) = query_access::analyze_diagnosed("VALUES (1), (2, 3)");
+        assert!(accesses.records().is_empty());
+    }
+
+    #[test]
     fn sql_visible_objects_stop_at_view_and_function_outputs() {
         let accesses = query_access::analyze_in(
             "SELECT v.id, f.f, m.id FROM v CROSS JOIN f() CROSS JOIN m",

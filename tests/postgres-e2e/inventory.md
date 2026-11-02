@@ -1,3 +1,5 @@
+# Query access matrix
+
 | Relation | Column | Access purpose | Rust queries (source; statement) |
 | --- | --- | --- | --- |
 | public.e2e_items | — | DeleteRows | `delete_item` (&lt;unknown&gt;:34; 1) |

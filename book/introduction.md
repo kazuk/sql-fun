@@ -179,7 +179,7 @@ interpret SQL, resolve numeric IDs or reshape the data:
 
 The beginning of the rendered matrix from the same tested fixture is:
 
-{{#include ../tests/postgres-e2e/inventory.md:1:8}}
+{{#include ../tests/postgres-e2e/inventory.md:3:10}}
 
 Use the column-access rows in the same template for a column matrix. A renderer
 may choose a different presentation while consuming the same nested mappings.

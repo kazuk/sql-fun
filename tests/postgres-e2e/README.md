@@ -9,11 +9,14 @@ tests/postgres-e2e/run.sh --local
 
 The command builds the local CLI/server, starts disposable PostgreSQL 18,
 applies `schema.sql` with `psql`, generates a fresh lockfile with `sql-fun check`,
-and executes the ordinary Cargo consumer. Parameters explicitly declare their
+validates the generated CRUD/query inventory against `inventory.toml`, checks
+validation without writes and deterministic regeneration, and executes the
+ordinary Cargo consumer. Parameters explicitly declare their
 SQL types using `${id:bigint}` and `${name:text}`. Rust assertions verify bound
-integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`.
+integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`,
+including RETURNING, a self-join, a CTE, a scalar subquery and a view.
 Failure in any phase makes the command fail. Containers, server processes, generated
-lockfiles, and temporary state are cleaned up on exit or handled interruption.
+lockfiles, inventories, and temporary state are cleaned up on exit or handled interruption.
 Dependency artifacts persist in the repository's `target/` (or an explicitly
 supplied `CARGO_TARGET_DIR`) and are reused across queries and subsequent local
 runs. The consumer itself is rebuilt against each run's generated lockfile.

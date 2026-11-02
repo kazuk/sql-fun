@@ -107,93 +107,50 @@ select u.id, u.name from users u where u.is_active=TRUE
 
 ## CRUD table generation
 
-`sql-fun` automatically generates a `CRUD table` in TOML format.
+`sql-fun check` generates an inspectable TOML inventory showing which selected
+Rust query functions access each SQL-visible relation and column, and how.
+It writes `sql-fun.<datasource>.<schema>.toml` beside the existing lockfile.
+For datasource `default` and schema-dump variant `develop`, the filename is
+`sql-fun.default.develop.toml`.
 
-Given this example Rust code:
+For example, the maintained PostgreSQL E2E fixture contains this query:
 
-```rust
-#[sql_fun::sql_query_one(
-    sql="insert into users (name) values (${name}) returning id"
-)]
-async fn insert_user(client: &Client, name: &str ) 
-  -> Result<IdRow, ApplicationError> {};
-
-#[sql_fun::sql_query_opt(sql="select id, name from users where id=${id}")]
-async fn select_user_by_id(client: &Client, id: i64 ) 
-  -> Result<Option<UserRow>, ApplicationError> {};
-
-#[sql_fun::sql_query_opt(sql="select id, name from users where name=${name}")]
-async fn find_user_by_name(client: &Client, name: &str ) 
-  -> Result<Option<UserRow>, ApplicationError> {};
-
-#[sql_fun::sql_query_opt(
-    sql="delete from users u where id=${name} returning u.id"
-)]
-async fn delete_user_by_id(client: &Client, id: i64 ) 
-  -> Result<Option<IdRow>, ApplicationError> {};
+```sql
+UPDATE e2e_items
+SET id = id, name = ${name:text}
+WHERE id = ${id:bigint}
+RETURNING id, name
 ```
 
-`sql-fun` will generate a `sql-fun.develop.toml` file like this:
-
-(The `develop` part of the filename is determined by the `SQL_FUN_SCHEMA`
-environment variable.)
+Its inventory query record looks like this (excerpt from the tested fixture):
 
 ```toml
-[table.users]
-inserts=["insert_user"]
-selects=["select_user_by_id", "find_user_by_name"]
-deletes=["delete_user_by_id"]
-updates=["update_user_name_by_id"]
-
-[column.users.id]
-sql_type="bigint"
-type="i64"
-where_by=["select_user_by_id", "delete_user_by_id"]
-update_by=["insert_user"]
-
-[column.users.name]
-sql_type="varchar"
-type="String"
-where_by=["select_user_by_name"]
-update_by=["insert_user"]
-
-[queries.insert_user]
-sql="insert into users (name) values ($1) returning id"
-parameters=["name"]
-results=["id"]
-creates=["user"]
-
-[queries.select_user_by_id]
-sql="select id, name from users where id=$1"
-parameters=["id"]
-results=["id", "name"]
-reads= ["users"]
-
-[queries.find_user_by_name]
-sql="select id, name from users where name=$1"
-parameters=["name"]
-results=["id", "name"]
-reads= ["users"]
-
-[queries.delete_user_by_id]
-sql="delete from users u where id=$1 returning u.id"
-parameters=["id"]
-results=["id"]
-deletes=["users"]
-
+{{#include ../tests/postgres-e2e/inventory.toml:update-query}}
 ```
 
-You can convert this TOML to JSON and process it with `jq` or other tools to
-generate documentation or reports for your SQL usage automatically.
+The source fields preserve the extracted Rust location; `<unknown>` means the
+extractor did not supply a file name. Query IDs are local to this document.
+For `public.e2e_items.id`, the column access list includes all four purposes of
+that query, with one-based query/statement references:
 
-Each `[queries.*]` section includes the exact SQL string that will be sent to
-PostgreSQL.
+```toml
+{{#include ../tests/postgres-e2e/inventory.toml:update-id-accesses}}
+```
 
-Unlike many ORMs, `sql-fun` makes it clear exactly what SQL will be executed—no
-hidden queries, no surprises.
+`UpdateTarget` identifies the assignment destination, `UpdateInput` the value
+expression read, `UpdateFilter` the WHERE read, and `UpdateReturning` the output
+read. The relation also has `UpdateRows` involvement. Reads and writes to the
+same column remain separate facts. INSERT, SELECT and DELETE retain their own
+detailed purposes, including RETURNING and filtering.
 
-This means your carefully written SQL is preserved—not buried in macros or lost
-to code generation.
+The inventory covers the invocation's **selected targets**, not necessarily the
+entire workspace. Regeneration replaces entries for touched datasources; it
+leaves other datasource files untouched. Queries with no object accesses still
+appear. View and table-function accesses stop at their SQL-visible objects;
+view definitions and function bodies are not recursively expanded.
 
-Even if you switch to another tool in the future, you’ll always have a clear,
-structured record of your queries.
+Use this data for schema-impact analysis or query-usage reports. It does not
+certify access-control correctness or map queries to business functions.
+Executable SQL and code-generation metadata remain in the lockfile. See
+[`check`](cli/check.md#crudquery-inventory) for the complete field definitions,
+validation options and failure behavior.

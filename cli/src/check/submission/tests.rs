@@ -32,6 +32,7 @@ async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
     for (index, datasource) in [(1, "first"), (3, "second"), (4, "first")] {
         let request = &requests[index];
         assert_eq!(request["method"], "analyze_query");
+        assert_eq!(request["params"]["analyze_access"], true);
         assert_eq!(
             request["params"]["context_handle"],
             format!("context-{datasource}")
@@ -263,7 +264,7 @@ async fn check_session_regenerates_multiple_statements_and_removes_stale_entries
     assert_eq!(content.matches("[[entries.statements]]").count(), 4);
     assert_eq!(
         String::from_utf8(output).unwrap(),
-        "Analyzing 2 query functions\n..\nWriting lockfiles\nCompleted: 2/2 query functions analyzed\n"
+        "Analyzing 2 query functions\n..\nWriting lockfiles and inventories\nCompleted: 2/2 query functions analyzed\n"
     );
 }
 
@@ -285,6 +286,11 @@ async fn check_session_does_not_write_on_rpc_failure(#[case] failure: &'static s
     let path = args.lockfile_path("first").unwrap();
     project.write_lockfile("first", "old hash", &[]);
     let old = std::fs::read_to_string(&path).unwrap();
+    let inventory_path = args
+        .project_dir()
+        .unwrap()
+        .join(format!("sql-fun.first.{}.toml", args.schema()));
+    std::fs::write(&inventory_path, "prior inventory").unwrap();
     let requirements = test_helpers::requirements(
         &["first", "first"],
         "SELECT 1",
@@ -295,13 +301,17 @@ async fn check_session_does_not_write_on_rpc_failure(#[case] failure: &'static s
         test_helpers::peer_with_response(test_helpers::successful_response(1), Some(failure)).await;
     let mut output = Vec::new();
     let mut progress = Progress::new(&mut output, ProgressMode::dots());
-    let result = CheckArgs::try_parse_from(["check"])
+    let result = CheckArgs::try_parse_from(["check", "--force-rebuild"])
         .unwrap()
         .process_analyses(client, &args, requirements, lockfiles, &mut progress)
         .await;
     progress.finish(false).unwrap();
     assert!(result.is_err());
     assert_eq!(std::fs::read_to_string(path).unwrap(), old);
+    assert_eq!(
+        std::fs::read_to_string(inventory_path).unwrap(),
+        "prior inventory"
+    );
     peer.await.unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(output.contains("Stopped:"));
@@ -350,6 +360,10 @@ async fn completed_ineligible_analysis_removes_old_entries_and_returns_failure(
     let mut response = test_helpers::successful_response(count);
     response["queries"]["items"][failed]["complete"] = ::serde_json::json!(false);
     response["queries"]["items"][failed]["execute_sql"] = ::serde_json::Value::Null;
+    response["queries"]["items"][failed]["column_access"] = ::serde_json::json!({
+        "handle":"accesses", "total_length":1, "offset":0, "require_release":false,
+        "items":[{"access_kind":"ReadRows", "relation_kind":"View", "relation":{"catalog":null,"schema":"public","name":"visible_view"}, "column_name":null}]
+    });
     let (client, peer) = test_helpers::peer_with_response(response, None).await;
     let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
     let result = CheckArgs::try_parse_from(["check"])
@@ -360,6 +374,13 @@ async fn completed_ineligible_analysis_removes_old_entries_and_returns_failure(
     assert_eq!(result, std::process::ExitCode::FAILURE);
     let content = std::fs::read_to_string(args.lockfile_path("first").unwrap()).unwrap();
     assert!(content.contains("entries = []"));
+    let inventory = std::fs::read_to_string(
+        args.project_dir()
+            .unwrap()
+            .join(format!("sql-fun.first.{}.toml", args.schema())),
+    )
+    .unwrap();
+    assert!(inventory.contains("visible_view") && inventory.contains("ReadRows"));
     peer.await.unwrap();
 }
 

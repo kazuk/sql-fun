@@ -407,10 +407,16 @@ this session's eligible query functions. It preserves statement order and
 per-statement bindings and result shapes for multi-statement functions. It waits
 for successful submission and connection completion before saving any output.
 See [`check`](../cli/check.md) for validation, empty-session, and progress behavior.
-Diagnostic rendering remains separate work (#699).
+The inventory-producing request explicitly enables `analyze_access`. The CLI
+aggregates the returned single access collection independently of `complete`,
+parameter inference and lockfile eligibility. It does not classify SQL diagnostics
+to infer access-analysis status. Relation/column groups preserve detailed access
+kinds and reference source-correlated queries and their statement indices in
+`sql-fun.<datasource>.<schema>.toml`, alongside the existing lockfile.
 
 The server handles SQL analysis and reusable CTE expansion. The CLI handles
-Rust source extraction, source-level reporting, and lockfile policy. The
+Rust source extraction, source-level reporting, lockfile policy, and cross-query
+inventory aggregation/rendering. The
 server's analysis of SQL parameters does not itself establish whether a Rust
 function's declared parameter types are compatible.
 
@@ -431,7 +437,7 @@ implementation and reference documentation cover the behavior.
 | `sql-fun-codegen` | `QueryRequirements::extract` |
 | `sql-fun-server/src/cte_realization.rs` | `realize_cte_catalog` produces a common AST and `OrderedBindings`; it is server-internal |
 | `sql-fun-server/src/lib.rs` | Connection-local initialization, query analysis and collection RPCs implemented; object-consumer handlers remain unfinished |
-| `cli/src/check.rs` | Requirements extraction and server submission exist; diagnostic presentation and lockfile integration are incomplete |
+| `cli/src/check.rs` | Requirements extraction, server submission, diagnostics, lockfiles and CRUD/query inventories |
 
 ### Pending design and implementation decisions
 

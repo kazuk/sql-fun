@@ -7,7 +7,7 @@ Check the application embedded queries and prepare to build.
 - Scan a schema dump and enumerate schema objects.
 - Scan a application source code and enumerate queries.
 - Validate all queries syntax and semantics.
-- Build CRUD table
+- Generate a CRUD/query inventory.
 - Prepare query information for `sql-fun` procidual macro
   - `sql-fun` procidual macro uses schema cache default
     - When schema cache not found or invalid:
@@ -30,12 +30,12 @@ from the selected targets disappear. A function whose analysis lacks executable
 SQL or required parameter/result metadata is omitted, including its old entry.
 SQL analysis failures make the command fail, but eligible entries are still
 saved. Connection, extraction, initialization, and RPC failures prevent saving
-an incomplete inventory.
+partial lockfiles or CRUD/query inventories.
 
 If no SQL query functions are extracted, `check` warns and succeeds without
-opening an analysis session or reading or changing any lockfile. This also applies
-to `--validate-only`, even if a datasource was selected. It does not clean up old
-lockfiles when all queries have been removed.
+opening an analysis session or reading or changing lockfiles or CRUD inventories.
+This also applies to `--validate-only`, even if a datasource was selected. It does
+not clean up old artifacts when all queries have been removed.
 
 A single-statement entry keeps its SQL, bindings, and result shape directly on
 `[[entries]]`. Multiple statements retain their order and independent metadata
@@ -43,8 +43,65 @@ in `[[entries.statements]]` tables. Acceptance by analysis does not guarantee th
 the selected connector can execute multiple statements; proc-macro/codegen makes
 that capability decision and reports unsupported operations.
 
-Diagnostic rendering is separate work tracked by #699. Analysis results retain
-their diagnostics even when no lockfile entry can be produced.
+## CRUD/query inventory
+
+For each datasource referenced by the selected targets, `check` also writes
+`sql-fun.<datasource>.<schema>.toml` beside the lockfile, in the directory containing
+the selected metadata file. Here `<schema>` is the selected schema-dump variant,
+not a SQL schema name. For example, datasource `default` and variant `develop`
+produce `sql-fun.default.develop.toml`.
+
+The inventory identifies which queries access each SQL-visible relation and
+column, preserving detailed access purposes such as `UpdateTarget`, `UpdateInput`,
+`UpdateFilter` and `UpdateReturning`. A column can appear under several purposes
+in one statement. Relation-level `DeleteRows` does not imply access to every
+column. Purposes describe the enclosing top-level operation: column references
+inside a scalar subquery in SELECT output retain `SelectOutput`, including
+references written in that subquery's WHERE.
+
+The TOML contains:
+
+- `inventory_version`, `datasource`, `schema_variant`, `schema_dump_hash`: artifact
+  format and selected input identity.
+- `[[queries]]`: a document-local one-based `id`, Rust `function`, `source_file`,
+  `source_line`, query/CTE `fingerprint`, and statement count `statements`.
+  Equal function names at different source locations remain separate queries.
+  Source fields preserve extractor values, including `<unknown>` when a file
+  name is unavailable.
+- `[[relations]]`: SQL object `kind`, optional `catalog`/`schema`, and `name`.
+  Names are logical identifier components; embedded dots are not separators.
+- `[[relations.accesses]]`: relation-level `kind`, `query` ID and one-based
+  `statement` index within that query.
+- `[[relations.columns]]` and `[[relations.columns.accesses]]`: column `name` and
+  its access purposes with the same query/statement references.
+
+Query IDs are local to one generated document and may change when its selected
+query set changes. Empty access lists are valid. Query records remain present
+when SQL accesses no schema objects or Rust generation lacks required types.
+The inventory does not duplicate executable SQL or Rust type metadata; lockfiles
+continue to serve code generation.
+
+Aliases, CTEs and subqueries use the resolved accesses returned by the server.
+A view reference identifies that view and its columns; a table-function output
+identifies the function's output columns. View definitions and function bodies
+are not recursively inspected. This is a query/schema usage inventory, not proof
+of access-control correctness or a mapping to business functions.
+
+Each touched datasource's inventory covers **only the queries selected by this
+invocation**. Regeneration removes entries absent from that selection; other
+datasources' files are untouched. Repeating the same check with unchanged inputs
+produces identical bytes. No timestamp or server-session identity is stored.
+
+Inventory collection is independent of Rust generation eligibility. SQL
+diagnostics are still reported and the command retains its existing failure
+result when a lockfile entry cannot be produced; returned access facts remain in
+the inventory. Extraction, initialization, RPC or connection errors prevent
+inventory publication, leaving any previous file stale. Each inventory is
+replaced atomically after analysis/connection completion. Lockfiles and inventory
+files are not replaced as one transaction; inspect the command result before
+using generated artifacts.
+
+See the [fixture-backed introductory example](../introduction.md#crud-table-generation).
 
 ## SQL input rules
 
@@ -111,7 +168,8 @@ Default : Cargo default package to check.
 
 ### Lockfile control options
 
-- `--force-rebuild`: Start with an empty initial lockfile state. All queries are
+- `--force-rebuild`: Start with an empty initial lockfile state and regenerate
+  inventory without loading its previous content. All queries are
   analyzed and the entire lockfile is regenerated, as in normal mode. This treats
   every entry as new; it does not invalidate the server schema cache. Conflicts
   with `--validate-only` and `--expect-schema-dump-valid`.
@@ -121,7 +179,13 @@ Default : Cargo default package to check.
   empty, an absent file and an existing valid empty file both succeed. Existing
   files still require valid matching version/schema-hash headers, even when
   empty. Stale nonempty files, malformed TOML, and read errors fail validation.
-- `--expect-schema-dump-valid`: Fail if schema dump changed
+  Inventory validation also compares the prospective parsed document, including
+  query/source identity, membership, detailed accesses and headers. Missing expected
+  inventories, stale content, malformed TOML and unsupported versions fail;
+  whitespace alone does not. Queries with no object accesses still require an
+  inventory. The zero-extracted-query behavior described above takes precedence.
+- `--expect-schema-dump-valid`: Fail if an existing lockfile or inventory records
+  a different schema-dump hash.
 
 ## Progress output
 
@@ -135,7 +199,7 @@ takes precedence over the environment; the default is `names`.
   once. The line ends cleanly on completion or failure.
 - `names`: report each analyzed function name and the completed/total counts.
 
-Progress includes extraction, analysis, and lockfile finalization phases. It goes
+Progress includes extraction, analysis, and artifact finalization phases. It goes
 only to **stdout**, including when redirected. Select `silent` if stdout must be
 free of progress. Warnings and diagnostic rendering use **stderr**. A completed
 analysis count does not imply successful finalization: errors report termination

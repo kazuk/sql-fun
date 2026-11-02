@@ -40,6 +40,7 @@ fi
 run_dir=$(mktemp -d /tmp/sql-fun-postgres-e2e.XXXXXXXX)
 server_pid=""
 lockfile="$fixture_dir/default.${run_dir##*/}.lock"
+inventory="$fixture_dir/sql-fun.default.${run_dir##*/}.toml"
 function cleanup() {
   local status=$? running_pid
   trap - EXIT
@@ -60,7 +61,7 @@ function cleanup() {
       exit 1
     fi
   fi
-  rm -f -- "$lockfile"
+  rm -f -- "$lockfile" "$inventory"
   rm -rf -- "$run_dir"
   exit "$status"
 }
@@ -129,6 +130,13 @@ fi
 cd "$fixture_dir"
 "$cli_binary" check --bin sql-fun-postgres-e2e
 test -s "$lockfile"
+test -s "$inventory"
+cp "$inventory" "$run_dir/first-inventory.toml"
+"$cli_binary" check --bin sql-fun-postgres-e2e --validate-only
+cmp "$inventory" "$run_dir/first-inventory.toml"
+"$cli_binary" check --bin sql-fun-postgres-e2e
+cmp "$inventory" "$run_dir/first-inventory.toml"
+export SQL_FUN_E2E_INVENTORY="$inventory"
 # Macro inputs include this run's lockfile and are not Cargo fingerprint inputs.
 cargo clean --package sql-fun-postgres-e2e
 cargo run --bin sql-fun-postgres-e2e

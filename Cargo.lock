@@ -3052,7 +3052,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun"
-version = "0.1.0"
+version = "0.1.1-snapshot1"
 dependencies = [
  "anyhow",
  "bon",
@@ -3081,7 +3081,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-cli"
-version = "0.1.0"
+version = "0.2.0-snapshot1"
 dependencies = [
  "anyhow",
  "bollard",
@@ -3128,7 +3128,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-client"
-version = "0.1.0"
+version = "0.2.0-snapshot1"
 dependencies = [
  "bon",
  "clap",
@@ -3152,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-codegen"
-version = "0.1.0"
+version = "0.1.1-snapshot1"
 dependencies = [
  "assert_matches",
  "bon",
@@ -3179,14 +3179,14 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-collector"
-version = "0.1.0"
+version = "0.1.1-snapshot1"
 dependencies = [
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "sql-fun-core"
-version = "0.1.1"
+version = "0.2.0-snapshot1"
 dependencies = [
  "assert_matches",
  "clap",
@@ -3218,7 +3218,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-server"
-version = "0.1.0"
+version = "0.2.0-snapshot1"
 dependencies = [
  "clap",
  "derive-getters",
@@ -3246,7 +3246,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-server-api"
-version = "0.1.0"
+version = "0.2.0-snapshot1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3265,7 +3265,7 @@ dependencies = [
 
 [[package]]
 name = "sql-fun-sqlast"
-version = "0.1.0"
+version = "0.2.0-snapshot1"
 dependencies = [
  "assert_matches",
  "clap",

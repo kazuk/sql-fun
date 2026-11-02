@@ -112,6 +112,7 @@ def validate_record(revision, release):
 
 def resolve(args):
     clean()
+    require(git('rev-parse', 'HEAD') == args.source, 'Resolution checkout must match selected revision')
     release = identity(args.ref, args.source)
     tip = remote_tip(args.ref)
     requested = record(args.source)

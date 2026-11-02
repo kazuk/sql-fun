@@ -65,7 +65,7 @@ fn child_parameter_is_independent_of_boolean_result(#[case] sql: &str) {
 #[derive(Default)]
 struct Parameters(Vec<u32>);
 
-impl crate::sem::traversal::SemanticVisitor for Parameters {
+impl crate::sem::traversal::SemanticVisitorMut for Parameters {
     fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), crate::sem::AnalysisError> {
         if let SemScalarExpr::Param(parameter) = value {
             self.0.push(parameter.position());
@@ -128,7 +128,7 @@ struct Bindings {
     ambiguous: usize,
 }
 
-impl crate::sem::traversal::SemanticVisitor for Bindings {
+impl crate::sem::traversal::SemanticVisitorMut for Bindings {
     fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), crate::sem::AnalysisError> {
         use crate::sem::ColumnReferenceExpr;
         match value {

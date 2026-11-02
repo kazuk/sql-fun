@@ -111,7 +111,7 @@ impl ArrayIndex {
 }
 
 impl ArrayIndex {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -119,15 +119,32 @@ impl ArrayIndex {
         self.index.walk(visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.array.visit(visitor)?;
+        self.index.visit(visitor)?;
+        Ok(())
+    }
 }
 
 impl ArrayIndex {
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.array.walk_assignment_target(visitor)?;
         self.index.walk(visitor)?;
+        visitor.subscript(&self.index);
+        Ok(())
+    }
+    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.array.visit_assignment_target(visitor)?;
+        self.index.visit(visitor)?;
         visitor.subscript(&self.index);
         Ok(())
     }

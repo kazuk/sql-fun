@@ -123,17 +123,24 @@ impl SemScalarExprNode for NullTestExpr {
 }
 
 impl BooleanExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         self.body.walk(visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.body.visit(visitor)?;
+        Ok(())
+    }
 }
 
 impl BooleanExprBody {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -147,14 +154,35 @@ impl BooleanExprBody {
         }
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::And(values) | Self::Or(values) => {
+                for value in values {
+                    value.visit(visitor)?;
+                }
+            }
+            Self::Not(value) => value.visit(visitor)?,
+        }
+        Ok(())
+    }
 }
 
 impl NullTestExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         self.arg_expr.walk(visitor)?;
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg_expr.visit(visitor)?;
         Ok(())
     }
 }

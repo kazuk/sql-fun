@@ -174,7 +174,7 @@ impl SemScalarExprNode for ArithExpr {
 }
 
 impl BetweenExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -183,10 +183,19 @@ impl BetweenExpr {
         self.end.walk(visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left.visit(visitor)?;
+        self.start.visit(visitor)?;
+        self.end.visit(visitor)?;
+        Ok(())
+    }
 }
 
 impl ArithExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -203,6 +212,26 @@ impl ArithExpr {
             Self::Between(v) => v.walk(visitor)?,
             Self::Pattern(value) => value.walk(visitor)?,
             Self::SqliteLike(value) => value.walk(visitor)?,
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::OpBinary(v) => v.visit(visitor)?,
+            Self::OpLeftUnary(v) => v.visit(visitor)?,
+            Self::OpRightUnary(v) => v.visit(visitor)?,
+            Self::OpAnyBinary(v) => v.visit(visitor)?,
+            Self::OpAllBinary(v) => v.visit(visitor)?,
+            Self::UndefinedOperator(v) => v.visit(visitor)?,
+            Self::UndefinedOperatorAny(v) => v.visit(visitor)?,
+            Self::UndefinedOperatorAll(v) => v.visit(visitor)?,
+            Self::NullIfExpr(v) => v.visit(visitor)?,
+            Self::Between(v) => v.visit(visitor)?,
+            Self::Pattern(value) => value.visit(visitor)?,
+            Self::SqliteLike(value) => value.visit(visitor)?,
         }
         Ok(())
     }

@@ -167,9 +167,8 @@ impl QueryAccess {
         statement: &SemAst,
     ) -> Result<Self, AnalysisError> {
         let mut collector = AccessCollector::new(context);
-        let mut statement = statement.clone();
         if statement.result_columns().is_some() {
-            statement.walk_nested_command(&mut collector)?;
+            statement.visit_nested_command(&mut collector)?;
         }
         Ok(collector.finish())
     }
@@ -401,6 +400,19 @@ mod tests {
         "value",
         AccessKind::update_input()
     )]
+    #[case::values_later_output(
+        "WITH c(x) AS (VALUES ((SELECT id FROM a)), ((SELECT value FROM b))) SELECT x FROM c WHERE x = 1",
+        "b",
+        "value",
+        AccessKind::select_output()
+    )]
+    #[case::values_later_filter(
+        "WITH c(x) AS (VALUES ((SELECT id FROM a)), ((SELECT value FROM b))) SELECT x FROM c WHERE x = 1",
+        "b",
+        "value",
+        AccessKind::select_filter()
+    )]
+    #[case::plain_distinct("SELECT DISTINCT id FROM a", "a", "id", AccessKind::select_distinct())]
     #[case::self_join(
         "SELECT x.value FROM a x JOIN a y ON x.id = y.id",
         "a",
@@ -511,6 +523,18 @@ mod tests {
             "{sql}: {:?}",
             accesses.records()
         );
+    }
+
+    #[rstest::rstest]
+    #[case::subquery("SELECT (SELECT id FROM b) FROM a")]
+    #[case::array_subquery("SELECT ARRAY(SELECT id FROM b) FROM a")]
+    #[case::values(
+        "WITH c(x) AS (VALUES ((SELECT id FROM a)), ((SELECT value FROM b))) SELECT DISTINCT x FROM c"
+    )]
+    #[case::update("UPDATE a SET (id, value) = (SELECT id, value FROM b) RETURNING id")]
+    fn collection_preserves_result_bindings(#[case] sql: &str) {
+        let accesses = query_access::analyze_preserving_output(sql);
+        assert!(!accesses.records().is_empty());
     }
 
     #[test]
@@ -883,7 +907,7 @@ impl<C: ParseContext> SemanticVisitor for AccessCollector<'_, C> {
             .expect("set operation entered")
             .push(self.finished.clone());
     }
-    fn set_output(&mut self, index: usize, name: &str, _value: &mut SemScalarExpr) {
+    fn set_output(&mut self, index: usize, name: &str, _value: &SemScalarExpr) {
         let mut columns = Vec::new();
         for operand in self.set_operands.last().expect("set operation entered") {
             if let Some((_, inputs)) = operand.0.get(index) {
@@ -1070,11 +1094,11 @@ impl<C: ParseContext> SemanticVisitor for AccessCollector<'_, C> {
             self.scope().bind(alias, output.aliased(alias));
         }
     }
-    fn enter_expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+    fn enter_expression(&mut self, _expression: &SemScalarExpr) -> Result<(), AnalysisError> {
         self.expressions.push(Vec::new());
         Ok(())
     }
-    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+    fn expression(&mut self, expression: &SemScalarExpr) -> Result<(), AnalysisError> {
         let columns = self.columns(expression);
         self.record_columns(&columns);
         let mut dependencies = self.expressions.pop().expect("balanced expression");
@@ -1093,14 +1117,39 @@ impl<C: ParseContext> SemanticVisitor for AccessCollector<'_, C> {
         self.last_expression = dependencies;
         Ok(())
     }
-    fn output(&mut self, name: &str, _expression: &mut SemScalarExpr) {
+    fn values_output(&mut self, index: usize, name: &str, _expression: &SemScalarExpr) {
+        let inputs = self.last_expression.clone();
+        if let Some((_, columns)) = self.scope().outputs.0.get_mut(index) {
+            for input in inputs {
+                if !columns.contains(&input) {
+                    columns.push(input);
+                }
+            }
+        } else {
+            self.scope()
+                .outputs
+                .0
+                .push((ColumnName::from(name), inputs));
+        }
+    }
+    fn distinct_outputs(&mut self) {
+        let columns = self
+            .scope()
+            .outputs
+            .0
+            .iter()
+            .flat_map(|(_, inputs)| inputs.clone())
+            .collect::<Vec<_>>();
+        self.record_columns(&columns);
+    }
+    fn output(&mut self, name: &str, _expression: &SemScalarExpr) {
         let columns = self.last_expression.clone();
         self.scope()
             .outputs
             .0
             .push((ColumnName::from(name), columns));
     }
-    fn assignment_target(&mut self, target: &mut SemScalarExpr) {
+    fn assignment_target(&mut self, target: &SemScalarExpr) {
         let columns = self.columns(target);
         self.record_columns(&columns);
     }

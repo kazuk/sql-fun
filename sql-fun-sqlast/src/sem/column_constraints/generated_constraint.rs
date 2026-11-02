@@ -99,7 +99,7 @@ impl GeneratedColumnConstraint {
 
     pub(super) fn rename_expression(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.expr.walk(visitor)
     }

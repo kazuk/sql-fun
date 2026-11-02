@@ -8,7 +8,7 @@ pub(crate) use self::destination::UpdateDestination;
 pub use self::view_support::ViewUpdateSupport;
 
 use crate::ast::TryFromWithTokens;
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext, QueryCte,
     ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TableName, TypeReference,
@@ -34,12 +34,21 @@ impl UpdateAssignmentCollection {
     ) -> Result<(), AnalysisError> {
         self.walk(&mut AssignmentChecker { context })
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for assignment in &mut self.0 {
             assignment.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for assignment in &self.0 {
+            assignment.visit(visitor)?;
         }
         Ok(())
     }
@@ -163,7 +172,7 @@ impl UpdateStatement {
     ) -> Result<(), AnalysisError> {
         self.walk(&mut AssignmentChecker { context })
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -174,26 +183,54 @@ impl UpdateStatement {
         visitor.leave_dml();
         result
     }
-    fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
-        visitor.access_action(
-            self.target.full_name(),
-            crate::sem::AccessKind::update_rows(),
-        );
-        visitor.access_purpose(crate::sem::AccessKind::update_source());
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_dml();
+        visitor.enter_query();
+        let result = self.visit_body(visitor);
+        visitor.leave_query();
+        visitor.leave_dml();
+        result
+    }
+    fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.table_binding(&mut self.target);
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }
         self.from.walk(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::update_filter());
         if let Some(predicate) = &mut self.predicate {
             predicate.walk(visitor)?;
         }
         // PostgreSQL transforms WHERE and RETURNING before SET assignments.
         // This order matters when RETURNING resolves an unknown parameter.
-        visitor.access_purpose(crate::sem::AccessKind::update_returning());
         visitor.dml_returning(&mut self.returning)?;
         self.assignments.walk(visitor)
+    }
+    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_action(
+            self.target.full_name(),
+            crate::sem::AccessKind::update_rows(),
+        );
+        visitor.access_purpose(crate::sem::AccessKind::update_source());
+        visitor.table_binding(&self.target);
+        for cte in &self.with {
+            cte.visit(visitor)?;
+        }
+        self.from.visit(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::update_filter());
+        if let Some(predicate) = &self.predicate {
+            predicate.visit(visitor)?;
+        }
+        // PostgreSQL transforms WHERE and RETURNING before SET assignments.
+        // This order matters when RETURNING resolves an unknown parameter.
+        visitor.access_purpose(crate::sem::AccessKind::update_returning());
+        visitor.dml_returning(&self.returning)?;
+        self.assignments.visit(visitor)
     }
 }
 
@@ -228,13 +265,22 @@ impl UpdateAssignment {
     pub const fn value(&self) -> &UpdateValue {
         &self.value
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::update_target());
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.destination.walk_assignment_target(visitor)?;
         visitor.bound_definition(&mut self.column, &self.destination);
-        visitor.access_purpose(crate::sem::AccessKind::update_input());
         self.value
             .walk(visitor, self.destination.get_type().as_ref())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::update_target());
+        self.destination.visit_assignment_target(visitor)?;
+        visitor.bound_definition(&self.column, &self.destination);
+        visitor.access_purpose(crate::sem::AccessKind::update_input());
+        self.value
+            .visit(visitor, self.destination.get_type().as_ref())
     }
 }
 
@@ -295,7 +341,7 @@ impl UpdateValue {
             _ => None,
         }
     }
-    fn walk<V: SemanticVisitor>(
+    fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         ty: Option<&TypeReference>,
@@ -317,11 +363,30 @@ impl UpdateValue {
         }
         Ok(())
     }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        ty: Option<&TypeReference>,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Default => {}
+            Self::Expression(value) => {
+                value.visit(visitor)?;
+                if let Some(ty) = ty {
+                    visitor.assignment_value(value, ty)?;
+                }
+            }
+            Self::Query(value) => {
+                value.query.visit(visitor)?;
+            }
+        }
+        Ok(())
+    }
 }
 struct AssignmentChecker<'a, C> {
     context: &'a mut C,
 }
-impl<C: ParseContext> SemanticVisitor for AssignmentChecker<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
     fn assignment_value(
         &mut self,
         value: &mut SemScalarExpr,

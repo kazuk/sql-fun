@@ -4,7 +4,7 @@ use crate::{
         AliasSpec, AnalysisError, ColumnCollection, ColumnName, ColumnReferenceExpr, DataSource,
         FullName, Nullable, OverloadVariant, QueryName, QueryNameResolution, SemScalarExpr,
         TableFunctionProblem, TypeReference, WildcardTypedRecord, WithClause, WithTypmod,
-        data_source::AliasName, traversal::SemanticVisitor,
+        data_source::AliasName, traversal::SemanticVisitorMut,
     },
 };
 
@@ -89,8 +89,19 @@ impl TableFunctionDataSource {
 }
 
 impl TableFunctionDataSource {
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        let mut args = self.args.to_vec();
+        for argument in &mut args {
+            argument.walk(visitor)?;
+        }
+        self.args = args.into();
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         if let Some(name) = &self.function_name
@@ -98,11 +109,9 @@ impl TableFunctionDataSource {
         {
             visitor.function_binding(name, &self.alias, &self.output.names());
         }
-        let mut args = self.args.to_vec();
-        for argument in &mut args {
-            argument.walk(visitor)?;
+        for argument in self.args.iter() {
+            argument.visit(visitor)?;
         }
-        self.args = args.into();
         Ok(())
     }
 }

@@ -176,7 +176,7 @@ impl SqliteCaseBuilder {
 }
 
 impl CaseExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -187,10 +187,21 @@ impl CaseExpr {
         crate::sem::traversal::optional(&mut self.default_expr, visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        crate::sem::traversal::visit_optional(&self.arg_expr, visitor)?;
+        for arm in &self.when_exprs {
+            arm.visit(visitor)?;
+        }
+        crate::sem::traversal::visit_optional(&self.default_expr, visitor)?;
+        Ok(())
+    }
 }
 
 impl CaseWhen {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -198,6 +209,17 @@ impl CaseWhen {
         self.result.walk(visitor)?;
         if let Some(comparison) = &mut self.comparison {
             comparison.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.when_value.visit(visitor)?;
+        self.result.visit(visitor)?;
+        if let Some(comparison) = &self.comparison {
+            comparison.visit(visitor)?;
         }
         Ok(())
     }

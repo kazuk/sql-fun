@@ -7,7 +7,7 @@ use crate::sem::{AnalysisError, GroupingExpr, PgBuiltInType, SelectStatement, Se
 fn groupings(query: &SelectStatement) -> Vec<GroupingExpr> {
     #[derive(Default)]
     struct Groupings(Vec<GroupingExpr>);
-    impl crate::sem::traversal::SemanticVisitor for Groupings {
+    impl crate::sem::traversal::SemanticVisitorMut for Groupings {
         fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let Some(grouping) = expression.as_grouping() {
                 self.0.push(grouping.clone());

@@ -6,7 +6,7 @@ use crate::{
         AliasSpec, AnalysisError, DataSource, FromClause, PgBuiltInType, ResolutionFailure,
         ResultColumn, ResultColumnCollection, RuleIdentity, ScalarAnalysisContext, SemAst,
         SemScalarExpr, TableName, TypeReference, ViewLike, ViewName, WithClause,
-        problem::RuleProblem, traversal::SemanticVisitor,
+        problem::RuleProblem, traversal::SemanticVisitorMut,
     },
 };
 
@@ -366,7 +366,7 @@ impl<'a, C> PredicateValidator<'a, C> {
         }
     }
 }
-impl<C: ParseContext> SemanticVisitor for PredicateValidator<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for PredicateValidator<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }

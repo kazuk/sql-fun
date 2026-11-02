@@ -10,7 +10,7 @@ use crate::{
     sem::{
         AliasSpec, AnalysisError, ColumnName, DataSource, FromClause, FullName, PgBuiltInType,
         ResolutionFailure, ScalarAnalysisContext, SchemaName, SemAst, SemScalarExpr, ViewLike,
-        WithClause, problem::TriggerProblem, traversal::SemanticVisitor,
+        WithClause, problem::TriggerProblem, traversal::SemanticVisitorMut,
     },
 };
 
@@ -584,7 +584,7 @@ struct WhenValidator<'a, C> {
     context: &'a C,
     invalid: bool,
 }
-impl<C: ParseContext> SemanticVisitor for WhenValidator<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for WhenValidator<'_, C> {
     fn enter_query(&mut self) {
         self.invalid = true;
     }

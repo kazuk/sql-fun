@@ -388,7 +388,7 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitor>(
+    pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -403,6 +403,25 @@ impl SemAst {
             Self::DeleteStatement(delete) => {
                 visitor.relation_identity(delete.target().full_name());
                 delete.walk(visitor)
+            }
+            _ => unreachable!("only resolved common query/DML actions are traversed here"),
+        }
+    }
+    pub(crate) fn visit_nested_command<V: self::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::SelectStatement(query) => query.visit(visitor),
+            Self::InsertStatement(insert) => insert.visit(visitor),
+            Self::MergeStatement(merge) => merge.visit(visitor),
+            Self::UpdateStatement(update) => {
+                visitor.relation_identity(update.target().full_name());
+                update.visit(visitor)
+            }
+            Self::DeleteStatement(delete) => {
+                visitor.relation_identity(delete.target().full_name());
+                delete.visit(visitor)
             }
             _ => unreachable!("only resolved common query/DML actions are traversed here"),
         }

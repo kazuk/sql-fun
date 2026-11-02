@@ -35,11 +35,17 @@ impl NamedArgExpr {
     pub(crate) const fn canonicalize_grouping_key(&mut self) {
         self.source_span = None;
     }
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.value.walk(visitor)
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.value.visit(visitor)
     }
 }
 

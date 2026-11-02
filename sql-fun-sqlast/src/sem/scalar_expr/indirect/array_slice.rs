@@ -122,7 +122,7 @@ impl ArraySlice {
 }
 
 impl ArraySlice {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -131,16 +131,36 @@ impl ArraySlice {
         crate::sem::traversal::optional(&mut self.upper, visitor)?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.array.visit(visitor)?;
+        crate::sem::traversal::visit_optional(&self.lower, visitor)?;
+        crate::sem::traversal::visit_optional(&self.upper, visitor)?;
+        Ok(())
+    }
 }
 
 impl ArraySlice {
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.array.walk_assignment_target(visitor)?;
         for index in [&mut self.lower, &mut self.upper].into_iter().flatten() {
             index.walk(visitor)?;
+            visitor.subscript(index);
+        }
+        Ok(())
+    }
+    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.array.visit_assignment_target(visitor)?;
+        for index in [&self.lower, &self.upper].into_iter().flatten() {
+            index.visit(visitor)?;
             visitor.subscript(index);
         }
         Ok(())

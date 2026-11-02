@@ -25,7 +25,7 @@ impl QueryMetadata {
         &self.relations
     }
 }
-impl crate::sem::traversal::SemanticVisitor for QueryMetadata {
+impl crate::sem::traversal::SemanticVisitorMut for QueryMetadata {
     fn relation_identity(&mut self, name: &FullName) {
         if !self.relations.contains(name) {
             self.relations.push(name.clone());

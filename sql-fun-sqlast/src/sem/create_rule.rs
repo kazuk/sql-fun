@@ -1,5 +1,5 @@
 use crate::context::BaseParseContext;
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{AnalysisError, FullName, ParseContext, SemAst, SemScalarExpr};
 
 /// PostgreSQL rule identity: a rule name in one resolved relation's namespace.
@@ -263,7 +263,7 @@ impl CreateRule {
         self.dependencies = dependencies;
         Ok(())
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -276,6 +276,7 @@ impl CreateRule {
         }
         Ok(())
     }
+
     pub(crate) fn apply<C: ParseContext>(&self, mut context: C) -> Result<C, AnalysisError> {
         if !self.replace && context.rule(&self.identity).is_some() {
             context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
@@ -340,7 +341,7 @@ impl RuleDependencies {
         &self.types
     }
 }
-impl SemanticVisitor for RuleDependencies {
+impl SemanticVisitorMut for RuleDependencies {
     fn relation_identity(&mut self, name: &FullName) {
         if !self.relations.contains(name) {
             self.relations.push(name.clone());

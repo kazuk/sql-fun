@@ -326,7 +326,7 @@ impl DataSource {
 }
 
 impl DataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -343,6 +343,27 @@ impl DataSource {
             Self::UndefinedTableFunc(value) => value.walk(visitor)?,
             Self::RowFunctions(value) => value.walk(visitor)?,
             Self::RangeTableSample(sample) => sample.walk(visitor)?,
+            Self::Unknown(_, _) => {}
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::CteQuery(v) => v.visit(visitor)?,
+            Self::Table(v) => v.visit(visitor)?,
+            Self::View(v) => v.visit(visitor)?,
+            Self::JoinExpr(v) => v.visit(visitor)?,
+            Self::MergeRecord(v) => v.visit(visitor)?,
+            Self::Group(v) => v.visit(visitor)?,
+            Self::SubQuery(v) => v.visit(visitor)?,
+            Self::CallTableFunc(value) => value.visit(visitor)?,
+            Self::DeferredTableFunc(value) => value.visit(visitor)?,
+            Self::UndefinedTableFunc(value) => value.visit(visitor)?,
+            Self::RowFunctions(value) => value.visit(visitor)?,
+            Self::RangeTableSample(sample) => sample.visit(visitor)?,
             Self::Unknown(_, _) => {}
         }
         Ok(())

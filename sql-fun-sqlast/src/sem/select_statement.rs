@@ -60,7 +60,7 @@ impl SelectStatement {
         }
     }
 
-    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         index: usize,
@@ -181,7 +181,7 @@ impl SelectStatement {
 }
 
 struct SetOperationValidity(bool);
-impl crate::sem::traversal::SemanticVisitor for SetOperationValidity {
+impl crate::sem::traversal::SemanticVisitorMut for SetOperationValidity {
     fn walk_source_column_values(&self) -> bool {
         false
     }
@@ -326,7 +326,7 @@ mod test_scalar_scope {
 }
 
 impl SelectStatement {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -336,16 +336,32 @@ impl SelectStatement {
         result?;
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.enter_query();
+        let result = self.visit_body(visitor);
+        visitor.leave_query();
+        result?;
+        Ok(())
+    }
 }
 
 impl SelectStatement {
-    pub(super) fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk_body<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.walk_body_assigned(visitor, &[])
     }
-    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.visit_body_assigned(visitor, &[])
+    }
+    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
@@ -355,7 +371,17 @@ impl SelectStatement {
         visitor.leave_query();
         result
     }
-    pub(super) fn walk_body_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_query();
+        let result = self.visit_body_assigned(visitor, targets);
+        visitor.leave_query();
+        result
+    }
+    pub(super) fn walk_body_assigned<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
@@ -367,26 +393,54 @@ impl SelectStatement {
             Self::Set(query) => query.walk_assigned(visitor, targets),
         }
     }
+    pub(super) fn visit_body_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Simple(query) => query.visit_assigned(visitor, targets),
+            Self::Query(query) => query.visit_assigned(visitor, targets),
+            Self::Values(values) => values.visit_assigned(visitor, targets),
+            Self::Set(query) => query.visit_assigned(visitor, targets),
+        }
+    }
 }
 
 impl SelectStatementNode {
-    fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk_assigned<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_source());
         self.with_clause.walk(visitor)?;
         self.from_clause.walk(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::select_filter());
         crate::sem::traversal::optional(&mut self.where_clause, visitor)?;
         if let Some(predicate) = &self.where_clause {
             visitor.predicate(predicate);
         }
         self.clauses.walk_windows(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::select_output());
         self.result_columns.walk_assigned(visitor, targets)?;
         self.clauses.walk(visitor)?;
+        Ok(())
+    }
+    fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_source());
+        self.with_clause.visit(visitor)?;
+        self.from_clause.visit(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::select_filter());
+        crate::sem::traversal::visit_optional(&self.where_clause, visitor)?;
+        if let Some(predicate) = &self.where_clause {
+            visitor.predicate(predicate);
+        }
+        self.clauses.visit_windows(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::select_output());
+        self.result_columns.visit_assigned(visitor, targets)?;
+        self.clauses.visit(visitor)?;
         Ok(())
     }
 }

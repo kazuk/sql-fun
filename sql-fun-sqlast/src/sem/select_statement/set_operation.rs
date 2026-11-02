@@ -4,7 +4,7 @@ use crate::{
         AnalysisError, AnalysisProblem, ConstrainedExpr, InputTypeConstraint, MinMaxExpr,
         ParameterConstraints, ParseContext, QueryProblem, ResultColumnCollection, SelectStatement,
         SemScalarExpr, TypeReference, parameter_resolution::ParameterResolution,
-        traversal::SemanticVisitor,
+        traversal::SemanticVisitorMut,
     },
 };
 
@@ -374,7 +374,7 @@ impl SetOperationQuery {
         }
     }
 
-    pub(crate) fn assign_update_output<V: SemanticVisitor>(
+    pub(crate) fn assign_update_output<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         index: usize,
@@ -382,13 +382,11 @@ impl SetOperationQuery {
     ) -> Result<(), AnalysisError> {
         self.columns.assign_update_output(visitor, index, ty)
     }
-    pub(crate) fn walk_assigned<V: SemanticVisitor>(
+    pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_output());
-        visitor.enter_set_operation();
         visitor.enter_set_operand();
         self.left.walk(visitor)?;
         visitor.leave_set_operand();
@@ -397,6 +395,23 @@ impl SetOperationQuery {
         visitor.leave_set_operand();
         visitor.set_operation(self)?;
         self.columns.walk_set_outputs(visitor, targets)?;
+        Ok(())
+    }
+    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_output());
+        visitor.enter_set_operation();
+        visitor.enter_set_operand();
+        self.left.visit(visitor)?;
+        visitor.leave_set_operand();
+        visitor.enter_set_operand();
+        self.right.visit(visitor)?;
+        visitor.leave_set_operand();
+        visitor.set_operation(self)?;
+        self.columns.visit_set_outputs(visitor, targets)?;
         visitor.leave_set_operation();
         Ok(())
     }

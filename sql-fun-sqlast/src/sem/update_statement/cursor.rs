@@ -49,13 +49,26 @@ impl UpdatePredicate {
             Self::Expression(_) => None,
         }
     }
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         match self {
             Self::Expression(value) => {
                 value.walk(visitor)?;
+                visitor.predicate(value);
+                Ok(())
+            }
+            Self::CurrentOf(_) => Ok(()),
+        }
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::Expression(value) => {
+                value.visit(visitor)?;
                 visitor.predicate(value);
                 Ok(())
             }

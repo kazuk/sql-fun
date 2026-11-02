@@ -220,7 +220,7 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -228,7 +228,6 @@ impl JoinExprDataSource {
         self.left.walk(visitor)?;
         visitor.join_right();
         self.right.walk(visitor)?;
-        visitor.access_join(self);
         visitor.leave_join(
             self.using_clause
                 .as_ref()
@@ -237,6 +236,28 @@ impl JoinExprDataSource {
             self.alias.as_ref(),
         );
         crate::sem::traversal::optional(&mut self.qualifications, visitor)?;
+        if let Some(value) = &self.qualifications {
+            visitor.predicate(value);
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.enter_join();
+        self.left.visit(visitor)?;
+        visitor.join_right();
+        self.right.visit(visitor)?;
+        visitor.access_join(self);
+        visitor.leave_join(
+            self.using_clause
+                .as_ref()
+                .map_or(&[], |using| using.using_columns.as_slice()),
+            self.natural,
+            self.alias.as_ref(),
+        );
+        crate::sem::traversal::visit_optional(&self.qualifications, visitor)?;
         if let Some(value) = &self.qualifications {
             visitor.predicate(value);
         }

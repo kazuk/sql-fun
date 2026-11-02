@@ -1,6 +1,6 @@
 use crate::sem::{
     AnalysisError, AnalysisProblem, DataSource, FullName, ParseContext, SamplingMethodLookup,
-    SemScalarExpr, TypeReference, problem::TableSampleProblem, traversal::SemanticVisitor,
+    SemScalarExpr, TypeReference, problem::TableSampleProblem, traversal::SemanticVisitorMut,
 };
 
 /// A sampled relation with its completed method lookup and analyzed inputs.
@@ -78,7 +78,7 @@ impl TableSampleSource {
         }
         Ok(())
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -88,6 +88,19 @@ impl TableSampleSource {
         }
         if let Some(seed) = &mut self.repeatable {
             seed.walk(visitor)?;
+        }
+        visitor.table_sample(self)
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.source.visit(visitor)?;
+        for argument in &self.arguments {
+            argument.visit(visitor)?;
+        }
+        if let Some(seed) = &self.repeatable {
+            seed.visit(visitor)?;
         }
         visitor.table_sample(self)
     }
@@ -627,8 +640,18 @@ impl SamplingInput {
         }
         Ok(())
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.expression.walk(visitor)?;
+        if let Some(target) = &self.target {
+            visitor.sampling_input(&self.expression, target);
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.expression.visit(visitor)?;
         if let Some(target) = &self.target {
             visitor.sampling_input(&self.expression, target);
         }
@@ -641,7 +664,7 @@ struct SamplingPlacement<'a, C: ParseContext> {
     depth: usize,
     invalid: bool,
 }
-impl<C: ParseContext> SemanticVisitor for SamplingPlacement<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for SamplingPlacement<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }

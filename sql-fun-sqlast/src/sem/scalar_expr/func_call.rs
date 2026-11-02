@@ -69,11 +69,17 @@ mod implementation {
         pub fn modifiers(&self) -> &crate::sem::FunctionModifiers {
             &self.modifiers
         }
-        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
             &mut self,
             visitor: &mut V,
         ) -> Result<(), crate::sem::AnalysisError> {
             self.modifiers.walk(visitor)
+        }
+        pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+            &self,
+            visitor: &mut V,
+        ) -> Result<(), crate::sem::AnalysisError> {
+            self.modifiers.visit(visitor)
         }
     }
     impl FuncCallExpr {
@@ -303,7 +309,7 @@ mod implementation {
         }
     }
     impl FuncCallExpr {
-        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
             &mut self,
             visitor: &mut V,
         ) -> Result<(), crate::sem::AnalysisError> {
@@ -313,6 +319,16 @@ mod implementation {
             }
             self.args = args.into();
             self.modifiers.walk(visitor)?;
+            Ok(())
+        }
+        pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+            &self,
+            visitor: &mut V,
+        ) -> Result<(), crate::sem::AnalysisError> {
+            for arg in self.args.iter() {
+                arg.arg_expr.visit(visitor)?;
+            }
+            self.modifiers.visit(visitor)?;
             Ok(())
         }
         pub(crate) fn inference_call(&self) -> (&FullName, Vec<SemScalarExpr>) {

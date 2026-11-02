@@ -5,7 +5,7 @@ use crate::{
         IndirectionExpr, InsertTarget, QueryProblem, SemScalarExpr, TypeReference,
         create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
         parameter_resolution::ParameterResolution,
-        traversal::SemanticVisitor,
+        traversal::SemanticVisitorMut,
     },
 };
 
@@ -304,7 +304,7 @@ impl ResultColumnCollection {
         }
     }
 
-    pub(crate) fn assign_update_output<V: SemanticVisitor>(
+    pub(crate) fn assign_update_output<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         index: usize,
@@ -480,13 +480,19 @@ impl ResultColumnCollection {
 }
 
 impl ResultColumnCollection {
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.walk_assigned(visitor, &[])
     }
-    pub(crate) fn walk_assigned<V: SemanticVisitor>(
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.visit_assigned(visitor, &[])
+    }
+    pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[InsertTarget],
@@ -521,6 +527,42 @@ impl ResultColumnCollection {
                 );
                 column.col_type = expression.get_type();
                 column.is_not_null = expression.is_not_null();
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        let pending = self.has_pending_stars();
+        for (index, column) in self.0.iter().enumerate() {
+            if let Some(expression) = &column.expression {
+                if column.join_sensitive_star.get() {
+                    visitor.join_sensitive_star();
+                }
+                visitor.projection(
+                    &column.col_name,
+                    column.explicit_name.get(),
+                    column.expanded.get(),
+                    expression,
+                )?;
+                expression.visit(visitor)?;
+                if column.star_expansion.is_some() {
+                    continue;
+                }
+                if pending {
+                    continue;
+                }
+                if let Some(target) = targets.get(index) {
+                    visitor.assignment(expression, target)?;
+                }
+                visitor.result_name(&column.col_name, column.explicit_name.get(), expression);
+                visitor.output(
+                    column.col_name.as_ref().map_or("", ColumnName::as_str),
+                    expression,
+                );
             }
         }
         Ok(())
@@ -641,7 +683,7 @@ impl ResultColumnCollection {
         }
     }
 
-    pub(crate) fn walk_set_outputs<V: SemanticVisitor>(
+    pub(crate) fn walk_set_outputs<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[InsertTarget],
@@ -651,12 +693,30 @@ impl ResultColumnCollection {
                 if let Some(target) = targets.get(index) {
                     visitor.assignment(expression, target)?;
                 }
+                visitor.output(
+                    column.col_name.as_ref().map_or("", ColumnName::as_str),
+                    expression,
+                );
+                column.col_type = expression.get_type();
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn visit_set_outputs<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        for (index, column) in self.0.iter().enumerate() {
+            if let Some(expression) = &column.expression {
+                if let Some(target) = targets.get(index) {
+                    visitor.assignment(expression, target)?;
+                }
                 visitor.set_output(
                     index,
                     column.col_name.as_ref().map_or("", ColumnName::as_str),
                     expression,
                 );
-                column.col_type = expression.get_type();
             }
         }
         Ok(())

@@ -157,7 +157,7 @@ impl SemScalarExprNode for IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
@@ -166,6 +166,18 @@ impl IndirectionExpr {
             Self::ArraySlice(v) => v.walk(visitor)?,
             Self::ArraySubscripts(value) => value.walk(visitor)?,
             Self::MemberRef(v) => v.walk(visitor)?,
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::ArrayIndex(v) => v.visit(visitor)?,
+            Self::ArraySlice(v) => v.visit(visitor)?,
+            Self::ArraySubscripts(value) => value.visit(visitor)?,
+            Self::MemberRef(v) => v.visit(visitor)?,
         }
         Ok(())
     }
@@ -187,7 +199,7 @@ impl IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -196,6 +208,17 @@ impl IndirectionExpr {
             Self::ArraySlice(target) => target.walk_assignment_target(visitor),
             Self::ArraySubscripts(value) => value.walk_assignment_target(visitor),
             Self::MemberRef(target) => target.walk_assignment_target(visitor),
+        }
+    }
+    pub(crate) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::ArrayIndex(target) => target.visit_assignment_target(visitor),
+            Self::ArraySlice(target) => target.visit_assignment_target(visitor),
+            Self::ArraySubscripts(value) => value.visit_assignment_target(visitor),
+            Self::MemberRef(target) => target.visit_assignment_target(visitor),
         }
     }
 }

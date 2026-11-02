@@ -8,7 +8,7 @@ use crate::{
             AliasName, ColumnCandidates, MergeRecordRole, ProjectionColumn, QualifiedSource,
             SourceNamespace, WildcardProjection,
         },
-        traversal::SemanticVisitor,
+        traversal::SemanticVisitorMut,
     },
     syn::ScanToken,
 };
@@ -410,12 +410,21 @@ impl MergeScopeConfig {
 }
 
 impl FromClause {
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for source in &mut self.0 {
             source.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for source in &self.0 {
+            source.visit(visitor)?;
         }
         Ok(())
     }

@@ -39,12 +39,19 @@ impl SemScalarExprNode for SubLinkExpr {
 }
 
 impl SubLinkExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         self.subselect.walk(visitor)?;
         self.type_ref = self.subselect.returning_composite_type()?;
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.subselect.visit(visitor)?;
         Ok(())
     }
 }

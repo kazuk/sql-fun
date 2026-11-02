@@ -1,5 +1,5 @@
 //! Clause structure retained after name resolution.
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AliasName, AnalysisError, OperatorName, ResultColumnCollection, SelectStatement, SemScalarExpr,
 };
@@ -148,11 +148,21 @@ impl QueryOrder {
     pub const fn using(&self) -> Option<&ResolvedOperator> {
         self.using.as_ref()
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.expression.walk(visitor)?;
+        if let Some(operator) = &self.using {
+            visitor.order_operator(&self.expression, operator)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.expression.visit(visitor)?;
         if let Some(operator) = &self.using {
             visitor.order_operator(&self.expression, operator)?;
         }
@@ -195,7 +205,7 @@ impl QueryGrouping {
     pub(crate) const fn simple(groups: Vec<Self>) -> Self {
         Self::Simple(groups)
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Expression(expression) => expression.walk(visitor),
             Self::Empty => Ok(()),
@@ -205,6 +215,24 @@ impl QueryGrouping {
             | Self::Simple(groups) => {
                 for group in groups {
                     group.walk(visitor)?;
+                }
+                Ok(())
+            }
+        }
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Expression(expression) => expression.visit(visitor),
+            Self::Empty => Ok(()),
+            Self::Rollup(groups)
+            | Self::Cube(groups)
+            | Self::Sets(groups)
+            | Self::Simple(groups) => {
+                for group in groups {
+                    group.visit(visitor)?;
                 }
                 Ok(())
             }
@@ -242,7 +270,7 @@ impl QueryFrameBound {
     pub(crate) const fn unbounded_following() -> Self {
         Self::UnboundedFollowing
     }
-    fn walk<V: SemanticVisitor>(
+    fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         mode: &str,
@@ -251,6 +279,19 @@ impl QueryFrameBound {
     ) -> Result<(), AnalysisError> {
         if let Self::Preceding(value) | Self::Following(value) = self {
             value.walk(visitor)?;
+            visitor.frame_offset(value, mode, order, reference);
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        mode: &str,
+        order: &[QueryOrder],
+        reference: Option<&QueryName>,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Preceding(value) | Self::Following(value) = self {
+            value.visit(visitor)?;
             visitor.frame_offset(value, mode, order, reference);
         }
         Ok(())
@@ -363,7 +404,7 @@ impl QueryWindow {
     pub const fn frame(&self) -> Option<&QueryFrame> {
         self.frame.as_ref()
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -379,6 +420,26 @@ impl QueryWindow {
                 .walk(visitor, &frame.mode, &self.order, self.reference.as_ref())?;
             if let Some(end) = &mut frame.end {
                 end.walk(visitor, &frame.mode, &self.order, self.reference.as_ref())?;
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for expression in &self.partition {
+            expression.visit(visitor)?;
+        }
+        for order in &self.order {
+            order.visit(visitor)?;
+        }
+        if let Some(frame) = &self.frame {
+            frame
+                .start
+                .visit(visitor, &frame.mode, &self.order, self.reference.as_ref())?;
+            if let Some(end) = &frame.end {
+                end.visit(visitor, &frame.mode, &self.order, self.reference.as_ref())?;
             }
         }
         Ok(())
@@ -440,34 +501,65 @@ impl SelectClauses {
     pub fn windows(&self) -> &[QueryWindow] {
         &self.windows
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_distinct());
         if let Some(distinct) = &mut self.distinct {
             for expression in distinct {
                 expression.walk(visitor)?;
             }
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_grouping());
         for group in &mut self.group {
             group.walk(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_group_filter());
         if let Some(having) = &mut self.having {
             having.walk(visitor)?;
             visitor.predicate(having);
         }
         Ok(())
     }
-    pub(crate) fn walk_windows<V: SemanticVisitor>(
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_distinct());
+        if let Some(distinct) = &self.distinct {
+            if distinct.is_empty() {
+                visitor.distinct_outputs();
+            }
+            for expression in distinct {
+                expression.visit(visitor)?;
+            }
+        }
+        visitor.access_purpose(crate::sem::AccessKind::select_grouping());
+        for group in &self.group {
+            group.visit(visitor)?;
+        }
+        visitor.access_purpose(crate::sem::AccessKind::select_group_filter());
+        if let Some(having) = &self.having {
+            having.visit(visitor)?;
+            visitor.predicate(having);
+        }
+        Ok(())
+    }
+    pub(crate) fn walk_windows<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_window());
         for window in &mut self.windows {
             window.walk(visitor)?;
+            visitor.window_definition(window);
+        }
+        Ok(())
+    }
+    pub(crate) fn visit_windows<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_window());
+        for window in &self.windows {
+            window.visit(visitor)?;
             visitor.window_definition(window);
         }
         Ok(())
@@ -545,7 +637,7 @@ impl FunctionModifiers {
     pub fn within_order(&self) -> &[QueryOrder] {
         &self.within_order
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -561,6 +653,25 @@ impl FunctionModifiers {
         }
         if let Some(over) = &mut self.over {
             over.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for order in &self.order {
+            order.visit(visitor)?;
+        }
+        for order in &self.within_order {
+            order.visit(visitor)?;
+        }
+        if let Some(filter) = &self.filter {
+            filter.visit(visitor)?;
+            visitor.predicate(filter);
+        }
+        if let Some(over) = &self.over {
+            over.visit(visitor)?;
         }
         Ok(())
     }
@@ -677,7 +788,7 @@ impl SemanticQuery {
     pub fn locks(&self) -> &[QueryLock] {
         &self.locks
     }
-    pub(crate) fn walk_assigned<V: SemanticVisitor>(
+    pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
@@ -686,18 +797,40 @@ impl SemanticQuery {
             entry.walk(visitor)?;
         }
         self.body.walk_body_assigned(visitor, targets)?;
-        visitor.access_purpose(crate::sem::AccessKind::select_ordering());
         for order in &mut self.order {
             order.walk(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_limit());
         if let Some(limit) = &mut self.limit {
             limit.walk(visitor)?;
             visitor.row_count(limit);
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_offset());
         if let Some(offset) = &mut self.offset {
             offset.walk(visitor)?;
+            visitor.row_count(offset);
+        }
+        Ok(())
+    }
+    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        for entry in &self.with {
+            entry.visit(visitor)?;
+        }
+        self.body.visit_body_assigned(visitor, targets)?;
+        visitor.access_purpose(crate::sem::AccessKind::select_ordering());
+        for order in &self.order {
+            order.visit(visitor)?;
+        }
+        visitor.access_purpose(crate::sem::AccessKind::select_limit());
+        if let Some(limit) = &self.limit {
+            limit.visit(visitor)?;
+            visitor.row_count(limit);
+        }
+        visitor.access_purpose(crate::sem::AccessKind::select_offset());
+        if let Some(offset) = &self.offset {
+            offset.visit(visitor)?;
             visitor.row_count(offset);
         }
         Ok(())
@@ -711,7 +844,7 @@ pub struct SemanticValues {
     columns: ResultColumnCollection,
 }
 impl SemanticValues {
-    pub(crate) fn assign_update_output<V: SemanticVisitor>(
+    pub(crate) fn assign_update_output<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         index: usize,
@@ -747,7 +880,7 @@ impl SemanticValues {
     pub(crate) fn rename(&mut self, names: &[String]) {
         self.columns.rename(names);
     }
-    pub(crate) fn walk_assigned<V: SemanticVisitor>(
+    pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
@@ -770,6 +903,30 @@ impl SemanticValues {
                     visitor.output(name, value);
                     self.columns.refresh_value(index, value);
                 }
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        for row in &self.rows {
+            for (index, value) in row.iter().enumerate() {
+                value.visit(visitor)?;
+                if let Some(target) = targets.get(index) {
+                    visitor.assignment(value, target)?;
+                }
+                let column = self
+                    .columns
+                    .get_column_at(index)
+                    .expect("VALUES output position");
+                let name = column
+                    .column_name()
+                    .as_ref()
+                    .map_or("", crate::sem::ColumnName::as_str);
+                visitor.values_output(index, name, value);
             }
         }
         Ok(())
@@ -814,15 +971,29 @@ impl QueryCte {
     pub const fn statement(&self) -> &crate::sem::CteStatement {
         &self.statement
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Some(columns) = self.statement.result_columns() {
+            visitor.source_outputs(&columns.names());
+        }
+        self.statement.walk(visitor)?;
+        visitor.cte(&self.name);
+        if let Some(columns) = self.statement.result_columns() {
+            visitor.cte_columns(&self.name, &columns.names());
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         if let Some(columns) = self.statement.result_columns() {
             visitor.enter_cte(&self.name, &columns.names());
             visitor.source_outputs(&columns.names());
         }
-        self.statement.walk(visitor)?;
+        self.statement.visit(visitor)?;
         visitor.cte(&self.name);
         if let Some(columns) = self.statement.result_columns() {
             visitor.cte_columns(&self.name, &columns.names());

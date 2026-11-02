@@ -132,11 +132,18 @@ impl WholeRowExpr {
             None
         }
     }
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.fields.walk(visitor)?;
+        Ok(())
+    }
+    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.fields.visit(visitor)?;
         Ok(())
     }
 }
@@ -316,12 +323,21 @@ impl WholeRowFields {
     fn get_type(&self) -> TypeReference {
         TypeReference::dynamic(&TypeDefinition::implicit_composite(&self.columns()))
     }
-    fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for field in &mut self.0 {
             field.value.walk(visitor)?;
+        }
+        Ok(())
+    }
+    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for field in &self.0 {
+            field.value.visit(visitor)?;
         }
         Ok(())
     }

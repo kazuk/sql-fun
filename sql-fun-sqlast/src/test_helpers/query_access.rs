@@ -61,6 +61,15 @@ fn analyze_pair(
         .analyze(context, &mut create_cache_context())
         .unwrap()
 }
+pub(crate) fn analyze_preserving_output(sql: &str) -> QueryAccess {
+    let pair = analyze_pair(sql, context(), Dialect::postgres());
+    assert!(pair.context().reported_problems().is_empty());
+    let before = pair.ast().result_columns().unwrap().clone();
+    let accesses = QueryAccess::from_statement(pair.context(), pair.ast()).unwrap();
+    assert_eq!(pair.ast().result_columns(), Some(&before));
+    accesses
+}
+
 pub(crate) fn analyze_diagnosed(sql: &str) -> (QueryAccess, Vec<String>) {
     let pair = analyze_pair(sql, context(), Dialect::postgres());
     let problems = pair

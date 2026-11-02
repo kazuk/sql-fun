@@ -44,7 +44,7 @@ impl CreateView {
     pub(crate) fn rename_column_with(
         &mut self,
         rename: &crate::sem::ColumnRename,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitor,
+        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.lineage.rename_column(rename, &self.query)?;
         self.query.walk(visitor)?;

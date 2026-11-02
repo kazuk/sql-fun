@@ -27,7 +27,7 @@ pub(crate) fn parameter_bindings(query: &SelectStatement) -> Vec<(u32, Option<Ty
 }
 #[derive(Default)]
 struct Parameters(Vec<(u32, Option<TypeReference>)>);
-impl crate::sem::traversal::SemanticVisitor for Parameters {
+impl crate::sem::traversal::SemanticVisitorMut for Parameters {
     fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if let SemScalarExpr::Param(parameter) = value {
             self.0.push((parameter.position(), value.get_type()));

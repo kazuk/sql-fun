@@ -10,7 +10,7 @@ pub use self::row::{DeleteRowColumn, DeleteRowVersion};
 pub use self::view_support::ViewDeleteSupport;
 
 use crate::ast::TryFromWithTokens;
-use crate::sem::traversal::SemanticVisitor;
+use crate::sem::traversal::SemanticVisitorMut;
 use crate::sem::{
     AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection, SemAst,
     SemScalarExpr, TableName,
@@ -121,7 +121,7 @@ impl DeleteStatement {
     pub(crate) fn rename_columns(&mut self, names: &[String]) {
         self.returning.rename(names);
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -132,23 +132,49 @@ impl DeleteStatement {
         visitor.leave_dml();
         result
     }
-    fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
-        visitor.access_action(
-            self.target.full_name(),
-            crate::sem::AccessKind::delete_rows(),
-        );
-        visitor.access_purpose(crate::sem::AccessKind::delete_source());
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_dml();
+        visitor.enter_query();
+        let result = self.visit_body(visitor);
+        visitor.leave_query();
+        visitor.leave_dml();
+        result
+    }
+    fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.table_binding(&mut self.target);
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }
         self.from.walk(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::delete_filter());
         if let Some(predicate) = &mut self.predicate {
             predicate.walk(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::delete_returning());
         visitor.dml_returning(&mut self.returning)?;
+        Ok(())
+    }
+    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.access_action(
+            self.target.full_name(),
+            crate::sem::AccessKind::delete_rows(),
+        );
+        visitor.access_purpose(crate::sem::AccessKind::delete_source());
+        visitor.table_binding(&self.target);
+        for cte in &self.with {
+            cte.visit(visitor)?;
+        }
+        self.from.visit(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::delete_filter());
+        if let Some(predicate) = &self.predicate {
+            predicate.visit(visitor)?;
+        }
+        visitor.access_purpose(crate::sem::AccessKind::delete_returning());
+        visitor.dml_returning(&self.returning)?;
         Ok(())
     }
 }

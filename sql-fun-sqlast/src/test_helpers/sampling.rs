@@ -106,7 +106,7 @@ pub(crate) fn sources(query: &SelectStatement) -> Vec<TableSampleSource> {
 }
 #[derive(Default)]
 struct Samples(Vec<TableSampleSource>);
-impl crate::sem::traversal::SemanticVisitor for Samples {
+impl crate::sem::traversal::SemanticVisitorMut for Samples {
     fn table_sample(
         &mut self,
         value: &mut TableSampleSource,

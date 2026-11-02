@@ -397,28 +397,47 @@ mod test_expression_sources {
 }
 
 impl DataSourceRowFunctions {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        visitor.enter_rows_functions();
         let mut functions = self.functions.to_vec();
         for function in &mut functions {
             function.walk(visitor)?;
         }
         self.functions = functions.into();
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_rows_functions();
+        for function in self.functions.iter() {
+            function.visit(visitor)?;
+        }
         visitor.leave_rows_functions(&self.alias, self.ordinality);
         Ok(())
     }
 }
 impl DataSourceRowsFromFunc {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         match &mut self.source {
             RowsFromSource::Invocation(source) => source.walk(visitor)?,
             RowsFromSource::Expression(source) => source.value.walk(visitor)?,
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match &self.source {
+            RowsFromSource::Invocation(source) => source.visit(visitor)?,
+            RowsFromSource::Expression(source) => source.value.visit(visitor)?,
         }
         Ok(())
     }
@@ -582,7 +601,7 @@ struct FromExpressionValidator<'a, C> {
     root_depth: usize,
     invalid: bool,
 }
-impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for FromExpressionValidator<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for FromExpressionValidator<'_, C> {
     fn walk_source_column_values(&self) -> bool {
         false
     }

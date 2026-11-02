@@ -3,7 +3,7 @@ use crate::{
     context::ParseContext,
     sem::{
         AnalysisError, AnalysisProblem, QueryGrouping, QueryProblem, ResultColumnCollection,
-        SelectStatement, SemScalarExpr, traversal::SemanticVisitor,
+        SelectStatement, SemScalarExpr, traversal::SemanticVisitorMut,
     },
 };
 
@@ -75,12 +75,21 @@ impl GroupingExpr {
     pub const fn is_valid(&self) -> bool {
         self.valid && self.completed
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         for argument in &mut self.arguments {
             argument.expression.walk(visitor)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for argument in &self.arguments {
+            argument.expression.visit(visitor)?;
         }
         Ok(())
     }
@@ -197,7 +206,7 @@ struct GroupingKeyValidation<'a, C> {
     query_id: usize,
     context: &'a mut C,
 }
-impl<C: ParseContext> SemanticVisitor for GroupingKeyValidation<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for GroupingKeyValidation<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.validate_grouping_key_node(self.query_id, self.context)
     }
@@ -205,7 +214,7 @@ impl<C: ParseContext> SemanticVisitor for GroupingKeyValidation<'_, C> {
 struct GroupingCompletion<'a, C> {
     context: &'a mut C,
 }
-impl<C: ParseContext> SemanticVisitor for GroupingCompletion<'_, C> {
+impl<C: ParseContext> SemanticVisitorMut for GroupingCompletion<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.complete_grouping_node(self.context)
     }
@@ -354,7 +363,7 @@ fn comparison_key(expression: &SemScalarExpr) -> Result<Option<SemScalarExpr>, A
     }
 }
 struct GroupingCastNormalization;
-impl SemanticVisitor for GroupingCastNormalization {
+impl SemanticVisitorMut for GroupingCastNormalization {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.normalize_grouping_cast();
         Ok(())
@@ -363,7 +372,7 @@ impl SemanticVisitor for GroupingCastNormalization {
 struct ComparisonKey {
     resolved: bool,
 }
-impl SemanticVisitor for ComparisonKey {
+impl SemanticVisitorMut for ComparisonKey {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         self.resolved &= expression.grouping_references_resolved();
         expression.canonicalize_grouping_key();

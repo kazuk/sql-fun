@@ -120,7 +120,7 @@ struct ColumnOrigin<'a> {
     rename: &'a crate::sem::ColumnRename,
     found: bool,
 }
-impl crate::sem::traversal::SemanticVisitor for ColumnOrigin<'_> {
+impl crate::sem::traversal::SemanticVisitorMut for ColumnOrigin<'_> {
     fn expression(
         &mut self,
         expression: &mut crate::sem::SemScalarExpr,

@@ -5,7 +5,7 @@ use crate::{
         AnalysisError, DeleteStatement, FullName, InsertStatement, MergeStatement,
         ResultColumnCollection, SelectStatement, UpdateStatement,
         create_table::{ColumnDefinition, ColumnName},
-        traversal::SemanticVisitor,
+        traversal::SemanticVisitorMut,
     },
     syn::ScanToken,
 };
@@ -321,7 +321,7 @@ impl WithClause {
 }
 
 impl CteStatement {
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -335,10 +335,24 @@ impl CteStatement {
         }
         Ok(())
     }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Unresolved => {}
+            Self::Select(query) => query.visit(visitor)?,
+            Self::Insert(insert) => insert.visit(visitor)?,
+            Self::Update(update) => update.visit(visitor)?,
+            Self::Delete(delete) => delete.visit(visitor)?,
+            Self::Merge(merge) => merge.visit(visitor)?,
+        }
+        Ok(())
+    }
 }
 
 impl WithClause {
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -347,6 +361,22 @@ impl WithClause {
                 visitor.source_outputs(&columns.names());
             }
             query.walk(visitor)?;
+            visitor.cte(name);
+            if let Some(columns) = query.result_columns() {
+                visitor.cte_columns(name, &columns.names());
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for (name, query) in &self.0 {
+            if let Some(columns) = query.result_columns() {
+                visitor.source_outputs(&columns.names());
+            }
+            query.visit(visitor)?;
             visitor.cte(name);
             if let Some(columns) = query.result_columns() {
                 visitor.cte_columns(name, &columns.names());

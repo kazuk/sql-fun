@@ -137,7 +137,7 @@ impl Bindings {
     }
 }
 
-impl crate::sem::traversal::SemanticVisitor for Bindings {
+impl crate::sem::traversal::SemanticVisitorMut for Bindings {
     fn expression(
         &mut self,
         expression: &mut crate::sem::SemScalarExpr,

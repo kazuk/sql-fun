@@ -379,6 +379,8 @@ def validate_init_unchanged_install(binary, destination):
     home = project / "chosen-home"
     for major in IMAGES:
         shutil.copytree(destination / major, home / "postgres" / major)
+    fixture = Path(__file__).resolve().parents[2] / "sql-fun-home"
+    shutil.copytree(fixture / "highlighter", home / "highlighter")
     before = home_snapshot(home)
     terminal = InitTerminal(binary, project, home)
     try:

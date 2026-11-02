@@ -1,133 +1,131 @@
 # Release preparation
 
-Push an explicitly chosen source revision to a branch named
+Choose an explicitly selected source revision `S` from `main` for a normal
+release, or deliberately from a maintenance/fix branch for a hotfix. Push it to
 `release/vX.Y.Z`, `release/vX.Y.Z-snapshot`, or
 `release/vX.Y.Z-snapshotN` (for example, `release/v0.2.0-snapshot1`).
-Version components must not have leading zeroes. Normal releases originate
-from an intended `main` revision; a hotfix may explicitly select a
-maintenance/fix revision.
+Version components must not have leading zeroes. The shared project parser
+classifies stable versus snapshot; project release numbers and individual
+crate versions are separate identities. Tag pushes do not start preparation.
 
-The pushed branch tip is the exact release target. The release preparation
-workflow rejects invalid release branch names before adopting inputs. Tag
-pushes do not trigger it. The shared project release parser determines stable
-or snapshot classification; individual crate versions are a separate concern.
+## Release lifecycle and implementation status
 
-## Required normal CI
+| Stage | Stable release | Snapshot/prerelease | Status / owner |
+| --- | --- | --- | --- |
+| Select `S` | Successful required normal CI for the exact SHA | Same | Implemented, #326 |
+| Materialize versions | Final crate versions from declared intent | Next crate versions with selected snapshot suffix | Implemented, #325 |
+| Finalize release state | Adopt baseline and reset intent to `patch` | Preserve baseline and intent | Implemented, #329/#330 |
+| Record source `R` | Commit and push release-state changes on the release branch | Same | Implemented, #330 |
+| Release build and tag | Build/validate packages from `R`, retain assets, then tag `R` | Same | Planned integration, #331 |
+| Prepare draft | Create draft and attach completed assets | Same, marked prerelease | Planned integration, #259 |
+| Human publication | Review and publish the draft | Same | Maintainer gate |
+| Distribution | Publish crates, merge the entire release branch into `main`, deploy existing manual | Publish crates; never merge into `main` or deploy Pages | #260; crates/Pages implemented, stable merge integration still required |
 
-The exact target SHA must already have a successful required normal-CI run
-of `build-test.yml`. This is a release eligibility gate: a missing successful
-run means the target cannot be confirmed to have passed required validation.
-The workflow fails before downloading inputs. A different SHA's success is
-never substituted, even if its source appears equivalent.
+Preparation currently ends with the recorded source `R` and a versioned manual
+in Actions storage. It does not yet build distributable release packages,
+create an immutable tag or create a draft GitHub Release. These remaining
+steps must use `R`; they must not distribute the normal-CI binaries from `S`.
 
-Normal-CI triggers remain unchanged. Release preparation does not dispatch
-or wait for another CI run, or rebuild selected artifacts to bypass validation.
-After correcting repository/CI state, rerun preparation for the same SHA.
-Alternatively, pushing a new explicitly selected SHA to the release branch
-starts preparation for that new target, which must meet the same CI requirement.
+When draft integration is complete, review the draft and its completed assets
+before publishing it manually. Publication authorizes #260 distribution.
+Only a published **stable** release permits a history-preserving merge of the
+**entire release branch** into `main`. Prereleases never merge into `main`.
+There is no preparation-time main write or patch back-commit.
 
-## Adopted inputs
+## Required normal CI and adopted inputs
 
-Preparation selects the newest successful eligible normal-CI run, ordered by
-run creation time and then run number/ID. Rerunning an older run does not make
-it a newly created run. All three required inputs come from the selected run:
+The exact original source `S` must already have a successful required normal-CI
+run of `build-test.yml`. Preparation neither dispatches nor waits for CI. It
+selects the newest successful eligible run, ordered by creation time and then
+run number/ID; rerunning an old run does not make it newly created. A different
+SHA's result is never substituted, even if its source appears equivalent.
 
-- `sql-fun-x86_64-unknown-linux-gnu`
+Both reusable inputs come from that single selected run:
+
 - `sql-fun-user-manual`
 - `sql-fun-semver-baseline` (internal `semver_baseline.tar.gz`)
 
-Missing or expired required inputs fail preparation. It does not fall back
-to an older run. The job summary links the selected run and records the target
-SHA and adopted inputs. Investigate the named producer/run when an input
-cannot be downloaded, then retry with eligible CI state or a new target.
+Missing or expired inputs stop preparation before materialization; it never
+falls back to an older run. The summary records the original SHA, selected
+normal-CI link and inputs. Correct the reported eligibility/input problem and
+rerun, or explicitly choose a new source with its own exact-SHA CI evidence.
+The CI packaging artifact is verification-only and is not downloaded for
+release preparation. Release packages require a new validated build from `R`.
 
-Binary/package and manual contents are adopted as produced by CI, without
-rebuilding or repeating producer validation. Preparation does not publish,
-create tags, or push source changes.
+## Stable and prerelease state
 
-## Materialized crate versions
+Before selecting `S`, ensure every publishable crate has a valid
+`workspace.metadata.next-release` entry. Materialization uses each crate's
+current version and declared bump, never the project tag's numeric version.
+It updates workspace manifests/dependency requirements and the lockfile.
 
-After all three CI inputs have been adopted, preparation materializes each
-publishable workspace crate's version from its current version and
-`workspace.metadata.next-release`. Ensure that every publishable crate has a
-valid release-intent entry before selecting the release target. Project release
-numbers do not determine crate versions. The parsed project identity selects
-stable materialization or appends its snapshot suffix to each crate's next
-version; no separate classification input is needed.
+Stable preparation adopts the selected baseline into
+`.local/semver_baseline.tar.gz`, then resets existing publishable crate intent
+entries to `patch` **after** calculating release versions from their old values.
+Prerelease preparation adds the explicitly selected suffix to next crate
+versions and preserves both active baseline and intent. The adopter owns
+baseline validation; the workflow does not build a replacement candidate.
+The downloaded candidate stays internal and is never a Release asset.
 
-The job summary reports the materialized package versions. Updated manifests
-and the lockfile remain in the same runner worktree for subsequent release
-steps. Adopted CI inputs and version/path outputs stay outside that worktree;
-this stage does not commit them. See the internal
-[materialized-state handoff contract](../docs/internal-rules/release-materialization.md)
-for integration with later release steps.
+Only intentional release-state files enter `R`, with explicit staging. CI
+inputs, state handoffs and generated manual archives stay outside the checkout.
+`R` is pushed to the originating release branch before any future release
+build/tag step. The summary reports its SHA and exact committed crate versions.
+See the internal [state handoff contract](../docs/internal-rules/release-materialization.md).
 
-A materialization failure stops preparation. If a failure occurs after manifest
-updates begin, discard the partial runner state and rerun from the original
-exact target rather than reuse partial output. Currently, the materializer
-requires stable current crate versions: a target already containing snapshot
-versions fails. That existing limitation is tracked separately in #364.
+The current materializer requires stable current crate versions. A newly
+selected source already containing snapshot versions fails; issue #364 tracks that
+separate lifecycle limitation. Reusing an existing recorded `R` does not rerun
+the materializer or strip prerelease suffixes.
 
-## Versioned manual asset
+## Versioned manual
 
-After crate-version materialization succeeds, preparation packages the adopted
-manual as `sql-fun_vX.Y.Z_user-manual.tar.gz`,
-`sql-fun_vX.Y.Z-snapshot_user-manual.tar.gz`, or
-`sql-fun_vX.Y.Z-snapshotN_user-manual.tar.gz`, matching the selected project
-release identity. It preserves the adopted output at the archive root without
-rebuilding mdBook or modifying its files.
+Preparation archives the adopted mdBook output as
+`sql-fun_<project-tag>_user-manual.tar.gz`, preserving its files at the archive
+root without rebuilding mdBook. Download it from the preparation run's
+`release-manual-<attempt>` Actions artifact. Missing input, archive or upload
+failure stops dependent preparation. A later draft step attaches this archive
+unchanged; stable Pages consumes that exact asset after publication.
 
-Download the archive from the preparation run's `release-manual-<attempt>`
-Actions artifact. The job summary records the archive filename alongside the
-release target and selected normal-CI run. If the adopted manual directory is
-missing, packaging fails with its path; archive creation and upload failures
-also stop preparation.
+## Safe reruns and failed attempts
 
-Both the adopted input and archive remain outside the checkout. Later draft
-Release assembly can attach this archive unchanged. Stable and snapshot releases
-both carry the manual asset; only stable releases publish that same asset to
-Pages after the Release is published. Preparation itself does not create a
-GitHub Release or deploy Pages.
+A successful release-state push records `R` permanently. Rerunning the original
+`S` run, or explicitly executing preparation on that recorded `R`, reuses the
+same commit rather than bumping versions, resetting intent or adopting a
+baseline again. CI evidence still belongs to original `S`. Preparation may
+re-adopt reusable inputs and recreate the manual before tag integration exists;
+Issue #331's matching-tag recovery must instead skip producer work entirely.
 
-## SemVer baseline adoption
+A conflicting remote tip, invalid recorded state or rejected push fails safely.
+If a connection fails after a server accepted the push, preparation confirms
+success only when the remote contains the exact intended `R`. Main stays
+unchanged throughout. After a later build or publication failure, stable
+baseline/reset state remains on the release branch; it does not reach main
+until successful stable publication and the full-branch merge.
 
-After version materialization and manual asset preparation succeed, preparation
-passes the selected CI candidate to the existing baseline adoption operation.
-Stable preparation replaces `.local/semver_baseline.tar.gz` in the runner
-checkout; snapshot preparation preserves the active baseline, including its
-modification time. The summary reports the adoption outcome and the baseline
-path intended for release-state finalization (empty for snapshots).
-
-The candidate is required from the same selected normal-CI run for both kinds
-of release. A missing or expired artifact fails input adoption before version
-materialization. A stable adoption failure stops preparation and leaves the
-previous active baseline intact. Discard partial runner state and rerun from
-the original exact target after correcting the reported input or CI state.
-Preparation never selects an older candidate or builds a replacement.
-
-The downloaded candidate remains outside the checkout and is never a GitHub
-Release asset. Only the adopted active baseline is repository release state.
-The later release-state finalization/back-commit step (#330) owns committing
-that state together with materialized versions; preparation alone does not
-advance `main`. See the internal
-[baseline handoff contract](../docs/internal-rules/release-materialization.md#baseline-state-handoff)
-for that integration.
+Before a commit is recorded, discard partial runner-local edits after a failed
+materialization/adoption and retry from the selected source. After `R` is
+recorded, reuse that history; do not reconstruct it as a different commit.
+Recovery is best-effort, bounded by available evidence and artifacts. Missing
+or expired required data fails normally. An irrecoverable version may be
+abandoned and a **new version/tag explicitly selected** for the next attempt.
+Never delete/move tags, reset branches, force-update, erase commits or rewrite
+history to conceal failed attempts. Preserve release branches for downstream
+stable merge and recorded failed history.
 
 ## Maintainer tooling and permissions
 
-The workflow runs on Ubuntu in the adopted pinned CI-builder container. It
-provides Bash, Git, GitHub CLI (`gh`), `jq`, Cargo, `cargo set-version` (cargo-edit),
-Taplo, uv/Python 3.12 for baseline adoption, and GNU `realpath` (coreutils);
-no separate runner tool installation is required. For local contract tests, use
-the contributor setup linked below.
+The pinned CI-builder provides Bash, Git, gh, jq, Cargo/cargo-edit, Taplo,
+uv/Python 3.12 and GNU coreutils. No additional runner installation or
+contributor command is required. For local API diagnostics use an authenticated
+GitHub CLI with repository Actions read access.
 
-For live local API diagnostics, install [GitHub CLI](https://cli.github.com/),
-authenticate with `gh auth login`, and provide repository Actions read access.
-The workflow authenticates using its GitHub token with `contents: read`,
-`actions: read`, and `packages: read`. Package read access authenticates the
-CI-builder image pull from GHCR; no write or publication credentials are needed.
+The preparation job uses `GITHUB_TOKEN` with `contents: write` for release-branch
+pushes, `actions: read` for input selection/downloads and `packages: read` for
+the CI-builder pull. Its pushes do not trigger recursive push workflows. Branch
+rules must permit this normal release-ref push; main bypass is not required.
+No registry or Pages publication credentials are used by preparation.
 
 Release preparation contracts have no approved recurring execution budget;
-they are not part of the standard local checks or CI. See
-[contributor workflow validation](../CONTRIBUTING.md#release-workflow-validation)
-for optional workflow linting.
+they are not part of standard checks or CI. See the existing optional
+[workflow validation procedure](../CONTRIBUTING.md#release-workflow-validation).

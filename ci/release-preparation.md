@@ -135,8 +135,8 @@ A successful release-state push records `R` permanently. Rerunning the original
 `S` run, or explicitly executing preparation on that recorded `R`, reuses the
 same commit rather than bumping versions, resetting intent or adopting a
 baseline again. Before tagging, CI evidence still belongs to original `S`;
-preparation may
-re-adopt reusable inputs, recreate the manual and build again from recorded `R`.
+preparation may re-adopt reusable inputs, recreate the manual and build again
+from recorded `R`.
 A matching remote tag skips CI selection/downloads, materialization, manual
 packaging, baseline work, release builds and package validation entirely. It
 restores the retained complete asset set for the same transaction instead.
@@ -164,14 +164,14 @@ The pinned CI-builder provides Bash, Git, gh, jq, Cargo/cargo-edit, Taplo,
 uv/Python 3.12, cargo-deb, dpkg tools, binutils and GNU coreutils.
 See [Linux packaging prerequisites][packaging-prerequisites].
 No additional runner installation or contributor command is required. For local
-API diagnostics use an authenticated
-GitHub CLI with repository Actions read access.
+API diagnostics use an authenticated GitHub CLI with repository Actions read
+access.
 
 The preparation job uses `GITHUB_TOKEN` with `contents: write` for release-branch
 and immutable-tag pushes, `actions: read` for input selection/downloads and
 `packages: read` for the CI-builder pull. Its pushes do not trigger recursive
-push workflows. Branch
-rules must permit this normal release-ref push; main bypass is not required.
+push workflows. Branch rules must permit normal release-ref and tag pushes;
+main bypass is not required.
 No registry or Pages publication credentials are used by preparation.
 
 Release preparation contracts have no approved recurring execution budget;

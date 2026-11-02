@@ -13,7 +13,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 json="$(
-  cargo llvm-cov report --json --summary-only "$@"
+  cargo llvm-cov report --workspace --json --summary-only "$@"
 )"
 
 jq -r --argjson topn "$TOPN" '

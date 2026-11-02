@@ -8,6 +8,3 @@ test -x "$SQL_FUN_BIN"
 function sql-fun() {
   "$SQL_FUN_BIN" "$@"
 }
-
-# This catalog contract retains the canonical completed-home theme offline.
-export SQL_FUN_TEST_THEME="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/sql-fun-home/highlighter/default.toml"

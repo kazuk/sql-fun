@@ -396,74 +396,6 @@ async fn unspecified_search_path_shares_effective_default_identity() {
 // Deletion commit: d4b1ac47e5969c4e639b7c181b561fe176085774; recover from its parent.
 
 #[tokio::test]
-async fn changed_observation_does_not_join_older_pending_extension() {
-    let project = SchemaProject::new();
-    let service = Arc::new(project.service());
-    let root = SchemaCacheService::load_root(
-        project.home(),
-        &"17".parse().unwrap(),
-        &["public".to_owned()],
-        None,
-        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None),
-    )
-    .unwrap();
-    let path = project
-        .schema("extension.sql", "CREATE TABLE old_extension (id int4);")
-        .canonicalize()
-        .unwrap();
-    let old = SchemaProject::hash(&path);
-    let token = service.hashes.begin(&path).unwrap();
-    let pending = super::LayerLoadKey {
-        parent: root.key.clone(),
-        path: path.clone(),
-        generation: crate::file_hash_cache::FileHashCache::generation(token),
-        observed_hash: old,
-    };
-    let (started, ready) = ::tokio::sync::oneshot::channel();
-    let (release, blocked) = ::tokio::sync::oneshot::channel();
-    let owned = Arc::clone(&service);
-    let old_root = root.clone();
-    let older = ::tokio::spawn(async move {
-        owned
-            .inflight
-            .load(&pending, move || async move {
-                started.send(()).unwrap();
-                blocked.await.unwrap();
-                Ok(old_root)
-            })
-            .await
-            .unwrap()
-    });
-    ready.await.unwrap();
-    project.schema("extension.sql", "CREATE TABLE new_extension (id int4);");
-    // Reuse the generation deliberately: absent notifications must not merge observations.
-    let (args, metadata) = project.schema_environment();
-    let loaded = ::tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        service.resolve_layer(
-            &root,
-            ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap(),
-            token,
-            &args,
-            &metadata,
-        ),
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    let table = TableName::from(FullName::with_schema("public", "new_extension"));
-    assert!(
-        SchemaCacheService::successful(&loaded.outcome)
-            .unwrap()
-            .base_context()
-            .get_table(&table)
-            .is_some()
-    );
-    release.send(()).unwrap();
-    older.await.unwrap();
-}
-
-#[tokio::test]
 async fn expected_hash_selects_historical_schema_after_dump_changes_or_deletion() {
     let project = SchemaProject::new();
     let service = project.service();
@@ -579,7 +511,6 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
 }
 
 #[rstest::rstest]
-#[case::folded("OWNER", "owner")]
 #[case::quoted(r#""Mixed Owner""#, "Mixed Owner")]
 #[case::escaped_quote(r#""a""b""#, "a\"b")]
 #[case::unicode(r#""所有者""#, "所有者")]

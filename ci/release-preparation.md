@@ -16,15 +16,15 @@ crate versions are separate identities. Tag pushes do not start preparation.
 | Materialize versions | Final crate versions from declared intent | Next crate versions with selected snapshot suffix | Implemented, #325 |
 | Finalize release state | Adopt baseline and reset intent to `patch` | Preserve baseline and intent | Implemented, #329/#330 |
 | Record source `R` | Commit and push release-state changes on the release branch | Same | Implemented, #330 |
-| Release build and tag | Build/validate packages from `R`, retain assets, then tag `R` | Same | Planned integration, #331 |
+| Release build and tag | Build/validate packages from `R`, retain assets, then tag `R` | Same | Implemented, #331 |
 | Prepare draft | Create draft and attach completed assets | Same, marked prerelease | Planned integration, #259 |
 | Human publication | Review and publish the draft | Same | Maintainer gate |
 | Distribution | Publish crates, merge the entire release branch into `main`, deploy existing manual | Publish crates; never merge into `main` or deploy Pages | #260; crates/Pages implemented, stable merge integration still required |
 
-Preparation currently ends with the recorded source `R` and a versioned manual
-in Actions storage. It does not yet build distributable release packages,
-create an immutable tag or create a draft GitHub Release. These remaining
-steps must use `R`; they must not distribute the normal-CI binaries from `S`.
+Preparation builds and validates distributable packages from recorded source
+`R`, retains the complete prepared asset set, and creates and pushes the
+immutable project tag at `R`. Draft GitHub Release creation remains downstream
+work under #259. Normal-CI binaries from `S` are never distributed.
 
 When draft integration is complete, review the draft and its completed assets
 before publishing it manually. Publication authorizes #260 distribution.
@@ -69,7 +69,7 @@ The downloaded candidate stays internal and is never a Release asset.
 
 Only intentional release-state files enter `R`, with explicit staging. CI
 inputs, state handoffs and generated manual archives stay outside the checkout.
-`R` is pushed to the originating release branch before any future release
+`R` is pushed to the originating release branch before the release
 build/tag step. The summary reports its SHA and exact committed crate versions.
 See the internal [state handoff contract](../docs/internal-rules/release-materialization.md).
 
@@ -87,14 +87,59 @@ root without rebuilding mdBook. Download it from the preparation run's
 failure stops dependent preparation. A later draft step attaches this archive
 unchanged; stable Pages consumes that exact asset after publication.
 
+## Release packages and immutable tag
+
+After `R` is committed and pushed, preparation builds the supported Linux target
+`x86_64-unknown-linux-gnu` using the existing locked packaging command and its
+artifact checks. A fresh external Cargo target directory prevents stale package
+selection. Individual crate versions come from Cargo metadata at `R`; the CLI
+crate owns the tarball/Debian package version, independently of the project tag.
+Debian prereleases replace the SemVer `-` with `~`.
+
+The complete public asset set contains:
+
+- `sql-fun-<CLI-version>-x86_64-unknown-linux-gnu.tar.gz`
+- `sql-fun_<Debian-version>_amd64.deb`
+- `sql-fun-<CLI-version>-x86_64-unknown-linux-gnu-SHA256SUMS`
+- `sql-fun_<project-tag>_user-manual.tar.gz`
+
+Package filenames and bytes remain as validated. Only the checksum metadata
+filename changes; its contents still name the original packages. The manual
+archive is preserved unchanged. No SemVer baseline or internal state is public.
+
+Download the complete directory from Actions artifact
+`release-assets-<project-tag>-<R>-<run-id>-<attempt>`. The summary records its
+name, artifact ID, producer run, `R` and inventory. Upload must succeed before
+creating/pushing the tag. Build, validation, assembly or retention failure stops
+tagging while preserving the recorded release branch. Successful local tag
+creation alone is insufficient: the remote must confirm the exact `R`, including
+when a push response is lost.
+
+Existing remote tags are checked before CI input selection. A tag resolving to
+the validated recorded `R` enters recovery; another commit or an invalid record
+fails without mutation. Immediately before a new push, preparation rechecks for
+concurrent tags and accepts only the same transaction. Existing tags are never
+moved or overwritten.
+
+Recovery uses only available complete-set artifacts from the release preparation
+workflow for this release branch and original/recorded source. The most recently
+uploaded matching set is selected; absent, expired or incomplete data fails
+clearly without rebuilding, revalidation or extending retention. Ordinary
+Actions retention applies. The restored bytes are available to #259's later
+Draft creation/repair; preparation itself creates no GitHub Release. Retained
+assets and all generated build/assembly output stay outside the checkout.
+
 ## Safe reruns and failed attempts
 
 A successful release-state push records `R` permanently. Rerunning the original
 `S` run, or explicitly executing preparation on that recorded `R`, reuses the
 same commit rather than bumping versions, resetting intent or adopting a
-baseline again. CI evidence still belongs to original `S`. Preparation may
-re-adopt reusable inputs and recreate the manual before tag integration exists;
-Issue #331's matching-tag recovery must instead skip producer work entirely.
+baseline again. Before tagging, CI evidence still belongs to original `S`;
+preparation may re-adopt reusable inputs, recreate the manual and build again
+from recorded `R`.
+A matching remote tag skips CI selection/downloads, materialization, manual
+packaging, baseline work, release builds and package validation entirely. It
+restores the retained complete asset set for the same transaction instead.
 
 A conflicting remote tip, invalid recorded state or rejected push fails safely.
 If a connection fails after a server accepted the push, preparation confirms
@@ -116,16 +161,21 @@ stable merge and recorded failed history.
 ## Maintainer tooling and permissions
 
 The pinned CI-builder provides Bash, Git, gh, jq, Cargo/cargo-edit, Taplo,
-uv/Python 3.12 and GNU coreutils. No additional runner installation or
-contributor command is required. For local API diagnostics use an authenticated
-GitHub CLI with repository Actions read access.
+uv/Python 3.12, cargo-deb, dpkg tools, binutils and GNU coreutils.
+See [Linux packaging prerequisites][packaging-prerequisites].
+No additional runner installation or contributor command is required. For local
+API diagnostics use an authenticated GitHub CLI with repository Actions read
+access.
 
 The preparation job uses `GITHUB_TOKEN` with `contents: write` for release-branch
-pushes, `actions: read` for input selection/downloads and `packages: read` for
-the CI-builder pull. Its pushes do not trigger recursive push workflows. Branch
-rules must permit this normal release-ref push; main bypass is not required.
+and immutable-tag pushes, `actions: read` for input selection/downloads and
+`packages: read` for the CI-builder pull. Its pushes do not trigger recursive
+push workflows. Branch rules must permit normal release-ref and tag pushes;
+main bypass is not required.
 No registry or Pages publication credentials are used by preparation.
 
 Release preparation contracts have no approved recurring execution budget;
 they are not part of standard checks or CI. See the existing optional
 [workflow validation procedure](../CONTRIBUTING.md#release-workflow-validation).
+
+[packaging-prerequisites]: ../docs/internal-rules/linux-packaging.md#prerequisites

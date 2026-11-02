@@ -2,7 +2,9 @@
 //! test helper types
 
 mod postgres_ast;
-pub(crate) use self::postgres_ast::assert_postgres_structure;
+pub(crate) use self::postgres_ast::{
+    assert_postgres_structure, postgres_expression, postgres_node,
+};
 pub(crate) mod analysis_cache;
 pub(crate) mod column_rename;
 

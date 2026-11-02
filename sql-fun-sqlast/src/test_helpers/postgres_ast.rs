@@ -57,3 +57,32 @@ pub(crate) fn assert_postgres_structure(sql: &str) {
     normalize_locations(&mut emitted);
     assert_eq!(original, emitted, "{sql}\n=> {rendered}");
 }
+
+/// Parse one PostgreSQL syntax node without initializing a semantic catalog.
+pub(crate) fn postgres_node(sql: &str) -> crate::syn::Node {
+    use crate::syn::{ListOpt, Opt};
+    let parsed = crate::syn::ParseResult::from(
+        ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
+            .expect("valid PostgreSQL syntax")
+            .protobuf,
+    );
+    parsed
+        .get_stmts()
+        .get(0)
+        .get_stmt()
+        .as_inner()
+        .expect("statement")
+}
+
+/// Parse a SELECT's first expression without analyzing names or types.
+pub(crate) fn postgres_expression(sql: &str) -> crate::syn::Node {
+    use crate::syn::{ListOpt, Opt};
+    postgres_node(&format!("SELECT {sql}"))
+        .as_select_stmt()
+        .get_target_list()
+        .get(0)
+        .as_res_target()
+        .get_val()
+        .as_inner()
+        .expect("SELECT expression")
+}

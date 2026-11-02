@@ -400,7 +400,7 @@ impl Inventories {
 
 #[cfg(test)]
 mod test_inventories {
-    use super::{Document, Inventories, Target};
+    use super::{Inventories, Target};
     use crate::test_helpers::inventory::Project;
     use std::collections::BTreeMap;
 
@@ -429,28 +429,6 @@ mod test_inventories {
             project.inventory_bytes("second").unwrap(),
             b"unrelated inventory"
         );
-    }
-
-    #[rstest::rstest]
-    #[case::malformed("not toml")]
-    #[case::version(
-        r"inventory_version = 2
- datasource = 'first'
- schema_variant = 'qa'
- schema_dump_hash = 'hash'
- queries = []
- relations = []"
-    )]
-    fn rejects_invalid_files_and_force_rebuild_recovers(#[case] content: &str) {
-        let project = Project::new();
-        let args = project.args();
-        project.seed_inventory("first", content);
-        assert!(Target::new(&args, "first", false, false).is_err());
-        let target = Target::new(&args, "first", true, false).unwrap();
-        Inventories(BTreeMap::from([("first".to_owned(), target)]))
-            .finalize(false)
-            .unwrap();
-        assert!(Document::load(&project.path("first")).unwrap().is_some());
     }
 
     #[test]

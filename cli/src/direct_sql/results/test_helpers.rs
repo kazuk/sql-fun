@@ -8,13 +8,8 @@ use ::sql_fun_client::{
 
 pub(super) fn column_access_response() -> ::testresult::TestResult<AnalyzeQueryResponse> {
     let access: ColumnAccess = ::serde_json::from_value(::serde_json::json!({
-        "accessing_span": {
-            "from": {"offset":7,"line":1,"col":8},
-            "to": {"offset":9,"line":1,"col":10}
-        },
-        "relation_schema":"public", "relation_local_name":"events",
-        "relation_kind":"Table", "column_name":"id", "column_ordinal":0,
-        "access_kind":"SelectResTarget"
+        "relation":{"catalog":null,"schema":"public","name":"events"},
+        "relation_kind":"Table", "column_name":"id", "access_kind":"SelectOutput"
     }))?;
     let columns = vec![
         ResultSetColumn::new(
@@ -34,7 +29,6 @@ pub(super) fn column_access_response() -> ::testresult::TestResult<AnalyzeQueryR
             Collection::completed(Vec::new()),
             Collection::completed(Vec::new()),
             Collection::completed(columns),
-            Collection::completed(Vec::new()),
             Collection::completed(vec![access]),
         ),
     ])))

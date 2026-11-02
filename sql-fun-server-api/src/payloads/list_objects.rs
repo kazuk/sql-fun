@@ -50,6 +50,29 @@ pub enum ObjectKind {
     Index,
 }
 
+impl ObjectKind {
+    /// An ordinary table.
+    #[must_use]
+    pub const fn table() -> Self {
+        Self::Table
+    }
+    /// An ordinary view.
+    #[must_use]
+    pub const fn view() -> Self {
+        Self::View
+    }
+    /// A materialized view.
+    #[must_use]
+    pub const fn materialized_view() -> Self {
+        Self::MaterializedView
+    }
+    /// A function.
+    #[must_use]
+    pub const fn function() -> Self {
+        Self::Function
+    }
+}
+
 /// filter conditions
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]

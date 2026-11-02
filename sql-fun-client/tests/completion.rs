@@ -335,7 +335,6 @@ async fn copied_api_response_completes_every_nested_analysis_field(
                 assert_eq!(response.queries().items().len(), total);
                 for item in response.queries().items() {
                     assert!(item.probrems().is_completed());
-                    assert!(item.accessing_relations().is_completed());
                     assert!(item.column_access().is_completed());
                     assert!(item.parameters().is_completed());
                     assert!(item.result_columns().is_completed());
@@ -347,7 +346,7 @@ async fn copied_api_response_completes_every_nested_analysis_field(
         .await?;
     let log = ::tokio::time::timeout(Duration::from_secs(5), peer.finish()).await??;
     received.await?;
-    assert_eq!(log.releases(), 1 + 5 * total);
+    assert_eq!(log.releases(), 1 + 4 * total);
     assert_eq!(log.reads(), reads);
     Ok(())
 }

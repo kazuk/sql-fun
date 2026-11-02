@@ -27,7 +27,6 @@ pub(super) fn response(codes: &[&str], columns: Vec<ResultSetColumn>) -> Analyze
         Collection::completed(Vec::new()),
         Collection::completed(columns),
         Collection::completed(Vec::new()),
-        Collection::completed(Vec::new()),
     )]))
 }
 pub(super) fn column(

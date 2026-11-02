@@ -157,7 +157,7 @@ impl ColumnReferenceExpr {
     }
 
     /// SQL source spelling retained by a completed projection binding.
-    pub(crate) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
+    pub(crate) fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         match self {
             Self::TableColumn(value) => value.projection_reference(),
             Self::SystemColumn(value) => value.projection_reference(),
@@ -165,6 +165,8 @@ impl ColumnReferenceExpr {
             Self::TableFuncColumn(value) => value.projection_reference(),
             Self::CteColumn(value) => value.projection_reference(),
             Self::SubQueryColumn(value) => value.projection_reference(),
+            Self::DeleteRow(value) => value.source().projection_reference(),
+            Self::MergeRecord(value) => value.source().projection_reference(),
             _ => None,
         }
     }
@@ -503,5 +505,37 @@ impl ColumnReferenceExpr {
         Ok(SemScalarExpr::ColumnRef(Self::AmbiguousColumnRef(
             column.clone(),
         )))
+    }
+}
+
+impl ColumnReferenceExpr {
+    pub(crate) fn access_column(&self) -> Option<crate::sem::query_access::AccessColumn> {
+        use crate::sem::query_access::{AccessColumn, AccessObjectKind};
+        match self {
+            Self::TableColumn(value) => {
+                let column = value.get_column_def().as_ref()?.name().as_ref()?;
+                Some(AccessColumn::new(
+                    AccessObjectKind::table(),
+                    value.relation(),
+                    column,
+                ))
+            }
+            Self::ViewColumn(value) => {
+                let column = value.get_column_def().as_ref()?.name().as_ref()?;
+                Some(AccessColumn::new(
+                    AccessObjectKind::view(),
+                    value.access_relation(),
+                    column,
+                ))
+            }
+            Self::SystemColumn(value) => Some(AccessColumn::new(
+                AccessObjectKind::table(),
+                value.relation(),
+                value.attribute(),
+            )),
+            Self::DeleteRow(value) => value.source().access_column(),
+            Self::MergeRecord(value) => value.source().access_column(),
+            _ => None,
+        }
     }
 }

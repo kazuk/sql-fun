@@ -1669,3 +1669,13 @@ impl SemScalarExpr {
         }
     }
 }
+
+impl SemScalarExpr {
+    pub(crate) const fn access_reference(&self) -> Option<&ColumnReferenceExpr> {
+        if let Self::ColumnRef(reference) = self {
+            Some(reference)
+        } else {
+            None
+        }
+    }
+}

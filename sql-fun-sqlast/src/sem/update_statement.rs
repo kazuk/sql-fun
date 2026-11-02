@@ -175,16 +175,23 @@ impl UpdateStatement {
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_action(
+            self.target.full_name(),
+            crate::sem::AccessKind::update_rows(),
+        );
+        visitor.access_purpose(crate::sem::AccessKind::update_source());
         visitor.table_binding(&mut self.target);
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }
         self.from.walk(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::update_filter());
         if let Some(predicate) = &mut self.predicate {
             predicate.walk(visitor)?;
         }
         // PostgreSQL transforms WHERE and RETURNING before SET assignments.
         // This order matters when RETURNING resolves an unknown parameter.
+        visitor.access_purpose(crate::sem::AccessKind::update_returning());
         visitor.dml_returning(&mut self.returning)?;
         self.assignments.walk(visitor)
     }
@@ -222,8 +229,10 @@ impl UpdateAssignment {
         &self.value
     }
     fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::update_target());
         self.destination.walk_assignment_target(visitor)?;
         visitor.bound_definition(&mut self.column, &self.destination);
+        visitor.access_purpose(crate::sem::AccessKind::update_input());
         self.value
             .walk(visitor, self.destination.get_type().as_ref())
     }

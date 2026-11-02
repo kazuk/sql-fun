@@ -4,10 +4,7 @@ use url::Url;
 
 use crate::{
     Collection,
-    payloads::{
-        AnalysisProbrem, ContextHandle, Nullability, ObjectKind, ObjectSummary, TextSpan,
-        TypeReference,
-    },
+    payloads::{AnalysisProbrem, ContextHandle, Nullability, ObjectKind, TextSpan, TypeReference},
 };
 
 /// SQL file input source
@@ -26,6 +23,9 @@ pub enum AnalyzeQueryInput {
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalyzeQueryArgs {
+    /// Collect SQL-visible access purposes only when true. Defaults to false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    analyze_access: bool,
     /// specify semantic analysis context
     context_handle: ContextHandle,
     /// Required, authoritative application SQL input.
@@ -40,6 +40,7 @@ impl AnalyzeQueryArgs {
     #[must_use]
     pub fn new(context_handle: &ContextHandle, query: &str) -> Self {
         Self {
+            analyze_access: false,
             context_handle: context_handle.clone(),
             query: AnalyzeQueryInput::from_text(query),
             resolved_cte_catalog: None,
@@ -55,6 +56,7 @@ impl AnalyzeQueryArgs {
         catalog: ::sql_fun_core::ResolvedCteCatalog,
     ) -> Self {
         Self {
+            analyze_access: false,
             context_handle: context_handle.clone(),
             query: AnalyzeQueryInput::from_text(query),
             resolved_cte_catalog: Some(catalog),
@@ -138,6 +140,38 @@ mod test_catalog_request_transport {
     }
 }
 
+impl AnalyzeQueryArgs {
+    /// Request the optional semantic access traversal without changing shared defaults.
+    #[must_use]
+    pub const fn with_access_analysis(mut self) -> Self {
+        self.analyze_access = true;
+        self
+    }
+}
+
+#[cfg(test)]
+mod test_access_request {
+    use super::AnalyzeQueryArgs;
+    #[test]
+    fn access_analysis_requires_explicit_true() {
+        for option in [None, Some(false), Some(true)] {
+            let mut value =
+                ::serde_json::json!({"context_handle":"c", "query":{"Text":"SELECT 1"}});
+            if let Some(option) = option {
+                value["analyze_access"] = option.into();
+            }
+            let args: AnalyzeQueryArgs = ::serde_json::from_value(value).unwrap();
+            assert_eq!(*args.analyze_access(), option == Some(true));
+        }
+        let args = AnalyzeQueryArgs::new(
+            &crate::payloads::ContextHandle::from("c".to_owned()),
+            "SELECT 1",
+        );
+        assert!(!args.analyze_access());
+        assert!(args.with_access_analysis().analyze_access());
+    }
+}
+
 /// response for `analyze_query`
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
@@ -193,9 +227,6 @@ pub struct AnalyzeQueryItem {
     /// semantic probrems
     probrems: Collection<AnalysisProbrem>,
 
-    /// query accessing relations
-    accessing_relations: Collection<ObjectSummary>,
-
     /// column access collection
     column_access: Collection<ColumnAccess>,
 
@@ -210,7 +241,6 @@ impl super::CollectionTraversal for AnalyzeQueryItem {
     fn collections(&self) -> Vec<&dyn super::CollectionReference> {
         vec![
             &self.probrems,
-            &self.accessing_relations,
             &self.column_access,
             &self.parameters,
             &self.result_columns,
@@ -219,7 +249,6 @@ impl super::CollectionTraversal for AnalyzeQueryItem {
     fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
         vec![
             &mut self.probrems,
-            &mut self.accessing_relations,
             &mut self.column_access,
             &mut self.parameters,
             &mut self.result_columns,
@@ -245,74 +274,85 @@ pub struct ParameterDescribe {
 
 impl super::CollectionTraversal for ParameterDescribe {}
 
-/// column access kind
+/// Why a top-level SQL operation needs a relation or column.
+pub use ::sql_fun_core::AccessKind;
+
+/// Resolved SQL-visible object name, preserving logical identifier components.
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
-#[derive(serde::Serialize, serde::Deserialize)]
-pub enum ColumnAccessKind {
-    /// Column accessed in select statement column list.
-    SelectResTarget,
-
-    /// Column accessed in select statement from clause
-    SelectFrom,
-
-    /// Column accessed in select statement where clause.
-    SelectWhere,
-
-    /// column accessed in select statement order by clause
-    SelectOrderBy,
-
-    /// column accessed in select statement group by clause
-    SelectGroupBy,
-
-    /// column accessed in select statement having clause
-    SelectHaving,
-
-    /// column accessed in update statement set left value
-    UpdateSet,
-
-    /// column accessed in update statement set right value
-    UpdateSetValue,
-
-    /// column accessed in update statement from clause
-    UpdateFrom,
-
-    /// column accessed in update statement where clause
-    UpdateWhere,
-
-    /// column accessed in insert statement
-    InsertInto,
-
-    /// column accessed in delete statement
-    Delete,
+#[derive(
+    Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize, derive_getters::Getters,
+)]
+pub struct RelationName {
+    catalog: Option<String>,
+    schema: Option<String>,
+    name: String,
+}
+impl RelationName {
+    /// Construct a resolved name without parsing or case folding its components.
+    #[must_use]
+    pub fn new(catalog: Option<&str>, schema: Option<&str>, name: &str) -> Self {
+        Self {
+            catalog: catalog.map(str::to_owned),
+            schema: schema.map(str::to_owned),
+            name: name.to_owned(),
+        }
+    }
 }
 
-/// column access
+/// One relation-level action or column reference in the same access collection.
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ColumnAccess {
-    /// accessing span
-    accessing_span: TextSpan,
-
-    /// relation schema name
-    relation_schema: String,
-
-    /// relation local name
-    relation_local_name: String,
-
-    /// relation kind
+    access_kind: AccessKind,
     relation_kind: ObjectKind,
-
-    /// column name
-    column_name: String,
-
-    /// column ordinal in relation
-    column_ordinal: usize,
-
-    /// kind of column access
-    access_kind: ColumnAccessKind,
+    relation: RelationName,
+    column_name: Option<String>,
 }
-
+impl ColumnAccess {
+    /// Describe a resolved SQL-visible access; absence of a column denotes a relation action.
+    #[must_use]
+    pub fn new(
+        kind: AccessKind,
+        object: ObjectKind,
+        relation: &RelationName,
+        column: Option<&str>,
+    ) -> Self {
+        Self {
+            access_kind: kind,
+            relation_kind: object,
+            relation: relation.clone(),
+            column_name: column.map(str::to_owned),
+        }
+    }
+}
 impl super::CollectionTraversal for ColumnAccess {}
+
+#[cfg(test)]
+mod test_access_record {
+    #[test]
+    fn accesses_have_exactly_four_semantic_fields() {
+        for (column, kind, wire_kind) in [
+            (None, super::AccessKind::read_rows(), "ReadRows"),
+            (
+                Some("id"),
+                super::AccessKind::select_output(),
+                "SelectOutput",
+            ),
+        ] {
+            let access = super::ColumnAccess::new(
+                kind,
+                crate::payloads::ObjectKind::table(),
+                &super::RelationName::new(None, Some("public"), "a"),
+                column,
+            );
+            let value = ::serde_json::to_value(access).unwrap();
+            assert_eq!(
+                value,
+                ::serde_json::json!({"access_kind":wire_kind, "relation_kind":"Table", "relation":{"catalog":null,"schema":"public","name":"a"}, "column_name":column})
+            );
+        }
+    }
+}
 
 /// result set column description item
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -380,7 +420,6 @@ impl AnalyzeQueryItem {
         probrems: Collection<AnalysisProbrem>,
         parameters: Collection<ParameterDescribe>,
         result_columns: Collection<ResultSetColumn>,
-        accessing_relations: Collection<ObjectSummary>,
         column_access: Collection<ColumnAccess>,
     ) -> Self {
         Self {
@@ -389,7 +428,6 @@ impl AnalyzeQueryItem {
             complete,
             query_kind,
             probrems,
-            accessing_relations,
             column_access,
             parameters,
             result_columns,

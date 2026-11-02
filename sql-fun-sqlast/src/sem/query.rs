@@ -444,14 +444,17 @@ impl SelectClauses {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_distinct());
         if let Some(distinct) = &mut self.distinct {
             for expression in distinct {
                 expression.walk(visitor)?;
             }
         }
+        visitor.access_purpose(crate::sem::AccessKind::select_grouping());
         for group in &mut self.group {
             group.walk(visitor)?;
         }
+        visitor.access_purpose(crate::sem::AccessKind::select_group_filter());
         if let Some(having) = &mut self.having {
             having.walk(visitor)?;
             visitor.predicate(having);
@@ -462,6 +465,7 @@ impl SelectClauses {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_window());
         for window in &mut self.windows {
             window.walk(visitor)?;
             visitor.window_definition(window);
@@ -682,13 +686,16 @@ impl SemanticQuery {
             entry.walk(visitor)?;
         }
         self.body.walk_body_assigned(visitor, targets)?;
+        visitor.access_purpose(crate::sem::AccessKind::select_ordering());
         for order in &mut self.order {
             order.walk(visitor)?;
         }
+        visitor.access_purpose(crate::sem::AccessKind::select_limit());
         if let Some(limit) = &mut self.limit {
             limit.walk(visitor)?;
             visitor.row_count(limit);
         }
+        visitor.access_purpose(crate::sem::AccessKind::select_offset());
         if let Some(offset) = &mut self.offset {
             offset.walk(visitor)?;
             visitor.row_count(offset);
@@ -812,6 +819,7 @@ impl QueryCte {
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         if let Some(columns) = self.statement.result_columns() {
+            visitor.enter_cte(&self.name, &columns.names());
             visitor.source_outputs(&columns.names());
         }
         self.statement.walk(visitor)?;

@@ -375,13 +375,16 @@ impl SelectStatementNode {
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_source());
         self.with_clause.walk(visitor)?;
         self.from_clause.walk(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::select_filter());
         crate::sem::traversal::optional(&mut self.where_clause, visitor)?;
         if let Some(predicate) = &self.where_clause {
             visitor.predicate(predicate);
         }
         self.clauses.walk_windows(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::select_output());
         self.result_columns.walk_assigned(visitor, targets)?;
         self.clauses.walk(visitor)?;
         Ok(())

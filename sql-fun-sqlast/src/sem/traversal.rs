@@ -2,6 +2,20 @@
 use crate::sem::{AnalysisError, SemScalarExpr};
 
 pub(crate) trait SemanticVisitor {
+    fn enter_rows_functions(&mut self) {}
+    fn leave_rows_functions(&mut self, _alias: &crate::sem::AliasSpec, _ordinality: bool) {}
+    fn access_purpose(&mut self, _kind: crate::sem::AccessKind) {}
+    fn access_join(&mut self, _join: &crate::sem::data_source::JoinExprDataSource) {}
+    fn leave_access_join(&mut self) {}
+    fn access_action(&mut self, _name: &crate::sem::FullName, _kind: crate::sem::AccessKind) {}
+    fn function_binding(
+        &mut self,
+        _name: &crate::sem::FullName,
+        _alias: &crate::sem::AliasSpec,
+        _columns: &[crate::sem::ColumnName],
+    ) {
+    }
+
     // Placement validators inspect written operands, not definitions behind bindings.
     fn walk_source_column_values(&self) -> bool {
         true
@@ -17,6 +31,7 @@ pub(crate) trait SemanticVisitor {
     }
     fn source_outputs(&mut self, _columns: &[crate::sem::ColumnName]) {}
     fn assignment_target(&mut self, _target: &mut SemScalarExpr) {}
+    fn enter_cte(&mut self, _name: &str, _columns: &[crate::sem::ColumnName]) {}
     fn cte_columns(&mut self, _name: &str, _columns: &[crate::sem::ColumnName]) {}
     fn cte_source(&mut self, _name: &str, _alias: &crate::sem::AliasSpec) {}
     fn table_binding(&mut self, _name: &mut crate::sem::TableName) {}
@@ -74,6 +89,11 @@ pub(crate) trait SemanticVisitor {
     fn enter_dml(&mut self) {}
     fn leave_dml(&mut self) {}
     fn enter_query(&mut self) {}
+    fn enter_set_operation(&mut self) {}
+    fn leave_set_operation(&mut self) {}
+    fn set_output(&mut self, _index: usize, name: &str, value: &mut SemScalarExpr) {
+        self.output(name, value);
+    }
     fn enter_set_operand(&mut self) {}
     fn leave_set_operand(&mut self) {}
     fn leave_query(&mut self) {}

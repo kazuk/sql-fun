@@ -3975,6 +3975,10 @@
             "description": "`analyze_query` request arguments",
             "type": "object",
             "properties": {
+              "analyze_access": {
+                "description": "Collect SQL-visible access purposes only when true. Defaults to false.",
+                "type": "boolean"
+              },
               "context_handle": {
                 "description": "specify semantic analysis context",
                 "$ref": "#/$defs/ContextHandle"
@@ -4337,27 +4341,22 @@
                   "description": "semantic probrems",
                   "$ref": "#/$defs/Collection2"
                 },
-                "accessing_relations": {
-                  "description": "query accessing relations",
-                  "$ref": "#/$defs/Collection3"
-                },
                 "column_access": {
                   "description": "column access collection",
-                  "$ref": "#/$defs/Collection4"
+                  "$ref": "#/$defs/Collection3"
                 },
                 "parameters": {
                   "description": "query parameters",
-                  "$ref": "#/$defs/Collection5"
+                  "$ref": "#/$defs/Collection4"
                 },
                 "result_columns": {
                   "description": "query result sets",
-                  "$ref": "#/$defs/Collection6"
+                  "$ref": "#/$defs/Collection5"
                 }
               },
               "required": [
                 "complete",
                 "probrems",
-                "accessing_relations",
                 "column_access",
                 "parameters",
                 "result_columns"
@@ -7901,7 +7900,7 @@
                   "description": "collection items",
                   "type": "array",
                   "items": {
-                    "$ref": "#/$defs/ObjectSummary"
+                    "$ref": "#/$defs/ColumnAccess"
                   }
                 }
               },
@@ -7913,45 +7912,200 @@
                 "items"
               ]
             },
-            "ObjectSummary": {
-              "description": "database object summary",
+            "ColumnAccess": {
+              "description": "One relation-level action or column reference in the same access collection.",
               "type": "object",
               "properties": {
-                "schema_name": {
-                  "description": "schema name",
-                  "type": "string"
+                "access_kind": {
+                  "$ref": "#/$defs/AccessKind"
                 },
-                "local_name": {
-                  "description": "local name",
-                  "type": "string"
-                },
-                "kind": {
-                  "description": "object kind",
+                "relation_kind": {
                   "$ref": "#/$defs/ObjectKind"
                 },
-                "definition_file": {
-                  "description": "definition SQL file",
+                "relation": {
+                  "$ref": "#/$defs/RelationName"
+                },
+                "column_name": {
                   "type": [
                     "string",
                     "null"
                   ]
-                },
-                "definition_span": {
-                  "description": "definition statement span",
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/TextSpan"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
                 }
               },
               "required": [
-                "schema_name",
-                "local_name",
-                "kind"
+                "access_kind",
+                "relation_kind",
+                "relation"
+              ]
+            },
+            "AccessKind": {
+              "description": "Why a top-level SQL operation needs an object or column.\nNested expressions and subqueries inherit their enclosing purpose.",
+              "oneOf": [
+                {
+                  "description": "Insert rows into a relation.",
+                  "type": "string",
+                  "const": "InsertRows"
+                },
+                {
+                  "description": "Read rows from a SQL-visible source.",
+                  "type": "string",
+                  "const": "ReadRows"
+                },
+                {
+                  "description": "Update rows in a relation.",
+                  "type": "string",
+                  "const": "UpdateRows"
+                },
+                {
+                  "description": "Delete rows from a relation.",
+                  "type": "string",
+                  "const": "DeleteRows"
+                },
+                {
+                  "description": "Produce SELECT output.",
+                  "type": "string",
+                  "const": "SelectOutput"
+                },
+                {
+                  "description": "Evaluate a SELECT source expression.",
+                  "type": "string",
+                  "const": "SelectSource"
+                },
+                {
+                  "description": "Filter SELECT rows.",
+                  "type": "string",
+                  "const": "SelectFilter"
+                },
+                {
+                  "description": "Match joined SELECT rows.",
+                  "type": "string",
+                  "const": "SelectJoin"
+                },
+                {
+                  "description": "Form SELECT groups.",
+                  "type": "string",
+                  "const": "SelectGrouping"
+                },
+                {
+                  "description": "Filter SELECT groups.",
+                  "type": "string",
+                  "const": "SelectGroupFilter"
+                },
+                {
+                  "description": "Order SELECT output.",
+                  "type": "string",
+                  "const": "SelectOrdering"
+                },
+                {
+                  "description": "Choose distinct SELECT rows.",
+                  "type": "string",
+                  "const": "SelectDistinct"
+                },
+                {
+                  "description": "Define a named SELECT window.",
+                  "type": "string",
+                  "const": "SelectWindow"
+                },
+                {
+                  "description": "Limit SELECT output rows.",
+                  "type": "string",
+                  "const": "SelectLimit"
+                },
+                {
+                  "description": "Skip SELECT output rows.",
+                  "type": "string",
+                  "const": "SelectOffset"
+                },
+                {
+                  "description": "Write an INSERT destination column.",
+                  "type": "string",
+                  "const": "InsertTarget"
+                },
+                {
+                  "description": "Supply inserted values.",
+                  "type": "string",
+                  "const": "InsertInput"
+                },
+                {
+                  "description": "Produce INSERT RETURNING output.",
+                  "type": "string",
+                  "const": "InsertReturning"
+                },
+                {
+                  "description": "Evaluate INSERT conflict selection.",
+                  "type": "string",
+                  "const": "InsertConflict"
+                },
+                {
+                  "description": "Write an UPDATE assignment destination.",
+                  "type": "string",
+                  "const": "UpdateTarget"
+                },
+                {
+                  "description": "Compute an UPDATE assignment input.",
+                  "type": "string",
+                  "const": "UpdateInput"
+                },
+                {
+                  "description": "Evaluate an UPDATE source expression.",
+                  "type": "string",
+                  "const": "UpdateSource"
+                },
+                {
+                  "description": "Filter updated rows.",
+                  "type": "string",
+                  "const": "UpdateFilter"
+                },
+                {
+                  "description": "Match joined UPDATE rows.",
+                  "type": "string",
+                  "const": "UpdateJoin"
+                },
+                {
+                  "description": "Produce UPDATE RETURNING output.",
+                  "type": "string",
+                  "const": "UpdateReturning"
+                },
+                {
+                  "description": "Evaluate a DELETE source expression.",
+                  "type": "string",
+                  "const": "DeleteSource"
+                },
+                {
+                  "description": "Filter deleted rows.",
+                  "type": "string",
+                  "const": "DeleteFilter"
+                },
+                {
+                  "description": "Match joined DELETE rows.",
+                  "type": "string",
+                  "const": "DeleteJoin"
+                },
+                {
+                  "description": "Produce DELETE RETURNING output.",
+                  "type": "string",
+                  "const": "DeleteReturning"
+                },
+                {
+                  "description": "Evaluate a MERGE source.",
+                  "type": "string",
+                  "const": "MergeSource"
+                },
+                {
+                  "description": "Match MERGE source and target rows.",
+                  "type": "string",
+                  "const": "MergeJoin"
+                },
+                {
+                  "description": "Choose a MERGE action.",
+                  "type": "string",
+                  "const": "MergeCondition"
+                },
+                {
+                  "description": "Produce MERGE RETURNING output.",
+                  "type": "string",
+                  "const": "MergeReturning"
+                }
               ]
             },
             "ObjectKind": {
@@ -8004,157 +8158,31 @@
                 }
               ]
             },
+            "RelationName": {
+              "description": "Resolved SQL-visible object name, preserving logical identifier components.",
+              "type": "object",
+              "properties": {
+                "catalog": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "schema": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            },
             "Collection4": {
-              "description": "collection",
-              "type": "object",
-              "properties": {
-                "handle": {
-                  "description": "handle for collecttion",
-                  "$ref": "#/$defs/CollectionHandle"
-                },
-                "total_length": {
-                  "description": "length of collection",
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                },
-                "offset": {
-                  "description": "offset of items",
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                },
-                "require_release": {
-                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
-                  "type": "boolean"
-                },
-                "items": {
-                  "description": "collection items",
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/$defs/ColumnAccess"
-                  }
-                }
-              },
-              "required": [
-                "handle",
-                "total_length",
-                "offset",
-                "require_release",
-                "items"
-              ]
-            },
-            "ColumnAccess": {
-              "description": "column access",
-              "type": "object",
-              "properties": {
-                "accessing_span": {
-                  "description": "accessing span",
-                  "$ref": "#/$defs/TextSpan"
-                },
-                "relation_schema": {
-                  "description": "relation schema name",
-                  "type": "string"
-                },
-                "relation_local_name": {
-                  "description": "relation local name",
-                  "type": "string"
-                },
-                "relation_kind": {
-                  "description": "relation kind",
-                  "$ref": "#/$defs/ObjectKind"
-                },
-                "column_name": {
-                  "description": "column name",
-                  "type": "string"
-                },
-                "column_ordinal": {
-                  "description": "column ordinal in relation",
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                },
-                "access_kind": {
-                  "description": "kind of column access",
-                  "$ref": "#/$defs/ColumnAccessKind"
-                }
-              },
-              "required": [
-                "accessing_span",
-                "relation_schema",
-                "relation_local_name",
-                "relation_kind",
-                "column_name",
-                "column_ordinal",
-                "access_kind"
-              ]
-            },
-            "ColumnAccessKind": {
-              "description": "column access kind",
-              "oneOf": [
-                {
-                  "description": "Column accessed in select statement column list.",
-                  "type": "string",
-                  "const": "SelectResTarget"
-                },
-                {
-                  "description": "Column accessed in select statement from clause",
-                  "type": "string",
-                  "const": "SelectFrom"
-                },
-                {
-                  "description": "Column accessed in select statement where clause.",
-                  "type": "string",
-                  "const": "SelectWhere"
-                },
-                {
-                  "description": "column accessed in select statement order by clause",
-                  "type": "string",
-                  "const": "SelectOrderBy"
-                },
-                {
-                  "description": "column accessed in select statement group by clause",
-                  "type": "string",
-                  "const": "SelectGroupBy"
-                },
-                {
-                  "description": "column accessed in select statement having clause",
-                  "type": "string",
-                  "const": "SelectHaving"
-                },
-                {
-                  "description": "column accessed in update statement set left value",
-                  "type": "string",
-                  "const": "UpdateSet"
-                },
-                {
-                  "description": "column accessed in update statement set right value",
-                  "type": "string",
-                  "const": "UpdateSetValue"
-                },
-                {
-                  "description": "column accessed in update statement from clause",
-                  "type": "string",
-                  "const": "UpdateFrom"
-                },
-                {
-                  "description": "column accessed in update statement where clause",
-                  "type": "string",
-                  "const": "UpdateWhere"
-                },
-                {
-                  "description": "column accessed in insert statement",
-                  "type": "string",
-                  "const": "InsertInto"
-                },
-                {
-                  "description": "column accessed in delete statement",
-                  "type": "string",
-                  "const": "Delete"
-                }
-              ]
-            },
-            "Collection5": {
               "description": "collection",
               "type": "object",
               "properties": {
@@ -8281,7 +8309,7 @@
                 }
               ]
             },
-            "Collection6": {
+            "Collection5": {
               "description": "collection",
               "type": "object",
               "properties": {

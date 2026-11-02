@@ -53,6 +53,7 @@ pub(crate) mod parameter_resolution;
 pub(crate) mod pg_type;
 pub mod problem;
 mod query;
+mod query_access;
 mod query_metadata;
 mod resolution;
 mod sampling_method;
@@ -63,8 +64,10 @@ mod top_level_statement;
 pub(crate) mod traversal;
 mod wildcard_expansion;
 pub use self::declaration_collation::DeclarationCollation;
+pub use self::query_access::{AccessObjectKind, AccessRecord, QueryAccess};
 pub use self::query_metadata::QueryMetadata;
 pub use self::with_typmod::WithTypmod;
+pub use ::sql_fun_core::AccessKind;
 
 pub(crate) mod type_system;
 mod update_statement;
@@ -392,6 +395,7 @@ impl SemAst {
         match self {
             Self::SelectStatement(query) => query.walk(visitor),
             Self::InsertStatement(insert) => insert.walk(visitor),
+            Self::MergeStatement(merge) => merge.walk(visitor),
             Self::UpdateStatement(update) => {
                 visitor.relation_identity(update.target().full_name());
                 update.walk(visitor)

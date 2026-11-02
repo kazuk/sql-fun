@@ -651,7 +651,8 @@ impl ResultColumnCollection {
                 if let Some(target) = targets.get(index) {
                     visitor.assignment(expression, target)?;
                 }
-                visitor.output(
+                visitor.set_output(
+                    index,
                     column.col_name.as_ref().map_or("", ColumnName::as_str),
                     expression,
                 );

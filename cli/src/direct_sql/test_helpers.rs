@@ -64,7 +64,7 @@ pub(super) async fn peer() -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<
             let response = if query == "api_error" {
                 ::serde_json::json!({"jsonrpc":"2.0","id":request["id"],"error":{"code":-32603,"message":"injected internal failure"}})
             } else {
-                let item = ::serde_json::json!({"query_span":null,"query_kind":null,"execute_sql":null,"complete":true,"probrems":page(&[]),"parameters":page(&[]),"result_columns":page(&[]),"accessing_relations":page(&[]),"column_access":page(&[])});
+                let item = ::serde_json::json!({"query_span":null,"query_kind":null,"execute_sql":null,"complete":true,"probrems":page(&[]),"parameters":page(&[]),"result_columns":page(&[]),"column_access":page(&[])});
                 ::serde_json::json!({"jsonrpc":"2.0","id":request["id"],"result":{"queries":page(&[item])}})
             };
             stream

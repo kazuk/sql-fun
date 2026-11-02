@@ -133,14 +133,21 @@ impl DeleteStatement {
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_action(
+            self.target.full_name(),
+            crate::sem::AccessKind::delete_rows(),
+        );
+        visitor.access_purpose(crate::sem::AccessKind::delete_source());
         visitor.table_binding(&mut self.target);
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }
         self.from.walk(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::delete_filter());
         if let Some(predicate) = &mut self.predicate {
             predicate.walk(visitor)?;
         }
+        visitor.access_purpose(crate::sem::AccessKind::delete_returning());
         visitor.dml_returning(&mut self.returning)?;
         Ok(())
     }

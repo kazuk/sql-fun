@@ -93,6 +93,11 @@ impl TableFunctionDataSource {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        if let Some(name) = &self.function_name
+            && let Some(name) = name.resolution().function_identity()
+        {
+            visitor.function_binding(name, &self.alias, &self.output.names());
+        }
         let mut args = self.args.to_vec();
         for argument in &mut args {
             argument.walk(visitor)?;

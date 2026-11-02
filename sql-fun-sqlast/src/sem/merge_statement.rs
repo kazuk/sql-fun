@@ -128,6 +128,14 @@ impl MergeAction {
     pub const fn is_nothing(&self) -> bool {
         matches!(self, Self::Nothing)
     }
+    const fn access_action(&self) -> Option<crate::sem::AccessKind> {
+        match self {
+            Self::Update(_) => Some(crate::sem::AccessKind::update_rows()),
+            Self::Insert(_) => Some(crate::sem::AccessKind::insert_rows()),
+            Self::Delete => Some(crate::sem::AccessKind::delete_rows()),
+            Self::Nothing | Self::Unresolved => None,
+        }
+    }
     fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Update(value) => value.0.walk(visitor),
@@ -199,6 +207,7 @@ impl MergeWhenCollection {
     }
     fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for clause in &mut self.0 {
+            visitor.access_purpose(crate::sem::AccessKind::merge_condition());
             if let Some(condition) = &mut clause.condition {
                 condition.walk(visitor)?;
                 visitor.predicate(condition);
@@ -324,13 +333,22 @@ impl MergeStatement {
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::merge_source());
         for cte in &mut self.with {
             cte.walk(visitor)?;
         }
+        for clause in &self.clauses.0 {
+            let kind = clause.action.access_action();
+            if let Some(kind) = kind {
+                visitor.access_action(self.target.full_name(), kind);
+            }
+        }
         self.from.walk(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::merge_join());
         self.on.walk(visitor)?;
         visitor.predicate(&self.on);
         // PostgreSQL transforms RETURNING before WHEN action expressions.
+        visitor.access_purpose(crate::sem::AccessKind::merge_returning());
         visitor.dml_returning(&mut self.returning)?;
         self.clauses.walk(visitor)
     }

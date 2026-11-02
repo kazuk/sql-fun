@@ -47,6 +47,9 @@ impl DeferredTableFunction {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        if let Some(name) = self.call.name_resolution().function_identity() {
+            visitor.function_binding(name, &self.alias, &self.output.names());
+        }
         self.call.walk(visitor)
     }
 }

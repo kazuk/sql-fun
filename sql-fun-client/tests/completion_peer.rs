@@ -211,13 +211,7 @@ impl Scenario {
         let mut items = Vec::new();
         for index in 0..self.total {
             let mut item = item.clone();
-            for name in [
-                "probrems",
-                "accessing_relations",
-                "column_access",
-                "parameters",
-                "result_columns",
-            ] {
+            for name in ["probrems", "column_access", "parameters", "result_columns"] {
                 let handle = format!("{name}-{index}");
                 item[name] = page(&handle, &[], 0, 0, true);
                 collections.insert(handle, Vec::new());

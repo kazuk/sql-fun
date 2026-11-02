@@ -1,8 +1,6 @@
 use std::io::Write;
 
-use ::sql_fun_client::payloads::{
-    AnalyzeQueryResponse, ColumnAccessKind, ObjectKind, QueryKind, TypeReference,
-};
+use ::sql_fun_client::payloads::{AnalyzeQueryResponse, ObjectKind, QueryKind, TypeReference};
 
 /// Display completed collections, preserving input and statement identity.
 pub(super) fn write_response(
@@ -54,33 +52,28 @@ pub(super) fn write_response(
         }
         writeln!(
             output,
-            "  Relations ({}):",
-            statement.accessing_relations().items().len()
-        )?;
-        for relation in statement.accessing_relations().items() {
-            writeln!(
-                output,
-                "    {}.{} ({})",
-                relation.schema_name(),
-                relation.local_name(),
-                relation.kind().label()
-            )?;
-        }
-        writeln!(
-            output,
             "  Column access ({}):",
             statement.column_access().items().len()
         )?;
         for access in statement.column_access().items() {
-            let kind = access.access_kind().label();
+            let relation = access.relation();
+            let relation_name = relation
+                .catalog()
+                .iter()
+                .chain(relation.schema())
+                .map(String::as_str)
+                .chain(std::iter::once(relation.name().as_str()))
+                .collect::<Vec<_>>()
+                .join(".");
+            let column = access
+                .column_name()
+                .as_ref()
+                .map_or(String::new(), |name| format!(".{name}"));
             writeln!(
                 output,
-                "    {}.{}.{} [{}] ({}): {kind}",
-                access.relation_schema(),
-                access.relation_local_name(),
-                access.column_name(),
-                access.column_ordinal(),
-                access.relation_kind().label()
+                "    {relation_name}{column} ({}): {}",
+                access.relation_kind().label(),
+                access.access_kind().name()
             )?;
         }
     }
@@ -99,7 +92,7 @@ mod test_response_display {
         let output = String::from_utf8(output)?;
         assert!(output.contains("queries.yaml#$.queries[2] (statement 0)"));
         assert!(output.contains("Column access (1):"));
-        assert!(output.contains("public.events.id [0] (Table): SelectResTarget"));
+        assert!(output.contains("public.events.id (Table): SelectOutput"));
         assert!(output.contains("[0] id: unresolved; unknown"));
         assert!(output.contains("[1] ids: pg_catalog.int4[]; nullable"));
         assert!(output.find("[0]").unwrap() < output.find("[1]").unwrap());
@@ -167,25 +160,6 @@ impl AnalysisLabel for ObjectKind {
             Self::Sequence => "Sequence",
             Self::Trigger => "Trigger",
             Self::Index => "Index",
-        }
-    }
-}
-
-impl AnalysisLabel for ColumnAccessKind {
-    fn label(&self) -> &'static str {
-        match self {
-            Self::SelectResTarget => "SelectResTarget",
-            Self::SelectFrom => "SelectFrom",
-            Self::SelectWhere => "SelectWhere",
-            Self::SelectOrderBy => "SelectOrderBy",
-            Self::SelectGroupBy => "SelectGroupBy",
-            Self::SelectHaving => "SelectHaving",
-            Self::UpdateSet => "UpdateSet",
-            Self::UpdateSetValue => "UpdateSetValue",
-            Self::UpdateFrom => "UpdateFrom",
-            Self::UpdateWhere => "UpdateWhere",
-            Self::InsertInto => "InsertInto",
-            Self::Delete => "Delete",
         }
     }
 }

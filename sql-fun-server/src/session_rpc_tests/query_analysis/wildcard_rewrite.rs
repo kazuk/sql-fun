@@ -120,13 +120,7 @@ async fn reparses_imported_ctes_without_changing_bindings_or_input_spans() {
         assert!(output.contains("$1") && output.contains("$2"), "{output}");
         item.as_object_mut().unwrap().remove("execute_sql");
         // Collections have intentionally distinct session-local issuance identities.
-        for field in [
-            "parameters",
-            "result_columns",
-            "probrems",
-            "accessing_relations",
-            "column_access",
-        ] {
+        for field in ["parameters", "result_columns", "probrems", "column_access"] {
             item[field].as_object_mut().unwrap().remove("handle");
         }
         if let Some(original) = &original {
@@ -163,13 +157,7 @@ async fn reparse_keeps_original_multistatement_parameter_and_diagnostic_coordina
         assert_eq!(items[1]["complete"], false, "{response}");
         for item in &mut items {
             item.as_object_mut().unwrap().remove("execute_sql");
-            for field in [
-                "parameters",
-                "result_columns",
-                "probrems",
-                "accessing_relations",
-                "column_access",
-            ] {
+            for field in ["parameters", "result_columns", "probrems", "column_access"] {
                 item[field].as_object_mut().unwrap().remove("handle");
             }
         }

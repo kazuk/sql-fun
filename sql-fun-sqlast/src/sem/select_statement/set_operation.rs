@@ -387,6 +387,8 @@ impl SetOperationQuery {
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::select_output());
+        visitor.enter_set_operation();
         visitor.enter_set_operand();
         self.left.walk(visitor)?;
         visitor.leave_set_operand();
@@ -394,7 +396,9 @@ impl SetOperationQuery {
         self.right.walk(visitor)?;
         visitor.leave_set_operand();
         visitor.set_operation(self)?;
-        self.columns.walk_set_outputs(visitor, targets)
+        self.columns.walk_set_outputs(visitor, targets)?;
+        visitor.leave_set_operation();
+        Ok(())
     }
 }
 

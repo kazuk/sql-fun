@@ -401,11 +401,13 @@ impl DataSourceRowFunctions {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.enter_rows_functions();
         let mut functions = self.functions.to_vec();
         for function in &mut functions {
             function.walk(visitor)?;
         }
         self.functions = functions.into();
+        visitor.leave_rows_functions(&self.alias, self.ordinality);
         Ok(())
     }
 }

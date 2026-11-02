@@ -307,7 +307,6 @@ async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::test
         "{stdout}"
     );
     assert!(stdout.contains("Parameters (0):"), "{stdout}");
-    assert!(stdout.contains("Relations (0):"), "{stdout}");
     assert!(stdout.contains("Column access (0):"), "{stdout}");
     assert!(String::from_utf8_lossy(&output.stderr).contains("query_parse"));
     Ok(())

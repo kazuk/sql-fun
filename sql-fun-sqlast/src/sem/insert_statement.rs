@@ -135,14 +135,21 @@ impl InsertStatement {
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_action(
+            self.target.full_name(),
+            crate::sem::AccessKind::insert_rows(),
+        );
+        visitor.access_purpose(crate::sem::AccessKind::insert_input());
         visitor.table_binding(&mut self.target);
         for entry in &mut self.with {
             entry.walk(visitor)?;
         }
         self.source.walk(visitor, self.columns.as_mut_slice())?;
+        visitor.access_purpose(crate::sem::AccessKind::insert_conflict());
         for conflict in &mut self.conflicts {
             conflict.walk(visitor)?;
         }
+        visitor.access_purpose(crate::sem::AccessKind::insert_returning());
         self.returning.walk(visitor)
     }
 }
@@ -259,7 +266,9 @@ impl InsertClauseSemantics {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::insert_target());
         self.targets.walk(visitor)?;
+        visitor.access_purpose(crate::sem::AccessKind::insert_input());
         if let Some(values) = self.values.values_mut() {
             values.walk(visitor, &self.targets)?;
         }
@@ -347,10 +356,12 @@ impl InsertSource {
         visitor: &mut V,
         targets: &mut [InsertTarget],
     ) -> Result<(), AnalysisError> {
+        visitor.access_purpose(crate::sem::AccessKind::insert_target());
         for target in targets.iter_mut() {
             target.destination.walk_assignment_target(visitor)?;
             visitor.bound_definition(&mut target.column, &target.destination);
         }
+        visitor.access_purpose(crate::sem::AccessKind::insert_input());
         match self {
             Self::DefaultValues => Ok(()),
             Self::Values(rows) => {

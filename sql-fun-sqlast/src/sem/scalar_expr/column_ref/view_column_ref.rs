@@ -45,6 +45,10 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
+    pub(super) const fn access_relation(&self) -> &crate::sem::FullName {
+        self.view_name.full_name()
+    }
+
     pub(super) fn set_projection_name(&mut self, name: &ColumnName) {
         self.column = name.clone();
         if let Some(column) = &mut self.column_def {

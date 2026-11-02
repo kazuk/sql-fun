@@ -267,7 +267,7 @@ pub(super) async fn peer_with_response(
 pub(super) fn successful_response(statement_count: usize) -> Value {
     let statements = (0..statement_count).map(|index| ::serde_json::json!({
         "query_span":null, "execute_sql":format!("SELECT {index}"), "complete":true, "query_kind":"Select",
-        "probrems":page(), "accessing_relations":page(), "column_access":page(), "parameters":page(), "result_columns":page()
+        "probrems":page(), "column_access":page(), "parameters":page(), "result_columns":page()
     })).collect::<Vec<_>>();
     let mut queries = page();
     queries["total_length"] = ::serde_json::json!(statement_count);

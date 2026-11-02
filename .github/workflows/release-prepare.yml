@@ -16,6 +16,10 @@ concurrency:
 
 jobs:
   prepare:
+    permissions:
+      contents: write
+      actions: read
+      packages: read
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/kazuk/ci-builder@sha256:5a9fb8282de0a11c8291cdc368461e8ed432a528adddc2777e8d9dd744386e8f
@@ -31,6 +35,9 @@ jobs:
       snapshot: ${{ steps.identity.outputs.snapshot }}
       classification: ${{ steps.identity.outputs.classification }}
       revision: ${{ steps.identity.outputs.revision }}
+      source: ${{ steps.state.outputs.source }}
+      materialized-revision: ${{ steps.final.outputs.revision }}
+      release-ref: ${{ github.ref }}
       ci-run-id: ${{ steps.ci.outputs.run_id }}
       ci-run-url: ${{ steps.ci.outputs.run_url }}
     env:
@@ -40,6 +47,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
       - name: Parse release branch identity
         id: identity
         env:
@@ -47,10 +55,20 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: .local/sbin/release-branch-identity "$RELEASE_REF" "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve recorded release state
+        id: state
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          uv run --no-project --no-config --python 3.12 \
+            .local/sbin/release-state resolve "$RELEASE_REF" "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
       - name: Require successful exact-SHA normal CI
         id: ci
+        env:
+          SOURCE_SHA: ${{ steps.state.outputs.source }}
         run: |
-          selected="$(.local/sbin/resolve-release-ci-run "$GITHUB_REPOSITORY" "$RELEASE_SHA")"
+          selected="$(.local/sbin/resolve-release-ci-run "$GITHUB_REPOSITORY" "$SOURCE_SHA")"
           {
             echo "run_id=$(jq -r '.id' <<<"$selected")"
             echo "run_url=$(jq -r '.html_url' <<<"$selected")"
@@ -61,9 +79,10 @@ jobs:
         run: |
           .local/sbin/adopt-release-ci-inputs "$GITHUB_REPOSITORY" "$CI_RUN_ID" \
             "$RUNNER_TEMP/release-inputs" \
-            sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual sql-fun-semver-baseline
+            sql-fun-user-manual sql-fun-semver-baseline
       - name: Materialize crate versions
         id: materialize
+        if: steps.state.outputs.status == 'new'
         env:
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
           RELEASE_SNAPSHOT: ${{ steps.identity.outputs.snapshot }}
@@ -101,6 +120,7 @@ jobs:
           if-no-files-found: error
       - name: Adopt SemVer baseline candidate
         id: baseline
+        if: steps.state.outputs.status == 'new'
         env:
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
         run: |
@@ -122,29 +142,50 @@ jobs:
             echo "status=$(jq -r '.status' <<<"$result")"
             echo "paths=$paths"
           } >> "$GITHUB_OUTPUT"
-      - name: Record adopted release inputs
+      - name: Commit release state on the release branch
+        id: committed
+        if: steps.state.outputs.status == 'new'
         env:
+          RELEASE_REF: ${{ github.ref }}
+          SOURCE_SHA: ${{ steps.state.outputs.source }}
+          MATERIALIZED_PATHS: ${{ steps.materialize.outputs.paths }}
+          BASELINE_PATHS: ${{ steps.baseline.outputs.paths }}
+        run: |
+          uv run --no-project --no-config --python 3.12 \
+            .local/sbin/release-state commit "$RELEASE_REF" "$SOURCE_SHA" \
+            "$MATERIALIZED_PATHS" "$BASELINE_PATHS" >> "$GITHUB_OUTPUT"
+
+      - name: Hand off committed release source
+        id: final
+        env:
+          CREATED_REVISION: ${{ steps.committed.outputs.revision }}
+          RECORDED_REVISION: ${{ steps.state.outputs.revision }}
+          RELEASE_STATUS: ${{ steps.state.outputs.status }}
+          SOURCE_SHA: ${{ steps.state.outputs.source }}
           CI_RUN_URL: ${{ steps.ci.outputs.run_url }}
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
-          CRATE_VERSIONS: ${{ steps.materialize.outputs.versions }}
           MANUAL_ARCHIVE: ${{ steps.manual.outputs.archive }}
-          BASELINE_STATUS: ${{ steps.baseline.outputs.status }}
-          BASELINE_PATHS: ${{ steps.baseline.outputs.paths }}
         run: |
+          revision="${CREATED_REVISION:-$RECORDED_REVISION}"
+          [[ "$(git rev-parse HEAD)" == "$revision" ]]
+          versions="$RUNNER_TEMP/committed-crates.tsv"
+          .local/bin/release-crate-manifest > "$versions"
+          {
+            echo "revision=$revision"
+            echo "versions=$versions"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "Product release: $RELEASE_TAG ($RELEASE_CLASSIFICATION)"
-            echo "Release target: $RELEASE_SHA"
+            echo "Original source: $SOURCE_SHA"
+            echo "Recorded release source: $revision ($RELEASE_STATUS attempt)"
+            echo "Release branch: $GITHUB_REF"
             echo "Normal CI: $CI_RUN_URL"
-            echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual, sql-fun-semver-baseline"
+            echo 'Adopted: sql-fun-user-manual, sql-fun-semver-baseline'
             echo "Manual asset: $MANUAL_ARCHIVE (Actions artifact: release-manual-$GITHUB_RUN_ATTEMPT)"
-            echo "SemVer baseline: $BASELINE_STATUS ($RELEASE_CLASSIFICATION)"
-            echo 'Baseline paths for release-state finalization (empty for snapshots):'
-            echo '```text'
-            cat "$BASELINE_PATHS"
-            echo '```'
+            echo 'main was not modified. Release build, immutable tag and draft integration remain downstream work.'
             echo 'Materialized crate versions:'
             echo '```text'
-            cat "$CRATE_VERSIONS"
+            cat "$versions"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""Resolve and persist the explicitly selected release branch's source state."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tomllib
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def run(*args):
+    return subprocess.check_output(args, text=True).strip()
+
+
+def git(*args):
+    return run('git', *args)
+
+
+def metadata():
+    return json.loads(run('cargo', 'metadata', '--locked', '--no-deps', '--format-version=1'))
+
+
+def workspace_paths(data):
+    members = set(data['workspace_members'])
+    return {'Cargo.toml', 'Cargo.lock'} | {
+        str(Path(p['manifest_path']).relative_to(Path.cwd()))
+        for p in data['packages'] if p['id'] in members
+    }
+
+
+def packages(data):
+    members = set(data['workspace_members'])
+    return {p['name']: p['version'] for p in data['packages']
+            if p['id'] in members and p['source'] is None and p['publish'] != []}
+
+
+def manifest_at(revision):
+    return tomllib.loads(git('show', f'{revision}:Cargo.toml'))
+
+
+def intent(document):
+    return document['workspace']['metadata']['next-release']
+
+
+def changed_paths(*args):
+    return set(git('diff', '--name-only', *args).splitlines())
+
+
+def remote_tip(ref):
+    # Fetch only the explicitly selected release ref; do not scan other branches.
+    subprocess.run(['git', 'fetch', '--no-tags', 'origin', ref], check=True)
+    return git('rev-parse', 'FETCH_HEAD')
+
+
+def clean():
+    require(not changed_paths() and not changed_paths('--cached'),
+            'Release state resolution requires a clean tracked worktree/index')
+
+
+def identity(ref, revision):
+    helper = Path(__file__).resolve().with_name('release-branch-identity')
+    return dict(line.split('=', 1) for line in run(str(helper), ref, revision).splitlines())
+
+
+def record(revision):
+    message = git('show', '-s', '--format=%B', revision)
+    fields = {}
+    for line in message.splitlines():
+        if line.startswith(('Release-Source:', 'Release-Tag:')):
+            key, value = line.split(':', 1)
+            require(key not in fields, f'Duplicate release record at {revision}')
+            fields[key] = value.strip()
+    if not fields:
+        return None
+    require(set(fields) == {'Release-Source', 'Release-Tag'},
+            f'Incomplete release record at {revision}')
+    require(re.fullmatch('[0-9a-f]{40}', fields['Release-Source']), 'Invalid recorded source SHA')
+    require(git('rev-list', '--parents', '-n', '1', revision).split() ==
+            [revision, fields['Release-Source']], 'Release commit must be a direct child of its source')
+    return fields
+
+
+def validate_record(revision, release):
+    fields = record(revision)
+    require(fields is not None and fields['Release-Tag'] == release['tag'],
+            f'Remote release state does not match {release["tag"]}')
+    require(git('show', '-s', '--format=%s', revision) ==
+            f'chore(release): materialize {release["tag"]}', 'Unexpected release commit subject')
+    data = metadata()
+    allowed = workspace_paths(data)
+    if release['classification'] == 'stable':
+        allowed.add('.local/semver_baseline.tar.gz')
+    require(changed_paths(fields['Release-Source'], revision) <= allowed,
+            'Recorded release commit contains unowned paths')
+    before = intent(manifest_at(fields['Release-Source']))
+    after = intent(manifest_at(revision))
+    if release['classification'] == 'snapshot':
+        require(before == after, 'Prerelease record changed release intent')
+    else:
+        expected = dict(before)
+        expected.update({name: 'patch' for name in packages(data)})
+        require(after == expected, 'Stable record did not reset release intent')
+    return fields['Release-Source']
+
+
+def resolve(args):
+    clean()
+    require(git('rev-parse', 'HEAD') == args.source, 'Resolution checkout must match selected revision')
+    release = identity(args.ref, args.source)
+    tip = remote_tip(args.ref)
+    requested = record(args.source)
+    if tip == args.source and requested is None:
+        return dict(source=args.source, revision=args.source, status='new')
+    fields = record(tip)
+    require(fields is not None, 'Release branch moved without a matching release-state record')
+    require(args.source in (tip, fields['Release-Source']),
+            'Release branch belongs to a different source revision')
+    # The current checkout is the explicitly selected source. Switch to the
+    # recorded state before reading Cargo metadata; never recalculate versions.
+    subprocess.run(['git', 'switch', '--detach', tip], check=True)
+    source = validate_record(tip, release)
+    return dict(source=source, revision=tip, status='reused')
+
+
+def read_paths(filename):
+    path = Path(filename).resolve()
+    require(not path.is_relative_to(Path.cwd()), 'Path lists must be outside the Git worktree')
+    return set(path.read_text().splitlines())
+
+
+def reset_intent(data):
+    """Edit existing scalar declarations, preserving comments and other TOML."""
+    path = Path('Cargo.toml')
+    original = path.read_text()
+    before = tomllib.loads(original)
+    expected = json.loads(json.dumps(before))
+    declared = intent(before)
+    names = set(packages(data))
+    require(names and all(declared.get(name) in ('patch', 'minor', 'major') for name in names),
+            'Every publishable package needs valid explicit release intent')
+    # This repository stores intent in an explicit table of scalar entries.
+    # Fail on another representation instead of broad serialization/format churn.
+    active = False
+    seen = set()
+    result = []
+    for line in original.splitlines(keepends=True):
+        if line.lstrip().startswith('['):
+            active = line.strip().split('#', 1)[0].strip() == '[workspace.metadata.next-release]'
+        if active:
+            match = re.fullmatch(r'(\s*)([A-Za-z0-9_-]+)(\s*=\s*)([\"\x27])(patch|minor|major)\4(\s*(?:#[^\n]*)?)(\n?)', line)
+            if match and match[2] in names:
+                seen.add(match[2])
+                line = f'{match[1]}{match[2]}{match[3]}{match[4]}patch{match[4]}{match[6]}{match[7]}'
+        result.append(line)
+    require(seen == names, 'Unsupported release-intent TOML layout; no intent changes written')
+    intent(expected).update({name: 'patch' for name in names})
+    updated = ''.join(result)
+    require(tomllib.loads(updated) == expected, 'Intent reset changed unrelated TOML values')
+    path.write_text(updated)
+
+
+def commit(args):
+    release = identity(args.ref, args.source)
+    require(git('rev-parse', 'HEAD') == args.source, 'Commit checkout must match original source')
+    require(record(args.source) is None, 'Source is already a release-state commit')
+    require(not changed_paths('--cached'), 'Release finalization requires an empty index')
+    require(remote_tip(args.ref) == args.source, 'Release branch changed before finalization')
+    data = metadata()
+    manifests = workspace_paths(data)
+    paths = read_paths(args.manifests)
+    baseline = read_paths(args.baseline)
+    require(paths <= manifests, 'Materializer paths contain unowned files')
+    expected_baseline = {'.local/semver_baseline.tar.gz'} if release['classification'] == 'stable' else set()
+    require(baseline == expected_baseline, 'Baseline paths disagree with release classification')
+    owned = paths | baseline
+    require(changed_paths() <= owned, 'Unexpected tracked changes before release finalization')
+    if release['classification'] == 'stable':
+        reset_intent(data)
+        owned.add('Cargo.toml')
+    else:
+        require(intent(tomllib.loads(Path('Cargo.toml').read_text())) == intent(manifest_at(args.source)),
+                'Prerelease must preserve release intent')
+    require(changed_paths() <= owned, 'Unexpected tracked release-state changes')
+    require(changed_paths(), 'Release materialization produced no changes')
+    subprocess.run(['git', 'add', '--', *sorted(owned)], check=True)
+    require(changed_paths('--cached') <= owned, 'Index contains unowned paths')
+    message = (f'chore(release): materialize {release["tag"]}\n\n'
+               f'Release-Source: {args.source}\nRelease-Tag: {release["tag"]}\n')
+    subprocess.run(['git', '-c', 'user.name=github-actions[bot]',
+                    '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com',
+                    'commit', '-m', message], check=True, stdout=sys.stderr)
+    revision = git('rev-parse', 'HEAD')
+    validate_record(revision, release)
+    pushed = subprocess.run(['git', 'push', 'origin', f'{revision}:{args.ref}'], stdout=sys.stderr)
+    # A connection failure may occur after the server accepted the update.
+    require(remote_tip(args.ref) == revision,
+            f'Release push not confirmed (exit {pushed.returncode}); preserve local commit {revision}')
+    return dict(source=args.source, revision=revision, status='created')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='operation', required=True)
+    for operation in ('resolve', 'commit'):
+        command = sub.add_parser(operation)
+        command.add_argument('ref')
+        command.add_argument('source')
+        if operation == 'commit':
+            command.add_argument('manifests')
+            command.add_argument('baseline')
+    args = parser.parse_args()
+    os.chdir(git('rev-parse', '--show-toplevel'))
+    result = resolve(args) if args.operation == 'resolve' else commit(args)
+    for key, value in result.items():
+        print(f'{key}={value}')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
+        print(f'Release state failed: {error}', file=sys.stderr)
+        sys.exit(1)

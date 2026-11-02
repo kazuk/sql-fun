@@ -22,7 +22,7 @@ build_dir=$(jq -er '.target_directory' <<< "$metadata")
 release_dir="$build_dir/$package_target/release"
 output_dir="$build_dir/distributions/$package_target"
 # Debian sorts prereleases before the final version using ~.
-deb_version=${package_version/-/~}
+deb_version=${package_version/-/'~'}
 mkdir -p "$output_dir"
 staging=$(mktemp -d "$output_dir/.package.XXXXXX")
 trap 'rm -rf "$staging"' EXIT

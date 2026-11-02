@@ -431,6 +431,8 @@ mod test_inventories {
         );
     }
 
+    // Invalid-file/force-rebuild cases timed out in CI; removed in 62b29ada.
+
     #[test]
     fn detects_header_changes_and_respects_schema_guard() {
         let project = Project::new();

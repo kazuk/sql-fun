@@ -17,3 +17,4 @@ bon = "3.10.1"
 sql-fun = { path = "../.." }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tokio-postgres = "0.7"
+toml = "1.0.6"

@@ -1,4 +1,5 @@
 mod diagnostics;
+mod inventory;
 mod lockfiles;
 mod progress;
 mod submission;
@@ -73,13 +74,13 @@ pub struct CheckArgs {
     #[clap(long, help_heading = Self::FEATURE_SELECTION_HEADING, conflicts_with ="all_features")]
     no_default_features: bool,
 
-    /// Build the lockfile from an empty initial state
+    /// Build lockfiles and inventories from an empty initial state
     #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "validate_only")]
     force_rebuild: bool,
 
     /// Validate only
     ///
-    /// When specified, Fail if schema dump or SQL statement change.
+    /// Fail if the schema dump, queries, or inventory have changed.
     #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     validate_only: bool,
 
@@ -213,6 +214,12 @@ impl CheckArgs {
         diagnostics_output: &mut D,
     ) -> Result<ExitCode, anyhow::Error> {
         progress.begin(requirements.len())?;
+        let mut inventories = inventory::Inventories::new(
+            args,
+            &requirements,
+            self.force_rebuild,
+            self.expect_schema_dump_valid,
+        )?;
         let renderer = crate::diagnostic::DiagnosticRenderer::from_args(args)?;
         let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
         let producer = async {
@@ -222,55 +229,79 @@ impl CheckArgs {
             finished?;
             Ok::<(), anyhow::Error>(())
         };
-        let consumer = async {
-            let mut failure = None;
-            while let Some(analysis) = receiver.recv().await {
-                analysis.log_received();
-                let reported = progress.received(analysis.function_name());
-                if let Err(error) = reported
-                    && failure.is_none()
-                {
-                    failure = Some(anyhow::Error::from(error));
-                }
-                if let Err(error) =
-                    diagnostics::render_all(&analysis, &renderer, diagnostics_output)
-                    && failure.is_none()
-                {
-                    failure = Some(error);
-                }
-                if let Some(error) = analysis.tokenization_error()
-                    && failure.is_none()
-                {
-                    failure = Some(anyhow::anyhow!(
-                        "cannot tokenize SQL diagnostic for {}: {error}",
-                        analysis.function_name()
-                    ));
-                }
-                if failure.is_none()
-                    && let Err(error) = lockfiles.receive(&analysis)
-                {
-                    failure = Some(error);
-                }
-            }
-            if let Some(error) = failure {
-                Err(error)
-            } else {
-                Ok(())
-            }
-        };
+        let consumer = Self::consume_analyses(
+            &mut receiver,
+            &renderer,
+            progress,
+            diagnostics_output,
+            &mut lockfiles,
+            &mut inventories,
+        );
         let (completed, processed) = ::tokio::join!(producer, consumer);
-        completed?;
-        processed?;
+        if let Err(error) = completed.and(processed) {
+            eprintln!("warning: inventories were not refreshed; existing files may be stale");
+            return Err(error);
+        }
         let phase = if self.validate_only {
-            "Validating lockfiles"
+            "Validating lockfiles and inventories"
         } else {
-            "Writing lockfiles"
+            "Writing lockfiles and inventories"
         };
         progress.phase(phase)?;
-        if lockfiles.finalize(self.validate_only)? {
+        let lockfiles_valid = lockfiles.finalize(self.validate_only)?;
+        let inventories_valid = inventories.finalize(self.validate_only)?;
+        if lockfiles_valid && inventories_valid {
             Ok(ExitCode::SUCCESS)
         } else {
             Ok(ExitCode::FAILURE)
+        }
+    }
+
+    async fn consume_analyses<W: std::io::Write, D: std::io::Write>(
+        receiver: &mut ::tokio::sync::mpsc::Receiver<submission::QueryAnalysis>,
+        renderer: &crate::diagnostic::DiagnosticRenderer,
+        progress: &mut Progress<W>,
+        diagnostics_output: &mut D,
+        lockfiles: &mut lockfiles::Lockfiles,
+        inventories: &mut inventory::Inventories,
+    ) -> Result<(), ::anyhow::Error> {
+        let mut failure = None;
+        while let Some(analysis) = receiver.recv().await {
+            analysis.log_received();
+            let reported = progress.received(analysis.function_name());
+            if let Err(error) = reported
+                && failure.is_none()
+            {
+                failure = Some(anyhow::Error::from(error));
+            }
+            if let Err(error) = diagnostics::render_all(&analysis, renderer, diagnostics_output)
+                && failure.is_none()
+            {
+                failure = Some(error);
+            }
+            if let Some(error) = analysis.tokenization_error()
+                && failure.is_none()
+            {
+                failure = Some(anyhow::anyhow!(
+                    "cannot tokenize SQL diagnostic for {}: {error}",
+                    analysis.function_name()
+                ));
+            }
+            if failure.is_none()
+                && let Err(error) = inventories.receive(&analysis)
+            {
+                failure = Some(error);
+            }
+            if failure.is_none()
+                && let Err(error) = lockfiles.receive(&analysis)
+            {
+                failure = Some(error);
+            }
+        }
+        if let Some(error) = failure {
+            Err(error)
+        } else {
+            Ok(())
         }
     }
 

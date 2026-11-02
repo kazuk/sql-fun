@@ -1,0 +1,14 @@
+# Query access matrix
+
+| Relation | Column | Access purpose | Rust queries (source; statement) |
+| --- | --- | --- | --- |
+{{#each relations}}
+{{#each accesses}}
+| {{../schema}}.{{../name}} | — | {{@key}} | {{#each this}}`{{function}}` ({{source_file}}:{{source_line}}; {{statement}}){{#unless @last}}; {{/unless}}{{/each}} |
+{{/each}}
+{{#each columns}}
+{{#each accesses}}
+| {{../../schema}}.{{../../name}} | {{../name}} | {{@key}} | {{#each this}}`{{function}}` ({{source_file}}:{{source_line}}; {{statement}}){{#unless @last}}; {{/unless}}{{/each}} |
+{{/each}}
+{{/each}}
+{{/each}}

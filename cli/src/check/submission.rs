@@ -117,7 +117,8 @@ pub(super) async fn submit(
             &contexts[&datasource],
             &original_query,
             requirement.into_cte_catalog(),
-        );
+        )
+        .with_access_analysis();
         let response = request_typed(client, "analyze_query", &request)
             .await
             .with_context(|| format!("cannot analyze {function_name} at {source_file}:{source_line} (datasource {datasource})"))?;

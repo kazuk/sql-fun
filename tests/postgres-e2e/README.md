@@ -9,11 +9,14 @@ tests/postgres-e2e/run.sh --local
 
 The command builds the local CLI/server, starts disposable PostgreSQL 18,
 applies `schema.sql` with `psql`, generates a fresh lockfile with `sql-fun check`,
-and executes the ordinary Cargo consumer. Parameters explicitly declare their
+validates the generated CRUD/query inventory against `inventory.toml`, checks
+validation without writes and deterministic regeneration, and executes the
+ordinary Cargo consumer. Parameters explicitly declare their
 SQL types using `${id:bigint}` and `${name:text}`. Rust assertions verify bound
-integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`.
+integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`,
+including RETURNING, a self-join, a CTE, a scalar subquery and a view.
 Failure in any phase makes the command fail. Containers, server processes, generated
-lockfiles, and temporary state are cleaned up on exit or handled interruption.
+lockfiles, inventories, and temporary state are cleaned up on exit or handled interruption.
 Dependency artifacts persist in the repository's `target/` (or an explicitly
 supplied `CARGO_TARGET_DIR`) and are reused across queries and subsequent local
 runs. The consumer itself is rebuilt against each run's generated lockfile.
@@ -43,3 +46,11 @@ The runner copies the repository's PostgreSQL 18 builtin catalog into a
 temporary `SQL_FUN_HOME`. As a temporary workaround for [#718](https://github.com/kazuk/sql-fun/issues/718),
 it also copies the existing default highlighter theme to the path expected by
 `check`. Remove that provisioning when #718 is fixed.
+
+The inventory's relation/column access maps group responsible query identities
+under the exact AccessKind names. `inventory.hbs` renders this model as a Markdown
+CRUD/column matrix using ordinary nested iteration, and `inventory.md` is its
+expected output. A CLI unit test converts the maintained TOML to JSON and checks
+that rendering without SQL interpretation, ID lookup or data transformation.
+Both this source-tree runner and installed-package validation compare the real
+CLI inventory with the same TOML golden.

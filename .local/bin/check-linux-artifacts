@@ -14,7 +14,7 @@ case "$package_target" in
     x86_64-unknown-linux-gnu) deb_arch=amd64; elf_machine='Advanced Micro Devices X86-64' ;;
     *) echo "unsupported packaging target: $package_target" >&2; exit 2 ;;
 esac
-deb_version=${package_version/-/~}
+deb_version=${package_version/-/'~'}
 deb="$output_dir/sql-fun_${deb_version}_${deb_arch}.deb"
 tarball="$output_dir/sql-fun-${package_version}-${package_target}.tar.gz"
 extracted=$(mktemp -d)

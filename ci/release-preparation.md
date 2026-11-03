@@ -150,7 +150,11 @@ existing assets. A conflicting size, incomplete upload or wrong prerelease
 classification stops preparation for operator correction. An upload failure
 may leave a partial draft; correct the reported problem and rerun using the
 retained complete asset set. If that data is unavailable or expired, recovery
-fails without rebuilding or changing the tag. Already published Releases are
+fails without rebuilding or changing the tag. A full workflow rerun can remove
+artifacts from its previous attempt, even before their retention period ends;
+do not treat a rerun as a guarantee that recovery data will survive. If no
+complete retained set remains, preserve the failed version and explicitly
+select a new release identity. Already published Releases are
 left untouched; downstream failures are resumed through distribution, not
 producer draft repair. A rerun may still fail earlier if its retained inputs
 are unavailable.

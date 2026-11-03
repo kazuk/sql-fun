@@ -66,13 +66,24 @@ def create_draft(args):
     notes = (f'Prepared product release {args.tag}.\n\n'
              f'Original source: {args.source}\nMaterialized release source: {args.revision}\n\n'
              'Review the prepared assets before manually publishing this draft.\n')
-    result = subprocess.run(['gh', 'release', 'create', args.tag, '--repo', args.repository,
-                             '--draft', '--verify-tag', '--title', args.tag, '--notes', notes,
-                             f'--prerelease={str(args.classification == "snapshot").lower()}'],
-                            stdout=sys.stderr)
-    release = release_for_tag(args)
-    require(release is not None,
-            f'Draft creation not confirmed for {args.tag} (exit {result.returncode})')
+    # Consume the create response directly: a newly created draft may not yet
+    # appear in the paginated Release listing (observed in live preparation).
+    payload = dict(tag_name=args.tag, draft=True, name=args.tag, body=notes,
+                   prerelease=args.classification == 'snapshot')
+    result = subprocess.run(['gh', 'api', '--method', 'POST',
+                             f'repos/{args.repository}/releases', '--input', '-'],
+                            input=json.dumps(payload), text=True, stdout=subprocess.PIPE)
+    if result.returncode == 0:
+        release = json.loads(result.stdout)
+        require(release['tag_name'] == args.tag and release['draft'] and
+                release['prerelease'] == (args.classification == 'snapshot'),
+                'Create response does not identify the intended draft')
+    else:
+        # A lost response may still have created the draft; accept only state
+        # that can be confirmed, without repeating the create operation.
+        release = release_for_tag(args)
+        require(release is not None,
+                f'Draft creation not confirmed for {args.tag} (exit {result.returncode})')
     return release
 
 

@@ -1,0 +1,346 @@
+id: import-local-path
+snapshots:
+  "fn f() { <crate::names::FullName as crate::traits::Convert>::convert(); }":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 10
+      end: 32
+    - source: crate
+      style: secondary
+      start: 10
+      end: 15
+    - source: crate::names
+      style: secondary
+      start: 10
+      end: 22
+  "fn f() { crate::factory::make(); }":
+    labels:
+    - source: crate::factory::make
+      style: primary
+      start: 9
+      end: 29
+    - source: crate
+      style: secondary
+      start: 9
+      end: 14
+    - source: crate::factory
+      style: secondary
+      start: 9
+      end: 23
+  "fn f() { crate::names::FullName::new(); }":
+    labels:
+    - source: crate::names::FullName::new
+      style: primary
+      start: 9
+      end: 36
+    - source: crate
+      style: secondary
+      start: 9
+      end: 14
+    - source: crate::names
+      style: secondary
+      start: 9
+      end: 21
+    - source: crate::names::FullName
+      style: secondary
+      start: 9
+      end: 31
+  "fn f() { let limit = crate::constants::LIMIT; }":
+    labels:
+    - source: crate::constants::LIMIT
+      style: primary
+      start: 21
+      end: 44
+    - source: crate
+      style: secondary
+      start: 21
+      end: 26
+    - source: crate::constants
+      style: secondary
+      start: 21
+      end: 37
+  "fn f() { let x = crate::constants::LIMIT; crate::factory::make(x); }":
+    labels:
+    - source: crate::constants::LIMIT
+      style: primary
+      start: 17
+      end: 40
+    - source: crate
+      style: secondary
+      start: 17
+      end: 22
+    - source: crate::constants
+      style: secondary
+      start: 17
+      end: 33
+  "fn f() { let x = crate::names::FullName { value: 1 }; }":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 17
+      end: 39
+    - source: crate
+      style: secondary
+      start: 17
+      end: 22
+    - source: crate::names
+      style: secondary
+      start: 17
+      end: 29
+  "fn f() { let x: crate::names::FullName; }":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 16
+      end: 38
+    - source: crate
+      style: secondary
+      start: 16
+      end: 21
+    - source: crate::names
+      style: secondary
+      start: 16
+      end: 28
+  "fn f() { self::items::Thing::new(); super::factory::make(); }":
+    labels:
+    - source: self::items::Thing::new
+      style: primary
+      start: 9
+      end: 32
+    - source: self
+      style: secondary
+      start: 9
+      end: 13
+    - source: self::items
+      style: secondary
+      start: 9
+      end: 20
+    - source: self::items::Thing
+      style: secondary
+      start: 9
+      end: 27
+  "fn f(x: Kind) { match x { crate::kind::Kind::Named => (), _ => () } }":
+    labels:
+    - source: crate::kind::Kind::Named
+      style: primary
+      start: 26
+      end: 50
+    - source: crate
+      style: secondary
+      start: 26
+      end: 31
+    - source: crate::kind
+      style: secondary
+      start: 26
+      end: 37
+    - source: crate::kind::Kind
+      style: secondary
+      start: 26
+      end: 43
+  "fn f(x: crate::names::FullName) -> crate::names::TableName { todo!() }":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 8
+      end: 30
+    - source: crate
+      style: secondary
+      start: 8
+      end: 13
+    - source: crate::names
+      style: secondary
+      start: 8
+      end: 20
+  "fn f<T: crate::traits::Bound>() {}":
+    labels:
+    - source: crate::traits::Bound
+      style: primary
+      start: 8
+      end: 28
+    - source: crate
+      style: secondary
+      start: 8
+      end: 13
+    - source: crate::traits
+      style: secondary
+      start: 8
+      end: 21
+  "fn f<T>() where T: crate::traits::Bound {}":
+    labels:
+    - source: crate::traits::Bound
+      style: primary
+      start: 19
+      end: 39
+    - source: crate
+      style: secondary
+      start: 19
+      end: 24
+    - source: crate::traits
+      style: secondary
+      start: 19
+      end: 32
+  "impl Child for Type { type Item = crate::names::FullName; }":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 34
+      end: 56
+    - source: crate
+      style: secondary
+      start: 34
+      end: 39
+    - source: crate::names
+      style: secondary
+      start: 34
+      end: 46
+  "impl crate::names::FullName {}":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 5
+      end: 27
+    - source: crate
+      style: secondary
+      start: 5
+      end: 10
+    - source: crate::names
+      style: secondary
+      start: 5
+      end: 17
+  "impl crate::traits::Convert<FullName> for crate::names::TableName {}":
+    labels:
+    - source: crate::names::TableName
+      style: primary
+      start: 42
+      end: 65
+    - source: crate
+      style: secondary
+      start: 42
+      end: 47
+    - source: crate::names
+      style: secondary
+      start: 42
+      end: 54
+  "impl crate::traits::Convert<crate::names::FullName> for TableName {}":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 28
+      end: 50
+    - source: crate
+      style: secondary
+      start: 28
+      end: 33
+    - source: crate::names
+      style: secondary
+      start: 28
+      end: 40
+  "impl crate::traits::Convert<crate::names::FullName> for crate::names::TableName {}":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 28
+      end: 50
+    - source: crate
+      style: secondary
+      start: 28
+      end: 33
+    - source: crate::names
+      style: secondary
+      start: 28
+      end: 40
+  "impl super::Hoge<crate::names::FullName> {}":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 17
+      end: 39
+    - source: crate
+      style: secondary
+      start: 17
+      end: 22
+    - source: crate::names
+      style: secondary
+      start: 17
+      end: 29
+  "impl super::traits::Convert for super::Hoge {}":
+    labels:
+    - source: super::Hoge
+      style: primary
+      start: 32
+      end: 43
+    - source: super
+      style: secondary
+      start: 32
+      end: 37
+  "struct Field { value: crate::names::FullName }":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 22
+      end: 44
+    - source: crate
+      style: secondary
+      start: 22
+      end: 27
+    - source: crate::names
+      style: secondary
+      start: 22
+      end: 34
+  "trait Child { type Item: crate::traits::Bound; }":
+    labels:
+    - source: crate::traits::Bound
+      style: primary
+      start: 25
+      end: 45
+    - source: crate
+      style: secondary
+      start: 25
+      end: 30
+    - source: crate::traits
+      style: secondary
+      start: 25
+      end: 38
+  "trait Child: crate::traits::Parent {}":
+    labels:
+    - source: crate::traits::Parent
+      style: primary
+      start: 13
+      end: 34
+    - source: crate
+      style: secondary
+      start: 13
+      end: 18
+    - source: crate::traits
+      style: secondary
+      start: 13
+      end: 26
+  "type Item = crate /* module boundary */ :: names :: FullName;":
+    labels:
+    - source: "crate /* module boundary */ :: names :: FullName"
+      style: primary
+      start: 12
+      end: 60
+    - source: crate
+      style: secondary
+      start: 12
+      end: 17
+    - source: "crate /* module boundary */ :: names"
+      style: secondary
+      start: 12
+      end: 48
+  "type Nested = Option<Vec<crate::names::FullName>>;":
+    labels:
+    - source: crate::names::FullName
+      style: primary
+      start: 25
+      end: 47
+    - source: crate
+      style: secondary
+      start: 25
+      end: 30
+    - source: crate::names
+      style: secondary
+      start: 25
+      end: 37

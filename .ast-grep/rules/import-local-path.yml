@@ -1,0 +1,81 @@
+id: import-local-path
+language: Rust
+severity: error
+message: Import this item with use (use an as alias if names conflict).
+utils:
+  local-path:
+    any:
+      - kind: crate
+      - kind: self
+      - kind: super
+      - all:
+          - any:
+              - kind: scoped_identifier
+              - kind: scoped_type_identifier
+          - has:
+              field: path
+              matches: local-path
+  trait-head:
+    any:
+      - inside:
+          kind: impl_item
+          field: trait
+      - inside:
+          kind: generic_type
+          field: type
+          inside:
+            kind: impl_item
+            field: trait
+  parent-inherent-target:
+    kind: scoped_type_identifier
+    has:
+      field: path
+      kind: super
+    any:
+      - inside:
+          kind: impl_item
+          field: type
+          not:
+            has:
+              field: trait
+              regex: .
+      - inside:
+          kind: generic_type
+          field: type
+          inside:
+            kind: impl_item
+            field: type
+            not:
+              has:
+                field: trait
+                regex: .
+rule:
+  any:
+    - kind: scoped_identifier
+    - kind: scoped_type_identifier
+  has:
+    field: path
+    matches: local-path
+  not:
+    any:
+      - inside:
+          kind: use_declaration
+          stopBy: end
+      - inside:
+          any:
+            - kind: attribute_item
+            - kind: inner_attribute_item
+            - kind: visibility_modifier
+            - kind: token_tree
+          stopBy: end
+      - inside:
+          kind: macro_invocation
+          field: macro
+      # Report one path, not each nested module prefix.
+      - inside:
+          any:
+            - kind: scoped_identifier
+            - kind: scoped_type_identifier
+          field: path
+      - matches: trait-head
+      - matches: parent-inherent-target

@@ -35,6 +35,36 @@ Diagnostics are shown for every statement with SQL source context. Error
 diagnostics do not stop later inputs. Each input uses the same selected schema
 base, without inheriting changes from preceding inputs.
 
+## Relation and column access
+
+By default, `analyze` also requests access analysis and displays the returned
+facts in a `Column access` section for each statement. Each record shows a
+resolved relation, its kind, an optional column, and the purpose of the access:
+
+```text
+  Column access (3):
+    public.events (Table): ReadRows
+    public.events.id (Table): SelectFilter
+    public.events.id (Table): SelectOutput
+```
+
+A record without a column describes a relation-level action. Names preserve
+returned catalog/schema qualification. Records are sorted by relation identity,
+column, relation kind, and purpose; every returned role is shown even when the
+same column has several roles. Purpose names describe why the top-level statement
+needs the access, including references inside nested expressions and subqueries.
+
+To avoid the additional server-side analysis and omit its display, use:
+
+```sh
+sql-fun --metadata-file Cargo.toml --datasource app analyze queries.sql --no-column-access
+```
+
+This option preserves ordinary diagnostics, parameters, and result columns.
+`Column access (0)` means the requested analysis returned no accesses for that
+statement. Access facts can also be returned for incomplete statements; they do
+not guarantee that every access was resolved.
+
 ## Parameter bindings
 
 Analysis finalizes the application's input binding contract. If SQL inference

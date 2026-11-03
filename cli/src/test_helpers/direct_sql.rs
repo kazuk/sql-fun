@@ -1,3 +1,6 @@
+pub(crate) mod results;
+pub(crate) mod session;
+
 pub(crate) struct StructuredFile(::tempfile::NamedTempFile);
 impl StructuredFile {
     pub(crate) fn sql(format: &str) -> ::testresult::TestResult<Self> {

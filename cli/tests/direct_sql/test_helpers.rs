@@ -1,3 +1,5 @@
+pub(super) mod request_peer;
+
 #[allow(
     dead_code,
     reason = "shared API fixtures include helpers for other integration targets"

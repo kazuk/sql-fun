@@ -12,6 +12,17 @@ $ sql-fun test --help | head -1
 Test diagnostic sets and result-column contracts without executing SQL
 ```
 
+```scrut
+$ sql-fun analyze --help | grep -A1 -- '--no-column-access'
+      --no-column-access
+          Disable relation/column access analysis and its output
+```
+
+```scrut
+$ sql-fun test --help | grep -- '--no-column-access'
+[1]
+```
+
 ## Required input and explicit schema levels
 
 ```scrut

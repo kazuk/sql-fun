@@ -8,7 +8,6 @@ use ::sql_fun_sqlast::ast::{CteDefinition, Dialect, HaveWithClause, StatementKin
 
 use crate::test_helpers::common_ast_mutation::{
     cte_names, parse_statement, query_definition, recursive_definition,
-    verify_abandoned_empty_editor, verify_with_carrier,
 };
 
 #[rstest::rstest]
@@ -496,4 +495,71 @@ fn invalid_column_edits_leave_existing_aliases_unchanged() {
         definition.view().columns().collect::<Vec<_>>(),
         ["original"]
     );
+}
+
+fn verify_abandoned_empty_editor(dialect: Dialect, failed_insertion: bool, forget_editor: bool) {
+    let mut statement = parse_statement("SELECT 1", dialect);
+    let definition = query_definition("source", dialect);
+    let mut editor = statement.ensure_with_clause().unwrap();
+    editor.set_recursive(true).unwrap();
+    if failed_insertion {
+        assert_eq!(
+            editor.insert(1, &definition).unwrap_err().invalid_index(),
+            Some(1)
+        );
+    }
+    assert!(editor.view().is_empty());
+    assert!(editor.view().is_recursive());
+    if forget_editor {
+        std::mem::forget(editor);
+    } else {
+        drop(editor);
+    }
+    assert!(statement.with_clause().is_none());
+    assert!(statement.with_clause_mut().is_none());
+    {
+        let mut editor = statement.ensure_with_clause().unwrap();
+        assert!(
+            !editor.view().is_recursive(),
+            "abandoned edits must not survive"
+        );
+        editor.insert(0, &definition).unwrap();
+    }
+    assert!(!statement.with_clause().unwrap().is_recursive());
+}
+
+fn verify_with_carrier(sql: &str, dialect: Dialect, expected_kind: StatementKind, existing: bool) {
+    let sql = if existing {
+        format!("WITH RECURSIVE existing AS (SELECT 1) {sql}")
+    } else {
+        sql.to_owned()
+    };
+    let mut statement = parse_statement(&sql, dialect);
+    assert_eq!(statement.kind(), expected_kind);
+    assert_eq!(statement.with_clause().is_some(), existing);
+    assert_eq!(statement.with_clause_mut().is_some(), existing);
+    {
+        let mut editor = statement.ensure_with_clause().unwrap();
+        assert_eq!(editor.view().is_recursive(), existing);
+        editor
+            .insert(0, &query_definition("new_cte", dialect))
+            .unwrap();
+        let expected = if existing {
+            vec!["new_cte", "existing"]
+        } else {
+            vec!["new_cte"]
+        };
+        assert_eq!(cte_names(editor.view()), expected);
+        editor.set_recursive(false).unwrap();
+        assert!(!editor.view().is_recursive());
+        editor.set_recursive(true).unwrap();
+    }
+    assert!(
+        statement
+            .ensure_with_clause()
+            .unwrap()
+            .view()
+            .is_recursive()
+    );
+    assert!(statement.with_clause().unwrap().is_recursive());
 }

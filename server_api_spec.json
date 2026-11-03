@@ -1034,17 +1034,8 @@
                 },
                 {
                   "description": "sub query not have a derived column",
-                  "type": "object",
-                  "properties": {
-                    "SubQueryNotHaveColumnForDerivedColumnName": {
-                      "type": "array",
-                      "maxItems": 0
-                    }
-                  },
-                  "required": [
-                    "SubQueryNotHaveColumnForDerivedColumnName"
-                  ],
-                  "additionalProperties": false
+                  "type": "string",
+                  "const": "SubQueryNotHaveColumnForDerivedColumnName"
                 },
                 {
                   "description": "incompatible case values",
@@ -5234,17 +5225,8 @@
                 },
                 {
                   "description": "sub query not have a derived column",
-                  "type": "object",
-                  "properties": {
-                    "SubQueryNotHaveColumnForDerivedColumnName": {
-                      "type": "array",
-                      "maxItems": 0
-                    }
-                  },
-                  "required": [
-                    "SubQueryNotHaveColumnForDerivedColumnName"
-                  ],
-                  "additionalProperties": false
+                  "type": "string",
+                  "const": "SubQueryNotHaveColumnForDerivedColumnName"
                 },
                 {
                   "description": "incompatible case values",

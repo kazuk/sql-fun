@@ -1,6 +1,6 @@
 # fixture	schema-level	schema-file	case-count	versions
 pilot	builtin	-	2	17,18
-output-names	builtin	-	15	17,18
+output-names	builtin	-	17	17,18
 casts	builtin	-	9	17,18
 vectors	builtin	-	4	18
 arrays-metadata	builtin	-	21	17,18

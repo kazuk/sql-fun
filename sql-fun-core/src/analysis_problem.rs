@@ -171,7 +171,7 @@ pub enum AnalysisProblem {
     RequireArray(SemScalarExpr, TypeReference),
 
     /// sub query not have a derived column
-    SubQueryNotHaveColumnForDerivedColumnName(),
+    SubQueryNotHaveColumnForDerivedColumnName,
 
     /// incompatible case values
     IncompatibleCaseValues(TypeList),
@@ -503,7 +503,7 @@ impl AnalysisProblem {
             Self::ExpressionTypeNotKnown(..) => "expression_type_not_known",
             Self::UndefinedOperator(..) => "undefined_operator",
             Self::RequireArray(..) => "require_array",
-            Self::SubQueryNotHaveColumnForDerivedColumnName(..) => {
+            Self::SubQueryNotHaveColumnForDerivedColumnName => {
                 "sub_query_not_have_column_for_derived_column_name"
             }
             Self::IncompatibleCaseValues(..) => "incompatible_case_values",
@@ -629,7 +629,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::RequireArray(_, ty) => {
                 format!("array operation requires an array value, found {ty}")
             }
-            Self::SubQueryNotHaveColumnForDerivedColumnName() => {
+            Self::SubQueryNotHaveColumnForDerivedColumnName => {
                 "subquery has no column for the derived column name".to_owned()
             }
             Self::IncompatibleCaseValues(types) => {
@@ -936,7 +936,7 @@ impl AnalysisProblem {
     /// subquery not have column
     #[must_use]
     pub const fn subquery_not_have_column_for_derived_column_name() -> Self {
-        Self::SubQueryNotHaveColumnForDerivedColumnName()
+        Self::SubQueryNotHaveColumnForDerivedColumnName
     }
 
     /// Diagnostic foreign key column type mismatch.
@@ -961,6 +961,34 @@ impl AnalysisProblem {
         _name: &str,
     ) -> Self {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod derived_column_diagnostic_tests {
+    use crate::analysis_problem::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity};
+
+    #[rstest::rstest]
+    #[case::json_text(false)]
+    #[case::json_value(true)]
+    fn derived_column_error_survives_transport(#[case] through_value: bool) {
+        let problem = AnalysisProblem::subquery_not_have_column_for_derived_column_name();
+        let restored: AnalysisProblem = if through_value {
+            let value = ::serde_json::to_value(&problem).unwrap();
+            ::serde_json::from_value(value).unwrap()
+        } else {
+            let text = ::serde_json::to_string(&problem).unwrap();
+            ::serde_json::from_str(&text).unwrap()
+        };
+        assert_eq!(
+            restored.code(),
+            "sub_query_not_have_column_for_derived_column_name"
+        );
+        assert_eq!(restored.severity(), DiagnosticSeverity::Error);
+        assert_eq!(
+            restored.diagnostic_message(),
+            "subquery has no column for the derived column name"
+        );
     }
 }
 

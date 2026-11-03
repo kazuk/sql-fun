@@ -139,7 +139,41 @@ not package validity. No producer validation is repeated.
 
 `steps.assets.outputs` supplies `tag`, `source`, `revision`, `status`
 (`produced`/`recovered`), `directory`, comma-separated `inventory`, `artifact-id`,
-`artifact-name` and `run-id` to #259's later same-job Draft integration. Existing
+`artifact-name` and `run-id` to the same-job draft integration. Existing
 job-level source/revision outputs retain their meanings. Paths are runner-local;
 artifact locators provide cross-run recovery within ordinary retention. Missing
 retained assets never authorize erasing the tag or rematerializing the version.
+
+## Draft handoff and mutation boundary
+
+`.local/sbin/prepare-release-draft` consumes the explicit `steps.assets`
+tag/source/revision and external directory/inventory handoff, together with
+the explicit workflow repository. The
+shared project parser owns classification; `release-state tag-status` owns
+record validation and remote-tag confirmation. No new identity record,
+manifest, CI-run lookup or packaging strategy is introduced.
+
+Authenticated paginated Release listings distinguish absent drafts from API
+failures. After confirmation of the immutable remote tag, an absent Release
+is created with `--draft --verify-tag`, explicit title/notes and parsed
+prerelease status. Existing drafts retain their metadata and unrelated assets.
+The helper lists assets by Release ID, requires existing expected assets to be
+uploaded with the prepared size, and uploads only missing inventory names
+without `--clobber`. It re-reads state after create/upload responses, including
+failures whose server-side effects may already have completed. Incomplete or
+conflicting assets fail without replacement; producer package validation is
+not repeated. A final inventory read confirms all required draft assets.
+
+Before each upload, the helper rechecks draft state and the remote tag. A
+published Release is left untouched when observed. These checks do not lock
+out a concurrent human publication; operators must wait for preparation to
+finish and review the complete draft before publishing it. Partial drafts
+and recorded Git state remain intact after failures. Summary output records
+the URL/status and complete inventory on success, or the failure diagnostic.
+Existing artifact locators remain in the earlier handoff summary.
+
+The producer never publishes crates, merges into main or deploys Pages.
+Reopened #260 owns publication-triggered crates → stable full-branch merge →
+Pages ordering, protected-main access and downstream retry evidence. Producer
+completion requires the complete draft and preserved branch/tag/asset handoff;
+it does not depend on completing #260 or a live publication trial.

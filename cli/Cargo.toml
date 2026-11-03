@@ -1,7 +1,7 @@
 [package]
 name = "sql-fun-cli"
 license = "MIT"
-version = "0.1.0"
+version = "0.2.0-snapshot2"
 edition = "2024"
 description = "command line tool for sql-fun"
 categories = ["database", "development-tools", "command-line-utilities"]

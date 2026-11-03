@@ -1,7 +1,7 @@
 [package]
 name = "sql-fun-codegen"
 license = "MIT"
-version = "0.1.0"
+version = "0.1.1-snapshot2"
 edition = "2024"
 categories = ["database", "development-tools"]
 keywords.workspace = true

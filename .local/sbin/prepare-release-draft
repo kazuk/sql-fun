@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Attach the prepared public inventory to a draft for an immutable release tag."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def run(*args):
+    return subprocess.check_output(args, text=True).strip()
+
+
+def api(args, endpoint):
+    return json.loads(run('gh', 'api', f'repos/{args.repository}/{endpoint}'))
+
+
+def pages(args, endpoint):
+    page = 1
+    while True:
+        values = api(args, f'{endpoint}?per_page=100&page={page}')
+        yield from values
+        if len(values) < 100:
+            break
+        page += 1
+
+
+def release_for_tag(args):
+    # Authenticated listings include drafts. A failed query is never absence.
+    matches = [release for release in pages(args, 'releases') if release['tag_name'] == args.tag]
+    require(len(matches) <= 1, f'Multiple Releases identify {args.tag}')
+    return matches[0] if matches else None
+
+
+def confirm_tag(args):
+    result = run(sys.executable, '.local/sbin/release-state', 'tag-status',
+                 f'refs/heads/release/{args.tag}', args.revision)
+    require(dict(line.split('=', 1) for line in result.splitlines()).get('status') == 'matching',
+            f'Remote tag {args.tag} must exist at recorded release source {args.revision}')
+
+
+def draft_assets(args, release, files):
+    require(release['tag_name'] == args.tag, 'Release identity changed; refusing asset mutation')
+    require(release['draft'], 'Release was published; refusing further draft mutation')
+    require(release['prerelease'] == (args.classification == 'snapshot'),
+            f'Release classification mismatch for {args.tag}; operator correction required')
+    existing = {}
+    for asset in pages(args, f'releases/{release["id"]}/assets'):
+        if asset['name'] in files:
+            require(asset['name'] not in existing, f'Duplicate release asset: {asset["name"]}')
+            require(asset['state'] == 'uploaded' and asset['size'] == files[asset['name']].stat().st_size,
+                    f'Conflicting or incomplete release asset: {asset["name"]}; no replacement attempted')
+            existing[asset['name']] = asset
+    return set(existing)
+
+
+def create_draft(args):
+    confirm_tag(args)
+    notes = (f'Prepared product release {args.tag}.\n\n'
+             f'Original source: {args.source}\nMaterialized release source: {args.revision}\n\n'
+             'Review the prepared assets before manually publishing this draft.\n')
+    result = subprocess.run(['gh', 'release', 'create', args.tag, '--repo', args.repository,
+                             '--draft', '--verify-tag', '--title', args.tag, '--notes', notes,
+                             f'--prerelease={str(args.classification == "snapshot").lower()}'],
+                            stdout=sys.stderr)
+    release = release_for_tag(args)
+    require(release is not None,
+            f'Draft creation not confirmed for {args.tag} (exit {result.returncode})')
+    return release
+
+
+def attach_asset(args, release, files, name, path):
+    # Re-read before each write, including after ambiguous API responses.
+    current = api(args, f'releases/{release["id"]}')
+    if not current['draft']:
+        return current
+    completed = draft_assets(args, current, files)
+    if name in completed:
+        return current
+    confirm_tag(args)
+    result = subprocess.run(['gh', 'release', 'upload', args.tag, str(path),
+                             '--repo', args.repository], stdout=sys.stderr)
+    current = api(args, f'releases/{release["id"]}')
+    if current['draft']:
+        completed = draft_assets(args, current, files)
+        require(name in completed,
+                f'Upload not confirmed: {name} (exit {result.returncode}); '
+                f'missing assets: {sorted(set(files) - completed)}; rerun with retained assets')
+    return current
+
+
+def prepare(args, files):
+    confirm_tag(args)
+    release = release_for_tag(args)
+    if release is None:
+        release = create_draft(args)
+    print(f'Release: {release["html_url"]}', file=sys.stderr)
+    if os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+            stream.write(f'\nDraft transaction: {release["html_url"]}\n')
+    if not release['draft']:
+        return dict(url=release['html_url'], status='published-untouched')
+    completed = draft_assets(args, release, files)
+    print(f'Completed assets: {sorted(completed)}; missing: {sorted(set(files) - completed)}',
+          file=sys.stderr)
+    for name, path in files.items():
+        if name not in completed:
+            release = attach_asset(args, release, files, name, path)
+            if not release['draft']:
+                return dict(url=release['html_url'], status='published-untouched')
+    confirm_tag(args)
+    current = api(args, f'releases/{release["id"]}')
+    if not current['draft']:
+        return dict(url=current['html_url'], status='published-untouched')
+    completed = draft_assets(args, current, files)
+    require(completed == set(files), f'Missing draft assets: {sorted(set(files) - completed)}')
+    return dict(url=current['html_url'], status='draft-complete')
+
+
+def inputs():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('repository', 'tag', 'classification', 'source', 'revision', 'directory', 'inventory'):
+        parser.add_argument('--' + name, required=True)
+    args = parser.parse_args()
+    require(re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository), 'Invalid repository')
+    require(all(re.fullmatch('[0-9a-f]{40}', value) for value in (args.source, args.revision)),
+            'Invalid release source revision')
+    os.chdir(run('git', 'rev-parse', '--show-toplevel'))
+    require(run('git', 'rev-parse', 'HEAD') == args.revision, 'Draft checkout must match recorded R')
+    parsed = run('.local/bin/parse-release-version', args.tag).split('\t')
+    require(parsed[-1] == args.classification, 'Classification disagrees with parsed project tag')
+    directory = Path(args.directory).resolve()
+    require(not directory.is_relative_to(Path.cwd()), 'Prepared assets must be outside checkout')
+    names = args.inventory.split(',')
+    require(len(names) == len(set(names)) == 4 and
+            all(re.fullmatch(r'[A-Za-z0-9_.~+-]+', name) for name in names),
+            'Invalid prepared public inventory')
+    require(set(path.name for path in directory.iterdir()) == set(names),
+            'Prepared directory differs from handed-off public inventory')
+    files = {name: directory / name for name in names}
+    require(all(path.is_file() and not path.is_symlink() and path.stat().st_size > 0
+                for path in files.values()), 'Missing, empty or symlinked prepared asset')
+    return args, files
+
+
+def main():
+    args, files = inputs()
+    print(f'Preparing {args.repository} {args.tag}: S={args.source}, R={args.revision}', file=sys.stderr)
+    print(f'Required assets: {", ".join(files)}', file=sys.stderr)
+    result = prepare(args, files)
+    for key, value in result.items():
+        print(f'{key}={value}')
+    summary = os.environ.get('GITHUB_STEP_SUMMARY')
+    if summary:
+        with open(summary, 'a') as stream:
+            stream.write(f'\nRelease: {result["url"]} ({result["status"]})\n\n'
+                         f'Original source: `{args.source}`; recorded source: `{args.revision}`.\n\n')
+            if result['status'] == 'draft-complete':
+                stream.write('All required draft assets are attached:\n\n')
+                stream.writelines(f'- `{name}`\n' for name in files)
+                stream.write('\nPreparation stopped for maintainer review and manual publication.\n')
+            else:
+                stream.write('Already published; producer left the Release untouched.\n')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
+        message = f'Draft preparation failed: {error}'
+        print(message, file=sys.stderr)
+        if os.environ.get('GITHUB_STEP_SUMMARY'):
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+                stream.write(f'\n{message}\n')
+        sys.exit(1)

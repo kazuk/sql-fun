@@ -82,6 +82,11 @@ definitions are handled through the table-as path described at [CREATE
 TABLE](create-table.md#create-table-as). Analysis does not enforce runtime CHECK
 OPTION checks or execute the defining query.
 
+SQLite/Turso CREATE MATERIALIZED VIEW and DROP VIEW semantic entry points remain
+unimplemented; see the
+[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+These paths do not acquire PostgreSQL semantics from similarly named commands.
+
 ## Diagnostics
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): creation or

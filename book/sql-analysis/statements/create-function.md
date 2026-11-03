@@ -31,6 +31,24 @@ implemented; unresolved polymorphic call signatures retain the limitations
 described at the function-call page. Missing result/parameter facts do not prove
 that every valid routine declaration is rejected or fully checked.
 
+### Declaration validation gaps
+
+Routine declaration analysis is incomplete
+([#640](https://github.com/kazuk/sql-fun/issues/640)). It retains overload metadata
+but does not validate SQL body references/statements or all retained language
+and routine options. Constructing that metadata does not establish complete
+agreement between explicit return declarations and output-parameter result
+shapes. Lack of sql-fun body validation does not determine when PostgreSQL
+validates a language-specific body.
+
+Unknown parameter type references and missing scalar return types can remain
+unresolved in overload metadata without the required missing-type diagnostic
+([#566](https://github.com/kazuk/sql-fun/issues/566)). A missing set-returning
+result type instead reaches the unfinished reporting helper described below.
+A returned declaration is therefore not proof that all declared type references
+and explicit-versus-derived outputs were validated. The OUT/INOUT/TABLE and
+procedure metadata support described above remains distinct from these gaps.
+
 ## Diagnostics
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): a routine

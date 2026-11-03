@@ -25,6 +25,11 @@ PostgreSQL 18 constraint features are version-gated and can reach explicit
 unimplemented boundaries. SQLite type-name syntax does not supply this
 PostgreSQL domain model.
 
+SQLite/Turso CREATE DOMAIN and DROP DOMAIN semantic entry points remain
+unimplemented; see the
+[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+These paths do not acquire PostgreSQL semantics from similarly named commands.
+
 ## Diagnostics
 
 - [domain_base_type_not_found](../../diagnostics/domain_base_type_not_found.md):

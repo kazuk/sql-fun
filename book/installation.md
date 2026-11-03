@@ -11,6 +11,13 @@ cargo install sql-fun-cli sql-fun-server
 cargo install --locked cargo-expand
 ```
 
+Prebuilt installation through `cargo binstall` is not yet supported by the
+published CLI/server package metadata
+([#950](https://github.com/kazuk/sql-fun/issues/950)). Product release tags and
+component crate versions are independent; cargo-binstall cannot currently use
+package metadata to select the corresponding shared release archive. The Cargo
+installation commands above build from source.
+
 Building the analyzer from source requires native compilation tools: a C compiler
 and assembler for stack growth, plus Clang for PostgreSQL parser bindings. On
 Ubuntu, install `build-essential` and `clang` before the Cargo commands above.

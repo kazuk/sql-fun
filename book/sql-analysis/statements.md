@@ -49,3 +49,43 @@ schema definitions rather than treating schema files as a migration history.
 The [conflicting_creation](../diagnostics/conflicting_creation.md) diagnostic
 reports an object-identity conflict. Statement-specific existence diagnostics
 and permitted no-op or replacement behavior are described on the statement pages.
+
+## Unimplemented SQLite and Turso statement analysis
+
+The SQLite/Turso frontend retains statement forms whose semantic entry points
+are still unimplemented. The following operations cannot yet be used to obtain
+analyzed statements or apply their intended catalog/state changes; encountering
+these entry points can panic. Tokenizing or parsing a statement is a separate
+capability.
+
+| Statement family | Missing analysis | Tracking issue |
+| --- | --- | --- |
+| Maintenance | ANALYZE and VACUUM | [#549](https://github.com/kazuk/sql-fun/issues/549) |
+| Attached databases | ATTACH and DETACH | [#550](https://github.com/kazuk/sql-fun/issues/550) |
+| Transactions | BEGIN, COMMIT, ROLLBACK, SAVEPOINT and RELEASE | [#551](https://github.com/kazuk/sql-fun/issues/551) |
+| Index lifecycle | CREATE INDEX and DROP INDEX | [#552](https://github.com/kazuk/sql-fun/issues/552) |
+| Index maintenance | REINDEX and OPTIMIZE | [#553](https://github.com/kazuk/sql-fun/issues/553) |
+| Virtual tables | CREATE VIRTUAL TABLE | [#554](https://github.com/kazuk/sql-fun/issues/554) |
+| View removal | DROP VIEW | [#556](https://github.com/kazuk/sql-fun/issues/556) |
+| Connection settings | PRAGMA statements | [#557](https://github.com/kazuk/sql-fun/issues/557) |
+| Materialized views | CREATE MATERIALIZED VIEW | [#558](https://github.com/kazuk/sql-fun/issues/558) |
+| Named types | CREATE TYPE and DROP TYPE | [#559](https://github.com/kazuk/sql-fun/issues/559) |
+| Sequences | CREATE SEQUENCE and DROP SEQUENCE | [#560](https://github.com/kazuk/sql-fun/issues/560) |
+| Domains | CREATE DOMAIN and DROP DOMAIN | [#561](https://github.com/kazuk/sql-fun/issues/561) |
+
+This inventory describes the frontend's retained forms, including Turso
+extensions; it does not assert that every form is legal in stock SQLite.
+PostgreSQL support for a similarly named statement does not implement these
+SQLite/Turso entry points. In particular, an explicit PRAGMA cannot currently
+establish connection state for later analysis. Rename propagation has the
+additional [PRAGMA-state limitation](statements/alter-table.md#rename-table).
+
+## Other PostgreSQL utility statements
+
+Common syntax conversion and downstream interpretation remain unimplemented
+for `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` and
+`CREATE FOREIGN TABLE (... LIKE ...)`
+([#891](https://github.com/kazuk/sql-fun/issues/891)). These valid PostgreSQL
+forms can reach an unimplemented conversion panic before semantic analysis;
+parser recognition and engine-version checks do not supply their missing
+privilege or foreign-table semantics.

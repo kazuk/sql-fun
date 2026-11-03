@@ -703,3 +703,129 @@ Screenshots were inspected for the syntax sidebar and page layout. The separate
 baseline CLI diagnostic-index link defect recorded above is not a newly added
 reference link. Temporary validation scripts, browser tooling and rendered HTML
 are not part of the committed product or recurring test suites.
+
+### Open-issue support-boundary additions (2026-11-03)
+
+The maintainer requested explicit documentation for the audit's partial,
+missing and internal-only entries. This authorizes documentation, not the
+implementation of the reported gaps. The original 61-entry selection contains
+an unrelated internal release-workflow item, #297; the maintainer explicitly
+excluded it. No release-workflow, contributor-procedure or SemVer-policy change
+is included. The remaining 60 audit entries are accounted for below. During final
+verification, #947 was fixed on the updated base; 59 entries therefore retain
+current limitations requiring documentation.
+
+Readers and purpose:
+
+- SQL authors use the owning statement/clause/expression page to determine
+  whether valid dialect syntax produces trustworthy bindings, result metadata
+  and catalog changes. Specific missing operations replace umbrella caveats.
+- SQLAST consumers need the distinction between parsed syntax, resolved trees
+  and callable metadata accessors. SQL/JSON/XML representation gaps and
+  projection-accessor panics are documented at those boundaries.
+- CLI users need installation, response-resource and diagnostic delivery
+  limitations at the corresponding installation/API/diagnostic pages. These
+  three areas do not change SQL validity or introduce new developer obligations.
+- Parser-retained SQLite/Turso extensions are distinguished from stock SQLite
+  legality. The common statement inventory owns the unsupported entry points;
+  existing statement pages link to it instead of copying a second inventory.
+
+Implementation evidence remains the existing common AST, ParseContext,
+statement dispatch, declaration resolvers and structured diagnostic adapters.
+The additions extend the existing handwritten mdBook pages and diagnostic page
+contract; no second documentation system or automated recurring check is added.
+Source inspection at the PR head includes `sem/top_level_statement.rs`,
+`ast/resolve.rs`, `ast/resolve/query.rs`, `ast/resolve/document.rs`, `ast/ddl.rs`,
+`sem/scalar_expr.rs`, `sem/create_view.rs`, `sem/query.rs` (VALUES),
+`sem/data_source/join_expr.rs`, core diagnostic constructors/render metadata,
+operator-name conversion, and the authenticated client response reader.
+
+Planning capacity: approximately 93 GB available on the worktree/build
+filesystem, above the 20 GB baseline; estimated additional demand is below
+20 GB using this task's existing build artifacts. `check-test-flow --list-steps`
+was inspected. Validation uses the unchanged standard full check flow, mdBook
+and temporary link/coverage checks; existing builder tools suffice. Tests and
+coverage generation are not run concurrently. No permanent tests are added.
+
+Corrections to the preliminary audit:
+
+- #947 already had a CLI transport limitation in the diagnostic example, and
+  was subsequently fixed by main commit `4c49c93d` during final verification.
+  After rebasing, the diagnostic page keeps the base's successful CLI example;
+  no obsolete decoding-failure warning is retained. Its mapping below records
+  the resolved audit entry, not a current limitation.
+- #717's legacy body predates richer structured facts. Current internal evidence
+  distinguishes coarse target/function messages from facts requiring new
+  semantic analysis. The manual does not claim every old payload gap persists.
+- #522 has a readable CLI fallback; missing detailed metadata does not mean
+  every diagnostic panics. #523 lists only remaining reporting helper gaps;
+  implemented unreachable-COALESCE and dynamic-registration error handling are
+  not called unimplemented.
+- Implemented declaration collations, FK delete-column lists, partial-index
+  predicates, expression-key scope and view column defaults remain explicitly
+  supported alongside their issue families' remaining gaps.
+- The four issue-status reconciliation entries (#395/#519/#568/#574) are not
+  converted into blanket unimplemented claims by this follow-up.
+
+| Audited issue | Reader-facing documentation owner |
+| --- | --- |
+| [#950](https://github.com/kazuk/sql-fun/issues/950) | `book/installation.md` |
+| [#947](https://github.com/kazuk/sql-fun/issues/947) | `book/diagnostics/sub_query_not_have_column_for_derived_column_name.md` — resolved on the updated base; no current limitation |
+| [#946](https://github.com/kazuk/sql-fun/issues/946) | `book/sql-analysis/expressions/operators-and-predicates.md` |
+| [#891](https://github.com/kazuk/sql-fun/issues/891) | `book/sql-analysis/statements.md` |
+| [#887](https://github.com/kazuk/sql-fun/issues/887) | `book/sql-analysis/statements/alter-table.md`, `book/sql-analysis/statements/create-table.md` |
+| [#879](https://github.com/kazuk/sql-fun/issues/879) | `book/diagnostics/README.md` |
+| [#865](https://github.com/kazuk/sql-fun/issues/865) | `book/sql-analysis/expressions.md` |
+| [#864](https://github.com/kazuk/sql-fun/issues/864) | `book/sql-analysis/expressions.md` |
+| [#797](https://github.com/kazuk/sql-fun/issues/797) | `book/sql-analysis/expressions/operators-and-predicates.md` |
+| [#792](https://github.com/kazuk/sql-fun/issues/792) | `book/sql-analysis/expressions/operators-and-predicates.md` |
+| [#781](https://github.com/kazuk/sql-fun/issues/781) | `book/cli/api.md` |
+| [#717](https://github.com/kazuk/sql-fun/issues/717) | `book/diagnostics/README.md` |
+| [#657](https://github.com/kazuk/sql-fun/issues/657) | `book/sql-analysis/statements/create-table.md` |
+| [#640](https://github.com/kazuk/sql-fun/issues/640) | `book/sql-analysis/statements/create-function.md` |
+| [#575](https://github.com/kazuk/sql-fun/issues/575) | `book/sql-analysis/clauses/having.md`, `book/sql-analysis/clauses/where.md` |
+| [#571](https://github.com/kazuk/sql-fun/issues/571) | `book/sql-analysis/expressions/operators-and-predicates.md`, `book/sql-analysis/statements/rules.md` |
+| [#566](https://github.com/kazuk/sql-fun/issues/566) | `book/sql-analysis/statements/create-function.md` |
+| [#565](https://github.com/kazuk/sql-fun/issues/565) | `book/sql-analysis/statements/insert.md`, `book/sql-analysis/statements/select.md` |
+| [#564](https://github.com/kazuk/sql-fun/issues/564) | `book/sql-analysis/statements/create-table.md` |
+| [#563](https://github.com/kazuk/sql-fun/issues/563) | `book/sql-analysis/statements/create-table.md` |
+| [#561](https://github.com/kazuk/sql-fun/issues/561) | `book/sql-analysis/statements.md` |
+| [#560](https://github.com/kazuk/sql-fun/issues/560) | `book/sql-analysis/statements.md` |
+| [#559](https://github.com/kazuk/sql-fun/issues/559) | `book/sql-analysis/statements.md` |
+| [#558](https://github.com/kazuk/sql-fun/issues/558) | `book/sql-analysis/statements.md` |
+| [#557](https://github.com/kazuk/sql-fun/issues/557) | `book/sql-analysis/statements.md` |
+| [#556](https://github.com/kazuk/sql-fun/issues/556) | `book/sql-analysis/statements.md` |
+| [#554](https://github.com/kazuk/sql-fun/issues/554) | `book/sql-analysis/statements.md` |
+| [#553](https://github.com/kazuk/sql-fun/issues/553) | `book/sql-analysis/statements.md` |
+| [#552](https://github.com/kazuk/sql-fun/issues/552) | `book/sql-analysis/statements.md` |
+| [#551](https://github.com/kazuk/sql-fun/issues/551) | `book/sql-analysis/statements.md` |
+| [#550](https://github.com/kazuk/sql-fun/issues/550) | `book/sql-analysis/statements.md` |
+| [#549](https://github.com/kazuk/sql-fun/issues/549) | `book/sql-analysis/statements.md` |
+| [#547](https://github.com/kazuk/sql-fun/issues/547) | `book/sql-analysis/statements/create-index.md` |
+| [#546](https://github.com/kazuk/sql-fun/issues/546) | `book/sql-analysis/statements/alter-table.md`, `book/sql-analysis/statements/create-table.md` |
+| [#544](https://github.com/kazuk/sql-fun/issues/544) | `book/sql-analysis/statements/alter-view.md` |
+| [#543](https://github.com/kazuk/sql-fun/issues/543) | `book/sql-analysis/statements/create-type.md` |
+| [#541](https://github.com/kazuk/sql-fun/issues/541) | `book/sql-analysis/statements/alter-table.md` |
+| [#540](https://github.com/kazuk/sql-fun/issues/540) | `book/sql-analysis/statements/alter-table.md` |
+| [#539](https://github.com/kazuk/sql-fun/issues/539) | `book/sql-analysis/statements/alter-table.md` |
+| [#538](https://github.com/kazuk/sql-fun/issues/538) | `book/sql-analysis/statements/alter-table.md` |
+| [#537](https://github.com/kazuk/sql-fun/issues/537) | `book/sql-analysis/statements/alter-table.md` |
+| [#536](https://github.com/kazuk/sql-fun/issues/536) | `book/sql-analysis/statements/alter-table.md` |
+| [#535](https://github.com/kazuk/sql-fun/issues/535) | `book/sql-analysis/statements/alter-table.md` |
+| [#534](https://github.com/kazuk/sql-fun/issues/534) | `book/sql-analysis/statements/alter-table.md` |
+| [#533](https://github.com/kazuk/sql-fun/issues/533) | `book/sql-analysis/statements/alter-table.md` |
+| [#531](https://github.com/kazuk/sql-fun/issues/531) | `book/sql-analysis/statements/alter-table.md` |
+| [#526](https://github.com/kazuk/sql-fun/issues/526) | `book/sql-analysis/statements/create-table.md` |
+| [#525](https://github.com/kazuk/sql-fun/issues/525) | `book/sql-analysis/statements/create-table.md` |
+| [#523](https://github.com/kazuk/sql-fun/issues/523) | `book/diagnostics/README.md` |
+| [#522](https://github.com/kazuk/sql-fun/issues/522) | `book/diagnostics/README.md` |
+| [#521](https://github.com/kazuk/sql-fun/issues/521) | `book/sql-analysis/statements/select.md` |
+| [#506](https://github.com/kazuk/sql-fun/issues/506) | `book/sql-analysis/clauses/from.md` |
+| [#505](https://github.com/kazuk/sql-fun/issues/505) | `book/sql-analysis/expressions/function-calls.md` |
+| [#498](https://github.com/kazuk/sql-fun/issues/498) | `book/sql-analysis/expressions.md` |
+| [#497](https://github.com/kazuk/sql-fun/issues/497) | `book/sql-analysis/expressions.md` |
+| [#496](https://github.com/kazuk/sql-fun/issues/496) | `book/sql-analysis/expressions/operators-and-predicates.md` |
+| [#491](https://github.com/kazuk/sql-fun/issues/491) | `book/sql-analysis/clauses/from.md` |
+| [#490](https://github.com/kazuk/sql-fun/issues/490) | `book/sql-analysis/clauses/from.md` |
+| [#489](https://github.com/kazuk/sql-fun/issues/489) | `book/sql-analysis/expressions.md` |
+| [#317](https://github.com/kazuk/sql-fun/issues/317) | `book/sql-analysis/clauses/from.md` |

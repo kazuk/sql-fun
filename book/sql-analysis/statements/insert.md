@@ -80,6 +80,10 @@ images remain a separate unimplemented boundary
 not support for binding them. Native SQLite analyzer support is not a claim that
 the server initialization API supports SQLite.
 
+Multi-row VALUES sources inherit the
+[first-row output-metadata limitation](select.md#values-result-metadata)
+([#565](https://github.com/kazuk/sql-fun/issues/565)).
+
 ## Diagnostics
 
 - [relation_not_found](../../diagnostics/relation_not_found.md): the requested

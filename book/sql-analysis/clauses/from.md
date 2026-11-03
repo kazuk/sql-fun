@@ -17,9 +17,10 @@ preceding-source scope. Analysis does not execute the query or its functions.
 
 INNER/CROSS, LEFT, RIGHT and FULL joins retain their sources and conditions.
 Outer joins can make source columns nullable. ON expressions participate in
-parameter analysis. USING and NATURAL joins merge matching columns for an
-unqualified star; qualified stars retain each source's columns and its outer-join
-nullability.
+parameter analysis, but parameter-free PostgreSQL ON operands share the
+[boolean-validation gap](where.md#parameter-free-boolean-validation). USING and
+NATURAL joins merge matching columns for an unqualified star; qualified stars
+retain each source's columns and its outer-join nullability.
 
 For PostgreSQL FULL JOIN USING and NATURAL FULL JOIN, merged keys appear first,
 followed by remaining left and right columns. Each merged key uses the common
@@ -104,6 +105,35 @@ SQLite names use ASCII case-insensitive matching in implemented name-resolution
 paths; general expression/type-affinity and complete SQL-legality analysis remain
 incomplete. See the [overview](../../sql-analysis.md) for parser boundaries and
 CLI/server availability.
+
+### Document table sources
+
+JSON_TABLE source analysis is not implemented
+([#491](https://github.com/kazuk/sql-fun/issues/491)). Retaining its paths,
+columns and nested syntax does not produce a resolved FROM source; current
+analysis can fail before output columns are available.
+
+XMLTABLE analysis currently processes only its row expression through the
+function-source path. The XML document/PASSING input, namespaces, declared
+output columns, paths, defaults and ordinality are not semantically analyzed
+([#490](https://github.com/kazuk/sql-fun/issues/490)). Consequently, this path
+does not establish the declared XMLTABLE output shape. These limitations are
+separate from ordinary record-returning functions.
+
+### SQLite source limitations
+
+SQLite table-valued function binding and output-column construction remain
+unimplemented and can panic
+([#506](https://github.com/kazuk/sql-fun/issues/506)). PostgreSQL function-source
+support above does not supply SQLite function/module signatures.
+
+For an aliased parenthesized SQLite FULL JOIN using USING or NATURAL, merged
+column analysis incorrectly selects the left input and can report incorrect
+type/nullability ([#317](https://github.com/kazuk/sql-fun/issues/317)). For
+example, in `SELECT q.id FROM (a FULL JOIN b USING (id)) AS q`, unmatched rows
+can supply `id` from either table, including different SQLite storage types.
+The general merged-column behavior described above does not establish correct
+metadata for this grouped-source case.
 
 ## Diagnostics
 

@@ -32,6 +32,15 @@ Syntax options such as concurrency, tablespace and null-distinctness must not be
 treated as executed or fully validated merely because they are retained in
 syntax.
 
+Index-element collation and operator-class references still lack complete
+semantic binding. Concurrency, NULLS NOT DISTINCT and tablespace properties
+also do not have complete analyzed application
+([#547](https://github.com/kazuk/sql-fun/issues/547)). Expression-key scope,
+partial predicates and supported B-tree storage settings are already analyzed;
+the remaining modifier gap does not mean those implemented parts are absent.
+SQLite/Turso DROP INDEX and index maintenance are separately unimplemented in
+the [statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+
 ## Diagnostics
 
 - [relation_not_found](../../diagnostics/relation_not_found.md): the owning

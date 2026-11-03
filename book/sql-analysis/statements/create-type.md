@@ -26,6 +26,13 @@ enum/composite implementation. Defining a type does not install database
 input/output functions or validate values at runtime. Unimplemented
 base/range-type grammar must not be inferred from enum/composite support.
 
+PostgreSQL ALTER TYPE operations dispatched as composite-type alterations remain
+unimplemented and can panic
+([#543](https://github.com/kazuk/sql-fun/issues/543)). CREATE TYPE metadata does
+not establish ALTER TYPE catalog transitions. SQLite/Turso CREATE/DROP TYPE
+entry points are separately listed in the
+[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+
 ## Diagnostics
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): the

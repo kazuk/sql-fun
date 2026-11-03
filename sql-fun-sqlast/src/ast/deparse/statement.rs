@@ -35,6 +35,8 @@ impl SqlEmit for StatementNode {
             Self::Index(v) => v.emit(writer),
             Self::TableAs(v) => v.emit(writer),
             Self::Table(v) => v.emit(writer),
+            Self::DefaultPrivileges(v) => v.emit(writer),
+            Self::ForeignTable(v) => v.emit(writer),
             Self::AlterRelation(v) => v.emit(writer),
         })
         .map_err(|error| error.context(&self.kind().to_string()))

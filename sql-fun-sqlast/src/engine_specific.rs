@@ -127,6 +127,10 @@ pub trait TursoArrayTypeFeature {
 /// PostgreSQL 18 syntax recognized independently of the selected target engine.
 #[derive(Clone, Copy, Debug)]
 pub enum Postgres18Syntax {
+    /// Default privileges on large objects.
+    LargeObjectDefaultPrivileges,
+    /// LIKE elements in a foreign table definition.
+    ForeignTableLike,
     /// Explicit OLD/NEW aliases in RETURNING WITH.
     ReturningAliases,
     /// Special OLD/NEW destination row images in RETURNING.
@@ -147,6 +151,8 @@ impl Postgres18Syntax {
     /// SQL construct named by the version diagnostic.
     pub const fn description(self) -> &'static str {
         match self {
+            Self::LargeObjectDefaultPrivileges => "default privileges on LARGE OBJECTS",
+            Self::ForeignTableLike => "CREATE FOREIGN TABLE LIKE",
             Self::ReturningAliases => "RETURNING WITH row aliases",
             Self::ReturningRowImages => "RETURNING OLD/NEW row images",
             Self::VirtualGeneratedColumn => "virtual generated columns",

@@ -11,10 +11,12 @@
 #![allow(dead_code)]
 
 mod ddl;
+mod default_privileges;
 mod deparse;
 mod document;
 mod drop_behavior;
 mod engine_features;
+mod foreign_table;
 mod mutation;
 mod ownership;
 mod postgres;
@@ -34,6 +36,7 @@ mod sqlite_retention;
 mod tests;
 mod traversal;
 mod trigger;
+mod utility;
 mod validation;
 mod view_definition;
 mod wildcard;
@@ -44,7 +47,14 @@ pub(crate) use self::ddl::{
 pub(crate) use self::deparse::render_full_name;
 pub(crate) use self::document::{JsonTable, Merge, XmlTable};
 pub use self::{
+    default_privileges::{
+        DefaultPrivilegeOption, DefaultPrivileges, PrivilegeGrantee, PrivilegeObject,
+        PrivilegeSpecification,
+    },
     deparse::DeparseError,
+    foreign_table::{
+        FdwOption, ForeignTable, ForeignTableElement, ForeignTableElementKind, TableLike,
+    },
     mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
     public::{CommonTableExpression, Statement, StatementKind, WithClause},
     wildcard::WildcardRewriteError,
@@ -271,10 +281,19 @@ pub(crate) enum StatementNode {
     Index(Index),
     TableAs(TableAs),
     Table(Table),
+    DefaultPrivileges(DefaultPrivileges),
+    ForeignTable(ForeignTable),
     AlterRelation(AlterRelation),
 }
 
 impl StatementNode {
+    const fn default_privileges(value: DefaultPrivileges) -> Self {
+        Self::DefaultPrivileges(value)
+    }
+    const fn foreign_table(value: ForeignTable) -> Self {
+        Self::ForeignTable(value)
+    }
+
     const fn query(value: Query) -> Self {
         Self::Query(value)
     }
@@ -385,6 +404,12 @@ impl StatementNode {
             return Ok(SemAst::unresolved_statement());
         }
         match self {
+            Self::DefaultPrivileges(_) => {
+                todo!("ALTER DEFAULT PRIVILEGES interpretation (#955)")
+            }
+            Self::ForeignTable(_) => {
+                todo!("CREATE FOREIGN TABLE interpretation (#956)")
+            }
             Self::Query(query) => query
                 .resolve(context, cache)
                 .map(|query| SemAst::select(&query)),

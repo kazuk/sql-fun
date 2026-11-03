@@ -326,10 +326,14 @@ legal SQLite tuple assignments. Bare relation-name whole-row binding remains
 
 Issue #885 adds paired `postgres18-syntax-17.json` and
 `postgres18-syntax-18.json` fixtures for implemented behavior and engine-version
-diagnostics (36 cases on 17, 13 on 18). Missing common-AST conversion or analysis
+diagnostics (39 cases on 17, 13 on 18). Missing common-AST conversion or analysis
 retains explicit `todo!()` panics; focused Rust tests verify those markers rather
-than terminating the shared CLI regression server. Utility implementation is
-tracked in #891 and remaining constraint semantics in #887.
+than terminating the shared CLI regression server. Issue #891 adds the three
+PostgreSQL 17 utility-version rejections. Structured conversion, PostgreSQL 18
+version acceptance, traversal and parse/edit/deparse
+contracts run in Rust without semantic interpretation. Compatible utility
+interpretation remains an explicit `todo!()` (#955 / #956), so those inputs are
+not sent to the shared CLI server. Remaining constraint semantics are in #887.
 
 Issue #508 adds `rows-from.json` with the explicit `rows-from.sql` project
 schema for PostgreSQL 17/18 through both maintained paths. It checks SQL-value

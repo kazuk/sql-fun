@@ -322,7 +322,9 @@ impl RetainSqliteTypes for StatementNode {
             Self::Table(value) => value.retain_types(retainer),
             Self::AlterRelation(value) => value.retain_types(retainer),
             Self::DropTable(_) | Self::DropTrigger(_) => Ok(()),
-            Self::DropRule(_)
+            Self::DefaultPrivileges(_)
+            | Self::ForeignTable(_)
+            | Self::DropRule(_)
             | Self::CreateRule(_)
             | Self::Extension(_)
             | Self::VariableSet(_)

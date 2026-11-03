@@ -38,6 +38,8 @@ impl StatementNode {
             return Ok(true);
         }
         match self {
+            Self::DefaultPrivileges(value) => value.check_engine_features(context),
+            Self::ForeignTable(value) => value.check_engine_features(context),
             Self::Query(query) => query.check_engine_features(context),
             Self::Insert(insert) => Ok(insert.with.check_engine_features(context)?
                 & ReturningOption::check_features(&insert.returning_options, context)?),
@@ -52,6 +54,79 @@ impl StatementNode {
             Self::AlterRelation(alter) => alter.check_engine_features(context),
             _ => Ok(true),
         }
+    }
+}
+
+#[cfg(test)]
+mod utility_version_tests {
+    use crate::{
+        ast::Dialect,
+        parse_statements,
+        test_helpers::{TestParseContext, create_cache_context},
+    };
+
+    #[rstest::rstest]
+    #[case::large_objects(
+        "ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC",
+        true
+    )]
+    #[case::foreign_like("CREATE FOREIGN TABLE f (LIKE missing) SERVER absent", true)]
+    #[case::older_privileges("ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO PUBLIC", false)]
+    #[case::older_foreign("CREATE FOREIGN TABLE f (x missing_type) SERVER absent", false)]
+    fn syntax_versions_need_no_catalog(
+        #[case] sql: &str,
+        #[case] requires_18: bool,
+        #[values("17", "18")] version: &str,
+    ) {
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let mut context = TestParseContext::default().with_postgres_version(version);
+        assert_eq!(
+            statement.node.check_engine_features(&mut context).unwrap(),
+            !requires_18 || version == "18"
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            usize::from(requires_18 && version == "17")
+        );
+        assert_eq!(
+            context.has_reported_problem("incompatible_engine_version"),
+            requires_18 && version == "17"
+        );
+    }
+
+    #[rstest::rstest]
+    #[case("ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC")]
+    #[case("CREATE FOREIGN TABLE f (LIKE missing) SERVER absent")]
+    fn incompatible_syntax_returns_before_unimplemented_interpretation(#[case] sql: &str) {
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let context = TestParseContext::default().with_postgres_version("17");
+        let result = statement
+            .analyze(context, &mut create_cache_context())
+            .unwrap();
+        assert!(
+            result
+                .context()
+                .has_reported_problem("incompatible_engine_version")
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::privileges("ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC")]
+    #[case::foreign("CREATE FOREIGN TABLE f (LIKE missing) SERVER absent")]
+    #[should_panic(expected = "interpretation")]
+    fn compatible_syntax_retains_semantic_todo(#[case] sql: &str) {
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let context = TestParseContext::default().with_postgres_version("18");
+        let _ = statement.analyze(context, &mut create_cache_context());
     }
 }
 

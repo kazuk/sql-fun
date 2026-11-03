@@ -420,5 +420,35 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "default-privileges-large-objects",
+    "sql": "ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "default-privileges-revoke-large-objects",
+    "sql": "ALTER DEFAULT PRIVILEGES REVOKE GRANT OPTION FOR ALL ON LARGE OBJECTS FROM PUBLIC CASCADE",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "foreign-table-like",
+    "sql": "CREATE FOREIGN TABLE foreign_sample (LIKE missing_source INCLUDING DEFAULTS) SERVER absent_server",
+    "expected": {
+      "diagnostics": [
+        "incompatible_engine_version"
+      ],
+      "columns": []
+    }
   }
 ]

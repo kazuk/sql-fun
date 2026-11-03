@@ -22,8 +22,8 @@ run through the shared source-tree and installed-distribution manifest.
 | Constraint `ENFORCED` / `NOT ENFORCED` | Inline attributes remain separate constraint nodes; table attributes remain on their owner. Token positions distinguish explicit table `ENFORCED` from the parser's default `is_enforced = true`. |
 | Table `NOT NULL column`, inline `NOT NULL NO INHERIT`, new nullability validation attributes | Nullability constraints retain keys, inheritance and validation flags; statement/ALTER analysis gates the new forms. Plain inline NOT NULL remains valid on 17. |
 | `ALTER CONSTRAINT` enforcement and `INHERIT` / `NO INHERIT` | `ATAlterConstraint` retains independent optional deferrability, enforcement and inheritance changes. Only the new attributes trigger version notifications. |
-| `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` | Common-AST conversion explicitly panics with `todo!()`; conversion and interpretation are tracked in #891. |
-| `CREATE FOREIGN TABLE (... LIKE ...)` | Common-AST conversion explicitly panics with `todo!()` (#891). PostgreSQL 17 explicitly prohibited this combination. |
+| `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` | Structured common-AST conversion, editing/deparsing and the PostgreSQL 18 version check are implemented (#891). Interpretation remains an explicit `todo!()` (#955). |
+| `CREATE FOREIGN TABLE (... LIKE ...)` | Ordered LIKE syntax and FDW options survive common-AST conversion and editing/deparsing (#891). The version check rejects LIKE on PostgreSQL 17; interpretation and LIKE expansion remain an explicit `todo!()` (#956). |
 
 Keyword additions (`ENFORCED`, `OBJECTS`, `PERIOD`, `VIRTUAL`) and parser source
 location changes are not independent feature choices. Their containing constructs
@@ -43,8 +43,9 @@ large-object default privileges and foreign-table LIKE. An ordinary target alias
 
 On implemented conversion paths, syntax on a PostgreSQL 17 target reports
 `incompatible_engine_version` through `ParseContext`. Compatible syntax whose
-analysis is missing reaches an explicit `todo!()` panic. Missing utility
-conversion also panics directly; no conversion-error feature metadata,
+analysis is missing reaches an explicit `todo!()` panic. Utility conversion is
+context-free and preserves unresolved names; compatible utility interpretation
+still panics explicitly. No conversion-error feature metadata,
 alternative unsupported diagnostic or success-shaped placeholder is used.
 The version diagnostic uses the existing analysis protocol.
 
@@ -57,13 +58,15 @@ The migration retains parse/edit/deparse syntax but does not implement:
 - Non-enforced constraint catalog semantics; ALTER CONSTRAINT enforcement or
   inheritance transitions.
 - New table/nullability inheritance and validation semantics.
-- Common-AST interpreters for the two utility statement families above, which
-  were already unsupported before this upgrade.
+- Interpretation of ALTER DEFAULT PRIVILEGES (#955) and CREATE FOREIGN TABLE
+  (#956), including name resolution, ACL/catalog handling and LIKE expansion.
+  Their syntax conversion does not imply semantic support.
 
-Constraint gaps are tracked by #887. Utility conversion and interpretation are
-tracked by #891, and domain-constraint analysis by #548. Paired CLI cases cover
-implemented paths and target-version diagnostics; focused Rust tests verify explicit
-unimplemented panics without terminating the shared CLI regression server.
+Constraint gaps are tracked by #887. Utility syntax conversion is implemented
+by #891; interpretation is tracked by #955 and #956, and domain-constraint
+analysis by #548. Paired CLI cases cover implemented paths and target-version diagnostics;
+focused Rust tests verify explicit unimplemented panics without terminating the
+shared CLI regression server.
 
 ## Independent existing limitation observed during acceptance
 

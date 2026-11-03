@@ -150,8 +150,10 @@ post-publication distribution has completed.
 
 A rerun preserves an existing draft's title, notes and unrelated assets, and
 uploads only missing required filenames. It neither replaces nor deletes
-existing assets. A conflicting size, incomplete upload or wrong prerelease
-classification stops preparation for operator correction. An upload failure
+existing assets. Each expected asset must be uploaded with the retained file
+size and matching SHA-256 digest. A missing, unusable or mismatched digest,
+conflicting size, incomplete upload or wrong prerelease classification stops
+preparation for operator correction. An upload failure
 may leave a partial draft; correct the reported problem and rerun using the
 retained complete asset set. If that data is unavailable or expired, recovery
 fails without rebuilding or changing the tag. A full workflow rerun can remove

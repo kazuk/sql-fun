@@ -15,7 +15,7 @@ case "$package_target" in
     *) echo "unsupported packaging target: $package_target" >&2; exit 2 ;;
 esac
 deb_version=${package_version/-/'~'}
-deb="$output_dir/sql-fun_${deb_version}_${deb_arch}.deb"
+deb="$output_dir/sql-fun_${package_version}_${deb_arch}.deb"
 tarball="$output_dir/sql-fun-${package_version}-${package_target}.tar.gz"
 extracted=$(mktemp -d)
 trap 'rm -rf "$extracted"' EXIT

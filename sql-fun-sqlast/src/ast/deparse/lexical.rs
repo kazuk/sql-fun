@@ -708,29 +708,17 @@ fn emit_sqlite_type_modifiers(
 
 #[cfg(test)]
 mod test_lexical_emit {
+    use crate::test_helpers::deparse::render;
     #[cfg(feature = "sqlite")]
-    use crate::ast::Statement;
-    use crate::{ast::deparse::lexical::DeparseError, parse_statements};
+    use crate::test_helpers::deparse_lexical::{declared_types, sqlite_statement};
+
+    use crate::parse_statements;
 
     use crate::ast::{
         Dialect, Expr, Literal, SqliteTypeModifier, SqliteTypeModifiers, SqliteTypeNamePart,
         SqliteTypeNameTrivia,
-        deparse::lexical::{Name, Parameter, SqlEmit, SqlWriter, TypeName},
+        deparse::lexical::{Name, Parameter, SqlWriter, TypeName},
     };
-
-    #[cfg(feature = "sqlite")]
-    fn sqlite_statement(sql: &str) -> Statement {
-        parse_statements(sql, Dialect::sqlite())
-            .next()
-            .expect("one statement")
-            .expect(sql)
-    }
-
-    fn render<T: SqlEmit>(value: &T, dialect: Dialect) -> Result<String, DeparseError> {
-        let mut writer = SqlWriter::new(dialect);
-        value.emit(&mut writer)?;
-        Ok(writer.sql)
-    }
 
     #[rstest::rstest]
     #[case::quoted_component(vec!["select".to_owned(), "a\"b".to_owned()], Dialect::postgres(), "\"select\".\"a\"\"b\"")]
@@ -1103,18 +1091,6 @@ mod test_lexical_emit {
         let error = render(&forged, Dialect::sqlite()).unwrap_err();
         assert!(error.is_invalid_syntax(), "{error}");
         assert_eq!(error.node(), "type modifier", "{error}");
-    }
-
-    #[cfg(feature = "sqlite")]
-    fn declared_types(sql: &str) -> Vec<String> {
-        let connection = rusqlite::Connection::open_in_memory().unwrap();
-        connection.execute_batch(sql).unwrap();
-        let mut statement = connection.prepare("PRAGMA table_info(t)").unwrap();
-        statement
-            .query_map([], |row| row.get(2))
-            .unwrap()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap()
     }
 
     #[cfg(feature = "sqlite")]

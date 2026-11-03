@@ -1,8 +1,9 @@
 //! Derived-column visibility through the maintained SQL-to-semantics boundary.
-use crate::{
-    ast::{Dialect, resolve::query::test_helpers::resolve},
-    sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
-};
+use crate::ast::Dialect;
+use crate::sem::ColumnReferenceExpr;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::resolve;
 
 #[rstest::rstest]
 #[case::union(

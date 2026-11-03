@@ -1,11 +1,14 @@
 //! EXISTS behavior at the query-analysis boundary using a small catalog.
 
-use crate::{
-    ast::{Dialect, resolve::query::test_helpers::resolve},
-    context::ParseContext,
-    names::ColumnName,
-    sem::{AnalysisError, PgBuiltInType, SelectStatement, SemScalarExpr},
-};
+use crate::test_helpers::query::expression as projection;
+
+use crate::ast::Dialect;
+use crate::context::ParseContext;
+use crate::names::ColumnName;
+use crate::sem::AnalysisError;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::resolve;
 
 #[rstest::rstest]
 #[case::null("SELECT EXISTS (SELECT NULL) AS found")]
@@ -147,15 +150,6 @@ impl crate::sem::traversal::SemanticVisitorMut for Bindings {
         }
         Ok(())
     }
-}
-
-fn projection(query: &SelectStatement) -> &SemScalarExpr {
-    query
-        .result_columns()
-        .get_column_at(0)
-        .unwrap()
-        .expression()
-        .unwrap()
 }
 
 #[test]

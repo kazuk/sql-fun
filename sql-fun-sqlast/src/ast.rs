@@ -12,7 +12,7 @@
 
 mod ddl;
 mod default_privileges;
-mod deparse;
+pub(crate) mod deparse;
 mod document;
 mod drop_behavior;
 mod engine_features;
@@ -2116,4 +2116,63 @@ enum TriggerBody {
 struct TriggerFunction {
     name: Name,
     arguments: Vec<String>,
+}
+
+#[cfg(test)]
+impl Query {
+    pub(crate) fn test_rows_functions(self) -> TableFunctions {
+        let QueryBody::Select(mut select) = self.body else {
+            panic!("select");
+        };
+        let FromItem::Functions(source) = select.from.pop().unwrap() else {
+            panic!("function");
+        };
+        source
+    }
+
+    pub(crate) fn test_projection_statement(source: FromItem) -> Statement {
+        Statement::from_node(
+            StatementNode::query(Self::projection(&[], &[source])),
+            Dialect::postgres(),
+            StringSpan::default(),
+        )
+    }
+}
+
+#[cfg(test)]
+impl StatementNode {
+    pub(crate) fn into_test_drop_rule(self) -> DropRule {
+        match self {
+            Self::DropRule(rule) => rule,
+            _ => panic!("DROP RULE node"),
+        }
+    }
+}
+
+#[cfg(test)]
+impl StatementNode {
+    pub(crate) fn into_test_drop_trigger(self) -> DropTrigger {
+        match self {
+            Self::DropTrigger(trigger) => trigger,
+            _ => panic!("DROP TRIGGER node"),
+        }
+    }
+}
+
+#[cfg(test)]
+impl TableConstraint {
+    pub(crate) fn test_new(
+        name: Option<&str>,
+        keys: &[&str],
+        constraint: ColumnConstraint,
+    ) -> Self {
+        Self {
+            extras: ConstraintExtras::default(),
+            name: name.map(str::to_owned),
+            keys: keys.iter().map(|key| (*key).to_owned()).collect(),
+            constraint,
+            order: Vec::new(),
+            auto_increment: false,
+        }
+    }
 }

@@ -550,31 +550,19 @@ impl SemScalarExprNode for FuncCallExpr {
 
 #[cfg(test)]
 mod test_func_call_expr_analyze_scalar_expr {
+    use crate::test_helpers::function_syntax::func_name_tokens;
+
     use crate::{
         names::SchemaName,
         sem::{
             FromClause, FunctionParam, OverloadVariant, PgBuiltInType, ScalarAnalysisContext,
             SemScalarExpr, WithClause,
         },
-        syn::{
-            KeywordKindOpt, Node, NodeInner, NodeList, ScanToken, ScanTokenBuilder, Token, TokenOpt,
-        },
+        syn::{Node, NodeInner, NodeList},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
 
-    use ::sql_fun_core::IVec;
     use ::testresult::TestResult;
-
-    fn func_name_tokens() -> IVec<ScanToken> {
-        let token = ScanTokenBuilder::default()
-            .start(1)
-            .end(1)
-            .token(TokenOpt::from(Token::Ident))
-            .keyword_kind(KeywordKindOpt::none())
-            .build()
-            .unwrap();
-        vec![token.into()].into()
-    }
 
     #[rstest::rstest]
     fn test_analyze_scalar_expr_reports_missing_function(

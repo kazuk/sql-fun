@@ -13,30 +13,4 @@ fn synthetic_array_parameters_retain_assignment_compatibility() {
     assert_eq!(context.reported_problem_count(), 0);
 }
 
-mod test_helpers {
-    use crate::ast::resolve::update::tests::test_helpers::catalog as test_helpers_catalog;
-
-    use crate::{
-        ast::Dialect,
-        names::ColumnName,
-        sem::{ColumnDefinition, PgBuiltInType},
-        test_helpers::{TestParseContext, source_span},
-    };
-
-    pub(super) fn catalog() -> TestParseContext {
-        let mut context = test_helpers_catalog(Dialect::postgres());
-        let array = PgBuiltInType::int4().array_type();
-        context.setup_type(array.clone());
-        context.setup_table(
-            "arrays",
-            &[ColumnDefinition::new(
-                &Some(ColumnName::from("a")),
-                Some(&array),
-                Some(false),
-                &[],
-            )],
-            &source_span(),
-        );
-        context
-    }
-}
+use crate::test_helpers::update_assignments as test_helpers;

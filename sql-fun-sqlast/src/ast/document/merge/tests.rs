@@ -5,7 +5,8 @@ mod views;
 
 use crate::sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs;
 
-use self::test_helpers::{catalog, resolve};
+use crate::test_helpers::document_merge::catalog;
+use crate::test_helpers::statements::resolve_postgres as resolve;
 use crate::{context::ParseContext, sem::PgBuiltInType};
 
 #[rstest::rstest]
@@ -159,61 +160,4 @@ fn infers_parameters_across_ordered_actions_and_returning() {
             .col_type(),
         &Some(PgBuiltInType::int4())
     );
-}
-
-mod test_helpers {
-    use crate::{parse_statements, test_helpers::create_cache_context};
-
-    use crate::{
-        ast::Dialect,
-        context::MutSourcePathWithSpan,
-        names::{ColumnName, SchemaName},
-        sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SemAst},
-        test_helpers::{TestParseContext, source_span},
-    };
-    pub(super) fn catalog(version: u32) -> TestParseContext {
-        let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":version.to_string(), "search_path":["public"]})).unwrap();
-        let mut context = TestParseContext::default().with_metadata(&metadata);
-        context.set_source_path_with_span(&source_span());
-        context.set_get_search_path_result(&[
-            SchemaName::from("public"),
-            SchemaName::from("pg_catalog"),
-        ]);
-        context.setup_type(PgBuiltInType::int4());
-        context.setup_type(PgBuiltInType::text());
-        context.setup_type(PgBuiltInType::bool());
-        context.setup_binary("=", "int4", "int4", "bool", true);
-        for (name, id, label) in [("items", "id", "label"), ("incoming", "sid", "slabel")] {
-            context.setup_table(
-                name,
-                &[
-                    ColumnDefinition::new(
-                        &Some(ColumnName::from(id)),
-                        Some(&PgBuiltInType::int4()),
-                        Some(false),
-                        &[],
-                    ),
-                    ColumnDefinition::new(
-                        &Some(ColumnName::from(label)),
-                        Some(&PgBuiltInType::text()),
-                        Some(false),
-                        &[],
-                    ),
-                ],
-                &source_span(),
-            );
-        }
-        context
-    }
-    pub(super) fn resolve(
-        sql: &str,
-        context: &mut TestParseContext,
-    ) -> Result<SemAst, AnalysisError> {
-        parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .node
-            .resolve(context, &mut create_cache_context())
-    }
 }

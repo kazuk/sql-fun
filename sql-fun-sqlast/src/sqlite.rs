@@ -223,21 +223,22 @@ impl SqliteDialect {
 
 #[cfg(test)]
 mod test_schema_content_hash {
+    #[cfg(feature = "sqlite")]
+    use crate::SqliteDialect;
+    use crate::ast::Dialect;
+    use crate::test_helpers::schema_content_hash as test_helpers;
     use crate::{
         SqlFileSnapshot, ast::Dialect as AstDialect,
         context::BaseParseContext as ContextBaseParseContext,
         test_helpers::TestParseContext as TestHelpersTestParseContext,
     };
 
-    #[cfg(feature = "sqlite")]
-    use crate::SqliteDialect;
-
     #[rstest::rstest]
     #[case::success("CREATE TABLE hash_test (id);", true)]
     #[case::failure("CREATE TABLE broken (id", false)]
     fn preserves_original_hash_even_on_syntax_failure(#[case] sql: &str, #[case] succeeds: bool) {
         let file = test_helpers::schema_file(sql);
-        let base = test_helpers::base_with_public_schema();
+        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
         let mut hash = None;
         let result = {
             let analysis_base = &base;
@@ -262,7 +263,7 @@ mod test_schema_content_hash {
     fn analyzes_snapshot_after_source_is_deleted() {
         let file = test_helpers::schema_file("CREATE TABLE retained (id);");
         let snapshot = SqlFileSnapshot::read(file.path()).unwrap();
-        let base = test_helpers::base_with_public_schema();
+        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
         std::fs::remove_file(file.path()).unwrap();
         assert!(
             {
@@ -283,7 +284,7 @@ mod test_schema_content_hash {
     #[test]
     fn read_failure_clears_output_hash() {
         let directory = ::tempfile::tempdir().unwrap();
-        let base = test_helpers::base_with_public_schema();
+        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
         let mut hash = Some("previous".to_owned());
         let error = {
             let analysis_base = &base;
@@ -300,25 +301,6 @@ mod test_schema_content_hash {
         .unwrap_err();
         assert!(error.is_io());
         assert!(hash.is_none());
-    }
-
-    mod test_helpers {
-        use crate::{ast::Dialect, context::FrozenBaseContext, test_helpers::TestParseContext};
-
-        use crate::context::ParseContext;
-
-        pub(super) fn base_with_public_schema() -> FrozenBaseContext {
-            use crate::names::SchemaName;
-            let mut base = TestParseContext::default().with_dialect(Dialect::sqlite());
-            base.set_get_search_path_result(&[SchemaName::from("public")]);
-            base.freeze()
-        }
-
-        pub(super) fn schema_file(sql: &str) -> ::tempfile::NamedTempFile {
-            let file = ::tempfile::NamedTempFile::new().unwrap();
-            std::fs::write(file.path(), sql).unwrap();
-            file
-        }
     }
 }
 

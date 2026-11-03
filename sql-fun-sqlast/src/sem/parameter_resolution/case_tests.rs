@@ -1,6 +1,6 @@
 //! CASE contracts at the public analysis boundary with a small explicit catalog.
 
-mod test_helpers;
+use crate::test_helpers::case_parameters as test_helpers;
 
 use crate::{sem::TypeReference, test_helpers::create_cache_context};
 

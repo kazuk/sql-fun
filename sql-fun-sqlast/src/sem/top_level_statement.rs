@@ -172,8 +172,8 @@ mod tests {
         AstAndContextPair, PostgresDialect,
         context::{BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext},
         sem::SourcePathWithSpan,
+        test_helpers::context_args,
         test_helpers::source_span,
-        tests::context_args,
     };
     use ::sql_fun_core::SqlFunArgs;
     use ::testresult::TestResult;

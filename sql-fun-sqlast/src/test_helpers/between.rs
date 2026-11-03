@@ -1,3 +1,4 @@
+pub(crate) use crate::test_helpers::query::expression;
 use crate::{
     StringSpan,
     ast::Dialect,
@@ -5,9 +6,8 @@ use crate::{
     names::{OperatorName, SchemaName},
     parse_statements,
     sem::{
-        AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType,
-        SelectStatement, SemScalarExpr, SourcePathWithSpan, TypeCategory, TypeDefinition,
-        TypeReference,
+        AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, SemScalarExpr,
+        SourcePathWithSpan, TypeCategory, TypeDefinition, TypeReference,
     },
     test_helpers::{TestParseContext, create_cache_context},
 };
@@ -86,28 +86,6 @@ pub(crate) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error:
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(context)
-}
-
-pub(crate) fn query(
-    sql: &str,
-    context: SchemaFileContext,
-) -> Result<(SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    Ok((query, analyzed.into_context()))
-}
-
-pub(crate) fn expression(query: &SelectStatement) -> &SemScalarExpr {
-    query
-        .result_columns()
-        .get_column_at(0)
-        .unwrap()
-        .expression()
-        .unwrap()
 }
 
 /// Inspect retained comparison lookups without repeating name resolution.

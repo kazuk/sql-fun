@@ -987,46 +987,22 @@ impl ConflictClause {
 
 #[cfg(test)]
 mod test_constraint_emit {
-    use crate::{
-        ast::{StatementNode, deparse::constraints::DeparseError},
-        parse_statements,
-        test_helpers::assert_postgres_structure,
-    };
+    use crate::test_helpers::deparse::render;
+    use crate::test_helpers::deparse_constraints::constraint;
+
+    use crate::{ast::StatementNode, parse_statements, test_helpers::assert_postgres_structure};
 
     use crate::{
         ast::{
             Column, Dialect, Expr, ForeignReference, Literal, Name, SyntaxOption, SyntaxValue,
             TypeName,
-            deparse::constraints::{
-                ColumnConstraint, ConstraintExtras, SqlEmit, SqlWriter, TableConstraint,
-            },
+            deparse::constraints::{ColumnConstraint, SqlWriter},
         },
         sem::{
             ConflictClause, Deferrability, ForeignKeyAction, GeneratedColumnMode,
             IdentityColumnMode,
         },
     };
-
-    fn render<T: SqlEmit>(value: &T, dialect: Dialect) -> Result<String, DeparseError> {
-        let mut writer = SqlWriter::new(dialect);
-        value.emit(&mut writer)?;
-        Ok(writer.sql)
-    }
-
-    fn constraint(
-        name: Option<&str>,
-        keys: &[&str],
-        constraint: ColumnConstraint,
-    ) -> TableConstraint {
-        TableConstraint {
-            extras: ConstraintExtras::default(),
-            name: name.map(str::to_owned),
-            keys: keys.iter().map(|key| (*key).to_owned()).collect(),
-            constraint,
-            order: Vec::new(),
-            auto_increment: false,
-        }
-    }
 
     #[rstest::rstest]
     #[case::default(

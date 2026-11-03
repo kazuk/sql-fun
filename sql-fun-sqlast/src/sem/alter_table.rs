@@ -198,9 +198,10 @@ impl AlterTable {
 #[cfg(test)]
 mod test_analyze_alter_table_statement {
     #[cfg(feature = "sqlite")]
-    use crate::ast::Dialect;
+    use crate::test_helpers::alter_table::{make_column, parse_sqlite_alter_table, sqlite_context};
+
     #[cfg(feature = "sqlite")]
-    use crate::syn::sqlite::AlterTable as SqliteAlterTable;
+    use crate::ast::Dialect;
 
     use crate::{
         AstAndContextPair,
@@ -210,13 +211,6 @@ mod test_analyze_alter_table_statement {
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
-    #[cfg(feature = "sqlite")]
-    use crate::{
-        SqliteToken,
-        names::{ColumnName, SchemaName},
-        sem::{ColumnDefinition, TypeReference},
-        sqlite::SqliteDialect,
-    };
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -257,17 +251,6 @@ mod test_analyze_alter_table_statement {
     }
 
     #[cfg(feature = "sqlite")]
-    fn parse_sqlite_alter_table<'a>(sql: &'a str) -> (SqliteAlterTable, IVec<SqliteToken<'a>>) {
-        let cmd = SqliteDialect::parse(sql)
-            .expect("sqlite parse should succeed")
-            .expect("statement should exist");
-        let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
-        let alter_table = stmt.into_alter_table().expect("ALTER TABLE statement");
-        (alter_table, tokens)
-    }
-
-    #[cfg(feature = "sqlite")]
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_missing_relation(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
@@ -281,22 +264,6 @@ mod test_analyze_alter_table_statement {
         };
         assert_eq!(at.commands.len(), 1);
         assert_eq!(context.reported_problem_count(), 1);
-    }
-
-    #[cfg(feature = "sqlite")]
-    fn make_column(name: &str) -> ColumnDefinition {
-        ColumnDefinition::new(&Some(ColumnName::from(name)), None, None, &[])
-    }
-
-    #[cfg(feature = "sqlite")]
-    fn sqlite_context() -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-        context.set_get_search_path_result(&[SchemaName::from("public")]);
-        context.setup_type(TypeReference::concrete_type_ref(
-            &FullName::with_schema("public", "text"),
-            false,
-        ));
-        context
     }
 
     #[cfg(feature = "sqlite")]

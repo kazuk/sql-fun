@@ -948,28 +948,7 @@ impl Role {
 
 #[cfg(test)]
 mod object_signature_tests {
-    use crate::parse_statements;
-
-    use crate::ast::Dialect;
-
-    fn assert_native_deparse_round_trip(sql: &str) {
-        let statement = parse_statements(sql, Dialect::postgres())
-            .next()
-            .expect("one statement")
-            .expect(sql);
-        let emitted = statement
-            .deparse_sql(Dialect::postgres())
-            .expect("statement emits");
-        let expected = pg_query::parse(sql, ::pg_query::ParserOptions::default())
-            .expect(sql)
-            .deparse(::pg_query::DeparseOptions::default())
-            .expect("native deparse");
-        let actual = pg_query::parse(&emitted, ::pg_query::ParserOptions::default())
-            .expect(&emitted)
-            .deparse(::pg_query::DeparseOptions::default())
-            .expect("emitted native deparse");
-        assert_eq!(expected, actual, "emitted SQL: {emitted}");
-    }
+    use crate::test_helpers::deparse_statements::assert_native_deparse_round_trip;
 
     #[test]
     fn comments_retain_function_and_operator_signatures() {

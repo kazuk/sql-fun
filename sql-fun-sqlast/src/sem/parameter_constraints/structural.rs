@@ -194,8 +194,10 @@ impl StructuralConstraint {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_helpers::structural::record;
+
     use crate::sem::{
-        ConstraintGraph, InputTypeConstraint, ParameterConstraints, PgBuiltInType, TypeReference,
+        ConstraintGraph, InputTypeConstraint, ParameterConstraints, PgBuiltInType,
         parameter_constraints::structural::TypeProjection,
     };
     use std::collections::BTreeMap;
@@ -238,20 +240,6 @@ mod tests {
         ])));
         assert!(!constraints.allows(&BTreeMap::from([(1, array), (2, PgBuiltInType::text())])));
         assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    }
-    fn record(field_type: &TypeReference) -> TypeReference {
-        use crate::{
-            names::ColumnName,
-            sem::{ColumnCollection, ColumnDefinition, TypeDefinition},
-        };
-        TypeReference::dynamic(&TypeDefinition::ImplicitComposite(ColumnCollection::new(
-            vec![ColumnDefinition::new(
-                &Some(ColumnName::from("n")),
-                Some(field_type),
-                None,
-                &[],
-            )],
-        )))
     }
 
     #[test]

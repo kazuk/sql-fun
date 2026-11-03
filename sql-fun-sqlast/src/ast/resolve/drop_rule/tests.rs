@@ -1,3 +1,4 @@
+use crate::test_helpers::heavy::drop_rule as heavy;
 use crate::{
     context::{ParseContext, RuleInfoRead},
     names::{FullName, SchemaName},
@@ -18,7 +19,7 @@ fn resolved_drop_does_not_apply_until_requested(
     #[case] sql: &str,
     #[case] behavior: SemDropDependencyBehavior,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let mut child = test_helpers::layer(&parent);
     let statement = test_helpers::statement(sql)
         .node
@@ -35,7 +36,7 @@ fn resolved_drop_does_not_apply_until_requested(
 #[test]
 fn drop_masks_inherited_definition_and_recreation_replaces_the_tombstone() -> testresult::TestResult
 {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let child = test_helpers::apply(test_helpers::layer(&parent), "DROP RULE audit ON item_view")?
         .into_context()
         .freeze();
@@ -69,7 +70,7 @@ fn if_exists_retains_completed_absence_without_changing_associations(
     #[case] sql: &str,
     #[case] relation_found: bool,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let pair = test_helpers::apply(test_helpers::layer(&parent), sql)?;
     let drop = pair.ast().rule_drop().unwrap();
     assert!(!drop.found());
@@ -85,7 +86,7 @@ fn if_exists_retains_completed_absence_without_changing_associations(
 fn invalid_drop_leaves_named_definitions_and_links_intact(
     #[case] sql: &str,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let mut child = test_helpers::layer(&parent);
     assert!(
         test_helpers::statement(sql)
@@ -100,7 +101,7 @@ fn invalid_drop_leaves_named_definitions_and_links_intact(
 
 #[test]
 fn relation_namespace_and_quoted_rule_names_remain_distinct() -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let context = test_helpers::apply(
         test_helpers::layer(&parent),
         r#"CREATE RULE "Audit.Name" AS ON INSERT TO items DO ALSO NOTHING"#,
@@ -124,7 +125,7 @@ fn relation_namespace_and_quoted_rule_names_remain_distinct() -> testresult::Tes
 
 #[test]
 fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let mut context = test_helpers::apply(
         test_helpers::layer(&parent),
         "CREATE TABLE earlier.item_view(id integer)",
@@ -146,110 +147,7 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
     Ok(())
 }
 
-mod test_helpers {
-    use crate::{
-        AstAndContextPair,
-        ast::{Dialect, Statement},
-        context::MutSourcePathWithSpan,
-        parse_statements,
-        sem::AnalysisError,
-        test_helpers::{create_cache_context, source_span},
-    };
-
-    use crate::{
-        context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
-        names::{FullName, TableName, ViewName},
-        sem::RuleIdentity,
-    };
-    pub(super) const CREATE_AUDIT: &str =
-        "CREATE RULE audit AS ON INSERT TO item_view DO INSTEAD NOTHING";
-    pub(super) fn identity() -> RuleIdentity {
-        RuleIdentity::new(&FullName::with_schema("public", "item_view"), "audit")
-    }
-
-    pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
-        SchemaFileContext::new(
-            std::path::Path::new("drop-rule.sql"),
-            base,
-            base.get_args(),
-            base.metadata(),
-        )
-    }
-    pub(super) fn statement(sql: &str) -> Statement {
-        parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .expect("valid test SQL")
-    }
-    pub(super) fn apply(
-        mut context: SchemaFileContext,
-        sql: &str,
-    ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        let mut cache_context = create_cache_context();
-        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
-        statement(sql).analyze(context, &mut cache_context)
-    }
-    pub(super) fn table_rule_count(context: &FrozenBaseContext) -> usize {
-        let target = FullName::with_schema("public", "items");
-        context
-            .get_table(&TableName::from(target.clone()))
-            .unwrap()
-            .rules()
-            .resolve(context)
-            .len()
-    }
-    pub(super) fn active_count(context: &FrozenBaseContext) -> usize {
-        let target = FullName::with_schema("public", "item_view");
-        context
-            .get_view(&ViewName::from_full_name(&target))
-            .unwrap()
-            .rules()
-            .unwrap()
-            .resolve(context)
-            .len()
-    }
-    pub(super) mod heavy {
-        use crate::{
-            ast::resolve::drop_rule::tests::test_helpers::{
-                CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply,
-            },
-            context::{BaseContext, ParseContext},
-        };
-        /// Reload the maintained catalog and analyze the test schema on each call.
-        /// Catalog state is not shared across independent test processes.
-        pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            use ::clap::Parser;
-            let args = ::sql_fun_core::SqlFunArgs::try_parse_from([
-                "sql-fun",
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let metadata = ::serde_json::from_value(::serde_json::json!({
-                "engine": "PostgreSQL", "dialect": "postgres", "version": "17",
-                "search_path": ["public", "pg_catalog"]
-            }))?;
-            let base = FrozenBaseContext::from(BaseContext::new(&args, &metadata)?);
-            let mut context = SchemaFileContext::new(
-                std::path::Path::new("drop-rule.sql"),
-                &base,
-                &args,
-                &metadata,
-            );
-            for sql in [
-                "CREATE TABLE public.items(id integer)",
-                "CREATE VIEW public.item_view AS SELECT id FROM public.items",
-                CREATE_AUDIT,
-                "CREATE RULE other AS ON UPDATE TO item_view DO INSTEAD NOTHING",
-            ] {
-                context = apply(context, sql)?.into_context();
-            }
-            assert!(context.problems().is_empty(), "{:?}", context.problems());
-            Ok(context.freeze())
-        }
-    }
-}
+use crate::test_helpers::drop_rule as test_helpers;
 
 #[rstest::rstest]
 #[case::implicit_restrict("RESTRICT", false)]
@@ -260,7 +158,7 @@ fn cannot_drop_the_select_rule_required_by_a_view(
     #[case] behavior: &str,
     #[case] explicit: bool,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let context = if explicit {
         test_helpers::apply(test_helpers::layer(&parent), "CREATE OR REPLACE RULE \"_RETURN\" AS ON SELECT TO public.item_view DO INSTEAD SELECT id FROM public.items")?.into_context().freeze()
     } else {

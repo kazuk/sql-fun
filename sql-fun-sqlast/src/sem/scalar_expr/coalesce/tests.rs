@@ -1,6 +1,6 @@
 //! Small-catalog semantic and failure-continuation contracts.
 
-mod test_helpers;
+use crate::test_helpers::coalesce as test_helpers;
 
 use crate::test_helpers::create_cache_context;
 

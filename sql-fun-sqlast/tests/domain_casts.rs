@@ -1,5 +1,9 @@
 //! Domain coercions retain nominal results through the public analysis boundary.
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
+use crate::test_helpers::heavy::domain_casts as heavy;
 use ::sql_fun_sqlast::sem::TypeReference;
 
 #[rstest::rstest]
@@ -113,69 +117,3 @@ fn invalid_cast_keeps_target_lookup_and_argument(
 // PostgreSQL 18 was previously removed in fc49a6a15367c4b1e7c02c3f920bb3f7338ee0d6.
 
 // Removed shipped_postgres18_catalog_domain_casts_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_core::SqlFunArgs;
-        use ::sql_fun_sqlast::{
-            AstAndContextPair,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        /// Load real builtin cast metadata and small domain DDL per test process.
-        /// No shared setup.
-        pub(crate) fn analyze(
-            version: &str,
-            sql: &str,
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                version,
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            let mut context =
-                SchemaFileContext::new(Path::new("domains.sql"), &base, &args, &selected);
-            // Minimal real DDL; do not parse the whole catalog for small cases.
-            for statement in parse_statements(
-                r"
-                    CREATE SCHEMA information_schema;
-                    CREATE DOMAIN information_schema.cardinal_number AS integer;
-                    CREATE DOMAIN information_schema.character_data AS varchar;
-                    CREATE DOMAIN information_schema.sql_identifier AS name;
-                    CREATE DOMAIN information_schema.time_stamp AS timestamptz;
-                    CREATE DOMAIN public.amount AS integer;
-                    CREATE DOMAIN public.nested_amount AS public.amount;
-                    CREATE DOMAIN public.amounts AS integer[];
-                ",
-                Dialect::postgres(),
-            ) {
-                context = statement?
-                    .analyze(context, &mut cache_context)?
-                    .into_context();
-            }
-            assert!(context.problems().is_empty(), "{:?}", context.problems());
-            base = context.freeze();
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
-}

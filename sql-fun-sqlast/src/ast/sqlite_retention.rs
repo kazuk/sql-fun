@@ -49,9 +49,7 @@ impl Statement {
 
 #[cfg(test)]
 mod test_statement_type_retention {
-    use crate::{ast::Dialect, parse_statements};
-
-    use ::rusqlite::types::Value;
+    use crate::test_helpers::sqlite_retention::{query_rows, render, script_rows};
 
     #[rstest::rstest]
     #[case::query_clauses(
@@ -129,46 +127,6 @@ mod test_statement_type_retention {
             script_rows(&rendered, "SELECT * FROM v"),
             "{rendered}",
         );
-    }
-
-    fn render(sql: &str) -> String {
-        let mut rendered = String::new();
-        for statement in parse_statements(sql, Dialect::sqlite()) {
-            let statement = statement.expect("common SQLite statement");
-            rendered.push_str(
-                &statement
-                    .deparse_sql(Dialect::sqlite())
-                    .expect("render retained types"),
-            );
-            rendered.push(';');
-        }
-        rendered
-    }
-
-    fn query_rows(sql: &str) -> Vec<Vec<Value>> {
-        let connection = ::rusqlite::Connection::open_in_memory().unwrap();
-        rows(&connection, sql)
-    }
-
-    fn script_rows(script: &str, sql: &str) -> Vec<Vec<Value>> {
-        let connection = ::rusqlite::Connection::open_in_memory().unwrap();
-        connection.execute_batch(script).expect("SQLite script");
-        rows(&connection, sql)
-    }
-
-    fn rows(connection: &::rusqlite::Connection, sql: &str) -> Vec<Vec<Value>> {
-        let mut statement = connection.prepare(sql).expect("SQLite query");
-        let columns = statement.column_count();
-        let mut query = statement.query([]).unwrap();
-        let mut values = Vec::new();
-        while let Some(row) = query.next().unwrap() {
-            let mut cells = Vec::new();
-            for column in 0..columns {
-                cells.push(row.get(column).unwrap());
-            }
-            values.push(cells);
-        }
-        values
     }
 }
 

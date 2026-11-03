@@ -1,15 +1,10 @@
-use crate::{
-    ast::Dialect,
-    names::{ColumnName, FullName},
-    parse_statements,
-    sem::{
-        ColumnDefinition, CreateTableAs, CreateView, PgBuiltInType, SemAst, ViewLike,
-        ViewMergeSupport, ViewMergeTriggers,
-    },
-    test_helpers::{TestParseContext, create_cache_context},
+use crate::sem::{ViewMergeSupport, ViewMergeTriggers};
+use crate::test_helpers::merge_views::{
+    all_columns, automatic_support, columns, install_view, trigger_support, view_catalog,
 };
 
-use crate::ast::document::merge::tests::test_helpers::{catalog, resolve};
+use crate::test_helpers::document_merge::catalog;
+use crate::test_helpers::statements::resolve_postgres as resolve;
 
 const VIEW_NAME: &str = "writable_items";
 
@@ -163,79 +158,4 @@ fn insert_and_update_assignments_use_their_action_specific_writable_columns() {
         &mut context,
     );
     assert!(update_read_only.is_err() || context.reported_problem_count() > 0);
-}
-
-fn view_catalog(version: u32, support: &ViewMergeSupport) -> TestParseContext {
-    let mut context = catalog(version);
-    install_view(&mut context, false);
-    context.set_view_merge_support(&view_name(), support);
-    context
-}
-
-fn install_view(context: &mut TestParseContext, materialized: bool) {
-    let query = parse_statements("SELECT id,label FROM items", Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap()
-        .node
-        .resolve(context, &mut create_cache_context())
-        .unwrap()
-        .into_select_statemtnt()
-        .unwrap();
-    let name = view_name();
-    let view = if materialized {
-        let definition = CreateTableAs::new(&name, &SemAst::select(&query), true);
-        ViewLike::from(&definition)
-    } else {
-        let definition = CreateView::new(&name, &query, &[], &None, false);
-        ViewLike::from(&definition)
-    };
-    context.set_get_view_impl_result(&name, &Some(view.clone()));
-}
-
-fn view_name() -> FullName {
-    FullName::with_schema("public", VIEW_NAME)
-}
-
-fn automatic_support() -> ViewMergeSupport {
-    ViewMergeSupport::new(
-        true,
-        false,
-        ViewMergeTriggers::default(),
-        Some(&all_columns()),
-        Some(&all_columns()),
-    )
-}
-
-fn trigger_support(insert: bool, update: bool, delete: bool) -> ViewMergeSupport {
-    ViewMergeSupport::new(
-        false,
-        false,
-        ViewMergeTriggers::new(insert, update, delete),
-        Some(&all_columns()),
-        Some(&all_columns()),
-    )
-}
-
-fn all_columns() -> Vec<ColumnDefinition> {
-    columns(&["id", "label"])
-}
-
-fn columns(names: &[&str]) -> Vec<ColumnDefinition> {
-    names
-        .iter()
-        .map(|name| {
-            let type_ref = if *name == "id" {
-                PgBuiltInType::int4()
-            } else {
-                PgBuiltInType::text()
-            };
-            ColumnDefinition::new(
-                &Some(ColumnName::from(*name)),
-                Some(&type_ref),
-                Some(true),
-                &[],
-            )
-        })
-        .collect()
 }

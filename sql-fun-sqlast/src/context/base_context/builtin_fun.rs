@@ -208,6 +208,11 @@ pub struct PgBuiltInFunctions {
 }
 
 impl PgBuiltInFunctions {
+    #[cfg(test)]
+    pub(crate) fn load_test_catalog(path: &Path, details_path: &Path) -> Self {
+        Self::load_from(path, details_path).expect("test function catalog")
+    }
+
     pub(super) fn preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         self.property(name, overload, PgFunctionProto::preserves_view_rows)
     }
@@ -362,7 +367,7 @@ impl PgBuiltInFunctions {
 
 #[cfg(test)]
 mod test_declared_builtin_results {
-    use self::test_helpers::functions_with_scalar_and_output_overloads;
+    use crate::test_helpers::builtin_functions::functions_with_scalar_and_output_overloads;
     use crate::{
         names::{ColumnName, FullName},
         sem::{ColumnCollection, ColumnDefinition, FunctionParam, TypeReference},
@@ -443,38 +448,6 @@ mod test_declared_builtin_results {
         }
         assert_eq!(columns, ColumnCollection::new(expected_columns));
         assert_eq!(overload.params(), &expected);
-    }
-
-    mod test_helpers {
-        use crate::context::base_context::builtin_fun::{
-            PgBuiltInFunctions, PgFunctionDetail, PgFunctionProto,
-        };
-        use std::collections::HashMap;
-
-        pub(super) fn functions_with_scalar_and_output_overloads() -> PgBuiltInFunctions {
-            let prototypes: Vec<PgFunctionProto> = ::serde_json::from_str(
-                r#"[
-                    {"args":["text"],"ret":"text","is_strict":true},
-                    {"args":["text","any"],"ret":"text","is_strict":false},
-                    {"args":["bool"],"ret":"bool","is_strict":true},
-                    {"args":["int4"],"ret":"record","is_strict":true},
-                    {"args":["int8"],"ret":"record","is_strict":true}
-                ]"#,
-            )
-            .unwrap();
-            let details: Vec<PgFunctionDetail> = ::serde_json::from_str(
-                r#"[
-                    {"name":"probe","allargtypes":"{text}","argmodes":"{i}","argnames":"{value}"},
-                    {"name":"probe","allargtypes":"{text,any}","argmodes":"{i,v}","argnames":"{pattern,values}"},
-                    {"name":"probe","allargtypes":"{int4,text,int4}","argmodes":"{i,o,o}","argnames":"{value,label,count}"},
-                    {"name":"probe","allargtypes":"{int8,int8}","argmodes":"{i,o}","argnames":"{value,total}"}
-                ]"#,
-            ).unwrap();
-            PgBuiltInFunctions {
-                function_by_name: HashMap::from([(String::from("probe"), prototypes)]),
-                function_details: HashMap::from([(String::from("probe"), details)]),
-            }
-        }
     }
 }
 

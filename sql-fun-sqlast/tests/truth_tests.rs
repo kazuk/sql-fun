@@ -1,10 +1,8 @@
 //! Public truth-test analysis with the shipped `PostgreSQL` cast catalog.
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
 
-    pub(super) mod heavy;
-}
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
 
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::context::ParseContext;
@@ -24,7 +22,7 @@ fn shipped_catalog_preserves_semantics_and_constraints(
     #[case] negated: bool,
 ) -> testresult::TestResult {
     // Actual builtin casts must reject integer/text inputs while accepting bool.
-    let analyzed = heavy::analyze(&format!("SELECT $1 IS {kind}, NULL IS {kind}"))?;
+    let analyzed = heavy::analyze("18", &format!("SELECT $1 IS {kind}, NULL IS {kind}"), &[])?;
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::bool())])));
     assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
@@ -46,7 +44,7 @@ fn shipped_catalog_preserves_semantics_and_constraints(
 #[case::invalid_literal("'invalid' IS UNKNOWN")]
 fn shipped_catalog_retains_rejected_operand(#[case] expression: &str) -> testresult::TestResult {
     // Verify the real catalog does not confuse explicit casts with implicit ones.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"))?;
+    let analyzed = heavy::analyze("18", &format!("SELECT {expression}"), &[])?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let test = query
         .result_columns()

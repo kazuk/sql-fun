@@ -543,3 +543,6 @@ where
         ))
     }
 }
+
+#[cfg(test)]
+pub(crate) use self::frozen_base_context::forward_catalog_reads;

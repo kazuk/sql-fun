@@ -1,6 +1,6 @@
 //! Enduring SQL-to-catalog rename contracts with explicit metadata.
 
-mod test_helpers;
+use crate::test_helpers::table_rename as test_helpers;
 
 #[cfg(feature = "sqlite")]
 use crate::names::FullName as NamesFullName;
@@ -232,7 +232,7 @@ fn indexes_sequences_and_view_sources_follow_the_renamed_table() -> testresult::
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> testresult::TestResult {
-    use self::test_helpers::apply_sqlite;
+    use crate::test_helpers::table_rename::apply_sqlite;
     let context = apply_sqlite(
         test_helpers::sqlite_context(),
         "CREATE TABLE Before_Name(id INTEGER)",

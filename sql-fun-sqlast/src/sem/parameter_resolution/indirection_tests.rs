@@ -1,6 +1,6 @@
 //! Public analyzer regressions over a small in-memory catalog.
 
-mod test_helpers;
+use crate::test_helpers::indirection as test_helpers;
 
 use crate::{
     sem::{IndirectionExpr, SemScalarExpr, TypeReference as SemTypeReference},

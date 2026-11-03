@@ -1,5 +1,9 @@
 //! Parameter-dependent CASE semantics with real builtin casts and operators.
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
+use crate::test_helpers::heavy;
 use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{PgBuiltInType, TypeReference},
@@ -17,7 +21,7 @@ use std::collections::BTreeMap;
 #[case::cte("WITH c AS (SELECT CASE WHEN true THEN $1 ELSE 1 END AS n) SELECT n FROM c")]
 fn numeric_inputs_retain_admissible_alternatives(#[case] sql: &str) -> testresult::TestResult {
     // Real builtin cast/overload metadata determines the admissible numeric families.
-    let analyzed = heavy::analyze(sql, &[])?;
+    let analyzed = heavy::analyze("17", sql, &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -82,7 +86,7 @@ fn condition_parameters_preserve_result_selection(
     #[case] not_null: Option<bool>,
 ) -> testresult::TestResult {
     // Real catalog metadata verifies ordered casts, preferred types, and json without B-tree ordering.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -121,7 +125,7 @@ fn condition_parameters_preserve_result_selection(
 #[case::result_parameter("SELECT CASE 1 WHEN 1 THEN $1 ELSE 3 END")]
 fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestResult {
     // Equality overload and implicit-cast selection use the real builtin signatures.
-    let analyzed = heavy::analyze(sql, &[])?;
+    let analyzed = heavy::analyze("17", sql, &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -185,7 +189,7 @@ fn finalization_preserves_case_structure_and_branch_coercions(
     #[case] index: usize,
 ) -> testresult::TestResult {
     // Actual builtin explicit and implicit casts are part of this assertion.
-    let analyzed = heavy::analyze(sql, &[])?;
+    let analyzed = heavy::analyze("17", sql, &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -223,7 +227,11 @@ fn finalization_preserves_case_structure_and_branch_coercions(
 #[test]
 fn an_outer_cast_receives_the_case_result_domain() -> testresult::TestResult {
     // Explicit builtin casts apply to the CASE output, preserving input alternatives.
-    let analyzed = heavy::analyze("SELECT (CASE WHEN true THEN $1 ELSE 1 END)::smallint", &[])?;
+    let analyzed = heavy::analyze(
+        "17",
+        "SELECT (CASE WHEN true THEN $1 ELSE 1 END)::smallint",
+        &[],
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -248,7 +256,7 @@ fn unanchored_result_parameters_preserve_assignments(
     #[case] expression: &str,
 ) -> testresult::TestResult {
     // Real catalog casts distinguish numeric and string assignment families.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -303,60 +311,4 @@ fn unanchored_result_parameters_preserve_assignments(
             .is_some()
     );
     Ok(())
-}
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect, SqlFunArgs,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        /// Loads shipped builtin JSON metadata and optional SQL definitions per call.
-        /// Initialization repeats for each test process; no cache is shared.
-        pub(crate) fn analyze(
-            sql: &str,
-            definitions: &[&str],
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            if !definitions.is_empty() {
-                let file = ::tempfile::NamedTempFile::new()?;
-                std::fs::write(file.path(), definitions.join(";"))?;
-                let schema = PostgresDialect::parse_schema_file(
-                    file.path(),
-                    &base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )?;
-                assert!(schema.problems().is_empty(), "{:?}", schema.problems());
-                base = schema.base_context().clone();
-            }
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
 }

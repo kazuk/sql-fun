@@ -1,33 +1,24 @@
 //! Supplied call arguments survive analysis independently of function signatures.
 
-use crate::{
-    ast::{
-        Dialect, StatementNode,
-        resolve::query::test_helpers::{catalog, resolve},
-    },
-    context::ParseContext,
-    names::AliasName,
-    parse_statements,
-    sem::{
-        AnalysisError, DataSource, FuncCallExpr, FunctionParam, OverloadVariant, PgBuiltInType,
-        QueryNameResolution, ScalarConstExpr as SemScalarConstExpr, SelectStatement, SemScalarExpr,
-    },
-};
+use crate::test_helpers::call_arguments::call;
+use crate::test_helpers::query::expression as projection;
 
-fn projection(query: &SelectStatement) -> &SemScalarExpr {
-    query
-        .result_columns()
-        .get_column_at(0)
-        .unwrap()
-        .expression()
-        .unwrap()
-}
-
-fn call(query: &SelectStatement) -> &FuncCallExpr {
-    projection(query)
-        .as_function_call()
-        .expect("preserved call")
-}
+use crate::ast::Dialect;
+use crate::ast::StatementNode;
+use crate::context::ParseContext;
+use crate::names::AliasName;
+use crate::parse_statements;
+use crate::sem::AnalysisError;
+use crate::sem::DataSource;
+use crate::sem::FunctionParam;
+use crate::sem::OverloadVariant;
+use crate::sem::PgBuiltInType;
+use crate::sem::QueryNameResolution;
+use crate::sem::ScalarConstExpr as SemScalarConstExpr;
+use crate::sem::SelectStatement;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::catalog;
+use crate::test_helpers::query::resolve;
 
 #[rstest::rstest]
 #[case::named("SELECT identity(arg => 1)", &[Some("arg")])]

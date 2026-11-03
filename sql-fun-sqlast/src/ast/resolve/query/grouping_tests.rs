@@ -1,31 +1,18 @@
 //! Public semantic outcomes, using the lightweight query catalog.
 
-use crate::{
-    ast::{
-        Dialect, StatementNode,
-        resolve::query::test_helpers::{catalog, grouping_table_context, resolve},
-    },
-    context::ParseContext,
-    parse_statements,
-    sem::{AnalysisError, GroupingExpr, PgBuiltInType, SelectStatement, SemScalarExpr},
-    test_helpers::create_cache_context as test_helpers_create_cache_context,
-};
+use crate::test_helpers::grouping::groupings;
 
-fn groupings(query: &SelectStatement) -> Vec<GroupingExpr> {
-    #[derive(Default)]
-    struct Groupings(Vec<GroupingExpr>);
-    impl crate::sem::traversal::SemanticVisitorMut for Groupings {
-        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
-            if let Some(grouping) = expression.as_grouping() {
-                self.0.push(grouping.clone());
-            }
-            Ok(())
-        }
-    }
-    let mut result = Groupings::default();
-    query.clone().walk(&mut result).unwrap();
-    result.0
-}
+use crate::ast::Dialect;
+use crate::ast::StatementNode;
+use crate::context::ParseContext;
+use crate::parse_statements;
+use crate::sem::GroupingExpr;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::create_cache_context as test_helpers_create_cache_context;
+use crate::test_helpers::query::catalog;
+use crate::test_helpers::query::grouping_table_context;
+use crate::test_helpers::query::resolve;
 
 #[rstest::rstest]
 #[case::ordinary("SELECT GROUPING(a) FROM (SELECT 1 AS a) s GROUP BY a", &[0])]

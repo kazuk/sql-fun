@@ -1,7 +1,6 @@
-mod test_helpers;
-
-use self::test_helpers::{analyze, assert_problem};
 use crate::ast::Dialect;
+use crate::test_helpers::data_source_table::analyze;
+use crate::test_helpers::data_source_table::assert_problem;
 use crate::{
     names::FullName,
     sem::{ColumnReferenceExpr, ParseContext, SemScalarExpr, TypeReference},

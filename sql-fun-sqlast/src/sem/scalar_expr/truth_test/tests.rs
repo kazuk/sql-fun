@@ -1,9 +1,12 @@
-mod test_helpers;
+use crate::test_helpers::truth_test as test_helpers;
 
 use crate::sem::SemScalarExpr;
 
-use self::test_helpers::{context, expression, query, schema};
 use crate::sem::{CastContext, ParseContext, PgBuiltInType};
+use crate::test_helpers::query::expression;
+use crate::test_helpers::statements::query_postgres as query;
+use crate::test_helpers::truth_test::context;
+use crate::test_helpers::truth_test::schema;
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

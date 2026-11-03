@@ -1,3 +1,4 @@
+use crate::test_helpers::heavy::drop_trigger as heavy;
 use crate::{
     context::{ParseContext, TriggerInfoRead},
     names::{FullName, SchemaName},
@@ -12,7 +13,7 @@ fn resolved_drop_does_not_apply_until_requested(
     #[case] sql: &str,
     #[case] cascade: bool,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let mut child = test_helpers::layer(&parent);
     let statement = test_helpers::statement(sql)
         .node
@@ -29,7 +30,7 @@ fn resolved_drop_does_not_apply_until_requested(
 #[test]
 fn drop_masks_inherited_definition_and_recreation_replaces_the_tombstone() -> testresult::TestResult
 {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let child = test_helpers::apply(
         test_helpers::layer(&parent),
         "DROP TRIGGER audit ON item_view",
@@ -66,7 +67,7 @@ fn if_exists_retains_completed_absence_without_changing_associations(
     #[case] sql: &str,
     #[case] relation_found: bool,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let pair = test_helpers::apply(test_helpers::layer(&parent), sql)?;
     let drop = pair.ast().trigger_drop().unwrap();
     assert!(!drop.found());
@@ -82,7 +83,7 @@ fn if_exists_retains_completed_absence_without_changing_associations(
 fn invalid_drop_leaves_named_definitions_and_links_intact(
     #[case] sql: &str,
 ) -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let mut child = test_helpers::layer(&parent);
     assert!(
         test_helpers::statement(sql)
@@ -97,7 +98,7 @@ fn invalid_drop_leaves_named_definitions_and_links_intact(
 
 #[test]
 fn relation_namespace_and_quoted_trigger_names_remain_distinct() -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let context = test_helpers::apply(test_helpers::layer(&parent),
         r#"CREATE TRIGGER "Audit.Name" BEFORE INSERT ON items FOR EACH ROW EXECUTE FUNCTION audit_fn()"#)?.into_context();
     let context = test_helpers::apply(
@@ -127,7 +128,7 @@ fn relation_namespace_and_quoted_trigger_names_remain_distinct() -> testresult::
 
 #[test]
 fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult::TestResult {
-    let parent = test_helpers::heavy::catalog()?;
+    let parent = heavy::catalog()?;
     let mut context = test_helpers::apply(
         test_helpers::layer(&parent),
         "CREATE TABLE earlier.item_view(id integer)",
@@ -149,114 +150,7 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
     Ok(())
 }
 
-mod test_helpers {
-    use crate::{
-        AstAndContextPair,
-        ast::{Dialect, Statement},
-        context::MutSourcePathWithSpan,
-        parse_statements,
-        sem::AnalysisError,
-        test_helpers::{create_cache_context, source_span},
-    };
-
-    use crate::{
-        context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
-        names::{FullName, TableName, ViewName},
-        sem::TriggerIdentity,
-    };
-    pub(super) const CREATE_AUDIT: &str = "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()";
-    pub(super) fn identity() -> TriggerIdentity {
-        TriggerIdentity::postgres(
-            &FullName::with_schema("public", "item_view"),
-            &FullName::with_schema("public", "audit"),
-        )
-    }
-
-    pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
-        SchemaFileContext::new(
-            std::path::Path::new("drop-trigger.sql"),
-            base,
-            base.get_args(),
-            base.metadata(),
-        )
-    }
-    pub(super) fn statement(sql: &str) -> Statement {
-        parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .expect("valid test SQL")
-    }
-    pub(super) fn apply(
-        mut context: SchemaFileContext,
-        sql: &str,
-    ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        let mut cache_context = create_cache_context();
-        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
-        statement(sql).analyze(context, &mut cache_context)
-    }
-    pub(super) fn table_trigger_count(context: &FrozenBaseContext) -> usize {
-        let target = FullName::with_schema("public", "items");
-        context
-            .get_table(&TableName::from(target.clone()))
-            .unwrap()
-            .triggers()
-            .resolve(context, &target)
-            .len()
-    }
-    pub(super) fn active_count(context: &FrozenBaseContext) -> usize {
-        let target = FullName::with_schema("public", "item_view");
-        context
-            .get_view(&ViewName::from_full_name(&target))
-            .unwrap()
-            .triggers()
-            .unwrap()
-            .resolve(context, &target)
-            .len()
-    }
-    pub(super) mod heavy {
-        use crate::{
-            ParseContext,
-            ast::resolve::drop_trigger::tests::test_helpers::{
-                CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply,
-            },
-            context::BaseContext,
-        };
-        /// Reload the maintained catalog and analyze the test schema on each call.
-        /// Catalog state is not shared across independent test processes.
-        pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            use ::clap::Parser;
-            let args = ::sql_fun_core::SqlFunArgs::try_parse_from([
-                "sql-fun",
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let metadata = ::serde_json::from_value(::serde_json::json!({
-                "engine": "PostgreSQL", "dialect": "postgres", "version": "17",
-                "search_path": ["public", "pg_catalog"]
-            }))?;
-            let base = FrozenBaseContext::from(BaseContext::new(&args, &metadata)?);
-            let mut context = SchemaFileContext::new(
-                std::path::Path::new("drop-trigger.sql"),
-                &base,
-                &args,
-                &metadata,
-            );
-            for sql in [
-                "CREATE TABLE public.items(id integer)",
-                "CREATE VIEW public.item_view AS SELECT id FROM public.items",
-                "CREATE FUNCTION public.audit_fn() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'",
-                CREATE_AUDIT,
-                "CREATE TRIGGER other INSTEAD OF UPDATE ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()",
-            ] {
-                context = apply(context, sql)?.into_context();
-            }
-            assert!(context.problems().is_empty(), "{:?}", context.problems());
-            Ok(context.freeze())
-        }
-    }
-}
+use crate::test_helpers::drop_trigger as test_helpers;
 
 #[cfg(feature = "sqlite")]
 mod sqlite;

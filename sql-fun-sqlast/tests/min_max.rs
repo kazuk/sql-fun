@@ -1,5 +1,9 @@
 //! `PostgreSQL` common-type semantics through the maintained public analysis API.
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
+use crate::test_helpers::heavy;
 use ::sql_fun_sqlast::{context::TypeInfoRead, sem::TypeReference};
 
 #[rstest::rstest]
@@ -23,7 +27,7 @@ use ::sql_fun_sqlast::{context::TypeInfoRead, sem::TypeReference};
 fn operation_and_arguments_are_retained(
     #[case] expression: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let analyzed = heavy::analyze(&format!("select {expression} as result"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("select {expression} as result"), &[])?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = query.result_columns().get_column_at(0).unwrap();
     // CLI regressions assert the public result type and nullability. Keep the
@@ -52,7 +56,7 @@ fn invalid_operands_render_specific_diagnostics(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // The CLI regression checks the diagnostic set and result metadata; this
     // test preserves the rendered diagnostic message contract.
-    let analyzed = heavy::analyze(&format!("select {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("select {expression}"), &[])?;
     assert!(
         analyzed
             .context()
@@ -85,6 +89,7 @@ fn invalid_operands_render_specific_diagnostics(
 #[test]
 fn later_operands_retain_column_bindings() -> Result<(), Box<dyn std::error::Error>> {
     let analyzed = heavy::analyze(
+        "17",
         "select greatest(1,t.n) as result from t",
         &["create table t (n integer not null)"],
     )?;
@@ -111,7 +116,7 @@ fn later_operands_are_resolved_even_after_non_null_literal()
 -> Result<(), Box<dyn std::error::Error>> {
     // The CLI regression checks its undefined-alias diagnostic and result
     // metadata; this retains the unresolved AST binding after the literal.
-    let analyzed = heavy::analyze("select least(1,missing.n)", &[])?;
+    let analyzed = heavy::analyze("17", "select least(1,missing.n)", &[])?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let value = query
         .result_columns()
@@ -130,7 +135,7 @@ fn later_operands_are_resolved_even_after_non_null_literal()
 
 #[test]
 fn an_explicit_parameter_cast_sets_the_result_type() -> Result<(), Box<dyn std::error::Error>> {
-    let analyzed = heavy::analyze("select least($1::bigint,1) as result", &[])?;
+    let analyzed = heavy::analyze("17", "select least($1::bigint,1) as result", &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -153,6 +158,7 @@ fn an_explicit_parameter_cast_sets_the_result_type() -> Result<(), Box<dyn std::
 #[test]
 fn nullable_operands_do_not_prove_non_null() -> Result<(), Box<dyn std::error::Error>> {
     let analyzed = heavy::analyze(
+        "17",
         "select least(NULL,t.n) as result from t",
         &["create table t(n integer)"],
     )?;
@@ -181,6 +187,7 @@ fn dynamic_composite_operands_retain_their_type(
     // internal dynamic record identity and min/max operand structure.
     // The shipped function catalog supplies pg_control_system's dynamic record type.
     let analyzed = heavy::analyze(
+        "17",
         &format!("select {operation}(pg_control_system(), pg_control_system()) as result"),
         &[],
     )?;
@@ -211,7 +218,7 @@ fn comparison_catalog_distinguishes_absence_from_negative_answers(
     #[case] expected: Option<bool>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Use the shipped catalog to verify real positive/negative facts and context forwarding.
-    let analyzed = heavy::analyze("select 1", &[])?;
+    let analyzed = heavy::analyze("17", "select 1", &[])?;
     let reference = TypeReference::from_master_type_name(name);
     assert_eq!(
         analyzed
@@ -220,59 +227,4 @@ fn comparison_catalog_distinguishes_absence_from_negative_answers(
         expected
     );
     Ok(())
-}
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect, SqlFunArgs,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        /// Parses the full builtin catalog per call to exercise metadata/context forwarding.
-        pub(crate) fn analyze(
-            sql: &str,
-            definitions: &[&str],
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            if !definitions.is_empty() {
-                let file = ::tempfile::NamedTempFile::new()?;
-                std::fs::write(file.path(), definitions.join(";"))?;
-                let schema = PostgresDialect::parse_schema_file(
-                    file.path(),
-                    &base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )?;
-                assert!(schema.problems().is_empty(), "{:?}", schema.problems());
-                base = schema.base_context().clone();
-            }
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
 }

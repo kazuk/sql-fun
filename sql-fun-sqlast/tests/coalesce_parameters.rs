@@ -1,5 +1,9 @@
 //! COALESCE inference through the public semantic-analysis boundary.
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
+use crate::test_helpers::heavy;
 use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{PgBuiltInType, TypeReference},
@@ -20,7 +24,7 @@ use std::collections::BTreeMap;
 #[case::derived("SELECT n FROM (SELECT COALESCE($1,1) AS n) c")]
 fn numeric_inputs_keep_admissible_assignments(#[case] sql: &str) -> testresult::TestResult {
     // Real builtin casts and overloads determine the supported numeric alternatives.
-    let analyzed = heavy::analyze(sql, &[])?;
+    let analyzed = heavy::analyze("17", sql, &[])?;
     assert!(
         analyzed
             .context()
@@ -52,7 +56,7 @@ fn finalized_operands_retain_common_type_and_coercions(
     #[case] ty: &str,
 ) -> testresult::TestResult {
     // Catalog categories and casts verify source-order selection without requiring comparison operators.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed
             .context()
@@ -84,7 +88,7 @@ fn finalized_operands_retain_common_type_and_coercions(
 #[test]
 fn outer_cast_constrains_coalesce_output() -> testresult::TestResult {
     // The real explicit-cast catalog applies to the expression output, not each input.
-    let analyzed = heavy::analyze("SELECT COALESCE($1,1)::smallint", &[])?;
+    let analyzed = heavy::analyze("17", "SELECT COALESCE($1,1)::smallint", &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -112,6 +116,7 @@ fn catalog_types_survive_inference(
     // Keep the source-context success contract; the CLI additionally reports
     // unresolved parameter metadata for these same result-type cases.
     let analyzed = heavy::analyze(
+        "17",
         &format!("SELECT {expression}"),
         &[
             "CREATE DOMAIN amount AS integer",
@@ -131,66 +136,11 @@ fn catalog_types_survive_inference(
     Ok(())
 }
 
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect, SqlFunArgs,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        /// Loads shipped builtin JSON metadata and optional SQL definitions per call.
-        /// Initialization repeats for each test process; no cache is shared.
-        pub(crate) fn analyze(
-            sql: &str,
-            definitions: &[&str],
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            if !definitions.is_empty() {
-                let file = ::tempfile::NamedTempFile::new()?;
-                std::fs::write(file.path(), definitions.join(";"))?;
-                let schema = PostgresDialect::parse_schema_file(
-                    file.path(),
-                    &base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )?;
-                assert!(schema.problems().is_empty(), "{:?}", schema.problems());
-                base = schema.base_context().clone();
-            }
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
-}
-
 #[test]
 fn later_operands_retain_resolved_column_bindings() -> testresult::TestResult {
     // The real schema catalog supplies the column identity retained by analysis.
     let analyzed = heavy::analyze(
+        "17",
         "SELECT COALESCE($1::integer,t.n) FROM t",
         &["CREATE TABLE t(n integer)"],
     )?;

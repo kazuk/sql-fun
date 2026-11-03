@@ -1,24 +1,8 @@
-use crate::ast::{Dialect, DropBehavior, DropRule, StatementKind, StatementNode};
+use crate::ast::{Dialect, DropBehavior, DropRule};
+use crate::syn;
 use crate::syn::Opt;
-use crate::{parse_statements, syn};
-
-impl StatementNode {
-    fn into_test_drop_rule(self) -> DropRule {
-        match self {
-            Self::DropRule(rule) => rule,
-            _ => panic!("DROP RULE node"),
-        }
-    }
-}
-
-fn drop_rule(sql: &str, dialect: Dialect) -> DropRule {
-    let statement = parse_statements(sql, dialect)
-        .next()
-        .expect("statement")
-        .expect("context-free DROP RULE conversion");
-    assert_eq!(statement.kind(), StatementKind::drop_rule());
-    statement.node.into_test_drop_rule()
-}
+use crate::test_helpers::drop_rule_syntax::drop_rule;
+use crate::test_helpers::drop_syntax::postgres_drop_syntax;
 
 #[rstest::rstest]
 #[case::bare("DROP RULE RuleName ON Items", &["items"], "rulename")]
@@ -56,25 +40,6 @@ fn postgres_preserves_drop_options(
     );
     assert_eq!(rule.if_exists, if_exists);
     assert_eq!(rule.behavior, behavior);
-}
-
-fn postgres_drop_syntax(sql: &str) -> ::pg_query::protobuf::DropStmt {
-    let result =
-        ::pg_query::parse(sql, ::pg_query::ParserOptions::default()).expect("DROP syntax fixture");
-    let node = result
-        .protobuf
-        .stmts
-        .into_iter()
-        .next()
-        .expect("statement")
-        .stmt
-        .expect("node")
-        .node
-        .expect("payload");
-    match node {
-        ::pg_query::protobuf::node::Node::DropStmt(value) => value,
-        _ => panic!("DROP statement fixture"),
-    }
 }
 
 #[rstest::rstest]

@@ -1,4 +1,5 @@
-use crate::ast::{Dialect, resolve::delete::tests::test_helpers::resolve};
+use crate::ast::Dialect;
+use crate::test_helpers::delete::resolve;
 
 #[rstest::rstest]
 #[case::postgres17("17", true)]
@@ -84,16 +85,4 @@ fn explicit_old_alias_is_ordinary_source(#[values("17", "18")] version: &str) {
     );
 }
 
-mod test_helpers {
-    use crate::{
-        ast::{Dialect, resolve::delete::tests::test_helpers::catalog},
-        test_helpers::TestParseContext,
-    };
-
-    pub(super) fn catalog_for_version(version: &str) -> TestParseContext {
-        let metadata = ::serde_json::from_value(::serde_json::json!({
-            "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
-        })).unwrap();
-        catalog(Dialect::postgres()).with_metadata(&metadata)
-    }
-}
+use crate::test_helpers::delete_versions as test_helpers;

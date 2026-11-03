@@ -1,14 +1,14 @@
-mod test_helpers;
-
 use crate::{
     names::FullName as NamesFullName,
     parse_statements,
     test_helpers::{TestParseContext, create_cache_context},
 };
 
-use self::test_helpers::{analyze, context, layer};
 #[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
+use crate::test_helpers::type_hint::analyze;
+use crate::test_helpers::type_hint::context;
+use crate::test_helpers::type_hint::layer;
 use crate::{
     context::{BaseParseContext, ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext},
     names::SchemaName,

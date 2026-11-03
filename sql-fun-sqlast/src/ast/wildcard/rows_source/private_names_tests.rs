@@ -1,7 +1,6 @@
-use crate::ast::wildcard::rows_source::{
-    PrivateNames,
-    test_helpers::{invocation, layout},
-};
+use crate::ast::wildcard::rows_source::PrivateNames;
+use crate::test_helpers::wildcard_rows_source::invocation;
+use crate::test_helpers::wildcard_rows_source::layout;
 
 #[test]
 fn private_names_do_not_shadow_correlated_bindings_or_output_columns() {

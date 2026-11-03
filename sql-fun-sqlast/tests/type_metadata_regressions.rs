@@ -1,5 +1,9 @@
 //! Existing type consumers retain catalog identity and extracted cast preference.
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
+use crate::test_helpers::heavy::type_metadata_regressions as heavy;
 use ::sql_fun_sqlast::{
     context::{BaseParseContext, CastInfoRead, ParseContext},
     names::{ColumnName, FullName, ViewName},
@@ -241,69 +245,4 @@ fn output_parameters_do_not_contribute_input_matches() -> Result<(), Box<dyn std
         &Some(PgBuiltInType::int4())
     );
     Ok(())
-}
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect, SqlFunArgs,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        fn environment()
-        -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>>
-        {
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            Ok((args, selected))
-        }
-
-        /// Loads the full builtin catalog and schema to verify context forwarding.
-        pub(crate) fn catalog(sql: &str) -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            let (args, selected) = environment()?;
-            let builtin = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            let file = ::tempfile::NamedTempFile::new()?;
-            std::fs::write(file.path(), sql)?;
-            let schema = PostgresDialect::parse_schema_file(
-                file.path(),
-                &builtin,
-                &mut None,
-                &args,
-                &selected,
-            )?;
-            assert!(schema.problems().is_empty(), "{:?}", schema.problems());
-            Ok(schema.base_context().clone())
-        }
-
-        pub(crate) fn analyze(
-            schema: &str,
-            sql: &str,
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let base = catalog(schema)?;
-            let (args, selected) = environment()?;
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
 }

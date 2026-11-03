@@ -3,7 +3,7 @@
 #[cfg(feature = "sqlite")]
 mod sqlite_from_groups;
 mod stack_regressions;
-mod test_helpers;
+use crate::test_helpers::ast_query as test_helpers;
 
 #[cfg(feature = "sqlite")]
 use crate::AstAndContextPair;
@@ -15,7 +15,7 @@ use crate::names::SchemaName;
 use crate::test_helpers::SqliteSynBuilder as TestHelpersSqliteSynBuilder;
 use crate::{sem::SourcePathWithSpan, test_helpers::create_cache_context};
 
-use self::test_helpers::postgres;
+use crate::test_helpers::ast_query::postgres;
 
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::TestParseContext;
@@ -397,7 +397,9 @@ mod sqlite {
     };
 
     #[cfg(feature = "sqlite")]
-    use crate::ast::tests::test_helpers::{AnalysisFixture, postgres, sqlite};
+    use crate::test_helpers::ast_query::AnalysisFixture;
+    use crate::test_helpers::ast_query::postgres;
+    use crate::test_helpers::ast_query::sqlite;
     #[cfg(feature = "sqlite")]
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
     use crate::{

@@ -1,8 +1,7 @@
-use crate::{
-    ast::{Dialect, resolve::insert::tests::test_helpers::analyze},
-    names::ColumnName,
-    sem::PgBuiltInType,
-};
+use crate::ast::Dialect;
+use crate::names::ColumnName;
+use crate::sem::PgBuiltInType;
+use crate::test_helpers::insert::analyze;
 
 #[rstest::rstest]
 #[case::on(
@@ -72,37 +71,4 @@ fn retains_one_arbiter_and_correct_key_nullability(
     }
 }
 
-mod test_helpers {
-    use crate::{
-        ast::resolve::insert::tests::test_helpers::catalog, parse_statements,
-        test_helpers::create_cache_context,
-    };
-
-    use crate::{ast::Dialect, sem::SemAst, test_helpers::TestParseContext};
-
-    pub(super) fn analyze_keyed(definition: &str, returning: &str) -> (SemAst, TestParseContext) {
-        let mut cache_context = create_cache_context();
-        let dialect = Dialect::postgres();
-        let mut context =
-            parse_statements(&format!("CREATE TABLE review579({definition})"), dialect)
-                .next()
-                .unwrap()
-                .unwrap()
-                .analyze(catalog(dialect), &mut cache_context)
-                .unwrap()
-                .into_context();
-        let statement = parse_statements(
-            &format!(
-                "INSERT INTO review579 VALUES(1) ON CONFLICT(id) DO NOTHING RETURNING {returning}"
-            ),
-            dialect,
-        )
-        .next()
-        .unwrap()
-        .unwrap()
-        .node
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
-        (statement, context)
-    }
-}
+use crate::test_helpers::insert_join_and_key_semantics as test_helpers;

@@ -108,12 +108,15 @@ impl ArithExpr {
 mod tests {
     use crate::sem::TypeReference;
 
-    use crate::{
-        sem::{ParseContext, PgBuiltInType, SemScalarExpr},
-        test_helpers::between::{
-            comparison_bindings, context, expression, mixed_bounds_context, query, schema,
-        },
-    };
+    use crate::sem::ParseContext;
+    use crate::sem::PgBuiltInType;
+    use crate::sem::SemScalarExpr;
+    use crate::test_helpers::between::comparison_bindings;
+    use crate::test_helpers::between::context;
+    use crate::test_helpers::between::expression;
+    use crate::test_helpers::between::mixed_bounds_context;
+    use crate::test_helpers::between::schema;
+    use crate::test_helpers::statements::query_postgres as query;
     use std::collections::BTreeMap;
 
     #[rstest::rstest]

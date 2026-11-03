@@ -1,8 +1,12 @@
-mod test_helpers;
+use crate::test_helpers::wildcard as test_helpers;
 
 use crate::test_helpers::create_cache_context;
 
-use self::test_helpers::{ResultShapeAssertions, catalog, expansions, rewritten, statement};
+use crate::test_helpers::wildcard::ResultShapeAssertions;
+use crate::test_helpers::wildcard::catalog;
+use crate::test_helpers::wildcard::expansions;
+use crate::test_helpers::wildcard::rewritten;
+use crate::test_helpers::wildcard::statement;
 use crate::{ast::Dialect, context::ParseContext};
 
 #[rstest::rstest]

@@ -499,12 +499,12 @@ mod test_domain_casts {
 
 #[cfg(test)]
 mod test_cast_layers {
-    use crate::{names::FullName as NamesFullName, test_helpers::schema_layer};
-
+    use crate::test_helpers::cast_layers as test_helpers;
     use crate::{
         context::{CastInfoRead, ParseContext},
         sem::CastContext,
     };
+    use crate::{names::FullName as NamesFullName, test_helpers::schema_layer};
     use std::collections::HashSet;
 
     #[rstest::rstest]
@@ -609,55 +609,5 @@ mod test_cast_layers {
         assert!(targets.contains(&source));
         assert!(!targets.contains(&other));
         assert!(child.cast_sources(&target, true).contains(&other));
-    }
-
-    mod test_helpers {
-        use crate::test_helpers::schema_layer;
-
-        use crate::{
-            TrieMap,
-            context::{ParseContext, SchemaFileContext},
-            names::FullName,
-            sem::{CastContext, CastDefinition, TypeReference},
-            test_helpers::TestParseContext,
-        };
-        use std::path::Path;
-
-        pub(super) fn named_type(name: &str) -> TypeReference {
-            TypeReference::from_full_name(FullName::with_schema("fixture", name))
-        }
-
-        pub(super) fn cast_layer() -> (
-            SchemaFileContext,
-            TypeReference,
-            TypeReference,
-            TypeReference,
-        ) {
-            let root = TestParseContext::default().freeze();
-            let source = named_type("source");
-            let shared = named_type("shared");
-            let inherited = named_type("inherited");
-            let mut parent = schema_layer(Path::new("parent.sql"), &root);
-            register(&mut parent, &source, &shared, CastContext::implicit());
-            register(&mut parent, &source, &inherited, CastContext::implicit());
-            let child = schema_layer(Path::new("child.sql"), &parent.freeze());
-            (child, source, shared, inherited)
-        }
-
-        pub(super) fn register(
-            context: &mut SchemaFileContext,
-            source: &TypeReference,
-            target: &TypeReference,
-            cast_context: CastContext,
-        ) {
-            let cast = CastDefinition::new(cast_context);
-            if let Some(targets) = context.catalog.casts.get_mut(&source.to_string()) {
-                targets.insert(&target.to_string(), cast);
-            } else {
-                let mut targets = TrieMap::new();
-                targets.insert(&target.to_string(), cast);
-                context.catalog.casts.insert(&source.to_string(), targets);
-            }
-        }
     }
 }

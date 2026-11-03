@@ -86,7 +86,7 @@ impl SqlInputs {
 
 #[cfg(test)]
 mod tests {
-    use super::SqlInputs;
+    use crate::direct_sql::input::SqlInputs;
 
     #[rstest::rstest]
     #[case::scalar(r#""SELECT 1""#, true)]
@@ -104,8 +104,7 @@ mod tests {
 
 #[cfg(test)]
 mod test_selection {
-    use super::SqlInputs;
-    use crate::test_helpers::direct_sql::StructuredFile;
+    use crate::{direct_sql::input::SqlInputs, test_helpers::direct_sql::StructuredFile};
     #[rstest::rstest]
     fn formats_preserve_scalar_and_array_identity(
         #[values("json", "toml", "yaml")] format: &str,

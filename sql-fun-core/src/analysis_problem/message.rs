@@ -1,7 +1,7 @@
 //! Source-independent explanations for structured SQL diagnostics.
 use std::fmt::Write;
 
-use super::{
+use crate::analysis_problem::{
     AlterColumnProblem, ArrayProblem, CallArgumentProblem, ColumnAttributeProblem, CreationProblem,
     DeleteProblem, DiagnosticMessage, IndexProblem, InsertProblem, MinMaxProblem, OwnershipProblem,
     ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem,

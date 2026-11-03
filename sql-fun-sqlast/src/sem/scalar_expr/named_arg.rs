@@ -1,6 +1,11 @@
-use crate::StringSpan;
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, SemScalarExpr, TypeReference};
+use crate::{
+    StringSpan,
+    sem::{
+        AnalysisError, SemScalarExpr, TypeReference,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
+};
 
 /// A supplied PostgreSQL argument name and its analyzed value.
 /// The name follows SQL identifier normalization; it is not a formal binding.
@@ -35,16 +40,13 @@ impl NamedArgExpr {
     pub(crate) const fn canonicalize_grouping_key(&mut self) {
         self.source_span = None;
     }
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.value.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.value.visit(visitor)
     }
 }

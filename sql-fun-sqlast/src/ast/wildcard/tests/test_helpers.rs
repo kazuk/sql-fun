@@ -1,16 +1,18 @@
-use crate::ast::{Dialect, Statement};
-use crate::context::ParseContext;
-use crate::test_helpers::{TestParseContext, source_span};
 use crate::{
-    names::{ColumnName, SchemaName},
+    ast::{Dialect, Statement},
+    context::ParseContext,
+    names::{ColumnName, FullName, OperatorName, SchemaName, TableName},
+    parse_statements,
     sem::{
-        ColumnDefinition, FunctionParam, OverloadVariant, PgBuiltInType, TypeReference,
-        WildcardExpansion,
+        BinaryOperatorDefinition, ColumnDefinition, FunctionOverloadCollection, FunctionParam,
+        OperatorDefinition, OverloadVariant, PgBuiltInType, ResultColumnCollection, TypeDefinition,
+        TypeReference, WildcardExpansion,
     },
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
 
 pub(super) fn statement(sql: &str) -> Statement {
-    crate::parse_statements(sql, Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap_or_else(|error| panic!("{sql}: {error:?}"))
@@ -59,7 +61,7 @@ impl ColumnDefinition {
 }
 
 pub(super) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let pair = statement.analyze(catalog(), &mut cache_context).unwrap();
     assert!(
         pair.context().reported_problems().is_empty(),
@@ -82,10 +84,10 @@ pub(super) fn rewritten(sql: &str) -> (Statement, usize) {
 pub(super) fn rows_catalog() -> TestParseContext {
     let mut context = catalog();
     context.setup_type(PgBuiltInType::int8());
-    let table = crate::names::FullName::with_schema("public", "t");
+    let table = FullName::with_schema("public", "t");
     context.set_get_type_impl_result(
         &table,
-        &crate::sem::TypeDefinition::table_ref(&crate::names::TableName::from(table.clone())),
+        &TypeDefinition::table_ref(&TableName::from(table.clone())),
     );
     context.setup_function(
         "rows_fun",
@@ -97,8 +99,8 @@ pub(super) fn rows_catalog() -> TestParseContext {
         )],
     );
     context.set_get_function_impl_result(
-        &crate::names::FullName::with_schema("pg_catalog", "row_number"),
-        &crate::sem::FunctionOverloadCollection::new(&[OverloadVariant::new(
+        &FullName::with_schema("pg_catalog", "row_number"),
+        &FunctionOverloadCollection::new(&[OverloadVariant::new(
             &Some(PgBuiltInType::int8()),
             &vec![],
             false,
@@ -107,11 +109,11 @@ pub(super) fn rows_catalog() -> TestParseContext {
     );
     context.setup_type(PgBuiltInType::bool());
     context.set_get_operator_op_result(
-        &crate::names::OperatorName::from_parts(Some("pg_catalog"), ">="),
+        &OperatorName::from_parts(Some("pg_catalog"), ">="),
         true,
         true,
-        Some(&crate::sem::OperatorDefinition::binary(&[
-            crate::sem::BinaryOperatorDefinition::new(
+        Some(&OperatorDefinition::binary(&[
+            BinaryOperatorDefinition::new(
                 &PgBuiltInType::int8(),
                 &PgBuiltInType::int4(),
                 &PgBuiltInType::bool(),
@@ -120,8 +122,8 @@ pub(super) fn rows_catalog() -> TestParseContext {
         ])),
     );
     context.set_get_function_impl_result(
-        &crate::names::FullName::with_schema("pg_catalog", "count"),
-        &crate::sem::FunctionOverloadCollection::new(&[OverloadVariant::new(
+        &FullName::with_schema("pg_catalog", "count"),
+        &FunctionOverloadCollection::new(&[OverloadVariant::new(
             &Some(PgBuiltInType::int8()),
             &vec![],
             false,
@@ -135,7 +137,7 @@ pub(super) fn rows_catalog() -> TestParseContext {
 pub(super) trait ResultShapeAssertions {
     fn assert_same_result_shape(&self, other: &Self, sql: &str);
 }
-impl ResultShapeAssertions for crate::sem::ResultColumnCollection {
+impl ResultShapeAssertions for ResultColumnCollection {
     fn assert_same_result_shape(&self, other: &Self, sql: &str) {
         assert_eq!(self.len(), other.len(), "{sql}");
         for ordinal in 0..self.len() {

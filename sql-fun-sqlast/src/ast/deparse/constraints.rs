@@ -1,11 +1,13 @@
-use super::{DeparseError, SqlEmit, SqlWriter};
-use crate::ast::{
-    Column, ColumnConstraint, ConstraintExtras, ExclusionElement, ForeignReference, SyntaxOption,
-    SyntaxValue, TableConstraint,
-};
-use crate::sem::{
-    ConflictClause, Deferrability, Deferrable, ForeignKeyAction, ForeignKeyMatchType,
-    GeneratedColumnMode, IdentityColumnMode,
+use crate::{
+    ast::{
+        Column, ColumnConstraint, ConstraintExtras, ExclusionElement, Expr as AstExpr,
+        ForeignReference, Literal as AstLiteral, SyntaxOption, SyntaxValue, TableConstraint,
+        deparse::{DeparseError, SqlEmit, SqlWriter},
+    },
+    sem::{
+        ConflictClause, Deferrability, Deferrable, ForeignKeyAction, ForeignKeyMatchType,
+        GeneratedColumnMode, IdentityColumnMode,
+    },
 };
 
 impl SqlEmit for Column {
@@ -245,7 +247,7 @@ impl ColumnConstraint {
     }
 
     fn emit_default(
-        expression: &crate::ast::Expr,
+        expression: &AstExpr,
         column_context: bool,
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
@@ -259,7 +261,7 @@ impl ColumnConstraint {
     }
 
     fn emit_check(
-        expression: &crate::ast::Expr,
+        expression: &AstExpr,
         owner: &TableConstraint,
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
@@ -384,7 +386,7 @@ impl ColumnConstraint {
     }
 
     fn emit_generated(
-        expression: &crate::ast::Expr,
+        expression: &AstExpr,
         mode: Option<&GeneratedColumnMode>,
         column_context: bool,
         writer: &mut SqlWriter,
@@ -922,9 +924,7 @@ impl SyntaxOption {
     fn emit_identity_cycle(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         let cycle = match &self.value {
             None => true,
-            Some(SyntaxValue::Expression(crate::ast::Expr::Literal(
-                crate::ast::Literal::Boolean(cycle),
-            ))) => *cycle,
+            Some(SyntaxValue::Expression(AstExpr::Literal(AstLiteral::Boolean(cycle)))) => *cycle,
             _ => return writer.invalid("sequence option", "CYCLE option requires a Boolean value"),
         };
         writer.sql(if cycle { "CYCLE" } else { "NO CYCLE" });
@@ -937,9 +937,9 @@ impl SyntaxOption {
         };
         writer.sql("OWNED BY ");
         match value {
-            crate::ast::Expr::List(values) => writer.list(values, "."),
-            crate::ast::Expr::Column(name) => name.emit(writer),
-            crate::ast::Expr::Literal(crate::ast::Literal::Keyword(keyword))
+            AstExpr::List(values) => writer.list(values, "."),
+            AstExpr::Column(name) => name.emit(writer),
+            AstExpr::Literal(AstLiteral::Keyword(keyword))
                 if keyword.eq_ignore_ascii_case("none") =>
             {
                 writer.sql("NONE");
@@ -976,15 +976,27 @@ impl ConflictClause {
 
 #[cfg(test)]
 mod test_constraint_emit {
-    use super::{ColumnConstraint, ConstraintExtras, SqlEmit, SqlWriter, TableConstraint};
-    use crate::ast::{
-        Column, Dialect, Expr, ForeignReference, Literal, Name, SyntaxOption, SyntaxValue, TypeName,
-    };
-    use crate::sem::{
-        ConflictClause, Deferrability, ForeignKeyAction, GeneratedColumnMode, IdentityColumnMode,
+    use crate::{
+        ast::{StatementNode, deparse::constraints::DeparseError},
+        parse_statements,
+        test_helpers::assert_postgres_structure,
     };
 
-    fn render<T: SqlEmit>(value: &T, dialect: Dialect) -> Result<String, super::DeparseError> {
+    use crate::{
+        ast::{
+            Column, Dialect, Expr, ForeignReference, Literal, Name, SyntaxOption, SyntaxValue,
+            TypeName,
+            deparse::constraints::{
+                ColumnConstraint, ConstraintExtras, SqlEmit, SqlWriter, TableConstraint,
+            },
+        },
+        sem::{
+            ConflictClause, Deferrability, ForeignKeyAction, GeneratedColumnMode,
+            IdentityColumnMode,
+        },
+    };
+
+    fn render<T: SqlEmit>(value: &T, dialect: Dialect) -> Result<String, DeparseError> {
         let mut writer = SqlWriter::new(dialect);
         value.emit(&mut writer)?;
         Ok(writer.sql)
@@ -1079,7 +1091,7 @@ mod test_constraint_emit {
     #[test]
     fn postgres_column_storage_precedes_compression_after_parse() {
         let sql = "CREATE TABLE t (v text STORAGE EXTENDED COMPRESSION pglz)";
-        let emitted = crate::parse_statements(sql, Dialect::postgres())
+        let emitted = parse_statements(sql, Dialect::postgres())
             .next()
             .expect("one statement")
             .expect(sql)
@@ -1089,7 +1101,7 @@ mod test_constraint_emit {
         let compression = emitted.find("COMPRESSION").expect(&emitted);
         assert!(storage < compression, "{emitted}");
 
-        let reparsed = crate::parse_statements(&emitted, Dialect::postgres())
+        let reparsed = parse_statements(&emitted, Dialect::postgres())
             .next()
             .expect("one statement after deparse")
             .expect(&emitted)
@@ -1191,8 +1203,8 @@ mod test_constraint_emit {
         r#"ON DELETE SET DEFAULT ("a")"#
     )]
     fn postgres_frontend_retains_on_delete_column_lists(#[case] sql: &str, #[case] expected: &str) {
-        crate::test_helpers::assert_postgres_structure(sql);
-        let first = crate::parse_statements(sql, Dialect::postgres())
+        assert_postgres_structure(sql);
+        let first = parse_statements(sql, Dialect::postgres())
             .next()
             .expect("one statement")
             .expect(sql)
@@ -1200,7 +1212,7 @@ mod test_constraint_emit {
             .unwrap();
         assert!(first.contains(expected), "{sql} => {first}");
 
-        let second = crate::parse_statements(&first, Dialect::postgres())
+        let second = parse_statements(&first, Dialect::postgres())
             .next()
             .expect("one statement after deparse")
             .expect(&first)
@@ -1215,14 +1227,14 @@ mod test_constraint_emit {
     fn rejects_on_delete_column_lists_with_other_actions_as_invalid_syntax(
         #[case] action: Option<ForeignKeyAction>,
     ) {
-        let mut statement = crate::parse_statements(
+        let mut statement = parse_statements(
             "CREATE TABLE child (parent_id integer, FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE SET DEFAULT (parent_id))",
             Dialect::postgres(),
         )
         .next()
         .unwrap()
         .unwrap();
-        let crate::ast::StatementNode::Table(table) = &mut statement.node else {
+        let StatementNode::Table(table) = &mut statement.node else {
             panic!("table fixture");
         };
         let ColumnConstraint::ForeignKey(reference) = &mut table.constraints[0].constraint else {
@@ -1266,6 +1278,8 @@ mod test_constraint_emit {
 
 #[cfg(test)]
 mod test_postgres18_constraint_syntax {
+    use crate::test_helpers::assert_postgres_structure;
+
     #[rstest::rstest]
     #[case::virtual_column(
         "CREATE TABLE t (id int, computed int GENERATED ALWAYS AS (id+1) VIRTUAL)"
@@ -1289,6 +1303,6 @@ mod test_postgres18_constraint_syntax {
     #[case::alter_no_inherit("ALTER TABLE t ALTER CONSTRAINT check_id NO INHERIT")]
     #[case::domain_enforced("CREATE DOMAIN positive_int AS int CHECK (VALUE>0) ENFORCED")]
     fn preserves_postgres18_attributes(#[case] sql: &str) {
-        crate::test_helpers::assert_postgres_structure(sql);
+        assert_postgres_structure(sql);
     }
 }

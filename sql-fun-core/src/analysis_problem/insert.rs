@@ -1,4 +1,4 @@
-use super::DiagnosticMetadata;
+use crate::analysis_problem::DiagnosticMetadata;
 
 /// Structured INSERT violation, independently of its rendered message.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]

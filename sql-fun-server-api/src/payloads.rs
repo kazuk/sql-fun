@@ -19,8 +19,6 @@ pub use self::tokenize_sql::{SqlToken, TokenCategory, TokenizeSqlArgs};
 
 pub use self::traversal::{CollectionPage, CollectionReference, CollectionTraversal};
 
-use std::path::PathBuf;
-
 pub use self::{
     analyze_query::{
         AccessKind, AnalyzeQueryArgs, AnalyzeQueryInput, AnalyzeQueryItem, AnalyzeQueryResponse,
@@ -39,6 +37,8 @@ pub use self::{
         StringPred,
     },
 };
+
+use std::path::PathBuf;
 
 /// nullability
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -81,7 +81,7 @@ pub struct TextPosition {
 mod test_text_position {
     use testresult::TestResult;
 
-    use super::TextPosition;
+    use crate::payloads::TextPosition;
 
     #[test]
     fn test_serialize() -> TestResult {
@@ -235,13 +235,15 @@ impl AnalysisProbrem {
 
 #[cfg(test)]
 mod test_retained_diagnostic {
-    use super::{AnalysisProbrem, StatementByteRange};
+    use crate::payloads::DiagnosticSeverity as PayloadsDiagnosticSeverity;
+
+    use crate::payloads::{AnalysisProbrem, StatementByteRange};
 
     #[test]
     fn retains_byte_offsets_without_inventing_line_or_statement_positions() {
         let problem = AnalysisProbrem::new(
             "domain_base_type_not_found",
-            super::DiagnosticSeverity::error(),
+            PayloadsDiagnosticSeverity::error(),
             std::path::Path::new("schema.sql"),
             Some(StatementByteRange::new(9, 7)),
         );

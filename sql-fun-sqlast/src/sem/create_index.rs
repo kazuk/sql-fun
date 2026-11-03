@@ -1,6 +1,21 @@
 mod arbiter;
 mod settings;
+
 pub use self::settings::IndexStorageValue;
+
+#[cfg(test)]
+use crate::syn::IndexElem;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::SortOrder as SqliteSortOrder;
+use crate::{
+    ast::Index as AstIndex,
+    sem::{
+        ColumnRename,
+        problem::IndexProblemKind,
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
+    },
+    syn::IndexStmt,
+};
 
 use sql_fun_core::IVec;
 
@@ -21,8 +36,9 @@ pub enum SortOrder {
 }
 
 #[cfg(feature = "sqlite")]
-impl From<crate::syn::sqlite::SortOrder> for SortOrder {
-    fn from(value: crate::syn::sqlite::SortOrder) -> Self {
+impl From<SqliteSortOrder> for SortOrder {
+    fn from(value: SqliteSortOrder) -> Self {
+        #[cfg(feature = "sqlite")]
         use crate::syn::sqlite::SortOrder;
 
         match value {
@@ -42,19 +58,17 @@ pub enum IndexElement {
 }
 
 impl IndexElement {
-    fn rename_column(&mut self, rename: &crate::sem::ColumnRename) -> Result<(), AnalysisError> {
+    fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         match self {
             Self::ColumnName(name) => rename.rename_name(name),
-            Self::Expr(value) => {
-                value.walk(&mut crate::sem::traversal::ColumnRenamer::new(rename))?
-            }
+            Self::Expr(value) => value.walk(&mut ColumnRenamer::new(rename))?,
         }
         Ok(())
     }
 
     fn rename_relation(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         if let Self::Expr(expression) = self {
             expression.walk(visitor)?;
@@ -106,7 +120,7 @@ pub struct IndexElementCollection(Vec<IndexElementWithOrder>);
 impl IndexElementCollection {
     fn rename_relation(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.0 {
             column.element.rename_relation(visitor)?;
@@ -133,8 +147,12 @@ impl IndexElementCollection {
 
 #[cfg(test)]
 mod index_element_collection_tests {
-    use super::{IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder};
-    use crate::names::ColumnName;
+    use crate::{
+        names::ColumnName,
+        sem::create_index::{
+            IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder,
+        },
+    };
     use ::sql_fun_core::IVec;
 
     #[test]
@@ -189,10 +207,7 @@ pub struct CreateIndex {
 }
 
 impl CreateIndex {
-    pub(crate) fn rename_column(
-        &mut self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         if rename.matches_table(&self.table) {
             for column in self
                 .key_columns
@@ -202,10 +217,7 @@ impl CreateIndex {
             {
                 column.element.rename_column(rename)?;
             }
-            crate::sem::traversal::optional(
-                &mut self.predicate,
-                &mut crate::sem::traversal::ColumnRenamer::new(rename),
-            )?;
+            optional(&mut self.predicate, &mut ColumnRenamer::new(rename))?;
         }
         Ok(())
     }
@@ -216,10 +228,10 @@ impl CreateIndex {
         new: &TableName,
     ) -> Result<(), AnalysisError> {
         self.table.rename_reference(old, new);
-        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        let mut visitor = RelationRenamer::new(old, new);
         self.key_columns.rename_relation(&mut visitor)?;
         self.include_columns.rename_relation(&mut visitor)?;
-        crate::sem::traversal::optional(&mut self.predicate, &mut visitor)
+        optional(&mut self.predicate, &mut visitor)
     }
 
     /// Index access method retained from CREATE INDEX.
@@ -248,10 +260,7 @@ impl CreateIndex {
             self.statistics.insert(column, target);
         }
     }
-    pub(crate) fn statistics_column_problem(
-        &self,
-        column: i32,
-    ) -> Option<crate::sem::problem::IndexProblemKind> {
+    pub(crate) fn statistics_column_problem(&self, column: i32) -> Option<IndexProblemKind> {
         use crate::sem::problem::IndexProblemKind;
         let position = usize::try_from(column - 1).ok()?;
         if let Some(element) = self.key_columns.0.get(position) {
@@ -363,8 +372,10 @@ impl CreateIndex {
 
 #[cfg(test)]
 mod create_index_tests {
-    use super::{CreateIndex, IndexElementCollection};
-    use crate::names::{ColumnName, FullName, TableName};
+    use crate::{
+        names::{ColumnName, FullName, TableName},
+        sem::create_index::{CreateIndex, IndexElementCollection},
+    };
 
     #[test]
     fn new_sets_defaults_and_clones_fields() {
@@ -410,7 +421,7 @@ mod create_index_tests {
 impl CreateIndex {
     fn analyze_index_elem<TContext: ParseContext>(
         mut context: TContext,
-        keys: Vec<crate::syn::IndexElem>,
+        keys: Vec<IndexElem>,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
         use crate::ast::{Index, IndexExpression};
@@ -427,10 +438,12 @@ impl CreateIndex {
 
 #[cfg(test)]
 mod analyze_index_elem_tests {
-    use super::{CreateIndex, IndexElement, SortOrder};
     use crate::{
         names::ColumnName,
-        sem::{ScalarConstExpr, SemScalarExpr},
+        sem::{
+            ScalarConstExpr, SemScalarExpr,
+            create_index::{CreateIndex, IndexElement, SortOrder},
+        },
         syn::{Node, NodeInner, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext},
     };
@@ -499,23 +512,26 @@ impl CreateIndex {
     pub fn analyze_index_stmt<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::IndexStmt,
+        syn: IndexStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Index::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+        AstIndex::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }
 
 #[cfg(test)]
 mod analyze_index_stmt_tests {
-    use super::{CreateIndex, IndexElement, SortOrder};
-    use crate::sem::SemAst;
+    use crate::test_helpers::source_span;
+
     use crate::{
         names::{ColumnName, FullName},
-        sem::AstAndContextPair,
+        sem::{
+            AstAndContextPair, SemAst,
+            create_index::{CreateIndex, IndexElement, SortOrder},
+        },
         syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
@@ -525,7 +541,7 @@ mod analyze_index_stmt_tests {
     fn analyze_index_stmt_collects_keys_including_order_and_includes(
         mut test_context: TestParseContext,
     ) {
-        test_context.setup_table("items", &[], &crate::test_helpers::source_span());
+        test_context.setup_table("items", &[], &source_span());
         let builder = SynBuilder::new();
         let relation = RangeVarOpt::from(
             builder.range_var(&FullName::with_schema("public", "items"), &AliasOpt::none()),

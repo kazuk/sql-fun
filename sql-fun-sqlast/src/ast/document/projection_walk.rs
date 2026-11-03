@@ -1,12 +1,16 @@
 //! Mutable traversal of query-bearing common document syntax.
-use crate::ast::document::{
-    DocumentExpr, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
-    JsonBehavior, JsonColumn, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate,
-    JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonScalar, JsonSerialize, JsonTable,
-    JsonValue, Merge, MergeWhen, MultiAssignment, Xml, XmlColumn, XmlSerialize, XmlTable,
+
+use crate::ast::{
+    Alias,
+    document::{
+        DocumentExpr, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
+        JsonBehavior, JsonColumn, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate,
+        JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonScalar, JsonSerialize, JsonTable,
+        JsonValue, Merge, MergeWhen, MultiAssignment, Xml, XmlColumn, XmlSerialize, XmlTable,
+    },
+    projection::ProjectionScope,
+    traversal::{AstVisitorMut, WalkSqlMut},
 };
-use crate::ast::projection::ProjectionScope;
-use crate::ast::traversal::{AstVisitorMut, WalkSqlMut};
 macro_rules! walk_fields {
     ($($type:ty => $($field:ident),+;)+) => {
         $(impl WalkSqlMut for $type {
@@ -85,11 +89,11 @@ impl WalkSqlMut for Merge {
 }
 impl XmlTable {
     pub(in crate::ast) fn visible_alias(&self) -> Option<&str> {
-        self.alias.as_ref().map(crate::ast::Alias::visible_name)
+        self.alias.as_ref().map(Alias::visible_name)
     }
 }
 impl JsonTable {
     pub(in crate::ast) fn visible_alias(&self) -> Option<&str> {
-        self.alias.as_ref().map(crate::ast::Alias::visible_name)
+        self.alias.as_ref().map(Alias::visible_name)
     }
 }

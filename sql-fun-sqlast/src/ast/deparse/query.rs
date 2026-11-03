@@ -1,15 +1,18 @@
-use super::{DeparseError, SqlEmit, SqlWriter};
-use crate::ast::{
-    Alias, CommitAction, Cte, CteBody, CteColumn, Cycle, DerivedTable, Frame, FrameBound,
-    FrameExclusion, FrameMode, FromGroup, FromItem, IndexExpression, Into, Join, JoinKind, Lock,
-    LockStrength, LockWait, Name, Order, Query, QueryBody, Relation, Search, Select, SetOperation,
-    SetQuery, SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target,
-    TypedColumn, Window, With,
+use crate::{
+    ast::{
+        Alias, CommitAction, Cte, CteBody, CteColumn, Cycle, DerivedTable, Expr, Frame, FrameBound,
+        FrameExclusion, FrameMode, FromGroup, FromItem, IndexExpression, Into, Join, JoinKind,
+        Lock, LockStrength, LockWait, Name, Order, Query, QueryBody, Relation, Search, Select,
+        SetOperation, SetQuery, SyntaxOption, SyntaxValue, TableFunction, TableFunctions,
+        TableSample, Target, TypedColumn, Window, With,
+        deparse::{DeparseError, SqlEmit, SqlWriter},
+    },
+    sem::with_stack,
 };
 
 impl SqlEmit for Query {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
-        crate::sem::with_stack(|| {
+        with_stack(|| {
             self.with.emit(w)?;
             self.body.emit(w)?;
             if !self.order.is_empty() {
@@ -62,8 +65,7 @@ impl Query {
 
 #[cfg(test)]
 mod test_query_emission {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     #[rstest::rstest]
     #[case::distinct_on("SELECT DISTINCT ON (a) a, b FROM t ORDER BY a, b DESC NULLS LAST")]
@@ -152,7 +154,7 @@ impl SqlEmit for QueryBody {
     }
 }
 impl QueryBody {
-    fn emit_values(rows: &[Vec<crate::ast::Expr>], w: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_values(rows: &[Vec<Expr>], w: &mut SqlWriter) -> Result<(), DeparseError> {
         if rows.is_empty() {
             return w.invalid("VALUES", "VALUES requires a row");
         }
@@ -473,7 +475,7 @@ impl Alias {
 }
 impl SqlEmit for FromItem {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
-        crate::sem::with_stack(|| match self {
+        with_stack(|| match self {
             Self::Relation(v) => v.emit(w),
             Self::Query(v) => v.emit(w),
             Self::Join(v) => v.emit(w),

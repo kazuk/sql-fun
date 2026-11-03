@@ -4,6 +4,8 @@ mod report;
 mod results;
 mod test_input;
 
+use crate::{DiagnosticRenderer, api::ApiArgs};
+
 use self::{expectation::Expectation, input::SqlInputs, report::Case, test_input::TestInputs};
 use crate::analysis::{initialization, prepare_diagnostics, prepare_tokens, request_typed};
 use std::{path::PathBuf, process::ExitCode, time::Instant};
@@ -126,8 +128,8 @@ async fn execute(
             "analyze/test require an explicitly selected --datasource (or SQL_FUN_DATASOURCE)",
         )?;
         let request = initialization(args, datasource, level)?;
-        let renderer = crate::DiagnosticRenderer::from_args(args)?;
-        let mut client = crate::api::ApiArgs::from_environment()?.connect().await?;
+        let renderer = DiagnosticRenderer::from_args(args)?;
+        let mut client = ApiArgs::from_environment()?.connect().await?;
         let initialized = initialize(&mut client, &request, &renderer).await;
         let initialized = match initialized {
             Ok(context) => context,
@@ -163,7 +165,7 @@ async fn execute(
 async fn execute_session(
     mut client: TcpJsonRpcClientAsync,
     context: SchemaContext,
-    renderer: crate::DiagnosticRenderer,
+    renderer: DiagnosticRenderer,
     inputs: &SqlInputs,
     expectations: Option<&[Expectation]>,
     analyze_access: bool,
@@ -245,8 +247,10 @@ async fn execute_session(
 
 #[cfg(test)]
 mod test_execute_session {
-    use super::{Case, Expectation, SqlInputs, execute_session};
-    use crate::test_helpers::direct_sql::session as test_helpers;
+    use crate::{
+        direct_sql::{Case, Expectation, SqlInputs, execute_session},
+        test_helpers::direct_sql::session as test_helpers,
+    };
     #[rstest::rstest]
     #[case::rpc_continues(vec!["ok", "api_error", "ok"], 2, 1)]
     #[case::terminal_marks_remaining(vec!["ok", "transport_error", "ok"], 1, 2)]
@@ -287,7 +291,7 @@ mod test_execute_session {
 async fn initialize(
     client: &mut TcpJsonRpcClientAsync,
     request: &::sql_fun_client::payloads::InitializeSchemaArgs,
-    renderer: &crate::DiagnosticRenderer,
+    renderer: &DiagnosticRenderer,
 ) -> Result<SchemaContext, ::anyhow::Error> {
     let context: SchemaContext =
         request_typed(client, "initialize_schema_context", request).await?;

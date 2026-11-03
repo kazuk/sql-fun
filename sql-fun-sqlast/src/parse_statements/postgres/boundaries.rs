@@ -3,8 +3,7 @@
 //! Add syntax support in `BoundaryState` and its corpus tests. Candidate discovery,
 //! iteration, and error classification do not depend on particular SQL constructs.
 
-use crate::StringSpan;
-use crate::parse_statements::ParseStatementError;
+use crate::{StringSpan, parse_statements::ParseStatementError};
 
 use ::pg_query::protobuf::Token;
 
@@ -111,6 +110,8 @@ fn parser_ranges(sql: &str, statements: Vec<&str>) -> Vec<Result<StringSpan, Par
 
 #[cfg(test)]
 mod test_discover {
+    use crate::parse_statements::postgres::boundaries::discover;
+
     #[rstest::rstest]
     #[case::function(
         "CREATE FUNCTION f() RETURNS integer LANGUAGE SQL BEGIN ATOMIC SELECT 1; RETURN 2; END"
@@ -151,7 +152,7 @@ mod test_discover {
         } else {
             format!("{statement};asdf;SELECT 3;")
         };
-        let ranges = super::discover(&sql);
+        let ranges = discover(&sql);
         assert_eq!(ranges.len(), 3, "{sql}");
         let index = usize::from(malformed_before);
         assert_eq!(
@@ -176,7 +177,7 @@ mod test_discover {
     )]
     fn malformed_closed_range_does_not_absorb_next_statement(#[case] statement: &str) {
         let sql = format!("SELECT 1;{statement};SELECT 3;");
-        let ranges = super::discover(&sql);
+        let ranges = discover(&sql);
         assert_eq!(ranges.len(), 3);
         assert_eq!(ranges[1].as_ref().unwrap().get_from(&sql), Some(statement));
         assert!(::pg_query::parse(statement, ::pg_query::ParserOptions::default()).is_err());
@@ -191,7 +192,7 @@ mod test_discover {
     #[case::compound("CREATE PROCEDURE p() LANGUAGE SQL BEGIN ATOMIC SELECT 1; SELECT 3;")]
     fn uncertain_nesting_preserves_prefix_and_reports_unresolved_tail(#[case] tail: &str) {
         let sql = format!("SELECT 1;{tail}");
-        let mut ranges = super::discover(&sql).into_iter();
+        let mut ranges = discover(&sql).into_iter();
         assert_eq!(
             ranges.next().unwrap().unwrap().get_from(&sql),
             Some("SELECT 1")
@@ -212,7 +213,7 @@ mod test_discover {
             " BEGIN",
             " END",
         ];
-        let actual: Vec<_> = super::discover(sql)
+        let actual: Vec<_> = discover(sql)
             .into_iter()
             .map(|range| range.unwrap().get_from(sql).unwrap())
             .collect();

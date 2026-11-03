@@ -1,3 +1,9 @@
+use crate::{
+    ast::Function,
+    names::TableName,
+    sem::{ObjectKind, OwnerSpecification, OwnershipIdentity},
+    syn::CreateFunctionStmt,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -15,19 +21,15 @@ use crate::{
 pub struct CreateFunction {
     replace: bool,
 
-    owner: Option<crate::sem::OwnerSpecification>,
-    object_kind: crate::sem::ObjectKind,
+    owner: Option<OwnerSpecification>,
+    object_kind: ObjectKind,
     name: FullName,
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
 }
 
 impl CreateFunction {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) -> bool {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) -> bool {
         let previous = self.clone();
         self.overloads.rename_relation(old, new);
         if let Some(columns) = &mut self.returning_columdef {
@@ -46,11 +48,11 @@ impl CreateFunction {
     }
 
     /// Retained ownership; None means no ownership information was supplied.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -64,7 +66,7 @@ impl CreateFunction {
         Self {
             replace: false,
             owner: None,
-            object_kind: crate::sem::ObjectKind::from(20),
+            object_kind: ObjectKind::from(20),
             name: name.clone(),
             overloads: overloads.clone(),
             returning_columdef: returning_columns.clone(),
@@ -111,13 +113,13 @@ impl CreateFunction {
     pub fn analyze_create_function<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::CreateFunctionStmt,
+        syn: CreateFunctionStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Function::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+        Function::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }
 
@@ -154,7 +156,7 @@ impl CreateFunction {
     pub(crate) fn contains_identity(
         definitions: &[Self],
         name: &FullName,
-        identity: &crate::sem::OwnershipIdentity,
+        identity: &OwnershipIdentity,
     ) -> bool {
         for definition in definitions {
             if definition.ownership_identity(name) == *identity {
@@ -165,12 +167,12 @@ impl CreateFunction {
     }
     pub(crate) fn with_procedure_kind(mut self, procedure: bool) -> Self {
         if procedure {
-            self.object_kind = crate::sem::ObjectKind::from(30);
+            self.object_kind = ObjectKind::from(30);
         }
         self
     }
     /// Actual routine kind (FUNCTION or PROCEDURE).
-    pub const fn object_kind(&self) -> crate::sem::ObjectKind {
+    pub const fn object_kind(&self) -> ObjectKind {
         self.object_kind
     }
     pub(crate) fn split_definitions(&self) -> Vec<Self> {
@@ -182,11 +184,11 @@ impl CreateFunction {
         }
         definitions
     }
-    pub(crate) fn ownership_identity(&self, key: &FullName) -> crate::sem::OwnershipIdentity {
+    pub(crate) fn ownership_identity(&self, key: &FullName) -> OwnershipIdentity {
         let arguments = self
             .overloads
             .get_at(0)
             .map_or_else(Vec::new, OverloadVariant::identity_arguments);
-        crate::sem::OwnershipIdentity::with_arguments(self.object_kind, key, &arguments)
+        OwnershipIdentity::with_arguments(self.object_kind, key, &arguments)
     }
 }

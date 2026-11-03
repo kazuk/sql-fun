@@ -1,6 +1,6 @@
-use crate::sem::AstAndContextPair;
+use crate::{sem::AstAndContextPair, syn::CreateExtensionStmt};
 
-use super::{AnalysisError, ParseContext, SemAst};
+use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::CreateExtensionStmt`]
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ impl CreateExtension {
     pub fn analyze_create_extension<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::CreateExtensionStmt,
+        syn: CreateExtensionStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,

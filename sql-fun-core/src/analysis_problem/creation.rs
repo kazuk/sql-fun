@@ -1,4 +1,4 @@
-use super::{DiagnosticMetadata, FullName, Kind, OwnershipIdentity, StringSpan};
+use crate::analysis_problem::{DiagnosticMetadata, FullName, Kind, OwnershipIdentity, StringSpan};
 
 /// A rejected creation, retaining namespace and qualified semantic identity.
 #[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
@@ -111,7 +111,7 @@ impl CreationProblem {
 
 #[cfg(test)]
 mod tests {
-    use super::{CreationProblem, FullName, Kind, StringSpan};
+    use crate::analysis_problem::creation::{CreationProblem, FullName, Kind, StringSpan};
 
     #[test]
     fn labels_the_statement_source_slice() {

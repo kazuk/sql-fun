@@ -1,11 +1,12 @@
 mod assignments;
 mod integration;
 
-use self::test_helpers::{catalog, resolve};
-use crate::context::ParseContext;
-use crate::sem::PgBuiltInType;
-
 mod views;
+
+use crate::sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs;
+
+use self::test_helpers::{catalog, resolve};
+use crate::{context::ParseContext, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case::on_bindings("MERGE INTO items t USING incoming s ON t.id=s.sid WHEN MATCHED THEN DELETE")]
@@ -120,7 +121,7 @@ fn respects_versions(#[case] version: u32, #[case] sql: &str, #[case] accepted: 
 #[test]
 fn infers_parameters_across_ordered_actions_and_returning() {
     let mut context = catalog(17);
-    let before = crate::sem::parameter_resolution::inference_runs();
+    let before = parameter_resolution_inference_runs();
     let statement = resolve("MERGE INTO items t USING incoming s ON $2 WHEN MATCHED AND $3 THEN UPDATE SET id=$1 WHEN NOT MATCHED THEN INSERT(id) VALUES($1) RETURNING $1::integer AS value", &mut context).unwrap();
     assert_eq!(
         context.reported_problem_count(),
@@ -161,12 +162,14 @@ fn infers_parameters_across_ordered_actions_and_returning() {
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{parse_statements, test_helpers::create_cache_context};
+
     use crate::{
+        ast::Dialect,
         context::MutSourcePathWithSpan,
         names::{ColumnName, SchemaName},
         sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SemAst},
+        test_helpers::{TestParseContext, source_span},
     };
     pub(super) fn catalog(version: u32) -> TestParseContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":version.to_string(), "search_path":["public"]})).unwrap();
@@ -206,11 +209,11 @@ mod test_helpers {
         sql: &str,
         context: &mut TestParseContext,
     ) -> Result<SemAst, AnalysisError> {
-        crate::parse_statements(sql, Dialect::postgres())
+        parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(context, &mut crate::test_helpers::create_cache_context())
+            .resolve(context, &mut create_cache_context())
     }
 }

@@ -1,4 +1,4 @@
-use super::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
+use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
 
 /// Invalid shape or comparison in an IN/NOT IN predicate.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]

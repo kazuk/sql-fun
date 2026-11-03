@@ -1,6 +1,19 @@
 mod error;
 mod params;
 
+pub use self::{
+    error::{
+        CteCatalogCheckError, CteCatalogCheckErrorCollection, CteCatalogError,
+        CteCatalogValidationError,
+    },
+    params::{
+        CteParameter, CteParameterBinding, CteParameterBindingCollection, CteParameterCollection,
+        CteParameterRename, ParameterRenameCollection,
+    },
+};
+
+use crate::{Hasher, ParameterName as LocalParameterName};
+
 use std::{
     cell::{Ref, RefCell},
     collections::{HashMap, HashSet, VecDeque},
@@ -14,15 +27,6 @@ use crate::{PlaceholderedSql, SqlDialect};
 use ::indexmap::IndexMap;
 use ::petgraph::graph::NodeIndex;
 use ::walkdir::WalkDir;
-
-pub use self::error::{
-    CteCatalogCheckError, CteCatalogCheckErrorCollection, CteCatalogError,
-    CteCatalogValidationError,
-};
-pub use self::params::{
-    CteParameter, CteParameterBinding, CteParameterBindingCollection, CteParameterCollection,
-    CteParameterRename, ParameterRenameCollection,
-};
 
 /// CTE definition name
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
@@ -690,7 +694,7 @@ mod cte_catalog_load_from_tests {
 
     use crate::test_helpers::{TestProjectDir, write_cte_catalog_toml};
 
-    use super::{CteCatalog, CteCatalogError, CteName};
+    use crate::cte_catalog::{CteCatalog, CteCatalogError, CteName};
 
     #[test]
     fn load_from_registers_entry_and_source_file() -> TestResult {
@@ -952,8 +956,10 @@ impl CteCatalog<'_> {
 mod cte_catalog_check_dependencies_exist_tests {
     use testresult::TestResult;
 
-    use super::{CteCatalog, CteCatalogCheckError, CteName};
-    use crate::test_helpers::{TestProjectDir, cte_catalog_has_error, write_cte_catalog_toml};
+    use crate::{
+        cte_catalog::{CteCatalog, CteCatalogCheckError, CteName},
+        test_helpers::{TestProjectDir, cte_catalog_has_error, write_cte_catalog_toml},
+    };
 
     #[test]
     fn check_dependencies_exist_marks_missing_references() -> TestResult {
@@ -1051,7 +1057,7 @@ impl CteCatalog<'_> {
 mod cte_catalog_supported_extension_tests {
     use std::ffi::OsStr;
 
-    use super::CteCatalog;
+    use crate::cte_catalog::CteCatalog;
 
     #[test]
     fn supported_extension_values() {
@@ -1277,7 +1283,7 @@ impl ResolvedCteCatalog {
 
     /// Append catalog CTE parameter names in resolved collection order.
     /// The caller establishes placement relative to the application query.
-    pub fn append_cte_parameter_order(&self, order: &mut Vec<crate::ParameterName>) {
+    pub fn append_cte_parameter_order(&self, order: &mut Vec<LocalParameterName>) {
         for query in self.cte_queries.values() {
             query.append_parameter_order(order);
         }
@@ -1305,7 +1311,7 @@ impl ResolvedCteCatalog {
     /// [`CteCatalogError`]
     #[tracing::instrument(ret, err, skip(self, base_query))]
     pub fn finger_print(&self, base_query: &PlaceholderedSql) -> Result<String, CteCatalogError> {
-        let mut hasher = crate::Hasher::new();
+        let mut hasher = Hasher::new();
         hasher.append_str(&serde_json::to_string(&self.parameters)?);
         hasher.append_str(&serde_json::to_string(base_query)?);
         hasher.append_str(&serde_json::to_string(&self.cte_queries)?);
@@ -1315,8 +1321,12 @@ impl ResolvedCteCatalog {
 
 #[cfg(test)]
 mod test_resolved_cte_catalog {
-    use super::{CteAlias, CteName, CteParameterCollection, ResolvedCteCatalog};
-    use crate::{ParameterName, PlaceholderedSql};
+    use crate::{SqlDialect, cte_catalog::CteCatalog};
+
+    use crate::{
+        ParameterName, PlaceholderedSql,
+        cte_catalog::{CteAlias, CteName, CteParameterCollection, ResolvedCteCatalog},
+    };
     use ::indexmap::IndexMap;
 
     fn ordered_names(
@@ -1394,8 +1404,8 @@ mod test_resolved_cte_catalog {
     #[test]
     fn resolver_keeps_base_only_metadata_in_query() {
         let base_query = PlaceholderedSql::from_query("select ${base:int}");
-        let catalog = super::CteCatalog::default()
-            .resolve(&[], crate::SqlDialect::PostgreSQL)
+        let catalog = CteCatalog::default()
+            .resolve(&[], SqlDialect::PostgreSQL)
             .unwrap();
         let name = ParameterName::from("base");
         assert!(catalog.parameters().binding(&name).is_none());

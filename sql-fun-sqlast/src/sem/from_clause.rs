@@ -1,5 +1,5 @@
 use crate::{
-    ast::TryCollectFromWithTokens,
+    ast::{FromItem, TryCollectFromWithTokens},
     context::ParseContext,
     names::{AliasName, ColumnName, FullName},
     sem::{
@@ -8,9 +8,9 @@ use crate::{
             ColumnCandidates, MergeRecordRole, ProjectionColumn, QualifiedSource, SourceNamespace,
             WildcardProjection,
         },
-        traversal::SemanticVisitorMut,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::ScanToken,
+    syn::{NodeListOpt, ScanToken},
 };
 
 use ::sql_fun_core::IVec;
@@ -253,14 +253,14 @@ impl FromClause {
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
-        syn: crate::syn::NodeListOpt,
+        syn: NodeListOpt,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::FromItem::try_collect_from_with_tokens(syn, tokens)?;
-        let result = crate::ast::FromItem::resolve_list(&syntax, &mut context, with_clause);
+        let syntax = FromItem::try_collect_from_with_tokens(syn, tokens)?;
+        let result = FromItem::resolve_list(&syntax, &mut context, with_clause);
         Ok((result?, context))
     }
 
@@ -309,10 +309,10 @@ impl FromClause {
 
 #[cfg(test)]
 mod test_find_alias_for_column {
-    use crate::test_helpers::TestParseContext;
     use crate::{
         names::{AliasName, ColumnName},
         sem::{AliasSpec, WithClause},
+        test_helpers::TestParseContext,
     };
     use ::sql_fun_core::LookupResult;
 
@@ -422,10 +422,7 @@ impl FromClause {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for source in &self.0 {
             source.visit(visitor)?;
         }

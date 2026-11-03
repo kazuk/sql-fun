@@ -1,11 +1,18 @@
 mod postgres;
+
 #[cfg(feature = "sqlite")]
 mod sqlite;
 mod token;
 
+use crate::sem::client_type::postgres::parse as postgres_parse;
+#[cfg(feature = "sqlite")]
+use crate::sem::client_type::sqlite::parse as sqlite_parse;
+
 use self::token::TypeTokens;
-use crate::ast::Dialect;
-use crate::sem::{AnalysisError, ParseContext, TypeReference};
+use crate::{
+    ast::Dialect,
+    sem::{AnalysisError, ParseContext, TypeReference},
+};
 
 /// Interpret one SQL type name for a client-protocol parameter hint.
 ///
@@ -35,12 +42,12 @@ pub fn parse_client_type(
     let dialect = context.dialect();
     if dialect == Dialect::postgres() {
         let tokens = TypeTokens::postgres(input)?;
-        self::postgres::parse(&tokens)
+        postgres_parse(&tokens)
     } else {
         #[cfg(feature = "sqlite")]
         {
             let tokens = TypeTokens::sqlite(input)?;
-            self::sqlite::parse(&tokens)
+            sqlite_parse(&tokens)
         }
         #[cfg(not(feature = "sqlite"))]
         Err(invalid("SQLite requires the sqlite feature"))
@@ -49,11 +56,11 @@ pub fn parse_client_type(
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::Dialect;
-    use crate::test_helpers::TestParseContext;
     use crate::{
+        ast::Dialect,
         names::FullName,
         sem::{TypeReference, parse_client_type},
+        test_helpers::TestParseContext,
     };
 
     #[rstest::rstest]

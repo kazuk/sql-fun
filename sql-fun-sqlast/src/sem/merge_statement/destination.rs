@@ -1,8 +1,8 @@
 use crate::{
-    names::TableName,
+    names::{TableName, ViewName},
     sem::{
         AnalysisError, InsertDestination, ParseContext, UpdateDestination, ViewLike,
-        ViewMergeSupport,
+        ViewMergeSupport, merge_statement::MergeStatement,
     },
 };
 
@@ -27,7 +27,7 @@ impl MergeDestination {
             return Self::resolve_table(context, &name).map(Some);
         }
         let view = context
-            .get_view(&crate::names::ViewName::from_full_name(name.full_name()))
+            .get_view(&ViewName::from_full_name(name.full_name()))
             .expect("resolved view");
         if view.is_materialized() {
             Self::resolve_materialized_view(context, &name).map(Some)
@@ -75,7 +75,7 @@ impl MergeDestination {
         name: &TableName,
         view: &ViewLike,
     ) -> Result<Self, AnalysisError> {
-        super::MergeStatement::require_version(context, 17)?;
+        MergeStatement::require_version(context, 17)?;
         let support = context.view_merge_support(name.full_name());
         let insert = InsertDestination::for_merge_view(name, view, &support)?;
         let update = UpdateDestination::for_merge_view(name, view, &support)?;

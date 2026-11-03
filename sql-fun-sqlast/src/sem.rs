@@ -7,7 +7,7 @@ mod alter_seq;
 mod alter_table;
 mod column_rename;
 mod source_flag;
-pub use self::column_rename::ColumnRename;
+
 mod analysis_state;
 mod cast;
 mod client_type;
@@ -50,7 +50,6 @@ mod operators;
 mod overload_rank;
 pub(crate) mod ownership;
 mod parameter_constraints;
-pub(crate) use self::parameter_constraints::ConstraintMemo;
 pub(crate) mod parameter_resolution;
 pub(crate) mod pg_type;
 pub mod problem;
@@ -64,59 +63,24 @@ pub(crate) mod search_path;
 mod select_statement;
 mod top_level_statement;
 pub(crate) mod traversal;
-mod wildcard_expansion;
-pub use self::declaration_collation::DeclarationCollation;
-pub use self::query_access::{AccessObjectKind, AccessRecord, QueryAccess};
-pub use self::query_metadata::QueryMetadata;
-pub use self::with_typmod::WithTypmod;
-pub use ::sql_fun_core::AccessKind;
-
 pub(crate) mod type_system;
 mod update_statement;
 mod variable_set;
 mod view_definition;
 mod view_like;
 pub(crate) mod view_write;
+mod wildcard_expansion;
 mod with_typmod;
-pub use self::create_rule::{
-    CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences,
-};
-pub use self::create_trigger::{
-    CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
-    TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity, TriggerReferences,
-    TriggerTiming, TriggerTransition,
-};
-pub(crate) use self::data_source::{ProjectionColumn, WildcardProjection};
-pub use self::drop_rule::DropRule;
-pub(crate) use self::foreign_key_target::ForeignKeyTarget;
-pub(crate) use self::overload_rank::OverloadRank;
-pub use self::view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption};
-pub use self::view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport};
-pub(crate) use self::wildcard_expansion::{
-    WildcardQualifier, WildcardQualifiers, WildcardRowsFunction, WildcardRowsProjection,
-    WildcardRowsSource, WildcardRowsSources, WildcardSourceProjection, WildcardTypedRecord,
-};
 
+pub use self::column_rename::ColumnRename;
 #[cfg(test)]
 pub(crate) use self::conflict_info::infer_from_catalog;
 pub use self::cursor_info::CursorInfo;
-pub(crate) use self::insert_statement::{
-    InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
-};
-pub(crate) use self::resolution::ResolutionFailure;
-pub(crate) use self::update_statement::UpdateAssignmentCollection;
-
-pub(crate) use self::insert_statement::InsertDestination;
-pub(crate) use self::merge_statement::MergeDestination;
-pub(crate) use self::merge_statement::MergeWhenCollection;
 pub use self::merge_statement::{
     MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
     ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
 };
-
-pub use self::drop_dependency_behavior::DropDependencyBehavior;
-pub use self::drop_trigger::DropTrigger;
-
+pub(crate) use self::parameter_constraints::ConstraintMemo;
 #[expect(deprecated)]
 pub use self::{
     alter_column::{
@@ -218,8 +182,6 @@ pub use self::{
     view_like::ViewLike,
     wildcard_expansion::WildcardExpansion,
 };
-pub use crate::AstAndContextPair;
-
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,
     constraint::{ForeignKeyConstraint, UniqueConstraint},
@@ -232,6 +194,49 @@ pub(crate) use self::{
     select_statement::{ResultColumn, SelectStatementNode},
     update_statement::{UpdateDestination, UpdatePredicate},
 };
+pub use self::{
+    create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
+    create_trigger::{
+        CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
+        TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity,
+        TriggerReferences, TriggerTiming, TriggerTransition,
+    },
+    drop_rule::DropRule,
+    view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption},
+    view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport},
+};
+pub(crate) use self::{
+    data_source::{ProjectionColumn, WildcardProjection},
+    foreign_key_target::ForeignKeyTarget,
+    overload_rank::OverloadRank,
+    wildcard_expansion::{
+        WildcardQualifier, WildcardQualifiers, WildcardRowsFunction, WildcardRowsProjection,
+        WildcardRowsSource, WildcardRowsSources, WildcardSourceProjection, WildcardTypedRecord,
+    },
+};
+pub use self::{
+    declaration_collation::DeclarationCollation,
+    query_access::{AccessObjectKind, AccessRecord, QueryAccess},
+    query_metadata::QueryMetadata,
+    with_typmod::WithTypmod,
+};
+pub use self::{drop_dependency_behavior::DropDependencyBehavior, drop_trigger::DropTrigger};
+pub(crate) use self::{
+    insert_statement::InsertDestination,
+    merge_statement::{MergeDestination, MergeWhenCollection},
+};
+pub(crate) use self::{
+    insert_statement::{
+        InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
+    },
+    resolution::ResolutionFailure,
+    update_statement::UpdateAssignmentCollection,
+};
+pub use crate::AstAndContextPair;
+pub use ::sql_fun_core::AccessKind;
+
+use crate::sem::traversal::{SemanticVisitor, SemanticVisitorMut};
+
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::Cmd};
 use crate::{StringSpan, context::ParseContext};
@@ -384,7 +389,7 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk_nested_command<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -403,7 +408,7 @@ impl SemAst {
             _ => unreachable!("only resolved common query/DML actions are traversed here"),
         }
     }
-    pub(crate) fn visit_nested_command<V: self::traversal::SemanticVisitor>(
+    pub(crate) fn visit_nested_command<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {

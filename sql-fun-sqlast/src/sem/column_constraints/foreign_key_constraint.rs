@@ -1,5 +1,12 @@
 #[cfg(feature = "sqlite")]
 use crate::sem::AnalysisProblem;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::DeferSubclause;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ForeignKeyColumnConstraint as SqliteForeignKeyColumnConstraint;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::RefAct;
+use crate::{sem::ColumnRename, syn::Constraint};
 
 use crate::{
     names::{ColumnName, TableName},
@@ -28,9 +35,7 @@ pub enum ForeignKeyMatchType {
 
 impl ForeignKeyMatchType {
     /// convert from [`crate::syn::Constraint`]
-    pub fn try_from_postgres_constraint(
-        syn: &crate::syn::Constraint,
-    ) -> Result<Option<Self>, AnalysisError> {
+    pub fn try_from_postgres_constraint(syn: &Constraint) -> Result<Option<Self>, AnalysisError> {
         let value = syn.get_fk_matchtype();
         match value.as_str() {
             "" => Ok(None),
@@ -71,7 +76,7 @@ impl ForeignKeyAction {
 
     /// get delete action from [`crate::syn::Constraint`]
     pub fn try_from_delete_postgres_constraint(
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<Option<Self>, AnalysisError> {
         let del_action = syn.get_fk_del_action();
         if del_action.is_empty() {
@@ -83,7 +88,7 @@ impl ForeignKeyAction {
 
     /// get update action from [`crate::syn::Constraint`]
     pub fn try_from_update_postgres_constraint(
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<Option<Self>, AnalysisError> {
         let upd_action = syn.get_fk_upd_action();
         if upd_action.is_empty() {
@@ -95,13 +100,13 @@ impl ForeignKeyAction {
 
     /// convert from [`crate::syn::sqlite::RefAct`]
     #[cfg(feature = "sqlite")]
-    pub const fn from_ref_act(value: &crate::syn::sqlite::RefAct) -> Self {
+    pub const fn from_ref_act(value: &RefAct) -> Self {
         match value {
-            crate::syn::sqlite::RefAct::SetNull => Self::SetNull,
-            crate::syn::sqlite::RefAct::SetDefault => Self::SetDefault,
-            crate::syn::sqlite::RefAct::Cascade => Self::Cascade,
-            crate::syn::sqlite::RefAct::Restrict => Self::Restrict,
-            crate::syn::sqlite::RefAct::NoAction => Self::NoAction,
+            RefAct::SetNull => Self::SetNull,
+            RefAct::SetDefault => Self::SetDefault,
+            RefAct::Cascade => Self::Cascade,
+            RefAct::Restrict => Self::Restrict,
+            RefAct::NoAction => Self::NoAction,
         }
     }
 }
@@ -129,7 +134,7 @@ impl Deferrability {
             init_deferred,
         }
     }
-    const fn from_postgres_constraint(syn: &crate::syn::Constraint) -> Self {
+    const fn from_postgres_constraint(syn: &Constraint) -> Self {
         let deferrable = syn.get_deferrable();
         let init_deferred = syn.get_initdeferred();
         Self {
@@ -139,7 +144,7 @@ impl Deferrability {
     }
 
     #[cfg(feature = "sqlite")]
-    fn from_defer_subclause(syn: &crate::syn::sqlite::DeferSubclause) -> Self {
+    fn from_defer_subclause(syn: &DeferSubclause) -> Self {
         let deferrable = *syn.deferrable();
         let init_deferred = syn.init_deferred().unwrap_or_default().init_deferred();
         Self {
@@ -165,7 +170,7 @@ pub struct ForeignKeyColumnConstraint {
 }
 
 impl ForeignKeyColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -238,6 +243,8 @@ impl ForeignKeyColumnConstraint {
 
 #[cfg(test)]
 mod test_foreign_key_serialization {
+    use crate::sem::ForeignKeyColumnConstraint;
+
     use crate::{
         names::{ColumnName, FullName},
         sem::PgBuiltInType,
@@ -262,14 +269,14 @@ mod test_foreign_key_serialization {
         let json = ::serde_json::to_value(&constraint)?;
         assert_eq!(json["delete_action"], "Cascade");
         assert_eq!(json["deferrablity"]["deferrable"], false);
-        let restored: crate::sem::ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
+        let restored: ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
         assert_eq!(restored, constraint);
         let context = fk::bind(context, "unresolved", "missing(id)", false);
         let unresolved = fk::inline(&context, &FullName::with_schema("a", "unresolved"));
         assert!(unresolved.primary_key_table().is_none());
         let json = ::serde_json::to_value(&unresolved)?;
         assert!(json["primary_key_table"].is_null());
-        let restored: crate::sem::ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
+        let restored: ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
         assert_eq!(restored, unresolved);
         Ok(())
     }
@@ -295,7 +302,7 @@ impl ForeignKeyColumnConstraint {
         mut context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -409,7 +416,7 @@ impl ForeignKeyColumnConstraint {
         mut context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::ForeignKeyColumnConstraint,
+        syn: &SqliteForeignKeyColumnConstraint,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -418,6 +425,7 @@ impl ForeignKeyColumnConstraint {
         let mut del_action = None;
         let mut upd_action = None;
         for arg in clause.args() {
+            #[cfg(feature = "sqlite")]
             use crate::syn::sqlite::RefArg;
 
             match arg {
@@ -470,6 +478,9 @@ impl ForeignKeyColumnConstraint {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_constraint_sqlite {
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::ColumnConstraint;
+
     use crate::{
         names::{ColumnName, FullName},
         sem::ForeignKeyColumnConstraint,
@@ -482,7 +493,7 @@ mod test_analyze_constraint_sqlite {
         let syntax = SqliteSynBuilder.parse_as_stmt("CREATE TABLE child(id REFERENCES PARENT(id))");
         let table = syntax.as_create_table().unwrap();
         let body = table.body().as_columns_and_constraint().unwrap();
-        let crate::syn::sqlite::ColumnConstraint::ForeignKey(constraint) =
+        let ColumnConstraint::ForeignKey(constraint) =
             body.columns()[0].constraints()[0].constraint()
         else {
             panic!("foreign-key syntax");

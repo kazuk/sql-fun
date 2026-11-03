@@ -9,8 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::extensions::control_file;
-use crate::{ExtensionConfigError, ExtensionVersion};
+use crate::{ExtensionConfigError, ExtensionVersion, extensions::control_file};
 
 /// Postgres extensin name version pair.
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Default)]
@@ -32,11 +31,13 @@ impl Display for ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_extension_name_version_pair_display {
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
+
     use crate::ExtensionVersion;
 
     #[test]
     fn test_extension_name_version_pair_display() {
-        let item = super::ExtensionNameVersionPair {
+        let item = ExtensionNameVersionPair {
             name: String::from("ext"),
             version: Some(ExtensionVersion::new("1.0")),
         };
@@ -62,7 +63,7 @@ impl ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_validate_name {
-    use super::ExtensionNameVersionPair;
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
 
     #[test]
     fn test_validate_name_invalid() {
@@ -97,11 +98,13 @@ impl ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_try_new {
-    use super::ExtensionNameVersionPair;
+    use crate::extensions::name_version_pair::ExtensionVersion;
+
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
 
     #[test]
     fn test_try_new_ok() {
-        let version = Some(super::ExtensionVersion::new("1.0"));
+        let version = Some(ExtensionVersion::new("1.0"));
         let result = ExtensionNameVersionPair::try_new("ext", &version).unwrap();
         assert_eq!("ext", result.name);
         assert!(result.version.is_some());
@@ -224,9 +227,10 @@ impl ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_installation_resolution {
-    use super::ExtensionNameVersionPair;
-    use crate::ExtensionVersion;
-    use crate::extensions::test_helpers::ExtensionFixture;
+    use crate::{
+        ExtensionVersion,
+        extensions::{name_version_pair::ExtensionNameVersionPair, test_helpers::ExtensionFixture},
+    };
 
     #[test]
     fn prefers_default_and_explicit_version() -> ::testresult::TestResult {
@@ -328,11 +332,13 @@ mod test_installation_resolution {
 
 #[cfg(test)]
 mod test_resolve_version {
+    use crate::extensions::name_version_pair::ExtensionVersion as NameVersionPairExtensionVersion;
+
     use std::fs::File;
 
     use testresult::TestResult;
 
-    use super::ExtensionNameVersionPair;
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
 
     #[test]
     fn test_resolve_version_with_version() -> TestResult {
@@ -340,7 +346,7 @@ mod test_resolve_version {
         let file_path = tmp_dir.path().join("ext--1.0.sql");
         File::create(&file_path)?;
 
-        let version = Some(super::ExtensionVersion::try_from("1.0")?);
+        let version = Some(NameVersionPairExtensionVersion::try_from("1.0")?);
         let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
         let resolved = pair.resolve_version(tmp_dir.path())?;
 
@@ -351,7 +357,7 @@ mod test_resolve_version {
     #[test]
     fn test_resolve_version_missing_file() -> TestResult {
         let tmp_dir = tempfile::tempdir()?;
-        let version = Some(super::ExtensionVersion::try_from("1.0")?);
+        let version = Some(NameVersionPairExtensionVersion::try_from("1.0")?);
         let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
 
         let result = pair.resolve_version(tmp_dir.path());
@@ -421,11 +427,13 @@ impl ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_parsers {
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
+
     use combine::EasyParser;
 
     #[test]
     fn test_name_parser() {
-        let (parsed, remaining) = super::ExtensionNameVersionPair::name_parser()
+        let (parsed, remaining) = ExtensionNameVersionPair::name_parser()
             .easy_parse("extension-1.0 rest")
             .unwrap();
         assert_eq!("extension-1.0", parsed);
@@ -434,7 +442,7 @@ mod test_parsers {
 
     #[test]
     fn test_version_parser() {
-        let (parsed, remaining) = super::ExtensionNameVersionPair::version_parser()
+        let (parsed, remaining) = ExtensionNameVersionPair::version_parser()
             .easy_parse("1.0,rest")
             .unwrap();
         assert_eq!("1.0", parsed);
@@ -465,7 +473,7 @@ impl ExtensionNameVersionPair {
 mod test_parser {
     use combine::EasyParser;
 
-    use super::ExtensionNameVersionPair;
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
 
     #[test]
     fn test_parser_with_version() {
@@ -510,7 +518,7 @@ impl ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_parse_name {
-    use super::ExtensionNameVersionPair;
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
 
     #[test]
     fn test_parse_name_ok() {
@@ -537,7 +545,7 @@ impl ExtensionNameVersionPair {
 
 #[cfg(test)]
 mod test_parse_version {
-    use super::ExtensionNameVersionPair;
+    use crate::extensions::name_version_pair::ExtensionNameVersionPair;
 
     #[test]
     fn test_parse_version_ok() {

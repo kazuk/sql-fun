@@ -1,6 +1,9 @@
 use crate::{
     names::ColumnName,
-    sem::{ColumnDefinition, ResultColumnCollection, SelectStatement},
+    sem::{
+        AnalysisError, ColumnDefinition, ColumnRename, ResultColumnCollection, SelectStatement,
+        SemScalarExpr,
+    },
 };
 
 /// Resolved origin of each View output column, in projection order.
@@ -10,9 +13,9 @@ pub struct ViewColumnLineage(Vec<Option<ColumnName>>);
 impl ViewColumnLineage {
     pub(crate) fn rename_column(
         &mut self,
-        rename: &crate::sem::ColumnRename,
+        rename: &ColumnRename,
         query: &SelectStatement,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         for (index, lineage) in self.0.iter_mut().enumerate() {
             if let Some(lineage) = lineage
                 && let Some(column) = query.result_columns().get_column_at(index)
@@ -66,14 +69,10 @@ impl ViewColumnLineage {
 pub struct ViewOption {
     namespace: Option<String>,
     name: String,
-    value: Option<crate::sem::SemScalarExpr>,
+    value: Option<SemScalarExpr>,
 }
 impl ViewOption {
-    pub(crate) fn new(
-        namespace: Option<&str>,
-        name: &str,
-        value: Option<&crate::sem::SemScalarExpr>,
-    ) -> Self {
+    pub(crate) fn new(namespace: Option<&str>, name: &str, value: Option<&SemScalarExpr>) -> Self {
         Self {
             namespace: namespace.map(str::to_owned),
             name: name.to_owned(),
@@ -89,7 +88,7 @@ impl ViewOption {
         &self.name
     }
     /// Resolved option value, absent for a valueless option.
-    pub const fn value(&self) -> Option<&crate::sem::SemScalarExpr> {
+    pub const fn value(&self) -> Option<&SemScalarExpr> {
         self.value.as_ref()
     }
 }
@@ -120,14 +119,11 @@ impl ViewCheckOption {
 }
 
 struct ColumnOrigin<'a> {
-    rename: &'a crate::sem::ColumnRename,
+    rename: &'a ColumnRename,
     found: bool,
 }
 impl crate::sem::traversal::SemanticVisitorMut for ColumnOrigin<'_> {
-    fn expression(
-        &mut self,
-        expression: &mut crate::sem::SemScalarExpr,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         self.found |= expression.matches_column(self.rename);
         Ok(())
     }

@@ -1,8 +1,10 @@
-use super::{
-    catalog,
-    test_helpers::{QueryProblems, query_project, rewrite_request},
+use crate::{
+    session_rpc_tests::query_analysis::{
+        catalog,
+        test_helpers::{QueryProblems, query_project, rewrite_request},
+    },
+    test_helpers::heavy,
 };
-use crate::test_helpers::heavy;
 
 const SCHEMA: &str =
     "CREATE TABLE entries(id int4 NOT NULL, value int4); CREATE TABLE other(id int4, extra int4);";
@@ -212,7 +214,7 @@ async fn plain_rewrite_preserves_parser_anchored_diagnostic_spans() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn explicit_output_shape_survives_schema_additions_and_unreferenced_drops() {
-    use super::test_helpers::heavy;
+    use crate::session_rpc_tests::query_analysis::test_helpers::heavy;
 
     let item = heavy::analyze_schema_snapshot(SCHEMA, "SELECT * FROM entries", Some(true)).await;
     assert_eq!(item["complete"], true, "{item}");

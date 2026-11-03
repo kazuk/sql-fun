@@ -1,14 +1,14 @@
-use crate::ast::Dialect;
-use crate::sem::parameter_resolution::ParameterResolution;
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::traversal::SemanticVisitorMut;
 use crate::{
-    names::OperatorName,
+    ast::Dialect,
+    names::{AliasName, OperatorName, TableName},
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
         MinMaxExpr, OperatorDefinition, ParameterConstraints, ParseContext, PgBuiltInType,
         ResolvedOperator, SelectStatement, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
         problem::MembershipProblem,
+        scalar_expr::{SemScalarExprNode, arith_expr::UndefinedOperatorCallSite},
+        traversal::{RelationRenamer, SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -94,10 +94,7 @@ impl MembershipOperands {
             Self::Query(query) => query.walk(visitor),
         }
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::List(values) => {
                 for value in values {
@@ -234,7 +231,7 @@ impl MembershipComparison {
             )?
             .0
         } else {
-            super::arith_expr::UndefinedOperatorCallSite::undefined_operator_resolved(
+            UndefinedOperatorCallSite::undefined_operator_resolved(
                 context,
                 name,
                 Some(left.clone()),
@@ -248,8 +245,8 @@ impl MembershipComparison {
     fn inputs_not_null(&self) -> bool {
         self.left().is_not_null() == Some(true) && self.right().is_not_null() == Some(true)
     }
-    fn rename_relation(&mut self, old: &crate::names::TableName, new: &crate::names::TableName) {
-        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+    fn rename_relation(&mut self, old: &TableName, new: &TableName) {
+        let mut visitor = RelationRenamer::new(old, new);
         self.left.walk(&mut visitor).expect("relation rename");
         self.right.walk(&mut visitor).expect("relation rename");
         if let Some(expression) = &mut self.expression {
@@ -565,10 +562,7 @@ impl MembershipExpr {
         self.right.walk(visitor)?;
         visitor.membership(self)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.left.visit(visitor)?;
         self.right.visit(visitor)?;
         visitor.membership(self)
@@ -599,11 +593,7 @@ impl MembershipExpr {
         self.node = Some(result);
         Ok(())
     }
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         for comparison in &mut self.comparisons {
             comparison.rename_relation(old, new);
         }
@@ -630,17 +620,23 @@ impl MembershipExpr {
 }
 #[cfg(test)]
 mod construction_tests {
+    use crate::{
+        names::OperatorName,
+        sem::{ScalarConstExpr, scalar_expr::membership::MembershipExpr},
+        test_helpers::TestParseContext,
+    };
+
     use crate::sem::{PgBuiltInType, SemScalarExpr};
 
     #[rstest::rstest]
     fn custom_comparison_nullability_is_conservative(
         #[values(true, false)] strict: bool,
     ) -> testresult::TestResult {
-        let mut context = crate::test_helpers::TestParseContext::default();
+        let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
         context.setup_binary("=", "int4", "int4", "bool", strict);
-        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-        let predicate = SemScalarExpr::membership(super::MembershipExpr::list(
+        let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+        let predicate = SemScalarExpr::membership(MembershipExpr::list(
             &mut context,
             &value,
             std::slice::from_ref(&value),
@@ -652,12 +648,12 @@ mod construction_tests {
 
     #[test]
     fn non_boolean_comparison_is_rejected_and_retained() -> testresult::TestResult {
-        let mut context = crate::test_helpers::TestParseContext::default();
+        let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
         context.setup_binary("=", "int4", "int4", "int4", true);
-        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
         let predicate =
-            super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
+            MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
         assert!(context.has_reported_problem("membership_comparison_result"));
         assert_eq!(predicate.types().admissible_types(), Some(&[][..]));
         assert!(predicate.binding().unwrap().resolution().is_resolved());
@@ -670,11 +666,11 @@ mod construction_tests {
 
     #[test]
     fn missing_comparison_retains_failed_binding() -> testresult::TestResult {
-        let mut context = crate::test_helpers::TestParseContext::default();
+        let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
-        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
         let predicate =
-            super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
+            MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
         assert!(context.has_reported_problem("undefined_operator"));
         assert!(!predicate.binding().unwrap().resolution().is_resolved());
         assert_eq!(predicate.comparisons().len(), 1);
@@ -685,15 +681,15 @@ mod construction_tests {
     fn preserves_operator_candidates_after_catalog_changes(
         #[values(true, false)] remove: bool,
     ) -> testresult::TestResult {
-        let mut context = crate::test_helpers::TestParseContext::default();
+        let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
         context.setup_binary("=", "int4", "int4", "bool", true);
-        let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
+        let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
         let mut predicate =
-            super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
+            MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
         if remove {
             context.set_get_operator_op_result(
-                &crate::names::OperatorName::from_parts(None, "="),
+                &OperatorName::from_parts(None, "="),
                 true,
                 true,
                 None,
@@ -787,7 +783,7 @@ fn contains_variable(value: &SemScalarExpr) -> bool {
 impl SemScalarExpr {
     fn membership_variable_alias(&self) -> Option<&str> {
         match self {
-            Self::WholeRow(value) => value.alias().map(crate::names::AliasName::as_str),
+            Self::WholeRow(value) => value.alias().map(AliasName::as_str),
             _ => self.constraint_binding().map(|(alias, _)| alias),
         }
     }

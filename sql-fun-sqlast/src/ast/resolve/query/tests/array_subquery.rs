@@ -1,10 +1,19 @@
 //! ARRAY query semantics through the lightweight query-analysis boundary.
+
 mod test_helpers;
 
-use super::super::test_helpers::resolve;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::sem::{PgBuiltInType, SelectStatement, SemScalarExpr, TypeReference};
+use crate::{
+    ast::resolve::query::test_helpers::catalog,
+    parse_statements,
+    sem::{AnalysisError, AnalysisProblem},
+    test_helpers::create_cache_context,
+};
+
+use crate::{
+    ast::{Dialect, resolve::query::test_helpers::resolve},
+    context::ParseContext,
+    sem::{PgBuiltInType, SelectStatement, SemScalarExpr, TypeReference},
+};
 use std::collections::BTreeMap;
 
 #[rstest::rstest]
@@ -170,7 +179,7 @@ fn projection(query: &SelectStatement) -> &SemScalarExpr {
 
 struct Parameters(Vec<Option<TypeReference>>);
 impl crate::sem::traversal::SemanticVisitorMut for Parameters {
-    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), crate::sem::AnalysisError> {
+    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if matches!(value, SemScalarExpr::Param(_)) {
             self.0.push(value.get_type());
         }
@@ -197,10 +206,10 @@ fn synthetic_identity_function_consumes_array_subquery_result() {
 
 #[test]
 fn invalid_array_query_does_not_stop_following_statement() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let mut context = super::super::test_helpers::catalog();
+    let mut cache_context = create_cache_context();
+    let mut context = catalog();
     let mut results = Vec::new();
-    for statement in crate::parse_statements(
+    for statement in parse_statements(
         "SELECT ARRAY(SELECT 1,2); SELECT ARRAY(SELECT 1)",
         Dialect::postgres(),
     ) {
@@ -237,7 +246,7 @@ fn deferred_star_checks_final_output_width(#[case] name: &str, #[case] valid: bo
     );
 }
 
-fn reports_width_problem(problems: &[crate::sem::AnalysisProblem]) -> bool {
+fn reports_width_problem(problems: &[AnalysisProblem]) -> bool {
     for problem in problems {
         if problem.code() == "array_subquery_columns" {
             return true;

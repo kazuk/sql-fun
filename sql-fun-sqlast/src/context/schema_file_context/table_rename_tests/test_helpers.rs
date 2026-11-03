@@ -1,10 +1,18 @@
+#[cfg(feature = "sqlite")]
+use crate::AstAndContextPair;
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+#[cfg(feature = "sqlite")]
+use crate::parse_statements;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::create_cache_context;
 use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
-    names::FullName,
-    sem::AnalysisError,
-    test_helpers::{ownership::apply_ownership_sql, source_span},
+    names::{FullName, SchemaName},
+    sem::{AnalysisError, PgBuiltInType, TypeReference},
+    test_helpers::{TestParseContext, ownership::apply_ownership_sql, source_span},
 };
 
 pub(super) fn context() -> SchemaFileContext {
@@ -12,10 +20,10 @@ pub(super) fn context() -> SchemaFileContext {
         "engine":"postgres", "dialect":"postgres", "version":"17", "search_path":["public"]
     }))
     .unwrap();
-    let mut inventory = crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
-    inventory.set_search_path(&[crate::names::SchemaName::from("public")]);
-    inventory.setup_type(crate::sem::PgBuiltInType::int4());
-    inventory.setup_type(crate::sem::TypeReference::from_master_type_name("trigger"));
+    let mut inventory = TestParseContext::default().with_metadata(&metadata);
+    inventory.set_search_path(&[SchemaName::from("public")]);
+    inventory.setup_type(PgBuiltInType::int4());
+    inventory.setup_type(TypeReference::from_master_type_name("trigger"));
     child(&inventory.freeze())
 }
 
@@ -73,19 +81,19 @@ pub(super) fn sqlite_context() -> SchemaFileContext {
         "engine":"SQLite", "dialect":"SQLite", "version":"3", "search_path":["main"]
     }))
     .unwrap();
-    let mut inventory = crate::test_helpers::TestParseContext::default()
+    let mut inventory = TestParseContext::default()
         .with_metadata(&metadata)
-        .with_dialect(crate::ast::Dialect::sqlite());
-    inventory.set_search_path(&[crate::names::SchemaName::from("main")]);
+        .with_dialect(Dialect::sqlite());
+    inventory.set_search_path(&[SchemaName::from("main")]);
     child(&inventory.freeze())
 }
 #[cfg(feature = "sqlite")]
 pub(super) fn apply_sqlite(
     context: SchemaFileContext,
     sql: &str,
-) -> Result<crate::AstAndContextPair<SchemaFileContext>, AnalysisError> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    crate::parse_statements(sql, crate::ast::Dialect::sqlite())
+) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
+    let mut cache_context = create_cache_context();
+    parse_statements(sql, Dialect::sqlite())
         .next()
         .unwrap()
         .expect("valid SQLite SQL")

@@ -1,3 +1,4 @@
+use crate::syn::{DefElem, Node, NodeListOpt};
 use std::collections::HashMap;
 
 use crate::{
@@ -46,7 +47,7 @@ impl std::fmt::Display for DefElemKey {
 
 #[cfg(test)]
 mod display_tests {
-    use super::DefElemKey;
+    use crate::sem::def_elem::DefElemKey;
 
     #[rstest::rstest]
     #[case::local("", "strict", "strict")]
@@ -61,15 +62,15 @@ mod display_tests {
     }
 }
 
-impl From<&crate::syn::DefElem> for DefElemKey {
-    fn from(value: &crate::syn::DefElem) -> Self {
+impl From<&DefElem> for DefElemKey {
+    fn from(value: &DefElem) -> Self {
         Self::new(&value.get_defnamespace(), &value.get_defname())
     }
 }
 
 /// hash map of `DefElem`
 #[derive(Debug, Clone, Default)]
-pub struct DefElemList(HashMap<DefElemKey, crate::syn::Node>);
+pub struct DefElemList(HashMap<DefElemKey, Node>);
 
 impl DefElemList {
     /// test key exists
@@ -80,7 +81,7 @@ impl DefElemList {
 
     /// get key value
     #[must_use]
-    pub fn get(&self, key: &DefElemKey) -> Option<&crate::syn::Node> {
+    pub fn get(&self, key: &DefElemKey) -> Option<&Node> {
         self.0.get(key)
     }
 }
@@ -88,7 +89,7 @@ impl DefElemList {
 /// analyze [`crate::syn::NodeListOpt`] as [`DefElemList`]
 pub fn analyze_def_elem_list<TParseContext>(
     mut context: TParseContext,
-    syn: crate::syn::NodeListOpt,
+    syn: NodeListOpt,
 ) -> Result<(DefElemList, TParseContext), AnalysisError>
 where
     TParseContext: ParseContext,

@@ -1,6 +1,9 @@
-use crate::sem::parameter_resolution::Signature;
-use crate::sem::{PgBuiltInType, TypeReference};
-use crate::test_helpers::TestParseContext;
+use crate::{
+    sem::{
+        CastContext, CastDefinition, PgBuiltInType, TypeReference, parameter_resolution::Signature,
+    },
+    test_helpers::TestParseContext,
+};
 
 pub(crate) fn comparison() -> (TestParseContext, Vec<Signature>) {
     let mut context = TestParseContext::default();
@@ -26,7 +29,7 @@ pub(crate) fn numeric_array_comparison(array_cast: bool) -> (TestParseContext, V
     let (mut context, signatures) = comparison();
     let source = PgBuiltInType::int4();
     let target = PgBuiltInType::int8();
-    let cast = crate::sem::CastDefinition::new(crate::sem::CastContext::implicit());
+    let cast = CastDefinition::new(CastContext::implicit());
     context.set_get_implicit_cast_result(&source, &target, Some(cast.clone()));
     context.set_get_implicit_castable_result(
         &source,

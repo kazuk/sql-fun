@@ -1,10 +1,12 @@
 //! Parser-to-catalog regression tests using small, explicitly seeded catalogs.
+
 use crate::{
     context::{
         ObjectInfoRead, OwnershipInfoRead, ParseContext, TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
     names::{ColumnName, FullName},
     sem::Kind,
+    test_helpers::source_span,
 };
 
 #[rstest::rstest]
@@ -14,8 +16,7 @@ fn enum_references_retain_catalog_identity(
     #[case] declaration: &str,
     #[values(false, true)] inherited: bool,
 ) -> testresult::TestResult {
-    use crate::context::BaseParseContext;
-    use crate::sem::TypeReference;
+    use crate::{context::BaseParseContext, sem::TypeReference};
 
     let mut context = test_helpers::postgres(declaration)?;
     assert!(context.problems().is_empty(), "{:?}", context.problems());
@@ -471,9 +472,10 @@ fn record_only_drop_retains_the_name() -> testresult::TestResult {
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    use crate::context::schema_file_context::creation_tests::test_helpers;
     use crate::{
-        context::{ObjectInfoRead, ParseContext},
+        context::{
+            ObjectInfoRead, ParseContext, schema_file_context::creation_tests::test_helpers,
+        },
         names::FullName,
         sem::Kind,
     };
@@ -523,11 +525,24 @@ mod sqlite {
 }
 
 mod test_helpers {
-    use crate::context::FrozenBaseContext;
+    #[cfg(feature = "sqlite")]
+    use crate::ast::Dialect;
+    #[cfg(feature = "sqlite")]
+    use crate::names::SchemaName;
+    #[cfg(feature = "sqlite")]
+    use crate::test_helpers::SqliteSynBuilder;
+    #[cfg(feature = "sqlite")]
+    use crate::test_helpers::TestParseContext;
+    use crate::{
+        ast::StatementNode,
+        syn::Node,
+        test_helpers::{create_cache_context, ownership::ownership_context, source_span},
+    };
+
     #[cfg(feature = "sqlite")]
     use crate::context::ParseContext;
     use crate::{
-        context::{MutSourcePathWithSpan, SchemaFileContext},
+        context::{FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext},
         sem::AnalysisError,
     };
     pub(super) fn child(parent: FrozenBaseContext) -> SchemaFileContext {
@@ -538,11 +553,11 @@ mod test_helpers {
             parent.get_args(),
             parent.metadata(),
         );
-        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        context.set_source_path_with_span(&source_span());
         context
     }
     pub(super) fn postgres(sql: &str) -> Result<SchemaFileContext, AnalysisError> {
-        apply(crate::test_helpers::ownership::ownership_context(), sql)
+        apply(ownership_context(), sql)
     }
     pub(super) fn apply(
         mut context: SchemaFileContext,
@@ -552,13 +567,11 @@ mod test_helpers {
         let parsed = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
             .expect("valid PostgreSQL fixture");
         for raw in parsed.protobuf.stmts {
-            let node = crate::syn::Node::from(raw.stmt.expect("statement").as_ref().clone());
-            let syntax = crate::ast::StatementNode::try_from_with_tokens(
-                &node,
-                &::sql_fun_core::IVec::default(),
-            )?;
+            let node = Node::from(raw.stmt.expect("statement").as_ref().clone());
+            let syntax =
+                StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
             context = syntax
-                .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
+                .resolve_and_apply(context, &mut create_cache_context())?
                 .into_context();
         }
         Ok(context)
@@ -571,9 +584,8 @@ mod test_helpers {
     }
     #[cfg(feature = "sqlite")]
     pub(super) fn sqlite_context() -> SchemaFileContext {
-        let mut root = crate::test_helpers::TestParseContext::default()
-            .with_dialect(crate::ast::Dialect::sqlite());
-        root.set_search_path(&[crate::names::SchemaName::from("main")]);
+        let mut root = TestParseContext::default().with_dialect(Dialect::sqlite());
+        root.set_search_path(&[SchemaName::from("main")]);
         child(root.freeze())
     }
     #[cfg(feature = "sqlite")]
@@ -581,9 +593,9 @@ mod test_helpers {
         context: SchemaFileContext,
         sql: &str,
     ) -> Result<SchemaFileContext, AnalysisError> {
-        let statement = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(sql);
-        Ok(crate::ast::StatementNode::try_from(&statement)?
-            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
+        let statement = SqliteSynBuilder.parse_as_stmt(sql);
+        Ok(StatementNode::try_from(&statement)?
+            .resolve_and_apply(context, &mut create_cache_context())?
             .into_context())
     }
 }
@@ -803,8 +815,10 @@ fn temporary_relations_and_row_types_follow_search_path(
     #[case] selected: &str,
     #[values(false, true)] inherited: bool,
 ) -> testresult::TestResult {
-    use crate::context::BaseParseContext;
-    use crate::names::{SchemaName, TableName};
+    use crate::{
+        context::BaseParseContext,
+        names::{SchemaName, TableName},
+    };
     let mut context = test_helpers::postgres(
         "CREATE TABLE public.t(permanent integer); CREATE TEMP TABLE t(temporary integer)",
     )?;
@@ -840,8 +854,10 @@ fn temporary_relations_and_row_types_follow_search_path(
 
 #[test]
 fn temporary_view_shadows_permanent_table_without_affecting_routines() -> testresult::TestResult {
-    use crate::context::BaseParseContext;
-    use crate::names::{SchemaName, TableName};
+    use crate::{
+        context::BaseParseContext,
+        names::{SchemaName, TableName},
+    };
     let context = test_helpers::postgres(
         "CREATE TABLE public.t(permanent integer); CREATE TEMP VIEW t AS SELECT 1 AS temporary; CREATE FUNCTION public.f() RETURNS integer LANGUAGE SQL AS 'SELECT 1'; CREATE FUNCTION pg_temp.f() RETURNS bigint LANGUAGE SQL AS 'SELECT 1'",
     )?;
@@ -1001,7 +1017,7 @@ fn postgres18_named_not_null_occupies_the_constraint_namespace() -> testresult::
         &selected,
     );
     context.set_search_path(&[SchemaName::from("public")]);
-    context.set_source_path_with_span(&crate::test_helpers::source_span());
+    context.set_source_path_with_span(&source_span());
     let context = test_helpers::apply(
         context,
         "CREATE TABLE t(a integer CONSTRAINT same NOT NULL, b integer CONSTRAINT same NOT NULL)",

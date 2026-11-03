@@ -171,7 +171,7 @@ impl<'a, TValue> Iterator for TrieMapIter<'a, TValue> {
 
 #[cfg(test)]
 mod tests {
-    use super::TrieMap;
+    use crate::trie_map::TrieMap;
 
     #[test]
     fn test_insert_and_get() {

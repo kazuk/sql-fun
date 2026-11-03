@@ -1,6 +1,6 @@
 //! Execute generated PostgreSQL row conversion and interruption without a database server.
 
-use super::builders::{BonRow, ConsumingRow, QueryError};
+use crate::builders::{BonRow, ConsumingRow, QueryError};
 
 struct Client;
 struct Row;

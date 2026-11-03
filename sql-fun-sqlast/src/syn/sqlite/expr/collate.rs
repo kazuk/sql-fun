@@ -1,5 +1,7 @@
-use super::Expr;
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::Name;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 
 /// collate expression
 #[derive(Clone, Debug, derive_getters::Getters)]

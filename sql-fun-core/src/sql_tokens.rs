@@ -200,8 +200,10 @@ impl TokenStream {
 
 #[cfg(test)]
 mod tests {
-    use super::{SqlToken, TokenKind, TokenStream};
-    use crate::SqlDialect;
+    use crate::{
+        SqlDialect,
+        sql_tokens::{SqlToken, TokenKind, TokenStream},
+    };
 
     #[rstest::rstest]
     #[case::empty("")]

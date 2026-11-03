@@ -1,4 +1,4 @@
-use super::CollectionHandle;
+use crate::payloads::CollectionHandle;
 
 /// Enumerates collections using the response type's authoritative field layout.
 /// JSON values are opaque leaves, even when their contents resemble a page.

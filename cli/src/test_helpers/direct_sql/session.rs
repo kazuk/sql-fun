@@ -1,3 +1,4 @@
+use crate::DiagnosticRenderer;
 use ::serde_json::Value;
 use ::sql_fun_client::{TcpJsonRpcClientAsync, payloads::SchemaContext};
 use ::tokio::{
@@ -71,9 +72,9 @@ pub(crate) async fn peer() -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<
     )
 }
 
-pub(crate) fn renderer() -> ::testresult::TestResult<crate::DiagnosticRenderer> {
+pub(crate) fn renderer() -> ::testresult::TestResult<DiagnosticRenderer> {
     let args = ::sql_fun_core::SqlFunArgs::builder(&std::collections::HashMap::new())?
         .term_color(::sql_fun_core::TerminalColor::Never)
         .build()?;
-    Ok(crate::DiagnosticRenderer::from_args(&args)?)
+    Ok(DiagnosticRenderer::from_args(&args)?)
 }

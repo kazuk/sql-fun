@@ -1,6 +1,11 @@
-use super::ArithExpr;
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, PgBuiltInType, SemScalarExpr, TypeReference};
+use crate::{
+    context::ParseContext as ContextParseContext,
+    sem::{
+        AnalysisError, PgBuiltInType, SemScalarExpr, TypeReference,
+        scalar_expr::{SemScalarExprNode, arith_expr::ArithExpr},
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
+    },
+};
 
 /// SQLite's builtin LIKE predicate and its analyzed operands.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -29,21 +34,18 @@ impl SqliteLikeExpr {
         self.negated
     }
 
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.value.walk(visitor)?;
         self.pattern.walk(visitor)?;
-        crate::sem::traversal::optional(&mut self.escape, visitor)
+        optional(&mut self.escape, visitor)
     }
-    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.value.visit(visitor)?;
         self.pattern.visit(visitor)?;
-        crate::sem::traversal::visit_optional(&self.escape, visitor)
+        visit_optional(&self.escape, visitor)
     }
 }
 
@@ -62,7 +64,7 @@ impl SemScalarExprNode for SqliteLikeExpr {
 
 impl ArithExpr {
     pub(crate) fn sqlite_like(
-        context: &mut impl crate::context::ParseContext,
+        context: &mut impl ContextParseContext,
         value: &SemScalarExpr,
         pattern: &SemScalarExpr,
         escape: Option<&SemScalarExpr>,
@@ -94,9 +96,11 @@ impl ArithExpr {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod tests {
-    use crate::ast::Dialect;
-    use crate::sem::{ParseContext, PgBuiltInType, SemScalarExpr};
-    use crate::test_helpers::membership::{context_for, expression, query};
+    use crate::{
+        ast::Dialect,
+        sem::{ParseContext, PgBuiltInType, SemScalarExpr},
+        test_helpers::membership::{context_for, expression, query},
+    };
     use std::collections::BTreeMap;
 
     #[rstest::rstest]

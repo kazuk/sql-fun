@@ -1,9 +1,14 @@
 use crate::{
+    StringSpan,
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
-    names::SchemaName,
-    sem::{ParseContext, PgBuiltInType, SourcePathWithSpan, TypeCategory, TypeDefinition},
-    test_helpers::TestParseContext,
+    names::{OperatorName, SchemaName},
+    parse_statements,
+    sem::{
+        BinaryOperatorDefinition, OperatorDefinition, ParseContext, PgBuiltInType, SelectStatement,
+        SemScalarExpr, SourcePathWithSpan, TypeCategory, TypeDefinition,
+    },
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// Small catalog for distinctness binding and inference tests.
@@ -35,12 +40,12 @@ pub(super) fn context_for(dialect: Dialect) -> SchemaFileContext {
         PgBuiltInType::text(),
         PgBuiltInType::bool(),
     ]
-    .map(|ty| crate::sem::BinaryOperatorDefinition::new(&ty, &ty, &PgBuiltInType::bool(), true));
+    .map(|ty| BinaryOperatorDefinition::new(&ty, &ty, &PgBuiltInType::bool(), true));
     base.set_get_operator_op_result(
-        &crate::names::OperatorName::from_parts(None, "="),
+        &OperatorName::from_parts(None, "="),
         true,
         true,
-        Some(&crate::sem::OperatorDefinition::binary(&definitions)),
+        Some(&OperatorDefinition::binary(&definitions)),
     );
     let args = base.get_args().clone();
     let metadata = base.metadata().clone();
@@ -53,13 +58,13 @@ pub(super) fn context_for(dialect: Dialect) -> SchemaFileContext {
 }
 
 pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context();
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
-        &crate::StringSpan::new(0, sql.len()),
+        &StringSpan::new(0, sql.len()),
     ));
-    for statement in crate::parse_statements(sql, Dialect::postgres()) {
+    for statement in parse_statements(sql, Dialect::postgres()) {
         context = statement?
             .analyze(context, &mut cache_context)?
             .into_context();
@@ -71,9 +76,9 @@ pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error:
 pub(super) fn query(
     sql: &str,
     context: SchemaFileContext,
-) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let analyzed = crate::parse_statements(sql, context.dialect())
+) -> Result<(SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
+    let mut cache_context = create_cache_context();
+    let analyzed = parse_statements(sql, context.dialect())
         .next()
         .unwrap()?
         .analyze(context, &mut cache_context)?;
@@ -81,7 +86,7 @@ pub(super) fn query(
     Ok((query, analyzed.into_context()))
 }
 
-pub(super) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(super) fn expression(query: &SelectStatement) -> &SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)

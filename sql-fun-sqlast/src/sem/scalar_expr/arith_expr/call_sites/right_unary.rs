@@ -1,8 +1,11 @@
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, ParseContext, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
+        AnalysisError, ParseContext, ResolvedOperator, SemScalarExpr, TypeReference,
+        UnaryOperatorDefinition,
+        parameter_resolution::ParameterResolution,
         scalar_expr::arith_expr::ArithExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -10,7 +13,7 @@ use crate::{
 pub struct RightUnaryCallSite {
     operator_name: OperatorName,
     #[serde(default)]
-    binding: Option<Box<crate::sem::ResolvedOperator>>,
+    binding: Option<Box<ResolvedOperator>>,
     operator_def: UnaryOperatorDefinition,
     arg: SemScalarExpr,
 }
@@ -36,7 +39,7 @@ impl RightUnaryCallSite {
         rexpr: SemScalarExpr,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let call_site = Self {
             operator_name: name.clone(),
@@ -64,17 +67,14 @@ impl RightUnaryCallSite {
 }
 
 impl RightUnaryCallSite {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.arg.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.arg.visit(visitor)?;
         Ok(())
     }
@@ -83,8 +83,8 @@ impl RightUnaryCallSite {
 impl RightUnaryCallSite {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if let Some(binding) = &self.binding {
             binding.infer(parameters, context, None, Some(&self.arg))
@@ -95,10 +95,10 @@ impl RightUnaryCallSite {
 }
 
 impl RightUnaryCallSite {
-    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+    pub(crate) fn set_binding(&mut self, binding: ResolvedOperator) {
         self.binding = Some(Box::new(binding));
     }
-    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+    pub(crate) fn binding(&self) -> Option<&ResolvedOperator> {
         self.binding.as_deref()
     }
 }

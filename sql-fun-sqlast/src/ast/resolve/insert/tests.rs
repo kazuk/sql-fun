@@ -1,10 +1,19 @@
 mod join_and_key_semantics;
 mod views;
 
+use crate::{
+    names::FullName as NamesFullName,
+    parse_statements,
+    sem::{
+        CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType,
+        InsertConstraintKind as SemInsertConstraintKind, InsertStatement, TypeDefinition,
+        parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+    },
+    test_helpers::create_cache_context as test_helpers_create_cache_context,
+};
+
 use self::test_helpers::analyze;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::{names::ColumnName, sem::PgBuiltInType};
+use crate::{ast::Dialect, context::ParseContext, names::ColumnName, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *")]
@@ -69,24 +78,24 @@ fn infers_assignment_parameters(#[case] sql: &str) {
 )]
 #[case::implicit("INSERT INTO expanded_items SELECT ($1).*, $2 WHERE $1::public.pair IS NOT NULL")]
 fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = test_helpers_create_cache_context();
     let dialect = Dialect::postgres();
     let mut context = test_helpers::catalog(dialect);
-    let pair_name = crate::names::FullName::with_schema("public", "pair");
-    let mut fields = crate::sem::CompositeFieldCollection::default();
-    fields.push(crate::sem::CompositeFieldDefinition::new(
+    let pair_name = NamesFullName::with_schema("public", "pair");
+    let mut fields = CompositeFieldCollection::default();
+    fields.push(CompositeFieldDefinition::new(
         "a",
         &Some(PgBuiltInType::int4()),
         &None,
     ));
-    fields.push(crate::sem::CompositeFieldDefinition::new(
+    fields.push(CompositeFieldDefinition::new(
         "b",
         &Some(PgBuiltInType::text()),
         &None,
     ));
-    let pair = crate::sem::CreateCompositeType::new(&pair_name, &fields);
-    context.set_get_type_impl_result(&pair_name, &crate::sem::TypeDefinition::from(&pair));
-    let table_statement = crate::parse_statements(
+    let pair = CreateCompositeType::new(&pair_name, &fields);
+    context.set_get_type_impl_result(&pair_name, &TypeDefinition::from(&pair));
+    let table_statement = parse_statements(
         "CREATE TABLE expanded_items(a integer, b text, c integer, d integer GENERATED ALWAYS AS (1) STORED)",
         dialect,
     )
@@ -97,16 +106,10 @@ fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
         .analyze(context, &mut cache_context)
         .unwrap()
         .into_context();
-    let statement = crate::parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap();
+    let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
     let result = statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut test_helpers_create_cache_context())
         .unwrap();
     assert!(result.as_insert().is_some());
     assert_eq!(
@@ -238,15 +241,14 @@ fn resolves_array_assignment_targets(#[case] sql: &str) {
     true
 )]
 fn fails_without_fabricated_bindings(#[case] sql: &str, #[case] fatal: bool) {
-    let statement = crate::parse_statements(sql, Dialect::postgres())
+    let statement = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
     let mut context = test_helpers::catalog(Dialect::postgres());
-    let result = statement.node.resolve(
-        &mut context,
-        &mut crate::test_helpers::create_cache_context(),
-    );
+    let result = statement
+        .node
+        .resolve(&mut context, &mut test_helpers_create_cache_context());
     if fatal {
         assert!(result.is_err());
     } else {
@@ -298,7 +300,7 @@ fn public_postgres_entry_points_share_insert_resolution() {
 
 #[test]
 fn unreferenced_modifying_cte_is_still_analyzed_once() {
-    let before = crate::sem::parameter_resolution::inference_runs();
+    let before = parameter_resolution_inference_runs();
     let (_, context) = analyze(
         "WITH changed AS (INSERT INTO items(id) VALUES($1)) SELECT 1",
         Dialect::postgres(),
@@ -323,16 +325,13 @@ fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
         &PgBuiltInType::int4(),
         Some(CastDefinition::new(CastContext::assignment())),
     );
-    let statement = crate::parse_statements(sql, Dialect::postgres())
+    let statement = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
     statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut test_helpers_create_cache_context())
         .unwrap();
     assert!(
         context
@@ -387,6 +386,7 @@ fn agrees_with_bundled_sqlite(#[case] sql: &str, #[case] accepted: bool) {
 #[cfg(feature = "sqlite")]
 #[test]
 fn public_sqlite_entry_point_retains_returning_and_parameters() {
+    #[cfg(feature = "sqlite")]
     use crate::{sem::SemAst, sqlite::SqliteDialect};
     let sql = "INSERT INTO items(id) VALUES(?1) RETURNING id";
     let statement = SqliteDialect::parse(sql)
@@ -438,9 +438,9 @@ fn public_sqlite_entry_point_retains_returning_and_parameters() {
     false
 )]
 fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] accepted: bool) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = test_helpers_create_cache_context();
     let dialect = Dialect::postgres();
-    let mut context = crate::parse_statements(index, dialect)
+    let mut context = parse_statements(index, dialect)
         .next()
         .unwrap()
         .unwrap()
@@ -449,16 +449,10 @@ fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] a
         .into_context();
     assert_eq!(context.reported_problem_count(), 0);
     let sql = format!("INSERT INTO items(id) VALUES(1) ON CONFLICT {target} DO NOTHING");
-    let statement = crate::parse_statements(&sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap();
+    let statement = parse_statements(&sql, dialect).next().unwrap().unwrap();
     let result = statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut test_helpers_create_cache_context())
         .unwrap();
     assert_eq!(
         context.reported_problem_count() == 0,
@@ -566,7 +560,7 @@ fn binds_conflict_modifier_through_context(
         }
     }
     let json = ::serde_json::to_string(statement.as_insert().unwrap()).unwrap();
-    let roundtrip: crate::sem::InsertStatement = ::serde_json::from_str(&json).unwrap();
+    let roundtrip: InsertStatement = ::serde_json::from_str(&json).unwrap();
     assert_eq!(roundtrip.conflicts()[0].modifiers(), conflict.modifiers());
 }
 
@@ -622,7 +616,7 @@ fn preserves_modifier_positions_and_looks_up_both_names() {
             "public", "both",
         ))],
     );
-    let result = crate::parse_statements(
+    let result = parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT(id, label COLLATE "C" text_ops) DO NOTHING"#,
         dialect,
     )
@@ -630,10 +624,7 @@ fn preserves_modifier_positions_and_looks_up_both_names() {
     .unwrap()
     .unwrap()
     .node
-    .resolve(
-        &mut context,
-        &mut crate::test_helpers::create_cache_context(),
-    )
+    .resolve(&mut context, &mut test_helpers_create_cache_context())
     .unwrap();
     assert_eq!(context.reported_problem_count(), 0);
     assert_eq!(
@@ -655,10 +646,10 @@ fn retains_failed_inner_collation_even_when_outer_collation_is_bound() {
     context.set_collation_lookup(&outer, &outer_lookup);
     // Any attempt to infer an arbiter from these failed bindings is a bug.
     context.expect_conflict_modifiers(&[], &[]);
-    let result = crate::parse_statements(
+    let result = parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT ((label COLLATE absent579) COLLATE "C") DO NOTHING"#,
         dialect,
-    ).next().unwrap().unwrap().node.resolve(&mut context, &mut crate::test_helpers::create_cache_context()).unwrap();
+    ).next().unwrap().unwrap().node.resolve(&mut context, &mut test_helpers_create_cache_context()).unwrap();
     let conflict = &result.as_insert().unwrap().conflicts()[0];
     assert_eq!(
         conflict.modifiers()[0].collation_references(),
@@ -702,19 +693,19 @@ fn resolved_modifier_does_not_guarantee_an_eligible_arbiter() {
 #[case::unique("UNIQUE", crate::sem::InsertConstraintKind::Unique)]
 fn resolves_named_constraint_identity(
     #[case] kind: &str,
-    #[case] expected: crate::sem::InsertConstraintKind,
+    #[case] expected: SemInsertConstraintKind,
 ) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = test_helpers_create_cache_context();
     let dialect = Dialect::postgres();
     let ddl = format!("CREATE TABLE keyed(id int4, CONSTRAINT key473 {kind}(id))");
-    let mut context = crate::parse_statements(&ddl, dialect)
+    let mut context = parse_statements(&ddl, dialect)
         .next()
         .unwrap()
         .unwrap()
         .analyze(test_helpers::catalog(dialect), &mut cache_context)
         .unwrap()
         .into_context();
-    let statement = crate::parse_statements(
+    let statement = parse_statements(
         "INSERT INTO keyed VALUES(1) ON CONFLICT ON CONSTRAINT key473 DO NOTHING",
         dialect,
     )
@@ -723,10 +714,7 @@ fn resolves_named_constraint_identity(
     .unwrap();
     let result = statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut test_helpers_create_cache_context())
         .unwrap();
     assert_eq!(
         context.reported_problem_count(),
@@ -741,15 +729,12 @@ fn resolves_named_constraint_identity(
     assert_eq!(lookup.kind(), expected);
     assert_eq!(lookup.name(), "key473");
     assert_eq!(lookup.table().to_string(), "public.keyed");
-    let returning = crate::parse_statements("INSERT INTO keyed VALUES(2) RETURNING id", dialect)
+    let returning = parse_statements("INSERT INTO keyed VALUES(2) RETURNING id", dialect)
         .next()
         .unwrap()
         .unwrap()
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut test_helpers_create_cache_context())
         .unwrap();
     let nullability = returning
         .as_insert()
@@ -786,9 +771,9 @@ fn retains_failed_constraint_lookup_and_structured_problem() {
 
 #[test]
 fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = test_helpers_create_cache_context();
     let dialect = Dialect::postgres();
-    let mut context = crate::parse_statements(
+    let mut context = parse_statements(
         "CREATE TABLE keyed(id int4, label text, UNIQUE(id), UNIQUE(label))",
         dialect,
     )
@@ -798,7 +783,7 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
     .analyze(test_helpers::catalog(dialect), &mut cache_context)
     .unwrap()
     .into_context();
-    let statement = crate::parse_statements(
+    let statement = parse_statements(
         "INSERT INTO keyed VALUES(1,'x') ON CONFLICT(label) DO NOTHING",
         dialect,
     )
@@ -807,10 +792,7 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
     .unwrap();
     let result = statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut test_helpers_create_cache_context())
         .unwrap();
     assert_eq!(
         context.reported_problem_count(),
@@ -830,12 +812,22 @@ fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::test_helpers::{TestParseContext, source_span};
     use crate::{
+        names::{FullName as NamesFullName, TableName},
+        parse_statements,
+        sem::{
+            CatalogNameLookup as SemCatalogNameLookup, ColumnConstraint, IdentityColumnConstraint,
+            IdentityColumnMode,
+        },
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        ast::Dialect,
         context::MutSourcePathWithSpan,
         names::{ColumnName, SchemaName},
         sem::{ColumnDefinition, PgBuiltInType, SemAst},
+        test_helpers::{TestParseContext, source_span},
     };
 
     pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
@@ -878,13 +870,10 @@ mod test_helpers {
             )],
             &source_span(),
         );
-        let identity = crate::sem::IdentityColumnConstraint::new(
-            &crate::names::TableName::from(crate::names::FullName::with_schema(
-                "public",
-                "identity_items",
-            )),
+        let identity = IdentityColumnConstraint::new(
+            &TableName::from(NamesFullName::with_schema("public", "identity_items")),
             &ColumnName::from("id"),
-            crate::sem::IdentityColumnMode::always(),
+            IdentityColumnMode::always(),
         );
         context.setup_table(
             "identity_items",
@@ -892,7 +881,7 @@ mod test_helpers {
                 &Some(ColumnName::from("id")),
                 Some(&PgBuiltInType::int4()),
                 Some(true),
-                &[crate::sem::ColumnConstraint::identity(identity)],
+                &[ColumnConstraint::identity(identity)],
             )],
             &source_span(),
         );
@@ -904,7 +893,7 @@ mod test_helpers {
         requested: &str,
         outcome: &str,
         dialect: Dialect,
-    ) -> (SemAst, TestParseContext, crate::sem::CatalogNameLookup) {
+    ) -> (SemAst, TestParseContext, SemCatalogNameLookup) {
         use crate::{
             names::FullName,
             sem::{CatalogNameLookup, InsertArbiter, InsertInferenceModifiers},
@@ -950,30 +939,21 @@ mod test_helpers {
         };
         context.expect_conflict_modifiers(&[modifier], &arbiters);
         let sql = format!("INSERT INTO items VALUES(1,'x') ON CONFLICT({target}) DO NOTHING");
-        let statement = crate::parse_statements(&sql, dialect)
+        let statement = parse_statements(&sql, dialect)
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .unwrap();
         (statement, context, lookup)
     }
     pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
-        let statement = crate::parse_statements(sql, dialect)
-            .next()
-            .unwrap()
-            .unwrap();
+        let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
         let mut context = catalog(dialect);
         let result = statement
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .expect("semantic analysis");
         (result, context)
     }
@@ -982,7 +962,7 @@ mod test_helpers {
 #[test]
 fn nested_insert_cte_reports_a_query_problem() {
     let mut context = test_helpers::catalog(Dialect::postgres());
-    let statement = crate::parse_statements("SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s", Dialect::postgres()).next().unwrap().unwrap();
+    let statement = parse_statements("SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s", Dialect::postgres()).next().unwrap().unwrap();
     assert!(
         statement
             .node

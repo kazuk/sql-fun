@@ -1,4 +1,5 @@
-use super::Expr;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 
 /// unary expression
 #[derive(Clone, Debug, derive_getters::Getters)]

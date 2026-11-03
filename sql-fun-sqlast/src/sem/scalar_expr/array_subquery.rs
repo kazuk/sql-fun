@@ -1,7 +1,13 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
-    SelectStatement, TypeReference, problem::ArrayProblem,
+use crate::{
+    ast::Dialect,
+    sem::{
+        AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
+        PgBuiltInType, ScalarConstExpr, SelectStatement, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        problem::ArrayProblem,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
 };
 
 /// ARRAY(query) with its analyzed child and array-result domain.
@@ -75,7 +81,7 @@ impl ArraySubqueryExpr {
         Ok(changed)
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -84,10 +90,7 @@ impl ArraySubqueryExpr {
         self.refresh_type();
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.query.visit(visitor)?;
         visitor.array_subquery(self)?;
         Ok(())
@@ -95,7 +98,7 @@ impl ArraySubqueryExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         self.validate_shape(context)?;
@@ -161,17 +164,12 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for UnknownOutpu
     fn leave_query(&mut self) {
         self.depth -= 1;
     }
-    fn output(&mut self, _name: &str, value: &mut crate::sem::SemScalarExpr) {
-        if self.context.dialect() == crate::ast::Dialect::postgres()
+    fn output(&mut self, _name: &str, value: &mut SemScalarExpr) {
+        if self.context.dialect() == Dialect::postgres()
             && self.depth == 1
-            && value
-                .as_const()
-                .is_some_and(crate::sem::ScalarConstExpr::is_null)
+            && value.as_const().is_some_and(ScalarConstExpr::is_null)
         {
-            *value = crate::sem::SemScalarExpr::wrap_implicit_cast(
-                &crate::sem::PgBuiltInType::text(),
-                value,
-            );
+            *value = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::text(), value);
         }
     }
 }

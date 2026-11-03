@@ -10,6 +10,11 @@ mod trigger;
 mod update;
 
 use crate::{
+    CacheContext,
+    sem::{MembershipExpr, SamplingInput, TruthTestExpr, WithTypmod, with_stack},
+};
+
+use crate::{
     StringSpan,
     ast::{
         Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Collate, Dialect, Expr,
@@ -154,8 +159,7 @@ impl Expr {
     ) -> Result<SemScalarExpr, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, scope);
-        let result =
-            context.infer_expression_parameter_types(result, &mut crate::CacheContext::new());
+        let result = context.infer_expression_parameter_types(result, &mut CacheContext::new());
         context.finish_analysis(result)
     }
 
@@ -174,7 +178,7 @@ impl Expr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        crate::sem::with_stack(|| self.resolve_in_body(context, scope))
+        with_stack(|| self.resolve_in_body(context, scope))
     }
 
     #[inline(never)]
@@ -276,7 +280,7 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
         target: Option<&TypeReference>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        crate::sem::with_stack(|| {
+        with_stack(|| {
             if let Self::Array(items) = self {
                 Self::resolve_array(items, context, scope, target)
             } else if let Self::Parenthesized(items) = self
@@ -402,8 +406,7 @@ impl TruthTest {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let argument = self.argument.resolve_scalar_in(context, scope)?;
-        let value =
-            crate::sem::TruthTestExpr::resolve(context, &argument, self.value, self.negated)?;
+        let value = TruthTestExpr::resolve(context, &argument, self.value, self.negated)?;
         Ok(SemScalarExpr::truth_test(&value))
     }
 }
@@ -458,7 +461,7 @@ impl OperatorExpr {
         if let Some(negated) = self.kind.membership_negated(&self.name) {
             let left = left.expect("IN left operand");
             let values = right.expect("IN right operand").into_list_values()?;
-            return Ok(SemScalarExpr::membership(crate::sem::MembershipExpr::list(
+            return Ok(SemScalarExpr::membership(MembershipExpr::list(
                 context, &left, &values, negated,
             )?));
         }
@@ -546,6 +549,8 @@ impl OperatorExpr {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_sqlite_pattern_resolution {
+    use crate::{ast::Dialect, test_helpers::membership::context_for};
+
     use crate::test_helpers::pattern::query;
 
     #[rstest::rstest]
@@ -560,7 +565,7 @@ mod test_sqlite_pattern_resolution {
         let failure = std::panic::catch_unwind(|| {
             let _ = query(
                 &format!("SELECT {value} {negation}{operator} 'a'"),
-                crate::test_helpers::membership::context_for(crate::ast::Dialect::sqlite()),
+                context_for(Dialect::sqlite()),
             );
         })
         .expect_err("deferred semantics must not return success");
@@ -716,9 +721,16 @@ impl OperatorKind {
 
 #[cfg(test)]
 mod test_pattern_resolution {
-    use crate::context::ParseContext;
-    use crate::sem::{PgBuiltInType, SemScalarExpr};
-    use crate::test_helpers::pattern::{context, expression, query};
+    use crate::{
+        sem::TypeReference as SemTypeReference,
+        test_helpers::membership::context as membership_context,
+    };
+
+    use crate::{
+        context::ParseContext,
+        sem::{PgBuiltInType, SemScalarExpr},
+        test_helpers::pattern::{context, expression, query},
+    };
     use std::collections::BTreeMap;
 
     #[rstest::rstest]
@@ -775,7 +787,7 @@ mod test_pattern_resolution {
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         for ty in [
             PgBuiltInType::text(),
-            crate::sem::TypeReference::from_master_type_name("bytea"),
+            SemTypeReference::from_master_type_name("bytea"),
         ] {
             assert!(context.parameter_constraints().allows(&BTreeMap::from([
                 (1, ty.clone()),
@@ -830,7 +842,7 @@ mod test_pattern_resolution {
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         for ty in [
             PgBuiltInType::text(),
-            crate::sem::TypeReference::from_master_type_name("bytea"),
+            SemTypeReference::from_master_type_name("bytea"),
         ] {
             assert!(
                 context
@@ -877,10 +889,7 @@ mod test_pattern_resolution {
 
     #[test]
     fn postgres_missing_pattern_operator_retains_failed_binding() -> testresult::TestResult {
-        let (query, context) = query(
-            "SELECT 'a' LIKE 'a'",
-            crate::test_helpers::membership::context(),
-        )?;
+        let (query, context) = query("SELECT 'a' LIKE 'a'", membership_context())?;
         assert!(
             !expression(&query)
                 .operator_binding()
@@ -993,7 +1002,7 @@ impl Call {
         let modifiers = self.resolve_modifiers(context, argument_scope)?;
         if let Some(capture) = &capture {
             let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
-            crate::sem::SamplingInput::validate_aggregate_placement(context, &placement)?;
+            SamplingInput::validate_aggregate_placement(context, &placement)?;
             scope.grouping_scope().aggregate(owner, levels_up);
         } else if self.over.is_some() {
             scope.grouping_scope().window();
@@ -1134,9 +1143,9 @@ impl Subquery {
                 .expect("IN test operand")
                 .resolve_in(context, scope)?;
             let query = self.query.resolve_in(context, Some(scope))?;
-            return Ok(SemScalarExpr::membership(
-                crate::sem::MembershipExpr::query(context, &test, &query)?,
-            ));
+            return Ok(SemScalarExpr::membership(MembershipExpr::query(
+                context, &test, &query,
+            )?));
         }
         let query = self.query.resolve_in(context, Some(scope))?;
         self.kind.resolve(context, &query)
@@ -1340,9 +1349,8 @@ impl TypeName {
     pub(in crate::ast) fn declaration_type(
         &self,
         resolved: Option<&TypeReference>,
-    ) -> Result<crate::sem::WithTypmod<TypeReference>, AnalysisError> {
-        let mut declaration =
-            crate::sem::WithTypmod::new(&self.reference()?, &self.modifier_arguments()?);
+    ) -> Result<WithTypmod<TypeReference>, AnalysisError> {
+        let mut declaration = WithTypmod::new(&self.reference()?, &self.modifier_arguments()?);
         if let Some(resolved) = resolved {
             declaration.interpret_postgres(resolved);
         }

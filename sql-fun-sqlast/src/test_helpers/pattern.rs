@@ -1,14 +1,15 @@
-use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
-use crate::test_helpers::TestParseContext;
+pub(crate) use crate::test_helpers::membership::{expression, query};
+
 use crate::{
+    context::{BaseParseContext, ParseContext, SchemaFileContext},
     names::{FullName, OperatorName, SchemaName},
     sem::{
         BinaryOperatorDefinition, FunctionOverloadCollection, FunctionParam, OperatorDefinition,
         OverloadVariant, PgBuiltInType, TypeCategory, TypeDefinition,
+        TypeReference as SemTypeReference,
     },
+    test_helpers::TestParseContext,
 };
-
-pub(crate) use crate::test_helpers::membership::{expression, query};
 
 /// A finite pattern catalog for binding and correlated parameter contracts.
 /// Actual builtin completeness is covered by the maintained CLI fixtures.
@@ -17,10 +18,7 @@ pub(crate) fn context() -> SchemaFileContext {
     base.set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
     for (ty, category) in [
         (PgBuiltInType::text(), 'S'),
-        (
-            crate::sem::TypeReference::from_master_type_name("bytea"),
-            'U',
-        ),
+        (SemTypeReference::from_master_type_name("bytea"), 'U'),
         (PgBuiltInType::int4(), 'N'),
         (PgBuiltInType::bool(), 'B'),
     ] {
@@ -43,8 +41,8 @@ pub(crate) fn context() -> SchemaFileContext {
         )];
         if matches!(name, "~~" | "!~~") {
             signatures.push(BinaryOperatorDefinition::new(
-                &crate::sem::TypeReference::from_master_type_name("bytea"),
-                &crate::sem::TypeReference::from_master_type_name("bytea"),
+                &SemTypeReference::from_master_type_name("bytea"),
+                &SemTypeReference::from_master_type_name("bytea"),
                 &PgBuiltInType::bool(),
                 true,
             ));
@@ -88,7 +86,7 @@ pub(crate) fn context() -> SchemaFileContext {
     )
 }
 
-fn helper_signature(ty: &crate::sem::TypeReference, count: usize) -> OverloadVariant {
+fn helper_signature(ty: &SemTypeReference, count: usize) -> OverloadVariant {
     OverloadVariant::new(
         &Some(ty.clone()),
         &vec![FunctionParam::new_input_param(&None, &Some(ty.clone()), &None); count],

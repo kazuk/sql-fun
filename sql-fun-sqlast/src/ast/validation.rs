@@ -1,5 +1,7 @@
 //! Walk every query-bearing edge when a statement becomes a nested CTE body.
 
+use crate::sem::with_stack as sem_with_stack;
+
 use crate::ast::{
     Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte, CteBody,
     Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FromGroup, FromItem, Grouping, InTable,
@@ -129,7 +131,7 @@ impl ContainsInvalidCteClause for QueryBody {
 
 impl ContainsInvalidCteClause for Expr {
     fn contains_invalid_cte_clause(&self) -> bool {
-        crate::sem::with_stack(|| self.walk_invalid_cte_clause())
+        sem_with_stack(|| self.walk_invalid_cte_clause())
     }
 }
 
@@ -169,8 +171,10 @@ impl Expr {
 
 #[cfg(test)]
 mod test_expression_placement {
-    use crate::ast::{CteDefinition, Dialect};
-    use crate::parse_statements;
+    use crate::{
+        ast::{CteDefinition, Dialect},
+        parse_statements,
+    };
 
     #[rstest::rstest]
     #[case::array(
@@ -193,7 +197,7 @@ mod test_expression_placement {
 
 impl ContainsInvalidCteClause for FromItem {
     fn contains_invalid_cte_clause(&self) -> bool {
-        crate::sem::with_stack(|| self.walk_invalid_cte_clause())
+        sem_with_stack(|| self.walk_invalid_cte_clause())
     }
 }
 
@@ -214,7 +218,7 @@ impl FromItem {
 
 impl ContainsInvalidCteClause for Grouping {
     fn contains_invalid_cte_clause(&self) -> bool {
-        crate::sem::with_stack(|| match self {
+        sem_with_stack(|| match self {
             Self::Expression(node) => node.contains_invalid_cte_clause(),
             Self::Empty => false,
             Self::Rollup(nodes) | Self::Cube(nodes) | Self::Sets(nodes) | Self::Simple(nodes) => {

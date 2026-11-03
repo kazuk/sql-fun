@@ -154,6 +154,15 @@ fn attached_schema_order_matches_bundled_sqlite(
 
 mod test_helpers {
     use crate::{
+        AstAndContextPair,
+        ast::{Dialect, Statement},
+        context::MutSourcePathWithSpan,
+        parse_statements,
+        sem::AnalysisError,
+        test_helpers::{create_cache_context, source_span},
+    };
+
+    use crate::{
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
         names::{FullName, TableName, ViewName},
         sem::TriggerIdentity,
@@ -172,8 +181,8 @@ mod test_helpers {
             base.metadata(),
         )
     }
-    pub(super) fn statement(sql: &str) -> crate::ast::Statement {
-        crate::parse_statements(sql, crate::ast::Dialect::sqlite())
+    pub(super) fn statement(sql: &str) -> Statement {
+        parse_statements(sql, Dialect::sqlite())
             .next()
             .unwrap()
             .expect("valid test SQL")
@@ -181,12 +190,9 @@ mod test_helpers {
     pub(super) fn apply(
         mut context: SchemaFileContext,
         sql: &str,
-    ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
-        let mut cache_context = crate::test_helpers::create_cache_context();
-        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
-            &mut context,
-            &crate::test_helpers::source_span(),
-        );
+    ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
+        let mut cache_context = create_cache_context();
+        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
         statement(sql).analyze(context, &mut cache_context)
     }
     pub(super) fn table_trigger_count(context: &FrozenBaseContext, schema: &str) -> usize {
@@ -209,10 +215,12 @@ mod test_helpers {
             .len()
     }
     pub(super) mod heavy {
-        use crate::context::{BaseContext, ParseContext};
-        use {
-            super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply, layer},
-            crate::names::SchemaName,
+        use crate::{
+            ast::resolve::drop_trigger::tests::sqlite::test_helpers::{
+                CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply, layer,
+            },
+            context::{BaseContext, ParseContext},
+            names::SchemaName,
         };
 
         /// Reload the maintained catalog and analyze the test schema on each call.

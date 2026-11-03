@@ -1,3 +1,5 @@
+use crate::test_helpers::cli_executable;
+
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -19,7 +21,7 @@ impl InitializedProject {
         self.directory.path().join("home")
     }
     pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(super::cli_executable());
+        let mut command = Command::new(cli_executable());
         let bin = theme_downloader(self.directory.path());
         let source = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()

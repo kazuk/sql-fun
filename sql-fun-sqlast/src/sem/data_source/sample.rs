@@ -1,8 +1,10 @@
 use crate::{
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, DataSource, ParseContext, SamplingMethodLookup,
-        SemScalarExpr, TypeReference, problem::TableSampleProblem, traversal::SemanticVisitorMut,
+        AnalysisError, AnalysisProblem, DataSource, MinMaxExpr, ParseContext, SamplingMethodLookup,
+        SemScalarExpr, TypeReference,
+        problem::TableSampleProblem,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -36,7 +38,7 @@ impl TableSampleSource {
             repeatable: repeatable.as_ref().map(|value| {
                 SamplingInput::new(
                     value,
-                    Some(&crate::sem::TypeReference::from_master_type_name("float8")),
+                    Some(&TypeReference::from_master_type_name("float8")),
                     true,
                 )
             }),
@@ -94,10 +96,7 @@ impl TableSampleSource {
         }
         visitor.table_sample(self)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.source.visit(visitor)?;
         for argument in &self.arguments {
             argument.visit(visitor)?;
@@ -111,10 +110,16 @@ impl TableSampleSource {
 
 #[cfg(test)]
 mod test_sampling_semantics {
-    use crate::test_helpers::sampling::{context, query, sources};
+    use crate::{
+        names::SchemaName,
+        sem::{SamplingMethod, data_source::sample::TableSampleSource},
+        test_helpers::sampling::with_views,
+    };
+
     use crate::{
         names::FullName,
         sem::{ParseContext, PgBuiltInType, SamplingMethodLookup},
+        test_helpers::sampling::{context, query, sources},
     };
     use std::collections::BTreeMap;
 
@@ -164,7 +169,7 @@ mod test_sampling_semantics {
             &Some(PgBuiltInType::text())
         );
         let encoded = ::serde_json::to_string(sample)?;
-        let restored: super::TableSampleSource = ::serde_json::from_str(&encoded)?;
+        let restored: TableSampleSource = ::serde_json::from_str(&encoded)?;
         assert_eq!(sample, &restored);
         Ok(())
     }
@@ -296,7 +301,7 @@ mod test_sampling_semantics {
     #[case::ordinary("ordinary507", false)]
     #[case::materialized("materialized507", true)]
     fn validates_relation_kind(#[case] name: &str, #[case] valid: bool) -> testresult::TestResult {
-        let mut context = crate::test_helpers::sampling::with_views(context());
+        let mut context = with_views(context());
         let analyzed = query(
             &format!("SELECT * FROM {name} TABLESAMPLE system(1)"),
             &mut context,
@@ -397,7 +402,7 @@ mod test_sampling_semantics {
     fn lookup_obeys_search_path_and_explicit_qualification() -> testresult::TestResult {
         let mut context = context();
         let public = FullName::with_schema("public", "system");
-        let method = crate::sem::SamplingMethod::new(&public, &[PgBuiltInType::text()], false);
+        let method = SamplingMethod::new(&public, &[PgBuiltInType::text()], false);
         context.set_sampling_method(&public, &SamplingMethodLookup::found(&method));
         let implicit = query("SELECT * FROM sampled TABLESAMPLE system(1)", &mut context)?;
         assert_eq!(
@@ -405,8 +410,8 @@ mod test_sampling_semantics {
             &FullName::with_schema("pg_catalog", "system")
         );
         context.set_get_search_path_result(&[
-            crate::names::SchemaName::from("public"),
-            crate::names::SchemaName::from("pg_catalog"),
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
         ]);
         let selected = query(
             "SELECT * FROM sampled TABLESAMPLE system('x')",
@@ -617,13 +622,13 @@ impl SamplingInput {
         let Some(target) = &self.target else {
             return Ok(());
         };
-        let Some(source) = crate::sem::MinMaxExpr::input_type(&self.expression) else {
+        let Some(source) = MinMaxExpr::input_type(&self.expression) else {
             return Ok(());
         };
         if self.checked_type.as_ref() == Some(&source) {
             return Ok(());
         }
-        let valid = source == crate::sem::MinMaxExpr::unknown()
+        let valid = source == MinMaxExpr::unknown()
             || source == *target
             || source.assignment_match_context(target, context).is_some();
         self.checked_type = Some(source.clone());
@@ -653,10 +658,7 @@ impl SamplingInput {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.expression.visit(visitor)?;
         if let Some(target) = &self.target {
             visitor.sampling_input(&self.expression, target);

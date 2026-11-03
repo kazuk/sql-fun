@@ -17,6 +17,11 @@ mod rust_syn;
 #[cfg(test)]
 pub mod test_helpers;
 
+pub use self::{
+    error::SqlFunCodegenError,
+    query_requirements::{QueryRequirement, QueryRequirements},
+};
+
 use crate::{
     connectors::ConnectorSpec,
     cte_catalog::{CteCatalogSupport, CteReferenceCollection},
@@ -29,9 +34,6 @@ use self::{
     lockfile::LockfileProvider,
     rust_syn::{FunctionArg, ItemFunction, ParameterBindings},
 };
-
-pub use self::error::SqlFunCodegenError;
-pub use self::query_requirements::{QueryRequirement, QueryRequirements};
 
 use std::{collections::VecDeque, sync::Arc};
 
@@ -162,7 +164,7 @@ impl syn::parse::Parse for SqlQueryOptions {
 
 #[cfg(test)]
 mod test_codegen_overrides {
-    use super::SqlQueryOptions;
+    use crate::SqlQueryOptions;
     use ::sql_fun_core::CodegenOptions;
 
     fn resolve(metadata: &CodegenOptions, attrs: &str) -> CodegenOptions {
@@ -684,9 +686,10 @@ impl CteCatalogSupport for QueryFunctionForGenerate {}
 
 #[cfg(test)]
 mod test_codegen_propagation {
-    use ::sql_fun_core::CodegenOptions;
 
     mod test_helpers {
+        use crate::InnerFunction;
+
         use crate::{
             ConditionalQuery, FragmentExpandQueueItem, QueryFunctionForGenerate, QueryFunctionKind,
             ResultType, connectors::ConnectorSpec, cte_catalog::CteCatalogSupport,
@@ -694,7 +697,7 @@ mod test_codegen_propagation {
         };
         use ::sql_fun_core::{CodegenOptions, PlaceholderedSql, SqlFunMetadata};
 
-        pub(super) fn conditional_query(options: &CodegenOptions) -> Vec<crate::InnerFunction> {
+        pub(super) fn conditional_query(options: &CodegenOptions) -> Vec<InnerFunction> {
             let metadata: SqlFunMetadata = toml::from_str(
                 r#"engine = "PostgreSQL"
 dialect = "postgres"
@@ -731,6 +734,8 @@ connector = "tokio-postgres""#,
             QueryFunctionForGenerate::expand_conditional_query(&metadata, item).unwrap()
         }
     }
+
+    use ::sql_fun_core::CodegenOptions;
 
     #[test]
     fn conditional_children_keep_resolved_options_in_check_mode() {

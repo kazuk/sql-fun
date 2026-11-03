@@ -1,4 +1,4 @@
-use super::{
+use crate::analysis_problem::{
     AnalysisProblem, ArgumentBindingCollection, DiagnosticMessage, FullName, OperatorDefinition,
     TypeReference,
 };

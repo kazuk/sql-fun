@@ -4,6 +4,8 @@ mod lockfiles;
 mod progress;
 mod submission;
 
+use crate::{api::ApiArgs, diagnostic::DiagnosticRenderer};
+
 use self::progress::{Progress, ProgressMode};
 
 use std::{
@@ -180,7 +182,7 @@ impl CheckArgs {
             self.force_rebuild,
             self.expect_schema_dump_valid,
         )?;
-        let client = crate::api::ApiArgs::from_environment()?.connect().await?;
+        let client = ApiArgs::from_environment()?.connect().await?;
         self.process_analyses(client, common_args, requirements, lockfiles, progress)
             .await
     }
@@ -220,7 +222,7 @@ impl CheckArgs {
             self.force_rebuild,
             self.expect_schema_dump_valid,
         )?;
-        let renderer = crate::diagnostic::DiagnosticRenderer::from_args(args)?;
+        let renderer = DiagnosticRenderer::from_args(args)?;
         let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
         let producer = async {
             let submitted = submission::submit(&mut client, args, requirements, sender).await;
@@ -259,7 +261,7 @@ impl CheckArgs {
 
     async fn consume_analyses<W: std::io::Write, D: std::io::Write>(
         receiver: &mut ::tokio::sync::mpsc::Receiver<submission::QueryAnalysis>,
-        renderer: &crate::diagnostic::DiagnosticRenderer,
+        renderer: &DiagnosticRenderer,
         progress: &mut Progress<W>,
         diagnostics_output: &mut D,
         lockfiles: &mut lockfiles::Lockfiles,
@@ -388,7 +390,7 @@ impl CheckArgs {
 
 #[cfg(test)]
 mod test_check_args {
-    use super::CheckArgs;
+    use crate::check::CheckArgs;
     use ::clap::Parser;
 
     #[test]
@@ -465,7 +467,7 @@ impl CargoExpand {
 
 #[cfg(test)]
 mod test_cargo_expand {
-    use super::CargoExpand;
+    use crate::check::CargoExpand;
     use ::sql_fun_core::SqlFunArgs;
 
     #[rstest::rstest]

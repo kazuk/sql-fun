@@ -57,7 +57,7 @@ pub(super) fn default_version(
 
 #[cfg(test)]
 mod test_default_version {
-    use super::default_version;
+    use crate::extensions::control_file::default_version;
     use std::path::Path;
 
     #[test]
@@ -393,7 +393,7 @@ impl<'a> ControlLine<'a> {
 
 #[cfg(test)]
 mod test_control_line {
-    use super::ControlLine;
+    use crate::extensions::control_file::ControlLine;
     #[test]
     fn deescapes_postgres_strings() {
         let input = r"default_version='a''b\'c\141\q\t\b\f\n\r\\'";

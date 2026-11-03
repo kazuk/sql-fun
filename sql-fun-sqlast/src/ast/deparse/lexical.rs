@@ -1,7 +1,7 @@
-use super::{DeparseError, SqlEmit, SqlWriter};
 use crate::ast::{
     Dialect, Expr, Literal, Name, OperatorKind, Parameter, SqliteTypeModifier, SqliteTypeModifiers,
     SqliteTypeNamePart, SqliteTypeNameTrivia, TypeName,
+    deparse::{DeparseError, SqlEmit, SqlWriter},
 };
 
 impl SqlEmit for Name {
@@ -708,21 +708,25 @@ fn emit_sqlite_type_modifiers(
 
 #[cfg(test)]
 mod test_lexical_emit {
-    use super::{Name, Parameter, SqlEmit, SqlWriter, TypeName};
+    #[cfg(feature = "sqlite")]
+    use crate::ast::Statement;
+    use crate::{ast::deparse::lexical::DeparseError, parse_statements};
+
     use crate::ast::{
         Dialect, Expr, Literal, SqliteTypeModifier, SqliteTypeModifiers, SqliteTypeNamePart,
         SqliteTypeNameTrivia,
+        deparse::lexical::{Name, Parameter, SqlEmit, SqlWriter, TypeName},
     };
 
     #[cfg(feature = "sqlite")]
-    fn sqlite_statement(sql: &str) -> crate::ast::Statement {
-        crate::parse_statements(sql, Dialect::sqlite())
+    fn sqlite_statement(sql: &str) -> Statement {
+        parse_statements(sql, Dialect::sqlite())
             .next()
             .expect("one statement")
             .expect(sql)
     }
 
-    fn render<T: SqlEmit>(value: &T, dialect: Dialect) -> Result<String, super::DeparseError> {
+    fn render<T: SqlEmit>(value: &T, dialect: Dialect) -> Result<String, DeparseError> {
         let mut writer = SqlWriter::new(dialect);
         value.emit(&mut writer)?;
         Ok(writer.sql)
@@ -844,13 +848,13 @@ mod test_lexical_emit {
     #[case("SELECT 2 - -1.25")]
     #[case("SELECT CAST(-1.25 AS numeric)")]
     fn postgres_signed_float_expressions_reparse_stably(#[case] sql: &str) {
-        let first = crate::parse_statements(sql, Dialect::postgres())
+        let first = parse_statements(sql, Dialect::postgres())
             .next()
             .expect("one statement")
             .expect(sql)
             .deparse_sql(Dialect::postgres())
             .unwrap();
-        let second = crate::parse_statements(&first, Dialect::postgres())
+        let second = parse_statements(&first, Dialect::postgres())
             .next()
             .expect("one statement after deparse")
             .expect(&first)

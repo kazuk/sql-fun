@@ -72,7 +72,7 @@ impl CodegenOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{BuilderSetter, CodegenOptions};
+    use crate::codegen_options::{BuilderSetter, CodegenOptions};
 
     #[test]
     fn defaults_preserve_existing_contract() {

@@ -2,10 +2,10 @@ use crate::{
     AstAndContextPair,
     ast::Dialect,
     context::{BaseParseContext, SchemaFileContext},
-    names::SchemaName,
+    names::{FullName, SchemaName},
     parse_statements,
     sem::{CastContext, CastDefinition, ParseContext, TypeReference},
-    test_helpers::TestParseContext,
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 // Small explicit type/cast universe. No builtin metadata is loaded.
@@ -66,9 +66,8 @@ fn context() -> SchemaFileContext {
     for ty in [
         TypeReference::from_master_type_name("int4").array_type(),
         TypeReference::from_master_type_name("int2").array_type(),
-        TypeReference::from_full_name(crate::names::FullName::with_schema("public", "control")),
-        TypeReference::from_full_name(crate::names::FullName::with_schema("public", "control"))
-            .array_type(),
+        TypeReference::from_full_name(FullName::with_schema("public", "control")),
+        TypeReference::from_full_name(FullName::with_schema("public", "control")).array_type(),
     ] {
         base.set_get_implicit_cast_result(
             &ty,
@@ -102,7 +101,7 @@ pub(super) fn analyze(
     concrete_parameters: &str,
     reversed: bool,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context();
     let polymorphic = format!(
         "CREATE FUNCTION f({polymorphic_parameters}) RETURNS text LANGUAGE sql AS 'SELECT NULL::text'"
@@ -138,7 +137,7 @@ pub(super) fn analyze_vector(
     parameters: &str,
     result: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context();
     let definition =
         format!("CREATE FUNCTION vf({parameters}) RETURNS {result} LANGUAGE sql AS ''");
@@ -158,7 +157,7 @@ pub(super) fn analyze_vector(
 pub(super) fn analyze_variadic_any(
     query: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context();
     for statement in parse_statements(
         r#"CREATE FUNCTION format(text) RETURNS text LANGUAGE internal AS 'text_format';

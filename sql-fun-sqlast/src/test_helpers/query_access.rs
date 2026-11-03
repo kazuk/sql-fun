@@ -1,14 +1,20 @@
 //! Small access-analysis fixture; no builtin loading or external services.
+
 use crate::{
+    AstAndContextPair,
     ast::Dialect,
-    names::ColumnName,
-    sem::{ColumnDefinition, PgBuiltInType, QueryAccess},
+    names::{ColumnName, FullName, SchemaName},
+    parse_statements,
+    sem::{
+        ColumnDefinition, CreateTableAs, CreateView, OverloadVariant, PgBuiltInType, QueryAccess,
+        SemAst, ViewLike,
+    },
     test_helpers::{TestParseContext, create_cache_context, source_span},
 };
 
 pub(crate) fn context() -> TestParseContext {
     let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
-    context.set_get_search_path_result(&[crate::names::SchemaName::from("public")]);
+    context.set_get_search_path_result(&[SchemaName::from("public")]);
     context.setup_type(PgBuiltInType::int4());
     context.setup_type(PgBuiltInType::bool());
     for name in ["a", "b"] {
@@ -54,8 +60,8 @@ fn analyze_pair(
     sql: &str,
     context: TestParseContext,
     dialect: Dialect,
-) -> crate::AstAndContextPair<TestParseContext> {
-    crate::parse_statements(sql, dialect)
+) -> AstAndContextPair<TestParseContext> {
+    parse_statements(sql, dialect)
         .next()
         .unwrap()
         .unwrap()
@@ -87,7 +93,7 @@ pub(crate) fn analyze_diagnosed(sql: &str) -> (QueryAccess, Vec<String>) {
 
 pub(crate) fn object_context() -> TestParseContext {
     let mut context = context();
-    let statement = crate::parse_statements("SELECT id FROM a", Dialect::postgres())
+    let statement = parse_statements("SELECT id FROM a", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
@@ -96,15 +102,13 @@ pub(crate) fn object_context() -> TestParseContext {
         .unwrap();
     let query = pair.ast().select_statement().unwrap().clone();
     context = pair.into_context();
-    let name = crate::names::FullName::with_schema("public", "v");
-    let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
-    context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
-    let name = crate::names::FullName::with_schema("public", "m");
-    let materialized =
-        crate::sem::CreateTableAs::new(&name, &crate::sem::SemAst::select(&query), true);
-    context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&materialized)));
-    let function =
-        crate::sem::OverloadVariant::new(&Some(PgBuiltInType::int4()), &vec![], false, false);
+    let name = FullName::with_schema("public", "v");
+    let view = CreateView::new(&name, &query, &[], &None, false);
+    context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
+    let name = FullName::with_schema("public", "m");
+    let materialized = CreateTableAs::new(&name, &SemAst::select(&query), true);
+    context.set_get_view_impl_result(&name, &Some(ViewLike::from(&materialized)));
+    let function = OverloadVariant::new(&Some(PgBuiltInType::int4()), &vec![], false, false);
     let name = context.setup_function("f", std::slice::from_ref(&function));
     context.set_function_returns_set(&name, &function, true);
     context

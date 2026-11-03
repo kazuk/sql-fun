@@ -1,13 +1,17 @@
 use crate::{
+    ast::CompositeType,
     context::ParseContext,
-    names::ColumnName,
-    sem::{AstAndContextPair, ColumnDefinition, Nullable},
-    syn::{ColumnDef, Opt},
+    names::{ColumnName, TableName},
+    sem::{
+        AstAndContextPair, CatalogNameLookup, ColumnDefinition, DeclarationCollation, Nullable,
+        OwnerSpecification, WithTypmod,
+    },
+    syn::{ColumnDef, CompositeTypeStmt, Opt},
 };
 
-use {
-    super::{AnalysisError, ColumnCollection, TypeReference},
-    crate::names::FullName,
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ColumnCollection, TypeReference},
 };
 
 /// collection for composite type field
@@ -15,11 +19,7 @@ use {
 pub struct CompositeFieldCollection(Vec<CompositeFieldDefinition>);
 
 impl CompositeFieldCollection {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         for field in &mut self.0 {
             if let Some(ty) = &mut field.field_type {
                 ty.rename_relation(old, new);
@@ -63,7 +63,7 @@ impl CompositeFieldCollection {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateCompositeType {
     #[serde(skip)]
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     type_ref: Option<TypeReference>,
     fields: CompositeFieldCollection,
 }
@@ -73,22 +73,18 @@ impl CreateCompositeType {
         self.fields.declarations_can_apply()
     }
 
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.fields.rename_relation(old, new);
     }
 
     /// Retained ownership; None means no ownership information was supplied.
     /// Ownership is catalog state: it is omitted from the existing serialized
     /// type format and does not affect SQL type equality or hashing.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -147,13 +143,13 @@ impl CreateCompositeType {
     pub fn analyze_create_comp_type<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::CompositeTypeStmt,
+        syn: CompositeTypeStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
         use crate::ast::TryFromWithTokens;
-        crate::ast::CompositeType::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
+        CompositeType::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
             .resolve_and_apply(context)
     }
 }
@@ -163,34 +159,34 @@ pub struct CompositeFieldDefinition {
     name: String,
     field_type: Option<TypeReference>,
     #[serde(default)]
-    declaration_collation: crate::sem::DeclarationCollation,
+    declaration_collation: DeclarationCollation,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    requested_type: Option<Box<crate::sem::WithTypmod<TypeReference>>>,
+    requested_type: Option<Box<WithTypmod<TypeReference>>>,
     is_not_null: Option<Nullable>,
 }
 
 impl CompositeFieldDefinition {
     /// Requested declaration type and modifiers, separate from canonical identity.
-    pub fn requested_type(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+    pub fn requested_type(&self) -> Option<&WithTypmod<TypeReference>> {
         self.requested_type.as_deref()
     }
 
-    pub(crate) fn retain_requested_type(&mut self, value: &crate::sem::WithTypmod<TypeReference>) {
+    pub(crate) fn retain_requested_type(&mut self, value: &WithTypmod<TypeReference>) {
         self.requested_type = Some(Box::new(value.clone()));
     }
 
     /// Completed explicit field collation validation.
-    pub const fn declaration_collation(&self) -> &crate::sem::DeclarationCollation {
+    pub const fn declaration_collation(&self) -> &DeclarationCollation {
         &self.declaration_collation
     }
 
     pub(crate) fn validate_collation(
         &mut self,
         context: &mut impl ParseContext,
-        lookup: Option<&crate::sem::CatalogNameLookup>,
+        lookup: Option<&CatalogNameLookup>,
     ) -> Result<(), AnalysisError> {
         self.declaration_collation =
-            crate::sem::DeclarationCollation::validate(context, self.field_type.as_ref(), lookup);
+            DeclarationCollation::validate(context, self.field_type.as_ref(), lookup);
         self.declaration_collation
             .report(context, self.field_type.as_ref())
     }
@@ -207,7 +203,7 @@ impl CompositeFieldDefinition {
         Self {
             name: name.to_string(),
             field_type: field_type.clone(),
-            declaration_collation: crate::sem::DeclarationCollation::default(),
+            declaration_collation: DeclarationCollation::default(),
             requested_type: None,
             is_not_null: *is_not_null,
         }
@@ -236,7 +232,7 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
         Ok(Self {
             name,
             field_type: Some(type_ref),
-            declaration_collation: crate::sem::DeclarationCollation::default(),
+            declaration_collation: DeclarationCollation::default(),
             requested_type: None,
             is_not_null: Some(value.get_is_not_null()),
         })

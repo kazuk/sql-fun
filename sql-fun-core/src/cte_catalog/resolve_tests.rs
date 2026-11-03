@@ -1,9 +1,5 @@
-use crate::test_helpers::{TestProjectDir, write_cte_catalog_toml};
-use crate::{CteAlias, CteCatalog, CteCatalogError, CteCatalogReference, CteName, SqlDialect};
-use ::testresult::TestResult;
-
 mod test_helpers {
-    use super::{CteCatalog, TestProjectDir, write_cte_catalog_toml};
+    use crate::cte_catalog::resolve_tests::{CteCatalog, TestProjectDir, write_cte_catalog_toml};
 
     pub(super) fn catalog<'a>(
         project: &TestProjectDir,
@@ -33,6 +29,12 @@ with = [{cte_name = "other", alias = "shared"}]
         Ok(catalog)
     }
 }
+
+use crate::{
+    CteAlias, CteCatalog, CteCatalogError, CteCatalogReference, CteName, SqlDialect,
+    test_helpers::{TestProjectDir, write_cte_catalog_toml},
+};
+use ::testresult::TestResult;
 
 #[rstest::rstest]
 #[case::diamond(&[("left", "left"), ("right", "right")], &["shared", "left", "right"])]

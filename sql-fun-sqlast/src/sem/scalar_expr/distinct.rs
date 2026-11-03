@@ -1,11 +1,14 @@
-use crate::ast::Dialect;
-use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::{
+    ast::Dialect,
     names::OperatorName,
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr,
         ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr,
-        TypeReference, problem::DistinctProblem,
+        TypeReference,
+        parameter_resolution::ParameterResolution,
+        problem::DistinctProblem,
+        scalar_expr::{ScalarConstExpr, SemScalarExprNode},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -39,7 +42,7 @@ struct DeferredEquality {
 impl DeferredEquality {
     fn infer(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut operands = self.operands.clone();
@@ -98,7 +101,7 @@ impl DistinctComparison {
     }
     fn infer(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if let Self::Deferred(value) = self {
@@ -139,10 +142,7 @@ impl DistinctComparison {
         }
     }
 
-    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Equality(value) => value.walk(visitor),
             Self::Deferred(value) => {
@@ -159,10 +159,7 @@ impl DistinctComparison {
             }
         }
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Equality(value) => value.visit(visitor),
             Self::Deferred(value) => {
@@ -206,10 +203,8 @@ impl DistinctExpr {
             not_null: Some(true),
         };
         result.comparison = if context.dialect() == Dialect::sqlite()
-            || left.as_const().is_some_and(super::ScalarConstExpr::is_null)
-            || right
-                .as_const()
-                .is_some_and(super::ScalarConstExpr::is_null)
+            || left.as_const().is_some_and(ScalarConstExpr::is_null)
+            || right.as_const().is_some_and(ScalarConstExpr::is_null)
         {
             DistinctComparison::operands(left, right)
         } else if left.is_row_constructor() && right.is_row_constructor() {
@@ -312,22 +307,19 @@ impl DistinctExpr {
         &self.types
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.comparison.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.comparison.visit(visitor)
     }
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         self.comparison.infer(parameters, context)?;
@@ -375,7 +367,7 @@ impl super::RowExpr {
     ) -> Result<Option<Vec<SemScalarExpr>>, AnalysisError> {
         if self.0.len() != other.0.len() {
             context.report_analysis_problem(AnalysisProblem::distinct(
-                crate::sem::problem::DistinctProblem::row_arity(self.0.len(), other.0.len()),
+                DistinctProblem::row_arity(self.0.len(), other.0.len()),
             ))?;
             return Ok(None);
         }

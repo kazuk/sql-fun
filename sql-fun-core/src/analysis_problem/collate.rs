@@ -1,4 +1,4 @@
-use super::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
+use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
 
 /// A failed explicit COLLATE binding or type applicability check.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]

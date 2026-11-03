@@ -4,6 +4,7 @@ use crate::{
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, WithClause,
         scalar_expr::ColumnReferenceExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -97,10 +98,10 @@ impl CteDataSource {
 }
 
 impl CteDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         visitor.cte_source(&self.name, &self.alias);
         visitor.relation(
             Some(&self.name),
@@ -109,10 +110,7 @@ impl CteDataSource {
         );
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.cte_source(&self.name, &self.alias);
         visitor.relation(
             Some(&self.name),

@@ -1,9 +1,12 @@
-use crate::ast::{
-    CreateRule, Dialect, Expr, QueryBody, RuleEvent, StatementKind, StatementNode,
-    TryFromWithTokens,
+use crate::{
+    PostgresDialect,
+    ast::{
+        CreateRule, Dialect, Expr, QueryBody, RuleEvent, SetOperation, StatementKind,
+        StatementNode, TryFromWithTokens,
+    },
+    parse_statements, syn,
+    syn::Opt,
 };
-use crate::syn::Opt;
-use crate::{PostgresDialect, parse_statements, syn};
 
 impl StatementNode {
     fn into_test_rule(self) -> CreateRule {
@@ -461,7 +464,7 @@ impl QueryBody {
     }
 }
 
-impl crate::ast::SetOperation {
+impl SetOperation {
     fn assert_test_operation(&self, operation: &str) {
         let name = match self {
             Self::Union => "UNION",

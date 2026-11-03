@@ -1,9 +1,11 @@
 use crate::{
+    AstAndContextPair,
     ast::Dialect,
     context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
     names::SchemaName,
+    parse_statements,
     sem::TypeReference,
-    test_helpers::TestParseContext,
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// A small explicit catalog for parameter typing; no builtin catalog loading.
@@ -32,9 +34,9 @@ pub(super) fn layer(
 pub(super) fn analyze(
     sql: &str,
     context: SchemaFileContext,
-) -> crate::AstAndContextPair<SchemaFileContext> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    crate::parse_statements(sql, context.dialect())
+) -> AstAndContextPair<SchemaFileContext> {
+    let mut cache_context = create_cache_context();
+    parse_statements(sql, context.dialect())
         .next()
         .unwrap()
         .unwrap()

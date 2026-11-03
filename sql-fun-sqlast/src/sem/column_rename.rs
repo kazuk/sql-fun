@@ -1,9 +1,11 @@
 //! Completed column-rename analysis and exact dependency matching.
+
 mod sqlite;
+
 use crate::{
     ast::Dialect,
     context::ParseContext,
-    names::{ColumnName, TableName},
+    names::{ColumnName, FullName, TableName},
     sem::{AnalysisError, AnalysisProblem, ColumnDefinition},
 };
 
@@ -16,7 +18,7 @@ pub struct ColumnRename {
     destination: ColumnName,
     applicable: bool,
     rewrites_outputs: bool,
-    sqlite_outputs: std::collections::HashMap<crate::names::FullName, Vec<ColumnName>>,
+    sqlite_outputs: std::collections::HashMap<FullName, Vec<ColumnName>>,
 }
 impl ColumnRename {
     pub(crate) fn resolve(
@@ -71,9 +73,9 @@ impl ColumnRename {
 
     pub(crate) fn validate_dependencies(
         &mut self,
-        context: &mut impl crate::context::ParseContext,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        if self.applicable && context.dialect() == crate::ast::Dialect::sqlite() {
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if self.applicable && context.dialect() == Dialect::sqlite() {
             let problems = self.sqlite_dependency_problems(context)?;
             self.applicable = problems.is_empty();
             for problem in problems {

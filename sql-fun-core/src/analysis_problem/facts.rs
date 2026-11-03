@@ -1,5 +1,5 @@
 //! Owned diagnostic facts, independent of the semantic AST and terminal layout.
-use super::{OperatorName, TypeReference};
+use crate::analysis_problem::{OperatorName, TypeReference};
 use std::fmt;
 
 /// Known properties of an analyzed expression, without an internal expression dump.
@@ -63,7 +63,7 @@ impl fmt::Display for SemScalarExpr {
 }
 #[cfg(test)]
 mod expression_facts_tests {
-    use super::{OptionalExpression, SemScalarExpr, TypeReference};
+    use crate::analysis_problem::facts::{OptionalExpression, SemScalarExpr, TypeReference};
 
     #[rstest::rstest]
     #[case::known(Some("pg_catalog.int4"), Some(true), "literal of type pg_catalog.int4")]

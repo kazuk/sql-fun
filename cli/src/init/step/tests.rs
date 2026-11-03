@@ -1,7 +1,10 @@
-use super::{
-    ConnectionStep, Direction, HomeStep, InitStep, PostgresSourceStep, SelectionStep, VersionsStep,
+use crate::init::{
+    step::{
+        ConnectionStep, Direction, HomeStep, InitStep, PostgresSourceStep, SelectionStep,
+        VersionsStep,
+    },
+    test_helpers::{Answer, HomeFixture, Script, common_args, state},
 };
-use crate::init::test_helpers::{Answer, HomeFixture, Script, common_args, state};
 
 #[tokio::test]
 async fn independent_steps_update_shared_answers() {

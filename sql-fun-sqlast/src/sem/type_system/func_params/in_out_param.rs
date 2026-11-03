@@ -1,3 +1,11 @@
+use crate::{
+    names::TableName,
+    sem::{
+        ColumnCollection,
+        type_system::{SimpleInferResult, func_params::output_field_definition},
+    },
+    syn::FunctionParameter,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -11,8 +19,7 @@ use crate::{
     syn::{Opt, ScanToken},
 };
 
-use super::FunctionParameterTrait;
-use super::ParameterBindResult;
+use crate::sem::type_system::func_params::{FunctionParameterTrait, ParameterBindResult};
 
 impl From<&FunctionParamInOut> for FunctionParam {
     fn from(value: &FunctionParamInOut) -> Self {
@@ -28,11 +35,7 @@ pub struct FunctionParamInOut {
 }
 
 impl FunctionParamInOut {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(ty) = &mut self.param_type {
             ty.rename_relation(old, new);
         }
@@ -53,10 +56,10 @@ impl FunctionParamInOut {
     /// Returns a nullable output field when both its name and type are known.
     /// Returns `None` if either is absent; no name or type is synthesized.
     pub fn composite_field_definition(&self) -> Option<CompositeFieldDefinition> {
-        super::output_field_definition(self.name.as_ref(), self.param_type.as_ref())
+        output_field_definition(self.name.as_ref(), self.param_type.as_ref())
     }
 
-    pub fn append_returning_column(&self, column_collection: &mut crate::sem::ColumnCollection) {
+    pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {
         let col_name = self.name.as_ref().map(|v| ColumnName::from(v.as_str()));
         let col_def = ColumnDefinition::new(&col_name, self.param_type.as_ref(), None, &[]);
         column_collection.push(&col_def);
@@ -65,9 +68,13 @@ impl FunctionParamInOut {
 
 #[cfg(test)]
 mod test_output_field_definition {
-    use super::FunctionParamInOut;
-    use crate::sem::{CompositeFieldDefinition, FunctionParam, TypeReference};
-    use crate::test_helpers::dynamic_types;
+    use crate::{
+        sem::{
+            CompositeFieldDefinition, FunctionParam, TypeReference,
+            type_system::func_params::in_out_param::FunctionParamInOut,
+        },
+        test_helpers::dynamic_types,
+    };
 
     #[rstest::rstest]
     #[case::named_scalar(true, true, false)]
@@ -134,7 +141,7 @@ impl FunctionParameterTrait for FunctionParamInOut {
 
     fn from_syn<TParseContext>(
         mut context: TParseContext,
-        param: crate::syn::FunctionParameter,
+        param: FunctionParameter,
         tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
@@ -195,10 +202,7 @@ impl FunctionParameterTrait for FunctionParamInOut {
         true
     }
 
-    fn apply_simple_infer_result(
-        &mut self,
-        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    ) {
+    fn apply_simple_infer_result(&mut self, simple_infer_result: &SimpleInferResult) {
         if let Some(ty) = self.param_type.as_mut() {
             simple_infer_result.apply(ty);
         }

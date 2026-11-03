@@ -1,7 +1,15 @@
 //! Semantic wildcard groups use the same small relation fixtures as name resolution.
 
-use super::test_helpers::source_namespace_statement;
-use crate::context::ParseContext;
+#[cfg(feature = "sqlite")]
+use crate::ast::resolve::query::test_helpers::resolve;
+use crate::{
+    ast::{Dialect, resolve::query::test_helpers::table_function_query},
+    parse_statements,
+    sem::{MergeRecordRole, ResultColumn, WildcardExpansion},
+    test_helpers::create_cache_context,
+};
+
+use crate::{ast::resolve::query::test_helpers::source_namespace_statement, context::ParseContext};
 
 #[rstest::rstest]
 #[case::zero_width("SELECT * FROM a.zero_columns", &[7], &[true], &[""])]
@@ -65,7 +73,7 @@ fn aliased_merged_projection_retains_visible_reference() {
 
 #[test]
 fn next_analysis_resets_previous_groups() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let analyzed = source_namespace_statement("SELECT * FROM a.t");
     assert_eq!(
         analyzed
@@ -75,7 +83,7 @@ fn next_analysis_resets_previous_groups() {
             .len(),
         1
     );
-    let statement = crate::parse_statements("SELECT 1", crate::ast::Dialect::postgres())
+    let statement = parse_statements("SELECT 1", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
@@ -93,9 +101,9 @@ fn next_analysis_resets_previous_groups() {
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_groups_do_not_require_lexical_locations() {
-    let (_, context) = super::test_helpers::resolve(
+    let (_, context) = resolve(
         "SELECT s.* FROM (SELECT 1 AS id) s",
-        crate::ast::Dialect::sqlite(),
+        Dialect::sqlite(),
         true,
     )
     .unwrap();
@@ -122,7 +130,7 @@ fn classifies_function_output_by_its_resolved_shape(
     #[case] sql: &str,
     #[case] table_dependent: bool,
 ) {
-    let (_, context) = super::test_helpers::table_function_query(sql, false);
+    let (_, context) = table_function_query(sql, false);
     assert!(
         context.reported_problems().is_empty(),
         "{:?}",
@@ -143,7 +151,7 @@ fn rows_sources_retain_each_function_layout_before_aliasing(
     #[case] ordinality: Option<&str>,
     #[case] expected_layout: &str,
 ) {
-    let (_, context) = super::test_helpers::table_function_query(sql, false);
+    let (_, context) = table_function_query(sql, false);
     assert!(
         context.reported_problems().is_empty(),
         "{:?}",
@@ -176,7 +184,7 @@ fn rows_sources_retain_each_function_layout_before_aliasing(
 #[case::direct("SELECT (pair_fun()).*")]
 #[case::table_row("SELECT (row_fun()).*")]
 fn composite_value_expansion_is_not_a_source_wildcard(#[case] sql: &str) {
-    let (_, context) = super::test_helpers::table_function_query(sql, true);
+    let (_, context) = table_function_query(sql, true);
     assert!(context.analysis_state().wildcard_expansions().is_empty());
 }
 
@@ -350,9 +358,9 @@ fn duplicate_base_aliases_keep_physical_column_ordinals(#[case] sql: &str) {
 #[case::table("SELECT j.*, $1::int4 AS parameter FROM a.mixed j(x,x)")]
 #[case::function("SELECT j.*, $1::int4 AS parameter FROM mixed_fun() j(x,x)")]
 fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let original = source_namespace_statement(sql);
-    let mut statement = crate::parse_statements(sql, crate::ast::Dialect::postgres())
+    let mut statement = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
@@ -362,10 +370,8 @@ fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
     statement
         .rewrite_wildcards(analyzed.context().analysis_state().wildcard_expansions())
         .unwrap();
-    let output = statement
-        .deparse_sql(crate::ast::Dialect::postgres())
-        .unwrap();
-    let reparsed = crate::parse_statements(&output, crate::ast::Dialect::postgres())
+    let output = statement.deparse_sql(Dialect::postgres()).unwrap();
+    let reparsed = parse_statements(&output, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
@@ -455,9 +461,7 @@ fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case]
         analyzed.context().reported_problems()
     );
     let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
-    group
-        .columns()
-        .assert_merge_role(crate::sem::MergeRecordRole::source());
+    group.columns().assert_merge_role(MergeRecordRole::source());
 }
 
 #[rstest::rstest]
@@ -465,7 +469,7 @@ fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case]
 #[case::invalid_arguments("SELECT * FROM row_fun(1)")]
 #[case::rows_from("SELECT * FROM ROWS FROM (row_fun(1))")]
 fn unresolved_function_output_is_not_a_known_empty_projection(#[case] sql: &str) {
-    let (_, context) = super::test_helpers::table_function_query(sql, false);
+    let (_, context) = table_function_query(sql, false);
     assert!(
         context.has_reported_problem("query_reference_not_found"),
         "{:?}",
@@ -475,9 +479,9 @@ fn unresolved_function_output_is_not_a_known_empty_projection(#[case] sql: &str)
 
 trait RetainedColumnsAssertions {
     fn assert_retained_names(&self, expected: &str);
-    fn assert_merge_role(&self, expected: crate::sem::MergeRecordRole);
+    fn assert_merge_role(&self, expected: MergeRecordRole);
 }
-impl RetainedColumnsAssertions for [crate::sem::ResultColumn] {
+impl RetainedColumnsAssertions for [ResultColumn] {
     fn assert_retained_names(&self, expected: &str) {
         let names: Vec<_> = self
             .iter()
@@ -486,7 +490,7 @@ impl RetainedColumnsAssertions for [crate::sem::ResultColumn] {
         assert_eq!(names.join(","), expected);
         assert!(self.iter().all(|column| column.expression().is_some()));
     }
-    fn assert_merge_role(&self, expected: crate::sem::MergeRecordRole) {
+    fn assert_merge_role(&self, expected: MergeRecordRole) {
         for column in self {
             assert_eq!(
                 column
@@ -504,7 +508,7 @@ trait WildcardGroupsAssertions {
     fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]);
     fn assert_relation_schemas(&self, schemas: &[&str]);
 }
-impl WildcardGroupsAssertions for [crate::sem::WildcardExpansion] {
+impl WildcardGroupsAssertions for [WildcardExpansion] {
     fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]) {
         for (index, group) in self.iter().enumerate() {
             assert_eq!(group.location(), Some(locations[index]));

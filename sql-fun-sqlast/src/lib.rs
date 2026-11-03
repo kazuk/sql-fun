@@ -23,6 +23,7 @@ mod placeholdered_sql;
 mod schema_dump_file;
 mod sql_file;
 mod sql_tokens;
+
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
@@ -30,21 +31,9 @@ mod sqlite_parser;
 mod stack;
 mod trie_map;
 
-use sql_fun_core::IVec;
-
-pub use self::cache_context::CacheContext;
-pub use self::sql_file::SqlFileSnapshot;
-
 #[cfg(feature = "sqlite")]
 pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
-
-use crate::{
-    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
-    sem::SemAst,
-    syn::ParseResult,
-};
-use std::{io::SeekFrom, path::Path, string::String as StdString};
-
+pub use self::{cache_context::CacheContext, sql_file::SqlFileSnapshot};
 pub use self::{
     parse_statements::{ParseStatementError, parse_statements},
     placeholdered_sql::PlaceholderedSqlRenderError,
@@ -53,6 +42,19 @@ pub use self::{
     trie_map::TrieMap,
 };
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
+
+use crate::{
+    ast::Dialect, parse_statements::split_postgres_statements, sem::AnalysisError, syn::ScanToken,
+};
+
+use sql_fun_core::IVec;
+
+use crate::{
+    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
+    sem::SemAst,
+    syn::ParseResult,
+};
+use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 /// Semantic AST and parse context result
 pub struct AstAndContextPair<TParseContext>(SemAst, TParseContext)
@@ -102,11 +104,11 @@ impl PostgresDialect {
     }
 
     /// scan SQL Statement
-    pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
+    pub fn scan(sql: &str) -> Result<IVec<ScanToken>, pg_query::Error> {
         let scan_result = ::pg_query::scan(sql)?;
         let mut tokens = Vec::new();
         for token in scan_result.tokens {
-            tokens.push(crate::syn::ScanToken::from(token));
+            tokens.push(ScanToken::from(token));
         }
         Ok(tokens.into())
     }
@@ -159,12 +161,9 @@ impl PostgresDialect {
         let sql_statements = snapshot.postgres_text();
         let dump_file = snapshot.path();
 
-        let statements = self::parse_statements::split_postgres_statements(&sql_statements)?;
+        let statements = split_postgres_statements(&sql_statements)?;
         let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
-        crate::sem::AnalysisError::check_dialect(
-            crate::ast::Dialect::postgres(),
-            context.dialect(),
-        )?;
+        AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let mut sem_results = Vec::new();
         for statement in statements {
             context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
@@ -182,6 +181,8 @@ impl PostgresDialect {
 
 #[cfg(test)]
 mod test_schema_content_hash {
+    use crate::{ast::Dialect, context::BaseParseContext, test_helpers::TestParseContext};
+
     use crate::PostgresDialect;
     use ::sql_fun_core::Hasher;
 
@@ -198,14 +199,13 @@ mod test_schema_content_hash {
         let mut hash = Some("previous output".to_owned());
         let result = {
             let analysis_base = &base;
-            let environment = crate::test_helpers::TestParseContext::default()
-                .with_dialect(crate::ast::Dialect::postgres());
+            let environment = TestParseContext::default().with_dialect(Dialect::postgres());
             PostgresDialect::parse_schema_file(
                 file.path(),
                 analysis_base,
                 &mut hash,
-                crate::context::BaseParseContext::get_args(&environment),
-                crate::context::BaseParseContext::metadata(&environment),
+                BaseParseContext::get_args(&environment),
+                BaseParseContext::metadata(&environment),
             )
         };
         assert_eq!(result.is_ok(), succeeds, "{result:?}");
@@ -219,14 +219,13 @@ mod test_schema_content_hash {
         let mut hash = Some("previous output".to_owned());
         let error = {
             let analysis_base = &base;
-            let environment = crate::test_helpers::TestParseContext::default()
-                .with_dialect(crate::ast::Dialect::postgres());
+            let environment = TestParseContext::default().with_dialect(Dialect::postgres());
             PostgresDialect::parse_schema_file(
                 &directory.path().join("missing.sql"),
                 analysis_base,
                 &mut hash,
-                crate::context::BaseParseContext::get_args(&environment),
-                crate::context::BaseParseContext::metadata(&environment),
+                BaseParseContext::get_args(&environment),
+                BaseParseContext::metadata(&environment),
             )
         }
         .unwrap_err();
@@ -235,10 +234,12 @@ mod test_schema_content_hash {
     }
 
     mod test_helpers {
-        pub(super) fn base_with_public_schema() -> crate::context::FrozenBaseContext {
+        use crate::{context::FrozenBaseContext, test_helpers::TestParseContext};
+
+        pub(super) fn base_with_public_schema() -> FrozenBaseContext {
             use crate::{context::ParseContext, names::SchemaName};
 
-            let mut base = crate::test_helpers::TestParseContext::default();
+            let mut base = TestParseContext::default();
             base.set_get_search_path_result(&[SchemaName::from("public")]);
             base.freeze()
         }
@@ -321,7 +322,7 @@ impl StringSpan {
         self.len == 0
     }
 
-    const fn from_scan_token(tok: &crate::syn::ScanToken) -> Self {
+    const fn from_scan_token(tok: &ScanToken) -> Self {
         Self {
             offset: tok.get_start() as usize,
             len: (tok.get_end() - tok.get_start()) as usize,

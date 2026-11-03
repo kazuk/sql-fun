@@ -1,10 +1,12 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::UniqueColumnConstraint as SqliteUniqueColumnConstraint;
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
         ConflictClause, ParseContext,
     },
-    syn::{ConstrType, Opt},
+    syn::{ConstrType, Constraint, Opt},
 };
 
 /// unique value constraint
@@ -16,7 +18,7 @@ pub struct UniqueColumnConstraint {
 }
 
 impl UniqueColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -60,7 +62,7 @@ impl UniqueColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -85,7 +87,7 @@ impl UniqueColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::UniqueColumnConstraint,
+        syn: &SqliteUniqueColumnConstraint,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,

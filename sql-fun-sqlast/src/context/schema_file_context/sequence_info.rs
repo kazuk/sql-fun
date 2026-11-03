@@ -1,16 +1,21 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
-    context::{ParseContext, SequenceInfoRead, SequenceInfoWrite},
-    names::FullName,
-    sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence},
+    context::{
+        ParseContext, SequenceInfoRead, SequenceInfoWrite,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
+    },
+    names::{FullName, TableName},
+    sem::{
+        AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, Kind,
+        search_path::expand_relation_search_path,
+    },
 };
 
 #[derive(Clone, Debug, Default)]
 pub struct SequenceInfoCollection(TrieMap<CreateSequence>);
 
 impl SequenceInfoCollection {
-    fn owned_by(&self, table: &crate::names::TableName) -> Vec<CreateSequence> {
+    fn owned_by(&self, table: &TableName) -> Vec<CreateSequence> {
         self.0
             .iter()
             .filter(|(_, definition)| definition.owned_by() == Some(table))
@@ -28,7 +33,7 @@ impl SequenceInfoCollection {
 }
 
 impl SequenceInfoRead for SchemaCatalog {
-    fn sequences_owned_by(&self, table: &crate::names::TableName) -> Vec<CreateSequence> {
+    fn sequences_owned_by(&self, table: &TableName) -> Vec<CreateSequence> {
         let mut sequences = self.sequences.owned_by(table);
         for inherited in self.base.sequences_owned_by(table) {
             if self.sequences.get(inherited.name()).is_none() {
@@ -53,13 +58,11 @@ impl SequenceInfoWrite for SchemaFileContext {
         Self: Sized,
     {
         let seq_name = alter_seq.seq_name();
-        let Some((key, mut seq)) =
-            crate::sem::search_path::expand_relation_search_path(&self, seq_name, |key| {
-                self.get_sequence_impl(key)
-                    .cloned()
-                    .map(|sequence| (key.clone(), sequence))
-            })
-        else {
+        let Some((key, mut seq)) = expand_relation_search_path(&self, seq_name, |key| {
+            self.get_sequence_impl(key)
+                .cloned()
+                .map(|sequence| (key.clone(), sequence))
+        }) else {
             self.report_analysis_problem(AnalysisProblem::sequence_not_found(seq_name))?;
             return Ok(self);
         };
@@ -75,7 +78,7 @@ impl SequenceInfoWrite for SchemaFileContext {
         let name = self.creation_name(create_sequence.name(), create_sequence.temporary())?;
         if !self.permits_relation_creation(
             &name,
-            crate::sem::Kind::sequence(),
+            Kind::sequence(),
             create_sequence.if_not_exists(),
             false,
         )? {

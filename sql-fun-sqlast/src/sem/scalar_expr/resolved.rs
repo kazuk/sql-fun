@@ -1,30 +1,34 @@
-use crate::sem::{AnalysisError, SelectStatement, TypeReference};
 use crate::{
     context::ParseContext,
-    sem::scalar_expr::{
-        ArrayExpr, BooleanExpr, ExistsExpr, ListExpr, NullTestExpr, ScalarConstExpr, SemScalarExpr,
-        SubLinkExpr, TypeCastExpr,
-        boolean::{BooleanExprBody, NullTestType},
+    sem::{
+        AnalysisError, FuncCallExpr, IndirectionExpr, ParseContext as SemParseContext,
+        SelectStatement, SqlValueExpr, TypeReference,
+        scalar_expr::{
+            ArrayExpr, ArraySubqueryExpr, BooleanExpr, CaseExpr, CoalesceExpr, DistinctExpr,
+            ExistsExpr, ListExpr, NullTestExpr, RowExpr, ScalarConstExpr, SemScalarExpr,
+            SubLinkExpr, TruthTestExpr, TypeCastExpr,
+            boolean::{BooleanExprBody, NullTestType},
+        },
     },
 };
 
 impl SemScalarExpr {
-    pub(crate) fn truth_test(value: &super::TruthTestExpr) -> Self {
+    pub(crate) fn truth_test(value: &TruthTestExpr) -> Self {
         Self::TruthTest(value.clone())
     }
     /// SQL truth predicate, including its retained operand after inference.
-    pub const fn as_truth_test(&self) -> Option<&super::TruthTestExpr> {
+    pub const fn as_truth_test(&self) -> Option<&TruthTestExpr> {
         match self {
             Self::TruthTest(value) => Some(value),
             _ => None,
         }
     }
 
-    pub(crate) const fn distinct(value: super::DistinctExpr) -> Self {
+    pub(crate) const fn distinct(value: DistinctExpr) -> Self {
         Self::Distinct(value)
     }
     /// Null-safe distinctness predicate, preserved through parameter inference.
-    pub const fn as_distinct(&self) -> Option<&super::DistinctExpr> {
+    pub const fn as_distinct(&self) -> Option<&DistinctExpr> {
         if let Self::Distinct(value) = self {
             Some(value)
         } else {
@@ -33,7 +37,7 @@ impl SemScalarExpr {
     }
     pub(crate) fn distinct_row_comparisons(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl SemParseContext,
         other: &Self,
     ) -> Result<Option<Vec<Self>>, AnalysisError> {
         match (self, other) {
@@ -42,21 +46,21 @@ impl SemScalarExpr {
         }
     }
     pub(crate) fn row(fields: &[Self]) -> Self {
-        Self::Row(super::RowExpr::new(fields))
+        Self::Row(RowExpr::new(fields))
     }
-    pub(crate) fn function_call(value: &crate::sem::FuncCallExpr) -> Self {
+    pub(crate) fn function_call(value: &FuncCallExpr) -> Self {
         Self::FuncCall(value.clone())
     }
-    pub(crate) fn sql_value(value: &crate::sem::SqlValueExpr) -> Self {
+    pub(crate) fn sql_value(value: &SqlValueExpr) -> Self {
         Self::SqlValue(value.clone())
     }
-    pub(crate) fn indirection(value: &crate::sem::IndirectionExpr) -> Self {
+    pub(crate) fn indirection(value: &IndirectionExpr) -> Self {
         Self::Indirection(value.clone())
     }
-    pub(crate) fn coalesce(value: &super::CoalesceExpr) -> Self {
+    pub(crate) fn coalesce(value: &CoalesceExpr) -> Self {
         Self::Coalesce(value.clone())
     }
-    pub(crate) fn case(value: &super::CaseExpr) -> Self {
+    pub(crate) fn case(value: &CaseExpr) -> Self {
         Self::Case(value.clone())
     }
     pub(crate) fn into_list_values(self) -> Result<Vec<Self>, AnalysisError> {
@@ -100,12 +104,12 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         query: &SelectStatement,
     ) -> Result<Self, AnalysisError> {
-        Ok(Self::ArraySubquery(super::ArraySubqueryExpr::resolve(
+        Ok(Self::ArraySubquery(ArraySubqueryExpr::resolve(
             context, query,
         )?))
     }
     /// ARRAY(query), including its analyzed query and result domain.
-    pub const fn as_array_subquery(&self) -> Option<&super::ArraySubqueryExpr> {
+    pub const fn as_array_subquery(&self) -> Option<&ArraySubqueryExpr> {
         match self {
             Self::ArraySubquery(value) => Some(value),
             _ => None,

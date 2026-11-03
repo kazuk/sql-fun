@@ -1,15 +1,15 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::{
-    names::FullName,
-    sem::{
-        AnalysisError, AnalysisProblem, OverloadVariant, SemScalarExpr, TypeReference,
-        type_system::ArgumentBindingCollection,
-    },
-};
-
-use ::sql_fun_core::IVec;
-
 mod implementation {
+    use crate::{
+        StringSpan,
+        context::BaseParseContext,
+        names::TableName,
+        sem::{
+            AnalysisError, FunctionModifiers, FunctionOverloadCollection, NamedArgExpr,
+            QueryNameResolution,
+            traversal::{SemanticVisitor, SemanticVisitorMut},
+        },
+    };
+
     use crate::{
         names::FullName,
         sem::{FunctionParam, OverloadVariant, SemScalarExpr},
@@ -21,7 +21,7 @@ mod implementation {
     #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct FuncCallExpr {
         func_name: FullName,
-        name_resolution: crate::sem::QueryNameResolution,
+        name_resolution: QueryNameResolution,
         #[serde(default)]
         candidates: Option<Vec<OverloadVariant>>,
         overload: Option<OverloadVariant>,
@@ -30,7 +30,7 @@ mod implementation {
         #[serde(deserialize_with = "deserialize_arguments")]
         args: IVec<FuncCallArgs>,
         #[serde(default)]
-        modifiers: Box<crate::sem::FunctionModifiers>,
+        modifiers: Box<FunctionModifiers>,
     }
 
     fn deserialize_arguments<'de, D: serde::Deserializer<'de>>(
@@ -59,8 +59,8 @@ mod implementation {
     #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct FunctionBinding {
         name: FullName,
-        resolution: crate::sem::QueryNameResolution,
-        modifiers: Box<crate::sem::FunctionModifiers>,
+        resolution: QueryNameResolution,
+        modifiers: Box<FunctionModifiers>,
     }
     impl FunctionBinding {
         /// Resolved function identity (or original name after a failed lookup).
@@ -68,32 +68,28 @@ mod implementation {
             &self.name
         }
         /// Completed name lookup, independent of overload selection.
-        pub const fn resolution(&self) -> &crate::sem::QueryNameResolution {
+        pub const fn resolution(&self) -> &QueryNameResolution {
             &self.resolution
         }
         /// SQL modifiers owned by this call.
-        pub fn modifiers(&self) -> &crate::sem::FunctionModifiers {
+        pub fn modifiers(&self) -> &FunctionModifiers {
             &self.modifiers
         }
-        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+        pub(crate) fn walk<V: SemanticVisitorMut>(
             &mut self,
             visitor: &mut V,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        ) -> Result<(), AnalysisError> {
             self.modifiers.walk(visitor)
         }
-        pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        pub(crate) fn visit<V: SemanticVisitor>(
             &self,
             visitor: &mut V,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        ) -> Result<(), AnalysisError> {
             self.modifiers.visit(visitor)
         }
     }
     impl FuncCallExpr {
-        pub(crate) fn rename_relation(
-            &mut self,
-            old: &crate::names::TableName,
-            new: &crate::names::TableName,
-        ) {
+        pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
             self.name_resolution.rename_relation(old, new);
             if let Some(overload) = &mut self.overload {
                 overload.rename_relation(old, new);
@@ -142,9 +138,9 @@ mod implementation {
                 func_name: func_name.clone(),
                 candidates: None,
                 name_resolution: if overload.is_some() {
-                    crate::sem::QueryNameResolution::function(func_name)
+                    QueryNameResolution::function(func_name)
                 } else {
-                    crate::sem::QueryNameResolution::not_found()
+                    QueryNameResolution::not_found()
                 },
                 overload: overload.clone(),
                 signature_deferred: false,
@@ -156,10 +152,12 @@ mod implementation {
 
     #[cfg(test)]
     mod test_supplied_arguments {
-        use super::{FuncCallArgs, FuncCallExpr};
         use crate::{
             names::FullName,
-            sem::{FunctionParam, PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+            sem::{
+                FunctionParam, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+                scalar_expr::func_call::implementation::{FuncCallArgs, FuncCallExpr},
+            },
         };
 
         #[test]
@@ -206,10 +204,7 @@ mod implementation {
         pub(crate) fn set_candidates(&mut self, candidates: Option<Vec<OverloadVariant>>) {
             self.candidates = candidates;
         }
-        pub(crate) fn returns_set(
-            &self,
-            context: &impl crate::context::BaseParseContext,
-        ) -> Option<bool> {
+        pub(crate) fn returns_set(&self, context: &impl BaseParseContext) -> Option<bool> {
             let name = self.name_resolution().function_identity()?;
             if let Some(overload) = self.overload() {
                 Some(context.function_returns_set(name, overload))
@@ -217,23 +212,23 @@ mod implementation {
                 self.candidates()?.returns_set(context, name)
             }
         }
-        pub(crate) fn candidates(&self) -> Option<crate::sem::FunctionOverloadCollection> {
+        pub(crate) fn candidates(&self) -> Option<FunctionOverloadCollection> {
             self.candidates
                 .as_deref()
-                .map(crate::sem::FunctionOverloadCollection::new)
+                .map(FunctionOverloadCollection::new)
         }
-        pub(crate) fn set_name_resolution(&mut self, outcome: crate::sem::QueryNameResolution) {
+        pub(crate) fn set_name_resolution(&mut self, outcome: QueryNameResolution) {
             self.name_resolution = outcome;
         }
         /// Completed function-name lookup, independent of overload selection.
-        pub const fn name_resolution(&self) -> &crate::sem::QueryNameResolution {
+        pub const fn name_resolution(&self) -> &QueryNameResolution {
             &self.name_resolution
         }
-        pub(crate) fn set_modifiers(&mut self, modifiers: crate::sem::FunctionModifiers) {
+        pub(crate) fn set_modifiers(&mut self, modifiers: FunctionModifiers) {
             *self.modifiers = modifiers;
         }
         /// SQL modifiers retained alongside the resolved function binding.
-        pub fn modifiers(&self) -> &crate::sem::FunctionModifiers {
+        pub fn modifiers(&self) -> &FunctionModifiers {
             &self.modifiers
         }
     }
@@ -287,18 +282,16 @@ mod implementation {
         }
         /// Optional supplied name. `None` identifies a positional argument.
         pub fn supplied_name(&self) -> Option<&str> {
-            self.arg_expr
-                .as_named_argument()
-                .map(crate::sem::NamedArgExpr::name)
+            self.arg_expr.as_named_argument().map(NamedArgExpr::name)
         }
         /// The value inside a named wrapper, or the positional expression itself.
         pub fn value(&self) -> &SemScalarExpr {
             self.arg_expr
                 .as_named_argument()
-                .map_or(&self.arg_expr, crate::sem::NamedArgExpr::value)
+                .map_or(&self.arg_expr, NamedArgExpr::value)
         }
         /// Source span of the supplied argument name, when reliably available.
-        pub const fn source_span(&self) -> Option<&crate::StringSpan> {
+        pub const fn source_span(&self) -> Option<&StringSpan> {
             if let Some(named) = self.arg_expr.as_named_argument() {
                 named.source_span()
             } else {
@@ -318,10 +311,10 @@ mod implementation {
         }
     }
     impl FuncCallExpr {
-        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+        pub(crate) fn walk<V: SemanticVisitorMut>(
             &mut self,
             visitor: &mut V,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        ) -> Result<(), AnalysisError> {
             let mut args = self.args.to_vec();
             for arg in &mut args {
                 arg.arg_expr.walk(visitor)?;
@@ -330,10 +323,10 @@ mod implementation {
             self.modifiers.walk(visitor)?;
             Ok(())
         }
-        pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+        pub(crate) fn visit<V: SemanticVisitor>(
             &self,
             visitor: &mut V,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        ) -> Result<(), AnalysisError> {
             for arg in self.args.iter() {
                 arg.arg_expr.visit(visitor)?;
             }
@@ -349,15 +342,29 @@ mod implementation {
     }
 }
 
+use crate::{
+    StringSpan,
+    context::ParseContext as ContextParseContext,
+    names::FullName,
+    sem::{
+        AnalysisError, AnalysisProblem, FunctionOverloadCollection, InputTypeConstraint,
+        OverloadVariant, ParseContext, QueryNameResolution, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution, problem::CallArgumentProblem,
+        scalar_expr::SemScalarExprNode, type_system::ArgumentBindingCollection,
+    },
+};
+
+use ::sql_fun_core::IVec;
+
 pub use self::implementation::{FuncCallArgs, FuncCallExpr, FunctionBinding};
 
 impl FuncCallExpr {
     pub(crate) fn resolve_supplied(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         name: &FullName,
         arguments: &[SemScalarExpr],
-        argument_spans: &[Option<crate::StringSpan>],
-        span: &Option<crate::StringSpan>,
+        argument_spans: &[Option<StringSpan>],
+        span: &Option<StringSpan>,
     ) -> Result<Self, AnalysisError> {
         let mut names = std::collections::HashSet::new();
         let mut args = Vec::new();
@@ -366,7 +373,7 @@ impl FuncCallExpr {
             if let Some(named) = argument.as_named_argument() {
                 if !names.insert(named.name()) {
                     context.report_analysis_problem(AnalysisProblem::call_argument(
-                        crate::sem::problem::CallArgumentProblem::duplicate_name(
+                        CallArgumentProblem::duplicate_name(
                             named.name(),
                             &named.source_span().map(Into::into),
                         ),
@@ -374,7 +381,7 @@ impl FuncCallExpr {
                 }
             } else if !names.is_empty() {
                 context.report_analysis_problem(AnalysisProblem::call_argument(
-                    crate::sem::problem::CallArgumentProblem::positional_after_named(
+                    CallArgumentProblem::positional_after_named(
                         position,
                         &argument_spans
                             .get(position)
@@ -392,18 +399,16 @@ impl FuncCallExpr {
         if !found {
             context.report_analysis_problem(AnalysisProblem::function_not_found(
                 name,
-                &span.unwrap_or_else(|| crate::StringSpan::new(0, 0)),
+                &span.unwrap_or_else(|| StringSpan::new(0, 0)),
             ))?;
         }
         let mut call = Self::new(name, &None, &args.into());
         call.set_name_resolution(if found {
-            crate::sem::QueryNameResolution::function(
-                &context.resolve_function_name_with_search_path(name),
-            )
+            QueryNameResolution::function(&context.resolve_function_name_with_search_path(name))
         } else {
-            crate::sem::QueryNameResolution::not_found()
+            QueryNameResolution::not_found()
         });
-        call.set_candidates(candidates.map(crate::sem::FunctionOverloadCollection::into_snapshot));
+        call.set_candidates(candidates.map(FunctionOverloadCollection::into_snapshot));
         call.defer_signature();
         Ok(call)
     }
@@ -415,7 +420,7 @@ impl FuncCallExpr {
         overload: &OverloadVariant,
     ) -> Result<IVec<FuncCallArgs>, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let mut args = Vec::new();
         for (index, arg) in arg_exprs.iter().enumerate() {
@@ -451,11 +456,11 @@ impl FuncCallExpr {
 }
 
 impl FuncCallExpr {
-    pub(crate) fn resolve_common<TContext: crate::sem::ParseContext>(
+    pub(crate) fn resolve_common<TContext: ParseContext>(
         context: &mut TContext,
         name: &FullName,
         arguments: &[SemScalarExpr],
-        span: &crate::StringSpan,
+        span: &StringSpan,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let resolved_name = context.resolve_function_name_with_search_path(name);
         let candidates = context.get_function_by_name(name);
@@ -463,23 +468,22 @@ impl FuncCallExpr {
         let mut expression =
             Self::resolve_binding(context, name, arguments, span, candidates.as_ref())?;
         expression.set_function_name_resolution(if found {
-            crate::sem::QueryNameResolution::function(&resolved_name)
+            QueryNameResolution::function(&resolved_name)
         } else {
-            crate::sem::QueryNameResolution::not_found()
+            QueryNameResolution::not_found()
         });
         if context.parameter_inference_needed() {
-            expression.set_function_candidates(
-                candidates.map(crate::sem::FunctionOverloadCollection::into_snapshot),
-            );
+            expression
+                .set_function_candidates(candidates.map(FunctionOverloadCollection::into_snapshot));
         }
         Ok(expression)
     }
-    fn resolve_binding<TContext: crate::sem::ParseContext>(
+    fn resolve_binding<TContext: ParseContext>(
         context: &mut TContext,
         name: &FullName,
         arguments: &[SemScalarExpr],
-        span: &crate::StringSpan,
-        overloads: Option<&crate::sem::FunctionOverloadCollection>,
+        span: &StringSpan,
+        overloads: Option<&FunctionOverloadCollection>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arg_types = ArgumentBindingCollection::from_expr_list(arguments);
         if let Some(overloads) = overloads {
@@ -546,11 +550,11 @@ impl SemScalarExprNode for FuncCallExpr {
 
 #[cfg(test)]
 mod test_func_call_expr_analyze_scalar_expr {
-    use crate::sem::ScalarAnalysisContext;
     use crate::{
         names::SchemaName,
         sem::{
-            FromClause, FunctionParam, OverloadVariant, PgBuiltInType, SemScalarExpr, WithClause,
+            FromClause, FunctionParam, OverloadVariant, PgBuiltInType, ScalarAnalysisContext,
+            SemScalarExpr, WithClause,
         },
         syn::{
             KeywordKindOpt, Node, NodeInner, NodeList, ScanToken, ScanTokenBuilder, Token, TokenOpt,
@@ -658,6 +662,8 @@ mod test_func_call_expr_analyze_scalar_expr {
 
 #[cfg(test)]
 mod test_func_call_expr_cast_operand_expression {
+    use crate::sem::scalar_expr::func_call::FuncCallExpr;
+
     use crate::{
         names::FullName,
         sem::{
@@ -694,7 +700,7 @@ mod test_func_call_expr_cast_operand_expression {
         )];
         let overload = OverloadVariant::new(&Some(text), &params, false, false);
 
-        let args = super::FuncCallExpr::cast_operand_expression(
+        let args = FuncCallExpr::cast_operand_expression(
             &mut test_context,
             &func_name,
             &arg_exprs,
@@ -724,7 +730,7 @@ mod test_func_call_expr_cast_operand_expression {
         )];
         let overload = OverloadVariant::new(&None, &params, false, false);
 
-        let args = super::FuncCallExpr::cast_operand_expression(
+        let args = FuncCallExpr::cast_operand_expression(
             &mut test_context,
             &func_name,
             &arg_exprs,
@@ -739,11 +745,15 @@ mod test_func_call_expr_cast_operand_expression {
 
 #[cfg(test)]
 mod test_func_call_expr_is_not_null {
-    use crate::sem::scalar_expr::SemScalarExprNode;
-    use crate::sem::scalar_expr::func_call::{FuncCallArgs, FuncCallExpr};
     use crate::{
         names::FullName,
-        sem::{OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+        sem::{
+            OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+            scalar_expr::{
+                SemScalarExprNode,
+                func_call::{FuncCallArgs, FuncCallExpr},
+            },
+        },
     };
 
     use ::sql_fun_core::IVec;
@@ -785,8 +795,8 @@ mod test_func_call_expr_is_not_null {
 impl FuncCallExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if self.signature_is_deferred() {
             return Ok(None);
@@ -808,7 +818,7 @@ impl FuncCallExpr {
             let mut result = parameters.operation(
                 &name.to_string(),
                 &arguments,
-                &crate::sem::InputTypeConstraint::any(),
+                &InputTypeConstraint::any(),
                 None,
             );
             result.retain_semantic_call(self);
@@ -828,11 +838,7 @@ impl FuncCallExpr {
 }
 
 impl FuncCallExpr {
-    pub(crate) fn invalid_from(
-        &self,
-        context: &impl crate::context::ParseContext,
-        allow_set: bool,
-    ) -> bool {
+    pub(crate) fn invalid_from(&self, context: &impl ContextParseContext, allow_set: bool) -> bool {
         (!allow_set && self.returns_set(context) == Some(true))
             || self.modifiers().over().is_some()
             || self

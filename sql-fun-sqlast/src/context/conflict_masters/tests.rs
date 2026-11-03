@@ -1,9 +1,11 @@
 #[cfg(feature = "sqlite")]
 use crate::context::ConflictMasters;
 #[cfg(feature = "sqlite")]
+use crate::context::FrozenBaseContext;
+#[cfg(feature = "sqlite")]
 use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
 use crate::{
-    context::ConflictInfoRead, names::FullName, sem::CollationIdentity,
+    ast::Dialect, context::ConflictInfoRead, names::FullName, sem::CollationIdentity,
     test_helpers::conflict_masters as test_helpers,
 };
 
@@ -76,7 +78,7 @@ fn sqlite_namespace_is_explicit_case_insensitive_and_retained() -> testresult::T
     masters.declare_sqlite_collation("")?;
     let mut fixture = test_helpers::Masters::new()
         .context()
-        .with_dialect(crate::ast::Dialect::sqlite());
+        .with_dialect(Dialect::sqlite());
     fixture.set_conflict_masters(&masters);
     let args = fixture.get_args().clone();
     let metadata = fixture.metadata().clone();
@@ -132,9 +134,9 @@ fn sqlite_namespace_is_explicit_case_insensitive_and_retained() -> testresult::T
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_base_needs_no_postgres_masters_and_exposes_registration() -> testresult::TestResult {
-    let mut base = test_helpers::base_without_masters(crate::ast::Dialect::sqlite())?;
+    let mut base = test_helpers::base_without_masters(Dialect::sqlite())?;
     base.declare_sqlite_collation("provided")?;
-    let frozen = crate::context::FrozenBaseContext::from(base);
+    let frozen = FrozenBaseContext::from(base);
     assert!(
         frozen
             .lookup_collation(&FullName::from_local_name("PROVIDED"))
@@ -147,7 +149,7 @@ fn sqlite_base_needs_no_postgres_masters_and_exposes_registration() -> testresul
 
 #[test]
 fn postgres_base_requires_masters() {
-    let error = test_helpers::base_without_masters(crate::ast::Dialect::postgres())
+    let error = test_helpers::base_without_masters(Dialect::postgres())
         .unwrap_err()
         .to_string();
     assert!(error.contains("collations.json"), "{error}");

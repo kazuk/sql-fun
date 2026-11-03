@@ -1,7 +1,8 @@
 //! Common construction of explicit query projections and their source records.
+
 use crate::ast::{
-    Access, Alias, Call, Cast, DerivedTable, Expr, FromItem, Indirection, Name, Query, QueryBody,
-    Select, Target, TypeName, With,
+    Access, Alias, Call, CallKind, Cast, DerivedTable, Expr, FromItem, Indirection, Name, Query,
+    QueryBody, Select, Target, TypeName, With,
 };
 impl Select {
     pub(in crate::ast) fn projection(targets: &[Target], from: &[FromItem]) -> Self {
@@ -100,7 +101,7 @@ impl Call {
     pub(in crate::ast) fn coalesce_projection(arguments: &[Expr]) -> Self {
         Self {
             sql_syntax: false,
-            kind: crate::ast::CallKind::special("coalesce"),
+            kind: CallKind::special("coalesce"),
             name: Name::local("coalesce"),
             argument_locations: vec![None; arguments.len()],
             arguments: arguments.to_vec(),

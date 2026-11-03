@@ -1,11 +1,11 @@
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, AnalyzeConstraint, Constraint, Deferrability,
+        AnalysisError, AnalysisProblem, AnalyzeConstraint, ColumnRename, Constraint, Deferrability,
         ForeignKeyAction, ForeignKeyMatchType, ForeignKeyTarget, ImplicitChange, ParseContext,
         Validity,
     },
-    syn::{ListOpt, Opt},
+    syn::{Constraint as SynConstraint, ListOpt, Opt},
 };
 
 #[derive(Debug, Clone)]
@@ -94,7 +94,7 @@ impl ForeignKeyConstraint {
         self.delete_columns = columns.to_vec();
     }
 
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_names(&mut self.source_columns);
             rename.rename_names(&mut self.delete_columns);
@@ -260,7 +260,7 @@ mod test_foreign_key_attributes_and_dependencies {
 impl ForeignKeyConstraint {
     fn retain_postgres_attributes(
         &mut self,
-        constraint: &crate::syn::Constraint,
+        constraint: &SynConstraint,
     ) -> Result<(), AnalysisError> {
         self.match_type = ForeignKeyMatchType::try_from_postgres_constraint(constraint)?;
         self.delete_action = ForeignKeyAction::try_from_delete_postgres_constraint(constraint)?;
@@ -288,7 +288,7 @@ where
     fn analyze(
         context: &mut TParseContext,
         source_table: Option<&TableName>,
-        constraint: crate::syn::Constraint,
+        constraint: SynConstraint,
     ) -> Result<Constraint, AnalysisError> {
         let name = constraint.get_conname();
         let Some(source_columns) = constraint

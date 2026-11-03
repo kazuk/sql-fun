@@ -1,6 +1,9 @@
 use crate::{
     names::{AliasName, ColumnName},
-    sem::{AnalysisError, SemScalarExpr},
+    sem::{
+        AnalysisError, ColumnDefinition, SemScalarExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
 };
 
 /// A completed FROM-column binding backed by an analyzed expression.
@@ -13,8 +16,8 @@ pub struct SourceColumnExpr {
 }
 
 impl SourceColumnExpr {
-    pub(super) fn definition(&self) -> crate::sem::ColumnDefinition {
-        crate::sem::ColumnDefinition::new(
+    pub(super) fn definition(&self) -> ColumnDefinition {
+        ColumnDefinition::new(
             &Some(self.name.clone()),
             self.value.get_type().as_ref(),
             self.is_not_null(),
@@ -50,7 +53,7 @@ impl SourceColumnExpr {
         self.nullable |= nullable;
         self
     }
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -59,10 +62,7 @@ impl SourceColumnExpr {
         }
         Ok(())
     }
-    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if visitor.walk_source_column_values() {
             self.value.visit(visitor)?;
         }

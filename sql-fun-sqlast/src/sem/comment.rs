@@ -1,6 +1,10 @@
-use crate::{ast::TryFromWithTokens, sem::AstAndContextPair};
+use crate::{
+    ast::{Comment as AstComment, TryFromWithTokens},
+    sem::AstAndContextPair,
+    syn::CommentStmt,
+};
 
-use super::{AnalysisError, ParseContext};
+use crate::sem::{AnalysisError, ParseContext};
 
 /// analyzed [`crate::syn::CommentStmt`]
 #[derive(Debug, Clone)]
@@ -87,12 +91,11 @@ impl Comment {
     /// analyze [`crate::syn::CommentStmt`]
     pub fn analyze_comment<TParseContext>(
         context: TParseContext,
-        syn: crate::syn::CommentStmt,
+        syn: CommentStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Comment::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?
-            .apply(context)
+        AstComment::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?.apply(context)
     }
 }

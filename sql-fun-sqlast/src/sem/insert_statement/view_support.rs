@@ -1,6 +1,8 @@
 use crate::{
     names::{ColumnName, FullName},
-    sem::ColumnDefinition,
+    sem::{
+        AnalysisError, ColumnDefinition, ParseContext, ViewAssignmentColumn, ViewWriteEvaluation,
+    },
 };
 
 /// Analyzed capability for INSERT into an ordinary view.
@@ -10,7 +12,7 @@ pub struct ViewInsertSupport {
     writable_columns: Option<Vec<ColumnDefinition>>,
     returning: bool,
     #[serde(default)]
-    assignment_columns: Vec<crate::sem::ViewAssignmentColumn>,
+    assignment_columns: Vec<ViewAssignmentColumn>,
     on_conflict: bool,
 }
 impl ViewInsertSupport {
@@ -21,15 +23,15 @@ impl ViewInsertSupport {
     /// # Errors
     /// Returns only unrecoverable analysis or diagnostic delivery failures.
     pub fn analyze(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         view: &FullName,
-    ) -> Result<Option<Self>, crate::sem::AnalysisError> {
-        crate::sem::ViewWriteEvaluation::new(context).insert(view)
+    ) -> Result<Option<Self>, AnalysisError> {
+        ViewWriteEvaluation::new(context).insert(view)
     }
 
     /// Record alias equivalence for automatic-view assignment targets.
     /// Trigger/rule-backed NEW-row fields have independent identities instead.
-    pub fn set_assignment_columns(&mut self, columns: &[crate::sem::ViewAssignmentColumn]) {
+    pub fn set_assignment_columns(&mut self, columns: &[ViewAssignmentColumn]) {
         self.assignment_columns = columns.to_vec();
     }
     /// The underlying assignment-column key, or the supplied view name when
@@ -38,7 +40,7 @@ impl ViewInsertSupport {
         self.assignment_columns
             .iter()
             .find(|column| column.name() == name)
-            .map_or(name, crate::sem::ViewAssignmentColumn::source_column)
+            .map_or(name, ViewAssignmentColumn::source_column)
     }
 
     /// The view cannot accept INSERT statements.

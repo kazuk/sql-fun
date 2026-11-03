@@ -1,12 +1,16 @@
 //! Supplied call arguments survive analysis independently of function signatures.
-use super::super::test_helpers::{catalog, resolve};
-use crate::ast::{Dialect, StatementNode};
-use crate::context::ParseContext;
+
 use crate::{
+    ast::{
+        Dialect, StatementNode,
+        resolve::query::test_helpers::{catalog, resolve},
+    },
+    context::ParseContext,
     names::AliasName,
+    parse_statements,
     sem::{
         AnalysisError, DataSource, FuncCallExpr, FunctionParam, OverloadVariant, PgBuiltInType,
-        QueryNameResolution, SelectStatement, SemScalarExpr,
+        QueryNameResolution, ScalarConstExpr as SemScalarConstExpr, SelectStatement, SemScalarExpr,
     },
 };
 
@@ -91,7 +95,7 @@ fn checks_only_function_name(#[case] name: &str, #[case] found: bool) {
 #[test]
 fn does_not_select_overloads_or_insert_defaults() {
     let mut context = catalog();
-    let default = SemScalarExpr::literal(&crate::sem::ScalarConstExpr::new_integer(99));
+    let default = SemScalarExpr::literal(&SemScalarConstExpr::new_integer(99));
     let overloads = [PgBuiltInType::int4(), PgBuiltInType::text()].map(|ty| {
         OverloadVariant::new(
             &Some(ty.clone()),
@@ -108,7 +112,7 @@ fn does_not_select_overloads_or_insert_defaults() {
         )
     });
     context.setup_function("overloaded", &overloads);
-    let statement = crate::parse_statements("SELECT overloaded(a => 1)", Dialect::postgres())
+    let statement = parse_statements("SELECT overloaded(a => 1)", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();

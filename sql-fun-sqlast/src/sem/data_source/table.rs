@@ -1,9 +1,12 @@
 use crate::{
     context::ParseContext,
-    names::{AliasName, ColumnName, TableName},
+    names::{AliasName, ColumnName, FullName, TableName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable,
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, SemScalarExpr,
+        WildcardTypedRecord,
+        data_source::{QualifiedSource, qualified::relation_matches},
         scalar_expr::{ColumnReferenceExpr, SystemColumnRef},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -18,12 +21,12 @@ impl TableDataSource {
         &'a self,
         source: &'a DataSource,
         context: &impl ParseContext,
-        name: &crate::names::FullName,
+        name: &FullName,
         alias: Option<&'a AliasSpec>,
-    ) -> Option<super::QualifiedSource<'a>> {
+    ) -> Option<QualifiedSource<'a>> {
         let alias = alias.unwrap_or(&self.alias);
-        if super::qualified::relation_matches(context, name, self.name.full_name(), alias) {
-            Some(super::QualifiedSource::new(source, alias.name()))
+        if relation_matches(context, name, self.name.full_name(), alias) {
+            Some(QualifiedSource::new(source, alias.name()))
         } else {
             None
         }
@@ -134,20 +137,17 @@ impl TableDataSource {
 mod tests;
 
 impl TableDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         visitor.table_binding(&mut self.name);
         visitor.source_binding(self.name.full_name(), &self.alias);
         visitor.relation_identity(self.name.full_name());
         visitor.relation(None, self.alias.name().as_str(), &[]);
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.table_binding(&self.name);
         visitor.source_binding(self.name.full_name(), &self.alias);
         visitor.relation_identity(self.name.full_name());
@@ -162,18 +162,15 @@ impl TableDataSource {
         alias: &AliasName,
         context: &impl ParseContext,
         index: usize,
-    ) -> Option<crate::sem::WildcardTypedRecord> {
-        crate::sem::WildcardTypedRecord::from_table(alias, &self.name, context, index)
+    ) -> Option<WildcardTypedRecord> {
+        WildcardTypedRecord::from_table(alias, &self.name, context, index)
     }
 
-    pub(super) const fn wildcard_relation(&self) -> &crate::names::FullName {
+    pub(super) const fn wildcard_relation(&self) -> &FullName {
         self.name.full_name()
     }
 
-    pub(super) fn unaliased_projection_relation(
-        &self,
-        alias: &AliasName,
-    ) -> Option<&crate::names::FullName> {
+    pub(super) fn unaliased_projection_relation(&self, alias: &AliasName) -> Option<&FullName> {
         if !self.alias.is_explicit() && self.alias.name() == alias {
             Some(self.name.full_name())
         } else {
@@ -188,13 +185,13 @@ impl TableDataSource {
         column: &ColumnName,
         index: usize,
         nullable: bool,
-    ) -> crate::sem::SemScalarExpr {
+    ) -> SemScalarExpr {
         let definition = if let Some(table) = context.get_table(&self.name) {
             table.get_column_at(index)
         } else {
             None
         };
-        crate::sem::SemScalarExpr::column_reference(
+        SemScalarExpr::column_reference(
             ColumnReferenceExpr::table_column(alias, column, &self.name, definition, nullable)
                 .with_derived_column_name(index < self.alias.len_derived_column()),
         )

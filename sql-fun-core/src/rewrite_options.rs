@@ -18,7 +18,7 @@ impl RewriteOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::RewriteOptions;
+    use crate::rewrite_options::RewriteOptions;
 
     #[test]
     fn default_preserves_omitted_choice() {

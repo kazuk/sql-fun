@@ -173,7 +173,7 @@ impl FileHashCache {
 
 #[cfg(test)]
 mod tests {
-    use super::FileHashCache;
+    use crate::file_hash_cache::FileHashCache;
 
     #[test]
     fn missing_watcher_does_not_split_identical_inflight_loads() {

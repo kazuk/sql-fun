@@ -1,8 +1,8 @@
-use super::{DeparseError, SqlEmit, SqlWriter};
 use crate::ast::{
-    AlterOwner, AlterSequence, Comment, DropTable, EnumType, Expr, Extension, Literal, Name,
-    ObjectArgument, ObjectTarget, Role, Sequence, SyntaxOption, SyntaxValue, VariableSet,
+    AlterOwner, AlterSequence, Comment, Dialect, DropTable, EnumType, Expr, Extension, Literal,
+    Name, ObjectArgument, ObjectTarget, Role, Sequence, SyntaxOption, SyntaxValue, VariableSet,
     VariableSetKind, View, ViewCheckOption,
+    deparse::{DeparseError, SqlEmit, SqlWriter},
 };
 
 impl SqlEmit for Extension {
@@ -584,7 +584,7 @@ impl SqlEmit for Comment {
 
 impl Comment {
     pub(in crate::ast) fn canonical_target(&self) -> Result<String, DeparseError> {
-        let mut writer = SqlWriter::new(crate::ast::Dialect::postgres());
+        let mut writer = SqlWriter::new(Dialect::postgres());
         self.target
             .emit_comment_target(self.object_kind.code(), &mut writer)?;
         Ok(writer.into_sql())
@@ -948,10 +948,12 @@ impl Role {
 
 #[cfg(test)]
 mod object_signature_tests {
+    use crate::parse_statements;
+
     use crate::ast::Dialect;
 
     fn assert_native_deparse_round_trip(sql: &str) {
-        let statement = crate::parse_statements(sql, Dialect::postgres())
+        let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .expect("one statement")
             .expect(sql);

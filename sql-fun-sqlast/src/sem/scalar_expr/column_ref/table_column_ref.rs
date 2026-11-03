@@ -1,6 +1,6 @@
 use crate::{
-    names::{AliasName, ColumnName, TableName},
-    sem::{ColumnDefinition, Nullable, TypeReference},
+    names::{AliasName, ColumnName, FullName, TableName},
+    sem::{ColumnDefinition, ColumnRename, Nullable, TypeReference, source_flag::SourceFlag},
 };
 
 /// table column reference
@@ -8,9 +8,9 @@ use crate::{
 pub struct TableColumnRef {
     alias: AliasName,
     #[serde(skip)]
-    derived_name: crate::sem::source_flag::SourceFlag,
+    derived_name: SourceFlag,
     #[serde(skip)]
-    unqualified: crate::sem::source_flag::SourceFlag,
+    unqualified: SourceFlag,
     column: ColumnName,
     table_name: TableName,
     column_def: Option<ColumnDefinition>,
@@ -55,7 +55,7 @@ impl TableColumnRef {
         }
     }
 
-    pub(super) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
+    pub(super) fn matches_column(&self, rename: &ColumnRename) -> bool {
         if let Some(column) = &self.column_def
             && let Some(source) = rename.source()
         {
@@ -70,9 +70,9 @@ impl TableColumnRef {
     }
 
     pub(super) const fn mark_unqualified(&mut self) {
-        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+        self.unqualified = SourceFlag::new(true);
     }
-    pub(super) fn renamed_output(&self, rename: &crate::sem::ColumnRename) -> Option<&ColumnName> {
+    pub(super) fn renamed_output(&self, rename: &ColumnRename) -> Option<&ColumnName> {
         if rename.matches_table(&self.table_name)
             && !self.derived_name.get()
             && &self.column == rename.destination()
@@ -83,7 +83,7 @@ impl TableColumnRef {
         }
     }
 
-    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(super) fn rename_column(&mut self, rename: &ColumnRename) {
         if rename.matches_table(&self.table_name) {
             if !self.derived_name.get() && self.matches_column(rename) {
                 self.column = rename.destination().clone();
@@ -94,7 +94,7 @@ impl TableColumnRef {
         }
     }
     pub(in crate::sem) const fn with_derived_name(mut self, value: bool) -> Self {
-        self.derived_name = crate::sem::source_flag::SourceFlag::new(value);
+        self.derived_name = SourceFlag::new(value);
         self
     }
 
@@ -115,14 +115,14 @@ impl TableColumnRef {
         self.column_def = None;
     }
     /// Exact relation identity for this resolved column.
-    pub const fn relation(&self) -> &crate::names::FullName {
+    pub const fn relation(&self) -> &FullName {
         self.table_name.full_name()
     }
     /// Local source alias, including trigger OLD/NEW aliases.
     pub const fn alias(&self) -> &AliasName {
         &self.alias
     }
-    pub(super) fn belongs_to(&self, relation: &crate::names::FullName) -> bool {
+    pub(super) fn belongs_to(&self, relation: &FullName) -> bool {
         self.table_name.full_name() == relation
     }
 
@@ -141,8 +141,8 @@ impl TableColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
-            derived_name: crate::sem::source_flag::SourceFlag::new(false),
-            unqualified: crate::sem::source_flag::SourceFlag::new(false),
+            derived_name: SourceFlag::new(false),
+            unqualified: SourceFlag::new(false),
             column: column.clone(),
             table_name: table_name.clone(),
             column_def: column_def.cloned(),
@@ -152,7 +152,7 @@ impl TableColumnRef {
 }
 
 impl TableColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

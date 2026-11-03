@@ -1,6 +1,6 @@
 use crate::{
     names::ColumnName,
-    sem::{InputTypeConstraint, ParseContext, TypeDefinition, TypeReference},
+    sem::{AnalysisError, InputTypeConstraint, ParseContext, TypeDefinition, TypeReference},
 };
 
 /// A functional type relationship, evaluated in the graph's common fixed point.
@@ -152,7 +152,7 @@ impl StructuralConstraint {
         &self,
         domains: &[InputTypeConstraint],
         context: &mut impl ParseContext,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         if let TypeProjection::Member { name, .. } = &self.projection
             && let Some(sources) = domains[self.source].admissible_types()
             && sources
@@ -194,9 +194,9 @@ impl StructuralConstraint {
 
 #[cfg(test)]
 mod tests {
-    use super::TypeProjection;
     use crate::sem::{
         ConstraintGraph, InputTypeConstraint, ParameterConstraints, PgBuiltInType, TypeReference,
+        parameter_constraints::structural::TypeProjection,
     };
     use std::collections::BTreeMap;
 

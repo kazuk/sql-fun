@@ -2,8 +2,7 @@ use std::io::Write;
 
 use ::anyhow::Context;
 
-use super::submission::QueryAnalysis;
-use crate::diagnostic::DiagnosticRenderer;
+use crate::{check::submission::QueryAnalysis, diagnostic::DiagnosticRenderer};
 
 /// Present every SQL analysis diagnostic with its extracted Rust and SQL context.
 pub(super) fn render_all(

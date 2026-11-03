@@ -1,8 +1,11 @@
-use crate::sem::{
-    ParseContext, TypeReference,
-    type_system::{
-        TypeError,
-        func_params::{FunctionParameterTrait, ParameterBindResult},
+use crate::{
+    context::BaseParseContext,
+    sem::{
+        ParseContext, TypeReference,
+        type_system::{
+            TypeError,
+            func_params::{FunctionParameterTrait, ParameterBindResult},
+        },
     },
 };
 
@@ -54,7 +57,7 @@ impl SimpleInferContext {
     fn push_array(
         &mut self,
         array_ty: &TypeReference,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         if let Some(element) = catalog.get_array_item_type(array_ty) {
             self.array_types.insert(array_ty.clone());
@@ -69,7 +72,7 @@ impl SimpleInferContext {
     fn push_non_array_element(
         &mut self,
         ty: &TypeReference,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
@@ -102,7 +105,7 @@ impl SimpleInferContext {
         &mut self,
         param_type: &TypeReference,
         arg_type: &TypeReference,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         if param_type.is_any_element() {
             self.push_element(arg_type);
@@ -148,7 +151,7 @@ impl SimpleInferContext {
         &mut self,
         param: &TParam,
         bind: &ParameterBindResult,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError>
     where
         TParam: FunctionParameterTrait + Sized,
@@ -167,10 +170,14 @@ impl SimpleInferContext {
 
 #[cfg(test)]
 mod test_simple_infer_context {
-    use crate::sem::type_system::infer::SimpleInferContext;
+    use crate::test_helpers::TestParseContext;
+
     use crate::{
         names::FullName,
-        sem::{TypeReference, type_system::TypeError},
+        sem::{
+            TypeReference,
+            type_system::{TypeError, infer::SimpleInferContext},
+        },
     };
 
     use ::testresult::TestResult;
@@ -181,11 +188,7 @@ mod test_simple_infer_context {
         let param_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
 
-        context.push_input_param(
-            &param_type,
-            &arg_type,
-            &crate::test_helpers::TestParseContext::default(),
-        )?;
+        context.push_input_param(&param_type, &arg_type, &TestParseContext::default())?;
         assert!(!context.is_require_infer());
         assert!(context.element_types.is_empty());
         assert!(matches!(
@@ -198,11 +201,7 @@ mod test_simple_infer_context {
         assert!(param_type.is_simple_infer_arg());
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
-        context.push_input_param(
-            &param_type,
-            &arg_type,
-            &crate::test_helpers::TestParseContext::default(),
-        )?;
+        context.push_input_param(&param_type, &arg_type, &TestParseContext::default())?;
 
         assert!(context.is_require_infer());
         assert!(context.element_types.contains(&arg_type));
@@ -214,11 +213,7 @@ mod test_simple_infer_context {
         let arg_type =
             TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), true);
 
-        context.push_input_param(
-            &param_type,
-            &arg_type,
-            &crate::test_helpers::TestParseContext::default(),
-        )?;
+        context.push_input_param(&param_type, &arg_type, &TestParseContext::default())?;
         assert!(context.is_require_infer());
         assert_eq!(context.element_types.len(), 1);
         assert!(context.get_inference_result().is_ok());
@@ -228,11 +223,7 @@ mod test_simple_infer_context {
         assert!(param_type.is_simple_infer_arg());
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int8"));
-        context.push_input_param(
-            &param_type,
-            &arg_type,
-            &crate::test_helpers::TestParseContext::default(),
-        )?;
+        context.push_input_param(&param_type, &arg_type, &TestParseContext::default())?;
         assert_eq!(context.element_types.len(), 2);
         assert!(matches!(
             context.get_inference_result(),
@@ -257,7 +248,7 @@ impl CommonInferContext {
     pub fn push_compat_array(
         &mut self,
         array_ty: &TypeReference,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         if let Some(element) = catalog.get_array_item_type(array_ty) {
             self.element_types.insert(element);
@@ -270,7 +261,7 @@ impl CommonInferContext {
     pub fn push_compat_non_array(
         &mut self,
         ty: &TypeReference,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
@@ -303,7 +294,7 @@ impl CommonInferContext {
         &mut self,
         param_type: &TypeReference,
         arg_type: &TypeReference,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         if param_type.is_any_compatible() {
             self.push_compat_element(arg_type);
@@ -343,7 +334,7 @@ impl CommonInferContext {
         self.infer_from_catalog(context)
     }
 
-    pub(crate) fn infer_from_catalog<TCatalog: crate::context::BaseParseContext>(
+    pub(crate) fn infer_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<TypeReference, TypeError> {
@@ -396,7 +387,7 @@ impl CommonInferContext {
         &mut self,
         param: &TParam,
         bind: &ParameterBindResult,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError>
     where
         TParam: FunctionParameterTrait + Sized,
@@ -417,11 +408,13 @@ impl CommonInferContext {
 
 #[cfg(test)]
 mod test_common_infer_context {
-    use crate::sem::type_system::infer::CommonInferContext;
-    use crate::test_helpers::TestParseContext;
     use crate::{
         names::FullName,
-        sem::{CastContext, CastDefinition, TypeReference, type_system::TypeError},
+        sem::{
+            CastContext, CastDefinition, TypeReference,
+            type_system::{TypeError, infer::CommonInferContext},
+        },
+        test_helpers::TestParseContext,
     };
 
     use std::collections::HashSet;
@@ -437,11 +430,7 @@ mod test_common_infer_context {
         ));
         let arg_type = TypeReference::from_master_type_name("int4");
 
-        let result = context.push_input_param(
-            &param_type,
-            &arg_type,
-            &crate::test_helpers::TestParseContext::default(),
-        );
+        let result = context.push_input_param(&param_type, &arg_type, &TestParseContext::default());
 
         assert!(matches!(result, Err(TypeError::RequireArray(_))));
         assert!(context.element_types.is_empty());
@@ -457,11 +446,7 @@ mod test_common_infer_context {
         ));
         let arg_type = TypeReference::from_master_type_name("_int4");
 
-        let result = context.push_input_param(
-            &param_type,
-            &arg_type,
-            &crate::test_helpers::TestParseContext::default(),
-        );
+        let result = context.push_input_param(&param_type, &arg_type, &TestParseContext::default());
 
         assert!(matches!(result, Err(TypeError::RequireNonArray(_))));
         assert!(context.element_types.is_empty());

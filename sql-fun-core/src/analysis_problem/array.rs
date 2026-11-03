@@ -1,4 +1,4 @@
-use super::{DiagnosticMetadata, MinMaxProblem, TypeReference};
+use crate::analysis_problem::{DiagnosticMetadata, MinMaxProblem, TypeReference};
 
 /// A `PostgreSQL` ARRAY constructor type-resolution failure.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]

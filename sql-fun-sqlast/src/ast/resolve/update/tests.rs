@@ -2,10 +2,18 @@ mod assignments;
 mod cursors;
 mod views;
 
+#[cfg(feature = "sqlite")]
+use crate::sem::SemAst as SemSemAst;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::SqliteSynBuilder;
+use crate::{
+    parse_statements,
+    sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+    test_helpers::create_cache_context,
+};
+
 use self::test_helpers::{analyze, catalog};
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::sem::PgBuiltInType;
+use crate::{ast::Dialect, context::ParseContext, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case::literal("UPDATE items SET id=2 RETURNING *")]
@@ -60,14 +68,13 @@ fn infers_parameters(#[case] sql: &str) {
 #[case::unreadable("WITH u AS (UPDATE items SET id=1) SELECT * FROM u", true)]
 fn rejects_invalid_structure(#[case] sql: &str, #[case] fatal: bool) {
     let mut context = catalog(Dialect::postgres());
-    let statement = crate::parse_statements(sql, Dialect::postgres())
+    let statement = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
-    let result = statement.node.resolve(
-        &mut context,
-        &mut crate::test_helpers::create_cache_context(),
-    );
+    let result = statement
+        .node
+        .resolve(&mut context, &mut create_cache_context());
     if fatal {
         assert!(result.is_err());
     } else {
@@ -83,16 +90,13 @@ fn rejects_invalid_structure(#[case] sql: &str, #[case] fatal: bool) {
 fn preserves_default_and_resets_parameters() {
     let mut context = catalog(Dialect::postgres());
     for sql in ["UPDATE items SET id=$1", "UPDATE items SET id=DEFAULT"] {
-        let statement = crate::parse_statements(sql, Dialect::postgres())
+        let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap();
         let result = statement
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .unwrap();
         if sql.ends_with("DEFAULT") {
             assert!(
@@ -137,12 +141,14 @@ fn sqlite_invalid_returning(#[case] sql: &str) {
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{parse_statements, test_helpers::create_cache_context};
+
     use crate::{
+        ast::Dialect,
         context::MutSourcePathWithSpan,
         names::{ColumnName, SchemaName},
         sem::{ColumnDefinition, PgBuiltInType, SemAst},
+        test_helpers::{TestParseContext, source_span},
     };
 
     #[cfg(feature = "sqlite")]
@@ -185,16 +191,10 @@ mod test_helpers {
     }
     pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
         let mut context = catalog(dialect);
-        let statement = crate::parse_statements(sql, dialect)
-            .next()
-            .unwrap()
-            .unwrap();
+        let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
         let result = statement
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .unwrap();
         (result, context)
     }
@@ -241,9 +241,9 @@ fn public_postgres_entry_points_share_update_resolution() {
 #[cfg(feature = "sqlite")]
 #[test]
 fn public_sqlite_entry_point_analyzes_update() {
-    let syntax = crate::test_helpers::SqliteSynBuilder
-        .parse_as_stmt("UPDATE OR IGNORE items NOT INDEXED SET id=?1 RETURNING id");
-    let result = crate::sem::SemAst::semantic_analysis_sqlite_stmt(
+    let syntax =
+        SqliteSynBuilder.parse_as_stmt("UPDATE OR IGNORE items NOT INDEXED SET id=?1 RETURNING id");
+    let result = SemSemAst::semantic_analysis_sqlite_stmt(
         catalog(Dialect::sqlite()),
         syntax,
         &::sql_fun_core::IVec::default(),
@@ -265,20 +265,17 @@ fn public_sqlite_entry_point_analyzes_update() {
 #[test]
 fn unreferenced_update_cte_is_analyzed_in_one_inference_pass() {
     let mut context = catalog(Dialect::postgres());
-    let statement = crate::parse_statements(
+    let statement = parse_statements(
         "WITH u AS (UPDATE items SET id=$1) SELECT 1",
         Dialect::postgres(),
     )
     .next()
     .unwrap()
     .unwrap();
-    let before = crate::sem::parameter_resolution::inference_runs();
+    let before = parameter_resolution_inference_runs();
     statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut create_cache_context())
         .unwrap();
     assert_eq!(
         crate::sem::parameter_resolution::inference_runs(),

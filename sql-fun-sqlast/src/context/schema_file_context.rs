@@ -1,4 +1,5 @@
 mod cast_info;
+
 #[cfg(test)]
 mod column_attribute_tests;
 mod column_rename;
@@ -18,6 +19,29 @@ mod table_rename;
 mod table_rename_tests;
 mod type_info;
 mod view_info;
+
+use crate::{
+    AstAndContextPair, ParsedSchemaDump,
+    context::{
+        CursorBindings, ExtensionInfoRead, OwnershipInfoRead, ParameterTypeHints, RuleInfoRead,
+        ownership::{ConfiguredRoles, OwnershipCatalog},
+    },
+    names::TableName as NamesTableName,
+    sem::{
+        AlterIndex, AlterOwner, AnalysisState, CatalogNameLookup, CollationDefinition,
+        ConflictArbiterInference, CreateRule, CreateTrigger, CursorInfo, DatabaseCollation,
+        InsertConflict, Kind, OperatorClassDefinition, OverloadVariant as SemOverloadVariant,
+        OwnedObjectDefinition, ParameterConstraints, Role, RuleIdentity, SemAst, TriggerIdentity,
+        VariableSet, ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport,
+        ViewUpdateSupport,
+        conflict_info::infer_from_catalog,
+        conflict_masters::{
+            lookup_collation as conflict_masters_lookup_collation,
+            lookup_operator_class as conflict_masters_lookup_operator_class,
+        },
+        problem::{CreationProblem, TriggerProblem},
+    },
+};
 
 use self::{
     func_info::FunctionDefinitionCollection, sequence_info::SequenceInfoCollection,
@@ -54,10 +78,10 @@ pub struct SchemaFileContext {
     diagnostic_source: Option<String>,
     presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
     problems: Vec<AnalysisProblem>,
-    cursors: crate::context::CursorBindings,
-    analysis_state: crate::sem::AnalysisState,
-    parameter_constraints: crate::sem::ParameterConstraints,
-    parameter_type_hints: crate::context::ParameterTypeHints,
+    cursors: CursorBindings,
+    analysis_state: AnalysisState,
+    parameter_constraints: ParameterConstraints,
+    parameter_type_hints: ParameterTypeHints,
 }
 
 #[derive(Clone, Debug)]
@@ -66,19 +90,18 @@ pub(super) struct SchemaCatalog {
     renamed_relations: std::collections::HashSet<FullName>,
     renamed_tables: std::collections::HashSet<FullName>,
     renamed_types: std::collections::HashSet<FullName>,
-    rules: std::collections::HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
-    ownership: crate::context::ownership::OwnershipCatalog,
-    configured_roles: crate::context::ownership::ConfiguredRoles,
+    rules: std::collections::HashMap<RuleIdentity, Option<CreateRule>>,
+    ownership: OwnershipCatalog,
+    configured_roles: ConfiguredRoles,
     base: FrozenBaseContext,
-    triggers:
-        std::collections::HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
+    triggers: std::collections::HashMap<TriggerIdentity, Option<CreateTrigger>>,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
     search_path: Vec<SchemaName>,
     types: TypeDefinitionCollection,
     tables: TableDefinitionCollection,
     functions: FunctionDefinitionCollection,
-    function_view_rows: std::collections::HashMap<(FullName, crate::sem::OverloadVariant), bool>,
+    function_view_rows: std::collections::HashMap<(FullName, SemOverloadVariant), bool>,
     extensions: TrieMap<CreateExtension>,
     variables: TrieMap<SemScalarExpr>,
     schemas: TrieMap<CreateSchema>,
@@ -92,7 +115,7 @@ pub(super) struct SchemaCatalog {
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
-    objects: TrieMap<crate::sem::Kind>,
+    objects: TrieMap<Kind>,
     sql_source_path: PathBuf,
     source: Option<SourcePathWithSpan>,
 }
@@ -162,9 +185,9 @@ impl SchemaFileContext {
             diagnostic_source: None,
             presentations: Vec::new(),
             problems: Vec::new(),
-            cursors: crate::context::CursorBindings::default(),
-            analysis_state: crate::sem::AnalysisState::default(),
-            parameter_constraints: crate::sem::ParameterConstraints::default(),
+            cursors: CursorBindings::default(),
+            analysis_state: AnalysisState::default(),
+            parameter_constraints: ParameterConstraints::default(),
             parameter_type_hints: Default::default(),
         }
     }
@@ -191,13 +214,10 @@ impl SchemaFileContext {
         self.diagnostic_source = Some(source.to_owned());
     }
 
-    pub(crate) fn into_parsed(
-        mut self,
-        sem_results: Vec<crate::sem::SemAst>,
-    ) -> crate::ParsedSchemaDump {
+    pub(crate) fn into_parsed(mut self, sem_results: Vec<SemAst>) -> ParsedSchemaDump {
         let problems = std::mem::take(&mut self.problems);
         let presentations = std::mem::take(&mut self.presentations);
-        crate::ParsedSchemaDump::new(sem_results, self.freeze(), problems, presentations)
+        ParsedSchemaDump::new(sem_results, self.freeze(), problems, presentations)
     }
 
     /// apply index from constraint
@@ -225,6 +245,8 @@ impl MutSourcePathWithSpan for SchemaFileContext {
 
 #[cfg(test)]
 mod test_schema_file_context {
+    use crate::test_helpers::schema_layer;
+
     use crate::{
         context::ParseContext,
         test_helpers::{TestParseContext, test_context},
@@ -234,12 +256,12 @@ mod test_schema_file_context {
     #[rstest::rstest]
     fn test_new(test_context: TestParseContext) {
         let path = Path::new("hoge.sql");
-        let _context = crate::test_helpers::schema_layer(path, &test_context.freeze());
+        let _context = schema_layer(path, &test_context.freeze());
     }
 }
 
 impl IndexInfoRead for SchemaCatalog {
-    fn indexes_for_table(&self, table: &crate::names::TableName) -> Vec<&CreateIndex> {
+    fn indexes_for_table(&self, table: &NamesTableName) -> Vec<&CreateIndex> {
         let mut indexes = self.base.indexes_for_table(table);
         indexes.retain(|index| !self.indexes.contains(&index.name().to_string()));
         indexes.extend(
@@ -261,10 +283,11 @@ impl IndexInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_index_lookup {
+    use crate::{names::SchemaName as NamesSchemaName, test_helpers::schema_layer};
+
     use self::test_helpers::{index, layer};
-    use crate::context::BaseParseContext;
     use crate::{
-        context::{IndexInfoRead, ParseContext},
+        context::{BaseParseContext, IndexInfoRead, ParseContext},
         names::FullName,
     };
 
@@ -328,11 +351,8 @@ mod test_index_lookup {
     fn frozen_parent_is_searched_per_qualified_candidate() -> testresult::TestResult {
         use std::path::Path;
         let parent = layer(&["b", "a"], &[index("a", "parent", "idx")])?.freeze();
-        let mut child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent);
-        child.set_search_path(&[
-            crate::names::SchemaName::from("a"),
-            crate::names::SchemaName::from("b"),
-        ]);
+        let mut child = schema_layer(Path::new("child.sql"), &parent);
+        child.set_search_path(&[NamesSchemaName::from("a"), NamesSchemaName::from("b")]);
         child = child.apply_create_index(&index("b", "child", "idx"))?;
         assert_eq!(
             child
@@ -385,7 +405,7 @@ mod test_index_lookup {
         let left = index("a.b", "parent_table", "c");
         let right = index("a", "other_table", "b.c");
         let parent = layer(&["a.b", "a"], std::slice::from_ref(&left))?.freeze();
-        let child = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &parent);
+        let child = schema_layer(std::path::Path::new("child.sql"), &parent);
         let child = child.apply_create_index(&right)?;
         assert_eq!(
             child
@@ -431,6 +451,8 @@ mod test_index_lookup {
     }
 
     mod test_helpers {
+        use crate::{sem::AnalysisError, test_helpers::schema_layer};
+
         use crate::{
             context::{ParseContext, SchemaFileContext},
             names::{FullName, SchemaName, TableName},
@@ -450,9 +472,9 @@ mod test_index_lookup {
         pub(super) fn layer(
             path: &[&str],
             indexes: &[CreateIndex],
-        ) -> Result<SchemaFileContext, crate::sem::AnalysisError> {
+        ) -> Result<SchemaFileContext, AnalysisError> {
             let base = TestParseContext::default().freeze();
-            let mut context = crate::test_helpers::schema_layer(Path::new("indexes.sql"), &base);
+            let mut context = schema_layer(Path::new("indexes.sql"), &base);
             let mut schemas = Vec::new();
             for name in path {
                 schemas.push(SchemaName::from(name));
@@ -522,6 +544,8 @@ mod test_operator_layers {
     }
 
     mod test_helpers {
+        use crate::{context::FrozenBaseContext, test_helpers::schema_layer};
+
         use crate::{
             context::{ParseContext, SchemaFileContext},
             sem::{
@@ -532,12 +556,9 @@ mod test_operator_layers {
         };
         use std::path::Path;
 
-        pub(super) fn operator_layer(
-            has_left: bool,
-            has_right: bool,
-        ) -> crate::context::FrozenBaseContext {
+        pub(super) fn operator_layer(has_left: bool, has_right: bool) -> FrozenBaseContext {
             let root = TestParseContext::default().freeze();
-            let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
+            let mut parent = schema_layer(Path::new("parent.sql"), &root);
             register(
                 &mut parent,
                 "+",
@@ -552,8 +573,7 @@ mod test_operator_layers {
                 has_right,
                 &PgBuiltInType::int4(),
             );
-            let mut child =
-                crate::test_helpers::schema_layer(Path::new("child.sql"), &parent.freeze());
+            let mut child = schema_layer(Path::new("child.sql"), &parent.freeze());
             register(&mut child, "+", has_left, has_right, &PgBuiltInType::int8());
             child.freeze()
         }
@@ -631,6 +651,8 @@ impl DiagnosticContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_diagnostic_context {
+    use crate::{sem::AnalysisError, test_helpers::schema_layer};
+
     use crate::{
         StringSpan,
         context::{DiagnosticContext, ParseContext},
@@ -649,7 +671,7 @@ mod test_diagnostic_context {
             _args: &::sql_fun_core::SqlFunArgs,
             _path: &Path,
             _span: StringSpan,
-        ) -> Result<String, crate::sem::AnalysisError> {
+        ) -> Result<String, AnalysisError> {
             panic!("diagnostic collection must not reopen the source")
         }
     }
@@ -659,7 +681,7 @@ mod test_diagnostic_context {
         let mut base = TestParseContext::default();
         base.reject_diagnostics_after(0);
         let base = base.freeze();
-        let mut context = crate::test_helpers::schema_layer(Path::new("schema.sql"), &base);
+        let mut context = schema_layer(Path::new("schema.sql"), &base);
         context.set_source_file(Box::new(UnavailableSource));
         context.set_diagnostic_source("first second");
         let first = AnalysisProblem::function_not_found(
@@ -681,53 +703,42 @@ mod test_diagnostic_context {
         assert_eq!(presentations.len(), 2);
         assert_eq!(presentations[0].as_ref().unwrap().source(), "first second");
         assert_eq!(presentations[1].as_ref().unwrap().source(), "first second");
-        let descendant =
-            crate::test_helpers::schema_layer(Path::new("descendant.sql"), parsed.base_context());
+        let descendant = schema_layer(Path::new("descendant.sql"), parsed.base_context());
         assert!(descendant.problems().is_empty());
-        let sibling = crate::test_helpers::schema_layer(Path::new("sibling.sql"), &base);
+        let sibling = schema_layer(Path::new("sibling.sql"), &base);
         assert!(sibling.problems().is_empty());
         Ok(())
     }
 }
 
 impl crate::context::RuleInfoRead for SchemaCatalog {
-    fn local_rule(
-        &self,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Option<Option<&crate::sem::CreateRule>> {
+    fn local_rule(&self, identity: &RuleIdentity) -> Option<Option<&CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
     }
-    fn rule_parent(&self) -> Option<&dyn crate::context::RuleInfoRead> {
+    fn rule_parent(&self) -> Option<&dyn RuleInfoRead> {
         Some(&self.base)
     }
 }
 impl crate::context::RuleInfoWrite for SchemaFileContext {
-    fn store_rule(
-        &mut self,
-        identity: &crate::sem::RuleIdentity,
-        definition: Option<&crate::sem::CreateRule>,
-    ) {
+    fn store_rule(&mut self, identity: &RuleIdentity, definition: Option<&CreateRule>) {
         self.catalog
             .rules
             .insert(identity.clone(), definition.cloned());
     }
-    fn store_rule_view(&mut self, target: &FullName, view: &crate::sem::ViewLike) {
+    fn store_rule_view(&mut self, target: &FullName, view: &ViewLike) {
         self.catalog.views.insert(target, view);
     }
 }
 
 impl crate::context::TriggerInfoRead for SchemaCatalog {
-    fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
+    fn trigger_is_cancelled(&self, identity: &TriggerIdentity) -> bool {
         if let Some(entry) = self.triggers.get(identity) {
             entry.is_none()
         } else {
             self.base.trigger_is_cancelled(identity)
         }
     }
-    fn trigger(
-        &self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Option<&crate::sem::CreateTrigger> {
+    fn trigger(&self, identity: &TriggerIdentity) -> Option<&CreateTrigger> {
         if let Some(trigger) = self.triggers.get(identity) {
             trigger.as_ref()
         } else {
@@ -764,10 +775,7 @@ impl BaseParseContext for SchemaCatalog {
 }
 
 impl crate::context::TriggerInfoWrite for SchemaFileContext {
-    fn register_trigger(
-        mut self,
-        trigger: &crate::sem::CreateTrigger,
-    ) -> Result<Self, AnalysisError> {
+    fn register_trigger(mut self, trigger: &CreateTrigger) -> Result<Self, AnalysisError> {
         self.catalog
             .triggers
             .insert(trigger.identity().clone(), Some(trigger.clone()));
@@ -785,16 +793,13 @@ impl crate::context::TriggerInfoWrite for SchemaFileContext {
             view.associate_trigger(name);
             self.catalog.views.insert(target, &view);
         } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
+            self.report_analysis_problem(AnalysisProblem::trigger(&TriggerProblem::target(
+                target,
+            )))?;
         }
         Ok(self)
     }
-    fn cancel_trigger(
-        mut self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Result<Self, AnalysisError> {
+    fn cancel_trigger(mut self, identity: &TriggerIdentity) -> Result<Self, AnalysisError> {
         self.catalog.triggers.insert(identity.clone(), None);
         Ok(self)
     }
@@ -810,9 +815,9 @@ impl crate::context::TriggerInfoWrite for SchemaFileContext {
             view.dissociate_trigger(name);
             self.catalog.views.insert(target, &view);
         } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
+            self.report_analysis_problem(AnalysisProblem::trigger(&TriggerProblem::target(
+                target,
+            )))?;
         }
         Ok(self)
     }
@@ -826,7 +831,7 @@ impl crate::context::ParameterTypeHintRead for SchemaFileContext {
 
 impl crate::context::ParameterTypeHintWrite for SchemaFileContext {
     fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
-        self.parameter_type_hints = crate::context::ParameterTypeHints::resolve(hints, self)?;
+        self.parameter_type_hints = ParameterTypeHints::resolve(hints, self)?;
         Ok(())
     }
 }
@@ -835,9 +840,9 @@ impl ParseContext for SchemaFileContext {
     fn apply_creation_group<F>(
         mut self,
         operation: F,
-    ) -> Result<crate::AstAndContextPair<Self>, AnalysisError>
+    ) -> Result<AstAndContextPair<Self>, AnalysisError>
     where
-        F: FnOnce(Self) -> Result<crate::AstAndContextPair<Self>, AnalysisError>,
+        F: FnOnce(Self) -> Result<AstAndContextPair<Self>, AnalysisError>,
     {
         // Stage a sparse child layer. Failed groups discard only their writes;
         // sharing the baseline avoids cloning catalog tries or definition bodies.
@@ -849,44 +854,44 @@ impl ParseContext for SchemaFileContext {
         self.catalog = Self::new(&path, &baseline, &args, &metadata).catalog;
         self.catalog.source = baseline.get_source_path_with_span().cloned();
         let before = self.problems.len();
-        let crate::AstAndContextPair(ast, mut context) = operation(self)?;
+        let AstAndContextPair(ast, mut context) = operation(self)?;
         if context.problems.len() != before {
             context.catalog = Self::new(&path, &baseline, &args, &metadata).catalog;
             context.catalog.source = baseline.get_source_path_with_span().cloned();
         }
-        Ok(crate::AstAndContextPair::new(ast, context))
+        Ok(AstAndContextPair::new(ast, context))
     }
-    fn insert_role(&mut self, role: &crate::sem::Role) {
+    fn insert_role(&mut self, role: &Role) {
         self.catalog.ownership.insert_role(role);
     }
-    fn insert_owned_object(&mut self, definition: &crate::sem::OwnedObjectDefinition) {
+    fn insert_owned_object(&mut self, definition: &OwnedObjectDefinition) {
         self.catalog.ownership.insert(definition);
     }
-    fn apply_alter_owner(self, alteration: &crate::sem::AlterOwner) -> Result<Self, AnalysisError> {
+    fn apply_alter_owner(self, alteration: &AlterOwner) -> Result<Self, AnalysisError> {
         self.apply_ownership_change(alteration)
     }
 
-    fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {
+    fn resolve_cursor(&self, name: &str) -> Option<&CursorInfo> {
         self.cursors.cursor(name)
     }
-    fn bind_cursor(&mut self, name: &str, info: &crate::sem::CursorInfo) {
+    fn bind_cursor(&mut self, name: &str, info: &CursorInfo) {
         self.cursors.bind(name, info);
     }
     fn remove_cursor(&mut self, name: &str) {
         self.cursors.remove(name);
     }
-    fn analysis_state(&self) -> &crate::sem::AnalysisState {
+    fn analysis_state(&self) -> &AnalysisState {
         &self.analysis_state
     }
-    fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState {
+    fn analysis_state_mut(&mut self) -> &mut AnalysisState {
         &mut self.analysis_state
     }
 
-    fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints {
+    fn parameter_constraints(&self) -> &ParameterConstraints {
         &self.parameter_constraints
     }
 
-    fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    fn set_parameter_constraints(&mut self, constraints: &ParameterConstraints) {
         self.parameter_constraints = constraints.clone();
     }
 
@@ -919,15 +924,13 @@ impl ParseContext for SchemaFileContext {
         create_extension: &CreateExtension,
     ) -> Result<Self, AnalysisError> {
         let name = create_extension.name();
-        if crate::context::ExtensionInfoRead::extension_exists(&self, name) {
+        if ExtensionInfoRead::extension_exists(&self, name) {
             if !create_extension.if_not_exists() {
-                self.report_problem(AnalysisProblem::creation(
-                    crate::sem::problem::CreationProblem::named(
-                        &FullName::from_local_name(name),
-                        "extension",
-                        &self.creation_span(),
-                    ),
-                ))?;
+                self.report_problem(AnalysisProblem::creation(CreationProblem::named(
+                    &FullName::from_local_name(name),
+                    "extension",
+                    &self.creation_span(),
+                )))?;
             }
             return Ok(self);
         }
@@ -937,10 +940,7 @@ impl ParseContext for SchemaFileContext {
         Ok(self)
     }
 
-    fn apply_variable_set(
-        mut self,
-        variable_set: &crate::sem::VariableSet,
-    ) -> Result<Self, AnalysisError> {
+    fn apply_variable_set(mut self, variable_set: &VariableSet) -> Result<Self, AnalysisError> {
         let name = variable_set.name();
         self.catalog
             .variables
@@ -950,15 +950,13 @@ impl ParseContext for SchemaFileContext {
 
     fn apply_create_schema(mut self, create_schema: &CreateSchema) -> Result<Self, AnalysisError> {
         let name = create_schema.name();
-        if crate::context::OwnershipInfoRead::schema_definition(&self, name).is_some() {
+        if OwnershipInfoRead::schema_definition(&self, name).is_some() {
             if !create_schema.if_not_exists() {
-                self.report_problem(AnalysisProblem::creation(
-                    crate::sem::problem::CreationProblem::named(
-                        &FullName::from_local_name(name),
-                        "schema",
-                        &self.creation_span(),
-                    ),
-                ))?;
+                self.report_problem(AnalysisProblem::creation(CreationProblem::named(
+                    &FullName::from_local_name(name),
+                    "schema",
+                    &self.creation_span(),
+                )))?;
             }
             return Ok(self);
         }
@@ -975,7 +973,7 @@ impl ParseContext for SchemaFileContext {
         Ok(self)
     }
 
-    fn apply_alter_index(mut self, index: &crate::sem::AlterIndex) -> Result<Self, AnalysisError> {
+    fn apply_alter_index(mut self, index: &AlterIndex) -> Result<Self, AnalysisError> {
         if let Some(replacement) = index.replacement() {
             self.catalog.store_index(replacement);
         }
@@ -985,7 +983,7 @@ impl ParseContext for SchemaFileContext {
         let name = create_index.name();
         if !self.permits_relation_creation(
             name,
-            crate::sem::Kind::index(),
+            Kind::index(),
             create_index.if_not_exists(),
             false,
         )? {
@@ -998,6 +996,8 @@ impl ParseContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_extension_record {
+    use crate::test_helpers::schema_layer;
+
     use crate::{context::ParseContext, sem::CreateExtension, test_helpers::TestParseContext};
     use std::path::Path;
 
@@ -1006,8 +1006,8 @@ mod test_extension_record {
     -> testresult::TestResult {
         let root = TestParseContext::default().freeze();
         let extension = CreateExtension::from_name("not_installed_by_this_operation");
-        let context = crate::test_helpers::schema_layer(Path::new("extension.sql"), &root)
-            .apply_create_extension(&extension)?;
+        let context =
+            schema_layer(Path::new("extension.sql"), &root).apply_create_extension(&extension)?;
 
         assert_eq!(
             context
@@ -1025,6 +1025,8 @@ mod test_extension_record {
 
 #[cfg(test)]
 mod test_freeze {
+    use crate::test_helpers::schema_layer;
+
     use crate::{
         StringSpan,
         context::{
@@ -1039,7 +1041,7 @@ mod test_freeze {
     fn consuming_freeze_keeps_definitions_and_provenance_and_drops_source_service()
     -> testresult::TestResult {
         let base = test_helpers::empty_base();
-        let mut context = crate::test_helpers::schema_layer(Path::new("parent.sql"), &base);
+        let mut context = schema_layer(Path::new("parent.sql"), &base);
         let statement_span = StringSpan::new(12, 24);
         context.set_statement_span(statement_span);
         let table = test_helpers::table_with_id();
@@ -1068,11 +1070,11 @@ mod test_freeze {
     fn child_alteration_leaves_shared_parent_and_sibling_unchanged() -> testresult::TestResult {
         let base = test_helpers::empty_base();
         let table = test_helpers::table_with_key_candidates();
-        let parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &base)
+        let parent = schema_layer(Path::new("parent.sql"), &base)
             .apply_create_table(&table)?
             .freeze();
-        let mut left = crate::test_helpers::schema_layer(Path::new("left.sql"), &parent);
-        let right = crate::test_helpers::schema_layer(Path::new("right.sql"), &parent);
+        let mut left = schema_layer(Path::new("left.sql"), &parent);
+        let right = schema_layer(Path::new("right.sql"), &parent);
         left.set_search_path(&[SchemaName::from("left")]);
         let left = left
             .apply_alter_table(&test_helpers::add_primary_key(&table, "other_id"))?
@@ -1173,6 +1175,8 @@ mod test_freeze {
 
 #[cfg(test)]
 mod test_search_path {
+    use crate::test_helpers::schema_layer;
+
     use crate::{
         context::{BaseParseContext, ParseContext, SearchPathRead},
         names::{FullName, SchemaName},
@@ -1193,7 +1197,7 @@ mod test_search_path {
         #[case] qualifier: Option<&str>,
         #[case] expected_schema: Option<&str>,
     ) {
-        let mut context = crate::test_helpers::schema_layer(
+        let mut context = schema_layer(
             Path::new("schema.sql"),
             &test_helpers::catalog_with_search_path(&["public"]),
         );
@@ -1231,16 +1235,16 @@ mod test_search_path {
 
     #[test]
     fn nested_contexts_keep_their_own_search_paths() {
-        let parent = crate::test_helpers::schema_layer(
+        let parent = schema_layer(
             Path::new("parent.sql"),
             &test_helpers::catalog_with_search_path(&["public", "pg_catalog"]),
         )
         .freeze();
-        let mut child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent);
+        let mut child = schema_layer(Path::new("child.sql"), &parent);
         assert_eq!(child.get_search_path(), parent.get_search_path());
         child.set_search_path(&test_helpers::search_path(&["app", "pg_catalog"]));
         let child = child.freeze();
-        let mut descendant = crate::test_helpers::schema_layer(Path::new("descendant.sql"), &child);
+        let mut descendant = schema_layer(Path::new("descendant.sql"), &child);
         assert_eq!(descendant.get_search_path(), child.get_search_path());
         descendant.set_search_path(&[]);
 
@@ -1325,70 +1329,57 @@ mod test_search_path {
 }
 
 impl crate::context::ConflictInfoRead for SchemaCatalog {
-    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+    fn database_collation(&self) -> Option<&DatabaseCollation> {
         self.base.database_collation()
     }
-    fn collation_definition(
-        &self,
-        name: &crate::names::FullName,
-    ) -> Option<&crate::sem::CollationDefinition> {
+    fn collation_definition(&self, name: &FullName) -> Option<&CollationDefinition> {
         self.base.collation_definition(name)
     }
     fn operator_class_definition(
         &self,
-        name: &crate::names::FullName,
+        name: &FullName,
         method: &str,
-    ) -> Option<&crate::sem::OperatorClassDefinition> {
+    ) -> Option<&OperatorClassDefinition> {
         self.base.operator_class_definition(name, method)
     }
-    fn lookup_sqlite_collation(
-        &self,
-        name: &crate::names::FullName,
-    ) -> crate::sem::CatalogNameLookup {
+    fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.base.lookup_sqlite_collation(name)
     }
-    fn lookup_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
-        crate::sem::conflict_masters::lookup_collation(self, name)
+    fn lookup_collation(&self, name: &FullName) -> CatalogNameLookup {
+        conflict_masters_lookup_collation(self, name)
     }
-    fn lookup_operator_class(
-        &self,
-        name: &FullName,
-        access_method: &str,
-    ) -> crate::sem::CatalogNameLookup {
-        crate::sem::conflict_masters::lookup_operator_class(self, name, access_method)
+    fn lookup_operator_class(&self, name: &FullName, access_method: &str) -> CatalogNameLookup {
+        conflict_masters_lookup_operator_class(self, name, access_method)
     }
     fn infer_conflict_arbiters(
         &self,
-        table: &crate::names::TableName,
-        conflict: &crate::sem::InsertConflict,
-    ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-        crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
+        table: &NamesTableName,
+        conflict: &InsertConflict,
+    ) -> Result<ConflictArbiterInference, AnalysisError> {
+        infer_from_catalog(self, table, conflict)
     }
 }
 
 impl crate::context::ViewInsertInfoRead for SchemaCatalog {
-    fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
+    fn view_insert_support(&self, view: &FullName) -> Option<&ViewInsertSupport> {
         self.base.view_insert_support(view)
     }
 }
 
 impl crate::context::ViewUpdateInfoRead for SchemaCatalog {
-    fn view_update_support(
-        &self,
-        view: &crate::names::FullName,
-    ) -> Option<&crate::sem::ViewUpdateSupport> {
+    fn view_update_support(&self, view: &FullName) -> Option<&ViewUpdateSupport> {
         self.base.view_update_support(view)
     }
 }
 
 impl crate::context::ViewDeleteInfoRead for SchemaCatalog {
-    fn view_delete_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewDeleteSupport {
+    fn view_delete_support(&self, _view: &FullName) -> ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
 impl crate::context::ViewMergeInfoRead for SchemaCatalog {
-    fn view_merge_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewMergeSupport {
+    fn view_merge_support(&self, _view: &FullName) -> ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }
 }

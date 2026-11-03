@@ -1,5 +1,7 @@
 //! ARRAY semantics through the maintained SQL analysis boundary.
+
 use self::test_helpers::heavy;
+use crate::test_helpers::create_cache_context;
 use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{PgBuiltInType, TypeReference},
@@ -37,7 +39,7 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
     #[case] code: &str,
     #[case] count: usize,
 ) -> testresult::TestResult {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     // The CLI regression asserts diagnostic identities and result metadata;
     // this integration test keeps rendered diagnostics, array shape, and recovery.
     let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
@@ -343,6 +345,8 @@ mod test_helpers {
     pub(crate) use self::cache_context::create_cache_context;
 
     pub(super) mod heavy {
+        use crate::test_helpers::create_cache_context;
+
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
@@ -357,7 +361,7 @@ mod test_helpers {
             sql: &str,
             definitions: &[&str],
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = crate::test_helpers::create_cache_context();
+            let mut cache_context = create_cache_context();
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",

@@ -1,5 +1,6 @@
 use crate::{
     TrieMap,
+    context::base_context::deserialize_from_path,
     sem::{
         AnalysisError, BinaryOperatorDefinition, OperatorDefinition, TypeReference,
         UnaryOperatorDefinition,
@@ -31,7 +32,7 @@ impl PgBuiltinOperators {
         P: AsRef<Path>,
     {
         let master_definitions: HashMap<String, Vec<BinaryOperatorTypeDecl>> =
-            super::deserialize_from_path(path)?;
+            deserialize_from_path(path)?;
 
         let mut master = TrieMap::new();
         for (k, v) in &master_definitions {
@@ -56,7 +57,7 @@ impl PgBuiltinOperators {
         P: AsRef<Path>,
     {
         let master_definitions: HashMap<String, Vec<UnaryOperatorTypeDecl>> =
-            super::deserialize_from_path(path)?;
+            deserialize_from_path(path)?;
         let mut master = TrieMap::new();
         for (k, v) in &master_definitions {
             let mut overloads = Vec::new();
@@ -76,7 +77,7 @@ impl PgBuiltinOperators {
         P: AsRef<Path>,
     {
         let master_definitions: HashMap<String, Vec<UnaryOperatorTypeDecl>> =
-            super::deserialize_from_path(path)?;
+            deserialize_from_path(path)?;
         let mut master = TrieMap::new();
         for (k, v) in &master_definitions {
             let mut overloads = Vec::new();

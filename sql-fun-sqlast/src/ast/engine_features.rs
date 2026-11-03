@@ -1,12 +1,13 @@
 //! Version notifications for retained PostgreSQL syntax, before catalog effects.
+
 use crate::{
     ast::{
-        ColumnConstraint, ConstraintExtras, CteBody, Query, ReturningOption, StatementNode,
-        TableConstraint, With,
+        ColumnConstraint, ConstraintExtras, CteBody, Dialect, Query, ReturningOption,
+        StatementNode, TableConstraint, With,
     },
     context::ParseContext,
     engine_specific::{Postgres18Feature, Postgres18Syntax},
-    sem::AnalysisError,
+    sem::{AnalysisError, GeneratedColumnMode},
     syn::{self, Opt},
 };
 use ::sql_fun_core::IVec;
@@ -33,7 +34,7 @@ impl StatementNode {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if context.dialect() != super::Dialect::postgres() {
+        if context.dialect() != Dialect::postgres() {
             return Ok(true);
         }
         match self {
@@ -56,6 +57,8 @@ impl StatementNode {
 
 #[cfg(test)]
 mod unimplemented_analysis_tests {
+    use crate::{ast::Dialect, parse_statements, test_helpers::TestParseContext};
+
     #[rstest::rstest]
     #[case::insert_alias("INSERT INTO t VALUES (1) RETURNING WITH (NEW AS n) n.id")]
     #[case::update_alias("UPDATE t SET id=1 RETURNING WITH (OLD AS o) o.id")]
@@ -72,9 +75,8 @@ mod unimplemented_analysis_tests {
     #[case::domain("CREATE DOMAIN d AS int CHECK (true) ENFORCED")]
     #[should_panic(expected = "not yet implemented")]
     fn compatible_target_reaches_todo(#[case] sql: &str) {
-        let mut context =
-            crate::test_helpers::TestParseContext::default().with_postgres_version("18");
-        let statement = crate::parse_statements(sql, crate::ast::Dialect::postgres())
+        let mut context = TestParseContext::default().with_postgres_version("18");
+        let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap();
@@ -129,7 +131,7 @@ impl TableConstraint {
         context: &mut impl ParseContext,
         column: bool,
     ) -> Result<bool, AnalysisError> {
-        if context.dialect() != super::Dialect::postgres() {
+        if context.dialect() != Dialect::postgres() {
             return Ok(true);
         }
         let mut valid = self.check_temporal_features(context)?;
@@ -168,7 +170,7 @@ impl ColumnConstraint {
     ) -> Result<bool, AnalysisError> {
         match self {
             Self::Enforcement(enforced) => Self::check_enforcement(context, *enforced),
-            Self::Generated(_, Some(mode)) if *mode == crate::sem::GeneratedColumnMode::Virtual => {
+            Self::Generated(_, Some(mode)) if *mode == GeneratedColumnMode::Virtual => {
                 context.postgres18_syntax_used(Postgres18Syntax::VirtualGeneratedColumn)
             }
             Self::Nullability(true, _, _)
@@ -261,19 +263,23 @@ impl super::Table {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod sqlite_feature_tests {
+    use crate::{
+        ast::{Dialect, Table},
+        test_helpers::{SynBuilder, TestParseContext},
+    };
+
     use crate::{ast::TryFromWithTokens, syn::Opt};
 
     #[test]
     fn virtual_column_has_no_postgres_version_requirement() {
-        let parser = crate::test_helpers::SynBuilder::new();
+        let parser = SynBuilder::new();
         let raw = parser.parse("CREATE TABLE t (id int, v int GENERATED ALWAYS AS (1) VIRTUAL)");
-        let table = super::super::Table::try_from_with_tokens(
+        let table = Table::try_from_with_tokens(
             &raw.as_create_stmt().as_inner().unwrap(),
             &::sql_fun_core::IVec::default(),
         )
         .unwrap();
-        let mut context = crate::test_helpers::TestParseContext::default()
-            .with_dialect(crate::ast::Dialect::sqlite());
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         assert!(table.check_engine_features(&mut context).unwrap());
         assert_eq!(context.reported_problem_count(), 0);
     }
@@ -284,7 +290,7 @@ impl super::AlterRelation {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if context.dialect() != super::Dialect::postgres() {
+        if context.dialect() != Dialect::postgres() {
             return Ok(true);
         }
         let mut valid = true;

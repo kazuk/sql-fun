@@ -1,9 +1,13 @@
-use crate::ast::{
-    Alias, Assignment, Conflict, ConflictAction, Delete, Expr, FromItem, FromOpt, IndexExpression,
-    Insert, Name, Query, Relation, Target, TryFromList, TryFromOpt, Update, With,
-};
-use crate::sem::{AnalysisError, ConflictClause};
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite as syn;
+use crate::{
+    ast::{
+        Alias, Assignment, Conflict, ConflictAction, Delete, Expr, FromItem, FromOpt,
+        IndexExpression, Insert, Name, Query, Relation, StatementNode, Target, TryFromList,
+        TryFromOpt, Update, With,
+    },
+    sem::{AnalysisError, ConflictClause, with_stack},
+};
 
 impl TryFrom<&syn::InsertStatement> for Insert {
     type Error = AnalysisError;
@@ -72,6 +76,7 @@ impl TryFrom<&syn::Update> for Update {
 #[cfg(test)]
 mod test_update {
     use crate::ast::Update;
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     #[test]
@@ -128,6 +133,7 @@ impl TryFrom<&syn::DeleteStatement> for Delete {
 #[cfg(test)]
 mod test_delete {
     use crate::ast::Delete;
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     #[test]
@@ -218,7 +224,7 @@ impl TryFrom<&syn::Upsert> for Conflict {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Upsert) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::sqlite_upsert(value))
+        with_stack(|| Self::sqlite_upsert(value))
     }
 }
 
@@ -317,7 +323,7 @@ impl TryFrom<&syn::SortedColumn> for IndexExpression {
     }
 }
 
-impl TryFrom<&syn::TriggerCmd> for crate::ast::StatementNode {
+impl TryFrom<&syn::TriggerCmd> for StatementNode {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::TriggerCmd) -> Result<Self, Self::Error> {
@@ -381,7 +387,9 @@ impl TryFrom<&syn::TriggerCmdInsert> for Insert {
 #[cfg(test)]
 mod test_trigger_insert {
     use crate::ast::Insert;
+    #[cfg(feature = "sqlite")]
     use crate::syn::sqlite::{InsertBody, Stmt, TriggerCmdInsert};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     #[test]

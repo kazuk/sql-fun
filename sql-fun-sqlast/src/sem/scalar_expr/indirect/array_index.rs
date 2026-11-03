@@ -1,7 +1,12 @@
-use crate::sem::scalar_expr::indirect::IndirectionExpr;
 use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
-    syn::{Opt, ScanToken},
+    ast::Dialect,
+    sem::{
+        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::indirect::IndirectionExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
+    syn::{AIndices, Opt, ScanToken},
 };
 
 use ::sql_fun_core::IVec;
@@ -54,7 +59,7 @@ impl ArrayIndex {
         Self::index_resolved(array, index, context)
     }
 
-    pub(super) fn index_resolved<TContext: crate::sem::ParseContext>(
+    pub(super) fn index_resolved<TContext: ParseContext>(
         array: SemScalarExpr,
         index: SemScalarExpr,
         context: &mut TContext,
@@ -79,10 +84,7 @@ impl ArrayIndex {
         let element = context.get_array_item_type(array)?;
         // PostgreSQL subscripting does not propagate the anonymous record's
         // typmod/field descriptor. The array definition retains that structure.
-        if context.dialect() == crate::ast::Dialect::postgres()
-            && element.is_dynamic()
-            && element.is_record()
-        {
+        if context.dialect() == Dialect::postgres() && element.is_dynamic() && element.is_record() {
             Some(TypeReference::from_master_type_name("record"))
         } else {
             Some(element)
@@ -93,7 +95,7 @@ impl ArrayIndex {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         arg: SemScalarExpr,
-        indices: &crate::syn::AIndices,
+        indices: &AIndices,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
     where
@@ -111,18 +113,15 @@ impl ArrayIndex {
 }
 
 impl ArrayIndex {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.array.walk(visitor)?;
         self.index.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.array.visit(visitor)?;
         self.index.visit(visitor)?;
         Ok(())
@@ -130,7 +129,7 @@ impl ArrayIndex {
 }
 
 impl ArrayIndex {
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk_assignment_target<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -139,7 +138,7 @@ impl ArrayIndex {
         visitor.subscript(&self.index);
         Ok(())
     }
-    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_assignment_target<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -153,8 +152,8 @@ impl ArrayIndex {
 impl ArrayIndex {
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> SemScalarExpr {
         let mut result = parameters.array_access(context, &self.array, &[&self.index], false);
         result.retain_indirection(&IndirectionExpr::index(self));

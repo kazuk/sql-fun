@@ -1,14 +1,16 @@
-use super::TestParseContext;
 use crate::{
-    context::ConflictInfoRead,
+    context::{ConflictInfoRead, ConflictMasters},
     names::{FullName, TableName},
     sem::{
-        AnalysisError, CatalogNameLookup, InsertArbiter, InsertConflict, InsertInferenceModifiers,
+        AnalysisError, CatalogNameLookup, CollationDefinition, ConflictArbiterInference,
+        DatabaseCollation, InsertArbiter, InsertConflict, InsertInferenceModifiers,
+        OperatorClassDefinition, infer_from_catalog,
     },
+    test_helpers::test_parse_context::TestParseContext,
 };
 
 impl TestParseContext {
-    pub(crate) fn set_conflict_masters(&mut self, masters: &crate::context::ConflictMasters) {
+    pub(crate) fn set_conflict_masters(&mut self, masters: &ConflictMasters) {
         self.masters = Some(masters.clone());
     }
 
@@ -36,11 +38,11 @@ impl TestParseContext {
     }
 }
 impl ConflictInfoRead for TestParseContext {
-    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+    fn database_collation(&self) -> Option<&DatabaseCollation> {
         let masters = self.masters.as_ref()?;
         masters.database()
     }
-    fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition> {
+    fn collation_definition(&self, name: &FullName) -> Option<&CollationDefinition> {
         let masters = self.masters.as_ref()?;
         masters.qualified_collation(name)
     }
@@ -48,7 +50,7 @@ impl ConflictInfoRead for TestParseContext {
         &self,
         name: &FullName,
         method: &str,
-    ) -> Option<&crate::sem::OperatorClassDefinition> {
+    ) -> Option<&OperatorClassDefinition> {
         let masters = self.masters.as_ref()?;
         masters.operator_class(name, method)
     }
@@ -74,7 +76,7 @@ impl ConflictInfoRead for TestParseContext {
         &self,
         table: &TableName,
         conflict: &InsertConflict,
-    ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
+    ) -> Result<ConflictArbiterInference, AnalysisError> {
         if let Some(expected) = &self.expected_conflict_modifiers {
             if let Some(expected) = &self.expected_conflict_target {
                 assert_eq!(table, expected);
@@ -86,11 +88,9 @@ impl ConflictInfoRead for TestParseContext {
                 expected,
                 "bound modifiers supplied to catalog inference"
             );
-            Ok(crate::sem::ConflictArbiterInference::complete(
-                &self.conflict_arbiters,
-            ))
+            Ok(ConflictArbiterInference::complete(&self.conflict_arbiters))
         } else {
-            crate::sem::infer_from_catalog(self, table, conflict)
+            infer_from_catalog(self, table, conflict)
         }
     }
 }

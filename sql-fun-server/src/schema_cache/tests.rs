@@ -1,13 +1,19 @@
-use super::{SchemaCacheService, SchemaContextKey, SchemaSelection};
-use ::sql_fun_sqlast::context::BaseParseContext;
-use ::sql_fun_sqlast::names::{FullName, TableName};
+use crate::{
+    Api,
+    schema_cache::{SchemaCacheService, SchemaContextKey, SchemaSelection},
+    test_helpers::create_cache_context,
+};
+use ::sql_fun_sqlast::{
+    context::BaseParseContext,
+    names::{FullName, TableName},
+};
 use std::sync::Arc;
 
-use super::test_helpers::SchemaProject;
+use crate::schema_cache::test_helpers::SchemaProject;
 
 #[tokio::test]
 async fn new_analysis_uses_selected_environment_over_shared_normalized_catalog() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let project = SchemaProject::new();
     let service = project.service();
     let dump = project.schema("dump.sql", "CREATE TABLE app_table (id int4);");
@@ -293,7 +299,7 @@ async fn different_dumps_share_extension_prefix_but_keep_separate_final_layers()
 fn server_owner_reuses_service_and_rejects_another_installation() {
     let first = SchemaProject::new();
     let second = SchemaProject::new();
-    let api = crate::Api {
+    let api = Api {
         schema_cache: std::sync::OnceLock::new(),
     };
     let service = api.schema_cache_service(first.home()).unwrap();
@@ -524,9 +530,8 @@ fn configured_roles_bind_and_apply_through_direct_context(
     #[case] spelling: &str,
     #[case] expected: &str,
 ) {
-    use ::sql_fun_sqlast::context::ParseContext;
     use ::sql_fun_sqlast::{
-        context::{OwnershipInfoRead, RoleInfoRead},
+        context::{OwnershipInfoRead, ParseContext, RoleInfoRead},
         sem::{ObjectKind, Role},
     };
     let project = SchemaProject::new();
@@ -567,8 +572,7 @@ fn configured_roles_bind_and_apply_through_direct_context(
 // 342e3aac2f36ac19430b23ae04a957a0fda352f5; recover them from that commit's parent.
 #[case::different("roles = ['other']")]
 fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: &str) {
-    use ::sql_fun_sqlast::context::ParseContext;
-    use ::sql_fun_sqlast::context::{OwnershipInfoRead, RoleInfoRead};
+    use ::sql_fun_sqlast::context::{OwnershipInfoRead, ParseContext, RoleInfoRead};
     let project = SchemaProject::new();
     project.configure_roles("products", "roles = ['owner']");
     project.configure_roles("orders", declaration);
@@ -698,8 +702,10 @@ async fn role_inventory_partitions_cached_bindings_and_diagnostics() {
 
 #[test]
 fn explicitly_registered_roles_survive_current_inventory_changes() {
-    use ::sql_fun_sqlast::context::ParseContext;
-    use ::sql_fun_sqlast::{context::RoleInfoRead, sem::Role};
+    use ::sql_fun_sqlast::{
+        context::{ParseContext, RoleInfoRead},
+        sem::Role,
+    };
     let project = SchemaProject::new();
     project.configure_roles("products", "roles = ['configured']");
     project.configure_roles("orders", "roles = []");

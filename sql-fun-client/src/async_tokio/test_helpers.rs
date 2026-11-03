@@ -1,8 +1,11 @@
-use ::tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use ::tokio::net::{TcpListener, TcpStream};
+use crate::async_tokio::TcpJsonRpcClientAsync;
+use ::tokio::{
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::{TcpListener, TcpStream},
+};
 
 /// A narrow wire fixture for framing/response validation, not lifecycle coverage.
-pub async fn response_peer(response: &[u8]) -> std::io::Result<super::TcpJsonRpcClientAsync> {
+pub async fn response_peer(response: &[u8]) -> std::io::Result<TcpJsonRpcClientAsync> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let response = response.to_owned();
@@ -19,14 +22,14 @@ pub async fn response_peer(response: &[u8]) -> std::io::Result<super::TcpJsonRpc
         let mut remainder = Vec::new();
         let _ = reader.read_to_end(&mut remainder).await;
     });
-    super::TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
+    TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
 }
 
 /// Respond only after write EOF, exercising submission independence and half-close.
 pub async fn draining_peer(
     responses: usize,
     reverse: bool,
-) -> std::io::Result<super::TcpJsonRpcClientAsync> {
+) -> std::io::Result<TcpJsonRpcClientAsync> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     ::tokio::spawn(async move {
@@ -50,7 +53,7 @@ pub async fn draining_peer(
             reader.get_mut().write_all(&frame).await.unwrap();
         }
     });
-    super::TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
+    TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
 }
 
 /// Capture structured tracing output without changing production logging setup.
@@ -81,7 +84,7 @@ impl<'a> ::tracing_subscriber::fmt::MakeWriter<'a> for LogCapture {
 }
 
 /// Echo each request immediately, independently of other callback completion.
-pub async fn eager_peer() -> std::io::Result<super::TcpJsonRpcClientAsync> {
+pub async fn eager_peer() -> std::io::Result<TcpJsonRpcClientAsync> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     ::tokio::spawn(async move {
@@ -99,5 +102,5 @@ pub async fn eager_peer() -> std::io::Result<super::TcpJsonRpcClientAsync> {
             reader.get_mut().write_all(&frame).await.unwrap();
         }
     });
-    super::TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
+    TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await?)
 }

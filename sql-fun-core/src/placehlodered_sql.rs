@@ -6,9 +6,12 @@ use std::collections::HashSet;
 // and conceptual cost of introducing another strategy.
 use combine::{
     Parser, any, attempt, between, many, optional,
-    parser::char::{alpha_num, char, letter, spaces, string},
     parser::{
-        combinator::not_followed_by, range::recognize, repeat::take_until, token::tokens_cmp,
+        char::{alpha_num, char, letter, spaces, string},
+        combinator::not_followed_by,
+        range::recognize,
+        repeat::take_until,
+        token::tokens_cmp,
     },
     satisfy,
 };
@@ -509,7 +512,7 @@ impl PlaceholderedSql {
 
 #[cfg(test)]
 mod test_append_parameter_order {
-    use super::{ParameterName, PlaceholderedSql};
+    use crate::placehlodered_sql::{ParameterName, PlaceholderedSql};
 
     #[test]
     fn shares_positions_and_ignores_sql_literals_and_comments() {

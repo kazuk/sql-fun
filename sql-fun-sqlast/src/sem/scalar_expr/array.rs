@@ -1,8 +1,12 @@
 use crate::{
     context::ParseContext,
     sem::{
-        AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, SemScalarExpr,
-        TypeReference, problem::ArrayProblem, scalar_expr::SemScalarExprNode,
+        AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
+        SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        problem::ArrayProblem,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -181,7 +185,7 @@ impl ArrayExpr {
         }
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -190,10 +194,7 @@ impl ArrayExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for value in &self.values {
             value.visit(visitor)?;
         }
@@ -202,7 +203,7 @@ impl ArrayExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if self.types.admissible_types() == Some(&[]) {
@@ -225,7 +226,7 @@ impl ArrayExpr {
         Ok(())
     }
 
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
             self.types = constraints.node_domain(node).clone();
             if let Some(target) = self.types.single_type() {

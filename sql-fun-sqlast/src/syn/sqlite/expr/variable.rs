@@ -1,4 +1,5 @@
-use super::Expr;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 use ::turso_parser::ast::Variable as VariableIn;
 use std::num::NonZero;
 
@@ -31,7 +32,9 @@ impl From<VariableIn> for Variable {
 
 #[cfg(test)]
 mod test_variable_conversion {
-    use super::{Variable, VariableIn};
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::expr::variable::{Variable, VariableIn};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
     use std::num::NonZeroU32;
 

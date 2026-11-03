@@ -4,8 +4,10 @@ use self::sql_highlighter::SqlHighlighter;
 use crate::highlighter_theme::HighlighterTheme;
 use std::io::IsTerminal;
 
-use ::sql_fun_core::analysis_problem::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity};
-use ::sql_fun_core::{SqlFunArgs, TerminalColor, TokenStream};
+use ::sql_fun_core::{
+    SqlFunArgs, TerminalColor, TokenStream,
+    analysis_problem::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity},
+};
 
 /// CLI-owned diagnostic rendering, including terminal and theme configuration.
 pub struct DiagnosticRenderer {
@@ -106,8 +108,7 @@ impl DiagnosticRenderer {
 
 #[cfg(test)]
 mod structured_fact_rendering_tests {
-    use super::DiagnosticRenderer;
-    use crate::highlighter_theme::HighlighterTheme;
+    use crate::{diagnostic::DiagnosticRenderer, highlighter_theme::HighlighterTheme};
     use ::sql_fun_core::analysis_problem::{
         AExprKind, AnalysisProblem, ArgumentBindingCollection, SemScalarExpr, TypeReference,
     };
@@ -158,10 +159,13 @@ mod structured_fact_rendering_tests {
 
 #[cfg(test)]
 mod test_ansi_rendering {
-    use super::DiagnosticRenderer;
-    use crate::highlighter_theme::HighlighterTheme;
-    use ::sql_fun_core::SqlDialect;
-    use ::sql_fun_core::analysis_problem::{AnalysisProblem, FullName, StringSpan};
+    use crate::test_helpers::heavy;
+
+    use crate::{diagnostic::DiagnosticRenderer, highlighter_theme::HighlighterTheme};
+    use ::sql_fun_core::{
+        SqlDialect,
+        analysis_problem::{AnalysisProblem, FullName, StringSpan},
+    };
 
     #[tokio::test]
     #[ignore = "High CI disk usage from server builds"]
@@ -176,8 +180,7 @@ mod test_ansi_rendering {
             theme: HighlighterTheme::from_toml_str(r#"keyword = { foreground = "blue" }"#)?,
             color: true,
         };
-        let tokens =
-            crate::test_helpers::heavy::tokenize_sql(source, SqlDialect::PostgreSQL).await?;
+        let tokens = heavy::tokenize_sql(source, SqlDialect::PostgreSQL).await?;
         let output = renderer.render(&problem, &tokens)?;
         assert!(output.contains("\x1b[34mcreate"));
         assert!(output.contains("domain_base_type_not_found"));
@@ -187,10 +190,13 @@ mod test_ansi_rendering {
 
 #[cfg(test)]
 mod test_min_max_rendering {
-    use super::DiagnosticRenderer;
-    use crate::highlighter_theme::HighlighterTheme;
-    use ::sql_fun_core::SqlDialect;
-    use ::sql_fun_core::analysis_problem::{AnalysisProblem, MinMaxProblem};
+    use crate::test_helpers::heavy;
+
+    use crate::{diagnostic::DiagnosticRenderer, highlighter_theme::HighlighterTheme};
+    use ::sql_fun_core::{
+        SqlDialect,
+        analysis_problem::{AnalysisProblem, MinMaxProblem},
+    };
 
     #[rstest::rstest]
     #[case::empty(
@@ -219,11 +225,7 @@ mod test_min_max_rendering {
             theme: HighlighterTheme::default(),
             color: false,
         };
-        let tokens = crate::test_helpers::heavy::tokenize_sql(
-            "select greatest(1, 2)",
-            SqlDialect::PostgreSQL,
-        )
-        .await?;
+        let tokens = heavy::tokenize_sql("select greatest(1, 2)", SqlDialect::PostgreSQL).await?;
         let output = renderer.render(&AnalysisProblem::min_max(problem), &tokens)?;
         assert!(output.contains(code));
         let normalized = output.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -234,13 +236,17 @@ mod test_min_max_rendering {
 
 #[cfg(test)]
 mod test_implemented_family_rendering {
-    use super::DiagnosticRenderer;
-    use crate::highlighter_theme::HighlighterTheme;
-    use ::sql_fun_core::SqlDialect;
-    use ::sql_fun_core::analysis_problem::{
-        AlterColumnProblem, AnalysisProblem, CallArgumentProblem, DeleteProblemKind,
-        DiagnosticMessage, DiagnosticSeverity, IndexProblem, IndexProblemKind, InsertProblemKind,
-        QueryProblem, RuleProblem, TriggerProblem, UpdateProblemKind, ViewProblem,
+    use crate::test_helpers::heavy;
+
+    use crate::{diagnostic::DiagnosticRenderer, highlighter_theme::HighlighterTheme};
+    use ::sql_fun_core::{
+        SqlDialect,
+        analysis_problem::{
+            AlterColumnProblem, AnalysisProblem, CallArgumentProblem, DeleteProblemKind,
+            DiagnosticMessage, DiagnosticSeverity, IndexProblem, IndexProblemKind,
+            InsertProblemKind, QueryProblem, RuleProblem, TriggerProblem, UpdateProblemKind,
+            ViewProblem,
+        },
     };
 
     #[rstest::rstest]
@@ -330,8 +336,7 @@ mod test_implemented_family_rendering {
             theme: HighlighterTheme::default(),
             color: false,
         };
-        let tokens =
-            crate::test_helpers::heavy::tokenize_sql("select 1", SqlDialect::PostgreSQL).await?;
+        let tokens = heavy::tokenize_sql("select 1", SqlDialect::PostgreSQL).await?;
         let metadata = problem.render_metadata().expect("existing renderer");
         assert_eq!(metadata.message(), message);
         assert_eq!(problem.code(), code);
@@ -372,10 +377,14 @@ pub async fn render_diagnostic(
 
 #[cfg(test)]
 mod test_rendering {
-    use super::render_diagnostic;
+    use crate::test_helpers::heavy;
+
+    use crate::diagnostic::render_diagnostic;
     use ::clap::Parser;
-    use ::sql_fun_core::analysis_problem::{AnalysisProblem, FullName, StringSpan};
-    use ::sql_fun_core::{DiagnosticPresentation, SqlDialect, SqlFunArgs};
+    use ::sql_fun_core::{
+        DiagnosticPresentation, SqlDialect, SqlFunArgs,
+        analysis_problem::{AnalysisProblem, FullName, StringSpan},
+    };
 
     #[tokio::test]
     #[ignore = "High CI disk usage from server builds"]
@@ -392,7 +401,7 @@ mod test_rendering {
         let wire = ::serde_json::to_string(&presentation)?;
         let received = ::serde_json::from_str(&wire)?;
         let args = SqlFunArgs::try_parse_from(["sql-fun", "--term-color", "never"])?;
-        let mut session = crate::test_helpers::heavy::DiagnosticSession::new().await?;
+        let mut session = heavy::DiagnosticSession::new().await?;
         let output = render_diagnostic(session.client(), &received, &args).await?;
         assert!(output.contains("domain_base_type_not_found"));
         assert!(output.contains("domain base type not found: missing"));

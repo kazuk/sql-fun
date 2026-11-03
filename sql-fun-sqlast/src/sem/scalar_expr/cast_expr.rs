@@ -1,9 +1,23 @@
 #[cfg(feature = "sqlite")]
 use crate::SqliteToken;
-use crate::sem::scalar_expr::SemScalarExprNode;
 #[cfg(feature = "sqlite")]
-use crate::sem::{AnalysisError, ParseContext, ScalarAnalysisContext};
-use crate::sem::{SemScalarExpr, TypeReference};
+use crate::ast::Expr;
+#[cfg(feature = "sqlite")]
+use crate::sem::ScalarAnalysisContext;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ExprCast;
+use crate::{
+    ast::Dialect,
+    context::BaseParseContext,
+    names::TableName,
+    sem::{
+        AnalysisError, InputTypeConstraint, ParseContext, QueryNameResolution, SemScalarExpr,
+        TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
+};
 
 #[cfg(feature = "sqlite")]
 use ::sql_fun_core::IVec;
@@ -16,11 +30,7 @@ pub struct ImplicitCastExpr {
 }
 
 impl ImplicitCastExpr {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.cast_target.rename_relation(old, new);
     }
 
@@ -52,7 +62,7 @@ impl SemScalarExprNode for ImplicitCastExpr {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TypeCastExpr {
     target_type: TypeReference,
-    resolution: crate::sem::QueryNameResolution,
+    resolution: QueryNameResolution,
     arg: Box<SemScalarExpr>,
 }
 
@@ -75,11 +85,7 @@ impl TypeCastExpr {
 }
 
 impl TypeCastExpr {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.target_type.rename_relation(old, new);
         self.resolution.rename_relation(old, new);
     }
@@ -109,18 +115,18 @@ impl TypeCastExpr {
         }
     }
 
-    pub(crate) fn set_resolution(&mut self, resolution: crate::sem::QueryNameResolution) {
+    pub(crate) fn set_resolution(&mut self, resolution: QueryNameResolution) {
         self.resolution = resolution;
     }
     /// Completed target-name resolution (or SQLite affinity interpretation).
-    pub const fn resolution(&self) -> &crate::sem::QueryNameResolution {
+    pub const fn resolution(&self) -> &QueryNameResolution {
         &self.resolution
     }
 
     pub(super) fn from_resolved(target_type: &TypeReference, arg: &SemScalarExpr) -> Self {
         Self {
             target_type: target_type.clone(),
-            resolution: crate::sem::QueryNameResolution::type_reference(target_type),
+            resolution: QueryNameResolution::type_reference(target_type),
             arg: Box::new(arg.clone()),
         }
     }
@@ -142,47 +148,41 @@ impl TypeCastExpr {
     pub fn analyze_sqlite_cast<TParseContext>(
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
-        syn: &crate::syn::sqlite::ExprCast,
+        syn: &ExprCast,
         _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::Expr::try_from(syn)?;
+        let syntax = Expr::try_from(syn)?;
         let result = syntax.resolve(&mut context, scalar_context);
         Ok((result?, context))
     }
 }
 
 impl TypeCastExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.arg.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.arg.visit(visitor)?;
         Ok(())
     }
 }
 
 impl ImplicitCastExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.value.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.value.visit(visitor)?;
         Ok(())
     }
@@ -191,15 +191,15 @@ impl ImplicitCastExpr {
 impl TypeCastExpr {
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if self.arg.constraint_node().is_none() {
             return Ok(None);
         }
-        let target = if context.dialect() == crate::ast::Dialect::postgres() {
+        let target = if context.dialect() == Dialect::postgres() {
             if let Some(target) =
-                crate::context::BaseParseContext::canonicalize_type_ref(context, &self.target_type)
+                BaseParseContext::canonicalize_type_ref(context, &self.target_type)
             {
                 parameters.require(context, &self.arg, &target, true);
                 target
@@ -212,7 +212,7 @@ impl TypeCastExpr {
         Ok(Some(parameters.operation(
             "CAST",
             std::slice::from_ref(&self.arg),
-            &crate::sem::InputTypeConstraint::exact(&target),
+            &InputTypeConstraint::exact(&target),
             None,
         )))
     }

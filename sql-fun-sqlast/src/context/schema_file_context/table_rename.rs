@@ -1,15 +1,17 @@
 //! Stage dependent metadata before committing one catalog identity transition.
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
+
 use crate::{
+    ast::Dialect,
     context::{
         FunctionInfoRead, IndexInfoRead, ObjectInfoRead, OwnershipInfoRead, ParseContext,
         SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
     names::{FullName, TableName},
     sem::{
-        AlterTable, AnalysisError, CreateFunction, CreateIndex, CreateRule, CreateSequence,
-        CreateTable, CreateTrigger, OverloadVariant, RuleIdentity, RuleReferences, TriggerIdentity,
-        TriggerReferences, TypeDefinition, ViewLike,
+        AlterTable, AnalysisError, ColumnRename, CreateFunction, CreateIndex, CreateRule,
+        CreateSequence, CreateTable, CreateTrigger, OverloadVariant, RuleIdentity, RuleReferences,
+        TriggerIdentity, TriggerReferences, TypeDefinition, ViewLike,
     },
 };
 
@@ -33,7 +35,7 @@ impl SchemaFileContext {
         let key = self.catalog.relation_identity(original.full_name());
         self.catalog.renamed_relations.insert(key.clone());
         self.catalog.renamed_tables.insert(key.clone());
-        if self.dialect() == crate::ast::Dialect::postgres() {
+        if self.dialect() == Dialect::postgres() {
             self.catalog.renamed_types.insert(key);
             self.catalog.types.insert_table_ref(destination);
         }
@@ -81,7 +83,7 @@ impl RenameUpdates {
 
     pub(super) fn prepare_column(
         context: &SchemaFileContext,
-        rename: &crate::sem::ColumnRename,
+        rename: &ColumnRename,
     ) -> Result<Self, AnalysisError> {
         let mut updates = Self::default();
         updates.collect_relations(context, &RenameChange::column(rename))?;
@@ -220,13 +222,13 @@ impl RenameUpdates {
 // The catalog inventory and staging rules are shared by both identity edits.
 enum RenameChange<'a> {
     Relation(&'a TableName, &'a TableName),
-    Column(&'a crate::sem::ColumnRename),
+    Column(&'a ColumnRename),
 }
 impl<'a> RenameChange<'a> {
     const fn relation(old: &'a TableName, new: &'a TableName) -> Self {
         Self::Relation(old, new)
     }
-    const fn column(rename: &'a crate::sem::ColumnRename) -> Self {
+    const fn column(rename: &'a ColumnRename) -> Self {
         Self::Column(rename)
     }
     const fn original(&self) -> &TableName {

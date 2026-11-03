@@ -1,6 +1,6 @@
 //! The terminal boundary depends only on input primitives, never workflow states.
 
-use super::error::InitError;
+use crate::init::error::InitError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PromptResponse {
@@ -51,7 +51,7 @@ impl PromptResponse {
 
 #[cfg(test)]
 mod test_prompt_response_values {
-    use super::PromptResponse;
+    use crate::init::prompt::PromptResponse;
 
     #[rstest::rstest]
     #[case::confirmed(&PromptResponse::confirm(true), Some(true), None, None)]
@@ -260,7 +260,7 @@ impl PromptRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{PromptRequest, PromptResponse};
+    use crate::init::prompt::{PromptRequest, PromptResponse};
 
     #[rstest::rstest]
     #[case::confirm(PromptRequest::confirm("confirm"), PromptResponse::confirm(true))]

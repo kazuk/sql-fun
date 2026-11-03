@@ -1,3 +1,4 @@
+use crate::syn::VariableSetStmt;
 use sql_fun_core::IVec;
 
 use crate::{
@@ -6,7 +7,7 @@ use crate::{
     syn::{ListOpt, ScanToken},
 };
 
-use super::{AnalysisError, SemAst};
+use crate::sem::{AnalysisError, SemAst};
 
 /// set a variable
 #[derive(Debug, Clone)]
@@ -42,7 +43,7 @@ impl VariableSet {
     /// Returns [`AnalysisError`] when the variable assignment is semantically invalid.
     pub fn analyze_variable_set<TParseContext>(
         mut context: TParseContext,
-        syn: &crate::syn::VariableSetStmt,
+        syn: &VariableSetStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
@@ -81,7 +82,7 @@ impl VariableSet {
 #[deprecated = "use VariableSet::analyze_variable_set"]
 pub fn analyze_variable_set<TParseContext>(
     context: TParseContext,
-    syn: &crate::syn::VariableSetStmt,
+    syn: &VariableSetStmt,
     tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where

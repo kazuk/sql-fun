@@ -1,8 +1,15 @@
-use crate::context::BaseParseContext;
-use crate::{context::ParseContext, names::FullName};
+use crate::{
+    ast::Dialect,
+    context::{BaseParseContext, ParseContext},
+    names::{FullName, TableName},
+    sem::{
+        AnalysisError, AnalysisProblem, CastContext as SemCastContext,
+        ColumnCollection as SemColumnCollection,
+    },
+};
 use std::collections::HashSet;
 
-use super::{
+use crate::sem::pg_type::{
     TypeDefinition, concrete_type::ConcreteTypeReference, dynamic_type::DynamicTypeReference,
 };
 
@@ -28,7 +35,7 @@ impl TypeReference {
     /// other dialects). This query does not validate SQL, report diagnostics or
     /// discover supplemental metadata. Nominal vectors use their own fact.
     pub fn collation_capability(&self, context: &impl ParseContext) -> Option<bool> {
-        if context.dialect() != crate::ast::Dialect::postgres() {
+        if context.dialect() != Dialect::postgres() {
             return None;
         }
         self.collation_capability_in(context, &mut HashSet::new())
@@ -61,6 +68,9 @@ impl TypeReference {
 
 #[cfg(test)]
 mod collation_capability_tests {
+    #[cfg(feature = "sqlite")]
+    use crate::ast::Dialect;
+
     use crate::{
         names::FullName,
         sem::{CreateDomain, TypeDefinition, TypeReference},
@@ -156,7 +166,7 @@ mod collation_capability_tests {
     #[test]
     #[cfg(feature = "sqlite")]
     fn other_dialects_do_not_expose_postgres_facts() {
-        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let context = TestParseContext::default().with_dialect(Dialect::sqlite());
         let reference = TypeReference::dynamic(&TypeDefinition::builtin(
             &FullName::with_schema("pg_catalog", "text"),
             Some(true),
@@ -166,11 +176,7 @@ mod collation_capability_tests {
 }
 
 impl TypeReference {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Self::Dynamic(value) = self {
             value.rename_relation(old, new);
         }
@@ -233,7 +239,7 @@ impl TypeReference {
     pub(crate) fn row_columns(
         &self,
         context: &impl BaseParseContext,
-    ) -> Option<crate::sem::ColumnCollection> {
+    ) -> Option<SemColumnCollection> {
         let base = self.member_base(context)?;
         if base.is_array() == Some(true) {
             return None;
@@ -241,7 +247,7 @@ impl TypeReference {
         base.definition_from_catalog(context)?.row_columns(context)
     }
 
-    pub(crate) fn owned_row_columns(&self) -> Option<crate::sem::ColumnCollection> {
+    pub(crate) fn owned_row_columns(&self) -> Option<SemColumnCollection> {
         if self.is_array() == Some(true) {
             return None;
         }
@@ -271,21 +277,19 @@ impl TypeReference {
         &self,
         context: &impl ParseContext,
         member: &str,
-    ) -> Option<crate::sem::AnalysisProblem> {
+    ) -> Option<AnalysisProblem> {
         let base = self.member_base(context)?;
         if self.row_columns(context).is_some()
             || (base.is_array() != Some(true) && base.is_record())
         {
-            Some(crate::sem::AnalysisProblem::composite_type_field_not_found(
+            Some(AnalysisProblem::composite_type_field_not_found(
                 self, member,
             ))
         } else {
-            Some(
-                crate::sem::AnalysisProblem::member_access_requires_composite_type(
-                    sql_fun_core::analysis_problem::FullName::new(&self.to_string()),
-                    member,
-                ),
-            )
+            Some(AnalysisProblem::member_access_requires_composite_type(
+                sql_fun_core::analysis_problem::FullName::new(&self.to_string()),
+                member,
+            ))
         }
     }
 
@@ -293,7 +297,7 @@ impl TypeReference {
         &self,
         target: &Self,
         context: &impl BaseParseContext,
-    ) -> Option<crate::sem::CastContext> {
+    ) -> Option<SemCastContext> {
         if self.is_dynamic() || target.is_dynamic() {
             self.implicit_match_context(target, context)
         } else {
@@ -307,14 +311,14 @@ impl TypeReference {
         &self,
         target: &Self,
         context: &impl BaseParseContext,
-    ) -> Option<crate::sem::CastContext> {
+    ) -> Option<SemCastContext> {
         if self.is_dynamic() || target.is_dynamic() {
             let accepts_record = *target == Self::from_master_type_name("record")
                 && self
                     .type_definition()
                     .is_some_and(|definition| definition.structural_columns().is_some());
             if accepts_record || self.matches_structure(target, context) {
-                Some(crate::sem::CastContext::no_conversion())
+                Some(SemCastContext::no_conversion())
             } else {
                 None
             }
@@ -702,10 +706,10 @@ impl TypeReference {
 
 #[cfg(test)]
 mod dynamic_accessor_tests {
-    use crate::test_helpers::{TestParseContext, dynamic_types::record};
     use crate::{
         names::FullName,
         sem::{PgBuiltInType, TypeDefinition, TypeReference},
+        test_helpers::{TestParseContext, dynamic_types::record},
     };
 
     #[rstest::rstest]
@@ -809,15 +813,19 @@ mod dynamic_accessor_tests {
 
 #[cfg(test)]
 mod array_identity_tests {
-    use super::TypeReference;
-    use crate::sem::create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition};
-    use crate::sem::{CreateCompositeType, PgBuiltInType, TypeDefinition};
+    use crate::test_helpers::TestParseContext;
+
+    use crate::sem::{
+        CreateCompositeType, PgBuiltInType, TypeDefinition,
+        create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+        pg_type::type_ref::TypeReference,
+    };
 
     use crate::test_helpers::dynamic_types::record;
 
     #[test]
     fn anonymous_record_accepts_generic_record_without_cast_master() {
-        let mut context = crate::test_helpers::TestParseContext::default();
+        let mut context = TestParseContext::default();
         let source = record(&PgBuiltInType::int4());
         let target = TypeReference::from_master_type_name("record");
         context.set_get_implicit_cast_result(&source, &target, None);
@@ -832,10 +840,10 @@ mod array_identity_tests {
         #[values(false, true)] reverse: bool,
         #[values(false, true)] matching: bool,
     ) {
-        use crate::test_helpers::TestParseContext;
         use crate::{
             names::FullName,
             sem::{CastContext, CastDefinition},
+            test_helpers::TestParseContext,
         };
 
         let mut context = TestParseContext::default();
@@ -900,10 +908,10 @@ mod array_identity_tests {
         #[values(false, true)] arrays: bool,
         #[values(false, true)] reverse: bool,
     ) {
-        use crate::test_helpers::TestParseContext;
         use crate::{
             names::FullName,
             sem::{CastContext, CastDefinition},
+            test_helpers::TestParseContext,
         };
 
         let mut context = TestParseContext::default();
@@ -1018,8 +1026,10 @@ impl std::fmt::Display for TypeReference {
 
 #[cfg(test)]
 mod dynamic_display_tests {
-    use crate::sem::{ColumnCollection, PgBuiltInType, TypeDefinition, TypeReference};
-    use crate::test_helpers::dynamic_types::record;
+    use crate::{
+        sem::{ColumnCollection, PgBuiltInType, TypeDefinition, TypeReference},
+        test_helpers::dynamic_types::record,
+    };
 
     #[rstest::rstest]
     #[case::row(false, "row(pg_catalog.int4)")]
@@ -1035,7 +1045,7 @@ mod dynamic_display_tests {
 }
 
 impl std::str::FromStr for TypeReference {
-    type Err = crate::sem::AnalysisError;
+    type Err = AnalysisError;
 
     /// Read canonical concrete type spelling, preserving quoted suffixes.
     fn from_str(value: &str) -> Result<Self, Self::Err> {
@@ -1053,8 +1063,7 @@ impl std::str::FromStr for TypeReference {
 
 #[cfg(test)]
 mod canonical_type_tests {
-    use super::TypeReference;
-    use crate::names::FullName;
+    use crate::{names::FullName, sem::pg_type::type_ref::TypeReference};
 
     #[rstest::rstest]
     #[case::plain(FullName::with_schema("fixture", "item"))]
@@ -1086,10 +1095,7 @@ mod canonical_type_tests {
 impl TypeReference {
     /// Resolve domain layers without erasing array element or source identity.
     /// Missing domain bases and cycles cannot establish coercion eligibility.
-    pub(crate) fn domain_base_type(
-        &self,
-        context: &impl crate::context::BaseParseContext,
-    ) -> Option<Self> {
+    pub(crate) fn domain_base_type(&self, context: &impl BaseParseContext) -> Option<Self> {
         let mut base = self.clone();
         let mut seen = std::collections::HashSet::new();
         loop {

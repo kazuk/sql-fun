@@ -1,14 +1,15 @@
-use crate::test_helpers::TestParseContext;
 use crate::{
+    ast::Dialect,
     names::FullName,
     sem::{
-        CastContext, CastDefinition, CreateDomain, PgBuiltInType, TypeCategory, TypeDefinition,
-        TypeReference,
+        CastContext, CastDefinition, CreateDomain, InputTypeConstraint, PgBuiltInType,
+        TypeCategory, TypeDefinition, TypeReference,
     },
+    test_helpers::TestParseContext,
 };
 
 pub(crate) fn context() -> TestParseContext {
-    let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());
+    let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
     for ty in [
         PgBuiltInType::int4(),
         PgBuiltInType::int8(),
@@ -66,8 +67,8 @@ pub(crate) fn inspection_context() -> TestParseContext {
 }
 
 /// The maintained protocol inference contract, independent of implementation seeds.
-pub(crate) fn protocol_candidates() -> crate::sem::InputTypeConstraint {
-    crate::sem::InputTypeConstraint::types(
+pub(crate) fn protocol_candidates() -> InputTypeConstraint {
+    InputTypeConstraint::types(
         [
             "bool", "int4", "int8", "float4", "float8", "text", "numeric",
         ]

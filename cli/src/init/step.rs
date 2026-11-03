@@ -22,25 +22,17 @@ mod theme_editor_step;
 mod theme_step;
 mod versions_step;
 
-pub(super) use self::confirm_home_step::ConfirmHomeStep;
-pub(super) use self::confirm_install_step::ConfirmInstallStep;
-pub(super) use self::connection_step::ConnectionStep;
-pub(super) use self::datasource_selection_step::DatasourceSelectionStep;
-pub(super) use self::edit_home_step::EditHomeStep;
-pub(super) use self::engine_selection_step::EngineSelectionStep;
-pub(super) use self::engine_steps::EngineSteps;
-pub(super) use self::home_directory_step::HomeDirectoryStep;
-pub(super) use self::home_step::HomeStep;
-pub(super) use self::postgres_source_step::PostgresSourceStep;
-pub(super) use self::postgres_steps::PostgresSteps;
-pub(super) use self::selection_step::SelectionStep;
-pub(super) use self::source_details::SourceDetails;
-pub(super) use self::sqlite_step::SqliteStep;
-pub(super) use self::theme_editor_step::ThemeEditorStep;
-pub(super) use self::theme_step::ThemeStep;
-pub(super) use self::versions_step::VersionsStep;
+pub(super) use self::{
+    confirm_home_step::ConfirmHomeStep, confirm_install_step::ConfirmInstallStep,
+    connection_step::ConnectionStep, datasource_selection_step::DatasourceSelectionStep,
+    edit_home_step::EditHomeStep, engine_selection_step::EngineSelectionStep,
+    engine_steps::EngineSteps, home_directory_step::HomeDirectoryStep, home_step::HomeStep,
+    postgres_source_step::PostgresSourceStep, postgres_steps::PostgresSteps,
+    selection_step::SelectionStep, source_details::SourceDetails, sqlite_step::SqliteStep,
+    theme_editor_step::ThemeEditorStep, theme_step::ThemeStep, versions_step::VersionsStep,
+};
 
-use super::{
+use crate::init::{
     InitializationState,
     error::InitError,
     prompt::{PromptRequest, PromptResponse},

@@ -1,11 +1,12 @@
 use crate::{
-    sem::{AlterSequence, AstAndContextPair},
-    syn::Opt,
+    names::TableName,
+    sem::{AlterSequence, AstAndContextPair, OwnerSpecification},
+    syn::{CreateSeqStmt, Opt},
 };
 
-use {
-    super::{AnalysisError, ParseContext, SemAst, alter_table::AlterObjSubCommand},
-    crate::names::FullName,
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ParseContext, SemAst, alter_table::AlterObjSubCommand},
 };
 
 /// analyzed [`crate::syn::CreateSeqStmt`]
@@ -16,8 +17,8 @@ pub struct CreateSequence {
 
     name: FullName,
     alter_statements: Vec<AlterSequence>,
-    owner: Option<crate::sem::OwnerSpecification>,
-    owned_by: Option<crate::names::TableName>,
+    owner: Option<OwnerSpecification>,
+    owned_by: Option<TableName>,
 }
 
 impl CreateSequence {
@@ -44,20 +45,20 @@ impl CreateSequence {
     }
 
     /// Dependency on an explicitly specified owning relation (not the role owner).
-    pub const fn owned_by(&self) -> Option<&crate::names::TableName> {
+    pub const fn owned_by(&self) -> Option<&TableName> {
         self.owned_by.as_ref()
     }
     /// Retain a known OWNED BY relation dependency.
-    pub fn set_owned_by(&mut self, table: &crate::names::TableName) {
+    pub fn set_owned_by(&mut self, table: &TableName) {
         self.owned_by = Some(table.clone());
     }
 
     /// Retained ownership; None means no ownership information was supplied.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -122,7 +123,7 @@ impl CreateSequence {
     pub fn analyze_create_seq<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::CreateSeqStmt,
+        syn: CreateSeqStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,

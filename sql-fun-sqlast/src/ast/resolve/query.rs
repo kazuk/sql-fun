@@ -1,10 +1,17 @@
 mod clauses;
+
 #[cfg(test)]
 mod grouping_tests;
 #[cfg(test)]
 mod test_helpers;
 #[cfg(test)]
 mod tests;
+
+use crate::{
+    CacheContext,
+    ast::{Cast, OperatorExpr, OperatorKind, SqlValue, TableSample},
+    sem::{SetOperationKind, TableSampleSource, with_stack},
+};
 
 use self::clauses::ClauseBinding;
 
@@ -32,7 +39,7 @@ impl Query {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<SelectStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None);
@@ -45,7 +52,7 @@ impl Query {
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        crate::sem::with_stack(|| Self::resolve_in_body(self, context, outer))
+        with_stack(|| Self::resolve_in_body(self, context, outer))
     }
 
     #[inline(never)]
@@ -117,12 +124,17 @@ impl Query {
 
 #[cfg(test)]
 mod test_name_resolution_phase {
-    use crate::ast::{Dialect, StatementNode};
-    use crate::context::ParseContext;
-    use crate::test_helpers::TestParseContext;
     use crate::{
+        parse_statements,
+        sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+    };
+
+    use crate::{
+        ast::{Dialect, StatementNode},
+        context::ParseContext,
         names::OperatorName,
         sem::{BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType},
+        test_helpers::TestParseContext,
     };
 
     #[rstest::rstest]
@@ -133,10 +145,7 @@ mod test_name_resolution_phase {
     #[case("SELECT $1 = ALL($2)")]
     fn untyped_operands_do_not_prevent_name_resolution(#[case] sql: &str) {
         let dialect = Dialect::postgres();
-        let statement = crate::parse_statements(sql, dialect)
-            .next()
-            .unwrap()
-            .unwrap();
+        let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
         let StatementNode::Query(query) = statement.node else {
             panic!("query fixture expected");
         };
@@ -154,7 +163,7 @@ mod test_name_resolution_phase {
             true,
             Some(&operator),
         );
-        let before = crate::sem::parameter_resolution::inference_runs();
+        let before = parameter_resolution_inference_runs();
         catalog.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut catalog, None);
         catalog.finish_analysis(result).unwrap();
@@ -205,9 +214,9 @@ impl SetOperation {
         right: SelectStatement,
     ) -> Result<SelectStatement, AnalysisError> {
         let kind = match self {
-            Self::Union => crate::sem::SetOperationKind::union(),
-            Self::Intersect => crate::sem::SetOperationKind::intersect(),
-            Self::Except => crate::sem::SetOperationKind::except(),
+            Self::Union => SetOperationKind::union(),
+            Self::Intersect => SetOperationKind::intersect(),
+            Self::Except => SetOperationKind::except(),
         };
         SelectStatement::set_operation(context, kind, left, right)
     }
@@ -679,7 +688,7 @@ impl FromItem {
         with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
-        crate::sem::with_stack(|| self.resolve_body(context, with, scope))
+        with_stack(|| self.resolve_body(context, with, scope))
     }
 
     #[inline(never)]
@@ -955,7 +964,7 @@ impl Call {
     }
 }
 
-impl crate::ast::OperatorKind {
+impl OperatorKind {
     const fn is_null_if(self) -> bool {
         matches!(self, Self::NullIf)
     }
@@ -1213,7 +1222,7 @@ impl Into {
     }
 }
 
-impl crate::ast::TableSample {
+impl TableSample {
     fn resolve(
         &self,
         context: &mut impl ParseContext,
@@ -1232,7 +1241,7 @@ impl crate::ast::TableSample {
             context,
             &expression_scope.with_grouping_placement("REPEATABLE"),
         )?;
-        let sample = crate::sem::TableSampleSource::resolve(
+        let sample = TableSampleSource::resolve(
             context,
             &source,
             &self.method.full_name()?,
@@ -1243,7 +1252,7 @@ impl crate::ast::TableSample {
     }
 }
 
-impl crate::ast::Cast {
+impl Cast {
     fn table_output_name(&self, value: &SemScalarExpr) -> Result<String, AnalysisError> {
         let name = self
             .argument
@@ -1270,12 +1279,12 @@ impl Name {
         Ok(self.full_name()?.local_name())
     }
 }
-impl crate::ast::SqlValue {
+impl SqlValue {
     fn table_output_name(&self) -> String {
         self.name.clone()
     }
 }
-impl crate::ast::OperatorExpr {
+impl OperatorExpr {
     fn table_output_name(&self) -> String {
         "nullif".to_owned()
     }

@@ -1,4 +1,4 @@
-use super::IdWithName;
+use crate::IdWithName;
 
 #[sql_fun::sql_query_many(sql = "#[choice]")]
 #[sql_fragment(choice, choice, (choice), {

@@ -132,7 +132,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::Cache;
+    use crate::cache::Cache;
     use ::tokio::sync::oneshot;
     use std::sync::{
         Arc,

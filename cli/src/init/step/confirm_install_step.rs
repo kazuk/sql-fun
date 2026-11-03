@@ -1,5 +1,8 @@
-use super::{Direction, InitStep, StepCompletion, StepFuture};
-use crate::init::{InitializationState, prompt::PromptRequest};
+use crate::init::{
+    InitializationState,
+    prompt::PromptRequest,
+    step::{Direction, InitStep, StepCompletion, StepFuture},
+};
 
 /// Final authorization is deliberately unselected on every entry.
 pub(in crate::init) struct ConfirmInstallStep;

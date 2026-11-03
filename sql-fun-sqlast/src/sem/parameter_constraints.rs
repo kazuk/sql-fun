@@ -5,20 +5,28 @@ mod common_type;
 mod memo;
 mod structural;
 
-pub(crate) use self::memo::ConstraintMemo;
-
 pub(crate) use self::call::array_cast_ranks;
+pub(crate) use self::memo::ConstraintMemo;
+pub(crate) use self::structural::TypeProjection;
+
+use crate::{
+    CacheContext,
+    sem::{
+        AnalysisError, AnalysisProblem, ParseContext, parameter_resolution::Signature,
+        problem::MinMaxProblem, with_stack,
+    },
+};
 
 use self::common_type::{CommonTypeConstraint, CommonTypeFacts};
 use std::sync::Arc;
 
-pub(crate) use self::structural::TypeProjection;
-
 use self::structural::StructuralConstraint;
 
 use crate::sem::{ParameterConstraintProblem, TypeReference};
-use std::collections::{BTreeMap, hash_map::DefaultHasher};
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::{BTreeMap, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
+};
 
 fn default_types() -> [TypeReference; 7] {
     [
@@ -379,7 +387,7 @@ pub(crate) struct ConstraintGraph {
     structural: Vec<StructuralConstraint>,
     requirements: Vec<String>,
     common_types: Vec<CommonTypeConstraint>,
-    common_problems: Vec<crate::sem::problem::MinMaxProblem>,
+    common_problems: Vec<MinMaxProblem>,
     common_facts: Option<Arc<CommonTypeFacts>>,
     calls: Vec<call::CallConstraint>,
     unsupported_inference: Vec<String>,
@@ -467,10 +475,10 @@ impl ConstraintGraph {
 
     pub(crate) fn call(
         &mut self,
-        context: &impl crate::sem::ParseContext,
-        cache: &mut crate::CacheContext,
+        context: &impl ParseContext,
+        cache: &mut CacheContext,
         nodes: &[usize],
-        signatures: &[crate::sem::parameter_resolution::Signature],
+        signatures: &[Signature],
         operation: &str,
     ) {
         self.resume_collection();
@@ -511,7 +519,7 @@ impl ConstraintGraph {
 
     pub(crate) fn common_type(
         &mut self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         inputs: &[usize],
         comparison: bool,
         operation: &str,
@@ -535,8 +543,8 @@ impl ConstraintGraph {
 
     pub(crate) fn prepare_projections(
         &mut self,
-        context: &impl crate::sem::ParseContext,
-        cache: &mut crate::CacheContext,
+        context: &impl ParseContext,
+        cache: &mut CacheContext,
     ) {
         self.resume_collection();
         if let Some(facts) = &mut self.common_facts {
@@ -576,11 +584,11 @@ impl ConstraintGraph {
 
     pub(crate) fn report_inference_problems(
         &self,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<(), crate::sem::AnalysisError> {
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
         for operation in &self.unsupported_inference {
             context.report_analysis_problem(
-                crate::sem::AnalysisProblem::inference_candidate_space_unsupported(operation),
+                AnalysisProblem::inference_candidate_space_unsupported(operation),
             )?;
         }
         Ok(())
@@ -588,9 +596,9 @@ impl ConstraintGraph {
 
     pub(crate) fn report_projection_problems(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         memo: &mut ConstraintMemo,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         // Inspect each relationship before it can discard an invalid source.
         // A clone preserves the original graph for solving and conflict reporting.
         let mut diagnostic_graph = self.inspection.as_deref().unwrap_or(self).clone();
@@ -598,7 +606,7 @@ impl ConstraintGraph {
             relation.report_problem(domains, context)
         })?;
         for problem in diagnostic_graph.common_problems {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(problem))?;
+            context.report_analysis_problem(AnalysisProblem::min_max(problem))?;
         }
         Ok(())
     }
@@ -701,7 +709,7 @@ impl ConstraintGraph {
         for alternative in self.overloads[index].alternatives.clone() {
             let mut branch = self.clone();
             branch.overloads[index].alternatives = vec![alternative];
-            if crate::sem::with_stack(|| branch.satisfiable(memo)) {
+            if with_stack(|| branch.satisfiable(memo)) {
                 return true;
             }
         }
@@ -798,8 +806,12 @@ impl ConstraintGraph {
 
 #[cfg(test)]
 mod test_constraints {
-    use super::{ConstraintGraph, InputTypeConstraint, ParameterConstraints, SignatureAlternative};
-    use crate::sem::PgBuiltInType;
+    use crate::sem::{
+        PgBuiltInType,
+        parameter_constraints::{
+            ConstraintGraph, InputTypeConstraint, ParameterConstraints, SignatureAlternative,
+        },
+    };
     use std::collections::BTreeMap;
 
     #[test]

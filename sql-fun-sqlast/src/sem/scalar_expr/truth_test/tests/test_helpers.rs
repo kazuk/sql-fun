@@ -1,12 +1,14 @@
 use crate::{
+    StringSpan,
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
-    names::SchemaName,
+    names::{FullName, SchemaName},
+    parse_statements,
     sem::{
-        CastContext, CastDefinition, ParseContext, PgBuiltInType, SourcePathWithSpan, TypeCategory,
-        TypeDefinition, TypeReference,
+        CastContext, CastDefinition, ParseContext, PgBuiltInType, SelectStatement, SemScalarExpr,
+        SourcePathWithSpan, TypeCategory, TypeDefinition, TypeReference,
     },
-    test_helpers::TestParseContext,
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// Small type catalog with integer equality and configurable text-to-bool casts.
@@ -48,13 +50,13 @@ pub(super) fn context(cast: Option<CastContext>) -> SchemaFileContext {
 }
 
 pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context(None);
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
-        &crate::StringSpan::new(0, sql.len()),
+        &StringSpan::new(0, sql.len()),
     ));
-    for statement in crate::parse_statements(sql, Dialect::postgres()) {
+    for statement in parse_statements(sql, Dialect::postgres()) {
         context = statement?
             .analyze(context, &mut cache_context)?
             .into_context();
@@ -66,9 +68,9 @@ pub(super) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error:
 pub(super) fn query(
     sql: &str,
     context: SchemaFileContext,
-) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let analyzed = crate::parse_statements(sql, Dialect::postgres())
+) -> Result<(SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
+    let mut cache_context = create_cache_context();
+    let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
         .analyze(context, &mut cache_context)?;
@@ -76,7 +78,7 @@ pub(super) fn query(
     Ok((query, analyzed.into_context()))
 }
 
-pub(super) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(super) fn expression(query: &SelectStatement) -> &SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)
@@ -86,5 +88,5 @@ pub(super) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::Se
 }
 
 pub(super) fn bool_domain() -> TypeReference {
-    TypeReference::from_full_name(crate::names::FullName::with_schema("public", "flag"))
+    TypeReference::from_full_name(FullName::with_schema("public", "flag"))
 }

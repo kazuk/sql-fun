@@ -1,11 +1,15 @@
 //! Analyzer-owned writable-view decisions from effective semantic definitions.
-use crate::sem::ResolutionFailure;
-use crate::sem::problem::ViewProblem;
+
 use crate::{
-    names::{ColumnName, FullName, TableName},
+    ast::Dialect,
+    context::RuleInfoRead,
+    names::{AliasName, ColumnName, FullName, TableName, ViewName},
     sem::{
-        AnalysisError, ColumnDefinition, ParseContext, SemScalarExpr, ViewInsertSupport,
-        ViewUpdateSupport,
+        AnalysisError, ColumnDefinition, ColumnReferenceExpr, ConflictArbiterInference, CreateRule,
+        CreateTrigger, CreateView, InsertConflict, ParseContext, ResolutionFailure, RuleIdentity,
+        SelectStatement, SemScalarExpr, TriggerEvent as SemTriggerEvent, TriggerGranularity,
+        TriggerIdentity, TriggerTiming, ViewInsertSupport, ViewLike, ViewUpdateSupport,
+        problem::ViewProblem,
     },
 };
 
@@ -48,8 +52,8 @@ impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
     pub(crate) fn infer_arbiters(
         &mut self,
         view: &TableName,
-        conflict: &crate::sem::InsertConflict,
-    ) -> Result<Option<crate::sem::ConflictArbiterInference>, AnalysisError> {
+        conflict: &InsertConflict,
+    ) -> Result<Option<ConflictArbiterInference>, AnalysisError> {
         let result = infer_view_arbiters(self.context, view, conflict);
         ResolutionFailure::finish(result, self.context)
     }
@@ -76,7 +80,7 @@ impl ViewWriteSupport {
 // Transient projection used only by this evaluation and conflict rewriting. It is never registered.
 struct EvaluationView<'a> {
     name: FullName,
-    definition: &'a crate::sem::CreateView,
+    definition: &'a CreateView,
     source: Option<FullName>,
     projections: Vec<(ColumnDefinition, Option<ColumnName>)>,
     expressions: Vec<(ColumnName, SemScalarExpr)>,
@@ -86,7 +90,7 @@ impl<'a> EvaluationView<'a> {
         &self,
         context: &'c impl ParseContext,
         event: WriteEvent,
-    ) -> Vec<&'c crate::sem::CreateRule> {
+    ) -> Vec<&'c CreateRule> {
         self.definition
             .rules()
             .resolve(context)
@@ -99,20 +103,20 @@ impl<'a> EvaluationView<'a> {
             .rules()
             .resolve(context)
             .into_iter()
-            .any(crate::sem::CreateRule::blocks_insert_on_conflict)
+            .any(CreateRule::blocks_insert_on_conflict)
     }
     fn matching_triggers<'c>(
         &self,
         context: &'c impl ParseContext,
         event: WriteEvent,
-    ) -> Vec<&'c crate::sem::CreateTrigger> {
+    ) -> Vec<&'c CreateTrigger> {
         self.definition
             .triggers()
             .resolve(context, &self.name)
             .into_iter()
             .filter(|trigger| {
-                trigger.timing() == crate::sem::TriggerTiming::instead_of()
-                    && trigger.granularity() == crate::sem::TriggerGranularity::row()
+                trigger.timing() == TriggerTiming::instead_of()
+                    && trigger.granularity() == TriggerGranularity::row()
                     && trigger
                         .events()
                         .iter()
@@ -131,12 +135,11 @@ impl<'a> EvaluationView<'a> {
             }
         }
         for trigger in definition.triggers().names() {
-            let identity =
-                if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
-                    crate::sem::TriggerIdentity::sqlite(trigger)
-                } else {
-                    crate::sem::TriggerIdentity::postgres(name, trigger)
-                };
+            let identity = if Dialect::from(context.metadata()) == Dialect::sqlite() {
+                TriggerIdentity::sqlite(trigger)
+            } else {
+                TriggerIdentity::postgres(name, trigger)
+            };
             if context.trigger(&identity).is_none() && !context.trigger_is_cancelled(&identity) {
                 return Err(missing_definition(trigger));
             }
@@ -220,7 +223,7 @@ impl<'a> EvaluationView<'a> {
                 !rules.iter().any(|rule| rule.instead()),
                 !self.has_conflict_rules(context),
             );
-            if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
+            if Dialect::from(context.metadata()) == Dialect::sqlite() {
                 decision.required_trigger_columns =
                     required_trigger_columns(&triggers, event).map(|columns| {
                         columns
@@ -240,7 +243,7 @@ impl<'a> EvaluationView<'a> {
             }
             return Some(decision);
         }
-        if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite()
+        if Dialect::from(context.metadata()) == Dialect::sqlite()
             || rules.iter().any(|rule| rule.instead())
         {
             return Some(Decision::read_only());
@@ -272,16 +275,13 @@ impl<'a> EvaluationView<'a> {
         event: WriteEvent,
         seen: &mut Vec<FullName>,
     ) -> Result<Decision, ResolutionFailure> {
-        let decision = if let Some(table) =
-            context.get_table(&crate::names::TableName::from(source.clone()))
-        {
+        let decision = if let Some(table) = context.get_table(&TableName::from(source.clone())) {
             let mut columns = Vec::new();
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
             }
             Decision::writable(&columns, true, true)
-        } else if let Some(view) = context.get_view(&crate::names::ViewName::from_full_name(source))
-        {
+        } else if let Some(view) = context.get_view(&ViewName::from_full_name(source)) {
             if view.is_materialized() {
                 Decision::read_only()
             } else {
@@ -417,7 +417,7 @@ fn insert_support(
     context: &impl ParseContext,
     view: &FullName,
 ) -> Result<ViewInsertSupport, ResolutionFailure> {
-    if lookup_bound_view(context, view)?.is_some_and(crate::sem::ViewLike::is_materialized) {
+    if lookup_bound_view(context, view)?.is_some_and(ViewLike::is_materialized) {
         return Ok(ViewInsertSupport::read_only());
     }
     if let Some(support) = context.view_insert_support(view) {
@@ -432,8 +432,7 @@ fn insert_support(
         let mut support = ViewInsertSupport::writable(
             &decision.columns,
             decision.returning,
-            decision.on_conflict
-                && crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::sqlite(),
+            decision.on_conflict && Dialect::from(context.metadata()) != Dialect::sqlite(),
         );
         support.set_assignment_columns(&decision.assignment_columns);
         Ok(support)
@@ -445,7 +444,7 @@ fn update_support(
     context: &impl ParseContext,
     view: &FullName,
 ) -> Result<ViewUpdateSupport, ResolutionFailure> {
-    if lookup_bound_view(context, view)?.is_some_and(crate::sem::ViewLike::is_materialized) {
+    if lookup_bound_view(context, view)?.is_some_and(ViewLike::is_materialized) {
         return Ok(ViewUpdateSupport::read_only());
     }
     if let Some(support) = context.view_update_support(view) {
@@ -474,7 +473,7 @@ pub(crate) enum WriteEvent {
     Delete,
 }
 impl WriteEvent {
-    const fn matches_trigger(self, event: &crate::sem::TriggerEvent) -> bool {
+    const fn matches_trigger(self, event: &SemTriggerEvent) -> bool {
         matches!(
             (self, event),
             (Self::Insert, crate::sem::TriggerEvent::Insert)
@@ -494,7 +493,7 @@ impl WriteEvent {
 }
 
 fn required_trigger_columns(
-    triggers: &[&crate::sem::CreateTrigger],
+    triggers: &[&CreateTrigger],
     event: WriteEvent,
 ) -> Option<Vec<ColumnName>> {
     let mut columns = Vec::new();
@@ -518,8 +517,8 @@ fn required_trigger_columns(
 fn infer_view_arbiters(
     context: &impl ParseContext,
     view: &TableName,
-    conflict: &crate::sem::InsertConflict,
-) -> Result<crate::sem::ConflictArbiterInference, ResolutionFailure> {
+    conflict: &InsertConflict,
+) -> Result<ConflictArbiterInference, ResolutionFailure> {
     let info = EvaluationView::load(context, view.full_name())?;
     info.decision(
         context,
@@ -534,14 +533,14 @@ fn infer_view_arbiters(
             .matching_triggers(context, WriteEvent::insert())
             .is_empty()
     {
-        return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
+        return Ok(ConflictArbiterInference::complete(&[]));
     }
     let Some(source) = &info.source else {
-        return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
+        return Ok(ConflictArbiterInference::complete(&[]));
     };
     let mut mapped = conflict.clone();
     if !mapped.map_view_columns(context, &info, source)? {
-        return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
+        return Ok(ConflictArbiterInference::complete(&[]));
     }
     let relation = TableName::from(source.clone());
     let inference = if context.get_table(&relation).is_some() {
@@ -550,24 +549,24 @@ fn infer_view_arbiters(
         infer_view_arbiters(context, &relation, &mapped)?
     };
     if context
-        .get_table(&crate::names::TableName::from(source.clone()))
+        .get_table(&TableName::from(source.clone()))
         .is_some()
     {
         match inference.into_result() {
-            Ok(arbiters) => Ok(crate::sem::ConflictArbiterInference::complete(
+            Ok(arbiters) => Ok(ConflictArbiterInference::complete(
                 &arbiters
                     .into_iter()
                     .map(|arbiter| arbiter.with_view_source(&relation))
                     .collect::<Vec<_>>(),
             )),
-            Err(problem) => Ok(crate::sem::ConflictArbiterInference::problem(&problem)),
+            Err(problem) => Ok(ConflictArbiterInference::problem(&problem)),
         }
     } else {
         Ok(inference)
     }
 }
 
-impl crate::sem::InsertConflict {
+impl InsertConflict {
     fn map_view_columns(
         &mut self,
         context: &impl ParseContext,
@@ -612,29 +611,25 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for ViewColumnMa
             table.get_column_def(mapped).cloned()
         } else if let Some(view) = self
             .context
-            .get_view(&crate::names::ViewName::from_full_name(self.source))
+            .get_view(&ViewName::from_full_name(self.source))
         {
             view.get_column_def(mapped)
         } else {
             None
         };
-        let alias = crate::names::AliasName::from(self.source.name().as_str());
-        *expression =
-            SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::table_column(
-                &alias,
-                mapped,
-                &TableName::from(self.source.clone()),
-                definition.as_ref(),
-                false,
-            ));
+        let alias = AliasName::from(self.source.name().as_str());
+        *expression = SemScalarExpr::column_reference(ColumnReferenceExpr::table_column(
+            &alias,
+            mapped,
+            &TableName::from(self.source.clone()),
+            definition.as_ref(),
+            false,
+        ));
         Ok(())
     }
 }
 
-fn rule_is_cancelled(
-    context: &dyn crate::context::RuleInfoRead,
-    identity: &crate::sem::RuleIdentity,
-) -> bool {
+fn rule_is_cancelled(context: &dyn RuleInfoRead, identity: &RuleIdentity) -> bool {
     if let Some(entry) = context.local_rule(identity) {
         entry.is_none()
     } else if let Some(parent) = context.rule_parent() {
@@ -646,7 +641,7 @@ fn rule_is_cancelled(
 
 fn automatic_view_source(
     context: &impl ParseContext,
-    query: &crate::sem::SelectStatement,
+    query: &SelectStatement,
 ) -> Result<Option<FullName>, AnalysisError> {
     use crate::sem::SelectStatement;
     if !projection_preserves_rows(context, query)? {
@@ -679,7 +674,7 @@ fn automatic_view_source(
 
 fn projection_preserves_rows(
     context: &impl ParseContext,
-    query: &crate::sem::SelectStatement,
+    query: &SelectStatement,
 ) -> Result<bool, AnalysisError> {
     let mut check = ProjectionRows {
         context,
@@ -740,11 +735,11 @@ fn missing_definition(name: &FullName) -> ResolutionFailure {
 fn lookup_bound_view<'a>(
     context: &'a impl ParseContext,
     name: &FullName,
-) -> Result<Option<&'a crate::sem::ViewLike>, ResolutionFailure> {
+) -> Result<Option<&'a ViewLike>, ResolutionFailure> {
     if name.schema().is_none() {
         return Err(ResolutionFailure::view(&ViewProblem::missing_metadata(
             name,
         )));
     }
-    Ok(context.get_view(&crate::names::ViewName::from_full_name(name)))
+    Ok(context.get_view(&ViewName::from_full_name(name)))
 }

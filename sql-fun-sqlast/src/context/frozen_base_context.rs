@@ -1,5 +1,5 @@
-use crate::context::{BaseContext, BaseParseContext};
 use crate::{
+    context::{BaseContext, BaseParseContext},
     names::FullName,
     sem::{TypeDefinition, TypeReference},
 };
@@ -526,6 +526,8 @@ impl crate::context::TypeInfoRead for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_type_lookup_cost {
+    use crate::test_helpers::schema_layer;
+
     use crate::{
         context::{BaseParseContext, ParseContext},
         names::FullName,
@@ -540,7 +542,7 @@ mod test_type_lookup_cost {
     fn qualified_type_miss_reaches_root_once(#[case] layers: usize) {
         let (mut base, probes) = test_helpers::counted_root();
         for _ in 0..layers {
-            base = crate::test_helpers::schema_layer(Path::new("layer.sql"), &base).freeze();
+            base = schema_layer(Path::new("layer.sql"), &base).freeze();
         }
 
         assert!(

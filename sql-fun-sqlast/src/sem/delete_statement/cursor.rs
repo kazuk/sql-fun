@@ -1,4 +1,7 @@
-use crate::sem::CursorInfo;
+use crate::sem::{
+    AnalysisError, CursorInfo, SemScalarExpr,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
 
 /// A positioned DELETE's portal reference and lookup result in its session scope.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -41,17 +44,17 @@ impl DeleteCursor {
 /// Predicate alternatives are exclusive, as in PostgreSQL's DELETE grammar.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum DeletePredicate {
-    Expression(Box<crate::sem::SemScalarExpr>),
+    Expression(Box<SemScalarExpr>),
     CurrentOf(DeleteCursor),
 }
 impl DeletePredicate {
-    pub(crate) fn expression(value: &crate::sem::SemScalarExpr) -> Self {
+    pub(crate) fn expression(value: &SemScalarExpr) -> Self {
         Self::Expression(Box::new(value.clone()))
     }
     pub(crate) fn current_of(value: &DeleteCursor) -> Self {
         Self::CurrentOf(value.clone())
     }
-    pub(crate) fn as_expression(&self) -> Option<&crate::sem::SemScalarExpr> {
+    pub(crate) fn as_expression(&self) -> Option<&SemScalarExpr> {
         match self {
             Self::Expression(value) => Some(value),
             Self::CurrentOf(_) => None,
@@ -63,10 +66,10 @@ impl DeletePredicate {
             Self::Expression(_) => None,
         }
     }
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         match self {
             Self::Expression(value) => {
                 value.walk(visitor)?;
@@ -76,10 +79,7 @@ impl DeletePredicate {
             Self::CurrentOf(_) => Ok(()),
         }
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Expression(value) => {
                 value.visit(visitor)?;

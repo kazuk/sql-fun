@@ -1,15 +1,17 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{ColumnName, FullName, TableName, ViewName},
     sem::{
         AnalysisError, AnalysisProblem, CreateTrigger, DataSourceRowsFromFunc, SelectStatement,
         SemScalarExpr, WithClause,
         data_source::{
-            AliasSpec, CteDataSource, DataSource, JoinExprDataSource, JoinKind, SubQueryDataSource,
-            TableDataSource, UndefinedTableFuncDataSource, ViewDataSource,
-            join_expr::JoinUsingClause,
+            AliasSpec, CteDataSource, DataSource, DataSourceRowFunctions, JoinExprDataSource,
+            JoinKind, SubQueryDataSource, TableDataSource, UndefinedTableFuncDataSource,
+            ViewDataSource, join_expr::JoinUsingClause,
         },
         problem::DeleteProblemKind,
+        search_path::expand_relation_search_path,
         type_system::ArgumentBindingCollection,
     },
 };
@@ -31,7 +33,7 @@ impl DataSource {
     }
 
     pub(crate) fn resolved_rows(functions: &[DataSourceRowsFromFunc], alias: &AliasSpec) -> Self {
-        Self::RowFunctions(super::DataSourceRowFunctions::new(
+        Self::RowFunctions(DataSourceRowFunctions::new(
             &functions.to_vec().into(),
             alias,
         ))
@@ -54,11 +56,10 @@ impl DataSource {
             return Ok(CteDataSource::new_data_source(cte_name, alias));
         }
         let canonical;
-        let name = if context.dialect() == crate::ast::Dialect::sqlite() {
-            canonical =
-                crate::sem::search_path::expand_relation_search_path(context, name, |key| {
-                    context.sqlite_relation_identity(key)
-                });
+        let name = if context.dialect() == Dialect::sqlite() {
+            canonical = expand_relation_search_path(context, name, |key| {
+                context.sqlite_relation_identity(key)
+            });
             canonical.as_ref().unwrap_or(name)
         } else {
             name

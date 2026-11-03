@@ -1,10 +1,11 @@
 use crate::{
     ast::Dialect,
     sem::{
-        AnalysisError, AnalysisProblem, ConstrainedExpr, InputTypeConstraint, MinMaxExpr,
-        ParameterConstraints, ParseContext, QueryProblem, ResultColumnCollection, SelectStatement,
-        SemScalarExpr, TypeReference, parameter_resolution::ParameterResolution,
-        traversal::SemanticVisitorMut,
+        AccessKind, AnalysisError, AnalysisProblem, ConstrainedExpr, InputTypeConstraint,
+        InsertTarget, MinMaxExpr, ParameterConstraints, ParseContext, QueryProblem,
+        ResultColumnCollection, SelectStatement, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -58,7 +59,7 @@ impl SetOperationKind {
 
 #[cfg(test)]
 mod test_set_nullability {
-    use super::SetOperationKind;
+    use crate::sem::select_statement::set_operation::SetOperationKind;
 
     #[rstest::rstest]
     #[case(SetOperationKind::union(), Some(true), Some(true), Some(true))]
@@ -385,7 +386,7 @@ impl SetOperationQuery {
     pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         visitor.enter_set_operand();
         self.left.walk(visitor)?;
@@ -397,12 +398,12 @@ impl SetOperationQuery {
         self.columns.walk_set_outputs(visitor, targets)?;
         Ok(())
     }
-    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_output());
+        visitor.access_purpose(AccessKind::select_output());
         visitor.enter_set_operation();
         visitor.enter_set_operand();
         self.left.visit(visitor)?;
@@ -419,9 +420,17 @@ impl SetOperationQuery {
 
 #[cfg(test)]
 mod test_set_operation {
-    use super::{SetOperationKind, SetOperationQuery};
     use crate::{
-        sem::{ParseContext, PgBuiltInType, SelectStatement},
+        ast::Dialect,
+        parse_statements,
+        test_helpers::{create_cache_context, ownership::apply_ownership_sql},
+    };
+
+    use crate::{
+        sem::{
+            ParseContext, PgBuiltInType, SelectStatement,
+            select_statement::set_operation::{SetOperationKind, SetOperationQuery},
+        },
         test_helpers::set_operations,
     };
     use std::collections::BTreeMap;
@@ -486,12 +495,12 @@ mod test_set_operation {
         #[case] sql: &str,
         #[case] invalid: bool,
     ) -> testresult::TestResult {
-        let analyzed = crate::parse_statements(sql, crate::ast::Dialect::postgres())
+        let analyzed = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()?
             .analyze(
                 set_operations::composite_context()?,
-                &mut crate::test_helpers::create_cache_context(),
+                &mut create_cache_context(),
             )?;
         let query = analyzed.ast().select_statement().unwrap();
         let SelectStatement::Set(set) = query.query_clauses().unwrap().body() else {
@@ -596,17 +605,14 @@ mod test_set_operation {
     fn catalog_column_constrains_both_input_and_output_domains(
         #[case] sql: &str,
     ) -> testresult::TestResult {
-        let catalog = crate::test_helpers::ownership::apply_ownership_sql(
-            set_operations::context(crate::ast::Dialect::postgres()),
+        let catalog = apply_ownership_sql(
+            set_operations::context(Dialect::postgres()),
             "CREATE TABLE table_x(id integer)",
         )?;
-        let analyzed = crate::parse_statements(sql, crate::ast::Dialect::postgres())
+        let analyzed = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()?
-            .analyze(
-                catalog.into_context(),
-                &mut crate::test_helpers::create_cache_context(),
-            )?;
+            .analyze(catalog.into_context(), &mut create_cache_context())?;
         assert!(analyzed.context().problems().is_empty());
         let constraints = analyzed.context().parameter_constraints();
         let input = constraints.parameter(1).unwrap().constraint();
@@ -659,12 +665,12 @@ mod test_set_operation {
             |row| row.get(0),
         )?;
         assert_eq!(count, 2);
-        let analyzed = crate::parse_statements(sql, Dialect::sqlite())
+        let analyzed = parse_statements(sql, Dialect::sqlite())
             .next()
             .unwrap()?
             .analyze(
                 set_operations::context(Dialect::sqlite()),
-                &mut crate::test_helpers::create_cache_context(),
+                &mut create_cache_context(),
             )?;
         assert!(
             analyzed.context().problems().is_empty(),

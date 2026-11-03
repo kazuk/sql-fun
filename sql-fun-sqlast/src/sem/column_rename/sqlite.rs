@@ -1,10 +1,13 @@
 //! SQLite validates the rewritten namespaces before committing a schema rename.
+
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{ColumnName, FullName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnRename, QueryProblem, SemScalarExpr,
-        ViewLike, traversal::SemanticVisitorMut,
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename, CreateTrigger,
+        QueryProblem, SemScalarExpr, ViewLike,
+        traversal::{ColumnRenamer, SemanticVisitorMut},
     },
 };
 use std::collections::HashMap;
@@ -89,7 +92,7 @@ impl ColumnRename {
     pub(crate) fn rewrite_sqlite_trigger(
         &self,
         context: &impl ParseContext,
-        trigger: &mut crate::sem::CreateTrigger,
+        trigger: &mut CreateTrigger,
     ) -> Result<(), AnalysisError> {
         trigger.rename_column_with(
             self,
@@ -100,7 +103,7 @@ impl ColumnRename {
 struct RenameNamespaces<'a, C> {
     context: &'a C,
     rename: &'a ColumnRename,
-    columns: crate::sem::traversal::ColumnRenamer<'a>,
+    columns: ColumnRenamer<'a>,
     outputs: HashMap<FullName, Vec<ColumnName>>,
     scopes: Vec<Vec<NamespaceSource>>,
     joins: Vec<(usize, usize)>,
@@ -185,7 +188,7 @@ impl<'a, C: ParseContext> RenameNamespaces<'a, C> {
         Self {
             context,
             rename,
-            columns: crate::sem::traversal::ColumnRenamer::new(rename),
+            columns: ColumnRenamer::new(rename),
             outputs,
             scopes: Vec::new(),
             joins: Vec::new(),
@@ -238,7 +241,7 @@ impl<C: ParseContext> SemanticVisitorMut for RenameNamespaces<'_, C> {
         self.source_outputs.push(columns.to_vec());
     }
     fn join_sensitive_star(&mut self) {
-        if self.context.dialect() == crate::ast::Dialect::sqlite()
+        if self.context.dialect() == Dialect::sqlite()
             && self.natural_projection_changes.last() == Some(&true)
         {
             todo!("SQLite NATURAL JOIN wildcard reconstruction (#868)");
@@ -251,7 +254,7 @@ impl<C: ParseContext> SemanticVisitorMut for RenameNamespaces<'_, C> {
         expanded: bool,
         value: &mut SemScalarExpr,
     ) -> Result<(), AnalysisError> {
-        if self.context.dialect() == crate::ast::Dialect::sqlite()
+        if self.context.dialect() == Dialect::sqlite()
             && !explicit
             && !expanded
             && value.namespace_reference().is_none()
@@ -302,11 +305,7 @@ impl<C: ParseContext> SemanticVisitorMut for RenameNamespaces<'_, C> {
     fn assignment_target(&mut self, value: &mut SemScalarExpr) {
         self.columns.assignment_target(value);
     }
-    fn bound_definition(
-        &mut self,
-        column: &mut crate::sem::ColumnDefinition,
-        destination: &SemScalarExpr,
-    ) {
+    fn bound_definition(&mut self, column: &mut ColumnDefinition, destination: &SemScalarExpr) {
         self.columns.bound_definition(column, destination);
     }
 

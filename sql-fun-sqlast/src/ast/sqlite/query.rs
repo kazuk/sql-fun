@@ -1,9 +1,13 @@
-use crate::ast::{
-    Alias, Call, Cte, CteBody, CteColumn, DerivedTable, Expr, Frame, FrameBound, FrameExclusion,
-    FrameMode, FromGroup, FromItem, FromList, FromOpt, Grouping, Join, JoinKind, Name, Order,
-    Query, QueryBody, Relation, Select, SetOperation, SetQuery, TableFunction, TableFunctions,
-    Target, TryFromList, TryFromOpt, Window, With,
+use crate::{
+    ast::{
+        Alias, Call, Cte, CteBody, CteColumn, DerivedTable, Expr, Frame, FrameBound,
+        FrameExclusion, FrameMode, FromGroup, FromItem, FromList, FromOpt, Grouping, Join,
+        JoinKind, Name, Order, Query, QueryBody, Relation, Select, SetOperation, SetQuery,
+        TableFunction, TableFunctions, Target, TryFromList, TryFromOpt, Window, With,
+    },
+    sem::with_stack,
 };
+#[cfg(feature = "sqlite")]
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
 impl From<QueryBody> for Query {
@@ -24,7 +28,7 @@ impl TryFrom<&syn::Select> for Query {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Select) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::convert_sqlite(value))
+        with_stack(|| Self::convert_sqlite(value))
     }
 }
 
@@ -346,7 +350,7 @@ impl TryFrom<&syn::SelectTable> for FromItem {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::SelectTable) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::convert_sqlite(value))
+        with_stack(|| Self::convert_sqlite(value))
     }
 }
 

@@ -1,11 +1,14 @@
-use crate::ast::ddl::{
-    AlterColumnType, AlterConstraintFlags, AlterDefinition, AlterIdentity, AlterOperation,
-    AlterPartition, CompositeField, CompositeType, Domain, Function, FunctionBody,
-    FunctionBodyStatement, FunctionOption, FunctionParameter, GenericAction, GenericOption, Index,
-    ParameterMode, PostgresAlterCommand, ReplicaIdentity, Schema, TableAs,
+use crate::ast::{
+    AlterCommand, AlterRelation, AlterRelationKind, Expr, Literal, Role, SyntaxOption, SyntaxValue,
+    TableConstraint, TypeName,
+    ddl::{
+        AlterColumnType, AlterConstraintFlags, AlterDefinition, AlterIdentity, AlterOperation,
+        AlterPartition, CompositeField, CompositeType, Domain, Function, FunctionBody,
+        FunctionBodyStatement, FunctionOption, FunctionParameter, GenericAction, GenericOption,
+        Index, ParameterMode, PostgresAlterCommand, ReplicaIdentity, Schema, TableAs,
+    },
+    deparse::{DeparseError, SqlEmit, SqlWriter},
 };
-use crate::ast::deparse::{DeparseError, SqlEmit, SqlWriter};
-use crate::ast::{AlterCommand, AlterRelation, AlterRelationKind};
 
 impl SqlEmit for TableAs {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
@@ -182,8 +185,7 @@ impl SqlEmit for Function {
 
 #[cfg(test)]
 mod test_ddl_families {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     #[rstest::rstest]
     #[case::string_body(
@@ -358,10 +360,7 @@ impl FunctionOption {
         Ok(())
     }
 
-    fn emit_transforms(
-        types: &[crate::ast::TypeName],
-        writer: &mut SqlWriter,
-    ) -> Result<(), DeparseError> {
+    fn emit_transforms(types: &[TypeName], writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if types.is_empty() {
             return writer.invalid("function TRANSFORM", "TRANSFORM requires a type");
         }
@@ -586,7 +585,7 @@ impl SqlEmit for AlterCommand {
 }
 
 impl AlterCommand {
-    fn emit_owner(owner: &crate::ast::Role, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_owner(owner: &Role, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("OWNER TO")?;
         writer.sql("OWNER TO ");
         owner.emit(writer)
@@ -594,7 +593,7 @@ impl AlterCommand {
 
     fn emit_column_default(
         column: &str,
-        expression: &crate::ast::Expr,
+        expression: &Expr,
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
         writer.postgres_only("ALTER COLUMN DEFAULT")?;
@@ -605,7 +604,7 @@ impl AlterCommand {
     }
 
     fn emit_added_constraint(
-        constraint: &crate::ast::TableConstraint,
+        constraint: &TableConstraint,
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
         writer.postgres_only("ADD CONSTRAINT")?;
@@ -627,8 +626,7 @@ impl AlterCommand {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_alter_command_emission {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     #[test]
     fn rejects_turso_column_replacement_for_stock_sqlite() {
@@ -710,8 +708,7 @@ impl PostgresAlterCommand {
 
 #[cfg(test)]
 mod test_statistics_emission {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     #[rstest::rstest]
     #[case::named_numeric(
@@ -759,8 +756,7 @@ mod test_statistics_emission {
 
 #[cfg(test)]
 mod test_alter_emission {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     #[rstest::rstest]
     #[case::rename_column("ALTER TABLE t RENAME COLUMN a TO b")]
@@ -1017,7 +1013,7 @@ impl AlterDefinition {
     }
 
     fn emit_identity_option_list(
-        options: &[crate::ast::SyntaxOption],
+        options: &[SyntaxOption],
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
         for (index, option) in options.iter().enumerate() {
@@ -1053,10 +1049,7 @@ impl SqlEmit for AlterDefinition {
 }
 
 impl AlterDefinition {
-    fn emit_options(
-        options: &[crate::ast::SyntaxOption],
-        writer: &mut SqlWriter,
-    ) -> Result<(), DeparseError> {
+    fn emit_options(options: &[SyntaxOption], writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.sql("(");
         writer.list(options, ", ")?;
         writer.sql(")");
@@ -1196,7 +1189,7 @@ impl SqlEmit for AlterIdentity {
     }
 }
 
-impl crate::ast::SyntaxOption {
+impl SyntaxOption {
     fn emit_alter_identity_option(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         // RESTART is an identity action in its own right. The other identity
         // options use SET, matching alter_identity_column_option grammar.
@@ -1216,7 +1209,7 @@ impl crate::ast::SyntaxOption {
     }
 }
 
-impl crate::ast::SyntaxValue {
+impl SyntaxValue {
     fn emit_identity_mode(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::Expression(value) => value.emit_identity_mode(writer),
@@ -1225,7 +1218,7 @@ impl crate::ast::SyntaxValue {
     }
 }
 
-impl crate::ast::Expr {
+impl Expr {
     fn emit_identity_mode(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::Literal(value) => value.emit_identity_mode(writer),
@@ -1234,7 +1227,7 @@ impl crate::ast::Expr {
     }
 }
 
-impl crate::ast::Literal {
+impl Literal {
     fn emit_identity_mode(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::String(value) if value == "a" => writer.sql("ALWAYS"),

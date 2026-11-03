@@ -1,8 +1,12 @@
-use crate::ast::Dialect;
-use crate::test_helpers::TestParseContext;
 use crate::{
+    ast::Dialect,
     names::FullName,
-    sem::{AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, TypeDefinition},
+    parse_statements,
+    sem::{
+        AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, SemScalarExpr,
+        TypeDefinition,
+    },
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// Explicit bindings and three type facts; no real catalog initialization.
@@ -37,8 +41,8 @@ pub(crate) fn query(
     context: &mut TestParseContext,
 ) -> Result<SelectStatement, Box<dyn std::error::Error>> {
     use crate::context::ParseContext;
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let statement = crate::parse_statements(sql, context.dialect())
+    let mut cache_context = create_cache_context();
+    let statement = parse_statements(sql, context.dialect())
         .next()
         .expect("one query")?;
     let analyzed = statement.analyze(std::mem::take(context), &mut cache_context)?;
@@ -51,7 +55,7 @@ pub(crate) fn query(
     Ok(query)
 }
 
-pub(crate) fn expression(query: &SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(crate) fn expression(query: &SelectStatement) -> &SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)

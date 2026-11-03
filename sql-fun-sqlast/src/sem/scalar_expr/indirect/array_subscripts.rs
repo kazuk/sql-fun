@@ -1,5 +1,9 @@
-use crate::sem::scalar_expr::indirect::{IndirectionExpr, array_index::ArrayIndex};
-use crate::sem::{AnalysisError, ParseContext, SemScalarExpr, TypeReference};
+use crate::sem::{
+    AnalysisError, ParseContext, SemScalarExpr, TypeReference,
+    parameter_resolution::ParameterResolution,
+    scalar_expr::indirect::{IndirectionExpr, array_index::ArrayIndex},
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
 
 /// One source-written dimension in a consecutive PostgreSQL subscript group.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -48,7 +52,7 @@ impl ArraySubscript {
         bounds.extend(self.upper.as_ref());
     }
 
-    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         assignment: bool,
@@ -61,7 +65,7 @@ impl ArraySubscript {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         assignment: bool,
@@ -143,7 +147,7 @@ impl ArraySubscripts {
         bounds
     }
 
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -153,10 +157,7 @@ impl ArraySubscripts {
         }
         Ok(())
     }
-    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.array.visit(visitor)?;
         for subscript in &self.subscripts {
             subscript.visit(visitor, false)?;
@@ -164,7 +165,7 @@ impl ArraySubscripts {
         Ok(())
     }
 
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk_assignment_target<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -174,7 +175,7 @@ impl ArraySubscripts {
         }
         Ok(())
     }
-    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_assignment_target<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -187,7 +188,7 @@ impl ArraySubscripts {
 
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> SemScalarExpr {
         let mut result =

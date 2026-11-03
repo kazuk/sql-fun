@@ -1,6 +1,8 @@
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::{Select, SubqueryType, TableInternalId};
 
-use super::Expr;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 
 impl Expr {
     /// create Subquery variant

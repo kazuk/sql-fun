@@ -69,8 +69,7 @@ impl PidFile {
     }
 
     fn write_to_path(&mut self, path: &Path) -> Result<(), ServerError> {
-        use std::fs::OpenOptions;
-        use std::io::Write;
+        use std::{fs::OpenOptions, io::Write};
 
         if self.pid_file.is_some() || self.pid_file_path.is_some() {
             return Err(ServerError::Bug(String::from("pid file ready persisted")));
@@ -130,7 +129,7 @@ impl PidFile {
 
 #[cfg(test)]
 mod tests {
-    use super::test_helpers::PidFileFixture;
+    use crate::pid_file::test_helpers::PidFileFixture;
 
     #[test]
     fn registers_and_persists_server_identity() -> ::testresult::TestResult {

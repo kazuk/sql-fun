@@ -1,4 +1,5 @@
-use super::Expr;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 
 /// is null expression
 #[derive(Clone, Debug)]

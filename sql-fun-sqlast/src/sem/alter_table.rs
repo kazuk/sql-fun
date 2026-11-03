@@ -1,3 +1,12 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::AlterTable as SqliteAlterTable;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::AlterTableBody;
+use crate::{
+    ast::{AlterCommand, AlterRelation},
+    sem::{AlterColumnAttributes, ColumnRename, CreateTable, OwnerSpecification},
+    syn::{AlterTableCmd, AlterTableStmt},
+};
 use sql_fun_core::IVec;
 
 #[cfg(feature = "sqlite")]
@@ -11,9 +20,9 @@ use crate::{
     syn::{AlterTableType, ScanToken},
 };
 
-use {
-    super::{AnalysisError, ParseContext},
-    crate::names::TableName,
+use crate::{
+    names::TableName,
+    sem::{AnalysisError, ParseContext},
 };
 
 /// analyzed alter table statement
@@ -38,7 +47,7 @@ impl AlterTable {
     pub(crate) fn column_rename(
         table: &TableName,
         target: Option<&TableName>,
-        rename: &crate::sem::ColumnRename,
+        rename: &ColumnRename,
         source: &SourcePathWithSpan,
     ) -> Self {
         let mut statement = Self::new(
@@ -51,7 +60,7 @@ impl AlterTable {
         statement
     }
     /// Completed standalone column rename, including rejected operations.
-    pub fn column_rename_change(&self) -> Option<&crate::sem::ColumnRename> {
+    pub fn column_rename_change(&self) -> Option<&ColumnRename> {
         let [command] = self.commands.as_slice() else {
             return None;
         };
@@ -101,7 +110,7 @@ impl AlterTable {
                 .all(AlterObjSubCommand::can_apply_column_attributes);
         statement
     }
-    pub(crate) fn conflicting_constraint(&self, table: &crate::sem::CreateTable) -> Option<String> {
+    pub(crate) fn conflicting_constraint(&self, table: &CreateTable) -> Option<String> {
         let mut names = Vec::new();
         for command in &self.commands {
             if let Some(constraint) = command.added_constraint() {
@@ -117,7 +126,7 @@ impl AlterTable {
         None
     }
 
-    pub(crate) fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub(crate) fn applied_owner(&self) -> Option<&OwnerSpecification> {
         self.commands
             .iter()
             .rev()
@@ -143,14 +152,14 @@ impl AlterTable {
     pub fn analyze_alter_table_statement<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::AlterTableStmt,
+        syn: AlterTableStmt,
         tokens: &IVec<ScanToken>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?
+        AlterRelation::try_from_with_tokens(&syn, tokens)?
             .resolve_and_apply_at(context, source_span)
     }
 
@@ -159,14 +168,14 @@ impl AlterTable {
     pub fn analyze_alter_statement<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::AlterTableStmt,
+        syn: AlterTableStmt,
         tokens: &IVec<ScanToken>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?
+        AlterRelation::try_from_with_tokens(&syn, tokens)?
             .resolve_and_apply_at(context, source_span)
     }
 
@@ -175,19 +184,24 @@ impl AlterTable {
     #[tracing::instrument(skip(context, syn))]
     pub fn analyze_alter_table<TParseContext>(
         context: TParseContext,
-        syn: crate::syn::sqlite::AlterTable,
+        syn: SqliteAlterTable,
         tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from(&syn)?.resolve_and_apply_at(context, source_span)
+        AlterRelation::try_from(&syn)?.resolve_and_apply_at(context, source_span)
     }
 }
 
 #[cfg(test)]
 mod test_analyze_alter_table_statement {
+    #[cfg(feature = "sqlite")]
+    use crate::ast::Dialect;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::AlterTable as SqliteAlterTable;
+
     use crate::{
         AstAndContextPair,
         names::FullName,
@@ -243,9 +257,7 @@ mod test_analyze_alter_table_statement {
     }
 
     #[cfg(feature = "sqlite")]
-    fn parse_sqlite_alter_table<'a>(
-        sql: &'a str,
-    ) -> (crate::syn::sqlite::AlterTable, IVec<SqliteToken<'a>>) {
+    fn parse_sqlite_alter_table<'a>(sql: &'a str) -> (SqliteAlterTable, IVec<SqliteToken<'a>>) {
         let cmd = SqliteDialect::parse(sql)
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
@@ -259,7 +271,7 @@ mod test_analyze_alter_table_statement {
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_missing_relation(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
-        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let context = TestParseContext::default().with_dialect(Dialect::sqlite());
 
         let AstAndContextPair(res, context) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
@@ -278,7 +290,7 @@ mod test_analyze_alter_table_statement {
 
     #[cfg(feature = "sqlite")]
     fn sqlite_context() -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "text"),
@@ -386,12 +398,12 @@ impl AlterView {
         context: TParseContext,
         _parent_schema: &Option<String>,
         as_matview: bool,
-        syn: crate::syn::AlterTableStmt,
+        syn: AlterTableStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
+        AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
             .with_view_kind(as_matview)
             .resolve_and_apply(context)
     }
@@ -400,8 +412,8 @@ impl AlterView {
 #[derive(Debug, Clone)]
 pub enum AlterObjSubCommand {
     /// An analyzed PostgreSQL column-attribute operation.
-    ColumnAttributes(Box<crate::sem::AlterColumnAttributes>),
-    ChangeOwner(crate::sem::OwnerSpecification),
+    ColumnAttributes(Box<AlterColumnAttributes>),
+    ChangeOwner(OwnerSpecification),
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
     /// Remove a column default.
     DropColumnDefault(ColumnName),
@@ -411,7 +423,7 @@ pub enum AlterObjSubCommand {
     RenameTo(TableName),
     AddColumn(ColumnDefinition),
     AlterColumn(ColumnName, ColumnDefinition),
-    RenameColumn(Box<crate::sem::ColumnRename>),
+    RenameColumn(Box<ColumnRename>),
     DropColumn(ColumnName),
 }
 
@@ -434,11 +446,11 @@ impl AlterObjSubCommand {
         }
     }
 
-    pub(crate) fn column_attributes(value: &crate::sem::AlterColumnAttributes) -> Self {
+    pub(crate) fn column_attributes(value: &AlterColumnAttributes) -> Self {
         Self::ColumnAttributes(Box::new(value.clone()))
     }
     /// Retained column binding, requested action, and validation outcomes.
-    pub fn column_attribute_change(&self) -> Option<&crate::sem::AlterColumnAttributes> {
+    pub fn column_attribute_change(&self) -> Option<&AlterColumnAttributes> {
         if let Self::ColumnAttributes(value) = self {
             Some(value)
         } else {
@@ -447,9 +459,9 @@ impl AlterObjSubCommand {
     }
     fn can_apply_column_attributes(&self) -> bool {
         self.column_attribute_change()
-            .is_some_and(crate::sem::AlterColumnAttributes::can_apply)
+            .is_some_and(AlterColumnAttributes::can_apply)
     }
-    pub(crate) fn apply_column_attributes(&self, table: &mut crate::sem::CreateTable) {
+    pub(crate) fn apply_column_attributes(&self, table: &mut CreateTable) {
         if let Self::ColumnAttributes(value) = self {
             value.apply(table);
         }
@@ -462,7 +474,7 @@ impl AlterObjSubCommand {
         }
     }
 
-    const fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    const fn applied_owner(&self) -> Option<&OwnerSpecification> {
         if let Self::ChangeOwner(owner) = self
             && owner.can_apply()
         {
@@ -472,7 +484,7 @@ impl AlterObjSubCommand {
         }
     }
 
-    pub(crate) fn resolved_owner(owner: &crate::sem::OwnerSpecification) -> Self {
+    pub(crate) fn resolved_owner(owner: &OwnerSpecification) -> Self {
         Self::ChangeOwner(owner.clone())
     }
     pub(crate) fn drop_column_default(column: &ColumnName) -> Self {
@@ -496,11 +508,11 @@ impl AlterObjSubCommand {
     pub(crate) fn alter_column(name: &ColumnName, column: &ColumnDefinition) -> Self {
         Self::AlterColumn(name.clone(), column.clone())
     }
-    pub(crate) fn analyzed_column_rename(rename: &crate::sem::ColumnRename) -> Self {
+    pub(crate) fn analyzed_column_rename(rename: &ColumnRename) -> Self {
         Self::RenameColumn(Box::new(rename.clone()))
     }
     /// Completed column-rename semantics.
-    pub fn column_rename_change(&self) -> Option<&crate::sem::ColumnRename> {
+    pub fn column_rename_change(&self) -> Option<&ColumnRename> {
         if let Self::RenameColumn(rename) = self {
             Some(rename)
         } else {
@@ -515,13 +527,13 @@ impl AlterObjSubCommand {
 #[cfg(test)]
 pub fn analyze_alter_obj_change_owner<TParseContext>(
     _context: &TParseContext,
-    cmd: crate::syn::AlterTableCmd,
+    cmd: AlterTableCmd,
 ) -> Result<AlterObjSubCommand, AnalysisError> {
     let Some(new_owner) = cmd.get_newowner().get_rolename() else {
         AnalysisError::raise_unexpected_none("alter_table_cmd.newwoner")?
     };
     Ok(AlterObjSubCommand::resolved_owner(
-        &crate::sem::OwnerSpecification::named(&new_owner),
+        &OwnerSpecification::named(&new_owner),
     ))
 }
 
@@ -546,19 +558,20 @@ impl AlterObjSubCommand {
     fn analyze_alter_obj_column_default<TParseContext>(
         context: TParseContext,
         table_name: &TableName,
-        cmd: crate::syn::AlterTableCmd,
+        cmd: AlterTableCmd,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?
-            .resolve_and_report(context, table_name)
+        AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(context, table_name)
     }
 }
 
 #[cfg(test)]
 mod test_analyze_alter_obj_column_default {
+    use crate::{names::ColumnName, sem::ColumnDefinition};
+
     use crate::{
         names::{FullName, TableName},
         sem::{
@@ -579,8 +592,8 @@ mod test_analyze_alter_obj_column_default {
         //   alter column value set default(0)
         test_context.setup_table(
             "table1",
-            &[crate::sem::ColumnDefinition::new(
-                &Some(crate::names::ColumnName::from("value")),
+            &[ColumnDefinition::new(
+                &Some(ColumnName::from("value")),
                 None,
                 None,
                 &[],
@@ -620,13 +633,13 @@ impl AlterObjSubCommand {
     pub fn analyze_alter_table_body<TParseContext>(
         context: TParseContext,
         table_name: &TableName,
-        body: &crate::syn::sqlite::AlterTableBody,
+        body: &AlterTableBody,
         _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterCommand::try_from(body)?.resolve_and_report(context, table_name)
+        AlterCommand::try_from(body)?.resolve_and_report(context, table_name)
     }
 }
 
@@ -634,14 +647,13 @@ impl AlterObjSubCommand {
     pub fn analyze_alter_table_cmd<TParseContext>(
         context: TParseContext,
         table_name: &TableName,
-        cmd: crate::syn::AlterTableCmd,
+        cmd: AlterTableCmd,
         _subtyp: AlterTableType,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?
-            .resolve_and_report(context, table_name)
+        AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(context, table_name)
     }
 }

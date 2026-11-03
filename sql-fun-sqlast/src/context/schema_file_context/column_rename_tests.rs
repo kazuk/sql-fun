@@ -1,9 +1,13 @@
 //! Maintained SQL-to-catalog column-rename transitions.
+
+#[cfg(feature = "sqlite")]
+use crate::names::FullName as NamesFullName;
 use crate::{
     context::{GetSourcePathWithSpan, ParseContext, TableInfoRead, ViewInfoRead},
-    names::{ColumnName, SchemaName},
+    names::{ColumnName, SchemaName, TableName},
+    sem::{ColumnConstraint, IndirectionExpr, SemScalarExpr},
     test_helpers::{
-        column_rename::{name, schema},
+        column_rename::{child as column_rename_child, name, schema},
         ownership::apply_ownership_sql,
     },
 };
@@ -22,7 +26,7 @@ fn rename_preserves_attributes_order_history_and_parent(
     ])?;
     let parent = if inherited {
         let parent = context.freeze();
-        context = crate::test_helpers::column_rename::child(&parent);
+        context = column_rename_child(&parent);
         Some(parent)
     } else {
         None
@@ -166,7 +170,7 @@ fn unqualified_foreign_keys_keep_creation_time_identity(
     .into_context();
     let parent = if inherited {
         let parent = context.freeze();
-        context = crate::test_helpers::column_rename::child(&parent);
+        context = column_rename_child(&parent);
         Some(parent)
     } else {
         None
@@ -198,7 +202,7 @@ fn unqualified_foreign_keys_keep_creation_time_identity(
             .unwrap()
             .constraints()
             .iter()
-            .find_map(crate::sem::ColumnConstraint::as_foreign_key)
+            .find_map(ColumnConstraint::as_foreign_key)
             .unwrap();
         assert_eq!(original.primary_key_column().as_str(), "id");
     }
@@ -228,6 +232,7 @@ fn sqlite_view_outputs_follow_unaliased_names(
     #[case] sql: &str,
     #[case] output: &str,
 ) -> testresult::TestResult {
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
     let context = sqlite_schema(&[
         "CREATE TABLE t(a)",
@@ -238,7 +243,7 @@ fn sqlite_view_outputs_follow_unaliased_names(
     assert!(result.context().problems().is_empty());
     let view = result
         .context()
-        .get_view_impl(&crate::names::FullName::with_schema("main", "v"))
+        .get_view_impl(&NamesFullName::with_schema("main", "v"))
         .unwrap();
     assert_eq!(
         view.result_columns().names(),
@@ -288,6 +293,7 @@ fn sqlite_checks_rewritten_namespaces_before_publication(
     #[case] view: &str,
     #[case] rejected: bool,
 ) -> testresult::TestResult {
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
     let oracle = rusqlite::Connection::open_in_memory()?;
     oracle.execute_batch("CREATE TABLE t(a)")?;
@@ -305,7 +311,7 @@ fn sqlite_checks_rewritten_namespaces_before_publication(
     );
     let table = result
         .context()
-        .get_table_impl(&crate::names::FullName::with_schema("main", "t"))
+        .get_table_impl(&NamesFullName::with_schema("main", "t"))
         .unwrap();
     assert_eq!(table.has_column(&ColumnName::from("a")), rejected);
     Ok(())
@@ -331,7 +337,7 @@ fn table_keys_indexes_and_fk_source_columns_follow_the_rename() -> testresult::T
         fk.target_columns(),
         Some([ColumnName::from("id")].as_slice())
     );
-    let indexes = context.indexes_for_table(&crate::names::TableName::from(name("t")));
+    let indexes = context.indexes_for_table(&TableName::from(name("t")));
     assert_eq!(indexes.len(), 2);
     assert!(
         indexes
@@ -378,9 +384,7 @@ fn row_type_projections_and_explicit_column_aliases_remain_usable() -> testresul
         .unwrap()
         .expression()
         .unwrap();
-    let crate::sem::SemScalarExpr::Indirection(crate::sem::IndirectionExpr::MemberRef(member)) =
-        expression
-    else {
+    let SemScalarExpr::Indirection(IndirectionExpr::MemberRef(member)) = expression else {
         panic!("retained row field");
     };
     assert_eq!(member.member(), "a");
@@ -400,6 +404,7 @@ fn row_type_projections_and_explicit_column_aliases_remain_usable() -> testresul
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_rejects_a_broken_dependent_view_atomically() -> testresult::TestResult {
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
     let context = sqlite_schema(&[
         "CREATE TABLE t(a)",
@@ -415,7 +420,7 @@ fn sqlite_rejects_a_broken_dependent_view_atomically() -> testresult::TestResult
     assert!(!result.ast().alter_table_statement().unwrap().can_apply());
     let view = result
         .context()
-        .get_view_impl(&crate::names::FullName::with_schema("main", "v1"))
+        .get_view_impl(&NamesFullName::with_schema("main", "v1"))
         .unwrap();
     assert_eq!(view.result_columns().names(), vec![ColumnName::from("a")]);
     Ok(())
@@ -529,7 +534,7 @@ fn an_unresolved_foreign_key_is_not_bound_by_a_later_rename() -> testresult::Tes
     let fk = column
         .constraints()
         .iter()
-        .find_map(crate::sem::ColumnConstraint::as_foreign_key)
+        .find_map(ColumnConstraint::as_foreign_key)
         .unwrap();
     assert!(fk.primary_key_table().is_none());
     assert_eq!(fk.primary_key_column().as_str(), "id");
@@ -641,6 +646,7 @@ fn expression_index_inference_uses_consistent_copied_column_constraints() -> tes
 #[case("CREATE VIEW v AS SELECT * FROM (SELECT a IS NULL FROM t)")]
 #[should_panic(expected = "SQLite implicit expression-derived output names (#867)")]
 fn sqlite_unfinished_implicit_expression_names_stop_explicitly(#[case] view: &str) {
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
     let context = sqlite_schema(&["CREATE TABLE t(a)", view]).unwrap();
     let _ = sqlite(context, "ALTER TABLE t RENAME a TO c");
@@ -656,6 +662,7 @@ fn sqlite_unfinished_implicit_expression_names_stop_explicitly(#[case] view: &st
 )]
 #[should_panic(expected = "SQLite NATURAL JOIN wildcard reconstruction (#868)")]
 fn sqlite_unfinished_natural_star_shapes_stop_explicitly(#[case] other: &str, #[case] view: &str) {
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
     let context = sqlite_schema(&["CREATE TABLE t(a)", other, view]).unwrap();
     let _ = sqlite(context, "ALTER TABLE t RENAME a TO c");
@@ -705,6 +712,7 @@ fn postgres_does_not_enter_sqlite_unfinished_paths(#[case] view: &str) -> testre
 #[case::stable_natural("CREATE VIEW v AS SELECT * FROM t AS x NATURAL JOIN t AS y")]
 #[case::unrelated_expression("CREATE VIEW v AS SELECT c IS NULL FROM u")]
 fn sqlite_correct_outputs_remain_supported(#[case] view: &str) -> testresult::TestResult {
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::column_rename::{sqlite, sqlite_schema};
     let context = sqlite_schema(&["CREATE TABLE t(a)", "CREATE TABLE u(c)", view])?;
     let result = sqlite(context, "ALTER TABLE t RENAME a TO c")?;

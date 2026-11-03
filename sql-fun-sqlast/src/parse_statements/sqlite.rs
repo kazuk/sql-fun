@@ -1,10 +1,15 @@
-use crate::StringSpan;
-use crate::ast::{Dialect, Statement, StatementNode};
-use crate::parse_statements::ParseStatementError;
+#[cfg(feature = "sqlite")]
 use crate::sqlite::SqliteStatement;
 #[cfg(feature = "workaround_turso_9791")]
+#[cfg(feature = "sqlite")]
 use crate::sqlite_parser::Parser;
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::Cmd;
+use crate::{
+    StringSpan,
+    ast::{Dialect, Statement, StatementNode},
+    parse_statements::ParseStatementError,
+};
 #[cfg(not(feature = "workaround_turso_9791"))]
 use ::turso_parser::parser::Parser;
 
@@ -23,10 +28,13 @@ pub(super) fn parse(
 
 #[cfg(all(test, feature = "workaround_turso_9791"))]
 mod diagnostic_tests {
+    #[cfg(feature = "sqlite")]
+    use crate::parse_statements::sqlite::parse;
+
     #[test]
     fn unsupported_join_reports_the_sql_word_without_result_debug() {
         let sql = "SELECT 1 FROM t LEFT surprising JOIN u";
-        let error = super::parse(sql).next().unwrap().unwrap_err();
+        let error = parse(sql).next().unwrap().unwrap_err();
         assert_eq!(error.to_string(), "unsupported JOIN type: surprising");
         assert!(error.is_syntax());
         assert!(error.is_boundary_discovery());

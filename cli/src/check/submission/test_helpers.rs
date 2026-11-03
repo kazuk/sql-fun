@@ -1,5 +1,7 @@
 pub(super) mod heavy;
 
+use crate::check::submission::{QueryAnalysis, submit};
+
 use std::fmt::Write;
 
 use ::serde_json::Value;
@@ -241,9 +243,9 @@ pub(super) async fn collect_submission(
     client: &mut TcpJsonRpcClientAsync,
     args: &SqlFunArgs,
     requirements: Vec<QueryRequirement>,
-) -> Result<Vec<super::QueryAnalysis>, ::anyhow::Error> {
+) -> Result<Vec<QueryAnalysis>, ::anyhow::Error> {
     let (sender, mut receiver) = ::tokio::sync::mpsc::channel(1);
-    let producer = super::submit(client, args, requirements, sender);
+    let producer = submit(client, args, requirements, sender);
     let consumer = async {
         let mut collected = Vec::new();
         while let Some(result) = receiver.recv().await {

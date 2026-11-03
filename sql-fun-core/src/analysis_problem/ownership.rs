@@ -1,4 +1,4 @@
-use super::{DiagnosticMetadata, OwnershipLookup};
+use crate::analysis_problem::{DiagnosticMetadata, OwnershipLookup};
 
 /// Structured ownership lookup failure, preserving semantic identities.
 #[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
@@ -58,7 +58,7 @@ impl OwnershipProblem {
 
 #[cfg(test)]
 mod tests {
-    use super::{OwnershipLookup, OwnershipProblem};
+    use crate::analysis_problem::ownership::{OwnershipLookup, OwnershipProblem};
 
     #[rstest::rstest]
     #[case::role(

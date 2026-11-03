@@ -7,11 +7,10 @@ use self::test_helpers::{
     parent_with_same_named_tables, query,
 };
 
-use ::sql_fun_sqlast::context::BaseParseContext;
 use ::sql_fun_sqlast::{
     context::{
-        GetSourcePathWithSpanOpt, IndexInfoRead, ParseContext, SearchPathRead, TypeInfoRead,
-        ViewInfoRead,
+        BaseParseContext, GetSourcePathWithSpanOpt, IndexInfoRead, ParseContext, SearchPathRead,
+        TypeInfoRead, ViewInfoRead,
     },
     names::{ColumnName, FullName, TableName},
     sem::{PgBuiltInType, TypeReference},
@@ -748,7 +747,9 @@ fn absent_index_traverses_schema_layers_to_builtin_root() -> Result<(), Box<dyn 
 
 mod test_helpers {
     pub(super) mod heavy {
-        use super::builtin_root;
+        use crate::test_helpers::environment;
+
+        use crate::test_helpers::builtin_root;
         use ::sql_fun_sqlast::{PostgresDialect, context::FrozenBaseContext};
         use std::path::Path;
 
@@ -767,7 +768,7 @@ mod test_helpers {
             let file =
                 Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
             Ok({
-                let (args, selected) = super::environment()?;
+                let (args, selected) = environment()?;
                 let analysis_base = &prefix;
                 PostgresDialect::parse_schema_file(
                     &file,

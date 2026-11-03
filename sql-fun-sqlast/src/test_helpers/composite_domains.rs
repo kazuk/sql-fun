@@ -1,5 +1,8 @@
 //! Small domain/member catalog; no builtin catalog loading.
+
 pub(crate) use crate::test_helpers::domain_casts::reference;
+
+use crate::sem::{CreateDomain, TypeDefinition, TypeReference};
 
 use crate::{
     context::{ParseContext, SchemaFileContext},
@@ -29,11 +32,9 @@ pub(crate) fn context(frozen: bool) -> Result<SchemaFileContext, AnalysisError> 
     Ok(context)
 }
 
-pub(crate) fn owned_domain(
-    name: &str,
-    base: &crate::sem::TypeReference,
-) -> crate::sem::TypeReference {
-    crate::sem::TypeReference::dynamic(&crate::sem::TypeDefinition::from(
-        &crate::sem::CreateDomain::new(&reference(name), &Some(base.clone())),
-    ))
+pub(crate) fn owned_domain(name: &str, base: &TypeReference) -> TypeReference {
+    TypeReference::dynamic(&TypeDefinition::from(&CreateDomain::new(
+        &reference(name),
+        &Some(base.clone()),
+    )))
 }

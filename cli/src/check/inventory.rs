@@ -91,8 +91,9 @@ impl QueryFacts {
 
 #[cfg(test)]
 mod test_query_facts {
-    use super::QueryFacts;
-    use crate::test_helpers::inventory::access_response;
+    use crate::test_helpers::inventory::object_response;
+
+    use crate::{check::inventory::QueryFacts, test_helpers::inventory::access_response};
 
     #[rstest::rstest]
     fn ignores_generation_eligibility_and_diagnostics(#[values(false, true)] eligible: bool) {
@@ -109,11 +110,7 @@ mod test_query_facts {
     }
     #[rstest::rstest]
     fn preserves_sql_visible_object_kinds(#[values("View", "Function")] kind: &str) {
-        let facts = QueryFacts::collect(
-            "hash",
-            &crate::test_helpers::inventory::object_response(kind),
-        )
-        .unwrap();
+        let facts = QueryFacts::collect("hash", &object_response(kind)).unwrap();
         assert!(
             facts
                 .accesses
@@ -271,8 +268,10 @@ impl Document {
 
 #[cfg(test)]
 mod test_document {
-    use super::{Document, QueryFacts, QueryIdentity, Target};
-    use crate::test_helpers::inventory::{Project, access_response};
+    use crate::{
+        check::inventory::{Document, QueryFacts, QueryIdentity, Target},
+        test_helpers::inventory::{Project, access_response},
+    };
 
     #[test]
     fn preserves_composite_identities_roles_and_quoted_names() {
@@ -435,8 +434,10 @@ impl Inventories {
 
 #[cfg(test)]
 mod test_inventories {
-    use super::{Inventories, Target};
-    use crate::test_helpers::inventory::Project;
+    use crate::{
+        check::inventory::{Inventories, Target},
+        test_helpers::inventory::Project,
+    };
     use std::collections::BTreeMap;
 
     #[test]

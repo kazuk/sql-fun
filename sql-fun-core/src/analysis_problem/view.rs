@@ -1,4 +1,4 @@
-use super::{DiagnosticMetadata, FullName};
+use crate::analysis_problem::{DiagnosticMetadata, FullName};
 
 /// A view declaration or capability cannot be analyzed as requested.
 #[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]

@@ -42,12 +42,14 @@ fn help_does_not_require_expand() {
 
 #[cfg(unix)]
 mod unix {
+    use crate::test_helpers::cli_executable;
+
     use std::process::Command;
 
     #[test]
     fn non_executable_expand_is_reported_as_missing() {
         let tools = test_helpers::expand_tools(false);
-        let output = Command::new(super::test_helpers::cli_executable())
+        let output = Command::new(cli_executable())
             .current_dir(tools.path())
             .env("PATH", tools.path())
             .args(["check", "--package", "fixture"])
@@ -61,7 +63,7 @@ mod unix {
     #[test]
     fn expansion_failure_is_not_reported_as_a_missing_prerequisite() {
         let tools = test_helpers::expand_tools(true);
-        let output = Command::new(super::test_helpers::cli_executable())
+        let output = Command::new(cli_executable())
             .current_dir(tools.path())
             .env("PATH", tools.path())
             .args(["check", "--package", "fixture"])
@@ -81,7 +83,7 @@ mod unix {
         let tools = test_helpers::empty_query_tools();
         let sentinel = tools.path().join("selected.develop.lock");
         let before = std::fs::read(&sentinel).unwrap();
-        let output = Command::new(super::test_helpers::cli_executable())
+        let output = Command::new(cli_executable())
             .current_dir(tools.path())
             .env("PATH", tools.path())
             .env("SQL_FUN_CHECK_PROGRESS", "silent")
@@ -116,7 +118,7 @@ mod unix {
         #[case] visible: bool,
     ) {
         let tools = test_helpers::expand_tools(true);
-        let mut command = Command::new(super::test_helpers::cli_executable());
+        let mut command = Command::new(cli_executable());
         command
             .current_dir(tools.path())
             .env("PATH", tools.path())
@@ -141,7 +143,7 @@ mod unix {
 
     #[test]
     fn invalid_progress_is_an_argument_error() {
-        let output = Command::new(super::test_helpers::cli_executable())
+        let output = Command::new(cli_executable())
             .env("SQL_FUN_CHECK_PROGRESS", "unknown")
             .arg("check")
             .output()

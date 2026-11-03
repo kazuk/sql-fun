@@ -1,7 +1,8 @@
 use crate::{
     context::{ParseContext, RuleInfoRead},
-    names::FullName,
-    sem::RuleIdentity,
+    names::{FullName, SchemaName},
+    sem::{DropDependencyBehavior as SemDropDependencyBehavior, RuleIdentity},
+    test_helpers::create_cache_context as test_helpers_create_cache_context,
 };
 
 #[rstest::rstest]
@@ -15,13 +16,13 @@ use crate::{
 )]
 fn resolved_drop_does_not_apply_until_requested(
     #[case] sql: &str,
-    #[case] behavior: crate::sem::DropDependencyBehavior,
+    #[case] behavior: SemDropDependencyBehavior,
 ) -> testresult::TestResult {
     let parent = test_helpers::heavy::catalog()?;
     let mut child = test_helpers::layer(&parent);
     let statement = test_helpers::statement(sql)
         .node
-        .resolve(&mut child, &mut crate::test_helpers::create_cache_context())?;
+        .resolve(&mut child, &mut test_helpers_create_cache_context())?;
     let drop = statement.rule_drop().unwrap();
     assert!(drop.found());
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
@@ -129,10 +130,7 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
         "CREATE TABLE earlier.item_view(id integer)",
     )?
     .into_context();
-    context.set_search_path(&[
-        crate::names::SchemaName::from("earlier"),
-        crate::names::SchemaName::from("public"),
-    ]);
+    context.set_search_path(&[SchemaName::from("earlier"), SchemaName::from("public")]);
     let pair = test_helpers::apply(context, "DROP RULE IF EXISTS audit ON item_view")?;
     let drop = pair.ast().rule_drop().unwrap();
     assert!(!drop.found());
@@ -149,6 +147,15 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
 }
 
 mod test_helpers {
+    use crate::{
+        AstAndContextPair,
+        ast::{Dialect, Statement},
+        context::MutSourcePathWithSpan,
+        parse_statements,
+        sem::AnalysisError,
+        test_helpers::{create_cache_context, source_span},
+    };
+
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
         names::{FullName, TableName, ViewName},
@@ -168,8 +175,8 @@ mod test_helpers {
             base.metadata(),
         )
     }
-    pub(super) fn statement(sql: &str) -> crate::ast::Statement {
-        crate::parse_statements(sql, crate::ast::Dialect::postgres())
+    pub(super) fn statement(sql: &str) -> Statement {
+        parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .expect("valid test SQL")
@@ -177,12 +184,9 @@ mod test_helpers {
     pub(super) fn apply(
         mut context: SchemaFileContext,
         sql: &str,
-    ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
-        let mut cache_context = crate::test_helpers::create_cache_context();
-        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
-            &mut context,
-            &crate::test_helpers::source_span(),
-        );
+    ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
+        let mut cache_context = create_cache_context();
+        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
         statement(sql).analyze(context, &mut cache_context)
     }
     pub(super) fn table_rule_count(context: &FrozenBaseContext) -> usize {
@@ -205,8 +209,12 @@ mod test_helpers {
             .len()
     }
     pub(super) mod heavy {
-        use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
-        use crate::context::{BaseContext, ParseContext};
+        use crate::{
+            ast::resolve::drop_rule::tests::test_helpers::{
+                CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply,
+            },
+            context::{BaseContext, ParseContext},
+        };
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.
         pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
@@ -263,7 +271,7 @@ fn cannot_drop_the_select_rule_required_by_a_view(
         "DROP RULE \"_RETURN\" ON public.item_view {behavior}"
     ))
     .node
-    .resolve(&mut child, &mut crate::test_helpers::create_cache_context());
+    .resolve(&mut child, &mut test_helpers_create_cache_context());
     assert!(matches!(result?, crate::sem::SemAst::UnresolvedStatement));
     assert!(
         child

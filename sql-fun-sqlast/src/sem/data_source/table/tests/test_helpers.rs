@@ -2,13 +2,14 @@ use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
     names::SchemaName,
+    parse_statements,
     sem::{ParseContext, SelectStatement, TypeReference},
-    test_helpers::{TestParseContext, source_span},
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
 
 /// Uses only six explicit builtin types and small local DDL, without a shipped catalog.
 pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFileContext) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = TestParseContext::default().with_dialect(dialect);
     context.set_get_search_path_result(&[SchemaName::from("public")]);
     for ty in ["int4", "bool", "oid", "tid", "xid", "cid"] {
@@ -28,7 +29,7 @@ pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFi
         "CREATE TABLE u(id integer)",
         "CREATE VIEW v AS SELECT id FROM t",
     ] {
-        context = crate::parse_statements(ddl, dialect)
+        context = parse_statements(ddl, dialect)
             .next()
             .unwrap()
             .unwrap()
@@ -36,7 +37,7 @@ pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFi
             .unwrap()
             .into_context();
     }
-    let analyzed = crate::parse_statements(sql, dialect)
+    let analyzed = parse_statements(sql, dialect)
         .next()
         .unwrap()
         .unwrap()

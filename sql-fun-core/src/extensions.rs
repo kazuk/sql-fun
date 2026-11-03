@@ -42,7 +42,7 @@ impl ExtensionVersion {
 
 #[cfg(test)]
 mod test_installation_version {
-    use super::ExtensionVersion;
+    use crate::extensions::ExtensionVersion;
 
     #[test]
     fn validates_postgres_installation_version_names() {

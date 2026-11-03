@@ -4,12 +4,26 @@
 mod case_tests;
 #[cfg(test)]
 mod indirection_tests;
-use crate::ast::Dialect;
-use crate::context::BaseParseContext;
-use crate::sem::overload_rank::OverloadRank;
-use crate::sem::{
-    AnalysisError, ConstrainedExpr, ConstraintGraph, InputTypeConstraint, ParameterConstraints,
-    SemScalarExpr, SignatureAlternative, TypeReference,
+
+use crate::{
+    CacheContext,
+    names::OperatorName,
+    sem::{
+        AnalysisProblem, ArraySubqueryExpr, DeleteStatement, InsertStatement, InsertTarget,
+        MembershipExpr, MergeStatement, MinMaxExpr, ParseContext, PgBuiltInType, QueryName,
+        QueryOrder, QueryWindow, ResolvedOperator, ResultColumnCollection, SelectStatement,
+        SetOperationQuery, TableSampleSource, TruthTestExpr, UpdateStatement,
+        parameter_constraints::TypeProjection, problem::MinMaxProblem,
+    },
+};
+
+use crate::{
+    ast::Dialect,
+    context::BaseParseContext,
+    sem::{
+        AnalysisError, ConstrainedExpr, ConstraintGraph, InputTypeConstraint, ParameterConstraints,
+        SemScalarExpr, SignatureAlternative, TypeReference, overload_rank::OverloadRank,
+    },
 };
 use std::collections::BTreeMap;
 
@@ -62,7 +76,7 @@ struct Output {
 impl Output {
     fn new(name: &str, value: &SemScalarExpr, text_projection: bool) -> Self {
         let domain = if text_projection {
-            InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text())
+            InputTypeConstraint::exact(&PgBuiltInType::text())
         } else {
             value
                 .get_type()
@@ -154,7 +168,7 @@ impl QueryScope {
 }
 
 pub(crate) struct ParameterResolution<'cache> {
-    cache: &'cache mut crate::CacheContext,
+    cache: &'cache mut CacheContext,
     graph: ConstraintGraph,
     scopes: Vec<QueryScope>,
     completed: Outputs,
@@ -171,7 +185,7 @@ impl Drop for ParameterResolution<'_> {
 impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn unify_set_types(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         operation: &str,
         inputs: &[SemScalarExpr],
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
@@ -187,7 +201,7 @@ impl<'cache> ParameterResolution<'cache> {
         }
     }
 
-    pub(crate) fn new(cache: &'cache mut crate::CacheContext) -> Self {
+    pub(crate) fn new(cache: &'cache mut CacheContext) -> Self {
         Self {
             cache,
             graph: ConstraintGraph::default(),
@@ -202,14 +216,14 @@ impl<'cache> ParameterResolution<'cache> {
         constraints
     }
 
-    fn solve(&mut self, context: &mut impl crate::sem::ParseContext) -> Result<(), AnalysisError> {
+    fn solve(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
         self.graph.prepare_projections(context, self.cache);
         self.graph
             .report_projection_problems(context, self.cache.constraint_memo())?;
         if let Err(problem) = self.graph.solve_with(self.cache.constraint_memo()) {
-            crate::sem::ParseContext::report_analysis_problem(
+            ParseContext::report_analysis_problem(
                 context,
-                crate::sem::AnalysisProblem::parameter_constraint(problem.message()),
+                AnalysisProblem::parameter_constraint(problem.message()),
             )?;
         }
         Ok(())
@@ -217,7 +231,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     fn complete(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         constraints: ParameterConstraints,
     ) -> Result<ParameterConstraints, AnalysisError> {
         // RETURNING and projection expansion use provisional solves. Only the
@@ -226,7 +240,7 @@ impl<'cache> ParameterResolution<'cache> {
         Ok(constraints)
     }
 
-    fn default_query_outputs(&mut self, context: &impl crate::sem::ParseContext) {
+    fn default_query_outputs(&mut self, context: &impl ParseContext) {
         self.graph.prepare_projections(context, self.cache);
         // UPDATE/DELETE subqueries resolve unknown projected parameters before
         // surrounding expressions or assignments constrain them. Keep solver failure
@@ -236,8 +250,7 @@ impl<'cache> ParameterResolution<'cache> {
             for output in &scope.outputs.0 {
                 if let Some(node) = output.node
                     && self.graph.domain(node).is_any()
-                    && output.domain
-                        == InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text())
+                    && output.domain == InputTypeConstraint::exact(&PgBuiltInType::text())
                 {
                     self.graph.restrict(node, &output.domain);
                 }
@@ -249,10 +262,8 @@ impl<'cache> ParameterResolution<'cache> {
             && let Some(node) = value.constraint_node()
             && self.graph.domain(node).is_any()
         {
-            self.graph.restrict(
-                node,
-                &InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text()),
-            );
+            self.graph
+                .restrict(node, &InputTypeConstraint::exact(&PgBuiltInType::text()));
         }
     }
     pub(crate) fn parameter(
@@ -269,7 +280,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn unify_case_types(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         results: &[SemScalarExpr],
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
         self.common_type(context, "CASE", results, false)
@@ -277,19 +288,18 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn case_condition(
         &mut self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         condition: &SemScalarExpr,
     ) -> usize {
         let node = self.input(condition);
         // Bare NULL/string literals have PostgreSQL unknown type and can be
         // coerced to boolean. Parameters instead retain their source domain.
-        if crate::sem::MinMaxExpr::input_type(condition) != Some(crate::sem::MinMaxExpr::unknown())
-        {
+        if MinMaxExpr::input_type(condition) != Some(MinMaxExpr::unknown()) {
             self.graph.restrict(
                 node,
                 &InputTypeConstraint::types(self.cache.cast_sources(
                     context,
-                    &crate::sem::PgBuiltInType::bool(),
+                    &PgBuiltInType::bool(),
                     false,
                 )),
             );
@@ -307,7 +317,7 @@ impl<'cache> ParameterResolution<'cache> {
         let output = existing.unwrap_or_else(|| self.graph.node(types));
         self.graph.restrict(output, types);
         if require_boolean {
-            let boolean = InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool());
+            let boolean = InputTypeConstraint::exact(&PgBuiltInType::bool());
             for comparison in comparisons {
                 let input = self.input(comparison);
                 self.graph.overload(
@@ -342,7 +352,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn truth_test(
         &mut self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         argument: &SemScalarExpr,
         types: &InputTypeConstraint,
     ) -> (usize, InputTypeConstraint) {
@@ -359,7 +369,7 @@ impl<'cache> ParameterResolution<'cache> {
             self.input(argument)
         };
         let output = self.graph.node(types);
-        let sources = crate::sem::TruthTestExpr::input_types(context);
+        let sources = TruthTestExpr::input_types(context);
         self.graph.restrict(input, &sources);
         self.graph.overload(
             &[input, output],
@@ -371,7 +381,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn unify_coalesce_types(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         arguments: &[SemScalarExpr],
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
         self.common_type(context, "COALESCE", arguments, false)
@@ -400,13 +410,13 @@ impl<'cache> ParameterResolution<'cache> {
         self.graph.project(
             source,
             result.constraint_node().expect("operation node"),
-            crate::sem::parameter_constraints::TypeProjection::member(member),
+            TypeProjection::member(member),
         );
         result
     }
     pub(crate) fn array_access(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         base: &SemScalarExpr,
         bounds: &[&SemScalarExpr],
         slice: bool,
@@ -417,7 +427,7 @@ impl<'cache> ParameterResolution<'cache> {
                 node,
                 &InputTypeConstraint::types(
                     self.cache
-                        .assignment_sources(context, &crate::sem::PgBuiltInType::int4()),
+                        .assignment_sources(context, &PgBuiltInType::int4()),
                 ),
             );
         }
@@ -435,9 +445,9 @@ impl<'cache> ParameterResolution<'cache> {
             is_not_null,
         );
         let projection = if slice {
-            crate::sem::parameter_constraints::TypeProjection::array()
+            TypeProjection::array()
         } else {
-            crate::sem::parameter_constraints::TypeProjection::array_element()
+            TypeProjection::array_element()
         };
         self.graph.project(
             source,
@@ -449,7 +459,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn sqlite_operator(
         &mut self,
-        _name: &crate::names::OperatorName,
+        _name: &OperatorName,
         _left: Option<&SemScalarExpr>,
         _right: Option<&SemScalarExpr>,
     ) -> SemScalarExpr {
@@ -520,7 +530,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn call(
         &mut self,
-        catalog: &impl crate::sem::ParseContext,
+        catalog: &impl ParseContext,
         name: &str,
         arguments: &[SemScalarExpr],
         signatures: &[Signature],
@@ -530,7 +540,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     fn call_with_diagnostic_name(
         &mut self,
-        catalog: &impl crate::sem::ParseContext,
+        catalog: &impl ParseContext,
         name: &str,
         diagnostic_name: &str,
         arguments: &[SemScalarExpr],
@@ -549,7 +559,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn min_max(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         operation: &str,
         arguments: &[SemScalarExpr],
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
@@ -560,7 +570,7 @@ impl<'cache> ParameterResolution<'cache> {
     // to GREATEST/LEAST. ARRAY lifts the selected type into its result below.
     fn common_type(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         operation: &str,
         arguments: &[SemScalarExpr],
         comparison: bool,
@@ -585,7 +595,7 @@ impl<'cache> ParameterResolution<'cache> {
                 .iter()
                 .all(|argument| argument.constraint_node().is_none())
         {
-            let domain = InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text());
+            let domain = InputTypeConstraint::exact(&PgBuiltInType::text());
             return Ok((self.graph.node(&domain), domain));
         }
         if choices.is_empty() {
@@ -664,7 +674,7 @@ impl<'cache> ParameterResolution<'cache> {
         let mut unordered = None;
         for source in candidate_types.admissible_types().unwrap_or(&[]) {
             let target = if *source == MinMaxExpr::unknown() {
-                crate::sem::PgBuiltInType::text()
+                PgBuiltInType::text()
             } else {
                 source.clone()
             };
@@ -674,8 +684,8 @@ impl<'cache> ParameterResolution<'cache> {
                 Some(true)
             };
             if ordering.is_none() {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(
-                    crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target),
+                context.report_analysis_problem(AnalysisProblem::min_max(
+                    MinMaxProblem::missing_comparison_facts(&target),
                 ))?;
             }
             // Unknown comparison support is not evidence against a type candidate.
@@ -693,8 +703,8 @@ impl<'cache> ParameterResolution<'cache> {
         if targets.is_empty()
             && let Some(target) = unordered
         {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(
-                crate::sem::problem::MinMaxProblem::not_ordered(&target),
+            context.report_analysis_problem(AnalysisProblem::min_max(
+                MinMaxProblem::not_ordered(&target),
             ))?;
         }
         let domain = InputTypeConstraint::types(targets);
@@ -723,7 +733,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn array(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         arguments: &[SemScalarExpr],
         explicit_target: Option<&TypeReference>,
         multidimensional: bool,
@@ -743,11 +753,8 @@ impl<'cache> ParameterResolution<'cache> {
         let (element, domain) = self.common_type(context, "ARRAY", arguments, false)?;
         if domain.is_any() {
             let result = self.graph.node(&InputTypeConstraint::any());
-            self.graph.project(
-                element,
-                result,
-                crate::sem::parameter_constraints::TypeProjection::construct_array(),
-            );
+            self.graph
+                .project(element, result, TypeProjection::construct_array());
             return Ok((result, InputTypeConstraint::any()));
         }
         let mut alternatives = Vec::new();
@@ -769,7 +776,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn membership_common(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         arguments: &[SemScalarExpr],
     ) -> Result<SemScalarExpr, AnalysisError> {
         let (node, domain) = self.common_type(context, "IN", arguments, false)?;
@@ -816,11 +823,8 @@ impl<'cache> ParameterResolution<'cache> {
             self.graph.node(&domain)
         };
         if let Some(source) = source {
-            self.graph.project(
-                source,
-                result,
-                crate::sem::parameter_constraints::TypeProjection::construct_array(),
-            );
+            self.graph
+                .project(source, result, TypeProjection::construct_array());
         }
         (result, domain)
     }
@@ -1013,30 +1017,25 @@ impl SetOperandScopes {
     }
 }
 
-struct Collector<'context, 'cache, C: crate::sem::ParseContext> {
+struct Collector<'context, 'cache, C: ParseContext> {
     set_scopes: SetOperandScopes,
     dml_depth: usize,
     parameters: ParameterResolution<'cache>,
     context: &'context mut C,
 }
 
-impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
-    for Collector<'_, '_, C>
-{
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Collector<'_, '_, C> {
     fn enter_expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.resolve_between(self.context)
     }
 
-    fn membership(&mut self, value: &mut crate::sem::MembershipExpr) -> Result<(), AnalysisError> {
+    fn membership(&mut self, value: &mut MembershipExpr) -> Result<(), AnalysisError> {
         if value.expand_pending_stars(self.context)? {
             value.walk(self)?;
         }
         Ok(())
     }
-    fn array_subquery(
-        &mut self,
-        value: &mut crate::sem::ArraySubqueryExpr,
-    ) -> Result<(), AnalysisError> {
+    fn array_subquery(&mut self, value: &mut ArraySubqueryExpr) -> Result<(), AnalysisError> {
         if value.expand_pending_stars(self.context)? {
             value.walk(self)?;
         }
@@ -1053,7 +1052,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
     fn assignment(
         &mut self,
         value: &mut SemScalarExpr,
-        target: &crate::sem::InsertTarget,
+        target: &InsertTarget,
     ) -> Result<(), AnalysisError> {
         if let Some(ty) = target.assignment_type() {
             self.assignment_value(value, &ty)?;
@@ -1072,11 +1071,10 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
                 && &source != ty
                 && self.context.get_assignment_cast(&source, ty).is_none()
             {
-                self.context.report_analysis_problem(
-                    crate::sem::AnalysisProblem::parameter_constraint(&format!(
+                self.context
+                    .report_analysis_problem(AnalysisProblem::parameter_constraint(&format!(
                         "cannot assign {source} to {ty}"
-                    )),
-                )?;
+                    )))?;
             }
             if value.get_type().as_ref() != Some(ty) {
                 *value = SemScalarExpr::wrap_implicit_cast(ty, value);
@@ -1084,10 +1082,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
         }
         Ok(())
     }
-    fn dml_returning(
-        &mut self,
-        columns: &mut crate::sem::ResultColumnCollection,
-    ) -> Result<(), AnalysisError> {
+    fn dml_returning(&mut self, columns: &mut ResultColumnCollection) -> Result<(), AnalysisError> {
         if self.context.dialect() == Dialect::postgres() {
             self.parameters.solve(self.context)?;
         }
@@ -1103,8 +1098,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
             self.parameters.graph.restrict(
                 node,
                 &InputTypeConstraint::types(
-                    self.context
-                        .assignment_sources(&crate::sem::PgBuiltInType::int4()),
+                    self.context.assignment_sources(&PgBuiltInType::int4()),
                 ),
             );
         }
@@ -1155,33 +1149,25 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
     }
     fn predicate(&mut self, value: &SemScalarExpr) {
         if self.context.dialect() == Dialect::postgres() {
-            self.parameters.require(
-                self.context,
-                value,
-                &crate::sem::PgBuiltInType::bool(),
-                false,
-            );
+            self.parameters
+                .require(self.context, value, &PgBuiltInType::bool(), false);
         }
     }
     fn order_operator(
         &mut self,
         value: &SemScalarExpr,
-        operator: &crate::sem::ResolvedOperator,
+        operator: &ResolvedOperator,
     ) -> Result<(), AnalysisError> {
         operator.infer(&mut self.parameters, self.context, Some(value), Some(value))?;
         Ok(())
     }
     fn row_count(&mut self, value: &SemScalarExpr) {
         if self.context.dialect() == Dialect::postgres() {
-            self.parameters.require(
-                self.context,
-                value,
-                &crate::sem::PgBuiltInType::int8(),
-                false,
-            );
+            self.parameters
+                .require(self.context, value, &PgBuiltInType::int8(), false);
         }
     }
-    fn window_definition(&mut self, window: &crate::sem::QueryWindow) {
+    fn window_definition(&mut self, window: &QueryWindow) {
         if let Some(scope) = self.parameters.scopes.last_mut() {
             scope
                 .window_orders
@@ -1192,8 +1178,8 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
         &mut self,
         value: &SemScalarExpr,
         mode: &str,
-        order: &[crate::sem::QueryOrder],
-        reference: Option<&crate::sem::QueryName>,
+        order: &[QueryOrder],
+        reference: Option<&QueryName>,
     ) {
         if self.context.dialect() != Dialect::postgres() {
             return;
@@ -1242,21 +1228,18 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
             self.parameters.require(self.context, value, &target, false);
         }
     }
-    fn set_operation(
-        &mut self,
-        query: &mut crate::sem::SetOperationQuery,
-    ) -> Result<(), AnalysisError> {
+    fn set_operation(&mut self, query: &mut SetOperationQuery) -> Result<(), AnalysisError> {
         query.collect_constraints(&mut self.parameters, self.context)
     }
 }
 
-struct Finalizer<'a, C: crate::sem::ParseContext> {
+struct Finalizer<'a, C: ParseContext> {
     set_scopes: SetOperandScopes,
     constraints: &'a ParameterConstraints,
     context: &'a mut C,
     expanded_arrays: bool,
 }
-impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
+impl<'a, C: ParseContext> Finalizer<'a, C> {
     fn new(constraints: &'a ParameterConstraints, context: &'a mut C) -> Self {
         Self {
             constraints,
@@ -1266,7 +1249,7 @@ impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
         }
     }
 }
-impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut for Finalizer<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Finalizer<'_, C> {
     fn enter_set_operand(&mut self) {
         self.set_scopes.enter_operand();
     }
@@ -1280,31 +1263,22 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut for 
         self.set_scopes.leave_query();
     }
 
-    fn set_operation(
-        &mut self,
-        query: &mut crate::sem::SetOperationQuery,
-    ) -> Result<(), AnalysisError> {
+    fn set_operation(&mut self, query: &mut SetOperationQuery) -> Result<(), AnalysisError> {
         query.apply_constraints(self.constraints);
         Ok(())
     }
 
-    fn table_sample(
-        &mut self,
-        sample: &mut crate::sem::TableSampleSource,
-    ) -> Result<(), AnalysisError> {
+    fn table_sample(&mut self, sample: &mut TableSampleSource) -> Result<(), AnalysisError> {
         sample.validate_inputs(self.context)
     }
-    fn membership(&mut self, value: &mut crate::sem::MembershipExpr) -> Result<(), AnalysisError> {
+    fn membership(&mut self, value: &mut MembershipExpr) -> Result<(), AnalysisError> {
         if value.expand_pending_stars(self.context)? {
             self.expanded_arrays = true;
             value.walk(self)?;
         }
         Ok(())
     }
-    fn array_subquery(
-        &mut self,
-        value: &mut crate::sem::ArraySubqueryExpr,
-    ) -> Result<(), AnalysisError> {
+    fn array_subquery(&mut self, value: &mut ArraySubqueryExpr) -> Result<(), AnalysisError> {
         if value.expand_pending_stars(self.context)? {
             self.expanded_arrays = true;
             value.walk(self)?;
@@ -1320,17 +1294,16 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut for 
             && !self.set_scopes.is_operand()
             && expression.is_unconstrained_parameter()
         {
-            *expression =
-                SemScalarExpr::wrap_implicit_cast(&crate::sem::PgBuiltInType::text(), expression);
+            *expression = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::text(), expression);
         }
     }
 }
 
 impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_query(
-        query: &mut crate::sem::SelectStatement,
-        context: &mut impl crate::sem::ParseContext,
-        cache: &'cache mut crate::CacheContext,
+        query: &mut SelectStatement,
+        context: &mut impl ParseContext,
+        cache: &'cache mut CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
@@ -1362,9 +1335,9 @@ impl<'cache> ParameterResolution<'cache> {
         }
     }
     pub(crate) fn infer_insert(
-        insert: &mut crate::sem::InsertStatement,
-        context: &mut impl crate::sem::ParseContext,
-        cache: &'cache mut crate::CacheContext,
+        insert: &mut InsertStatement,
+        context: &mut impl ParseContext,
+        cache: &'cache mut CacheContext,
         implicit_targets: bool,
     ) -> Result<(ParameterConstraints, bool), AnalysisError> {
         #[cfg(test)]
@@ -1405,9 +1378,9 @@ impl<'cache> ParameterResolution<'cache> {
         }
     }
     pub(crate) fn infer_update(
-        update: &mut crate::sem::UpdateStatement,
-        context: &mut impl crate::sem::ParseContext,
-        cache: &'cache mut crate::CacheContext,
+        update: &mut UpdateStatement,
+        context: &mut impl ParseContext,
+        cache: &'cache mut CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
@@ -1432,9 +1405,9 @@ impl<'cache> ParameterResolution<'cache> {
         }
     }
     pub(crate) fn infer_delete(
-        delete: &mut crate::sem::DeleteStatement,
-        context: &mut impl crate::sem::ParseContext,
-        cache: &'cache mut crate::CacheContext,
+        delete: &mut DeleteStatement,
+        context: &mut impl ParseContext,
+        cache: &'cache mut CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
@@ -1459,9 +1432,9 @@ impl<'cache> ParameterResolution<'cache> {
         }
     }
     pub(crate) fn infer_merge(
-        merge: &mut crate::sem::MergeStatement,
-        context: &mut impl crate::sem::ParseContext,
-        cache: &'cache mut crate::CacheContext,
+        merge: &mut MergeStatement,
+        context: &mut impl ParseContext,
+        cache: &'cache mut CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
@@ -1487,8 +1460,8 @@ impl<'cache> ParameterResolution<'cache> {
     }
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
-        context: &mut impl crate::sem::ParseContext,
-        cache: &'cache mut crate::CacheContext,
+        context: &mut impl ParseContext,
+        cache: &'cache mut CacheContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
@@ -1515,8 +1488,8 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn operator(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
-        name: &crate::names::OperatorName,
+        context: &mut impl ParseContext,
+        name: &OperatorName,
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {

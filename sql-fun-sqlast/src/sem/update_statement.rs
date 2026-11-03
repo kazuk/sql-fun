@@ -2,18 +2,23 @@ mod cursor;
 mod destination;
 mod view_support;
 
-pub use self::cursor::UpdateCursor;
-pub(crate) use self::cursor::UpdatePredicate;
-pub(crate) use self::destination::UpdateDestination;
-pub use self::view_support::ViewUpdateSupport;
+pub use self::{cursor::UpdateCursor, view_support::ViewUpdateSupport};
+pub(crate) use self::{cursor::UpdatePredicate, destination::UpdateDestination};
 
-use crate::ast::TryFromWithTokens;
-use crate::sem::traversal::SemanticVisitorMut;
 use crate::{
+    CacheContext,
+    ast::{Dialect, StatementNode, Update},
+    sem::{AccessKind, ConflictClause, problem::UpdateProblemKind, traversal::SemanticVisitor},
+    syn::UpdateStmt,
+};
+
+use crate::{
+    ast::TryFromWithTokens,
     names::TableName,
     sem::{
         AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext, QueryCte,
         ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
+        traversal::SemanticVisitorMut,
     },
 };
 
@@ -46,10 +51,7 @@ impl UpdateAssignmentCollection {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for assignment in &self.0 {
             assignment.visit(visitor)?;
         }
@@ -67,7 +69,7 @@ pub struct UpdateStatement {
     predicate: Option<UpdatePredicate>,
     returning: ResultColumnCollection,
     view_support: Option<ViewUpdateSupport>,
-    or_conflict: Option<crate::sem::ConflictClause>,
+    or_conflict: Option<ConflictClause>,
     inherit: bool,
     indexed: Option<String>,
     not_indexed: bool,
@@ -98,7 +100,7 @@ impl UpdateStatement {
     pub(crate) fn set_modifiers(
         &mut self,
         support: Option<&ViewUpdateSupport>,
-        conflict: &Option<crate::sem::ConflictClause>,
+        conflict: &Option<ConflictClause>,
         indexed: &Option<String>,
         not_indexed: bool,
         inherit: bool,
@@ -151,7 +153,7 @@ impl UpdateStatement {
         self.view_support.as_ref()
     }
     /// Explicit SQLite conflict policy.
-    pub const fn or_conflict(&self) -> Option<&crate::sem::ConflictClause> {
+    pub const fn or_conflict(&self) -> Option<&ConflictClause> {
         self.or_conflict.as_ref()
     }
     /// Whether PostgreSQL descendants are included (false for ONLY).
@@ -186,10 +188,7 @@ impl UpdateStatement {
         visitor.leave_dml();
         result
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_dml();
         visitor.enter_query();
         let result = self.visit_body(visitor);
@@ -211,27 +210,21 @@ impl UpdateStatement {
         visitor.dml_returning(&mut self.returning)?;
         self.assignments.walk(visitor)
     }
-    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_action(
-            self.target.full_name(),
-            crate::sem::AccessKind::update_rows(),
-        );
-        visitor.access_purpose(crate::sem::AccessKind::update_source());
+    fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_action(self.target.full_name(), AccessKind::update_rows());
+        visitor.access_purpose(AccessKind::update_source());
         visitor.table_binding(&self.target);
         for cte in &self.with {
             cte.visit(visitor)?;
         }
         self.from.visit(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::update_filter());
+        visitor.access_purpose(AccessKind::update_filter());
         if let Some(predicate) = &self.predicate {
             predicate.visit(visitor)?;
         }
         // PostgreSQL transforms WHERE and RETURNING before SET assignments.
         // This order matters when RETURNING resolves an unknown parameter.
-        visitor.access_purpose(crate::sem::AccessKind::update_returning());
+        visitor.access_purpose(AccessKind::update_returning());
         visitor.dml_returning(&self.returning)?;
         self.assignments.visit(visitor)
     }
@@ -274,14 +267,11 @@ impl UpdateAssignment {
         self.value
             .walk(visitor, self.destination.get_type().as_ref())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::update_target());
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_purpose(AccessKind::update_target());
         self.destination.visit_assignment_target(visitor)?;
         visitor.bound_definition(&self.column, &self.destination);
-        visitor.access_purpose(crate::sem::AccessKind::update_input());
+        visitor.access_purpose(AccessKind::update_input());
         self.value
             .visit(visitor, self.destination.get_type().as_ref())
     }
@@ -366,7 +356,7 @@ impl UpdateValue {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         ty: Option<&TypeReference>,
@@ -395,7 +385,7 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
         value: &mut SemScalarExpr,
         ty: &TypeReference,
     ) -> Result<(), AnalysisError> {
-        if self.context.dialect() == crate::ast::Dialect::sqlite() {
+        if self.context.dialect() == Dialect::sqlite() {
             return Ok(());
         }
         let unknown = value
@@ -408,7 +398,7 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
         {
             self.context
                 .report_analysis_problem(AnalysisProblem::update(
-                    crate::sem::problem::UpdateProblemKind::assignment_type(),
+                    UpdateProblemKind::assignment_type(),
                     &format!("cannot assign {source} to {ty}"),
                 ))?;
         }
@@ -428,11 +418,11 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
 pub fn analyze_update_statement<T: ParseContext>(
     mut context: T,
     _parent_schema: &Option<String>,
-    syn: crate::syn::UpdateStmt,
+    syn: UpdateStmt,
 ) -> Result<(SemAst, T), AnalysisError> {
-    AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
-    let syntax = crate::ast::Update::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = crate::ast::StatementNode::Update(syntax)
-        .resolve(&mut context, &mut crate::CacheContext::new())?;
+    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+    let syntax = Update::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
+    let statement =
+        StatementNode::Update(syntax).resolve(&mut context, &mut CacheContext::new())?;
     Ok((statement, context))
 }

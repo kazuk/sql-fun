@@ -245,10 +245,15 @@ impl SchemaCatalog {
 
 #[cfg(test)]
 mod test_domain_casts {
-    use crate::test_helpers::domain_casts as test_helpers;
+    use crate::{
+        sem::{CastContext, CastDefinition},
+        test_helpers::{TestParseContext, schema_layer},
+    };
+
     use crate::{
         context::{CastInfoRead, ParseContext},
         sem::PgBuiltInType,
+        test_helpers::domain_casts as test_helpers,
     };
 
     #[rstest::rstest]
@@ -257,18 +262,15 @@ mod test_domain_casts {
         #[values(false, true)] target_domain: bool,
         #[values(false, true)] frozen: bool,
     ) {
-        let mut base = crate::test_helpers::TestParseContext::default();
+        let mut base = TestParseContext::default();
         base.setup_type(PgBuiltInType::int4());
         base.setup_type(PgBuiltInType::int8());
         base.set_get_implicit_cast_result(
             &PgBuiltInType::int4(),
             &PgBuiltInType::int8(),
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::implicit_preferred(),
-            )),
+            Some(CastDefinition::new(CastContext::implicit_preferred())),
         );
-        let mut context =
-            crate::test_helpers::schema_layer(std::path::Path::new("domains.sql"), &base.freeze());
+        let mut context = schema_layer(std::path::Path::new("domains.sql"), &base.freeze());
         let source = if source_domain {
             test_helpers::domain(&mut context, "source", Some(&PgBuiltInType::int4()))
         } else {
@@ -298,7 +300,7 @@ mod test_domain_casts {
         let domain = test_helpers::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
         let nested = test_helpers::domain(&mut context, "nested", Some(&domain));
         let context = if frozen {
-            crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &context.freeze())
+            schema_layer(std::path::Path::new("child.sql"), &context.freeze())
         } else {
             context
         };
@@ -379,11 +381,11 @@ mod test_domain_casts {
         let domain = test_helpers::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
         let nested = test_helpers::domain(&mut context, "nested", Some(&domain));
         let context = if inherited {
-            crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &context.freeze())
+            schema_layer(std::path::Path::new("child.sql"), &context.freeze())
         } else {
             context
         };
-        let verify = |catalog: &dyn crate::context::CastInfoRead| {
+        let verify = |catalog: &dyn CastInfoRead| {
             assert!(
                 catalog
                     .get_implicit_cast(&nested, &nested)
@@ -497,6 +499,8 @@ mod test_domain_casts {
 
 #[cfg(test)]
 mod test_cast_layers {
+    use crate::{names::FullName as NamesFullName, test_helpers::schema_layer};
+
     use crate::{
         context::{CastInfoRead, ParseContext},
         sem::CastContext,
@@ -578,8 +582,8 @@ mod test_cast_layers {
         true
     )]
     fn preserves_cast_keys_and_enumerated_types(
-        #[case] left: crate::names::FullName,
-        #[case] right: crate::names::FullName,
+        #[case] left: NamesFullName,
+        #[case] right: NamesFullName,
         #[case] source_array: bool,
         #[case] other_array: bool,
     ) {
@@ -593,8 +597,7 @@ mod test_cast_layers {
         test_helpers::register(&mut child, &target, &source, CastContext::implicit());
         test_helpers::register(&mut child, &target, &other, CastContext::explicit());
         let parent = child.freeze();
-        let child =
-            crate::test_helpers::schema_layer(std::path::Path::new("cast-child.sql"), &parent);
+        let child = schema_layer(std::path::Path::new("cast-child.sql"), &parent);
         assert!(child.get_implicit_cast(&source, &target).is_some());
         assert!(child.get_implicit_cast(&other, &target).is_none());
         assert!(child.get_implicit_cast(&target, &source).is_some());
@@ -609,6 +612,8 @@ mod test_cast_layers {
     }
 
     mod test_helpers {
+        use crate::test_helpers::schema_layer;
+
         use crate::{
             TrieMap,
             context::{ParseContext, SchemaFileContext},
@@ -632,10 +637,10 @@ mod test_cast_layers {
             let source = named_type("source");
             let shared = named_type("shared");
             let inherited = named_type("inherited");
-            let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
+            let mut parent = schema_layer(Path::new("parent.sql"), &root);
             register(&mut parent, &source, &shared, CastContext::implicit());
             register(&mut parent, &source, &inherited, CastContext::implicit());
-            let child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent.freeze());
+            let child = schema_layer(Path::new("child.sql"), &parent.freeze());
             (child, source, shared, inherited)
         }
 

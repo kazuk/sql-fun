@@ -1,13 +1,18 @@
-use super::{CmdType, Merge, MergeMatchKind, MergeWhen, OverridingKind};
 use crate::{
-    ast::{Alias, Expr, resolve::insert::InsertTargetBinding},
+    CacheContext,
+    ast::{
+        Alias, Expr, Target,
+        document::{CmdType, Merge, MergeMatchKind, MergeWhen, OverridingKind},
+        resolve::insert::InsertTargetBinding,
+    },
     context::ParseContext,
     names::TableName,
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, FromClause, InsertClauseSemantics,
-        MergeAction, MergeDestination, MergeStatement, MergeWhenCollection, PgBuiltInType,
-        ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
-        UpdateAssignmentCollection, WithClause, parameter_resolution::ParameterResolution,
+        MergeAction, MergeDestination, MergeMatchKind as SemMergeMatchKind, MergeStatement,
+        MergeWhen as SemMergeWhen, MergeWhenCollection, PgBuiltInType, ResolutionFailure,
+        ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr, UpdateAssignmentCollection,
+        WithClause, parameter_resolution::ParameterResolution,
     },
 };
 
@@ -15,7 +20,7 @@ impl Merge {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<MergeStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|mut merge| {
@@ -154,7 +159,7 @@ impl Merge {
                 .map(|expr| expr.resolve_merge_predicate(context, &scope))
                 .transpose()?;
             let action = clause.resolve_action(context, &scope, &target_scope, table, alias)?;
-            clauses.push(&crate::sem::MergeWhen::new(kind, &condition, &action));
+            clauses.push(&SemMergeWhen::new(kind, &condition, &action));
         }
         Ok(clauses)
     }
@@ -167,16 +172,13 @@ impl MergeMatchKind {
             Self::NotMatchedByTarget => 2,
         }
     }
-    fn resolve(
-        self,
-        context: &impl ParseContext,
-    ) -> Result<crate::sem::MergeMatchKind, AnalysisError> {
+    fn resolve(self, context: &impl ParseContext) -> Result<SemMergeMatchKind, AnalysisError> {
         match self {
-            Self::Matched => Ok(crate::sem::MergeMatchKind::matched()),
-            Self::NotMatchedByTarget => Ok(crate::sem::MergeMatchKind::by_target()),
+            Self::Matched => Ok(SemMergeMatchKind::matched()),
+            Self::NotMatchedByTarget => Ok(SemMergeMatchKind::by_target()),
             Self::NotMatchedBySource => {
                 Merge::require_version(context, 17)?;
-                Ok(crate::sem::MergeMatchKind::by_source())
+                Ok(SemMergeMatchKind::by_source())
             }
         }
     }
@@ -310,7 +312,7 @@ impl Expr {
 }
 impl ResultColumnCollection {
     fn resolve_for_merge(
-        targets: &[crate::ast::Target],
+        targets: &[Target],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {

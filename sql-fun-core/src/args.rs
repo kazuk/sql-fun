@@ -7,14 +7,6 @@ mod log_args;
 mod metadata_args;
 mod postgres;
 
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    path::{Path, PathBuf},
-};
-
-use clap::Parser;
-
 pub use self::{
     error::SqlFunArgsError,
     home_path::resolve_sql_fun_home_path,
@@ -23,6 +15,16 @@ pub use self::{
     metadata_args::{MetadataArgs, MetadataArgsBuilder},
     postgres::{PostgresArgs, PostgresArgsBuilder},
 };
+
+use crate::{InitializationDatasources, SchemaLevel as LocalSchemaLevel};
+
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    path::{Path, PathBuf},
+};
+
+use clap::Parser;
 
 use crate::{
     PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
@@ -187,15 +189,19 @@ impl SqlFunArgs {
     /// # Errors
     /// Rejects unavailable metadata and missing or malformed selected datasources.
     pub fn selected_metadata(&self, datasource: &str) -> Result<SqlFunMetadata, SqlFunArgsError> {
-        let declarations = crate::InitializationDatasources::load_from(&self.metadata_file()?)?;
+        let declarations = InitializationDatasources::load_from(&self.metadata_file()?)?;
         Ok(declarations.selected_metadata(datasource)?)
     }
 }
 
 #[cfg(test)]
 mod test_transferred_configuration {
-    use super::SqlFunArgs;
-    use crate::test_helpers::{TestMetadataEnvs, TestProjectDir, write_postgres_metadata_project};
+    use crate::PostgresEngineVersion;
+
+    use crate::{
+        args::SqlFunArgs,
+        test_helpers::{TestMetadataEnvs, TestProjectDir, write_postgres_metadata_project},
+    };
 
     #[test]
     fn restores_core_serialized_configuration_and_overrides_metadata() {
@@ -209,7 +215,7 @@ mod test_transferred_configuration {
         )
         .unwrap()
         .datasource(Some("default".to_owned()))
-        .postgres_version("17".parse::<crate::PostgresEngineVersion>().unwrap())
+        .postgres_version("17".parse::<PostgresEngineVersion>().unwrap())
         .postgres_search_path(vec!["chosen".to_owned()])
         .builtin_schema_dir(project.path().join("selected-builtins"))
         .postgres_extensions_dir(project.path().join("selected-extensions"))
@@ -252,7 +258,7 @@ mod test_transferred_configuration {
                 .into_map(),
         )
         .unwrap()
-        .postgres_version("17".parse::<crate::PostgresEngineVersion>().unwrap())
+        .postgres_version("17".parse::<PostgresEngineVersion>().unwrap())
         .postgres_search_path(vec!["chosen".to_owned()])
         .builtin_schema_dir(project.path().join("selected-builtins"))
         .postgres_extensions_dir(project.path().join("selected-extensions"))
@@ -559,7 +565,7 @@ impl SqlFunArgs {
     /// Rejects missing datasource, metadata, or invalid selected configuration.
     pub fn analysis_environments(
         &self,
-        level: crate::SchemaLevel,
+        level: LocalSchemaLevel,
     ) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let datasource = self
             .datasource()

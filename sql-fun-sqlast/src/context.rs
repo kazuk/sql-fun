@@ -25,35 +25,48 @@ mod type_hint;
 mod type_info;
 mod view_info;
 
-pub use self::base_context::{BaseContext, PgBuiltInFunctions, PgBuiltinCasts, PgBuiltinOperators};
-pub use self::base_parse_context::BaseParseContext;
-pub use self::cast_info::CastInfoRead;
-pub use self::conflict_info::ConflictInfoRead;
-pub(crate) use self::conflict_masters::ConflictMasters;
-pub(crate) use self::cursor_bindings::CursorBindings;
-pub use self::diagnostic::DiagnosticContext;
-pub use self::frozen_base_context::FrozenBaseContext;
-pub use self::function_info::{FunctionInfoRead, FunctionInfoWrite};
-pub use self::index_info::IndexInfoRead;
-pub use self::object_info::{ExtensionInfoRead, ObjectInfoRead};
-pub use self::operator_info::OperatorInfoRead;
-pub use self::ownership_info::{OwnershipInfoRead, RoleInfoRead};
-pub use self::rule_info::{RuleInfoRead, RuleInfoWrite};
-pub use self::schema_file_context::SchemaFileContext;
-pub use self::search_path::SearchPathRead;
-pub use self::sequence_info::{SequenceInfoRead, SequenceInfoWrite};
-pub use self::source::{
-    DefaultSourceAccessService, GetSourcePathWithSpan, GetSourcePathWithSpanOpt,
-    MutSourcePathWithSpan, SourceAccessService,
+pub use self::{
+    base_context::{BaseContext, PgBuiltInFunctions, PgBuiltinCasts, PgBuiltinOperators},
+    base_parse_context::BaseParseContext,
+    cast_info::CastInfoRead,
+    conflict_info::ConflictInfoRead,
+    diagnostic::DiagnosticContext,
+    frozen_base_context::FrozenBaseContext,
+    function_info::{FunctionInfoRead, FunctionInfoWrite},
+    index_info::IndexInfoRead,
+    object_info::{ExtensionInfoRead, ObjectInfoRead},
+    operator_info::OperatorInfoRead,
+    ownership_info::{OwnershipInfoRead, RoleInfoRead},
+    rule_info::{RuleInfoRead, RuleInfoWrite},
+    schema_file_context::SchemaFileContext,
+    search_path::SearchPathRead,
+    sequence_info::{SequenceInfoRead, SequenceInfoWrite},
+    source::{
+        DefaultSourceAccessService, GetSourcePathWithSpan, GetSourcePathWithSpanOpt,
+        MutSourcePathWithSpan, SourceAccessService,
+    },
+    table_info::{TableInfoRead, TableInfoWrite},
+    trigger_info::{TriggerInfoRead, TriggerInfoWrite},
+    type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite},
+    type_info::{TypeInfoRead, TypeInfoWrite},
+    view_info::{
+        ViewDeleteInfoRead, ViewInfoRead, ViewInfoWrite, ViewInsertInfoRead, ViewMergeInfoRead,
+        ViewUpdateInfoRead,
+    },
 };
-pub use self::table_info::{TableInfoRead, TableInfoWrite};
-pub use self::trigger_info::{TriggerInfoRead, TriggerInfoWrite};
-pub(crate) use self::type_hint::ParameterTypeHints;
-pub use self::type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite};
-pub use self::type_info::{TypeInfoRead, TypeInfoWrite};
-pub use self::view_info::{
-    ViewDeleteInfoRead, ViewInfoRead, ViewInfoWrite, ViewInsertInfoRead, ViewMergeInfoRead,
-    ViewUpdateInfoRead,
+pub(crate) use self::{
+    conflict_masters::ConflictMasters, cursor_bindings::CursorBindings,
+    type_hint::ParameterTypeHints,
+};
+
+use crate::{
+    AstAndContextPair, CacheContext,
+    ast::Dialect,
+    sem::{
+        AnalysisState, InputTypeConstraint, ParameterConstraints, SamplingMethodLookup,
+        SelectStatement, parameter_resolution::ParameterResolution,
+    },
+    syn::FuncCall,
 };
 
 use sql_fun_core::{IVec, analysis_problem::AnalysisProblem};
@@ -99,14 +112,14 @@ where
     fn apply_creation_group<F>(
         self,
         operation: F,
-    ) -> Result<crate::AstAndContextPair<Self>, AnalysisError>
+    ) -> Result<AstAndContextPair<Self>, AnalysisError>
     where
-        F: FnOnce(Self) -> Result<crate::AstAndContextPair<Self>, AnalysisError>;
+        F: FnOnce(Self) -> Result<AstAndContextPair<Self>, AnalysisError>;
 
     /// Effective creation identity, including explicitly requested temporary storage.
     fn creation_name(&self, name: &FullName, temporary: bool) -> Result<FullName, AnalysisError> {
         if temporary && name.schema().is_none() {
-            let schema = if self.dialect() == crate::ast::Dialect::sqlite() {
+            let schema = if self.dialect() == Dialect::sqlite() {
                 "temp"
             } else {
                 "pg_temp"
@@ -126,7 +139,7 @@ where
         if_not_exists: bool,
         replace: bool,
     ) -> Result<bool, AnalysisError> {
-        if self.dialect() == crate::ast::Dialect::sqlite()
+        if self.dialect() == Dialect::sqlite()
             && name
                 .name()
                 .as_str()
@@ -145,8 +158,7 @@ where
         }
         if let Some(existing) = self.object_kind(name) {
             if if_not_exists
-                && (self.dialect() != crate::ast::Dialect::sqlite()
-                    || kind.permits_sqlite_noop(existing))
+                && (self.dialect() != Dialect::sqlite() || kind.permits_sqlite_noop(existing))
             {
                 return Ok(false);
             }
@@ -161,7 +173,7 @@ where
             )))?;
             return Ok(false);
         }
-        if self.dialect() == crate::ast::Dialect::postgres()
+        if self.dialect() == Dialect::postgres()
             && kind.creates_row_type()
             && !self.permits_type_creation(name)?
         {
@@ -187,16 +199,16 @@ where
     /// Dialect of the explicitly supplied metadata for this analysis.
     /// Engine identity and SQL dialect are independent metadata fields.
     /// Historical configuration retained by a frozen catalog is not consulted.
-    fn dialect(&self) -> crate::ast::Dialect {
-        crate::ast::Dialect::from(self.metadata())
+    fn dialect(&self) -> Dialect {
+        Dialect::from(self.metadata())
     }
 
     /// Resolve a TABLESAMPLE handler using the active qualification/search path rules.
     /// Providers must distinguish conclusive absence from unavailable metadata and
     /// return verified `(internal) RETURNS tsm_handler` facts on success. No source
     /// discovery is authorized here. Production acquisition is tracked by #895.
-    fn lookup_sampling_method(&self, _name: &FullName) -> crate::sem::SamplingMethodLookup {
-        crate::sem::SamplingMethodLookup::unavailable()
+    fn lookup_sampling_method(&self, _name: &FullName) -> SamplingMethodLookup {
+        SamplingMethodLookup::unavailable()
     }
 
     /// Resolve an explicit SQLite COLLATE name from the loaded analysis metadata.
@@ -221,16 +233,16 @@ where
     fn remove_cursor(&mut self, name: &str);
 
     /// Bookkeeping for the current outer analysis, independent of local scopes.
-    fn analysis_state(&self) -> &crate::sem::AnalysisState;
+    fn analysis_state(&self) -> &AnalysisState;
 
     /// Mutable bookkeeping for the current outer analysis.
-    fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState;
+    fn analysis_state_mut(&mut self) -> &mut AnalysisState;
 
     /// Start parameter type analysis for an independent statement or expression.
     /// Nested queries must not call this operation.
     fn begin_parameter_type_analysis(&mut self) {
         self.analysis_state_mut().begin();
-        self.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
+        self.set_parameter_constraints(&ParameterConstraints::default());
     }
 
     /// Complete analysis and deliver ordered structured findings, even on error.
@@ -272,9 +284,9 @@ where
     fn parameter(&mut self, position: u32) -> SemScalarExpr {
         self.analysis_state_mut().parameter();
         let constraint = if let Some(ty) = self.get_parameter_typehint(position as usize) {
-            crate::sem::InputTypeConstraint::exact(&ty)
+            InputTypeConstraint::exact(&ty)
         } else {
-            crate::sem::InputTypeConstraint::any()
+            InputTypeConstraint::any()
         };
         SemScalarExpr::parameter(position, usize::MAX, &constraint)
     }
@@ -285,14 +297,12 @@ where
     /// Propagates the supplied result or constraint-analysis errors.
     fn infer_query_parameter_types(
         &mut self,
-        result: Result<crate::sem::SelectStatement, AnalysisError>,
-        cache: &mut crate::CacheContext,
-    ) -> Result<crate::sem::SelectStatement, AnalysisError> {
+        result: Result<SelectStatement, AnalysisError>,
+        cache: &mut CacheContext,
+    ) -> Result<SelectStatement, AnalysisError> {
         let mut query = result?;
         if self.parameter_inference_needed() {
-            let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
-                &mut query, self, cache,
-            )?;
+            let constraints = ParameterResolution::infer_query(&mut query, self, cache)?;
             self.set_parameter_constraints(&constraints);
         } else {
             query.expand_pending_stars(self)?;
@@ -307,17 +317,12 @@ where
     fn infer_expression_parameter_types(
         &mut self,
         result: Result<SemScalarExpr, AnalysisError>,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut expression = result?;
         expression.complete_grouping(self)?;
         if self.parameter_inference_needed() {
-            let constraints =
-                crate::sem::parameter_resolution::ParameterResolution::infer_expression(
-                    &mut expression,
-                    self,
-                    cache,
-                )?;
+            let constraints = ParameterResolution::infer_expression(&mut expression, self, cache)?;
             self.set_parameter_constraints(&constraints);
         }
         Ok(expression)
@@ -328,10 +333,10 @@ where
     /// These retain explicit SQL input types but do not perform Rust type mapping.
     /// Conflicts are reported through [`DiagnosticContext::report_problem`]; a
     /// returned analysis result does not imply satisfiable constraints.
-    fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints;
+    fn parameter_constraints(&self) -> &ParameterConstraints;
 
     /// Replace the current analysis constraints, including an empty result.
-    fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints);
+    fn set_parameter_constraints(&mut self, constraints: &ParameterConstraints);
 
     /// Consume this builder and share its completed catalog as an immutable base.
     ///
@@ -375,9 +380,7 @@ where
             AnalysisError::raise_register_dynamic_type(create_comp_type)?;
             AnalysisError::never()
         };
-        if self.dialect() == crate::ast::Dialect::postgres()
-            && !create_comp_type.declarations_can_apply()
-        {
+        if self.dialect() == Dialect::postgres() && !create_comp_type.declarations_can_apply() {
             return Ok(self);
         }
         let name = self.apply_default_schema(name)?;
@@ -393,9 +396,7 @@ where
 
     /// apply `create domain` to current schema
     fn apply_create_domain(mut self, create_domain: &CreateDomain) -> Result<Self, AnalysisError> {
-        if self.dialect() == crate::ast::Dialect::postgres()
-            && !create_domain.declarations_can_apply()
-        {
+        if self.dialect() == Dialect::postgres() && !create_domain.declarations_can_apply() {
             return Ok(self);
         }
         let name = self.apply_default_schema(create_domain.name())?;
@@ -444,9 +445,7 @@ where
 
     /// apply `create table` statement to current schema
     fn apply_create_table(mut self, create_table: &CreateTable) -> Result<Self, AnalysisError> {
-        if self.dialect() == crate::ast::Dialect::postgres()
-            && !create_table.declarations_can_apply()
-        {
+        if self.dialect() == Dialect::postgres() && !create_table.declarations_can_apply() {
             return Ok(self);
         }
         let name = self.creation_name(create_table.name().full_name(), create_table.temporary())?;
@@ -458,7 +457,7 @@ where
         )? {
             return Ok(self);
         }
-        let indexes = if self.dialect() == crate::ast::Dialect::postgres() {
+        let indexes = if self.dialect() == Dialect::postgres() {
             create_table.declared_indexes(&name)?
         } else {
             Vec::new()
@@ -480,7 +479,7 @@ where
         }
         self.insert_create_table(&name, create_table);
         // when create table, define composite type as table
-        if self.dialect() == crate::ast::Dialect::postgres() {
+        if self.dialect() == Dialect::postgres() {
             self.insert_table_ref_type(&TableName::from(name));
         }
         for index in indexes {
@@ -519,7 +518,7 @@ where
     /// resolve table function call as data source
     fn resolve_table_function(
         &mut self,
-        call: &crate::syn::FuncCall,
+        call: &FuncCall,
         func_name: FullName,
         alias_name: &AliasSpec,
         arg_exprs: IVec<SemScalarExpr>,

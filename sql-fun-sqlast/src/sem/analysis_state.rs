@@ -1,5 +1,7 @@
 //! Per-analysis bookkeeping owned by the common parse context.
 
+use crate::sem::{WildcardExpansion, scalar_expr::grouping::GroupingAnalysis};
+
 use crate::sem::AnalysisProblem;
 
 /// Temporary bookkeeping for one outer statement or standalone expression.
@@ -12,27 +14,25 @@ pub struct AnalysisState {
     active: bool,
     has_parameters: bool,
     problems: Vec<AnalysisProblem>,
-    grouping: crate::sem::scalar_expr::grouping::GroupingAnalysis,
-    wildcard_expansions: Vec<crate::sem::WildcardExpansion>,
+    grouping: GroupingAnalysis,
+    wildcard_expansions: Vec<WildcardExpansion>,
 }
 
 impl AnalysisState {
     /// Wildcard groups recorded by this analysis, including nested query scopes.
     /// Groups remain available after analysis completes and reset at the next run.
-    pub fn wildcard_expansions(&self) -> &[crate::sem::WildcardExpansion] {
+    pub fn wildcard_expansions(&self) -> &[WildcardExpansion] {
         &self.wildcard_expansions
     }
 
-    pub(crate) fn record_wildcard(&mut self, expansion: crate::sem::WildcardExpansion) {
+    pub(crate) fn record_wildcard(&mut self, expansion: WildcardExpansion) {
         self.wildcard_expansions.push(expansion);
     }
 
-    pub(crate) const fn grouping(&self) -> &crate::sem::scalar_expr::grouping::GroupingAnalysis {
+    pub(crate) const fn grouping(&self) -> &GroupingAnalysis {
         &self.grouping
     }
-    pub(crate) const fn grouping_mut(
-        &mut self,
-    ) -> &mut crate::sem::scalar_expr::grouping::GroupingAnalysis {
+    pub(crate) const fn grouping_mut(&mut self) -> &mut GroupingAnalysis {
         &mut self.grouping
     }
 
@@ -71,8 +71,10 @@ impl AnalysisState {
 
 #[cfg(test)]
 mod test_analysis_lifecycle {
-    use crate::sem::{AnalysisError, ParseContext};
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        sem::{AnalysisError, ParseContext},
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn completed_analysis_delivers_findings_before_fatal_error() -> testresult::TestResult {
@@ -113,8 +115,8 @@ mod test_analysis_lifecycle {
     }
 
     mod test_helpers {
-        use crate::StringSpan;
         use crate::{
+            StringSpan,
             names::FullName,
             sem::{AnalysisError, AnalysisProblem, ParseContext},
         };

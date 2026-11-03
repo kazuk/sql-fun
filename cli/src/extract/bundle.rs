@@ -102,7 +102,7 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
 
 #[cfg(test)]
 mod import_tests {
-    use super::super::test_helpers::BundleFixture;
+    use crate::extract::test_helpers::BundleFixture;
 
     #[test]
     #[ignore = "large-payload validation needs a dedicated execution path; see #716"]
@@ -200,7 +200,7 @@ fn parse_version(record: &str) -> Result<u64, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_version;
+    use crate::extract::bundle::parse_version;
 
     #[rstest::rstest]
     #[case::seventeen("1\n17.9\n", 170_009)]

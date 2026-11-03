@@ -25,6 +25,7 @@ mod resolve;
 mod returning_options;
 mod rows_from;
 mod rule;
+
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
@@ -37,11 +38,26 @@ mod validation;
 mod view_definition;
 mod wildcard;
 
-pub use self::deparse::DeparseError;
+pub(crate) use self::ddl::{
+    CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
+};
 pub(crate) use self::deparse::render_full_name;
-pub use self::mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut};
-pub use self::public::{CommonTableExpression, Statement, StatementKind, WithClause};
-pub use self::wildcard::WildcardRewriteError;
+pub(crate) use self::document::{JsonTable, Merge, XmlTable};
+pub use self::{
+    deparse::DeparseError,
+    mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
+    public::{CommonTableExpression, Statement, StatementKind, WithClause},
+    wildcard::WildcardRewriteError,
+};
+
+use crate::{
+    AstAndContextPair, CacheContext,
+    sem::{
+        AlterSequence as SemAlterSequence, Comment as SemComment, CreateRule as SemCreateRule,
+        DropTable as SemDropTable, VariableSet as SemVariableSet,
+    },
+    syn::ScanToken,
+};
 
 use sql_fun_core::IVec;
 
@@ -54,11 +70,6 @@ use self::document::{
     MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize,
 };
 
-pub(crate) use self::document::{JsonTable, Merge, XmlTable};
-
-pub(crate) use self::ddl::{
-    CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
-};
 use crate::{
     StringSpan,
     context::ParseContext,
@@ -368,7 +379,7 @@ impl StatementNode {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<SemAst, AnalysisError> {
         if !self.check_engine_features(context)? {
             return Ok(SemAst::unresolved_statement());
@@ -470,15 +481,15 @@ impl StatementNode {
     pub(crate) fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
-        cache: &mut crate::CacheContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+        cache: &mut CacheContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let mut context = context;
         context.set_parameter_constraints(&ParameterConstraints::default());
         if !self.check_engine_features(&mut context)? {
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
@@ -508,7 +519,7 @@ impl StatementNode {
             _ => {
                 let outcome = self.resolve(&mut context, cache);
                 let statement = outcome?;
-                Ok(crate::AstAndContextPair::new(statement, context))
+                Ok(AstAndContextPair::new(statement, context))
             }
         }
     }
@@ -609,19 +620,16 @@ impl Comment {
     pub(crate) fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let target = self
             .canonical_target()
             .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
-        let comment = crate::sem::Comment::new(&target, self.object_kind, &self.text);
+        let comment = SemComment::new(&target, self.object_kind, &self.text);
         let context = context.apply_comment(&comment)?;
-        Ok(crate::AstAndContextPair::new(
-            SemAst::Comment(comment),
-            context,
-        ))
+        Ok(AstAndContextPair::new(SemAst::Comment(comment), context))
     }
 }
 
@@ -651,12 +659,12 @@ impl AlterSequence {
     fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let mut context = context;
-        let mut alter_sequence = crate::sem::AlterSequence::new(&self.name.full_name()?, &[]);
+        let mut alter_sequence = SemAlterSequence::new(&self.name.full_name()?, &[]);
         for option in &self.options {
             if option.name == "owned_by" {
                 let relation = if let Some(requested) = option.owned_relation()? {
@@ -675,7 +683,7 @@ impl AlterSequence {
             }
         }
         let context = context.apply_alter_sequence(&alter_sequence)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::AlterSequence(alter_sequence),
             context,
         ))
@@ -703,7 +711,7 @@ impl DropTable {
     fn apply<TContext>(
         &self,
         mut context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
@@ -715,9 +723,9 @@ impl DropTable {
             }
             names.push(table_name);
         }
-        let drop_table = crate::sem::DropTable::new(&names, self.if_exists, self.cascade);
+        let drop_table = SemDropTable::new(&names, self.if_exists, self.cascade);
         context = context.apply_drop_table(&drop_table)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::DropTable(drop_table),
             context,
         ))
@@ -759,7 +767,7 @@ impl Sequence {
     fn apply<TContext>(
         &self,
         mut context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
@@ -777,7 +785,7 @@ impl Sequence {
             }
         }
         let context = context.apply_create_sequence(&sequence)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::CreateSequence(sequence),
             context,
         ))
@@ -798,13 +806,13 @@ impl EnumType {
     fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let enum_type = CreateEnum::new(&self.name.full_name()?, &self.values);
         let context = context.apply_create_enum(&enum_type)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::CreateEnum(enum_type),
             context,
         ))
@@ -844,7 +852,7 @@ impl VariableSet {
     fn resolve_and_apply<TContext>(
         &self,
         mut context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
@@ -853,9 +861,9 @@ impl VariableSet {
         };
         let outcome = argument.resolve(&mut context, &ScalarAnalysisContext::default());
         let value = outcome?;
-        let variable_set = crate::sem::VariableSet::new(&self.name, &value);
+        let variable_set = SemVariableSet::new(&self.name, &value);
         let context = context.apply_variable_set(&variable_set)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::VariableSet(variable_set),
             context,
         ))
@@ -881,14 +889,14 @@ impl Extension {
     fn apply<TContext>(
         &self,
         context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
         let extension =
             CreateExtension::from_name(&self.name).with_if_not_exists(self.if_not_exists);
         let context = context.apply_create_extension(&extension)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::CreateExtension(extension),
             context,
         ))
@@ -937,8 +945,8 @@ impl View {
     fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
-        cache: &mut crate::CacheContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError>
+        cache: &mut CacheContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
@@ -949,7 +957,7 @@ impl View {
             context.report_analysis_problem(AnalysisProblem::view(
                 &ViewProblem::invalid_target(&requested),
             ))?;
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
@@ -961,7 +969,7 @@ impl View {
             Kind::view()
         };
         if !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)? {
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
@@ -983,7 +991,7 @@ impl View {
             {
                 view.retain_rule_references(references);
             }
-            crate::sem::CreateRule::replace_view_definition(&context, &name, &query)?
+            SemCreateRule::replace_view_definition(&context, &name, &query)?
         } else {
             None
         };
@@ -993,10 +1001,7 @@ impl View {
         } else {
             context
         };
-        Ok(crate::AstAndContextPair::new(
-            SemAst::CreateView(view),
-            context,
-        ))
+        Ok(AstAndContextPair::new(SemAst::CreateView(view), context))
     }
 }
 
@@ -1013,10 +1018,7 @@ where
 {
     type Error;
 
-    fn try_from_with_tokens(
-        value: T,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, Self::Error>;
+    fn try_from_with_tokens(value: T, tokens: &IVec<ScanToken>) -> Result<Self, Self::Error>;
 }
 
 pub(crate) trait TryFromWithTokensOpt<T>
@@ -1027,7 +1029,7 @@ where
 
     fn try_from_with_tokens_opt(
         value: T,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error>;
 }
 
@@ -1093,7 +1095,7 @@ where
 
     fn try_collect_from_with_tokens(
         nodes: T,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error>;
 }
 

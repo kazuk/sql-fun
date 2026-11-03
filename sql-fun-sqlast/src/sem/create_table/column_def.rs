@@ -1,3 +1,15 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ColumnDefinition as SqliteColumnDefinition;
+use crate::{
+    ast::Column,
+    names::FullName as NamesFullName,
+    sem::{
+        CatalogNameLookup, ColumnNullabilityConstraint, ColumnRename, DeclarationCollation,
+        DefaultColumnConstraint, GeneratedColumnConstraint, WithTypmod,
+        traversal::{ColumnRenamer, SemanticVisitorMut},
+    },
+    syn::ColumnDef,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -29,8 +41,8 @@ pub struct ColumnDefinition {
 // Keep declaration-only metadata out of the inline size of every column binding.
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 struct ColumnDeclaration {
-    requested_type: Option<crate::sem::WithTypmod<TypeReference>>,
-    collation: crate::sem::DeclarationCollation,
+    requested_type: Option<WithTypmod<TypeReference>>,
+    collation: DeclarationCollation,
 }
 
 /// Persistent PostgreSQL per-column planning attributes.
@@ -50,7 +62,7 @@ impl ColumnDefinition {
     pub(crate) fn set_projection_name(&mut self, name: &ColumnName) {
         self.name = Some(name.clone());
     }
-    pub(crate) fn rename_column_name(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(crate) fn rename_column_name(&mut self, rename: &ColumnRename) {
         self.rename_constraint_columns(rename, true);
         if let Some(name) = &mut self.name {
             rename.rename_name(name);
@@ -58,45 +70,45 @@ impl ColumnDefinition {
     }
     pub(crate) fn rename_column_dependencies(
         &mut self,
-        rename: &crate::sem::ColumnRename,
+        rename: &ColumnRename,
         owned: bool,
     ) -> Result<(), AnalysisError> {
         self.rename_constraint_columns(rename, owned);
-        self.rename_expressions(&mut crate::sem::traversal::ColumnRenamer::new(rename))
+        self.rename_expressions(&mut ColumnRenamer::new(rename))
     }
-    fn rename_constraint_columns(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    fn rename_constraint_columns(&mut self, rename: &ColumnRename, owned: bool) {
         for constraint in &mut self.constraints {
             constraint.rename_column(rename, owned);
         }
     }
 
     /// Requested declaration type and modifiers, separate from canonical identity.
-    pub fn requested_type(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+    pub fn requested_type(&self) -> Option<&WithTypmod<TypeReference>> {
         self.declaration.as_ref()?.requested_type.as_ref()
     }
 
-    pub(crate) fn retain_requested_type(&mut self, value: &crate::sem::WithTypmod<TypeReference>) {
+    pub(crate) fn retain_requested_type(&mut self, value: &WithTypmod<TypeReference>) {
         let declaration = self.declaration.get_or_insert_default();
         declaration.requested_type = Some(value.clone());
     }
 
     /// Retained explicit declaration collation analysis.
-    pub fn declaration_collation(&self) -> &crate::sem::DeclarationCollation {
+    pub fn declaration_collation(&self) -> &DeclarationCollation {
         if let Some(declaration) = &self.declaration {
             &declaration.collation
         } else {
-            crate::sem::DeclarationCollation::omitted()
+            DeclarationCollation::omitted()
         }
     }
 
     pub(crate) fn validate_collation(
         &mut self,
         context: &mut impl ParseContext,
-        lookup: Option<&crate::sem::CatalogNameLookup>,
+        lookup: Option<&CatalogNameLookup>,
     ) -> Result<(), AnalysisError> {
         let declaration = self.declaration.get_or_insert_default();
         declaration.collation =
-            crate::sem::DeclarationCollation::validate(context, self.type_ref.as_ref(), lookup);
+            DeclarationCollation::validate(context, self.type_ref.as_ref(), lookup);
         declaration
             .collation
             .report(context, self.type_ref.as_ref())
@@ -114,8 +126,8 @@ impl ColumnDefinition {
 
     pub(super) fn rename_expressions(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
-    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor: &mut impl SemanticVisitorMut,
+    ) -> Result<(), AnalysisError> {
         for constraint in &mut self.constraints {
             constraint.rename_expression(visitor)?;
         }
@@ -172,7 +184,7 @@ impl ColumnDefinition {
             .retain(|constraint| constraint.as_nullability().is_none());
         if let Some(column) = &self.name {
             self.constraints.push(ColumnConstraint::nullability(
-                crate::sem::ColumnNullabilityConstraint::new(table, column, value, None, None),
+                ColumnNullabilityConstraint::new(table, column, value, None, None),
             ));
         }
         // Keep the existing query metadata accessor in sync with the constraint.
@@ -192,14 +204,14 @@ impl ColumnDefinition {
         self.constraints.iter().any(|constraint| {
             constraint
                 .as_generated()
-                .is_some_and(crate::sem::GeneratedColumnConstraint::is_stored)
+                .is_some_and(GeneratedColumnConstraint::is_stored)
         })
     }
     pub(crate) fn has_virtual_generation(&self) -> bool {
         self.constraints.iter().any(|constraint| {
             constraint
                 .as_generated()
-                .is_some_and(crate::sem::GeneratedColumnConstraint::is_virtual)
+                .is_some_and(GeneratedColumnConstraint::is_virtual)
         })
     }
 }
@@ -221,21 +233,16 @@ impl Clone for ColumnDefinition {
 }
 
 impl ColumnDefinition {
-    pub(crate) fn replace_view_default(
-        &mut self,
-        view: &crate::names::FullName,
-        value: &SemScalarExpr,
-    ) {
+    pub(crate) fn replace_view_default(&mut self, view: &NamesFullName, value: &SemScalarExpr) {
         self.constraints
             .retain(|constraint| constraint.as_default().is_none());
         if let Some(name) = &self.name {
-            self.constraints.push(ColumnConstraint::default(
-                crate::sem::DefaultColumnConstraint::new(
+            self.constraints
+                .push(ColumnConstraint::default(DefaultColumnConstraint::new(
                     &TableName::from(view.clone()),
                     name,
                     value.clone(),
-                ),
-            ));
+                )));
         }
     }
 
@@ -328,14 +335,13 @@ impl ColumnDefinition {
     pub fn analyze_column_def<TParseContext>(
         context: TParseContext,
         table_name: &TableName,
-        column_def: &crate::syn::ColumnDef,
+        column_def: &ColumnDef,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Column::try_from_with_tokens(column_def, tokens)?
-            .resolve_and_report(context, table_name)
+        Column::try_from_with_tokens(column_def, tokens)?.resolve_and_report(context, table_name)
     }
 
     /// analyze [`crate::syn::sqlite::ColumnDefinition`]
@@ -343,37 +349,38 @@ impl ColumnDefinition {
     pub fn analyze_column_definition<TParseContext>(
         context: TParseContext,
         table_name: &TableName,
-        syn: &crate::syn::sqlite::ColumnDefinition,
+        syn: &SqliteColumnDefinition,
         _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Column::try_from(syn)?.resolve_and_report(context, table_name)
+        Column::try_from(syn)?.resolve_and_report(context, table_name)
     }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_sqlite_column_definition {
+    use crate::ast::Dialect;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::CreateTableStatement;
+
     use assert_matches::assert_matches;
     use sql_fun_core::IVec;
 
-    use super::{ColumnConstraint, ColumnDefinition};
     use crate::{
         SqliteToken,
         names::{FullName, SchemaName, TableName},
-        sem::{SemScalarExpr, TypeReference},
+        sem::{
+            SemScalarExpr, TypeReference,
+            create_table::column_def::{ColumnConstraint, ColumnDefinition},
+        },
         sqlite::SqliteDialect,
         syn::sqlite::CreateTableBody,
         test_helpers::TestParseContext,
     };
 
-    fn parse_create_table<'a>(
-        sql: &'a str,
-    ) -> (
-        crate::syn::sqlite::CreateTableStatement,
-        IVec<SqliteToken<'a>>,
-    ) {
+    fn parse_create_table<'a>(sql: &'a str) -> (CreateTableStatement, IVec<SqliteToken<'a>>) {
         let cmd = SqliteDialect::parse(sql)
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
@@ -386,7 +393,7 @@ mod test_sqlite_column_definition {
     }
 
     fn setup_context() -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "integer"),
@@ -400,10 +407,7 @@ mod test_sqlite_column_definition {
     }
 
     #[rstest::fixture]
-    fn create_table_statement<'a>() -> (
-        crate::syn::sqlite::CreateTableStatement,
-        IVec<SqliteToken<'a>>,
-    ) {
+    fn create_table_statement<'a>() -> (CreateTableStatement, IVec<SqliteToken<'a>>) {
         let sql = r#"
             create table users (
                 id integer primary key not null unique,
@@ -424,10 +428,7 @@ mod test_sqlite_column_definition {
 
     #[rstest::rstest]
     fn analyze_sqlite_column_definition_collects_constraints<'a>(
-        create_table_statement: (
-            crate::syn::sqlite::CreateTableStatement,
-            IVec<SqliteToken<'a>>,
-        ),
+        create_table_statement: (CreateTableStatement, IVec<SqliteToken<'a>>),
     ) {
         let (create_table, tokens) = create_table_statement;
         let Some(body) = create_table.body().as_columns_and_constraint() else {

@@ -86,7 +86,7 @@ impl ClientLifecycle {
 
 #[cfg(test)]
 mod tests {
-    use super::ClientLifecycle;
+    use crate::client_lifecycle::ClientLifecycle;
 
     use std::{pin::pin, time::Duration};
 

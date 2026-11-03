@@ -32,7 +32,7 @@ impl From<TypeCategory> for char {
 
 #[cfg(test)]
 mod tests {
-    use super::TypeCategory;
+    use crate::sem::pg_type::category::TypeCategory;
 
     #[rstest::rstest]
     #[case::internal('Z')]

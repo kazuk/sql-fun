@@ -104,8 +104,9 @@ impl QueryRequirement {
 
 #[cfg(test)]
 mod test_query_requirement {
-    use super::QueryRequirements;
-    use crate::test_helpers::query_requirements as test_helpers;
+    use crate::{
+        query_requirements::QueryRequirements, test_helpers::query_requirements as test_helpers,
+    };
 
     #[test]
     fn generator_round_trip_restores_typed_cte_and_source() {
@@ -218,8 +219,11 @@ impl IntoIterator for QueryRequirements {
 
 #[cfg(test)]
 mod test_query_requirements {
-    use super::QueryRequirements;
-    use crate::test_helpers::query_requirements as test_helpers;
+    use crate::query_requirements::{DATASOURCE, QueryRequirement};
+
+    use crate::{
+        query_requirements::QueryRequirements, test_helpers::query_requirements as test_helpers,
+    };
 
     #[test]
     fn separate_stubs_keep_their_own_fields() {
@@ -227,7 +231,7 @@ mod test_query_requirements {
         let mut second = first.clone();
         test_helpers::replace_marker(
             &mut second,
-            super::DATASOURCE,
+            DATASOURCE,
             quote::quote!(
                 const __SQL_FUN_DATASOURCE: &str = "second";
             ),
@@ -239,7 +243,7 @@ mod test_query_requirements {
         .unwrap();
         let datasources: Vec<_> = requirements
             .iter()
-            .map(super::QueryRequirement::datasource)
+            .map(QueryRequirement::datasource)
             .collect();
         assert_eq!(datasources, ["reporting", "second"]);
     }
@@ -248,7 +252,7 @@ mod test_query_requirements {
     fn nested_fields_cannot_complete_a_stub_and_partial_results_are_not_returned() {
         let valid = test_helpers::expanded_body();
         let mut invalid = valid.clone();
-        test_helpers::replace_marker(&mut invalid, super::DATASOURCE, quote::quote!());
+        test_helpers::replace_marker(&mut invalid, DATASOURCE, quote::quote!());
         invalid.stmts.push(syn::parse_quote!({
             const __SQL_FUN_DATASOURCE: &str = "nested";
         }));
@@ -362,18 +366,18 @@ impl<'a> StubConstants<'a> {
 
 #[cfg(test)]
 mod test_stub_constants {
-    use super::{CODEGEN_VERSION, QueryRequirements};
-    use crate::test_helpers::query_requirements as test_helpers;
+    use crate::query_requirements::{
+        DATASOURCE, QUERY, SOURCE_FILE, SOURCE_LINE, USING_CTE, VERSION,
+    };
+
+    use crate::{
+        query_requirements::{CODEGEN_VERSION, QueryRequirements},
+        test_helpers::query_requirements as test_helpers,
+    };
 
     #[test]
     fn missing_and_duplicate_fields_are_errors_after_identification() {
-        for name in [
-            super::SOURCE_FILE,
-            super::SOURCE_LINE,
-            super::DATASOURCE,
-            super::QUERY,
-            super::USING_CTE,
-        ] {
+        for name in [SOURCE_FILE, SOURCE_LINE, DATASOURCE, QUERY, USING_CTE] {
             let mut body = test_helpers::expanded_body();
             test_helpers::replace_marker(&mut body, name, quote::quote!());
             let error = QueryRequirements::extract(&test_helpers::source(&body)).unwrap_err();
@@ -383,12 +387,12 @@ mod test_stub_constants {
             );
         }
         for name in [
-            super::VERSION,
-            super::SOURCE_FILE,
-            super::SOURCE_LINE,
-            super::DATASOURCE,
-            super::QUERY,
-            super::USING_CTE,
+            VERSION,
+            SOURCE_FILE,
+            SOURCE_LINE,
+            DATASOURCE,
+            QUERY,
+            USING_CTE,
         ] {
             let mut body = test_helpers::expanded_body();
             let ident = syn::Ident::new(name, proc_macro2::Span::call_site());
@@ -406,55 +410,55 @@ mod test_stub_constants {
     fn invalid_marker_types_values_and_cte_data_are_errors() {
         for (name, replacement) in [
             (
-                super::VERSION,
+                VERSION,
                 quote::quote!(
                     const __SQL_FUN_CODEGEN_VERSION: u32 = 1;
                 ),
             ),
             (
-                super::QUERY,
+                QUERY,
                 quote::quote!(
                     const __SQL_FUN_QUERY: bool = "query";
                 ),
             ),
             (
-                super::QUERY,
+                QUERY,
                 quote::quote!(
                     const __SQL_FUN_QUERY: &str = concat!("query");
                 ),
             ),
             (
-                super::SOURCE_LINE,
+                SOURCE_LINE,
                 quote::quote!(
                     const __SQL_FUN_SOURCE_LINE: &str = "42";
                 ),
             ),
             (
-                super::SOURCE_LINE,
+                SOURCE_LINE,
                 quote::quote!(
                     const __SQL_FUN_SOURCE_LINE: u32 = 4294967296;
                 ),
             ),
             (
-                super::SOURCE_LINE,
+                SOURCE_LINE,
                 quote::quote!(
                     const __SQL_FUN_SOURCE_LINE: u32 = 1u64;
                 ),
             ),
             (
-                super::SOURCE_LINE,
+                SOURCE_LINE,
                 quote::quote!(
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
                 ),
             ),
             (
-                super::USING_CTE,
+                USING_CTE,
                 quote::quote!(
                     const __SQL_FUN_USING_CTE: &str = "not JSON";
                 ),
             ),
             (
-                super::USING_CTE,
+                USING_CTE,
                 quote::quote!(
                     const __SQL_FUN_USING_CTE: &str = "{}";
                 ),
@@ -534,8 +538,12 @@ impl<'ast> Visit<'ast> for RequirementVisitor {
 
 #[cfg(test)]
 mod test_requirement_visitor {
-    use super::{CODEGEN_VERSION, QueryRequirements};
-    use crate::test_helpers::query_requirements as test_helpers;
+    use crate::query_requirements::QueryRequirement;
+
+    use crate::{
+        query_requirements::{CODEGEN_VERSION, QueryRequirements},
+        test_helpers::query_requirements as test_helpers,
+    };
 
     #[test]
     fn traverses_all_function_kinds_and_nested_blocks() {
@@ -561,7 +569,7 @@ mod test_requirement_visitor {
         let requirements = QueryRequirements::extract(&file).unwrap();
         let names: Vec<_> = requirements
             .iter()
-            .map(super::QueryRequirement::function_name)
+            .map(QueryRequirement::function_name)
             .collect();
         assert_eq!(
             names,

@@ -5,6 +5,7 @@ use crate::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, SelectStatement,
         WithClause,
         scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -105,7 +106,7 @@ impl SubQueryDataSource {
 }
 
 impl SubQueryDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -115,10 +116,7 @@ impl SubQueryDataSource {
         visitor.derived(self.alias.name().as_str(), &self.alias.inference_columns());
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.source_outputs(&self.select_statement.result_columns().names());
         self.select_statement.visit(visitor)?;
         visitor.derived_binding(&self.alias, &self.select_statement.result_columns().names());

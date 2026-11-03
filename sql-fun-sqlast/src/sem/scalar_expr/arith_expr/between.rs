@@ -1,7 +1,9 @@
-use super::{ArithExpr, BetweenExpr};
 use crate::{
     names::OperatorName,
-    sem::{AnalysisError, ParseContext, ResolvedOperator, SemScalarExpr},
+    sem::{
+        AnalysisError, ParseContext, ResolvedOperator, SemScalarExpr,
+        scalar_expr::arith_expr::{ArithExpr, BetweenExpr},
+    },
 };
 
 impl ArithExpr {
@@ -104,9 +106,13 @@ impl ArithExpr {
 
 #[cfg(test)]
 mod tests {
-    use crate::sem::{ParseContext, PgBuiltInType, SemScalarExpr};
-    use crate::test_helpers::between::{
-        comparison_bindings, context, expression, mixed_bounds_context, query, schema,
+    use crate::sem::TypeReference;
+
+    use crate::{
+        sem::{ParseContext, PgBuiltInType, SemScalarExpr},
+        test_helpers::between::{
+            comparison_bindings, context, expression, mixed_bounds_context, query, schema,
+        },
     };
     use std::collections::BTreeMap;
 
@@ -159,8 +165,8 @@ mod tests {
     )]
     fn unknown_literals_retain_each_comparisons_coerced_operands(
         #[case] predicate: &str,
-        #[case] lower: crate::sem::TypeReference,
-        #[case] upper: crate::sem::TypeReference,
+        #[case] lower: TypeReference,
+        #[case] upper: TypeReference,
     ) -> testresult::TestResult {
         let (query, context) = query(
             &format!("SELECT {predicate}"),
@@ -337,8 +343,12 @@ impl BetweenExpr {
 
 #[cfg(test)]
 mod test_public_builders {
-    use crate::sem::{ParseContext, PgBuiltInType, SemScalarExpr};
-    use crate::test_helpers::between::{comparison_bindings, context};
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        sem::{ParseContext, PgBuiltInType, SemScalarExpr},
+        test_helpers::between::{comparison_bindings, context},
+    };
     use std::collections::BTreeMap;
 
     #[rstest::rstest]
@@ -350,8 +360,7 @@ mod test_public_builders {
         #[case] upper: &str,
         #[values(false, true)] parameter: bool,
     ) -> testresult::TestResult {
-        use crate::sem::parameter_resolution::ParameterResolution;
-        use crate::sem::{ArithExpr, ScalarConstExpr};
+        use crate::sem::{ArithExpr, ScalarConstExpr, parameter_resolution::ParameterResolution};
 
         let integer = |value| SemScalarExpr::new_const(ScalarConstExpr::new_integer(value));
         let mut context = context(&[lower, upper]);
@@ -383,7 +392,7 @@ mod test_public_builders {
         let constraints = ParameterResolution::infer_expression(
             &mut decoded,
             &mut context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
         )?;
         assert_eq!(decoded.get_type(), Some(PgBuiltInType::bool()));
         let bindings = comparison_bindings(&decoded)?;

@@ -192,7 +192,7 @@ impl InitializeArgs {
 
 #[cfg(test)]
 mod test_initialize_args {
-    use super::InitializeArgs;
+    use crate::args::init_args::InitializeArgs;
     use ::clap::Parser;
 
     #[test]

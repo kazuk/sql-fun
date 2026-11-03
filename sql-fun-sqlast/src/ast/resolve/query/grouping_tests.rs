@@ -1,8 +1,15 @@
 //! Public semantic outcomes, using the lightweight query catalog.
-use super::test_helpers::resolve;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::sem::{AnalysisError, GroupingExpr, PgBuiltInType, SelectStatement, SemScalarExpr};
+
+use crate::{
+    ast::{
+        Dialect, StatementNode,
+        resolve::query::test_helpers::{catalog, grouping_table_context, resolve},
+    },
+    context::ParseContext,
+    parse_statements,
+    sem::{AnalysisError, GroupingExpr, PgBuiltInType, SelectStatement, SemScalarExpr},
+    test_helpers::create_cache_context as test_helpers_create_cache_context,
+};
 
 fn groupings(query: &SelectStatement) -> Vec<GroupingExpr> {
     #[derive(Default)]
@@ -304,14 +311,14 @@ fn enforces_argument_limit(#[case] count: usize, #[case] valid: bool) {
 
 #[test]
 fn rejects_invalid_grouping_through_diagnostic_policy() {
-    let statement = crate::parse_statements("SELECT GROUPING(1)", Dialect::postgres())
+    let statement = parse_statements("SELECT GROUPING(1)", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
-    let crate::ast::StatementNode::Query(query) = statement.node else {
+    let StatementNode::Query(query) = statement.node else {
         panic!("query");
     };
-    let mut context = super::test_helpers::catalog();
+    let mut context = catalog();
     context.reject_diagnostics_after(0);
     assert!(
         query
@@ -358,9 +365,9 @@ fn grouping_result_type_does_not_constrain_argument_type() {
 #[case::delete_where("DELETE FROM t WHERE GROUPING(a) IS NULL")]
 #[case::delete_returning("DELETE FROM t RETURNING GROUPING(a)")]
 fn rejects_grouping_outside_select(#[case] sql: &str) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let context = super::test_helpers::grouping_table_context();
-    let analysis = crate::parse_statements(sql, Dialect::postgres())
+    let mut cache_context = test_helpers_create_cache_context();
+    let context = grouping_table_context();
+    let analysis = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()

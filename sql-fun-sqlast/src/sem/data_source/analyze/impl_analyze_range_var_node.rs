@@ -1,33 +1,34 @@
-use crate::sem::DataSource;
-use crate::sem::{AnalysisError, ParseContext, WithClause};
+use crate::{
+    ast::{FromItem, Relation},
+    sem::{AnalysisError, DataSource, FromClause as SemFromClause, ParseContext, WithClause},
+    syn::RangeVar,
+};
 
 impl DataSource {
     pub(super) fn analyze_range_var_node<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
-        range_var: crate::syn::RangeVar,
+        range_var: RangeVar,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::FromItem::relation(crate::ast::Relation::try_from(&range_var)?);
-        let outcome = syntax.resolve_source(
-            &mut context,
-            with_clause,
-            &crate::sem::FromClause::default(),
-        );
+        let syntax = FromItem::relation(Relation::try_from(&range_var)?);
+        let outcome = syntax.resolve_source(&mut context, with_clause, &SemFromClause::default());
         Ok((outcome?, context))
     }
 }
 
 #[cfg(test)]
 mod test_data_source_analyze_range_var_node {
-    use crate::sem::data_source::analyze::impl_analyze_range_var_node::DataSource;
+    use crate::sem::CreateTableMode;
+
     use crate::{
         names::{ColumnName, FullName, SchemaName, TableName},
         sem::{
             CreateTable, CreateView, FromClause, ScalarConstExpr, SelectStatement, SemScalarExpr,
             SourcePathWithSpan, ViewLike, WithClause,
+            data_source::analyze::impl_analyze_range_var_node::DataSource,
             select_statement::{ResultColumnCollection, SelectStatementNode},
         },
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
@@ -55,7 +56,7 @@ mod test_data_source_analyze_range_var_node {
         let table_definition = CreateTable::new(
             &TableName::from(table_full_name.clone()),
             vec![],
-            crate::sem::CreateTableMode::Default,
+            CreateTableMode::Default,
             false,
             &source_span,
         );

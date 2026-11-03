@@ -109,7 +109,7 @@ mod tests {
         sem::{ColumnDefinition, PgBuiltInType},
     };
 
-    use super::{ViewMergeSupport, ViewMergeTriggers};
+    use crate::sem::merge_statement::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
     #[test]
     fn automatically_updatable_view_without_triggers_supports_all_actions() {

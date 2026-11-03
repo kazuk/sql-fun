@@ -1,7 +1,21 @@
-use super::required;
-use crate::ast::TryFromOpt;
+use crate::{
+    ast::{
+        AlterCommand as AstAlterCommand, AlterRelation, AlterRelationKind as AstAlterRelationKind,
+        Column as AstColumn, ColumnConstraint, CommitAction, CompositeType, ConstraintExtras,
+        ExclusionElement, ForeignReference, Index, IndexExpression as AstIndexExpression,
+        PartitionBound, PartitionDatum, PartitionSpec, Relation as AstRelation, Role, Table,
+        TableAs, TableConstraint as AstTableConstraint, TableExtras, TryFromOpt, VariableSet,
+        ddl::{
+            AlterColumnType, AlterConstraintFlags, AlterDefinition, AlterIdentity, AlterOperation,
+            AlterPartition, CompositeField, GenericAction, GenericOption, PostgresAlterCommand,
+            ReplicaIdentity,
+        },
+        postgres::{nonempty, required},
+    },
+    sem::CreateTableMode,
+};
 
-impl TryFrom<syn::ObjectType> for crate::ast::AlterRelationKind {
+impl TryFrom<syn::ObjectType> for AstAlterRelationKind {
     type Error = AnalysisError;
     fn try_from(value: syn::ObjectType) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -17,7 +31,7 @@ impl TryFrom<syn::ObjectType> for crate::ast::AlterRelationKind {
     }
 }
 
-impl TryFromWithTokens<&syn::RenameStmt> for crate::ast::AlterRelation {
+impl TryFromWithTokens<&syn::RenameStmt> for AlterRelation {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::RenameStmt,
@@ -27,28 +41,23 @@ impl TryFromWithTokens<&syn::RenameStmt> for crate::ast::AlterRelation {
         let (kind, command, only) =
             match required(value.get_rename_type().as_inner(), "rename.rename_type")? {
                 syn::ObjectType::ObjectTable => (
-                    crate::ast::AlterRelationKind::table(),
-                    crate::ast::AlterCommand::Rename(crate::ast::Name::from_parts(&[
-                        value.get_newname()
-                    ])),
+                    AstAlterRelationKind::table(),
+                    AstAlterCommand::Rename(Name::from_parts(&[value.get_newname()])),
                     false,
                 ),
                 syn::ObjectType::ObjectColumn => (
-                    crate::ast::AlterRelationKind::try_from(required(
+                    AstAlterRelationKind::try_from(required(
                         value.get_relation_type().as_inner(),
                         "rename.relation_type",
                     )?)?,
-                    crate::ast::AlterCommand::RenameColumn(
-                        value.get_subname(),
-                        value.get_newname(),
-                    ),
+                    AstAlterCommand::RenameColumn(value.get_subname(), value.get_newname()),
                     !relation.get_inh(),
                 ),
                 _ => return AnalysisError::raise_unexpected_input("expected relation rename"),
             };
         Ok(Self {
             only: kind.supports_only() && only,
-            name: crate::ast::Name::from(&relation),
+            name: Name::from(&relation),
             kind,
             commands: vec![command],
             if_exists: value.get_missing_ok(),
@@ -56,7 +65,7 @@ impl TryFromWithTokens<&syn::RenameStmt> for crate::ast::AlterRelation {
     }
 }
 
-impl TryFromWithTokens<&syn::AlterTableStmt> for crate::ast::AlterRelation {
+impl TryFromWithTokens<&syn::AlterTableStmt> for AlterRelation {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::AlterTableStmt,
@@ -86,19 +95,19 @@ impl TryFromWithTokens<&syn::AlterTableStmt> for crate::ast::AlterRelation {
     }
 }
 
-impl TryFromWithTokens<&syn::AlterTableCmd> for crate::ast::AlterCommand {
+impl TryFromWithTokens<&syn::AlterTableCmd> for AstAlterCommand {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::AlterTableCmd,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        Ok(Self::postgres(
-            crate::ast::ddl::PostgresAlterCommand::try_from_with_tokens(value, tokens)?,
-        ))
+        Ok(Self::postgres(PostgresAlterCommand::try_from_with_tokens(
+            value, tokens,
+        )?))
     }
 }
 
-impl crate::ast::AlterCommand {
+impl AstAlterCommand {
     fn postgres_legacy(
         value: &syn::AlterTableCmd,
         tokens: &IVec<syn::ScanToken>,
@@ -106,9 +115,10 @@ impl crate::ast::AlterCommand {
         use crate::ast::{Column, TableConstraint};
         Ok(Some(
             match required(value.get_subtype().as_inner(), "alter_table_cmd.subtype")? {
-                syn::AlterTableType::AtChangeOwner => Self::Owner(crate::ast::Role::try_from(
-                    &required(value.get_newowner().as_inner(), "alter_table_cmd.newowner")?,
-                )?),
+                syn::AlterTableType::AtChangeOwner => Self::Owner(Role::try_from(&required(
+                    value.get_newowner().as_inner(),
+                    "alter_table_cmd.newowner",
+                )?)?),
                 syn::AlterTableType::AtColumnDefault => Self::Default(
                     value.get_name(),
                     if value.get_def().as_inner().is_some() {
@@ -141,7 +151,7 @@ impl crate::ast::AlterCommand {
     }
 }
 
-impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::Table {
+impl TryFromWithTokens<&syn::CreateStmt> for Table {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::CreateStmt,
@@ -162,19 +172,19 @@ impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::Table {
             }
         }
         Ok(Self {
-            extras: crate::ast::TableExtras::try_from_with_tokens(value, tokens)?,
+            extras: TableExtras::try_from_with_tokens(value, tokens)?,
             name: relation.name,
             columns,
             constraints,
             temporary: relation.persistence == "t",
-            mode: crate::sem::CreateTableMode::from_if_not_exists(value.get_if_not_exists()),
+            mode: CreateTableMode::from_if_not_exists(value.get_if_not_exists()),
             query: None,
             options: SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
         })
     }
 }
 
-impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
+impl TryFromWithTokens<&syn::ColumnDef> for AstColumn {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::ColumnDef,
@@ -207,8 +217,8 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
         }
         Ok(Self {
             collation,
-            compression: super::nonempty(value.get_compression()),
-            storage: super::nonempty(value.get_storage_name()),
+            compression: nonempty(value.get_compression()),
+            storage: nonempty(value.get_storage_name()),
             name: value.get_colname(),
             type_mod,
             type_name,
@@ -218,7 +228,7 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
     }
 }
 
-impl TryFromWithTokens<&syn::Constraint> for crate::ast::TableConstraint {
+impl TryFromWithTokens<&syn::Constraint> for AstTableConstraint {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::Constraint,
@@ -233,24 +243,26 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::TableConstraint {
             value.get_keys()
         };
         Ok(Self {
-            extras: crate::ast::ConstraintExtras::try_from_with_tokens(value, tokens)?,
-            name: super::nonempty(value.get_conname()),
+            extras: ConstraintExtras::try_from_with_tokens(value, tokens)?,
+            name: nonempty(value.get_conname()),
             keys: Name::try_from(keys)?.0,
             order: Vec::new(),
             auto_increment: false,
-            constraint: crate::ast::ColumnConstraint::try_from_with_tokens(value, tokens)?,
+            constraint: ColumnConstraint::try_from_with_tokens(value, tokens)?,
         })
     }
 }
 
-impl TryFromWithTokens<&syn::Constraint> for crate::ast::ColumnConstraint {
+impl TryFromWithTokens<&syn::Constraint> for ColumnConstraint {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::Constraint,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::ast::ForeignReference;
-        use crate::sem::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity};
+        use crate::{
+            ast::ForeignReference,
+            sem::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity},
+        };
         let kind = required(value.get_contype().as_inner(), "constraint.contype")?;
         Ok(match kind {
             syn::ConstrType::ConstrAttrEnforced => Self::Enforcement(true),
@@ -298,11 +310,13 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ColumnConstraint {
     }
 }
 
-impl TryFrom<&syn::Constraint> for crate::ast::ForeignReference {
+impl TryFrom<&syn::Constraint> for ForeignReference {
     type Error = AnalysisError;
     fn try_from(value: &syn::Constraint) -> Result<Self, Self::Error> {
-        use crate::ast::Relation;
-        use crate::sem::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity};
+        use crate::{
+            ast::Relation,
+            sem::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
+        };
         let table = required(value.get_pktable().as_inner(), "constraint.pktable")?;
         Ok(Self {
             table: Relation::try_from(&table)?.name,
@@ -333,7 +347,7 @@ use crate::{
 };
 use ::sql_fun_core::IVec;
 
-impl TryFromWithTokens<&syn::CreateTableAsStmt> for crate::ast::TableAs {
+impl TryFromWithTokens<&syn::CreateTableAsStmt> for TableAs {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::CreateTableAsStmt,
@@ -356,7 +370,7 @@ impl TryFromWithTokens<&syn::CreateTableAsStmt> for crate::ast::TableAs {
     }
 }
 
-impl TryFromWithTokens<&syn::IndexStmt> for crate::ast::Index {
+impl TryFromWithTokens<&syn::IndexStmt> for Index {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::IndexStmt,
@@ -412,7 +426,7 @@ impl TryFromWithTokens<&syn::CreateSchemaStmt> for Schema {
         Ok(
             Self::new(&value.get_schemaname(), elements, value.get_if_not_exists())
                 .with_authorization(value.get_authrole().as_inner().map(|role| {
-                    crate::ast::Role::new(
+                    Role::new(
                         role.get_roletype().as_inner().map_or(0, |kind| kind as u32),
                         &role.get_rolename(),
                     )
@@ -538,7 +552,7 @@ impl TryFromWithTokens<&syn::DefElem> for FunctionOption {
             "cost" => Self::Cost(Expr::try_from_with_tokens(&argument, tokens)?),
             "rows" => Self::Rows(Expr::try_from_with_tokens(&argument, tokens)?),
             "support" => Self::Support(Name::try_from(argument.as_list().get_items())?),
-            "set" => Self::Setting(crate::ast::VariableSet::try_from_with_tokens(
+            "set" => Self::Setting(VariableSet::try_from_with_tokens(
                 &required(
                     argument.as_variable_set_stmt().as_inner(),
                     "function setting",
@@ -631,7 +645,7 @@ impl TryFromWithTokens<&syn::Node> for FunctionBodyStatement {
     }
 }
 
-impl TryFromWithTokens<&syn::CompositeTypeStmt> for crate::ast::CompositeType {
+impl TryFromWithTokens<&syn::CompositeTypeStmt> for CompositeType {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::CompositeTypeStmt,
@@ -644,18 +658,13 @@ impl TryFromWithTokens<&syn::CompositeTypeStmt> for crate::ast::CompositeType {
             .map(|fields| fields.as_column_def())
             .unwrap_or_default()
         {
-            fields.push(crate::ast::ddl::CompositeField::try_from_with_tokens(
-                &field, tokens,
-            )?);
+            fields.push(CompositeField::try_from_with_tokens(&field, tokens)?);
         }
-        Ok(Self::new(
-            &crate::ast::Relation::try_from(&relation)?.name,
-            &fields,
-        ))
+        Ok(Self::new(&AstRelation::try_from(&relation)?.name, &fields))
     }
 }
 
-impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::ddl::CompositeField {
+impl TryFromWithTokens<&syn::ColumnDef> for CompositeField {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::ColumnDef,
@@ -678,7 +687,7 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::ddl::CompositeField {
     }
 }
 
-impl TryFrom<syn::AlterTableType> for crate::ast::ddl::AlterOperation {
+impl TryFrom<syn::AlterTableType> for AlterOperation {
     type Error = AnalysisError;
     fn try_from(value: syn::AlterTableType) -> Result<Self, Self::Error> {
         use syn::AlterTableType as Source;
@@ -748,16 +757,14 @@ impl TryFrom<syn::AlterTableType> for crate::ast::ddl::AlterOperation {
     }
 }
 
-impl TryFromWithTokens<&syn::AlterTableCmd> for crate::ast::ddl::PostgresAlterCommand {
+impl TryFromWithTokens<&syn::AlterTableCmd> for PostgresAlterCommand {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::AlterTableCmd,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let operation = crate::ast::ddl::AlterOperation::try_from(required(
-            value.get_subtype().as_inner(),
-            "ALTER action",
-        )?)?;
+        let operation =
+            AlterOperation::try_from(required(value.get_subtype().as_inner(), "ALTER action")?)?;
         let definition = operation.convert_definition(value, tokens)?;
         Ok(Self::new(
             operation,
@@ -769,30 +776,30 @@ impl TryFromWithTokens<&syn::AlterTableCmd> for crate::ast::ddl::PostgresAlterCo
                 value.get_behavior().as_inner(),
                 Some(syn::DropBehavior::DropCascade)
             ),
-            crate::ast::AlterCommand::postgres_legacy(value, tokens)?.as_ref(),
+            AstAlterCommand::postgres_legacy(value, tokens)?.as_ref(),
         ))
     }
 }
 
-impl crate::ast::ddl::AlterOperation {
+impl AlterOperation {
     fn convert_definition(
         &self,
         value: &syn::AlterTableCmd,
         tokens: &IVec<syn::ScanToken>,
-    ) -> Result<crate::ast::ddl::AlterDefinition, AnalysisError> {
+    ) -> Result<AlterDefinition, AnalysisError> {
         use crate::ast::ddl::AlterDefinition;
         let definition = value.get_def();
         Ok(match self {
-            Self::AddColumn => AlterDefinition::column(crate::ast::Column::try_from_with_tokens(
+            Self::AddColumn => AlterDefinition::column(AstColumn::try_from_with_tokens(
                 &required(definition.as_column_def().as_inner(), "added column")?,
                 tokens,
             )?),
-            Self::AlterColumnType => AlterDefinition::column_type(
-                crate::ast::ddl::AlterColumnType::try_from_with_tokens(
+            Self::AlterColumnType => {
+                AlterDefinition::column_type(AlterColumnType::try_from_with_tokens(
                     &required(definition.as_column_def().as_inner(), "altered column type")?,
                     tokens,
-                )?,
-            ),
+                )?)
+            }
             Self::ColumnDefault | Self::SetStatistics | Self::SetExpression => {
                 if definition.as_inner().is_some() {
                     AlterDefinition::expression(Expr::try_from_with_tokens(&definition, tokens)?)
@@ -815,31 +822,29 @@ impl crate::ast::ddl::AlterOperation {
                 )?)
             }
             Self::GenericOptions | Self::AlterColumnGenericOptions => {
-                AlterDefinition::generic_options(
-                    crate::ast::ddl::GenericOption::try_collect_from_with_tokens(
-                        definition.as_list().get_items(),
-                        tokens,
-                    )?,
-                )
+                AlterDefinition::generic_options(GenericOption::try_collect_from_with_tokens(
+                    definition.as_list().get_items(),
+                    tokens,
+                )?)
             }
             Self::AddConstraint => {
-                AlterDefinition::constraint(crate::ast::TableConstraint::try_from_with_tokens(
+                AlterDefinition::constraint(AstTableConstraint::try_from_with_tokens(
                     &required(definition.as_constraint().as_inner(), "added constraint")?,
                     tokens,
                 )?)
             }
-            Self::AlterConstraint => AlterDefinition::constraint_flags(
-                crate::ast::ddl::AlterConstraintFlags::try_from(&required(
+            Self::AlterConstraint => {
+                AlterDefinition::constraint_flags(AlterConstraintFlags::try_from(&required(
                     definition.as_atalter_constraint().as_inner(),
                     "altered constraint",
-                )?)?,
-            ),
-            Self::Owner => AlterDefinition::role(crate::ast::Role::try_from(&required(
+                )?)?)
+            }
+            Self::Owner => AlterDefinition::role(Role::try_from(&required(
                 value.get_newowner().as_inner(),
                 "new owner",
             )?)?),
             Self::AddInherit | Self::DropInherit => AlterDefinition::relation(
-                crate::ast::Relation::try_from(&required(
+                AstRelation::try_from(&required(
                     definition.as_range_var().as_inner(),
                     "inheritance parent",
                 )?)?
@@ -850,13 +855,13 @@ impl crate::ast::ddl::AlterOperation {
                 tokens,
             )?),
             Self::ReplicaIdentity => {
-                AlterDefinition::replica(crate::ast::ddl::ReplicaIdentity::try_from(&required(
+                AlterDefinition::replica(ReplicaIdentity::try_from(&required(
                     definition.as_replica_identity_stmt().as_inner(),
                     "replica identity",
                 )?)?)
             }
             Self::AttachPartition | Self::DetachPartition | Self::DetachPartitionFinalize => {
-                AlterDefinition::partition(crate::ast::ddl::AlterPartition::try_from_with_tokens(
+                AlterDefinition::partition(AlterPartition::try_from_with_tokens(
                     &required(
                         definition.as_partition_cmd().as_inner(),
                         "partition command",
@@ -864,18 +869,16 @@ impl crate::ast::ddl::AlterOperation {
                     tokens,
                 )?)
             }
-            Self::AddIdentity => {
-                AlterDefinition::identity(crate::ast::ddl::AlterIdentity::try_from_with_tokens(
-                    &required(definition.as_constraint().as_inner(), "identity constraint")?,
-                    tokens,
-                )?)
-            }
+            Self::AddIdentity => AlterDefinition::identity(AlterIdentity::try_from_with_tokens(
+                &required(definition.as_constraint().as_inner(), "identity constraint")?,
+                tokens,
+            )?),
             _ => AlterDefinition::none(),
         })
     }
 }
 
-impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::ddl::AlterColumnType {
+impl TryFromWithTokens<&syn::ColumnDef> for AlterColumnType {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::ColumnDef,
@@ -897,7 +900,7 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::ddl::AlterColumnType {
     }
 }
 
-impl TryFrom<&syn::AtAlterConstraint> for crate::ast::ddl::AlterConstraintFlags {
+impl TryFrom<&syn::AtAlterConstraint> for AlterConstraintFlags {
     type Error = AnalysisError;
     fn try_from(value: &syn::AtAlterConstraint) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -921,7 +924,7 @@ impl TryFrom<&syn::AtAlterConstraint> for crate::ast::ddl::AlterConstraintFlags 
     }
 }
 
-impl TryFrom<&syn::RoleSpec> for crate::ast::Role {
+impl TryFrom<&syn::RoleSpec> for Role {
     type Error = AnalysisError;
     fn try_from(value: &syn::RoleSpec) -> Result<Self, Self::Error> {
         Ok(Self::new(
@@ -931,28 +934,26 @@ impl TryFrom<&syn::RoleSpec> for crate::ast::Role {
     }
 }
 
-impl TryFrom<&syn::ReplicaIdentityStmt> for crate::ast::ddl::ReplicaIdentity {
+impl TryFrom<&syn::ReplicaIdentityStmt> for ReplicaIdentity {
     type Error = AnalysisError;
     fn try_from(value: &syn::ReplicaIdentityStmt) -> Result<Self, Self::Error> {
         Ok(Self::new(&value.get_identity_type(), &value.get_name()))
     }
 }
 
-impl TryFromWithTokens<&syn::PartitionCmd> for crate::ast::ddl::AlterPartition {
+impl TryFromWithTokens<&syn::PartitionCmd> for AlterPartition {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::PartitionCmd,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let relation = crate::ast::Relation::try_from(&required(
+        let relation = AstRelation::try_from(&required(
             value.get_name().as_inner(),
             "partition relation",
         )?)?
         .name;
         let bound = if let Some(bound) = value.get_bound().as_inner() {
-            Some(crate::ast::PartitionBound::try_from_with_tokens(
-                &bound, tokens,
-            )?)
+            Some(PartitionBound::try_from_with_tokens(&bound, tokens)?)
         } else {
             None
         };
@@ -960,7 +961,7 @@ impl TryFromWithTokens<&syn::PartitionCmd> for crate::ast::ddl::AlterPartition {
     }
 }
 
-impl TryFromWithTokens<&syn::Constraint> for crate::ast::ddl::AlterIdentity {
+impl TryFromWithTokens<&syn::Constraint> for AlterIdentity {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::Constraint,
@@ -973,7 +974,7 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ddl::AlterIdentity {
     }
 }
 
-impl TryCollectFromWithTokens<syn::NodeListOpt> for crate::ast::ddl::GenericOption {
+impl TryCollectFromWithTokens<syn::NodeListOpt> for GenericOption {
     type Error = AnalysisError;
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
@@ -990,13 +991,13 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for crate::ast::ddl::GenericOpti
     }
 }
 
-impl TryFromWithTokens<&syn::DefElem> for crate::ast::ddl::GenericOption {
+impl TryFromWithTokens<&syn::DefElem> for GenericOption {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::DefElem,
         _tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let action = crate::ast::ddl::GenericAction::try_from(required(
+        let action = GenericAction::try_from(required(
             value.get_defaction().as_inner(),
             "generic option action",
         )?)?;
@@ -1008,7 +1009,7 @@ impl TryFromWithTokens<&syn::DefElem> for crate::ast::ddl::GenericOption {
     }
 }
 
-impl TryFrom<syn::DefElemAction> for crate::ast::ddl::GenericAction {
+impl TryFrom<syn::DefElemAction> for GenericAction {
     type Error = AnalysisError;
     fn try_from(value: syn::DefElemAction) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -1021,7 +1022,7 @@ impl TryFrom<syn::DefElemAction> for crate::ast::ddl::GenericAction {
     }
 }
 
-impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::TableExtras {
+impl TryFromWithTokens<&syn::CreateStmt> for TableExtras {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         v: &syn::CreateStmt,
@@ -1030,7 +1031,7 @@ impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::TableExtras {
         let mut inherits = Vec::new();
         for node in v.get_inh_relations().as_inner().unwrap_or_default() {
             let relation = required(node.as_range_var().as_inner(), "table inheritance relation")?;
-            inherits.push(crate::ast::Relation::try_from(&relation)?.name);
+            inherits.push(AstRelation::try_from(&relation)?.name);
         }
         let of_type = if let Some(type_name) = v.get_of_typename().as_inner() {
             Some(TypeName::try_from_with_tokens(&type_name, tokens)?)
@@ -1038,16 +1039,12 @@ impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::TableExtras {
             None
         };
         let partition_spec = if let Some(spec) = v.get_partspec().as_inner() {
-            Some(crate::ast::PartitionSpec::try_from_with_tokens(
-                &spec, tokens,
-            )?)
+            Some(PartitionSpec::try_from_with_tokens(&spec, tokens)?)
         } else {
             None
         };
         let partition_bound = if let Some(bound) = v.get_partbound().as_inner() {
-            Some(crate::ast::PartitionBound::try_from_with_tokens(
-                &bound, tokens,
-            )?)
+            Some(PartitionBound::try_from_with_tokens(&bound, tokens)?)
         } else {
             None
         };
@@ -1055,15 +1052,15 @@ impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::TableExtras {
             unlogged: v.get_relation().get_relpersistence().as_deref() == Some("u"),
             inherits,
             of_type,
-            on_commit: crate::ast::CommitAction::try_from_opt(v.get_oncommit().as_inner())?,
-            tablespace: super::nonempty(v.get_tablespacename()),
-            access_method: super::nonempty(v.get_access_method()),
+            on_commit: CommitAction::try_from_opt(v.get_oncommit().as_inner())?,
+            tablespace: nonempty(v.get_tablespacename()),
+            access_method: nonempty(v.get_access_method()),
             partition_spec,
             partition_bound,
         })
     }
 }
-impl TryFromWithTokens<&syn::PartitionSpec> for crate::ast::PartitionSpec {
+impl TryFromWithTokens<&syn::PartitionSpec> for PartitionSpec {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         v: &syn::PartitionSpec,
@@ -1078,9 +1075,7 @@ impl TryFromWithTokens<&syn::PartitionSpec> for crate::ast::PartitionSpec {
         let mut keys = Vec::new();
         for node in v.get_part_params().as_inner().unwrap_or_default() {
             let p = required(node.as_partition_elem().as_inner(), "partition key")?;
-            keys.push(crate::ast::IndexExpression::try_from_with_tokens(
-                &p, tokens,
-            )?);
+            keys.push(AstIndexExpression::try_from_with_tokens(&p, tokens)?);
         }
         Ok(Self {
             strategy: strategy.to_owned(),
@@ -1089,7 +1084,7 @@ impl TryFromWithTokens<&syn::PartitionSpec> for crate::ast::PartitionSpec {
     }
 }
 
-impl TryFromWithTokens<&syn::PartitionElem> for crate::ast::IndexExpression {
+impl TryFromWithTokens<&syn::PartitionElem> for AstIndexExpression {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
@@ -1097,7 +1092,7 @@ impl TryFromWithTokens<&syn::PartitionElem> for crate::ast::IndexExpression {
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
-            name: super::nonempty(value.get_name()),
+            name: nonempty(value.get_name()),
             alias: None,
             expression: Expr::try_from_with_tokens_opt(value.get_expr(), tokens)?,
             collation: Name::try_from(value.get_collation())?,
@@ -1110,7 +1105,7 @@ impl TryFromWithTokens<&syn::PartitionElem> for crate::ast::IndexExpression {
     }
 }
 
-impl TryFromWithTokens<&syn::PartitionBoundSpec> for crate::ast::PartitionBound {
+impl TryFromWithTokens<&syn::PartitionBoundSpec> for PartitionBound {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         v: &syn::PartitionBoundSpec,
@@ -1122,18 +1117,12 @@ impl TryFromWithTokens<&syn::PartitionBoundSpec> for crate::ast::PartitionBound 
             modulus: v.get_modulus(),
             remainder: v.get_remainder(),
             list: Expr::try_collect_from_with_tokens(v.get_listdatums(), tokens)?,
-            lower: crate::ast::PartitionDatum::try_collect_from_with_tokens(
-                v.get_lowerdatums(),
-                tokens,
-            )?,
-            upper: crate::ast::PartitionDatum::try_collect_from_with_tokens(
-                v.get_upperdatums(),
-                tokens,
-            )?,
+            lower: PartitionDatum::try_collect_from_with_tokens(v.get_lowerdatums(), tokens)?,
+            upper: PartitionDatum::try_collect_from_with_tokens(v.get_upperdatums(), tokens)?,
         })
     }
 }
-impl TryFromWithTokens<&syn::Node> for crate::ast::PartitionDatum {
+impl TryFromWithTokens<&syn::Node> for PartitionDatum {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         v: &syn::Node,
@@ -1166,7 +1155,7 @@ impl TryFromWithTokens<&syn::Node> for crate::ast::PartitionDatum {
         )
     }
 }
-impl TryFromWithTokens<&syn::Constraint> for crate::ast::ConstraintExtras {
+impl TryFromWithTokens<&syn::Constraint> for ConstraintExtras {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         v: &syn::Constraint,
@@ -1174,9 +1163,7 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ConstraintExtras {
     ) -> Result<Self, Self::Error> {
         let mut exclusions = Vec::new();
         for node in v.get_exclusions().as_inner().unwrap_or_default() {
-            exclusions.push(crate::ast::ExclusionElement::try_from_with_tokens(
-                &node, tokens,
-            )?);
+            exclusions.push(ExclusionElement::try_from_with_tokens(&node, tokens)?);
         }
         Ok(Self {
             enforced: Self::explicit_enforcement(v, tokens),
@@ -1190,9 +1177,9 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ConstraintExtras {
             nulls_not_distinct: v.get_nulls_not_distinct(),
             include: Name::try_from(v.get_including())?.0,
             options: SyntaxOption::try_collect_from_with_tokens(v.get_options(), tokens)?,
-            index_name: super::nonempty(v.get_indexname()),
-            tablespace: super::nonempty(v.get_indexspace()),
-            access_method: super::nonempty(v.get_access_method()),
+            index_name: nonempty(v.get_indexname()),
+            tablespace: nonempty(v.get_indexspace()),
+            access_method: nonempty(v.get_access_method()),
             predicate: Expr::try_from_with_tokens_opt(v.get_where_clause(), tokens)?,
             exclusions,
             delete_columns: Name::try_from(v.get_fk_del_set_cols())?.0,
@@ -1200,7 +1187,7 @@ impl TryFromWithTokens<&syn::Constraint> for crate::ast::ConstraintExtras {
     }
 }
 
-impl TryFromWithTokens<&syn::Node> for crate::ast::ExclusionElement {
+impl TryFromWithTokens<&syn::Node> for ExclusionElement {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
@@ -1215,7 +1202,7 @@ impl TryFromWithTokens<&syn::Node> for crate::ast::ExclusionElement {
             return AnalysisError::raise_unexpected_input("exclusion pair");
         };
         Ok(Self {
-            expression: crate::ast::IndexExpression::try_from_with_tokens(
+            expression: AstIndexExpression::try_from_with_tokens(
                 &required(
                     expression.as_index_elem().as_inner(),
                     "exclusion expression",
@@ -1229,7 +1216,7 @@ impl TryFromWithTokens<&syn::Node> for crate::ast::ExclusionElement {
     }
 }
 
-impl TryCollectFromWithTokens<syn::NodeListOpt> for crate::ast::PartitionDatum {
+impl TryCollectFromWithTokens<syn::NodeListOpt> for PartitionDatum {
     type Error = AnalysisError;
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
@@ -1244,7 +1231,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for crate::ast::PartitionDatum {
     }
 }
 
-impl crate::ast::TableConstraint {
+impl AstTableConstraint {
     pub(in crate::ast) fn from_postgres_inline(
         constraint: &syn::Constraint,
         tokens: &IVec<syn::ScanToken>,

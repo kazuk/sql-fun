@@ -1,12 +1,21 @@
 //! Owned common-type facts and relationships for initially unrestricted inputs.
 //! These are inference data, not a second catalog or analysis environment.
-use crate::context::{CastInfoRead, SchemaFileContext};
-use crate::sem::parameter_constraints::{
-    ConstraintGraph, InputTypeConstraint, SignatureAlternative,
+
+use crate::{
+    ast::Dialect,
+    context::{CastInfoRead, FrozenBaseContext, SchemaFileContext},
+    sem::{
+        MinMaxExpr, ParseContext, PgBuiltInType, TypeReference,
+        parameter_constraints::{
+            ConstraintGraph, InputTypeConstraint, SignatureAlternative, default_types,
+        },
+        problem::MinMaxProblem,
+    },
 };
-use crate::sem::{MinMaxExpr, ParseContext, PgBuiltInType, TypeReference};
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 #[derive(Clone, Debug)]
 struct TypeFacts {
@@ -20,7 +29,7 @@ struct TypeFacts {
 /// The frozen base is shared; only the current catalog layer is copied.
 #[derive(Debug)]
 struct CommonTypeEnvironment {
-    catalog: crate::context::FrozenBaseContext,
+    catalog: FrozenBaseContext,
     args: sql_fun_core::SqlFunArgs,
     metadata: sql_fun_core::SqlFunMetadata,
 }
@@ -60,7 +69,7 @@ impl CommonTypeFacts {
     }
 
     fn permits_defaults(&self) -> bool {
-        crate::ast::Dialect::from(&self.environment.metadata) == crate::ast::Dialect::postgres()
+        Dialect::from(&self.environment.metadata) == Dialect::postgres()
     }
 
     pub(super) fn retain(&mut self, context: &impl ParseContext, ty: &TypeReference) {
@@ -265,8 +274,12 @@ impl CommonTypeFacts {
 
 #[cfg(test)]
 mod test_common_type_facts {
-    use crate::sem::{MinMaxExpr, TypeReference};
-    use crate::test_helpers::common_types as test_helpers;
+    use crate::sem::parameter_constraints::common_type::CommonTypeFacts;
+
+    use crate::{
+        sem::{MinMaxExpr, TypeReference},
+        test_helpers::common_types as test_helpers,
+    };
 
     #[rstest::rstest]
     #[case::domain_first("public.amount[]", "pg_catalog.int4[]", "public.amount[]")]
@@ -299,7 +312,7 @@ mod test_common_type_facts {
         assert!(MinMaxExpr::can_coerce(&context, &left, &result));
         assert!(MinMaxExpr::can_coerce(&context, &right, &result));
 
-        let mut facts = super::CommonTypeFacts::prepare(&context);
+        let mut facts = CommonTypeFacts::prepare(&context);
         drop(context);
         assert_eq!(facts.select(&left, &right), Some(result.clone()));
         assert!(facts.coerce(&left, &result));
@@ -371,7 +384,7 @@ impl CommonTypeConstraint {
             {
                 return None;
             }
-            seeds.extend(super::default_types());
+            seeds.extend(default_types());
         }
         let choices = facts.choices(seeds, !defaults);
         if choices.is_empty() {
@@ -428,7 +441,7 @@ impl CommonTypeConstraint {
             if ordering.is_none() {
                 graph
                     .common_problems
-                    .push(crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target));
+                    .push(MinMaxProblem::missing_comparison_facts(&target));
             }
             if ordering == Some(false) {
                 unordered.get_or_insert(target.clone());
@@ -445,7 +458,7 @@ impl CommonTypeConstraint {
         {
             graph
                 .common_problems
-                .push(crate::sem::problem::MinMaxProblem::not_ordered(&target));
+                .push(MinMaxProblem::not_ordered(&target));
         }
         graph.restrict(self.result, &InputTypeConstraint::types(targets));
         graph.overload(&[candidate, self.result], &alternatives, &self.operation);
@@ -474,12 +487,16 @@ impl CommonTypeConstraint {
 
 #[cfg(test)]
 mod tests {
+    use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
+
     use crate::test_helpers::common_types as test_helpers;
 
-    use crate::sem::parameter_constraints::{
-        ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
+    use crate::sem::{
+        MinMaxExpr, PgBuiltInType, TypeReference,
+        parameter_constraints::{
+            ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
+        },
     };
-    use crate::sem::{MinMaxExpr, PgBuiltInType, TypeReference};
     use std::collections::BTreeMap;
 
     #[rstest::rstest]
@@ -546,10 +563,10 @@ mod tests {
     ) -> testresult::TestResult {
         use crate::sem::ParseContext;
         let context = test_helpers::assignment_context();
-        let mut cache = crate::test_helpers::create_cache_context();
-        let analyzed = crate::parse_statements(
+        let mut cache = create_cache_context();
+        let analyzed = parse_statements(
             "SELECT CASE WHEN true THEN $1 ELSE $2 END",
-            crate::ast::Dialect::postgres(),
+            Dialect::postgres(),
         )
         .next()
         .unwrap()?

@@ -1,6 +1,6 @@
-use crate::engine_specific::TursoSequenceFeature;
-use crate::sem::AnalysisError;
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::{QualifiedName, Stmt};
+use crate::{engine_specific::TursoSequenceFeature, sem::AnalysisError};
 
 /// CREATE SEQUENCE syntax, including options omitted by the caller.
 #[derive(Debug, derive_getters::Getters)]
@@ -85,7 +85,10 @@ impl Stmt {
 
 #[cfg(test)]
 mod test_sequence_conversion {
-    use super::{CreateSequenceStatement, DropSequenceStatement, Stmt, TursoSequenceFeature};
+    use crate::syn::sqlite::sequence_statements::{
+        CreateSequenceStatement, DropSequenceStatement, Stmt, TursoSequenceFeature,
+    };
+    #[cfg(feature = "sqlite")]
     use crate::{sem::AnalysisError, test_helpers::SqliteSynBuilder};
 
     #[derive(Default)]

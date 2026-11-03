@@ -1,7 +1,6 @@
-use super::values::Problem;
-use super::{
+use crate::analysis_problem::{
     AliasName, AnalysisProblem, ColumnName, CteName, DiagnosticMessage, DiagnosticMetadata,
-    FullName, StringSpan, TableName, TypeName, TypeReference, ViewName,
+    FullName, StringSpan, TableName, TypeName, TypeReference, ViewName, values::Problem,
 };
 
 /// Domain base type name not found

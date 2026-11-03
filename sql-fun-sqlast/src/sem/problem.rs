@@ -1,5 +1,5 @@
 //! SQL analysis diagnostic adapters.
-use ::sql_fun_core::analysis_problem as diagnostic;
+
 pub use ::sql_fun_core::analysis_problem::{
     AlterColumnProblem, AnalysisProblem, ArrayProblem, CallArgumentProblem, CollateProblem,
     ColumnAttributeProblem, CreationProblem, DeleteProblem, DeleteProblemKind, DistinctProblem,
@@ -9,33 +9,46 @@ pub use ::sql_fun_core::analysis_problem::{
     TableFunctionProblem, TableSampleProblem, TriggerProblem, TruthTestProblem, UpdateProblem,
     UpdateProblemKind, ViewProblem,
 };
-impl From<&crate::names::FullName> for diagnostic::FullName {
-    fn from(value: &crate::names::FullName) -> Self {
+
+use crate::{
+    StringSpan,
+    names::{AliasName, ColumnName, FullName, OperatorName, TableName, ViewName},
+    sem::{
+        DefElemKey, Kind as SemKind, OwnershipIdentity, OwnershipLookup, RuleIdentity,
+        SemScalarExpr as SemSemScalarExpr, TriggerIdentity, TypeDefinition,
+        TypeReference as SemTypeReference, type_system::ArgumentBindingCollection,
+    },
+    syn::{AExprKind, TypeName},
+};
+use ::sql_fun_core::analysis_problem as diagnostic;
+
+impl From<&FullName> for diagnostic::FullName {
+    fn from(value: &FullName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::names::ColumnName> for diagnostic::ColumnName {
-    fn from(value: &crate::names::ColumnName) -> Self {
+impl From<&ColumnName> for diagnostic::ColumnName {
+    fn from(value: &ColumnName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::names::TableName> for diagnostic::TableName {
-    fn from(value: &crate::names::TableName) -> Self {
+impl From<&TableName> for diagnostic::TableName {
+    fn from(value: &TableName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::TypeReference> for diagnostic::TypeReference {
-    fn from(value: &crate::sem::TypeReference) -> Self {
+impl From<&SemTypeReference> for diagnostic::TypeReference {
+    fn from(value: &SemTypeReference) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::TypeDefinition> for diagnostic::TypeDefinition {
-    fn from(value: &crate::sem::TypeDefinition) -> Self {
+impl From<&TypeDefinition> for diagnostic::TypeDefinition {
+    fn from(value: &TypeDefinition) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
-    fn from(value: &crate::sem::SemScalarExpr) -> Self {
+impl From<&SemSemScalarExpr> for diagnostic::SemScalarExpr {
+    fn from(value: &SemSemScalarExpr) -> Self {
         Self::new(
             value.diagnostic_kind(),
             value
@@ -48,15 +61,14 @@ impl From<&crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
         .with_identity(value.diagnostic_identity().as_deref())
     }
 }
-impl From<crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
-    fn from(value: crate::sem::SemScalarExpr) -> Self {
+impl From<SemSemScalarExpr> for diagnostic::SemScalarExpr {
+    fn from(value: SemSemScalarExpr) -> Self {
         Self::from(&value)
     }
 }
 #[cfg(test)]
 mod expression_conversion_tests {
-    use super::diagnostic;
-    use crate::sem::{InputTypeConstraint, PgBuiltInType, SemScalarExpr};
+    use crate::sem::{InputTypeConstraint, PgBuiltInType, SemScalarExpr, problem::diagnostic};
 
     #[rstest::rstest]
     #[case::unknown(InputTypeConstraint::any(), None)]
@@ -79,20 +91,18 @@ mod expression_conversion_tests {
     }
 }
 
-impl From<&crate::sem::DefElemKey> for diagnostic::DefElemKey {
-    fn from(value: &crate::sem::DefElemKey) -> Self {
+impl From<&DefElemKey> for diagnostic::DefElemKey {
+    fn from(value: &DefElemKey) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::names::OperatorName> for diagnostic::OperatorName {
-    fn from(value: &crate::names::OperatorName) -> Self {
+impl From<&OperatorName> for diagnostic::OperatorName {
+    fn from(value: &OperatorName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::type_system::ArgumentBindingCollection>
-    for diagnostic::ArgumentBindingCollection
-{
-    fn from(value: &crate::sem::type_system::ArgumentBindingCollection) -> Self {
+impl From<&ArgumentBindingCollection> for diagnostic::ArgumentBindingCollection {
+    fn from(value: &ArgumentBindingCollection) -> Self {
         Self::new(
             &value
                 .types()
@@ -101,8 +111,8 @@ impl From<&crate::sem::type_system::ArgumentBindingCollection>
         )
     }
 }
-impl From<&crate::syn::AExprKind> for diagnostic::AExprKind {
-    fn from(value: &crate::syn::AExprKind) -> Self {
+impl From<&AExprKind> for diagnostic::AExprKind {
+    fn from(value: &AExprKind) -> Self {
         use crate::syn::AExprKind as Kind;
         let description = match value {
             Kind::AexprOp => "operator",
@@ -125,63 +135,63 @@ impl From<&crate::syn::AExprKind> for diagnostic::AExprKind {
         Self::new(description)
     }
 }
-impl From<crate::syn::AExprKind> for diagnostic::AExprKind {
-    fn from(value: crate::syn::AExprKind) -> Self {
+impl From<AExprKind> for diagnostic::AExprKind {
+    fn from(value: AExprKind) -> Self {
         Self::from(&value)
     }
 }
-impl From<&crate::names::AliasName> for diagnostic::AliasName {
-    fn from(value: &crate::names::AliasName) -> Self {
+impl From<&AliasName> for diagnostic::AliasName {
+    fn from(value: &AliasName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::names::ViewName> for diagnostic::ViewName {
-    fn from(value: &crate::names::ViewName) -> Self {
+impl From<&ViewName> for diagnostic::ViewName {
+    fn from(value: &ViewName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::RuleIdentity> for diagnostic::RuleIdentity {
-    fn from(value: &crate::sem::RuleIdentity) -> Self {
+impl From<&RuleIdentity> for diagnostic::RuleIdentity {
+    fn from(value: &RuleIdentity) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::TriggerIdentity> for diagnostic::TriggerIdentity {
-    fn from(value: &crate::sem::TriggerIdentity) -> Self {
+impl From<&TriggerIdentity> for diagnostic::TriggerIdentity {
+    fn from(value: &TriggerIdentity) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::OwnershipIdentity> for diagnostic::OwnershipIdentity {
-    fn from(value: &crate::sem::OwnershipIdentity) -> Self {
+impl From<&OwnershipIdentity> for diagnostic::OwnershipIdentity {
+    fn from(value: &OwnershipIdentity) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::OwnershipLookup> for diagnostic::OwnershipLookup {
-    fn from(value: &crate::sem::OwnershipLookup) -> Self {
+impl From<&OwnershipLookup> for diagnostic::OwnershipLookup {
+    fn from(value: &OwnershipLookup) -> Self {
         Self::new(value.code(), &value.diagnostic_message())
     }
 }
-impl From<&crate::sem::Kind> for diagnostic::Kind {
-    fn from(value: &crate::sem::Kind) -> Self {
+impl From<&SemKind> for diagnostic::Kind {
+    fn from(value: &SemKind) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<crate::sem::Kind> for diagnostic::Kind {
-    fn from(value: crate::sem::Kind) -> Self {
+impl From<SemKind> for diagnostic::Kind {
+    fn from(value: SemKind) -> Self {
         Self::from(&value)
     }
 }
-impl From<&crate::syn::TypeName> for diagnostic::TypeName {
-    fn from(value: &crate::syn::TypeName) -> Self {
+impl From<&TypeName> for diagnostic::TypeName {
+    fn from(value: &TypeName) -> Self {
         Self::new(&value.full_name().to_string())
     }
 }
-impl From<&crate::StringSpan> for diagnostic::StringSpan {
-    fn from(value: &crate::StringSpan) -> Self {
+impl From<&StringSpan> for diagnostic::StringSpan {
+    fn from(value: &StringSpan) -> Self {
         Self::new(value.offset(), value.len())
     }
 }
-impl From<&crate::names::FullName> for diagnostic::DebugName {
-    fn from(value: &crate::names::FullName) -> Self {
+impl From<&FullName> for diagnostic::DebugName {
+    fn from(value: &FullName) -> Self {
         Self::new(&value.to_string())
     }
 }

@@ -75,7 +75,8 @@ impl Name {
 
 #[cfg(test)]
 mod test_name_conversion {
-    use super::{Name, NameIn};
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::names::{Name, NameIn};
 
     #[rstest::rstest]
     #[case::plain("plain", "plain", None)]

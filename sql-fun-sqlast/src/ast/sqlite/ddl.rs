@@ -1,26 +1,27 @@
 use crate::{
     ast::{
-        Column, ColumnConstraint, Expr, ForeignReference, Name, Query, Table, TableConstraint,
-        TypeName,
+        AlterCommand as AstAlterCommand, AlterRelation, AlterRelationKind, Column,
+        ColumnConstraint, ConstraintExtras, Expr, ForeignReference, Name, Order, Query,
+        SyntaxOption, Table, TableConstraint, TableExtras, TypeName,
     },
-    sem::{AnalysisError, ConflictClause},
+    sem::{AnalysisError, ConflictClause, CreateTableMode, GeneratedColumnMode},
     syn::sqlite as syn,
 };
 
-impl TryFrom<&syn::AlterTable> for crate::ast::AlterRelation {
+impl TryFrom<&syn::AlterTable> for AlterRelation {
     type Error = AnalysisError;
     fn try_from(value: &syn::AlterTable) -> Result<Self, Self::Error> {
         Ok(Self {
             only: false,
             name: Name::from(value.name()),
-            kind: crate::ast::AlterRelationKind::table(),
+            kind: AlterRelationKind::table(),
             commands: vec![crate::ast::AlterCommand::try_from(value.body())?],
             if_exists: false,
         })
     }
 }
 
-impl TryFrom<&syn::AlterTableBody> for crate::ast::AlterCommand {
+impl TryFrom<&syn::AlterTableBody> for AstAlterCommand {
     type Error = AnalysisError;
     fn try_from(value: &syn::AlterTableBody) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -45,7 +46,7 @@ impl TryFrom<&syn::CreateTableStatement> for Table {
         let mut result = Self::try_from(value.body())?;
         result.name = Name::from(value.table_name());
         result.temporary = *value.temporary();
-        result.mode = crate::sem::CreateTableMode::from_if_not_exists(*value.if_not_exists());
+        result.mode = CreateTableMode::from_if_not_exists(*value.if_not_exists());
         Ok(result)
     }
 }
@@ -55,21 +56,21 @@ impl TryFrom<&syn::ColumnsAndConstraint> for Table {
     fn try_from(value: &syn::ColumnsAndConstraint) -> Result<Self, Self::Error> {
         let mut options = Vec::new();
         if value.options().without_rowid_text().is_some() {
-            options.push(crate::ast::SyntaxOption {
+            options.push(SyntaxOption {
                 namespace: None,
                 name: "without_rowid".to_owned(),
                 value: None,
             });
         }
         if value.options().strict_text().is_some() {
-            options.push(crate::ast::SyntaxOption {
+            options.push(SyntaxOption {
                 namespace: None,
                 name: "strict".to_owned(),
                 value: None,
             });
         }
         Ok(Self {
-            extras: crate::ast::TableExtras::default(),
+            extras: TableExtras::default(),
             name: Name::from_parts(&[]),
             columns: value
                 .columns()
@@ -83,7 +84,7 @@ impl TryFrom<&syn::ColumnsAndConstraint> for Table {
                 .collect::<Result<Vec<_>, _>>()?,
             query: None,
             temporary: false,
-            mode: crate::sem::CreateTableMode::Default,
+            mode: CreateTableMode::Default,
             options,
         })
     }
@@ -95,13 +96,13 @@ impl TryFrom<&syn::CreateTableBody> for Table {
         match value {
             syn::CreateTableBody::ColumnsAndConstraint(body) => Self::try_from(body),
             syn::CreateTableBody::AsSelect(query) => Ok(Self {
-                extras: crate::ast::TableExtras::default(),
+                extras: TableExtras::default(),
                 name: Name::from_parts(&[]),
                 columns: Vec::new(),
                 constraints: Vec::new(),
                 query: Some(Query::try_from(query)?),
                 temporary: false,
-                mode: crate::sem::CreateTableMode::Default,
+                mode: CreateTableMode::Default,
                 options: Vec::new(),
             }),
         }
@@ -134,17 +135,17 @@ impl TryFrom<&syn::NamedColumnConstraint> for TableConstraint {
     type Error = AnalysisError;
     fn try_from(value: &syn::NamedColumnConstraint) -> Result<Self, Self::Error> {
         Ok(Self {
-            extras: crate::ast::ConstraintExtras::default(),
+            extras: ConstraintExtras::default(),
             name: value.name().map(|name| name.value().to_owned()),
             keys: Vec::new(),
             constraint: ColumnConstraint::try_from(value.constraint())?,
-            order: crate::ast::Order::sqlite_column_primary_key(value.constraint()),
+            order: Order::sqlite_column_primary_key(value.constraint()),
             auto_increment: matches!(value.constraint(), syn::ColumnConstraint::PrimaryKey(primary) if primary.auto_increment()),
         })
     }
 }
 
-impl crate::ast::Order {
+impl Order {
     fn sqlite_column_primary_key(constraint: &syn::ColumnConstraint) -> Vec<Self> {
         let syn::ColumnConstraint::PrimaryKey(primary) = constraint else {
             return Vec::new();
@@ -186,10 +187,7 @@ impl TryFrom<&syn::ColumnConstraint> for ColumnConstraint {
             }
             syn::ColumnConstraint::Generated(value) => Self::Generated(
                 Expr::try_from(value.expr().as_ref())?,
-                value
-                    .typ()
-                    .as_ref()
-                    .map(crate::sem::GeneratedColumnMode::from),
+                value.typ().as_ref().map(GeneratedColumnMode::from),
             ),
         })
     }
@@ -252,12 +250,12 @@ impl TryFrom<&syn::NamedTableConstraint> for TableConstraint {
             syn::TableConstraint::PrimaryKey(primary) => primary
                 .columns()
                 .iter()
-                .map(crate::ast::Order::try_from)
+                .map(Order::try_from)
                 .collect::<Result<Vec<_>, _>>()?,
             syn::TableConstraint::Unique(unique) => unique
                 .columns()
                 .iter()
-                .map(crate::ast::Order::try_from)
+                .map(Order::try_from)
                 .collect::<Result<Vec<_>, _>>()?,
             _ => Vec::new(),
         };
@@ -292,7 +290,7 @@ impl TryFrom<&syn::NamedTableConstraint> for TableConstraint {
             ),
         };
         Ok(Self {
-            extras: crate::ast::ConstraintExtras::default(),
+            extras: ConstraintExtras::default(),
             name: value.name().as_ref().map(|name| name.value().to_owned()),
             keys,
             constraint,

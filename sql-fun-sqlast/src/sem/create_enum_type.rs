@@ -1,15 +1,18 @@
-use crate::{sem::AstAndContextPair, syn::ListOpt};
+use crate::{
+    sem::{AstAndContextPair, OwnerSpecification},
+    syn::{CreateEnumStmt, ListOpt},
+};
 
-use {
-    super::{AnalysisError, ParseContext, SemAst, TypeReference},
-    crate::names::FullName,
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ParseContext, SemAst, TypeReference},
 };
 
 /// analyzed [`crate::syn::CreateEnumStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateEnum {
     #[serde(skip)]
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     type_ref: TypeReference,
     values: Vec<EnumValueDefinition>,
 }
@@ -18,11 +21,11 @@ impl CreateEnum {
     /// Retained ownership; None means no ownership information was supplied.
     /// Ownership is catalog state: it is omitted from the existing serialized
     /// type format and does not affect SQL type equality or hashing.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -69,7 +72,7 @@ impl CreateEnum {
     pub fn analyze_create_enum_type<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        create: crate::syn::CreateEnumStmt,
+        create: CreateEnumStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,

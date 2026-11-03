@@ -8,6 +8,11 @@ mod variadic_param;
 
 pub use self::bind_result::ParameterBindResult;
 
+use crate::{
+    context::BaseParseContext, names::TableName, sem::type_system::SimpleInferResult,
+    syn::FunctionParameter,
+};
+
 use self::{
     in_out_param::FunctionParamInOut, in_param::FunctionParamIn, out_param::FunctionParamOut,
     table_param::FunctionParamTable, variadic_param::FunctionParamVariadic,
@@ -51,7 +56,7 @@ where
 
     fn from_syn<TParseContext>(
         context: TParseContext,
-        param: crate::syn::FunctionParameter,
+        param: FunctionParameter,
         tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
@@ -63,10 +68,7 @@ where
         arg_types: &mut ArgumentBindingCollection,
     ) -> Result<ParameterBindResult, TypeError>;
 
-    fn apply_simple_infer_result(
-        &mut self,
-        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    );
+    fn apply_simple_infer_result(&mut self, simple_infer_result: &SimpleInferResult);
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference);
 }
 
@@ -116,11 +118,7 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
             Self::In(value) => value.rename_relation(old, new),
             Self::Out(value) => value.rename_relation(old, new),
@@ -212,7 +210,7 @@ impl FunctionParam {
     ///
     /// Returns [`AnalysisError`] if any parameter fails to parse.
     pub fn collect_output_params_as_columns(
-        params: &Vec<crate::syn::FunctionParameter>,
+        params: &Vec<FunctionParameter>,
     ) -> Result<Option<ColumnCollection>, AnalysisError> {
         let mut columns = Vec::new();
         for param in params {
@@ -252,7 +250,7 @@ impl FunctionParam {
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
         bind: &ParameterBindResult,
     ) -> Result<(), TypeError> {
         match self {
@@ -273,7 +271,7 @@ impl FunctionParam {
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
         bind: &ParameterBindResult,
     ) -> Result<(), TypeError> {
         match self {
@@ -286,10 +284,7 @@ impl FunctionParam {
     }
 
     /// apply simple infer result
-    pub fn apply_simple_infer_result(
-        &mut self,
-        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    ) {
+    pub fn apply_simple_infer_result(&mut self, simple_infer_result: &SimpleInferResult) {
         match self {
             Self::In(p) => p.apply_simple_infer_result(simple_infer_result),
             Self::Out(p) => p.apply_simple_infer_result(simple_infer_result),
@@ -338,7 +333,7 @@ impl FunctionParam {
         self.castability_one_from_catalog(context, source_type)
     }
 
-    pub(crate) fn castability_one_from_catalog<TCatalog: crate::context::BaseParseContext>(
+    pub(crate) fn castability_one_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
         source_type: &Option<TypeReference>,
@@ -377,7 +372,7 @@ impl FunctionParam {
         self.castability_variadic_from_catalog(context, source_types)
     }
 
-    pub(crate) fn castability_variadic_from_catalog<TCatalog: crate::context::BaseParseContext>(
+    pub(crate) fn castability_variadic_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
         source_types: &IVec<Option<TypeReference>>,
@@ -410,8 +405,10 @@ impl FunctionParam {
 
 #[cfg(test)]
 mod test_variadic_any_castability {
-    use crate::sem::{FunctionParam, PgBuiltInType, TypeReference};
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        sem::{FunctionParam, PgBuiltInType, TypeReference},
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn heterogeneous_arguments_need_no_catalog_cast_or_exact_credit() {

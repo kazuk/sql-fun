@@ -69,14 +69,16 @@ impl JsonValueCache {
 
 #[cfg(test)]
 mod tests {
-    use super::JsonValueCache;
+    use crate::SqlFunCodegenError;
+
+    use crate::json_value_cache::JsonValueCache;
 
     #[test]
     fn yaml_cache_preserves_aliases_and_scalar_types() -> testresult::TestResult {
         let file = test_helpers::yaml_file(false)?;
         let load = || {
             JsonValueCache::get_or_fill(file.path(), |value| {
-                Ok::<_, crate::SqlFunCodegenError>(value.clone())
+                Ok::<_, SqlFunCodegenError>(value.clone())
             })
         };
         let value = load()?;
@@ -92,7 +94,7 @@ mod tests {
     fn malformed_yaml_is_rejected() -> testresult::TestResult {
         let file = test_helpers::yaml_file(true)?;
         let result = JsonValueCache::get_or_fill(file.path(), |value| {
-            Ok::<_, crate::SqlFunCodegenError>(value.clone())
+            Ok::<_, SqlFunCodegenError>(value.clone())
         });
         assert!(result.is_err());
         Ok(())

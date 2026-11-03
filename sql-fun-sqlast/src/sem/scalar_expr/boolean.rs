@@ -1,5 +1,14 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, PgBuiltInType, SemScalarExpr, TypeReference};
+use crate::{
+    ast::Dialect,
+    sem::{
+        AnalysisError, InputTypeConstraint, ParseContext, PgBuiltInType, SemScalarExpr,
+        TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
+    syn::NullTestType as SynNullTestType,
+};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BooleanExprBody {
@@ -98,16 +107,16 @@ impl NullTestExpr {
     }
 }
 
-impl TryFrom<crate::syn::NullTestType> for NullTestType {
+impl TryFrom<SynNullTestType> for NullTestType {
     type Error = AnalysisError;
 
-    fn try_from(value: crate::syn::NullTestType) -> Result<Self, Self::Error> {
+    fn try_from(value: SynNullTestType) -> Result<Self, Self::Error> {
         match value {
-            crate::syn::NullTestType::OptionNone | crate::syn::NullTestType::Undefined => {
+            SynNullTestType::OptionNone | SynNullTestType::Undefined => {
                 AnalysisError::raise_unexpected_input("nulltesttype")?
             }
-            crate::syn::NullTestType::IsNull => Ok(Self::IsNull),
-            crate::syn::NullTestType::IsNotNull => Ok(Self::IsNotNull),
+            SynNullTestType::IsNull => Ok(Self::IsNull),
+            SynNullTestType::IsNotNull => Ok(Self::IsNotNull),
         }
     }
 }
@@ -123,27 +132,24 @@ impl SemScalarExprNode for NullTestExpr {
 }
 
 impl BooleanExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.body.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.body.visit(visitor)?;
         Ok(())
     }
 }
 
 impl BooleanExprBody {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         match self {
             Self::And(values) | Self::Or(values) => {
                 for value in values {
@@ -154,10 +160,7 @@ impl BooleanExprBody {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::And(values) | Self::Or(values) => {
                 for value in values {
@@ -171,17 +174,14 @@ impl BooleanExprBody {
 }
 
 impl NullTestExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.arg_expr.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.arg_expr.visit(visitor)?;
         Ok(())
     }
@@ -198,14 +198,14 @@ impl BooleanExprBody {
 impl BooleanExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &impl ParseContext,
     ) -> Option<SemScalarExpr> {
         let arguments = self.body.inference_arguments();
         if !arguments.iter().any(|arg| arg.constraint_node().is_some()) {
             return None;
         }
-        if context.dialect() == crate::ast::Dialect::postgres() {
+        if context.dialect() == Dialect::postgres() {
             for arg in &arguments {
                 parameters.require(context, arg, &PgBuiltInType::bool(), false);
             }
@@ -213,7 +213,7 @@ impl BooleanExpr {
         Some(parameters.operation(
             "boolean",
             &arguments,
-            &crate::sem::InputTypeConstraint::exact(&PgBuiltInType::bool()),
+            &InputTypeConstraint::exact(&PgBuiltInType::bool()),
             None,
         ))
     }
@@ -221,13 +221,13 @@ impl BooleanExpr {
 impl NullTestExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
     ) -> Option<SemScalarExpr> {
         self.arg_expr.constraint_node()?;
         Some(parameters.operation(
             "IS NULL",
             std::slice::from_ref(&self.arg_expr),
-            &crate::sem::InputTypeConstraint::exact(&PgBuiltInType::bool()),
+            &InputTypeConstraint::exact(&PgBuiltInType::bool()),
             Some(true),
         ))
     }

@@ -5,15 +5,17 @@
 mod async_tokio;
 mod completion;
 mod connection;
+
 /// api payload
 pub mod payloads;
 mod tokenize_sql;
 
 pub use self::async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
-pub use self::completion::{
-    CompleteResponse, CompletionContext, CompletionFuture, TypedResponseError,
+pub use self::{
+    completion::{CompleteResponse, CompletionContext, CompletionFuture, TypedResponseError},
+    connection::{ConnectionError, ConnectionOptions, ConnectionOptionsBuilder, connect},
 };
-pub use self::connection::{ConnectionError, ConnectionOptions, ConnectionOptionsBuilder, connect};
+use crate::payloads::{CollectionPage, CollectionReference, CollectionTraversal};
 
 use crate::payloads::CollectionHandle;
 
@@ -88,6 +90,8 @@ impl<T> Collection<T> {
 
 #[cfg(test)]
 mod collection_tests {
+    use crate::Collection as LocalCollection;
+
     #[test]
     fn completed_state_has_no_wire_encoding() {
         assert!(::serde_json::to_value(super::Collection::completed(vec![1_u32])).is_err());
@@ -108,8 +112,7 @@ mod collection_tests {
     fn official_wire_page_starts_in_stream_state() -> ::testresult::TestResult {
         let handle = ::sql_fun_server_api::payloads::CollectionHandle::from("wire".to_owned());
         let wire = ::sql_fun_server_api::Collection::new(&handle, 3, 1, true, vec![7_u32]);
-        let client: super::Collection<u32> =
-            ::serde_json::from_value(::serde_json::to_value(wire)?)?;
+        let client: LocalCollection<u32> = ::serde_json::from_value(::serde_json::to_value(wire)?)?;
         assert!(!client.is_completed());
         assert_eq!(client.items(), &[7]);
         assert_eq!(
@@ -126,22 +129,22 @@ impl<T> From<StreamingCollection<T>> for Collection<T> {
     }
 }
 
-impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+impl<T: CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
     crate::payloads::CollectionTraversal for Collection<T>
 {
-    fn collections(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+    fn collections(&self) -> Vec<&dyn CollectionReference> {
         vec![self]
     }
-    fn collections_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+    fn collections_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         vec![self]
     }
 }
-impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+impl<T: CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
     crate::payloads::CollectionReference for Collection<T>
 {
-    fn page(&self) -> Option<crate::payloads::CollectionPage> {
+    fn page(&self) -> Option<CollectionPage> {
         match self {
-            Self::Stream(page) => Some(crate::payloads::CollectionPage::new(
+            Self::Stream(page) => Some(CollectionPage::new(
                 &page.handle,
                 page.total_length,
                 page.offset,
@@ -173,14 +176,14 @@ impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + '
         }
         Ok(())
     }
-    fn children(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+    fn children(&self) -> Vec<&dyn CollectionReference> {
         use crate::payloads::CollectionTraversal;
         match self {
             Self::Stream(page) => page.items.collections(),
             Self::Completed(items) => items.collections(),
         }
     }
-    fn children_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+    fn children_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         use crate::payloads::CollectionTraversal;
         match self {
             Self::Stream(page) => page.items.collections_mut(),

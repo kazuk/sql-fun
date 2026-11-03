@@ -321,6 +321,9 @@ function run_dependency_updates() {
 
 function run_doc() {
   require_command mdbook
+  require_command python3
+  # Validate before mdBook can create missing chapter files.
+  python3 "${GIT_ROOT}/.local/sbin/check-diagnostic-reference"
   echo "== Document build"
   cargo doc --workspace --no-deps
   "${GIT_ROOT}/.local/sbin/build-user-manual"

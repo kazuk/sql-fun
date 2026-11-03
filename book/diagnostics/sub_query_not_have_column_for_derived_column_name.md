@@ -21,9 +21,9 @@ output expression to the subquery.
 
 ## Example
 
-PostgreSQL-style SQLAST example; no schema is needed. This producer is
-source-verified, but current CLI transport cannot decode this diagnostic
-payload, so this is not a successful CLI reproduction.
+With a configured PostgreSQL datasource and its installed builtin catalog,
+`sql-fun analyze` reports this error for the following query. No application
+tables are needed.
 
 ```sql
 SELECT s.second FROM (SELECT 1) AS s(first, second);

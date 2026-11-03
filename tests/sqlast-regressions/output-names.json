@@ -274,5 +274,39 @@
         }
       ]
     }
+  },
+  {
+    "name": "output_names::excess_derived_alias",
+    "sql": "SELECT s.second FROM (SELECT 1) AS s(first, second);",
+    "expected": {
+      "diagnostics": [
+        "sub_query_not_have_column_for_derived_column_name"
+      ],
+      "columns": [
+        {
+          "name": "second",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_names::valid_derived_alias",
+    "sql": "SELECT s.first FROM (SELECT 1) AS s(first);",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "first",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
   }
 ]

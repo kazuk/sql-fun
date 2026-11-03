@@ -1,6 +1,7 @@
 use crate::{
     context::{ParseContext, TriggerInfoRead},
-    sem::{FullName, TriggerIdentity},
+    names::FullName,
+    sem::TriggerIdentity,
 };
 
 #[rstest::rstest]
@@ -132,8 +133,8 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
     )?
     .into_context();
     context.set_search_path(&[
-        crate::sem::SchemaName::from("earlier"),
-        crate::sem::SchemaName::from("public"),
+        crate::names::SchemaName::from("earlier"),
+        crate::names::SchemaName::from("public"),
     ]);
     let pair = test_helpers::apply(context, "DROP TRIGGER IF EXISTS audit ON item_view")?;
     let drop = pair.ast().trigger_drop().unwrap();
@@ -153,7 +154,8 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
 mod test_helpers {
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
-        sem::{FullName, TableName, TriggerIdentity, ViewName},
+        names::{FullName, TableName, ViewName},
+        sem::TriggerIdentity,
     };
     pub(super) const CREATE_AUDIT: &str = "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()";
     pub(super) fn identity() -> TriggerIdentity {

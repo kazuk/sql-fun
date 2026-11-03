@@ -1,5 +1,6 @@
-use crate::sem::{
-    AnalysisError, DropDependencyBehavior, FullName, ParseContext, RuleIdentity, SemAst,
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, DropDependencyBehavior, ParseContext, RuleIdentity, SemAst},
 };
 
 /// Resolved DROP RULE and the completed lookup outcome.

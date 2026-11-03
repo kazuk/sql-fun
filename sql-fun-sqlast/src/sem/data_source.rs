@@ -21,7 +21,7 @@ mod undefined;
 mod view;
 
 pub use self::{
-    alias::{AliasName, AliasSpec},
+    alias::AliasSpec,
     cte::CteDataSource,
     deferred_fun::DeferredTableFunction,
     group::GroupedDataSource,
@@ -47,7 +47,8 @@ pub(crate) use self::{
 
 use crate::{
     context::ParseContext,
-    sem::{AnalysisError, ColumnName, SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr},
+    names::{AliasName, ColumnName},
+    sem::{AnalysisError, SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr},
 };
 
 /// source nullability type

@@ -1,8 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, CteName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteName, DataSource, Nullable,
-        WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, WithClause,
+        scalar_expr::ColumnReferenceExpr,
     },
 };
 

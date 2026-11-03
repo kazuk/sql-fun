@@ -1,7 +1,7 @@
 //! SQL-to-semantics and catalog-chain regressions; no external server is required.
 use crate::{
     context::{BaseParseContext, ParseContext},
-    sem::ColumnName,
+    names::ColumnName,
     syn::{ListOpt, Opt},
 };
 
@@ -292,8 +292,8 @@ fn failed_bindings_are_retained(
         test_helpers::apply(result.into_context(), "CREATE TABLE later(a integer)")?.into_context();
     assert!(
         context
-            .get_table(&crate::sem::TableName::from(
-                crate::sem::FullName::with_schema("public", "later")
+            .get_table(&crate::names::TableName::from(
+                crate::names::FullName::with_schema("public", "later")
             ))
             .is_some()
     );
@@ -318,7 +318,7 @@ fn canonical_binding_survives_freezing_and_preserves_quoted_names() -> testresul
     let context = test_helpers::seed(r#"CREATE TABLE public."T"("A" integer)"#, "17")?;
     let context = test_helpers::child(context.freeze());
     let result = test_helpers::apply(context, r#"ALTER TABLE "T" ALTER "A" SET STATISTICS 25"#)?;
-    let target = crate::sem::TableName::from(crate::sem::FullName::with_schema("public", "T"));
+    let target = crate::names::TableName::from(crate::names::FullName::with_schema("public", "T"));
     let statement = result.ast().alter_table_statement().unwrap();
     assert_eq!(statement.resolved_target(), Some(&target));
     let context = test_helpers::child(result.into_context().freeze());
@@ -526,16 +526,17 @@ mod test_helpers {
             BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext,
             SchemaFileContext,
         },
-        sem::{AnalysisError, AstAndContextPair, ColumnDefinition, ColumnName, TableName},
+        names::{ColumnName, TableName},
+        sem::{AnalysisError, AstAndContextPair, ColumnDefinition},
     };
     pub(super) fn table_name() -> TableName {
-        TableName::from(crate::sem::FullName::with_schema("public", "t"))
+        TableName::from(crate::names::FullName::with_schema("public", "t"))
     }
     pub(super) fn context(version: &str) -> SchemaFileContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":version, "search_path":["public"]})).unwrap();
         let mut inventory =
             crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
-        inventory.set_search_path(&[crate::sem::SchemaName::from("public")]);
+        inventory.set_search_path(&[crate::names::SchemaName::from("public")]);
         inventory.setup_type(crate::sem::PgBuiltInType::int4());
         child(inventory.freeze())
     }

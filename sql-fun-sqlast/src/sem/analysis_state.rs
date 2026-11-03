@@ -114,7 +114,10 @@ mod test_analysis_lifecycle {
 
     mod test_helpers {
         use crate::StringSpan;
-        use crate::sem::{AnalysisError, AnalysisProblem, FullName, ParseContext};
+        use crate::{
+            names::FullName,
+            sem::{AnalysisError, AnalysisProblem, ParseContext},
+        };
         pub(super) fn missing_functions() -> Vec<AnalysisProblem> {
             vec![
                 AnalysisProblem::function_not_found(

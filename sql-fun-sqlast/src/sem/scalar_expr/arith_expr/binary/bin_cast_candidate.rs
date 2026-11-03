@@ -1,8 +1,11 @@
 use crate::sem::overload_rank::OverloadRank;
 use crate::sem::type_system::SimpleInferContext;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, BinaryOperatorDefinition, CastContext, OperatorDefinition,
-    OperatorName, ParseContext, SemScalarExpr, TypeReference,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, CastContext, OperatorDefinition,
+        ParseContext, SemScalarExpr, TypeReference,
+    },
 };
 
 pub struct BinaryCastCandidate {
@@ -308,7 +311,7 @@ mod tests {
         let operator = OperatorDefinition::binary(&[first, second]);
         let best = BinaryCastCandidate::resolve(
             &mut context,
-            &crate::sem::OperatorName::new("="),
+            &crate::names::OperatorName::new("="),
             &operator,
             &array,
             &array,
@@ -375,7 +378,7 @@ mod tests {
         ];
         let best = BinaryCastCandidate::resolve(
             &mut context,
-            &crate::sem::OperatorName::new("="),
+            &crate::names::OperatorName::new("="),
             &OperatorDefinition::binary(&overloads),
             &domain,
             &PgBuiltInType::int4(),
@@ -406,7 +409,7 @@ mod tests {
         };
         let best = BinaryCastCandidate::resolve(
             &mut context,
-            &crate::sem::OperatorName::new("="),
+            &crate::names::OperatorName::new("="),
             &OperatorDefinition::binary(&overloads),
             &domain,
             &right,

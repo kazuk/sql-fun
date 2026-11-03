@@ -1,4 +1,4 @@
-use crate::sem::{FullName, TypeReference};
+use crate::{names::FullName, sem::TypeReference};
 
 /// Offline facts for one PostgreSQL `(internal) RETURNS tsm_handler` handler.
 /// The parameter types describe TABLESAMPLE inputs, not the dummy handler argument.

@@ -6,7 +6,7 @@
 //! Classification also requires a catalog binding, so names absent from the
 //! selected server version are not made available by this list. User catalogs
 //! supply their own classification through FunctionInfoRead.
-use crate::sem::FullName;
+use crate::names::FullName;
 
 pub(super) fn builtin_aggregate(name: &FullName) -> bool {
     name.schema()
@@ -73,7 +73,7 @@ pub(super) fn builtin_aggregate(name: &FullName) -> bool {
 #[cfg(test)]
 mod tests {
     use super::builtin_aggregate;
-    use crate::sem::FullName;
+    use crate::names::FullName;
 
     #[rstest::rstest]
     #[case::aggregate("pg_catalog", "sum", true)]

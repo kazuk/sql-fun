@@ -9,12 +9,12 @@ pub(crate) trait SemanticVisitor {
     fn access_purpose(&mut self, _kind: crate::sem::AccessKind) {}
     fn access_join(&mut self, _join: &crate::sem::data_source::JoinExprDataSource) {}
     fn leave_access_join(&mut self) {}
-    fn access_action(&mut self, _name: &crate::sem::FullName, _kind: crate::sem::AccessKind) {}
+    fn access_action(&mut self, _name: &crate::names::FullName, _kind: crate::sem::AccessKind) {}
     fn function_binding(
         &mut self,
-        _name: &crate::sem::FullName,
+        _name: &crate::names::FullName,
         _alias: &crate::sem::AliasSpec,
-        _columns: &[crate::sem::ColumnName],
+        _columns: &[crate::names::ColumnName],
     ) {
     }
 
@@ -26,19 +26,19 @@ pub(crate) trait SemanticVisitor {
     fn join_right(&mut self) {}
     fn leave_join(
         &mut self,
-        _using: &[crate::sem::ColumnName],
+        _using: &[crate::names::ColumnName],
         _natural: bool,
         _alias: Option<&crate::sem::AliasSpec>,
     ) {
     }
-    fn source_outputs(&mut self, _columns: &[crate::sem::ColumnName]) {}
+    fn source_outputs(&mut self, _columns: &[crate::names::ColumnName]) {}
     fn assignment_target(&mut self, _target: &SemScalarExpr) {}
-    fn enter_cte(&mut self, _name: &str, _columns: &[crate::sem::ColumnName]) {}
-    fn cte_columns(&mut self, _name: &str, _columns: &[crate::sem::ColumnName]) {}
+    fn enter_cte(&mut self, _name: &str, _columns: &[crate::names::ColumnName]) {}
+    fn cte_columns(&mut self, _name: &str, _columns: &[crate::names::ColumnName]) {}
     fn cte_source(&mut self, _name: &str, _alias: &crate::sem::AliasSpec) {}
-    fn table_binding(&mut self, _name: &crate::sem::TableName) {}
+    fn table_binding(&mut self, _name: &crate::names::TableName) {}
 
-    fn relation_identity(&mut self, _name: &crate::sem::FullName) {}
+    fn relation_identity(&mut self, _name: &crate::names::FullName) {}
     // Observe the node before its already-analyzed children.
     fn enter_expression(&mut self, _expression: &SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
@@ -112,7 +112,7 @@ pub(crate) trait SemanticVisitor {
     fn join_sensitive_star(&mut self) {}
     fn projection(
         &mut self,
-        _name: &Option<crate::sem::ColumnName>,
+        _name: &Option<crate::names::ColumnName>,
         _explicit: bool,
         _expanded: bool,
         _value: &SemScalarExpr,
@@ -121,7 +121,7 @@ pub(crate) trait SemanticVisitor {
     }
     fn result_name(
         &mut self,
-        _name: &Option<crate::sem::ColumnName>,
+        _name: &Option<crate::names::ColumnName>,
         _explicit: bool,
         _value: &SemScalarExpr,
     ) {
@@ -135,10 +135,14 @@ pub(crate) trait SemanticVisitor {
     fn derived_binding(
         &mut self,
         _alias: &crate::sem::AliasSpec,
-        _columns: &[crate::sem::ColumnName],
+        _columns: &[crate::names::ColumnName],
     ) {
     }
-    fn source_binding(&mut self, _relation: &crate::sem::FullName, _alias: &crate::sem::AliasSpec) {
+    fn source_binding(
+        &mut self,
+        _relation: &crate::names::FullName,
+        _alias: &crate::sem::AliasSpec,
+    ) {
     }
 
     fn predicate(&mut self, _value: &SemScalarExpr) {}
@@ -177,18 +181,18 @@ pub(crate) trait SemanticVisitorMut {
     fn join_right(&mut self) {}
     fn leave_join(
         &mut self,
-        _using: &[crate::sem::ColumnName],
+        _using: &[crate::names::ColumnName],
         _natural: bool,
         _alias: Option<&crate::sem::AliasSpec>,
     ) {
     }
-    fn source_outputs(&mut self, _columns: &[crate::sem::ColumnName]) {}
+    fn source_outputs(&mut self, _columns: &[crate::names::ColumnName]) {}
     fn assignment_target(&mut self, _target: &mut SemScalarExpr) {}
-    fn cte_columns(&mut self, _name: &str, _columns: &[crate::sem::ColumnName]) {}
+    fn cte_columns(&mut self, _name: &str, _columns: &[crate::names::ColumnName]) {}
     fn cte_source(&mut self, _name: &str, _alias: &crate::sem::AliasSpec) {}
-    fn table_binding(&mut self, _name: &mut crate::sem::TableName) {}
+    fn table_binding(&mut self, _name: &mut crate::names::TableName) {}
 
-    fn relation_identity(&mut self, _name: &crate::sem::FullName) {}
+    fn relation_identity(&mut self, _name: &crate::names::FullName) {}
     // Normalize context-free expressions before walking their newly analyzed children.
     fn enter_expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
@@ -251,7 +255,7 @@ pub(crate) trait SemanticVisitorMut {
     fn join_sensitive_star(&mut self) {}
     fn projection(
         &mut self,
-        _name: &mut Option<crate::sem::ColumnName>,
+        _name: &mut Option<crate::names::ColumnName>,
         _explicit: bool,
         _expanded: bool,
         _value: &mut SemScalarExpr,
@@ -260,7 +264,7 @@ pub(crate) trait SemanticVisitorMut {
     }
     fn result_name(
         &mut self,
-        _name: &mut Option<crate::sem::ColumnName>,
+        _name: &mut Option<crate::names::ColumnName>,
         _explicit: bool,
         _value: &SemScalarExpr,
     ) {
@@ -274,10 +278,14 @@ pub(crate) trait SemanticVisitorMut {
     fn derived_binding(
         &mut self,
         _alias: &crate::sem::AliasSpec,
-        _columns: &[crate::sem::ColumnName],
+        _columns: &[crate::names::ColumnName],
     ) {
     }
-    fn source_binding(&mut self, _relation: &crate::sem::FullName, _alias: &crate::sem::AliasSpec) {
+    fn source_binding(
+        &mut self,
+        _relation: &crate::names::FullName,
+        _alias: &crate::sem::AliasSpec,
+    ) {
     }
 
     fn predicate(&mut self, _value: &SemScalarExpr) {}
@@ -328,19 +336,19 @@ pub(crate) fn visit_optional<V: SemanticVisitor>(
 
 /// Rebind exact analyzed identities while preserving SQL aliases and spelling.
 pub(crate) struct RelationRenamer<'a> {
-    old: &'a crate::sem::TableName,
-    new: &'a crate::sem::TableName,
+    old: &'a crate::names::TableName,
+    new: &'a crate::names::TableName,
 }
 impl<'a> RelationRenamer<'a> {
     pub(crate) const fn new(
-        old: &'a crate::sem::TableName,
-        new: &'a crate::sem::TableName,
+        old: &'a crate::names::TableName,
+        new: &'a crate::names::TableName,
     ) -> Self {
         Self { old, new }
     }
 }
 impl SemanticVisitorMut for RelationRenamer<'_> {
-    fn table_binding(&mut self, name: &mut crate::sem::TableName) {
+    fn table_binding(&mut self, name: &mut crate::names::TableName) {
         name.rename_reference(self.old, self.new);
     }
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
@@ -379,7 +387,7 @@ impl SemanticVisitorMut for ColumnRenamer<'_> {
 
     fn result_name(
         &mut self,
-        name: &mut Option<crate::sem::ColumnName>,
+        name: &mut Option<crate::names::ColumnName>,
         explicit: bool,
         value: &SemScalarExpr,
     ) {

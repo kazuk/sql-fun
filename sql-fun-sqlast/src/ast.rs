@@ -62,12 +62,12 @@ pub(crate) use self::ddl::{
 use crate::{
     StringSpan,
     context::ParseContext,
+    names::{TableName, ViewName},
     sem::{
         AnalysisError, AnalysisProblem, ConflictClause, CreateEnum, CreateExtension,
         CreateSequence, CreateTableMode, CreateView, Deferrability, Deferrable, ForeignKeyAction,
         ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, Kind, ObjectKind,
-        ParameterConstraints, ScalarAnalysisContext, SemAst, TableName, Validity, ViewName,
-        problem::ViewProblem,
+        ParameterConstraints, ScalarAnalysisContext, SemAst, Validity, problem::ViewProblem,
     },
 };
 

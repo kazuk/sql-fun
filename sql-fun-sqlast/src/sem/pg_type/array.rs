@@ -9,8 +9,8 @@ pub struct ArrayTypeDefinition {
 impl ArrayTypeDefinition {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         self.element.rename_relation(old, new);
     }

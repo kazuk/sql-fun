@@ -170,7 +170,7 @@ fn composite_access_propagates_named_field_types(
     #[case] sql: &str,
     #[case] result: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::sem::{FullName, TypeReference};
+    use crate::{names::FullName, sem::TypeReference};
     let mut cache_context = crate::test_helpers::create_cache_context();
     // SchemaFileContext supplies composite identity casts from the declared type.
     let definition = parse_statements(
@@ -223,8 +223,9 @@ fn deferred_composite_accepts_owned_anonymous_definitions(
     #[case] sql: &str,
     #[case] unbounded_result: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::sem::{
-        ColumnCollection, ColumnDefinition, ColumnName, TypeDefinition, TypeReference,
+    use crate::{
+        names::ColumnName,
+        sem::{ColumnCollection, ColumnDefinition, TypeDefinition, TypeReference},
     };
     let mut cache_context = crate::test_helpers::create_cache_context();
     // The result-context case needs only an int4 identity cast.
@@ -262,7 +263,7 @@ fn deferred_composite_accepts_owned_anonymous_definitions(
 fn nested_composite_and_table_fields_use_owned_definitions(
     #[case] frozen: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::sem::{FullName, TypeReference};
+    use crate::{names::FullName, sem::TypeReference};
     let mut cache_context = crate::test_helpers::create_cache_context();
     // Production schema layers provide nested field definitions and row types.
     let context = test_helpers::schema(
@@ -383,7 +384,7 @@ fn nested_deferred_members_report_structured_errors(
 #[test]
 fn owned_named_composites_preserve_nominal_identity() -> Result<(), Box<dyn std::error::Error>> {
     use crate::context::BaseParseContext;
-    use crate::sem::{FullName, TypeReference};
+    use crate::{names::FullName, sem::TypeReference};
     let mut cache_context = crate::test_helpers::create_cache_context();
     // Schema cast metadata distinguishes named composites with identical fields.
     let context = test_helpers::schema(

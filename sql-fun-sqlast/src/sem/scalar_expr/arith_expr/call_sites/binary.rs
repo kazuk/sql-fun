@@ -1,7 +1,8 @@
 use crate::{
+    names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorName, ParseContext,
-        SemScalarExpr, TypeReference, scalar_expr::arith_expr::ArithExpr,
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ParseContext, SemScalarExpr,
+        TypeReference, scalar_expr::arith_expr::ArithExpr,
     },
     syn::AExprKind,
 };
@@ -92,9 +93,10 @@ impl BinaryOpCallSite {
 mod test_binary_op_call_site {
     use crate::sem::scalar_expr::arith_expr::call_sites::binary::BinaryOpCallSite;
     use crate::{
+        names::{OperatorName, ValidOperatorName},
         sem::{
-            BinaryOperatorDefinition, OperatorName, SemScalarExpr, TypeReference,
-            names::ValidOperatorName, scalar_expr::const_expr::ScalarConstExpr,
+            BinaryOperatorDefinition, SemScalarExpr, TypeReference,
+            scalar_expr::const_expr::ScalarConstExpr,
         },
         test_helpers::{TestParseContext, test_context},
     };

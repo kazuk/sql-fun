@@ -116,7 +116,7 @@ fn renamed_column_retains_type_and_nullability(#[case] value: &str, #[case] not_
     let column = query.result_columns().get_column_at(0).unwrap();
     assert_eq!(
         column.column_name(),
-        &Some(crate::sem::ColumnName::from("renamed"))
+        &Some(crate::names::ColumnName::from("renamed"))
     );
     assert_eq!(column.col_type(), &Some(PgBuiltInType::int4()));
     assert_eq!(column.is_not_null(), &Some(not_null));

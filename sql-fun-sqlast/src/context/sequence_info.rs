@@ -1,9 +1,12 @@
-use crate::sem::{AlterSequence, AnalysisError, CreateSequence, FullName};
+use crate::{
+    names::FullName,
+    sem::{AlterSequence, AnalysisError, CreateSequence},
+};
 
 /// get sequence definition
 pub trait SequenceInfoRead {
     /// Existing sequences dependent on this exact owning table.
-    fn sequences_owned_by(&self, _table: &crate::sem::TableName) -> Vec<CreateSequence> {
+    fn sequences_owned_by(&self, _table: &crate::names::TableName) -> Vec<CreateSequence> {
         Vec::new()
     }
 

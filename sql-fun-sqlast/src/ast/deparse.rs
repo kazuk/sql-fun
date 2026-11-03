@@ -228,7 +228,7 @@ impl Statement {
 
 /// Render a semantic name using the same checked identifier emitter as the AST.
 pub(crate) fn render_full_name(
-    name: &crate::sem::FullName,
+    name: &crate::names::FullName,
     dialect: Dialect,
 ) -> Result<String, DeparseError> {
     let mut writer = SqlWriter::new(dialect);

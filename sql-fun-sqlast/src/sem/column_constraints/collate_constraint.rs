@@ -1,13 +1,14 @@
 #[cfg(feature = "sqlite")]
 use sql_fun_core::IVec;
 
-use crate::sem::{
-    ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName, TableName,
-};
 #[cfg(feature = "sqlite")]
 use crate::{
     SqliteToken,
     sem::{AnalysisError, AnalysisProblem, ParseContext},
+};
+use crate::{
+    names::{ColumnName, TableName},
+    sem::{ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait},
 };
 
 /// collate constraint

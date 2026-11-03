@@ -365,7 +365,7 @@ impl WildcardExpansion {
     }
 }
 
-impl crate::sem::FullName {
+impl crate::names::FullName {
     pub(super) fn projection_name(&self) -> Name {
         let mut parts = Vec::new();
         if let Some(catalog) = self.catalog() {

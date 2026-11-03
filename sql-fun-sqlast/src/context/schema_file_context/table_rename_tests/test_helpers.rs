@@ -2,7 +2,8 @@ use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
-    sem::{AnalysisError, FullName},
+    names::FullName,
+    sem::AnalysisError,
     test_helpers::{ownership::apply_ownership_sql, source_span},
 };
 
@@ -12,7 +13,7 @@ pub(super) fn context() -> SchemaFileContext {
     }))
     .unwrap();
     let mut inventory = crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
-    inventory.set_search_path(&[crate::sem::SchemaName::from("public")]);
+    inventory.set_search_path(&[crate::names::SchemaName::from("public")]);
     inventory.setup_type(crate::sem::PgBuiltInType::int4());
     inventory.setup_type(crate::sem::TypeReference::from_master_type_name("trigger"));
     child(&inventory.freeze())
@@ -75,7 +76,7 @@ pub(super) fn sqlite_context() -> SchemaFileContext {
     let mut inventory = crate::test_helpers::TestParseContext::default()
         .with_metadata(&metadata)
         .with_dialect(crate::ast::Dialect::sqlite());
-    inventory.set_search_path(&[crate::sem::SchemaName::from("main")]);
+    inventory.set_search_path(&[crate::names::SchemaName::from("main")]);
     child(&inventory.freeze())
 }
 #[cfg(feature = "sqlite")]

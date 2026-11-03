@@ -7,7 +7,7 @@ use self::test_helpers::{analyze, catalog};
 use crate::ast::Dialect;
 use crate::context::BaseParseContext;
 use crate::context::ParseContext;
-use crate::sem::{ColumnName, PgBuiltInType};
+use crate::{names::ColumnName, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case::plain("DELETE FROM items")]
@@ -36,7 +36,7 @@ fn retains_delete_bindings(#[case] sql: &str) {
     assert!(
         delete
             .from()
-            .resolve_alias(&crate::sem::AliasName::from(if sql.contains("AS i ") {
+            .resolve_alias(&crate::names::AliasName::from(if sql.contains("AS i ") {
                 "i"
             } else {
                 "items"
@@ -109,8 +109,8 @@ fn preserves_result_bindings_and_metadata() {
     );
     assert!(
         context
-            .get_table(&crate::sem::TableName::from(
-                crate::sem::FullName::from_local_name("items")
+            .get_table(&crate::names::TableName::from(
+                crate::names::FullName::from_local_name("items")
             ))
             .is_some()
     );
@@ -360,7 +360,8 @@ mod test_helpers {
     use crate::test_helpers::{TestParseContext, source_span};
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{AnalysisError, ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+        names::{ColumnName, SchemaName},
+        sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SemAst},
     };
 
     pub(super) fn catalog_with_text_integer_cast() -> TestParseContext {
@@ -436,7 +437,10 @@ mod test_helpers {
 #[case::target("items", false)]
 #[case::other_target("other", true)]
 fn sqlite_index_hint_belongs_to_the_target(#[case] indexed_table: &str, #[case] invalid: bool) {
-    use crate::sem::{CreateIndex, FullName, IndexElementCollection, TableName};
+    use crate::{
+        names::{FullName, TableName},
+        sem::{CreateIndex, IndexElementCollection},
+    };
     let context = catalog(Dialect::sqlite());
     let index = CreateIndex::new(
         &FullName::with_schema("public", "items_idx"),
@@ -482,7 +486,7 @@ fn retains_destination_lookup_outcome(#[case] sql: &str, #[case] found: bool) {
         assert!(matches!(
             delete
                 .from()
-                .resolve_alias(&crate::sem::AliasName::from("absent"))
+                .resolve_alias(&crate::names::AliasName::from("absent"))
                 .unwrap()
                 .0,
             crate::sem::DataSource::Unknown(_, _)

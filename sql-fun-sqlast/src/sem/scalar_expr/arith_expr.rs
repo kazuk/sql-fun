@@ -295,7 +295,7 @@ impl ArithExpr {
 
 impl ArithExpr {
     pub(crate) fn deferred_operator(
-        name: &crate::sem::OperatorName,
+        name: &crate::names::OperatorName,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
     ) -> SemScalarExpr {
@@ -306,7 +306,7 @@ impl ArithExpr {
 
 impl ArithExpr {
     pub(crate) fn deferred_any_operator(
-        name: &crate::sem::OperatorName,
+        name: &crate::names::OperatorName,
         left: SemScalarExpr,
         right: SemScalarExpr,
     ) -> SemScalarExpr {
@@ -317,7 +317,7 @@ impl ArithExpr {
 
 impl ArithExpr {
     pub(crate) fn deferred_all_operator(
-        name: &crate::sem::OperatorName,
+        name: &crate::names::OperatorName,
         left: SemScalarExpr,
         right: SemScalarExpr,
     ) -> SemScalarExpr {

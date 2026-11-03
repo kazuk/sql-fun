@@ -24,9 +24,10 @@ impl DataSource {
 mod test_data_source_analyze_range_var_node {
     use crate::sem::data_source::analyze::impl_analyze_range_var_node::DataSource;
     use crate::{
+        names::{ColumnName, FullName, SchemaName, TableName},
         sem::{
-            ColumnName, CreateTable, CreateView, FromClause, FullName, ScalarConstExpr, SchemaName,
-            SelectStatement, SemScalarExpr, SourcePathWithSpan, TableName, ViewLike, WithClause,
+            CreateTable, CreateView, FromClause, ScalarConstExpr, SelectStatement, SemScalarExpr,
+            SourcePathWithSpan, ViewLike, WithClause,
             select_statement::{ResultColumnCollection, SelectStatementNode},
         },
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},

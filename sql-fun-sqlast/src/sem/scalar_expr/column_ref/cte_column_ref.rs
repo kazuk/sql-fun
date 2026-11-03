@@ -1,5 +1,6 @@
-use crate::sem::{
-    ColumnDefinition, ColumnName, CteName, Nullable, TypeReference, data_source::AliasName,
+use crate::{
+    names::{AliasName, ColumnName, CteName},
+    sem::{ColumnDefinition, Nullable, TypeReference},
 };
 
 /// Column reference for CTE source
@@ -97,7 +98,7 @@ impl CteColumnRef {
 }
 
 impl CteColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
         Some((self.alias.as_str(), &self.column_name))
     }
 }

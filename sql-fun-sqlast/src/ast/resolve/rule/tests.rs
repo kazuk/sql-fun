@@ -1,7 +1,8 @@
 use crate::context::BaseParseContext;
 use crate::{
     context::{ParseContext, RuleInfoRead, RuleInfoWrite},
-    sem::{FullName, RuleEvent, RuleIdentity},
+    names::FullName,
+    sem::{RuleEvent, RuleIdentity},
 };
 
 #[rstest::rstest]
@@ -191,7 +192,7 @@ fn rejects_invalid_definition_without_registration(#[case] sql: &str) {
     assert!(has_rule_problem);
     assert!(
         context
-            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
+            .get_table(&crate::names::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .identities()
@@ -246,7 +247,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(context.rule(&view_identity).is_some());
     assert_eq!(
         context
-            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
+            .get_table(&crate::names::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&context)
@@ -255,7 +256,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     );
     assert_eq!(
         context
-            .get_view(&crate::sem::ViewName::from_full_name(
+            .get_view(&crate::names::ViewName::from_full_name(
                 view_identity.target()
             ))
             .unwrap()
@@ -273,7 +274,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(child.rule(&identity).is_none());
     assert_eq!(
         child
-            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
+            .get_table(&crate::names::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&child)
@@ -283,7 +284,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(parent.rule(&identity).is_some());
     assert_eq!(
         parent
-            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
+            .get_table(&crate::names::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&parent)
@@ -301,7 +302,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(recreated.rule(&identity).unwrap().instead());
     assert_eq!(
         recreated
-            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
+            .get_table(&crate::names::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&recreated)
@@ -342,7 +343,7 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
         test_helpers::layer(&parent),
     )?;
     let view = child
-        .get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+        .get_view(&crate::names::ViewName::from_full_name(identity.target()))
         .unwrap();
     let active = view.rules().unwrap().resolve(&child);
     assert_eq!(active.len(), 1);
@@ -362,7 +363,7 @@ fn select_rule_replacement_updates_the_target_query() -> testresult::TestResult 
     let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "_RETURN");
     assert_eq!(
         context
-            .get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+            .get_view(&crate::names::ViewName::from_full_name(identity.target()))
             .unwrap()
             .rules()
             .unwrap()
@@ -412,7 +413,7 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
         let registered = context.rule(&identity).unwrap();
         assert_eq!(registered.target(), &target);
         let linked = context
-            .get_table(&crate::sem::TableName::from(target.clone()))
+            .get_table(&crate::names::TableName::from(target.clone()))
             .unwrap()
             .rules()
             .resolve(&context);
@@ -523,7 +524,7 @@ fn modifier_capable_results_have_an_explicit_semantic_boundary() -> testresult::
     let mut context = test_helpers::catalog();
     let name = FullName::with_schema("public", "sized");
     let column = crate::sem::ColumnDefinition::new(
-        &Some(crate::sem::ColumnName::from("id")),
+        &Some(crate::names::ColumnName::from("id")),
         Some(&crate::sem::TypeReference::concrete_type_ref(
             &FullName::with_schema("pg_catalog", "varchar"),
             false,
@@ -532,7 +533,7 @@ fn modifier_capable_results_have_an_explicit_semantic_boundary() -> testresult::
         &[],
     );
     let table = crate::sem::CreateTable::new(
-        &crate::sem::TableName::from(name.clone()),
+        &crate::names::TableName::from(name.clone()),
         vec![column],
         crate::sem::CreateTableMode::from_if_not_exists(false),
         false,
@@ -608,9 +609,9 @@ mod test_helpers {
     use crate::{
         ast::Dialect,
         context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
+        names::{ColumnName, FullName, SchemaName, TableName},
         sem::{
-            AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, FullName,
-            PgBuiltInType, SchemaName, SemAst, TableName,
+            AnalysisError, ColumnDefinition, CreateTable, CreateTableMode, PgBuiltInType, SemAst,
         },
         test_helpers::TestParseContext,
     };
@@ -644,7 +645,7 @@ mod test_helpers {
                 true,
             )]);
         context.set_get_operator_op_result(
-            &crate::sem::OperatorName::from_parts(None, "="),
+            &crate::names::OperatorName::from_parts(None, "="),
             true,
             true,
             Some(&equality),

@@ -9,9 +9,12 @@ pub use self::view_support::ViewUpdateSupport;
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext, QueryCte,
-    ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TableName, TypeReference,
+use crate::{
+    names::TableName,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext, QueryCte,
+        ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
+    },
 };
 
 /// Resolved UPDATE assignments in SQL order.

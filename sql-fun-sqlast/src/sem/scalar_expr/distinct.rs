@@ -1,9 +1,12 @@
 use crate::ast::Dialect;
 use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr, OperatorName,
-    ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr,
-    TypeReference, problem::DistinctProblem,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr,
+        ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr,
+        TypeReference, problem::DistinctProblem,
+    },
 };
 
 /// A null-safe comparison, distinct from the equality operation it uses.

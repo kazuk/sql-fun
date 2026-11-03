@@ -3,7 +3,10 @@ use crate::{
     syn::Opt,
 };
 
-use super::{AnalysisError, FullName, ParseContext, SemAst, alter_table::AlterObjSubCommand};
+use {
+    super::{AnalysisError, ParseContext, SemAst, alter_table::AlterObjSubCommand},
+    crate::names::FullName,
+};
 
 /// analyzed [`crate::syn::CreateSeqStmt`]
 #[derive(Debug, Clone)]
@@ -14,7 +17,7 @@ pub struct CreateSequence {
     name: FullName,
     alter_statements: Vec<AlterSequence>,
     owner: Option<crate::sem::OwnerSpecification>,
-    owned_by: Option<crate::sem::TableName>,
+    owned_by: Option<crate::names::TableName>,
 }
 
 impl CreateSequence {
@@ -41,11 +44,11 @@ impl CreateSequence {
     }
 
     /// Dependency on an explicitly specified owning relation (not the role owner).
-    pub const fn owned_by(&self) -> Option<&crate::sem::TableName> {
+    pub const fn owned_by(&self) -> Option<&crate::names::TableName> {
         self.owned_by.as_ref()
     }
     /// Retain a known OWNED BY relation dependency.
-    pub fn set_owned_by(&mut self, table: &crate::sem::TableName) {
+    pub fn set_owned_by(&mut self, table: &crate::names::TableName) {
         self.owned_by = Some(table.clone());
     }
 

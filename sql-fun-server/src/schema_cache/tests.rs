@@ -1,6 +1,6 @@
 use super::{SchemaCacheService, SchemaContextKey, SchemaSelection};
 use ::sql_fun_sqlast::context::BaseParseContext;
-use ::sql_fun_sqlast::sem::{FullName, TableName};
+use ::sql_fun_sqlast::names::{FullName, TableName};
 use std::sync::Arc;
 
 use super::test_helpers::SchemaProject;

@@ -1,9 +1,10 @@
 use crate::{
     ast::Dialect,
     context::ParseContext,
+    names::{ColumnName, FullName, SchemaName},
     sem::{
-        CastContext, CastDefinition, ColumnDefinition, ColumnName, FullName, PgBuiltInType,
-        SamplingMethod, SamplingMethodLookup, SchemaName, SelectStatement, TableSampleSource,
+        CastContext, CastDefinition, ColumnDefinition, PgBuiltInType, SamplingMethod,
+        SamplingMethodLookup, SelectStatement, TableSampleSource,
     },
     test_helpers::{TestParseContext, source_span},
 };

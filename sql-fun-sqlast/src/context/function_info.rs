@@ -1,4 +1,7 @@
-use crate::sem::{AnalysisError, CreateFunction, FullName, FunctionOverloadCollection};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, CreateFunction, FunctionOverloadCollection},
+};
 
 /// get function definition
 pub trait FunctionInfoRead {

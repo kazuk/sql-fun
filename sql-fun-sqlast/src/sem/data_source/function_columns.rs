@@ -1,9 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{ColumnName, FullName},
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnCollection,
-        ColumnDefinition, ColumnName, FullName, OverloadVariant, TableFunctionProblem,
-        TypeReference,
+        ColumnDefinition, OverloadVariant, TableFunctionProblem, TypeReference,
     },
 };
 

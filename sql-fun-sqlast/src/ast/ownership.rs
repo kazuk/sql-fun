@@ -1,9 +1,10 @@
 use super::{AlterOwner, Name, ObjectArgument, ObjectTarget, Role};
 use crate::{
     context::ParseContext,
+    names::{FullName, SchemaName},
     sem::{
-        AnalysisError, AnalysisProblem, AstAndContextPair, FullName, ObjectKind,
-        OwnerSpecification, OwnershipIdentity, OwnershipLookup, SchemaName, SemAst, TypeReference,
+        AnalysisError, AnalysisProblem, AstAndContextPair, ObjectKind, OwnerSpecification,
+        OwnershipIdentity, OwnershipLookup, SemAst, TypeReference,
     },
 };
 
@@ -291,7 +292,7 @@ mod tests;
 impl super::SyntaxOption {
     pub(in crate::ast) fn owned_relation(
         &self,
-    ) -> Result<Option<crate::sem::TableName>, AnalysisError> {
+    ) -> Result<Option<crate::names::TableName>, AnalysisError> {
         if self.name != "owned_by" {
             return Ok(None);
         }
@@ -302,7 +303,7 @@ impl super::SyntaxOption {
     }
 }
 impl super::Expr {
-    fn owned_relation(&self) -> Result<Option<crate::sem::TableName>, AnalysisError> {
+    fn owned_relation(&self) -> Result<Option<crate::names::TableName>, AnalysisError> {
         match self {
             Self::List(parts) => Self::owned_relation_from_parts(parts),
             Self::Column(name) => name.owned_relation(),
@@ -312,7 +313,7 @@ impl super::Expr {
     }
     fn owned_relation_from_parts(
         parts: &[Self],
-    ) -> Result<Option<crate::sem::TableName>, AnalysisError> {
+    ) -> Result<Option<crate::names::TableName>, AnalysisError> {
         let mut names = Vec::new();
         for part in parts {
             names.push(part.owned_identifier()?);
@@ -327,20 +328,20 @@ impl super::Expr {
     }
 }
 impl Name {
-    fn owned_relation(&self) -> Result<Option<crate::sem::TableName>, AnalysisError> {
+    fn owned_relation(&self) -> Result<Option<crate::names::TableName>, AnalysisError> {
         if self.0.len() == 1 && self.0[0].eq_ignore_ascii_case("none") {
             return Ok(None);
         }
         let Some((_, table)) = self.0.split_last() else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY column");
         };
-        Ok(Some(crate::sem::TableName::from(
+        Ok(Some(crate::names::TableName::from(
             Self(table.to_vec()).full_name()?,
         )))
     }
 }
 impl super::Literal {
-    fn owned_relation(&self) -> Result<Option<crate::sem::TableName>, AnalysisError> {
+    fn owned_relation(&self) -> Result<Option<crate::names::TableName>, AnalysisError> {
         if let Self::Keyword(keyword) = self
             && keyword.eq_ignore_ascii_case("none")
         {

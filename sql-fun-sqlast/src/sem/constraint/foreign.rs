@@ -1,8 +1,9 @@
 use crate::{
+    names::{ColumnName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, AnalyzeConstraint, ColumnName, Constraint, Deferrability,
+        AnalysisError, AnalysisProblem, AnalyzeConstraint, Constraint, Deferrability,
         ForeignKeyAction, ForeignKeyMatchType, ForeignKeyTarget, ImplicitChange, ParseContext,
-        TableName, Validity,
+        Validity,
     },
     syn::{ListOpt, Opt},
 };
@@ -157,7 +158,7 @@ impl ForeignKeyConstraint {
 mod test_foreign_key_attributes_and_dependencies {
     use crate::{
         context::{ParseContext, TableInfoRead},
-        sem::ColumnName,
+        names::ColumnName,
         test_helpers::foreign_keys as fk,
     };
 
@@ -364,7 +365,7 @@ mod test_analyze {
         assert_eq!(result.target_table(), Some(&fk::name("a", "parent")));
         assert_eq!(
             result.target_columns,
-            Some(vec![crate::sem::ColumnName::from("id")])
+            Some(vec![crate::names::ColumnName::from("id")])
         );
         fk::reversed_path(&mut context);
         assert_eq!(result.target_table(), Some(&fk::name("a", "parent")));
@@ -381,7 +382,7 @@ mod test_analyze {
         let constraint = table.constraint("fk").unwrap().as_foreign_key().unwrap();
         assert_eq!(
             constraint.target_columns,
-            Some(vec![crate::sem::ColumnName::from("id")])
+            Some(vec![crate::names::ColumnName::from("id")])
         );
         assert_eq!(constraint.target_table(), Some(&fk::name("a", "parent")));
         assert!(context.problems().is_empty());

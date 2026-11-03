@@ -2,7 +2,10 @@ mod test_helpers;
 
 use self::test_helpers::{analyze, assert_problem};
 use crate::ast::Dialect;
-use crate::sem::{ColumnReferenceExpr, FullName, ParseContext, SemScalarExpr, TypeReference};
+use crate::{
+    names::FullName,
+    sem::{ColumnReferenceExpr, ParseContext, SemScalarExpr, TypeReference},
+};
 
 #[rstest::rstest]
 #[case::tableoid("tableoid", "oid")]

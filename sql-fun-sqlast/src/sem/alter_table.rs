@@ -6,14 +6,15 @@ use crate::SqliteToken;
 use crate::{
     ast::TryFromWithTokens,
     context::GetSourcePathWithSpan,
-    sem::{
-        AstAndContextPair, ColumnDefinition, ColumnName, Constraint, SemScalarExpr,
-        SourcePathWithSpan, ViewName,
-    },
+    names::{ColumnName, ViewName},
+    sem::{AstAndContextPair, ColumnDefinition, Constraint, SemScalarExpr, SourcePathWithSpan},
     syn::{AlterTableType, ScanToken},
 };
 
-use super::{AnalysisError, ParseContext, create_table::TableName};
+use {
+    super::{AnalysisError, ParseContext},
+    crate::names::TableName,
+};
 
 /// analyzed alter table statement
 #[derive(Debug, Clone, derive_getters::Getters)]
@@ -189,7 +190,8 @@ impl AlterTable {
 mod test_analyze_alter_table_statement {
     use crate::{
         AstAndContextPair,
-        sem::{AlterTable, FullName, SemAst, SourcePathWithSpan},
+        names::FullName,
+        sem::{AlterTable, SemAst, SourcePathWithSpan},
         syn::{AliasOpt, NodeInner, ObjectType},
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
@@ -197,7 +199,8 @@ mod test_analyze_alter_table_statement {
     #[cfg(feature = "sqlite")]
     use crate::{
         SqliteToken,
-        sem::{ColumnDefinition, ColumnName, SchemaName, TypeReference},
+        names::{ColumnName, SchemaName},
+        sem::{ColumnDefinition, TypeReference},
         sqlite::SqliteDialect,
     };
     use sql_fun_core::IVec;
@@ -557,9 +560,9 @@ impl AlterObjSubCommand {
 #[cfg(test)]
 mod test_analyze_alter_obj_column_default {
     use crate::{
+        names::{FullName, TableName},
         sem::{
-            FullName, ScalarConstExpr, SemScalarExpr, SourcePathWithSpan, TableName,
-            alter_table::AlterObjSubCommand,
+            ScalarConstExpr, SemScalarExpr, SourcePathWithSpan, alter_table::AlterObjSubCommand,
         },
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
@@ -577,7 +580,7 @@ mod test_analyze_alter_obj_column_default {
         test_context.setup_table(
             "table1",
             &[crate::sem::ColumnDefinition::new(
-                &Some(crate::sem::ColumnName::from("value")),
+                &Some(crate::names::ColumnName::from("value")),
                 None,
                 None,
                 &[],

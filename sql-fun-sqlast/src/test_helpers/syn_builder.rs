@@ -1,5 +1,5 @@
 use crate::{
-    sem::FullName,
+    names::FullName,
     syn::{
         AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
         AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType,

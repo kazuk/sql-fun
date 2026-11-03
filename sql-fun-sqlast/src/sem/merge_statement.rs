@@ -5,10 +5,13 @@ pub(crate) use self::destination::MergeDestination;
 pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue, ParseContext,
-    QueryCte, ResultColumnCollection, SemScalarExpr, TableName, UpdateAssignment,
-    UpdateAssignmentCollection,
+use crate::{
+    names::TableName,
+    sem::{
+        AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue, ParseContext,
+        QueryCte, ResultColumnCollection, SemScalarExpr, UpdateAssignment,
+        UpdateAssignmentCollection,
+    },
 };
 
 /// The rows for which a MERGE action is eligible.

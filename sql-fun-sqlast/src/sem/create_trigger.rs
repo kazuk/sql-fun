@@ -1,8 +1,8 @@
 use crate::context::BaseParseContext;
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AnalysisError, ColumnDefinition, ColumnName, FullName, ParseContext, SemAst, SemScalarExpr,
-    TypeReference,
+use crate::{
+    names::{ColumnName, FullName},
+    sem::{AnalysisError, ColumnDefinition, ParseContext, SemAst, SemScalarExpr, TypeReference},
 };
 
 /// Exact trigger lookup identity, including PostgreSQL's owning relation namespace.
@@ -22,14 +22,15 @@ impl TriggerIdentity {
     /// A schema-scoped SQLite trigger (ASCII case insensitive).
     pub fn sqlite(name: &FullName) -> Self {
         let schema = name.schema().map(Self::sqlite_schema);
-        let local = crate::sem::LocalName::from(name.name().as_str().to_ascii_lowercase().as_str());
+        let local =
+            crate::names::LocalName::from(name.name().as_str().to_ascii_lowercase().as_str());
         Self {
             name: FullName::new(&name.catalog().cloned(), &schema, &local),
             relation: None,
         }
     }
-    fn sqlite_schema(schema: &crate::sem::SchemaName) -> crate::sem::SchemaName {
-        crate::sem::SchemaName::from(schema.as_str().to_ascii_lowercase().as_str())
+    fn sqlite_schema(schema: &crate::names::SchemaName) -> crate::names::SchemaName {
+        crate::names::SchemaName::from(schema.as_str().to_ascii_lowercase().as_str())
     }
     /// Qualified object name.
     pub const fn name(&self) -> &FullName {
@@ -53,7 +54,7 @@ impl std::fmt::Display for TriggerIdentity {
 
 #[cfg(test)]
 mod identity_display_tests {
-    use crate::sem::{FullName, TriggerIdentity};
+    use crate::{names::FullName, sem::TriggerIdentity};
 
     #[test]
     fn distinguishes_relation_and_schema_namespaces() {
@@ -408,8 +409,8 @@ impl CreateTrigger {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> Result<(), AnalysisError> {
         if self.identity.relation.as_ref() == Some(old.full_name()) {
             self.identity.relation = Some(new.full_name().clone());
@@ -671,7 +672,10 @@ impl crate::sem::traversal::SemanticVisitorMut for TriggerDependencies {
 #[cfg(test)]
 mod anonymous_dependency_tests {
     use super::TriggerDependencies;
-    use crate::sem::{FullName, ScalarConstExpr, SemScalarExpr};
+    use crate::{
+        names::FullName,
+        sem::{ScalarConstExpr, SemScalarExpr},
+    };
 
     #[test]
     fn row_dependency_collection_keeps_field_dependencies_without_a_fake_row_name() {

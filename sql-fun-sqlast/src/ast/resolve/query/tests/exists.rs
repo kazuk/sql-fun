@@ -2,7 +2,10 @@
 use super::super::test_helpers::resolve;
 use crate::ast::Dialect;
 use crate::context::ParseContext;
-use crate::sem::{ColumnName, PgBuiltInType, SelectStatement, SemScalarExpr};
+use crate::{
+    names::ColumnName,
+    sem::{PgBuiltInType, SelectStatement, SemScalarExpr},
+};
 
 #[rstest::rstest]
 #[case::null("SELECT EXISTS (SELECT NULL) AS found")]

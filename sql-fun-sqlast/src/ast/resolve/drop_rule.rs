@@ -2,9 +2,10 @@ use crate::{
     AstAndContextPair,
     ast::{DropBehavior, DropRule},
     context::ParseContext,
+    names::{FullName, ViewName},
     sem::{
-        AnalysisError, DropDependencyBehavior, FullName, ResolutionFailure, RuleIdentity, SemAst,
-        ViewName, problem::RuleProblem,
+        AnalysisError, DropDependencyBehavior, ResolutionFailure, RuleIdentity, SemAst,
+        problem::RuleProblem,
     },
 };
 

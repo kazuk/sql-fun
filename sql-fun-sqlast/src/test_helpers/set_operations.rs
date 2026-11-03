@@ -1,7 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-    sem::{AnalysisError, AstAndContextPair, SchemaName},
+    names::SchemaName,
+    sem::{AnalysisError, AstAndContextPair},
     test_helpers::common_types,
 };
 

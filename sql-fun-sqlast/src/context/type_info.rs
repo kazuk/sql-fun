@@ -1,6 +1,6 @@
-use crate::sem::{
-    CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
-    TypeReference,
+use crate::{
+    names::{FullName, TableName},
+    sem::{CreateCompositeType, CreateDomain, CreateEnum, TypeDefinition, TypeReference},
 };
 
 /// get type definition

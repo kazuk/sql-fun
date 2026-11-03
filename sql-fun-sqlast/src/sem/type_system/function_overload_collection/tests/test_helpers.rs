@@ -2,8 +2,9 @@ use crate::{
     AstAndContextPair,
     ast::Dialect,
     context::{BaseParseContext, SchemaFileContext},
+    names::SchemaName,
     parse_statements,
-    sem::{CastContext, CastDefinition, ParseContext, SchemaName, TypeReference},
+    sem::{CastContext, CastDefinition, ParseContext, TypeReference},
     test_helpers::TestParseContext,
 };
 
@@ -65,8 +66,8 @@ fn context() -> SchemaFileContext {
     for ty in [
         TypeReference::from_master_type_name("int4").array_type(),
         TypeReference::from_master_type_name("int2").array_type(),
-        TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "control")),
-        TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "control"))
+        TypeReference::from_full_name(crate::names::FullName::with_schema("public", "control")),
+        TypeReference::from_full_name(crate::names::FullName::with_schema("public", "control"))
             .array_type(),
     ] {
         base.set_get_implicit_cast_result(

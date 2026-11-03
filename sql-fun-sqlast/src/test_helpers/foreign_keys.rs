@@ -3,7 +3,8 @@ use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
-    sem::{ColumnName, ForeignKeyColumnConstraint, FullName, SchemaName, TableName},
+    names::{ColumnName, FullName, SchemaName, TableName},
+    sem::ForeignKeyColumnConstraint,
     test_helpers::{TestParseContext, ownership::apply_ownership_sql, source_span},
 };
 

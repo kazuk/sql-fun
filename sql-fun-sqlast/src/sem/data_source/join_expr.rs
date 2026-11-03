@@ -1,9 +1,7 @@
 use crate::{
     context::ParseContext,
-    sem::{
-        AliasSpec, ColumnName, DataSource, FullName, JoinKind, Nullable, SemScalarExpr, WithClause,
-        data_source::AliasName,
-    },
+    names::{AliasName, ColumnName, FullName},
+    sem::{AliasSpec, DataSource, JoinKind, Nullable, SemScalarExpr, WithClause},
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

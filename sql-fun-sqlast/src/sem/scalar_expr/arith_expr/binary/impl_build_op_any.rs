@@ -1,9 +1,11 @@
 use super::BinaryCastCandidate;
 
-use crate::sem::{
-    AnalysisError, MinMaxExpr, OperatorName, ParseContext, PgBuiltInType, SemScalarExpr,
-    scalar_expr::arith_expr::AnyBinaryCallSite,
-    scalar_expr::arith_expr::UndefinedOperatorAnyCallSite,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, MinMaxExpr, ParseContext, PgBuiltInType, SemScalarExpr,
+        scalar_expr::arith_expr::{AnyBinaryCallSite, UndefinedOperatorAnyCallSite},
+    },
 };
 
 impl super::ArithExpr {
@@ -84,11 +86,14 @@ impl super::ArithExpr {
 #[cfg(test)]
 mod test_build_op_any {
     use crate::sem::scalar_expr::{ArrayExpr, ScalarConstExpr};
-    use crate::sem::{
-        ArithExpr, BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
-        OperatorName, PgBuiltInType, SemScalarExpr, TypeDefinition, TypeReference,
-    };
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::OperatorName,
+        sem::{
+            ArithExpr, BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
+            PgBuiltInType, SemScalarExpr, TypeDefinition, TypeReference,
+        },
+    };
 
     #[rstest::rstest]
     #[case::exact(false, false)]
@@ -340,10 +345,8 @@ mod test_build_op_any {
     mod test_helpers {
         use crate::{
             context::{BaseParseContext, SchemaFileContext},
-            sem::{
-                CreateDomain, ParseContext, PgBuiltInType, SchemaName, TypeDefinition,
-                TypeReference,
-            },
+            names::SchemaName,
+            sem::{CreateDomain, ParseContext, PgBuiltInType, TypeDefinition, TypeReference},
             test_helpers::TestParseContext,
         };
 

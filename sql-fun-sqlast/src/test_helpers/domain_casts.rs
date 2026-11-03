@@ -1,7 +1,8 @@
 //! Lightweight domain catalog and operator fixtures; no builtin loading.
 use crate::{
     context::{ParseContext, SchemaFileContext, TypeInfoWrite},
-    sem::{CastContext, CastDefinition, CreateDomain, FullName, PgBuiltInType, TypeReference},
+    names::FullName,
+    sem::{CastContext, CastDefinition, CreateDomain, PgBuiltInType, TypeReference},
     test_helpers::TestParseContext,
 };
 

@@ -3,7 +3,8 @@ mod primary;
 mod unique;
 
 use crate::{
-    sem::{AnalysisError, ParseContext, TableName, alter_table::AlterObjSubCommand},
+    names::TableName,
+    sem::{AnalysisError, ParseContext, alter_table::AlterObjSubCommand},
     syn::{ConstrType, Opt},
 };
 
@@ -52,7 +53,7 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn set_foreign_key_delete_columns(&mut self, columns: &[crate::sem::ColumnName]) {
+    pub(crate) fn set_foreign_key_delete_columns(&mut self, columns: &[crate::names::ColumnName]) {
         if let Self::Foreign(value) = self {
             value.set_delete_columns(columns);
         }
@@ -74,7 +75,7 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn unique_key_columns(&self) -> Vec<crate::sem::ColumnName> {
+    pub(crate) fn unique_key_columns(&self) -> Vec<crate::names::ColumnName> {
         match self {
             Self::PrimaryKey(key) => key.keys().to_vec(),
             Self::Unique(key) => key.key_columns(),
@@ -82,7 +83,7 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn matches_unique_columns(&self, columns: &[crate::sem::ColumnName]) -> bool {
+    pub(crate) fn matches_unique_columns(&self, columns: &[crate::names::ColumnName]) -> bool {
         match self {
             Self::PrimaryKey(key) => {
                 key.keys().len() == columns.len()
@@ -170,7 +171,8 @@ mod test_analyze_alter_obj_add_constraint {
     use testresult::TestResult;
 
     use crate::{
-        sem::{Constraint, CreateTable, FullName, SourcePathWithSpan, TableName},
+        names::{FullName, TableName},
+        sem::{Constraint, CreateTable, SourcePathWithSpan},
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 

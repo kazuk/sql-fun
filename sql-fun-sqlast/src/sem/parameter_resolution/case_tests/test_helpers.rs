@@ -1,7 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, SchemaFileContext},
-    sem::{ParseContext, PgBuiltInType, SchemaName},
+    names::SchemaName,
+    sem::{ParseContext, PgBuiltInType},
     test_helpers::TestParseContext,
 };
 
@@ -45,7 +46,7 @@ fn context_for(dialect: Dialect) -> SchemaFileContext {
         ("amount", PgBuiltInType::int4()),
         ("amount_array", PgBuiltInType::int4().array_type()),
     ] {
-        let ty = crate::sem::TypeReference::from_full_name(crate::sem::FullName::with_schema(
+        let ty = crate::sem::TypeReference::from_full_name(crate::names::FullName::with_schema(
             "public", name,
         ));
         let definition =

@@ -1,4 +1,7 @@
-use crate::sem::{ColumnName, Constraint, FullName, TableName};
+use crate::{
+    names::{ColumnName, FullName, TableName},
+    sem::Constraint,
+};
 
 /// The completed lookup outcome for an explicit ON CONSTRAINT reference.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

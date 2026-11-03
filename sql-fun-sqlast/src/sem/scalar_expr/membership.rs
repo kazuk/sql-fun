@@ -2,11 +2,14 @@ use crate::ast::Dialect;
 use crate::sem::parameter_resolution::ParameterResolution;
 use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
-    MinMaxExpr, OperatorDefinition, OperatorName, ParameterConstraints, ParseContext,
-    PgBuiltInType, ResolvedOperator, SelectStatement, SemScalarExpr, TypeReference,
-    problem::MembershipProblem,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, AnalysisProblem, ArithExpr, BinaryOperatorDefinition, InputTypeConstraint,
+        MinMaxExpr, OperatorDefinition, ParameterConstraints, ParseContext, PgBuiltInType,
+        ResolvedOperator, SelectStatement, SemScalarExpr, TypeReference,
+        problem::MembershipProblem,
+    },
 };
 
 /// An analyzed IN/NOT IN predicate. Operands retain their bindings independently
@@ -245,7 +248,7 @@ impl MembershipComparison {
     fn inputs_not_null(&self) -> bool {
         self.left().is_not_null() == Some(true) && self.right().is_not_null() == Some(true)
     }
-    fn rename_relation(&mut self, old: &crate::sem::TableName, new: &crate::sem::TableName) {
+    fn rename_relation(&mut self, old: &crate::names::TableName, new: &crate::names::TableName) {
         let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
         self.left.walk(&mut visitor).expect("relation rename");
         self.right.walk(&mut visitor).expect("relation rename");
@@ -598,8 +601,8 @@ impl MembershipExpr {
     }
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         for comparison in &mut self.comparisons {
             comparison.rename_relation(old, new);
@@ -690,7 +693,7 @@ mod construction_tests {
             super::MembershipExpr::list(&mut context, &value, std::slice::from_ref(&value), false)?;
         if remove {
             context.set_get_operator_op_result(
-                &crate::sem::OperatorName::from_parts(None, "="),
+                &crate::names::OperatorName::from_parts(None, "="),
                 true,
                 true,
                 None,
@@ -784,7 +787,7 @@ fn contains_variable(value: &SemScalarExpr) -> bool {
 impl SemScalarExpr {
     fn membership_variable_alias(&self) -> Option<&str> {
         match self {
-            Self::WholeRow(value) => value.alias().map(crate::sem::AliasName::as_str),
+            Self::WholeRow(value) => value.alias().map(crate::names::AliasName::as_str),
             _ => self.constraint_binding().map(|(alias, _)| alias),
         }
     }

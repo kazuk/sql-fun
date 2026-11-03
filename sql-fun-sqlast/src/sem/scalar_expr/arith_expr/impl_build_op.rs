@@ -1,6 +1,7 @@
 use crate::sem::scalar_expr::arith_expr::ArithExpr;
-use crate::sem::{
-    AnalysisError, OperatorName, SemScalarExpr, scalar_expr::arith_expr::UndefinedOperatorCallSite,
+use crate::{
+    names::OperatorName,
+    sem::{AnalysisError, SemScalarExpr, scalar_expr::arith_expr::UndefinedOperatorCallSite},
 };
 
 impl ArithExpr {
@@ -49,10 +50,10 @@ impl ArithExpr {
 #[cfg(test)]
 mod test_arith_expr_build_op {
     use crate::{
+        names::{OperatorName, ValidOperatorName},
         sem::{
             BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
-            OperatorName, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
-            names::ValidOperatorName,
+            SemScalarExpr, TypeReference, UnaryOperatorDefinition,
             scalar_expr::{arith_expr::ArithExpr, const_expr::ScalarConstExpr},
         },
         test_helpers::{TestParseContext, test_context},

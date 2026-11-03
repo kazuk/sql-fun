@@ -6,10 +6,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     ast::TryFromWithTokens,
-    sem::{
-        AnalysisError, AstAndContextPair, ColumnName, FullName, ParseContext, SemScalarExpr,
-        TableName,
-    },
+    names::{ColumnName, FullName, TableName},
+    sem::{AnalysisError, AstAndContextPair, ParseContext, SemScalarExpr},
     syn::ScanToken,
 };
 
@@ -136,7 +134,7 @@ impl IndexElementCollection {
 #[cfg(test)]
 mod index_element_collection_tests {
     use super::{IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder};
-    use crate::sem::ColumnName;
+    use crate::names::ColumnName;
     use ::sql_fun_core::IVec;
 
     #[test]
@@ -366,7 +364,7 @@ impl CreateIndex {
 #[cfg(test)]
 mod create_index_tests {
     use super::{CreateIndex, IndexElementCollection};
-    use crate::sem::{ColumnName, FullName, TableName};
+    use crate::names::{ColumnName, FullName, TableName};
 
     #[test]
     fn new_sets_defaults_and_clones_fields() {
@@ -431,7 +429,8 @@ impl CreateIndex {
 mod analyze_index_elem_tests {
     use super::{CreateIndex, IndexElement, SortOrder};
     use crate::{
-        sem::{ColumnName, ScalarConstExpr, SemScalarExpr},
+        names::ColumnName,
+        sem::{ScalarConstExpr, SemScalarExpr},
         syn::{Node, NodeInner, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext},
     };
@@ -515,7 +514,8 @@ mod analyze_index_stmt_tests {
     use super::{CreateIndex, IndexElement, SortOrder};
     use crate::sem::SemAst;
     use crate::{
-        sem::{AstAndContextPair, ColumnName, FullName},
+        names::{ColumnName, FullName},
+        sem::AstAndContextPair,
         syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };

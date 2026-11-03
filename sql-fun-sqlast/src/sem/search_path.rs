@@ -1,5 +1,5 @@
 use crate::context::BaseParseContext;
-use crate::sem::{FullName, SchemaName};
+use crate::names::{FullName, SchemaName};
 
 pub fn expand_search_path_inst<TBaseParseContext, TResult, F>(
     context: &TBaseParseContext,

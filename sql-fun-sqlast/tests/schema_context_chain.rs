@@ -13,7 +13,8 @@ use ::sql_fun_sqlast::{
         GetSourcePathWithSpanOpt, IndexInfoRead, ParseContext, SearchPathRead, TypeInfoRead,
         ViewInfoRead,
     },
-    sem::{ColumnName, FullName, PgBuiltInType, TableName, TypeReference},
+    names::{ColumnName, FullName, TableName},
+    sem::{PgBuiltInType, TypeReference},
 };
 
 #[test]
@@ -788,10 +789,8 @@ mod test_helpers {
             BaseContext, BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext,
             ViewInfoRead,
         },
-        sem::{
-            AnalysisProblem, ColumnName, FullName, SchemaName, TableName, TypeReference, ViewLike,
-            problem::NameResolution,
-        },
+        names::{ColumnName, FullName, SchemaName, TableName},
+        sem::{AnalysisProblem, TypeReference, ViewLike, problem::NameResolution},
     };
     use std::path::Path;
 

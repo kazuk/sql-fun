@@ -1,5 +1,8 @@
-use crate::sem::{AlterView, AnalysisError, CreateTableAs, CreateView, FullName, ViewLike};
 use crate::sem::{ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport, ViewUpdateSupport};
+use crate::{
+    names::FullName,
+    sem::{AlterView, AnalysisError, CreateTableAs, CreateView, ViewLike},
+};
 
 /// get view definition
 pub trait ViewInfoRead {

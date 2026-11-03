@@ -1,5 +1,8 @@
-use crate::sem::{AnalysisError, FullName, ResolutionFailure, ViewWriteEvaluation};
 use crate::test_helpers::TestParseContext;
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ResolutionFailure, ViewWriteEvaluation},
+};
 
 #[rstest::rstest]
 #[case::insert(true)]

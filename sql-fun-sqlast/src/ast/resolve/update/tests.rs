@@ -141,7 +141,8 @@ mod test_helpers {
     use crate::test_helpers::{TestParseContext, source_span};
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+        names::{ColumnName, SchemaName},
+        sem::{ColumnDefinition, PgBuiltInType, SemAst},
     };
 
     #[cfg(feature = "sqlite")]

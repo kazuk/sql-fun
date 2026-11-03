@@ -1,4 +1,7 @@
-use crate::sem::{ColumnName, InputTypeConstraint, ParseContext, TypeDefinition, TypeReference};
+use crate::{
+    names::ColumnName,
+    sem::{InputTypeConstraint, ParseContext, TypeDefinition, TypeReference},
+};
 
 /// A functional type relationship, evaluated in the graph's common fixed point.
 #[derive(Clone, Debug)]
@@ -237,7 +240,10 @@ mod tests {
         assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
     }
     fn record(field_type: &TypeReference) -> TypeReference {
-        use crate::sem::{ColumnCollection, ColumnDefinition, ColumnName, TypeDefinition};
+        use crate::{
+            names::ColumnName,
+            sem::{ColumnCollection, ColumnDefinition, TypeDefinition},
+        };
         TypeReference::dynamic(&TypeDefinition::ImplicitComposite(ColumnCollection::new(
             vec![ColumnDefinition::new(
                 &Some(ColumnName::from("n")),

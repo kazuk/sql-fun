@@ -1,7 +1,8 @@
 //! Clause structure retained after name resolution.
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AliasName, AnalysisError, OperatorName, ResultColumnCollection, SelectStatement, SemScalarExpr,
+use crate::{
+    names::{AliasName, OperatorName},
+    sem::{AnalysisError, ResultColumnCollection, SelectStatement, SemScalarExpr},
 };
 
 /// The completed outcome of resolving a clause name.
@@ -14,7 +15,7 @@ pub enum QueryNameResolution {
     /// An operator name found in the catalog (overload selection is separate).
     Operator(OperatorName),
     /// Reference to a function definition, independently of overload selection.
-    Function(crate::sem::FullName),
+    Function(crate::names::FullName),
     /// Reference to a catalog type.
     Type(crate::sem::TypeReference),
     /// SQLite cast names denote affinity, independently of a type catalog.
@@ -27,15 +28,15 @@ pub enum QueryNameResolution {
 impl QueryNameResolution {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let Self::Type(reference) = self {
             reference.rename_relation(old, new);
         }
     }
 
-    pub(crate) const fn function_identity(&self) -> Option<&crate::sem::FullName> {
+    pub(crate) const fn function_identity(&self) -> Option<&crate::names::FullName> {
         if let Self::Function(name) = self {
             Some(name)
         } else {
@@ -50,7 +51,7 @@ impl QueryNameResolution {
         Self::Affinity(value.to_owned())
     }
 
-    pub(crate) fn function(name: &crate::sem::FullName) -> Self {
+    pub(crate) fn function(name: &crate::names::FullName) -> Self {
         Self::Function(name.clone())
     }
     pub(crate) const fn window(index: usize) -> Self {
@@ -863,7 +864,7 @@ impl SemanticValues {
         if let Some(first) = rows.first() {
             for (index, value) in first.iter().enumerate() {
                 columns.push_column(
-                    &crate::sem::ColumnName::from(format!("column{}", index + 1).as_str()),
+                    &crate::names::ColumnName::from(format!("column{}", index + 1).as_str()),
                     value,
                 );
             }
@@ -899,7 +900,7 @@ impl SemanticValues {
                     let name = column
                         .column_name()
                         .as_ref()
-                        .map_or("", crate::sem::ColumnName::as_str);
+                        .map_or("", crate::names::ColumnName::as_str);
                     visitor.output(name, value);
                     self.columns.refresh_value(index, value);
                 }
@@ -922,7 +923,7 @@ impl SemanticValues {
                     let name = column
                         .column_name()
                         .as_ref()
-                        .map_or("", crate::sem::ColumnName::as_str);
+                        .map_or("", crate::names::ColumnName::as_str);
                     visitor.values_output(index, name, value);
                 }
             }
@@ -1103,18 +1104,18 @@ impl ResolvedOperator {
 /// A table declared by SELECT INTO, not a reference to an existing table.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SelectDestination {
-    name: crate::sem::FullName,
+    name: crate::names::FullName,
     persistence: String,
 }
 impl SelectDestination {
-    pub(crate) fn new(name: &crate::sem::FullName, persistence: &str) -> Self {
+    pub(crate) fn new(name: &crate::names::FullName, persistence: &str) -> Self {
         Self {
             name: name.clone(),
             persistence: persistence.to_owned(),
         }
     }
     /// Declared destination name.
-    pub const fn name(&self) -> &crate::sem::FullName {
+    pub const fn name(&self) -> &crate::names::FullName {
         &self.name
     }
     /// PostgreSQL persistence marker supplied by the parser.

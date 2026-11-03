@@ -1,5 +1,8 @@
 use super::{ArithExpr, BetweenExpr};
-use crate::sem::{AnalysisError, OperatorName, ParseContext, ResolvedOperator, SemScalarExpr};
+use crate::{
+    names::OperatorName,
+    sem::{AnalysisError, ParseContext, ResolvedOperator, SemScalarExpr},
+};
 
 impl ArithExpr {
     pub(crate) fn symmetric_between(

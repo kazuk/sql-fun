@@ -8,10 +8,10 @@ pub use self::result_column::ResultColumnCollection;
 
 use crate::{
     ast::TryFromWithTokens,
+    names::ColumnName,
     sem::{
         AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
-        SemScalarExpr, TypeDefinition, TypeReference, WithClause,
-        create_table::{ColumnDefinition, ColumnName},
+        SemScalarExpr, TypeDefinition, TypeReference, WithClause, create_table::ColumnDefinition,
     },
     syn::ScanToken,
 };
@@ -265,7 +265,8 @@ impl SelectStatementNode {
 mod test_scalar_scope {
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{ColumnName, PgBuiltInType, SourcePathWithSpan},
+        names::ColumnName,
+        sem::{PgBuiltInType, SourcePathWithSpan},
         syn::Opt,
         test_helpers::{SynBuilder, TestParseContext, source_span},
     };

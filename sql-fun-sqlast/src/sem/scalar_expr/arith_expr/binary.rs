@@ -6,9 +6,11 @@ mod impl_build_op_any;
 use self::bin_cast_candidate::BinaryCastCandidate;
 
 use crate::sem::scalar_expr::arith_expr::ArithExpr;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorDefinition, OperatorName,
-    SemScalarExpr,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorDefinition, SemScalarExpr,
+    },
 };
 
 pub(super) struct ResolvedBinaryOperator {

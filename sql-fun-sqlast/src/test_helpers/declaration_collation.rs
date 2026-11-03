@@ -1,7 +1,8 @@
 //! Small catalog for declaration validation and schema-chain tests.
 use crate::{
     context::{MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-    sem::{FullName, TypeDefinition},
+    names::FullName,
+    sem::TypeDefinition,
     test_helpers::{collate, conflict_masters::Masters, schema_layer},
 };
 
@@ -20,7 +21,7 @@ pub(crate) fn context(fact: Option<bool>) -> SchemaFileContext {
             Some(true),
         ),
     );
-    base.set_search_path(&[crate::sem::SchemaName::from("public")]);
+    base.set_search_path(&[crate::names::SchemaName::from("public")]);
     let mut context = schema_layer(
         std::path::Path::new("declaration-collation.sql"),
         &base.freeze(),

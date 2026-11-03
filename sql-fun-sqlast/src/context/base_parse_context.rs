@@ -8,9 +8,10 @@ use crate::{
         OperatorInfoRead, RuleInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead,
         TriggerInfoRead, TypeInfoRead, ViewInfoRead,
     },
+    names::{FullName, TableName, ViewName},
     sem::{
-        CreateIndex, CreateSequence, CreateTable, FullName, FunctionOverloadCollection, TableName,
-        TypeDefinition, TypeReference, ViewLike, ViewName,
+        CreateIndex, CreateSequence, CreateTable, FunctionOverloadCollection, TypeDefinition,
+        TypeReference, ViewLike,
         search_path::{
             expand_relation_search_path, expand_search_path_inst, expand_type_search_path,
         },
@@ -140,8 +141,11 @@ pub trait BaseParseContext:
 #[cfg(test)]
 mod canonicalization_tests {
     use crate::context::{BaseParseContext, ParseContext};
-    use crate::sem::{FullName, SchemaName, TypeDefinition, TypeReference};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::{FullName, SchemaName},
+        sem::{TypeDefinition, TypeReference},
+    };
 
     #[rstest::rstest]
     #[case::first_schema(&["a", "b", "pg_catalog"], None, Some("a"))]

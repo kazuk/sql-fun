@@ -1,9 +1,7 @@
 use crate::{
     context::ParseContext,
-    sem::{
-        FullName, TableName, ViewDeleteSupport, ViewLike, ViewName,
-        search_path::expand_relation_search_path,
-    },
+    names::{FullName, TableName, ViewName},
+    sem::{ViewDeleteSupport, ViewLike, search_path::expand_relation_search_path},
 };
 
 /// DELETE-owned projection of the bound catalog destination.

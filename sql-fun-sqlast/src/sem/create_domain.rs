@@ -7,7 +7,7 @@ use crate::{
     syn::ScanToken,
 };
 
-use super::{AnalysisError, FullName};
+use {super::AnalysisError, crate::names::FullName};
 
 /// analyzed [`crate::syn::CreateDomainStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -56,8 +56,8 @@ impl CreateDomain {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let Some(base) = &mut self.base_type {
             base.rename_relation(old, new);
@@ -128,7 +128,7 @@ impl CreateDomain {
 #[cfg(test)]
 mod tests {
     use super::CreateDomain;
-    use crate::sem::{FullName, TypeReference};
+    use crate::{names::FullName, sem::TypeReference};
 
     #[rstest::rstest]
     #[case::unresolved(None)]
@@ -170,7 +170,7 @@ impl CreateDomain {
     pub(crate) fn row_table_name(
         &self,
         context: &impl ParseContext,
-    ) -> Option<crate::sem::TableName> {
+    ) -> Option<crate::names::TableName> {
         self.base_type()?
             .definition_from_catalog(context)?
             .row_table_name(context)

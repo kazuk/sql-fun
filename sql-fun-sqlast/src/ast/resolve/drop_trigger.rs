@@ -2,9 +2,10 @@ use crate::{
     AstAndContextPair,
     ast::{Dialect, DropBehavior, DropTrigger},
     context::ParseContext,
+    names::FullName,
     sem::{
-        AnalysisError, DropDependencyBehavior, FullName, ResolutionFailure, SemAst,
-        TriggerIdentity, problem::TriggerProblem,
+        AnalysisError, DropDependencyBehavior, ResolutionFailure, SemAst, TriggerIdentity,
+        problem::TriggerProblem,
     },
 };
 
@@ -38,8 +39,8 @@ impl DropTrigger {
             Some(identity)
         } else {
             let mut schemas = vec![
-                crate::sem::SchemaName::from("temp"),
-                crate::sem::SchemaName::from("main"),
+                crate::names::SchemaName::from("temp"),
+                crate::names::SchemaName::from("main"),
             ];
             for schema in context.get_search_path() {
                 if !schemas

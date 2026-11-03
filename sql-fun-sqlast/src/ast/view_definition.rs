@@ -2,10 +2,11 @@
 use crate::{
     ast::{Expr, FromItem, Query, QueryBody, View},
     context::ParseContext,
+    names::{ColumnName, FullName, TableName, ViewName},
     sem::{
-        AnalysisError, ColumnDefinition, ColumnName, FromClause, FullName, ScalarAnalysisContext,
-        ScalarConstExpr, SelectStatement, SemScalarExpr, TableName, TypeReference, ViewCheckOption,
-        ViewColumnLineage, ViewName, ViewOption, WithClause,
+        AnalysisError, ColumnDefinition, FromClause, ScalarAnalysisContext, ScalarConstExpr,
+        SelectStatement, SemScalarExpr, TypeReference, ViewCheckOption, ViewColumnLineage,
+        ViewOption, WithClause,
     },
 };
 

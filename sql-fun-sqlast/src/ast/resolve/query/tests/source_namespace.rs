@@ -3,7 +3,10 @@ use super::super::test_helpers::resolve;
 use super::super::test_helpers::source_namespace_statement;
 #[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
-use crate::sem::{ColumnReferenceExpr, FullName, PgBuiltInType, SemScalarExpr};
+use crate::{
+    names::FullName,
+    sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
+};
 
 #[rstest::rstest]
 #[case::comma("SELECT a.t.id, b.t.id FROM a.t, b.t")]
@@ -635,9 +638,11 @@ fn an_unresolved_join_input_blocks_qualified_binding() {
 }
 
 mod test_helpers {
-    use crate::sem::{
-        AnalysisError, FullName, ResultColumnCollection, SemScalarExpr,
-        traversal::SemanticVisitorMut,
+    use crate::{
+        names::FullName,
+        sem::{
+            AnalysisError, ResultColumnCollection, SemScalarExpr, traversal::SemanticVisitorMut,
+        },
     };
 
     pub(super) fn result_columns(ast: &crate::sem::SemAst) -> ResultColumnCollection {

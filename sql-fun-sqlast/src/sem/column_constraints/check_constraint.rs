@@ -3,9 +3,10 @@ use sql_fun_core::IVec;
 #[cfg(feature = "sqlite")]
 use crate::SqliteToken;
 use crate::{
+    names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
-        ParseContext, ScalarAnalysisContext, SemScalarExpr, TableName,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ParseContext,
+        ScalarAnalysisContext, SemScalarExpr,
     },
     syn::{ConstrType, Opt, ScanToken},
 };

@@ -1,9 +1,7 @@
-use super::FullName;
-use crate::sem::AnalysisError;
+use crate::names::FullName;
 
 impl FullName {
-    pub(super) fn parse_components(input: &str) -> Result<Self, AnalysisError> {
-        let invalid = || AnalysisError::type_name_format(&input);
+    pub(crate) fn parse_components(input: &str) -> Option<Self> {
         let mut chars = input.chars().peekable();
         let mut parts = Vec::new();
         loop {
@@ -18,7 +16,7 @@ impl FullName {
                         }
                         Some('"') => break,
                         Some(character) => part.push(character),
-                        None => return Err(invalid()),
+                        None => return None,
                     }
                 }
             } else {
@@ -27,27 +25,27 @@ impl FullName {
                         break;
                     }
                     if !(character.is_alphanumeric() || matches!(character, '_' | '$')) {
-                        return Err(invalid());
+                        return None;
                     }
                     part.push(character);
                     chars.next();
                 }
                 if part.is_empty() {
-                    return Err(invalid());
+                    return None;
                 }
             }
             parts.push(part);
             match chars.next() {
                 None => break,
                 Some('.') if parts.len() < 3 => (),
-                _ => return Err(invalid()),
+                _ => return None,
             }
         }
         match parts.as_slice() {
-            [local] => Ok(Self::from_local_name(local)),
-            [schema, local] => Ok(Self::with_schema(schema, local)),
-            [catalog, schema, local] => Ok(Self::with_catalog(catalog, schema, local)),
-            _ => Err(invalid()),
+            [local] => Some(Self::from_local_name(local)),
+            [schema, local] => Some(Self::with_schema(schema, local)),
+            [catalog, schema, local] => Some(Self::with_catalog(catalog, schema, local)),
+            _ => None,
         }
     }
 }

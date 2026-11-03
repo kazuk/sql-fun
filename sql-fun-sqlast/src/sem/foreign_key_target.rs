@@ -1,7 +1,8 @@
 //! Creation-time foreign-key bindings, independent of subsequent search paths.
 use crate::{
     context::ParseContext,
-    sem::{AnalysisError, AnalysisProblem, ColumnName, TableName, TypeReference},
+    names::{ColumnName, TableName},
+    sem::{AnalysisError, AnalysisProblem, TypeReference},
 };
 
 /// A completed target lookup: `None` means the relation was unresolved.
@@ -91,7 +92,7 @@ impl ForeignKeyTarget {
     fn references_identity(
         &self,
         context: &impl ParseContext,
-        identity: &crate::sem::FullName,
+        identity: &crate::names::FullName,
     ) -> bool {
         self.relation().is_some_and(|name| {
             if context.dialect() == crate::ast::Dialect::sqlite() {
@@ -160,7 +161,7 @@ impl ForeignKeyTarget {
 mod test_foreign_key_bindings {
     use crate::{
         context::{ParseContext, TableInfoRead},
-        sem::{ColumnName, FullName},
+        names::{ColumnName, FullName},
         test_helpers::foreign_keys as fk,
     };
 

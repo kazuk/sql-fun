@@ -1,5 +1,5 @@
 use crate::context::BaseParseContext;
-use crate::{context::ParseContext, sem::FullName};
+use crate::{context::ParseContext, names::FullName};
 use std::collections::HashSet;
 
 use super::{
@@ -62,7 +62,8 @@ impl TypeReference {
 #[cfg(test)]
 mod collation_capability_tests {
     use crate::{
-        sem::{CreateDomain, FullName, TypeDefinition, TypeReference},
+        names::FullName,
+        sem::{CreateDomain, TypeDefinition, TypeReference},
         test_helpers::TestParseContext,
     };
 
@@ -167,8 +168,8 @@ mod collation_capability_tests {
 impl TypeReference {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let Self::Dynamic(value) = self {
             value.rename_relation(old, new);
@@ -701,8 +702,11 @@ impl TypeReference {
 
 #[cfg(test)]
 mod dynamic_accessor_tests {
-    use crate::sem::{FullName, PgBuiltInType, TypeDefinition, TypeReference};
     use crate::test_helpers::{TestParseContext, dynamic_types::record};
+    use crate::{
+        names::FullName,
+        sem::{PgBuiltInType, TypeDefinition, TypeReference},
+    };
 
     #[rstest::rstest]
     fn anonymous_identity_retains_definition_and_elements(#[values(false, true)] array: bool) {
@@ -828,8 +832,11 @@ mod array_identity_tests {
         #[values(false, true)] reverse: bool,
         #[values(false, true)] matching: bool,
     ) {
-        use crate::sem::{CastContext, CastDefinition, FullName};
         use crate::test_helpers::TestParseContext;
+        use crate::{
+            names::FullName,
+            sem::{CastContext, CastDefinition},
+        };
 
         let mut context = TestParseContext::default();
         let source = record(&PgBuiltInType::int4());
@@ -893,8 +900,11 @@ mod array_identity_tests {
         #[values(false, true)] arrays: bool,
         #[values(false, true)] reverse: bool,
     ) {
-        use crate::sem::{CastContext, CastDefinition, FullName};
         use crate::test_helpers::TestParseContext;
+        use crate::{
+            names::FullName,
+            sem::{CastContext, CastDefinition},
+        };
 
         let mut context = TestParseContext::default();
         let name = FullName::with_schema("public", "row_type");
@@ -1044,7 +1054,7 @@ impl std::str::FromStr for TypeReference {
 #[cfg(test)]
 mod canonical_type_tests {
     use super::TypeReference;
-    use crate::sem::FullName;
+    use crate::names::FullName;
 
     #[rstest::rstest]
     #[case::plain(FullName::with_schema("fixture", "item"))]

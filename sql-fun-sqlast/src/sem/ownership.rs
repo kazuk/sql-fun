@@ -1,5 +1,8 @@
 //! Semantic identities and ownership of PostgreSQL catalog objects.
-use crate::sem::{FullName, ObjectKind, TypeReference};
+use crate::{
+    names::FullName,
+    sem::{ObjectKind, TypeReference},
+};
 
 /// A role supplied by the analysis environment, independent of SQL spelling.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -198,8 +201,8 @@ impl std::fmt::Display for OwnershipIdentity {
                     crate::identifier::CanonicalIdentifier::from(catalog.as_str())
                 )?;
             }
-            let name = crate::sem::OperatorName::from_parts(
-                self.name.schema().map(crate::sem::SchemaName::as_str),
+            let name = crate::names::OperatorName::from_parts(
+                self.name.schema().map(crate::names::SchemaName::as_str),
                 self.name.name().as_str(),
             );
             write!(f, "{name}")?;
@@ -235,7 +238,10 @@ impl std::fmt::Display for OwnershipIdentity {
 
 #[cfg(test)]
 mod identity_display_tests {
-    use crate::sem::{FullName, ObjectKind, OwnershipIdentity, PgBuiltInType};
+    use crate::{
+        names::FullName,
+        sem::{ObjectKind, OwnershipIdentity, PgBuiltInType},
+    };
 
     #[test]
     fn preserves_omitted_and_explicit_signatures() {

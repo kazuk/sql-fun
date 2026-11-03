@@ -3,7 +3,8 @@ mod sqlite;
 use crate::{
     ast::Dialect,
     context::ParseContext,
-    sem::{AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, TableName},
+    names::{ColumnName, TableName},
+    sem::{AnalysisError, AnalysisProblem, ColumnDefinition},
 };
 
 /// A column rename retains its source binding and applicability independently of diagnostics.
@@ -15,7 +16,7 @@ pub struct ColumnRename {
     destination: ColumnName,
     applicable: bool,
     rewrites_outputs: bool,
-    sqlite_outputs: std::collections::HashMap<crate::sem::FullName, Vec<ColumnName>>,
+    sqlite_outputs: std::collections::HashMap<crate::names::FullName, Vec<ColumnName>>,
 }
 impl ColumnRename {
     pub(crate) fn resolve(

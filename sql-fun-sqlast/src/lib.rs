@@ -12,6 +12,7 @@
 pub mod ast;
 pub mod context;
 pub mod engine_specific;
+pub mod names;
 pub mod sem;
 pub mod syn;
 
@@ -235,7 +236,7 @@ mod test_schema_content_hash {
 
     mod test_helpers {
         pub(super) fn base_with_public_schema() -> crate::context::FrozenBaseContext {
-            use crate::{context::ParseContext, sem::SchemaName};
+            use crate::{context::ParseContext, names::SchemaName};
 
             let mut base = crate::test_helpers::TestParseContext::default();
             base.set_get_search_path_result(&[SchemaName::from("public")]);

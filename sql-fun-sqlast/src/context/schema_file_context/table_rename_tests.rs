@@ -131,7 +131,7 @@ fn freeze_repeated_renames_and_old_name_reuse_preserve_parent() -> testresult::T
         context
             .get_table_impl(&test_helpers::name("before_name"))
             .unwrap()
-            .has_column(&crate::sem::ColumnName::from("other"))
+            .has_column(&crate::names::ColumnName::from("other"))
     );
     test_helpers::assert_select(context, "SELECT id FROM after_name")?;
     Ok(())
@@ -149,8 +149,8 @@ fn destination_stays_in_the_bound_schema_and_preserves_quoted_names() -> testres
             .into_context();
     let mut context = context;
     context.set_search_path(&[
-        crate::sem::SchemaName::from("other"),
-        crate::sem::SchemaName::from("public"),
+        crate::names::SchemaName::from("other"),
+        crate::names::SchemaName::from("public"),
     ]);
     let context =
         apply_ownership_sql(context, r#"ALTER TABLE before_name RENAME TO "After.Name""#)?
@@ -162,9 +162,9 @@ fn destination_stays_in_the_bound_schema_and_preserves_quoted_names() -> testres
     );
     assert!(
         context
-            .get_table_impl(&crate::sem::FullName::with_schema("other", "After.Name"))
+            .get_table_impl(&crate::names::FullName::with_schema("other", "After.Name"))
             .unwrap()
-            .has_column(&crate::sem::ColumnName::from("other"))
+            .has_column(&crate::names::ColumnName::from("other"))
     );
     test_helpers::assert_select(context, r#"SELECT id FROM public."After.Name""#)?;
     Ok(())
@@ -174,7 +174,7 @@ fn destination_stays_in_the_bound_schema_and_preserves_quoted_names() -> testres
 fn indexes_sequences_and_view_sources_follow_the_renamed_table() -> testresult::TestResult {
     use crate::{
         context::{IndexInfoRead, SequenceInfoRead, ViewInfoRead},
-        sem::TableName,
+        names::TableName,
     };
     let context = apply_ownership_sql(
         test_helpers::context(),
@@ -245,8 +245,8 @@ fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> test
         "ALTER TABLE BEFORE_NAME RENAME TO After_Name",
     )?
     .into_context();
-    let old = crate::sem::FullName::with_schema("main", "before_name");
-    let new = crate::sem::FullName::with_schema("main", "after_name");
+    let old = crate::names::FullName::with_schema("main", "before_name");
+    let new = crate::names::FullName::with_schema("main", "after_name");
     assert!(context.get_table_impl(&old).is_none());
     assert!(context.get_table_impl(&new).is_some());
     let result = apply_sqlite(context, "SELECT id FROM AFTER_NAME")?;
@@ -259,14 +259,14 @@ fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> test
     assert!(context.get_table_impl(&new).is_none());
     assert!(
         context
-            .get_table_impl(&crate::sem::FullName::with_schema("main", "final_name"))
+            .get_table_impl(&crate::names::FullName::with_schema("main", "final_name"))
             .is_some()
     );
     let result = apply_sqlite(context, "SELECT id FROM preserved")?;
     assert!(result.context().problems().is_empty());
     let view = result
         .context()
-        .get_view_impl(&crate::sem::FullName::with_schema("main", "preserved"))
+        .get_view_impl(&crate::names::FullName::with_schema("main", "preserved"))
         .unwrap()
         .ordinary_definition()
         .unwrap();
@@ -274,7 +274,7 @@ fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> test
         crate::sem::QueryMetadata::from_statement(&crate::sem::SemAst::select(view.query()))?;
     assert_eq!(
         metadata.relations(),
-        &[crate::sem::FullName::with_schema("main", "final_name")]
+        &[crate::names::FullName::with_schema("main", "final_name")]
     );
     assert!(parent.get_table_impl(&old).is_some());
     let oracle = ::rusqlite::Connection::open_in_memory()?;
@@ -316,7 +316,7 @@ fn old_name_can_be_reused_without_resurrecting_the_table(
 
 #[test]
 fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresult::TestResult {
-    use crate::{context::FunctionInfoRead, sem::ColumnName};
+    use crate::{context::FunctionInfoRead, names::ColumnName};
     let context = apply_ownership_sql(
         test_helpers::context(),
         "CREATE TABLE before_name(id integer CONSTRAINT before_key PRIMARY KEY)",

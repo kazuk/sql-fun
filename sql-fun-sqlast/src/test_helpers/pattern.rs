@@ -1,10 +1,12 @@
 use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
-use crate::sem::{
-    BinaryOperatorDefinition, FullName, FunctionOverloadCollection, FunctionParam,
-    OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType, SchemaName, TypeCategory,
-    TypeDefinition,
-};
 use crate::test_helpers::TestParseContext;
+use crate::{
+    names::{FullName, OperatorName, SchemaName},
+    sem::{
+        BinaryOperatorDefinition, FunctionOverloadCollection, FunctionParam, OperatorDefinition,
+        OverloadVariant, PgBuiltInType, TypeCategory, TypeDefinition,
+    },
+};
 
 pub(crate) use crate::test_helpers::membership::{expression, query};
 

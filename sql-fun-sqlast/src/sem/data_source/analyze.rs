@@ -91,10 +91,8 @@ impl DataSource {
 #[cfg(test)]
 mod test_analyze_join_expr {
     use crate::{
-        sem::{
-            ColumnDefinition, ColumnName, FromClause, FullName, SchemaName, SourcePathWithSpan,
-            TypeReference, WithClause,
-        },
+        names::{ColumnName, FullName, SchemaName},
+        sem::{ColumnDefinition, FromClause, SourcePathWithSpan, TypeReference, WithClause},
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
@@ -178,7 +176,8 @@ impl DataSource {
 #[cfg(test)]
 mod test_data_source_analyze_range_table_func {
     use crate::{
-        sem::{DataSource, SchemaName, WithClause},
+        names::SchemaName,
+        sem::{DataSource, WithClause},
         test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
     };
 
@@ -243,10 +242,8 @@ impl DataSource {
 #[cfg(test)]
 mod test_data_source_analyze_range_func_rows_from {
     use crate::{
-        sem::{
-            AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, SchemaName,
-            WithClause,
-        },
+        names::SchemaName,
+        sem::{AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, WithClause},
         test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
     };
 
@@ -281,7 +278,7 @@ mod test_data_source_analyze_range_func_rows_from {
             &AliasSpec::from_names("rows_alias", &[]),
         );
         invocation.record_function_name(
-            &crate::sem::FullName::from_local_name(&func_name.local_name()),
+            &crate::names::FullName::from_local_name(&func_name.local_name()),
             &func_name,
         );
         let expected_rows_func = DataSourceRowsFromFunc::invocation(&invocation);
@@ -318,7 +315,8 @@ impl DataSource {
 #[cfg(test)]
 mod test_data_source_analyze_range_functions {
     use crate::{
-        sem::{DataSource, SchemaName, WithClause},
+        names::SchemaName,
+        sem::{DataSource, WithClause},
         test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
     };
 

@@ -2,9 +2,8 @@
 use crate::{
     ast::{AlterCommand, AlterRelation},
     context::ParseContext,
-    sem::{
-        AlterTable, AnalysisError, ColumnName, ColumnRename, SemAst, SourcePathWithSpan, TableName,
-    },
+    names::{ColumnName, TableName},
+    sem::{AlterTable, AnalysisError, ColumnRename, SemAst, SourcePathWithSpan},
 };
 impl AlterRelation {
     pub(super) fn has_column_rename(&self) -> bool {

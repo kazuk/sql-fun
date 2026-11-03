@@ -4,7 +4,7 @@ mod views;
 use self::test_helpers::analyze;
 use crate::ast::Dialect;
 use crate::context::ParseContext;
-use crate::sem::{ColumnName, PgBuiltInType};
+use crate::{names::ColumnName, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *")]
@@ -72,7 +72,7 @@ fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
     let mut cache_context = crate::test_helpers::create_cache_context();
     let dialect = Dialect::postgres();
     let mut context = test_helpers::catalog(dialect);
-    let pair_name = crate::sem::FullName::with_schema("public", "pair");
+    let pair_name = crate::names::FullName::with_schema("public", "pair");
     let mut fields = crate::sem::CompositeFieldCollection::default();
     fields.push(crate::sem::CompositeFieldDefinition::new(
         "a",
@@ -471,7 +471,7 @@ fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] a
     assert_eq!(lookup.is_not_found(), !accepted);
     if accepted {
         let index = lookup.arbiters().unwrap()[0].index_name().unwrap();
-        assert_eq!(index, &crate::sem::FullName::with_schema("public", "ix"));
+        assert_eq!(index, &crate::names::FullName::with_schema("public", "ix"));
     }
 }
 
@@ -527,7 +527,7 @@ fn binds_conflict_modifier_through_context(
     assert_eq!(
         lookup.requested(),
         &requested
-            .parse::<crate::sem::FullName>()
+            .parse::<crate::names::FullName>()
             .expect("logical fixture name")
     );
     if outcome == "found" {
@@ -596,7 +596,10 @@ fn sqlite_conflict_collation_uses_connection_catalog(
 
 #[test]
 fn preserves_modifier_positions_and_looks_up_both_names() {
-    use crate::sem::{CatalogNameLookup, FullName, InsertArbiter, InsertInferenceModifiers};
+    use crate::{
+        names::FullName,
+        sem::{CatalogNameLookup, InsertArbiter, InsertInferenceModifiers},
+    };
     let dialect = Dialect::postgres();
     let mut context = test_helpers::catalog(dialect);
     let collation_name = FullName::from_local_name("C");
@@ -641,7 +644,7 @@ fn preserves_modifier_positions_and_looks_up_both_names() {
 
 #[test]
 fn retains_failed_inner_collation_even_when_outer_collation_is_bound() {
-    use crate::sem::{CatalogNameLookup, FullName};
+    use crate::{names::FullName, sem::CatalogNameLookup};
     let dialect = Dialect::postgres();
     let mut context = test_helpers::catalog(dialect);
     let missing = FullName::from_local_name("absent579");
@@ -831,7 +834,8 @@ mod test_helpers {
     use crate::test_helpers::{TestParseContext, source_span};
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+        names::{ColumnName, SchemaName},
+        sem::{ColumnDefinition, PgBuiltInType, SemAst},
     };
 
     pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
@@ -875,7 +879,7 @@ mod test_helpers {
             &source_span(),
         );
         let identity = crate::sem::IdentityColumnConstraint::new(
-            &crate::sem::TableName::from(crate::sem::FullName::with_schema(
+            &crate::names::TableName::from(crate::names::FullName::with_schema(
                 "public",
                 "identity_items",
             )),
@@ -901,7 +905,10 @@ mod test_helpers {
         outcome: &str,
         dialect: Dialect,
     ) -> (SemAst, TestParseContext, crate::sem::CatalogNameLookup) {
-        use crate::sem::{CatalogNameLookup, FullName, InsertArbiter, InsertInferenceModifiers};
+        use crate::{
+            names::FullName,
+            sem::{CatalogNameLookup, InsertArbiter, InsertInferenceModifiers},
+        };
         let mut context = catalog(dialect);
         let requested_name = if let Some((schema, local)) = requested.split_once('.') {
             FullName::with_schema(schema, local)

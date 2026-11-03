@@ -1,8 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ColumnReferenceExpr,
-        IndirectionExpr, InsertTarget, QueryProblem, SemScalarExpr, TypeReference,
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnReferenceExpr, IndirectionExpr,
+        InsertTarget, QueryProblem, SemScalarExpr, TypeReference,
         create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
         parameter_resolution::ParameterResolution,
         traversal::SemanticVisitorMut,
@@ -158,7 +159,7 @@ impl ResultColumn {
 #[cfg(test)]
 mod test_result_column_composite_field_definition {
     use crate::sem::select_statement::result_column::ResultColumn;
-    use crate::sem::{ColumnName, TypeReference};
+    use crate::{names::ColumnName, sem::TypeReference};
 
     use ::testresult::TestResult;
 
@@ -594,7 +595,10 @@ impl ResultColumnCollection {
 #[cfg(test)]
 mod test_projection_metadata_contract {
     use super::{ResultColumn, ResultColumnCollection};
-    use crate::sem::{ColumnName, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+    use crate::{
+        names::ColumnName,
+        sem::{PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+    };
 
     #[test]
     fn retained_projection_preserves_serialized_column_metadata() {

@@ -1,7 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{ParseContext, TableInfoRead, TriggerInfoRead},
-    sem::{FullName, TriggerIdentity},
+    names::FullName,
+    sem::TriggerIdentity,
 };
 
 #[rstest::rstest]
@@ -600,7 +601,7 @@ fn sqlite_cte_precedes_case_insensitive_catalog_lookup(
     );
     assert!(
         query
-            .get_result_column_def(&crate::sem::ColumnName::from("picked"))
+            .get_result_column_def(&crate::names::ColumnName::from("picked"))
             .unwrap()
             .get_type_cloned()
             .is_some()
@@ -635,10 +636,10 @@ mod test_helpers {
     use crate::{
         ast::Dialect,
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
+        names::{ColumnName, FullName, SchemaName, TableName},
         sem::{
-            AnalysisError, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, FullName,
-            FunctionOverloadCollection, OverloadVariant, PgBuiltInType, SchemaName, TableName,
-            TypeReference,
+            AnalysisError, ColumnDefinition, CreateTable, CreateTableMode,
+            FunctionOverloadCollection, OverloadVariant, PgBuiltInType, TypeReference,
         },
         test_helpers::TestParseContext,
     };

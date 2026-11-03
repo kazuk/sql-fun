@@ -10,10 +10,8 @@ pub use self::{category::TypeCategory, type_ref::TypeReference};
 use crate::context::BaseParseContext;
 use crate::{
     context::ParseContext,
-    sem::{
-        ColumnCollection, ColumnName, CreateCompositeType, CreateDomain, CreateEnum, FullName,
-        LocalName, OwnerSpecification, SchemaName, TableName,
-    },
+    names::{ColumnName, FullName, LocalName, SchemaName, TableName},
+    sem::{ColumnCollection, CreateCompositeType, CreateDomain, CreateEnum, OwnerSpecification},
 };
 use std::collections::HashSet;
 
@@ -71,7 +69,7 @@ impl std::fmt::Display for TypeDefinition {
 #[cfg(test)]
 mod builtin_type_definition_tests {
     use super::TypeDefinition;
-    use crate::sem::{FullName, TypeReference};
+    use crate::{names::FullName, sem::TypeReference};
 
     #[rstest::rstest]
     fn nullable_fact_survives_serialization(
@@ -155,11 +153,11 @@ impl TypeDefinition {
 #[cfg(test)]
 mod category_tests {
     use super::TypeDefinition;
-    use crate::{context::BaseParseContext, sem::FullName, test_helpers::TestParseContext};
+    use crate::{context::BaseParseContext, names::FullName, test_helpers::TestParseContext};
 
     #[test]
     fn category_follows_selected_definition_and_search_path() {
-        use crate::sem::{SchemaName, TypeCategory};
+        use crate::{names::SchemaName, sem::TypeCategory};
 
         let mut context = TestParseContext::default();
         context
@@ -219,9 +217,10 @@ impl TypeDefinition {
 #[cfg(test)]
 mod definition_collation_tests {
     use crate::{
+        names::{FullName, TableName},
         sem::{
-            ColumnCollection, CompositeFieldCollection, CreateCompositeType, CreateEnum, FullName,
-            TableName, TypeDefinition, TypeReference,
+            ColumnCollection, CompositeFieldCollection, CreateCompositeType, CreateEnum,
+            TypeDefinition, TypeReference,
         },
         test_helpers::TestParseContext,
     };
@@ -249,8 +248,8 @@ mod definition_collation_tests {
 impl TypeDefinition {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         match self {
             Self::Array(value) => value.rename_relation(old, new),
@@ -451,8 +450,11 @@ impl TypeDefinition {
 
 #[cfg(test)]
 mod anonymous_compatibility_tests {
-    use crate::sem::{ColumnCollection, FullName, PgBuiltInType, TypeDefinition};
     use crate::test_helpers::dynamic_types::record;
+    use crate::{
+        names::FullName,
+        sem::{ColumnCollection, PgBuiltInType, TypeDefinition},
+    };
 
     #[rstest::rstest]
     #[case::same("int4", true)]
@@ -560,7 +562,8 @@ impl TypeDefinition {
 #[cfg(test)]
 mod domain_member_tests {
     use crate::{
-        sem::{CreateDomain, CreateEnum, FullName, TypeDefinition, TypeReference},
+        names::FullName,
+        sem::{CreateDomain, CreateEnum, TypeDefinition, TypeReference},
         test_helpers::{composite_domains, domain_casts},
     };
 
@@ -747,7 +750,7 @@ impl PgBuiltInType {
 
 #[cfg(test)]
 mod tests {
-    use crate::sem::FullName;
+    use crate::names::FullName;
     use crate::syn::NodeListOpt;
 
     fn build_string_node_list_opt(strings: &[&str]) -> NodeListOpt {

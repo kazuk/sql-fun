@@ -1,6 +1,7 @@
 use crate::{
     context::ParseContext,
-    sem::{AliasSpec, ColumnName, DataSource, Nullable, ViewName, data_source::AliasName},
+    names::{AliasName, ColumnName, ViewName},
+    sem::{AliasSpec, DataSource, Nullable},
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -14,7 +15,7 @@ impl ViewDataSource {
         &'a self,
         source: &'a DataSource,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
         alias: Option<&'a AliasSpec>,
     ) -> Option<super::QualifiedSource<'a>> {
         let alias = alias.unwrap_or(&self.alias);
@@ -144,14 +145,14 @@ impl ViewDataSource {
         crate::sem::WildcardTypedRecord::from_view(alias, &self.view, context, index)
     }
 
-    pub(super) const fn wildcard_relation(&self) -> &crate::sem::FullName {
+    pub(super) const fn wildcard_relation(&self) -> &crate::names::FullName {
         self.view.full_name()
     }
 
     pub(super) fn unaliased_projection_relation(
         &self,
         alias: &AliasName,
-    ) -> Option<&crate::sem::FullName> {
+    ) -> Option<&crate::names::FullName> {
         if !self.alias.is_explicit() && self.alias.name() == alias {
             Some(self.view.full_name())
         } else {

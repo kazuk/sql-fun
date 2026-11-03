@@ -16,7 +16,8 @@ mod test_helpers {
     use ::sql_fun_sqlast::{
         ParseDumpFileError, ParsedSchemaDump, PostgresDialect,
         context::{BaseContext, BaseParseContext, FrozenBaseContext, GetSourcePathWithSpanOpt},
-        sem::{AnalysisProblem, FullName, TableName, problem::NameResolution},
+        names::{FullName, TableName},
+        sem::{AnalysisProblem, problem::NameResolution},
     };
     use ::tempfile::NamedTempFile;
     use std::path::Path;

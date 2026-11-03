@@ -11,21 +11,21 @@ mod sql_emission;
 use crate::{
     AstAndContextPair, StringSpan,
     context::ParseContext,
+    names::{ColumnName, FullName, LocalName, TableName, ViewName},
     sem::{
         AliasSpec, AlterIndex, AlterObjSubCommand, AlterTable, AlterView, AnalysisError,
         AnalysisProblem, AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
         AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
-        ColumnCollection, ColumnConstraint, ColumnDefinition, ColumnName,
-        ColumnNullabilityConstraint, CompositeFieldCollection, CompositeFieldDefinition,
-        Constraint, CreateCompositeType, CreateDomain, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CreateTableAs, CreateTableMode, DataSource, DefaultColumnConstraint,
-        ExclusionColumnConstraint, ForeignKeyColumnConstraint, ForeignKeyConstraint, FromClause,
-        FullName, FunctionOverloadCollection, FunctionParam, GeneratedColumnConstraint,
-        IdentityColumnConstraint, IndexElement, IndexElementCollection, IndexElementWithOrder,
-        Kind, LocalName, OverloadVariant, PrimaryKeyColumnConstraint, PrimaryKeyConstraint,
-        ResolutionFailure, ScalarAnalysisContext, SemAst, SemScalarExpr, SortOrder,
-        SourcePathWithSpan, TableName, TypeCategory, TypeReference, UniqueColumnConstraint,
-        UniqueConstraint, ViewName, WithClause,
+        ColumnCollection, ColumnConstraint, ColumnDefinition, ColumnNullabilityConstraint,
+        CompositeFieldCollection, CompositeFieldDefinition, Constraint, CreateCompositeType,
+        CreateDomain, CreateFunction, CreateIndex, CreateSchema, CreateTable, CreateTableAs,
+        CreateTableMode, DataSource, DefaultColumnConstraint, ExclusionColumnConstraint,
+        ForeignKeyColumnConstraint, ForeignKeyConstraint, FromClause, FunctionOverloadCollection,
+        FunctionParam, GeneratedColumnConstraint, IdentityColumnConstraint, IndexElement,
+        IndexElementCollection, IndexElementWithOrder, Kind, OverloadVariant,
+        PrimaryKeyColumnConstraint, PrimaryKeyConstraint, ResolutionFailure, ScalarAnalysisContext,
+        SemAst, SemScalarExpr, SortOrder, SourcePathWithSpan, TypeCategory, TypeReference,
+        UniqueColumnConstraint, UniqueConstraint, WithClause,
         problem::{CreationProblem, ViewProblem},
         search_path::expand_relation_search_path,
     },
@@ -1057,7 +1057,7 @@ impl super::Table {
 
 #[cfg(test)]
 mod test_create_table_foreign_keys {
-    use crate::{context::TableInfoRead, sem::ColumnName, test_helpers::foreign_keys as fk};
+    use crate::{context::TableInfoRead, names::ColumnName, test_helpers::foreign_keys as fk};
 
     #[test]
     fn create_result_and_catalog_retain_composite_and_unnamed_foreign_keys()
@@ -1803,7 +1803,7 @@ impl Schema {
             None
         };
         let previous_path = context.get_search_path().to_vec();
-        let mut schema_path = vec![crate::sem::SchemaName::from(self.name.as_str())];
+        let mut schema_path = vec![crate::names::SchemaName::from(self.name.as_str())];
         for schema in &previous_path {
             if !schema_path.contains(schema) {
                 schema_path.push(schema.clone());
@@ -2272,7 +2272,7 @@ mod test_composite_field_resolution {
         let field = composite.fields[0]
             .resolve(
                 &mut context,
-                &crate::sem::TableName::from(crate::sem::FullName::with_schema(
+                &crate::names::TableName::from(crate::names::FullName::with_schema(
                     "public",
                     "array_value",
                 )),

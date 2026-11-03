@@ -26,8 +26,9 @@ pub use self::{
 
 use crate::{
     context::ParseContext,
+    names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, SemScalarExpr, TypeReference,
+        AnalysisError, AnalysisProblem, ColumnDefinition, SemScalarExpr, TypeReference,
         scalar_expr::SemScalarExprNode,
     },
 };
@@ -146,8 +147,8 @@ impl ColumnReferenceExpr {
 
     pub(in crate::sem) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         match self {
             Self::TableColumn(value) => value.rename_relation(old, new),
@@ -173,7 +174,7 @@ impl ColumnReferenceExpr {
 
     pub(super) fn with_reference_name(
         self,
-        alias: &crate::sem::AliasName,
+        alias: &crate::names::AliasName,
         column: &ColumnName,
     ) -> Self {
         match self {
@@ -245,9 +246,9 @@ impl ColumnReferenceExpr {
     }
 
     pub(crate) fn system_column(
-        alias: &crate::sem::AliasName,
+        alias: &crate::names::AliasName,
         column: &ColumnName,
-        table: &crate::sem::TableName,
+        table: &crate::names::TableName,
         column_type: &TypeReference,
         nullable: bool,
     ) -> Self {
@@ -271,7 +272,7 @@ impl ColumnReferenceExpr {
 
     pub(crate) fn undefined_alias_resolved<C: ParseContext>(
         context: &mut C,
-        alias: &crate::sem::data_source::AliasName,
+        alias: &crate::names::AliasName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
         UndefinedAliasColumnRef::new_with_report(context, alias, column)
@@ -296,7 +297,7 @@ impl ColumnReferenceExpr {
         }
     }
 
-    pub(crate) fn bound_view_column(&self, view: &crate::sem::FullName) -> Option<&ColumnName> {
+    pub(crate) fn bound_view_column(&self, view: &crate::names::FullName) -> Option<&ColumnName> {
         match self {
             Self::TableColumn(column) if column.belongs_to(view) => Some(column.get_column_name()),
             Self::ViewColumn(column) if column.belongs_to(view) => Some(column.get_column_name()),
@@ -317,9 +318,9 @@ impl ColumnReferenceExpr {
     }
 
     pub(crate) fn table_column(
-        alias: &crate::sem::AliasName,
+        alias: &crate::names::AliasName,
         column: &ColumnName,
-        table: &crate::sem::TableName,
+        table: &crate::names::TableName,
         definition: Option<&ColumnDefinition>,
         nullable: bool,
     ) -> Self {
@@ -365,8 +366,8 @@ impl ColumnReferenceExpr {
     }
 
     pub(crate) fn cte_column(
-        alias: &crate::sem::data_source::AliasName,
-        cte_name: &crate::sem::CteName,
+        alias: &crate::names::AliasName,
+        cte_name: &crate::names::CteName,
         column_name: &ColumnName,
         column_def: Option<&ColumnDefinition>,
         source_nullable: bool,

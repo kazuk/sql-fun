@@ -2,7 +2,10 @@
 use super::super::test_helpers::resolve;
 use crate::ast::Dialect;
 use crate::context::ParseContext;
-use crate::sem::{ColumnName, PgBuiltInType, SemScalarExpr};
+use crate::{
+    names::ColumnName,
+    sem::{PgBuiltInType, SemScalarExpr},
+};
 
 #[test]
 fn row_fields_preserve_order_types_nullability_and_nested_shape() {

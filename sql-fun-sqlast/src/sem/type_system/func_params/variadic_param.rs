@@ -1,8 +1,9 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    names::FullName,
     sem::{
-        AnalysisError, FullName, FunctionParam, ParseContext, SemScalarExpr, TypeReference,
+        AnalysisError, FunctionParam, ParseContext, SemScalarExpr, TypeReference,
         type_system::{ArgumentBindingCollection, TypeError},
     },
     syn::{Opt, ScanToken},
@@ -48,8 +49,8 @@ pub struct FunctionParamVariadic {
 impl FunctionParamVariadic {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let Some(ty) = &mut self.param_type {
             ty.rename_relation(old, new);

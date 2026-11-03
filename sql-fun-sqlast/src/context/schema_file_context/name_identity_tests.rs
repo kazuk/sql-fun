@@ -1,5 +1,5 @@
 //! Catalog identity across quoted component boundaries and frozen layers.
-use crate::{context::ParseContext, sem::FullName};
+use crate::{context::ParseContext, names::FullName};
 
 #[rstest::rstest]
 #[case::tables("table")]
@@ -83,7 +83,8 @@ mod test_helpers {
     use crate::{
         ast::{Dialect, StatementNode, TryFromWithTokens},
         context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-        sem::{AnalysisError, ColumnName, FullName, PgBuiltInType, SchemaName},
+        names::{ColumnName, FullName, SchemaName},
+        sem::{AnalysisError, PgBuiltInType},
         test_helpers::{SynBuilder, TestParseContext},
     };
 

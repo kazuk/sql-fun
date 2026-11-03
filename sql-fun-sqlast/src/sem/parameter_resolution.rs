@@ -449,7 +449,7 @@ impl<'cache> ParameterResolution<'cache> {
 
     pub(crate) fn sqlite_operator(
         &mut self,
-        _name: &crate::sem::OperatorName,
+        _name: &crate::names::OperatorName,
         _left: Option<&SemScalarExpr>,
         _right: Option<&SemScalarExpr>,
     ) -> SemScalarExpr {
@@ -1516,7 +1516,7 @@ impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn operator(
         &mut self,
         context: &mut impl crate::sem::ParseContext,
-        name: &crate::sem::OperatorName,
+        name: &crate::names::OperatorName,
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {

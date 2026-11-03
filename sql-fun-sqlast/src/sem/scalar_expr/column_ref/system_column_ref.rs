@@ -1,4 +1,7 @@
-use crate::sem::{AliasName, ColumnName, FullName, ParseContext, TableName, TypeReference};
+use crate::{
+    names::{AliasName, ColumnName, FullName, TableName},
+    sem::{ParseContext, TypeReference},
+};
 
 /// A PostgreSQL system attribute bound to a table occurrence, not a declared column.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -91,7 +94,7 @@ impl super::ColumnReference for SystemColumnRef {
 }
 
 impl SystemColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

@@ -1,4 +1,4 @@
-use crate::sem::SchemaName;
+use crate::names::SchemaName;
 
 /// search path
 pub trait SearchPathRead {

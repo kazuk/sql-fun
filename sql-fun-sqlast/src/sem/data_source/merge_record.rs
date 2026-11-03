@@ -1,8 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName},
     sem::{
-        AliasSpec, AnalysisError, ColumnName, DataSource, Nullable, SemScalarExpr, WithClause,
-        data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+        AliasSpec, AnalysisError, DataSource, Nullable, SemScalarExpr, WithClause,
+        scalar_expr::ColumnReferenceExpr,
     },
 };
 
@@ -58,7 +59,7 @@ impl MergeRecordDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
     ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
         Ok(self
             .source

@@ -10,14 +10,14 @@ use crate::{
         SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite, TypeInfoRead,
         TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
+    names::{FullName, OperatorName, SchemaName, TableName, ValidOperatorName},
     sem::{
         AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
         CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
-        CreateView, DropTable, FromClause, FullName, FunctionOverloadCollection,
-        OperatorDefinition, OperatorName, OverloadVariant, SchemaName, SourcePathWithSpan,
-        TableName, TypeDefinition, TypeReference, ValidOperatorName, VariableSet, ViewLike,
+        CreateView, DropTable, FromClause, FunctionOverloadCollection, OperatorDefinition,
+        OverloadVariant, SourcePathWithSpan, TypeDefinition, TypeReference, VariableSet, ViewLike,
         WithClause,
     },
     test_helpers::{SynBuilder, source_span},
@@ -791,7 +791,7 @@ mod test_search_path {
     use super::TestParseContext;
     use crate::{
         context::{ParseContext, SearchPathRead},
-        sem::SchemaName,
+        names::SchemaName,
     };
 
     #[test]
@@ -968,7 +968,7 @@ impl crate::context::OwnershipInfoRead for TestParseContext {
 }
 
 impl crate::context::ObjectInfoRead for TestParseContext {
-    fn object_kind(&self, name: &crate::sem::FullName) -> Option<crate::sem::Kind> {
+    fn object_kind(&self, name: &crate::names::FullName) -> Option<crate::sem::Kind> {
         if self.get_table_impl(name).is_some() {
             Some(crate::sem::Kind::table())
         } else if self.get_view_impl(name).is_some() {

@@ -1,7 +1,8 @@
 use crate::context::BaseParseContext;
 use crate::{
     context::TableInfoWrite,
-    sem::{AnalysisError, CreateRule, FullName, RuleIdentity, TableName, ViewLike, ViewName},
+    names::{FullName, TableName, ViewName},
+    sem::{AnalysisError, CreateRule, RuleIdentity, ViewLike},
 };
 
 /// Read named rules through context layers without falling through tombstones.

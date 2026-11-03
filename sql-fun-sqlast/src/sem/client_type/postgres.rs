@@ -1,6 +1,9 @@
 use super::token::{TypeToken, TypeTokens};
 use super::{invalid, typmod};
-use crate::sem::{AnalysisError, FullName, TypeReference};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, TypeReference},
+};
 use ::combine::{Parser, attempt, choice, many, optional};
 
 pub(super) fn parse(tokens: &TypeTokens) -> Result<TypeReference, AnalysisError> {

@@ -1,6 +1,9 @@
 //! Configuration and storage for catalog ownership.
 
-use crate::sem::{FullName, ObjectKind, OwnedObjectDefinition, Role};
+use crate::{
+    names::FullName,
+    sem::{ObjectKind, OwnedObjectDefinition, Role},
+};
 
 /// Roles derived from the current analysis metadata, independent of frozen configuration.
 #[derive(Clone, Debug, Default)]

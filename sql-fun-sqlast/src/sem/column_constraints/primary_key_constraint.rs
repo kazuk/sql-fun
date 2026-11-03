@@ -1,7 +1,8 @@
 use crate::{
+    names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
-        ConflictClause, Deferrable, ParseContext, TableName,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
+        ConflictClause, Deferrable, ParseContext,
     },
     syn::{ConstrType, Opt},
 };

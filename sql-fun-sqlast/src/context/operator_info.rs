@@ -1,4 +1,4 @@
-use crate::sem::{OperatorDefinition, OperatorName};
+use crate::{names::OperatorName, sem::OperatorDefinition};
 
 /// get operator definition
 pub trait OperatorInfoRead {

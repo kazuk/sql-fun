@@ -18,8 +18,8 @@ pub struct ImplicitCastExpr {
 impl ImplicitCastExpr {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         self.cast_target.rename_relation(old, new);
     }
@@ -77,8 +77,8 @@ impl TypeCastExpr {
 impl TypeCastExpr {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         self.target_type.rename_relation(old, new);
         self.resolution.rename_relation(old, new);

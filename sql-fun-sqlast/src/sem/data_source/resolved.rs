@@ -1,8 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{ColumnName, FullName, TableName, ViewName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnName, CreateTrigger, DataSourceRowsFromFunc,
-        FullName, SelectStatement, SemScalarExpr, TableName, ViewName, WithClause,
+        AnalysisError, AnalysisProblem, CreateTrigger, DataSourceRowsFromFunc, SelectStatement,
+        SemScalarExpr, WithClause,
         data_source::{
             AliasSpec, CteDataSource, DataSource, JoinExprDataSource, JoinKind, SubQueryDataSource,
             TableDataSource, UndefinedTableFuncDataSource, ViewDataSource,

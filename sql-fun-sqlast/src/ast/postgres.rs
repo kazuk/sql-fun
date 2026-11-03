@@ -87,7 +87,7 @@ impl From<&syn::RangeVar> for Name {
 mod test_name_from_range_var {
     use crate::{
         ast::{FromOpt, Name},
-        sem::{FullName, LocalName},
+        names::{FullName, LocalName},
         syn::AliasOpt,
         test_helpers::SynBuilder,
     };
@@ -836,7 +836,7 @@ impl TryFrom<&syn::CompositeTypeStmt> for crate::sem::CreateCompositeType {
             composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
         }
         Ok(Self::new(
-            &crate::sem::FullName::try_from(typevar)?,
+            &crate::names::FullName::try_from(typevar)?,
             &composite_fields,
         ))
     }

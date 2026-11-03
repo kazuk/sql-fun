@@ -1,5 +1,5 @@
 use crate::ast::Dialect;
-use crate::sem::{ColumnName, PgBuiltInType};
+use crate::{names::ColumnName, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case::on(

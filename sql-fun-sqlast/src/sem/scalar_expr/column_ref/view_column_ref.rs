@@ -1,6 +1,7 @@
 use crate::sem::scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr};
-use crate::sem::{
-    ColumnDefinition, ColumnName, Nullable, TypeReference, ViewName, data_source::AliasName,
+use crate::{
+    names::{AliasName, ColumnName, ViewName},
+    sem::{ColumnDefinition, Nullable, TypeReference},
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -45,7 +46,7 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
-    pub(super) const fn access_relation(&self) -> &crate::sem::FullName {
+    pub(super) const fn access_relation(&self) -> &crate::names::FullName {
         self.view_name.full_name()
     }
 
@@ -72,7 +73,7 @@ impl ViewColumnRef {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
-    pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
+    pub(super) fn belongs_to(&self, relation: &crate::names::FullName) -> bool {
         self.view_name.full_name() == relation
     }
 
@@ -113,7 +114,7 @@ impl ColumnReferenceExpr {
 }
 
 impl ViewColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

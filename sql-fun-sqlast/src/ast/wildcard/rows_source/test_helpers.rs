@@ -1,7 +1,10 @@
 use crate::ast::{
     Dialect, FromItem, Query, QueryBody, Select, Statement, StatementNode, TableFunctions,
 };
-use crate::sem::{AliasName, ColumnName, WildcardRowsFunction, WildcardRowsSource};
+use crate::{
+    names::{AliasName, ColumnName},
+    sem::{WildcardRowsFunction, WildcardRowsSource},
+};
 
 pub(super) fn invocation(sql: &str) -> TableFunctions {
     crate::parse_statements(sql, Dialect::postgres())

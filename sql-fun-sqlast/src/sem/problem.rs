@@ -9,18 +9,18 @@ pub use ::sql_fun_core::analysis_problem::{
     TableFunctionProblem, TableSampleProblem, TriggerProblem, TruthTestProblem, UpdateProblem,
     UpdateProblemKind, ViewProblem,
 };
-impl From<&crate::sem::FullName> for diagnostic::FullName {
-    fn from(value: &crate::sem::FullName) -> Self {
+impl From<&crate::names::FullName> for diagnostic::FullName {
+    fn from(value: &crate::names::FullName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::ColumnName> for diagnostic::ColumnName {
-    fn from(value: &crate::sem::ColumnName) -> Self {
+impl From<&crate::names::ColumnName> for diagnostic::ColumnName {
+    fn from(value: &crate::names::ColumnName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::TableName> for diagnostic::TableName {
-    fn from(value: &crate::sem::TableName) -> Self {
+impl From<&crate::names::TableName> for diagnostic::TableName {
+    fn from(value: &crate::names::TableName) -> Self {
         Self::new(&value.to_string())
     }
 }
@@ -84,8 +84,8 @@ impl From<&crate::sem::DefElemKey> for diagnostic::DefElemKey {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::OperatorName> for diagnostic::OperatorName {
-    fn from(value: &crate::sem::OperatorName) -> Self {
+impl From<&crate::names::OperatorName> for diagnostic::OperatorName {
+    fn from(value: &crate::names::OperatorName) -> Self {
         Self::new(&value.to_string())
     }
 }
@@ -130,13 +130,13 @@ impl From<crate::syn::AExprKind> for diagnostic::AExprKind {
         Self::from(&value)
     }
 }
-impl From<&crate::sem::data_source::AliasName> for diagnostic::AliasName {
-    fn from(value: &crate::sem::data_source::AliasName) -> Self {
+impl From<&crate::names::AliasName> for diagnostic::AliasName {
+    fn from(value: &crate::names::AliasName) -> Self {
         Self::new(&value.to_string())
     }
 }
-impl From<&crate::sem::ViewName> for diagnostic::ViewName {
-    fn from(value: &crate::sem::ViewName) -> Self {
+impl From<&crate::names::ViewName> for diagnostic::ViewName {
+    fn from(value: &crate::names::ViewName) -> Self {
         Self::new(&value.to_string())
     }
 }
@@ -180,8 +180,8 @@ impl From<&crate::StringSpan> for diagnostic::StringSpan {
         Self::new(value.offset(), value.len())
     }
 }
-impl From<&crate::sem::FullName> for diagnostic::DebugName {
-    fn from(value: &crate::sem::FullName) -> Self {
+impl From<&crate::names::FullName> for diagnostic::DebugName {
+    fn from(value: &crate::names::FullName) -> Self {
         Self::new(&value.to_string())
     }
 }

@@ -15,8 +15,9 @@ use crate::{
         SetOperation, SetQuery, TableFunctions, Target, TypedColumn, Update, Window, With,
     },
     context::ParseContext,
+    names::ColumnName,
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteStatement, DataSource,
+        AliasSpec, AnalysisError, AnalysisProblem, CteStatement, DataSource,
         DataSourceRowsFromFunc, FromClause, FunctionModifiers, JoinKind as SemanticJoinKind,
         JoinUsingClause, QueryCte, QueryGrouping, QueryWindow, ResultColumnCollection,
         ScalarAnalysisContext, SelectClauses, SelectDestination, SelectStatement,
@@ -118,8 +119,11 @@ impl Query {
 mod test_name_resolution_phase {
     use crate::ast::{Dialect, StatementNode};
     use crate::context::ParseContext;
-    use crate::sem::{BinaryOperatorDefinition, OperatorDefinition, OperatorName, PgBuiltInType};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::OperatorName,
+        sem::{BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType},
+    };
 
     #[rstest::rstest]
     #[case("SELECT CASE WHEN true THEN $1 ELSE 1 END")]

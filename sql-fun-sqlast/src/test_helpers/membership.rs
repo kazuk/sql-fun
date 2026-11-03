@@ -1,7 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-    sem::{PgBuiltInType, SchemaName, SourcePathWithSpan, TypeCategory, TypeDefinition},
+    names::SchemaName,
+    sem::{PgBuiltInType, SourcePathWithSpan, TypeCategory, TypeDefinition},
     test_helpers::TestParseContext,
 };
 
@@ -37,7 +38,7 @@ fn base_context(dialect: Dialect) -> TestParseContext {
     .map(|ty| crate::sem::BinaryOperatorDefinition::new(&ty, &ty, &PgBuiltInType::bool(), true));
     for name in ["=", "<>"] {
         base.set_get_operator_op_result(
-            &crate::sem::OperatorName::from_parts(None, name),
+            &crate::names::OperatorName::from_parts(None, name),
             true,
             true,
             Some(&crate::sem::OperatorDefinition::binary(&definitions)),
@@ -111,7 +112,7 @@ pub(crate) fn composite_schema() -> Result<SchemaFileContext, Box<dyn std::error
     let mut base = base_context(Dialect::postgres());
     for name in ["singleton", "pair"] {
         let ty = crate::sem::TypeReference::concrete_type_ref(
-            &crate::sem::FullName::with_schema("public", name),
+            &crate::names::FullName::with_schema("public", name),
             false,
         );
         base.set_get_implicit_cast_result(

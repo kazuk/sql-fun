@@ -1,10 +1,10 @@
 use crate::{
     ast::TryFromWithTokens,
     context::ParseContext,
+    names::{ColumnName, CteName, FullName},
     sem::{
-        AnalysisError, DeleteStatement, FullName, InsertStatement, MergeStatement,
-        ResultColumnCollection, SelectStatement, UpdateStatement,
-        create_table::{ColumnDefinition, ColumnName},
+        AnalysisError, DeleteStatement, InsertStatement, MergeStatement, ResultColumnCollection,
+        SelectStatement, UpdateStatement, create_table::ColumnDefinition,
         traversal::SemanticVisitorMut,
     },
     syn::ScanToken,
@@ -13,9 +13,6 @@ use crate::{
 use std::collections::HashMap;
 
 use ::sql_fun_core::IVec;
-
-/// CTE name
-pub type CteName = String;
 
 /// CTE query item types
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -121,7 +121,7 @@ producer and adapter path; the current worktree fixes the listed cases:
 | PostgreSQL AST conversion errors in `ast/postgres.rs` and `ast/postgres/query.rs` | `AnalysisError` to `ParseStatementError`, then server `unsupported_statement` | Replaced with descriptive conversion messages |
 | Assignment AST in `sem/insert_statement.rs`, `sem/update_statement.rs`, and `sem/parameter_resolution.rs` | Semantic problems `insert_semantics`, `update_semantics`, or `parameter_constraint` | Uses readable assignment descriptions |
 | Constraint domain in `sem/parameter_constraints.rs` | `ConstraintGraph::conflict` to `parameter_constraint` | Uses readable domain formatting and omits the internal node dump |
-| Client type hint parse errors in `sem/names/client_type/{postgres,sqlite}.rs` and the hint name in `context/type_hint/resolve.rs` | `invalid_parameter_hint` | Reports the hint syntax/value without parser `Debug` output |
+| Client type hint parse errors in `sem/client_type/{postgres,sqlite}.rs` and the hint name in `context/type_hint/resolve.rs` | `invalid_parameter_hint` | Reports the hint syntax/value without parser `Debug` output |
 | Dialect/kind in `ast/deparse.rs`, `ast/deparse/statement.rs`, and `ast/sqlite_retention.rs` | `query_deparse` or `unsupported_statement` | Uses display names; SQLite retention is an invariant-failure path |
 | Dialect and DROP object in `sem/error.rs` and `sem/top_level_statement.rs` | `query_analysis` | Uses descriptive names |
 | Rule and trigger problem enums in core metadata | `rule_invalid_definition` and `trigger_invalid_definition` | Uses explanatory messages instead of enum dumps |

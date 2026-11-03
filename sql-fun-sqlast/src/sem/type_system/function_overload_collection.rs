@@ -1,8 +1,9 @@
 use crate::context::BaseParseContext;
 use crate::{
     context::ParseContext,
+    names::FullName,
     sem::{
-        FullName, OverloadVariant, SemScalarExpr,
+        OverloadVariant, SemScalarExpr,
         overload_rank::OverloadRank,
         parameter_resolution::Signature,
         type_system::{
@@ -69,8 +70,8 @@ impl FunctionOverloadCollection {
         &self,
         context: &impl BaseParseContext,
         name: &FullName,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> Vec<((FullName, OverloadVariant), bool)> {
         self.overloads
             .iter()
@@ -85,8 +86,8 @@ impl FunctionOverloadCollection {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         for overload in &mut self.overloads {
             overload.rename_relation(old, new);

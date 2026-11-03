@@ -2,9 +2,8 @@ use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
     context::{ParseContext, ViewInfoRead, ViewInfoWrite},
-    sem::{
-        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, FullName, ViewLike,
-    },
+    names::FullName,
+    sem::{AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, ViewLike},
     syn::ObjectType,
 };
 
@@ -160,7 +159,8 @@ mod test_set_operation_catalog {
     use crate::{
         ast::Dialect,
         context::ViewInfoRead,
-        sem::{FullName, PgBuiltInType},
+        names::FullName,
+        sem::PgBuiltInType,
         test_helpers::{ownership::apply_ownership_sql, set_operations},
     };
 

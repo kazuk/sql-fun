@@ -1,11 +1,11 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasName, AliasSpec, AnalysisError, ColumnDefinition, ColumnName, ColumnReferenceExpr,
-        DataSource, FullName, PgBuiltInType, QualifiedColumnFailure, ResultColumnCollection,
-        ScalarAnalysisContext, SemScalarExpr, WildcardExpansion, WildcardQualifiers,
-        WildcardRowsSource, WildcardRowsSources, WildcardTypedRecord, WithClause,
-        data_source::QualifiedSource,
+        AliasSpec, AnalysisError, ColumnDefinition, ColumnReferenceExpr, DataSource, PgBuiltInType,
+        QualifiedColumnFailure, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
+        WildcardExpansion, WildcardQualifiers, WildcardRowsSource, WildcardRowsSources,
+        WildcardTypedRecord, WithClause, data_source::QualifiedSource,
     },
 };
 

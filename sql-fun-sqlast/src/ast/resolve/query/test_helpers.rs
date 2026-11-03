@@ -4,10 +4,10 @@ use crate::context::ParseContext;
 use crate::test_helpers::{TestParseContext, source_span};
 use crate::{
     context::MutSourcePathWithSpan,
+    names::{ColumnName, OperatorName, SchemaName},
     sem::{
-        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnName,
-        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType,
-        SchemaName, SelectStatement, TypeReference,
+        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, FunctionParam,
+        OperatorDefinition, OverloadVariant, PgBuiltInType, SelectStatement, TypeReference,
     },
 };
 
@@ -208,10 +208,10 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
             .unwrap()
             .into_context();
     }
-    let mixed = crate::sem::FullName::with_schema("a", "mixed");
+    let mixed = crate::names::FullName::with_schema("a", "mixed");
     context.set_get_type_impl_result(
         &mixed,
-        &crate::sem::TypeDefinition::table_ref(&crate::sem::TableName::from(mixed.clone())),
+        &crate::sem::TypeDefinition::table_ref(&crate::names::TableName::from(mixed.clone())),
     );
     context.setup_function(
         "mixed_fun",
@@ -241,7 +241,7 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
             .unwrap()
             .into_select_statemtnt()
             .unwrap();
-        let name = crate::sem::FullName::with_schema(schema, name);
+        let name = crate::names::FullName::with_schema(schema, name);
         let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
         context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
     }
@@ -277,7 +277,7 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         context.setup_type(TypeReference::from_master_type_name(name).array_type());
     }
     context.setup_type(TypeReference::concrete_type_ref(
-        &crate::sem::FullName::with_schema("public", "custom_type"),
+        &crate::names::FullName::with_schema("public", "custom_type"),
         false,
     ));
     let record = TypeReference::from_master_type_name("record");
@@ -301,12 +301,12 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         false,
     );
     context.setup_function("overloaded_record", &[overload, integer_overload]);
-    let collation_name = crate::sem::FullName::from_local_name("C");
+    let collation_name = crate::names::FullName::from_local_name("C");
     context.set_collation_lookup(
         &collation_name,
         &crate::sem::CatalogNameLookup::found(
             &collation_name,
-            &crate::sem::FullName::with_schema("pg_catalog", "C"),
+            &crate::names::FullName::with_schema("pg_catalog", "C"),
         ),
     );
     context.setup_function(
@@ -321,7 +321,7 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
             false,
         )],
     );
-    let name = crate::sem::FullName::with_schema("public", "pair");
+    let name = crate::names::FullName::with_schema("public", "pair");
     let mut fields = crate::sem::CompositeFieldCollection::default();
     fields.push(crate::sem::CompositeFieldDefinition::new(
         "a",
@@ -347,10 +347,10 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         .analyze(context, &mut cache_context)
         .unwrap()
         .into_context();
-    let row_name = crate::sem::FullName::with_schema("public", "row_item");
+    let row_name = crate::names::FullName::with_schema("public", "row_item");
     context.set_get_type_impl_result(
         &row_name,
-        &crate::sem::TypeDefinition::table_ref(&crate::sem::TableName::from(row_name.clone())),
+        &crate::sem::TypeDefinition::table_ref(&crate::names::TableName::from(row_name.clone())),
     );
     context.setup_function(
         "row_fun",

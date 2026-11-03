@@ -1,7 +1,8 @@
 use crate::{
+    names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorName, ParseContext,
-        SemScalarExpr, TypeReference, scalar_expr::arith_expr::ArithExpr,
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ParseContext, SemScalarExpr,
+        TypeReference, scalar_expr::arith_expr::ArithExpr,
     },
     syn::AExprKind,
 };

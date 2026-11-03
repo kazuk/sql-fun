@@ -422,7 +422,7 @@ fn inference_uses_captured_function_and_operator_bindings() {
     .unwrap();
     catalog.setup_function("sum", &[]);
     catalog.set_get_operator_op_result(
-        &crate::sem::OperatorName::from_parts(None, "+"),
+        &crate::names::OperatorName::from_parts(None, "+"),
         true,
         true,
         None,

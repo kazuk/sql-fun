@@ -7,9 +7,10 @@ use std::collections::VecDeque;
 
 use crate::{
     context::ParseContext,
+    names::ColumnName,
     sem::{
-        ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType, SemScalarExpr,
-        TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
+        ColumnCollection, ColumnDefinition, CreateCompositeType, SemScalarExpr, TypeDefinition,
+        TypeReference, create_comp_type::CompositeFieldCollection,
     },
 };
 
@@ -60,8 +61,8 @@ pub struct OverloadVariant {
 impl OverloadVariant {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let Some(ty) = &mut self.ret_type {
             ty.rename_relation(old, new);
@@ -187,7 +188,7 @@ impl OverloadVariant {
     pub(crate) fn table_function_output_columns(
         &self,
         context: &impl ParseContext,
-        scalar_name: &crate::sem::ColumnName,
+        scalar_name: &crate::names::ColumnName,
     ) -> crate::sem::ColumnCollection {
         let declared = self.returning_table();
         if !declared.is_empty() {
@@ -281,8 +282,11 @@ impl OverloadVariant {
 
 #[cfg(test)]
 mod test_output_return_shape {
-    use crate::sem::{ColumnName, FunctionParam, OverloadVariant, TypeReference};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::ColumnName,
+        sem::{FunctionParam, OverloadVariant, TypeReference},
+    };
 
     #[rstest::rstest]
     fn ordered_record_fields_match_table_output(#[values(false, true)] table: bool) {

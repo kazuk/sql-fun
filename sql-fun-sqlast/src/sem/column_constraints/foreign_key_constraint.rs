@@ -2,9 +2,10 @@
 use crate::sem::AnalysisProblem;
 
 use crate::{
+    names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
-        ForeignKeyTarget, ParseContext, TableName, TypeReference, Validity,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
+        ForeignKeyTarget, ParseContext, TypeReference, Validity,
     },
     syn::{ConstrType, ListOpt, Opt},
 };
@@ -238,7 +239,8 @@ impl ForeignKeyColumnConstraint {
 #[cfg(test)]
 mod test_foreign_key_serialization {
     use crate::{
-        sem::{ColumnName, FullName, PgBuiltInType},
+        names::{ColumnName, FullName},
+        sem::PgBuiltInType,
         test_helpers::foreign_keys as fk,
     };
 
@@ -357,7 +359,8 @@ impl ForeignKeyColumnConstraint {
 #[cfg(test)]
 mod test_analyze_constraint {
     use crate::{
-        sem::{ColumnName, ForeignKeyColumnConstraint, PgBuiltInType},
+        names::ColumnName,
+        sem::{ForeignKeyColumnConstraint, PgBuiltInType},
         test_helpers::foreign_keys as fk,
     };
 
@@ -468,7 +471,8 @@ impl ForeignKeyColumnConstraint {
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_constraint_sqlite {
     use crate::{
-        sem::{ColumnName, ForeignKeyColumnConstraint, FullName},
+        names::{ColumnName, FullName},
+        sem::ForeignKeyColumnConstraint,
         test_helpers::{SqliteSynBuilder, foreign_keys as fk},
     };
 

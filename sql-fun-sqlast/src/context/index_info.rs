@@ -1,4 +1,7 @@
-use crate::sem::{CreateIndex, FullName, TableName};
+use crate::{
+    names::{FullName, TableName},
+    sem::CreateIndex,
+};
 
 /// get index definition
 pub trait IndexInfoRead {

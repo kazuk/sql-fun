@@ -1,4 +1,7 @@
-use crate::sem::{AnalysisError, ColumnName, CreateIndex, InsertConflict, SemScalarExpr};
+use crate::{
+    names::ColumnName,
+    sem::{AnalysisError, CreateIndex, InsertConflict, SemScalarExpr},
+};
 
 impl CreateIndex {
     pub(crate) fn matches_inference(

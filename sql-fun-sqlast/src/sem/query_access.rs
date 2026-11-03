@@ -1,7 +1,10 @@
 //! Optional access-purpose extraction from completed semantic bindings.
-use crate::sem::{
-    AccessKind, AliasSpec, AnalysisError, ColumnName, FullName, ParseContext, SemAst,
-    SemScalarExpr, TableName, ViewName, traversal::SemanticVisitor,
+use crate::{
+    names::{ColumnName, FullName, TableName, ViewName},
+    sem::{
+        AccessKind, AliasSpec, AnalysisError, ParseContext, SemAst, SemScalarExpr,
+        traversal::SemanticVisitor,
+    },
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -122,8 +125,9 @@ impl AccessGraph {
 mod test_access_graph {
     #[test]
     fn cyclic_outputs_preserve_all_reachable_columns() {
-        use super::{
-            AccessColumn, AccessGraph, AccessInput, AccessObjectKind, ColumnName, FullName,
+        use {
+            super::{AccessColumn, AccessGraph, AccessInput, AccessObjectKind},
+            crate::names::{ColumnName, FullName},
         };
         let mut graph = AccessGraph::default();
         let x = graph.output();

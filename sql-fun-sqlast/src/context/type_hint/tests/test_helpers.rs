@@ -1,7 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
-    sem::{SchemaName, TypeReference},
+    names::SchemaName,
+    sem::TypeReference,
     test_helpers::TestParseContext,
 };
 

@@ -1,9 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
-    sem::{
-        ParseContext, PgBuiltInType, SchemaName, SourcePathWithSpan, TypeCategory, TypeDefinition,
-    },
+    names::SchemaName,
+    sem::{ParseContext, PgBuiltInType, SourcePathWithSpan, TypeCategory, TypeDefinition},
     test_helpers::TestParseContext,
 };
 
@@ -38,7 +37,7 @@ pub(super) fn context_for(dialect: Dialect) -> SchemaFileContext {
     ]
     .map(|ty| crate::sem::BinaryOperatorDefinition::new(&ty, &ty, &PgBuiltInType::bool(), true));
     base.set_get_operator_op_result(
-        &crate::sem::OperatorName::from_parts(None, "="),
+        &crate::names::OperatorName::from_parts(None, "="),
         true,
         true,
         Some(&crate::sem::OperatorDefinition::binary(&definitions)),

@@ -6,7 +6,7 @@ pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileC
     let mut base = super::super::super::test_helpers::catalog();
     for name in ["singleton", "pair", "container"] {
         let ty = crate::sem::TypeReference::concrete_type_ref(
-            &crate::sem::FullName::with_schema("public", name),
+            &crate::names::FullName::with_schema("public", name),
             false,
         );
         base.set_get_implicit_cast_result(

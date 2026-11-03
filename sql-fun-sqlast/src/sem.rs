@@ -10,6 +10,7 @@ mod source_flag;
 pub use self::column_rename::ColumnRename;
 mod analysis_state;
 mod cast;
+mod client_type;
 mod column_constraints;
 mod comment;
 pub(crate) mod conflict_info;
@@ -42,7 +43,8 @@ mod foreign_key_target;
 mod from_clause;
 mod insert_statement;
 mod merge_statement;
-mod names;
+mod name_analysis;
+mod name_conversion;
 mod object_info;
 mod operators;
 mod overload_rank;
@@ -130,6 +132,7 @@ pub use self::{
     alter_table::{AlterTable, AlterView},
     analysis_state::AnalysisState,
     cast::{CastContext, CastDefinition},
+    client_type::parse_client_type,
     column_constraints::{
         AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
         AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
@@ -157,13 +160,10 @@ pub use self::{
     },
     create_schema::CreateSchema,
     create_seq::CreateSequence,
-    create_table::{
-        ColumnCollection, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, DropTable,
-        TableName, ViewName,
-    },
+    create_table::{ColumnCollection, ColumnDefinition, CreateTable, CreateTableMode, DropTable},
     create_table_as::CreateTableAs,
     create_view::CreateView,
-    cte::{CteName, CteStatement, WithClause},
+    cte::{CteStatement, WithClause},
     data_source::{
         AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc,
         DeferredTableFunction, JoinKind, MergeRecordDataSource, MergeRecordRole, Nullable,
@@ -180,10 +180,6 @@ pub use self::{
         InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
         InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
         InsertTarget, InsertValue, ViewInsertSupport, ViewSourceArbiter, analyze_insert_statement,
-    },
-    names::{
-        CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName,
-        parse_client_type,
     },
     object_info::Kind,
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
@@ -229,7 +225,7 @@ pub(crate) use self::{
     constraint::{ForeignKeyConstraint, UniqueConstraint},
     create_comp_type::CompositeFieldDefinition,
     create_index::IndexElementCollection,
-    data_source::{AliasName, JoinUsingClause},
+    data_source::JoinUsingClause,
     delete_statement::{DeleteDestination, DeletePredicate},
     parameter_constraints::{ConstraintGraph, SignatureAlternative, array_cast_ranks},
     scalar_expr::{SqliteCaseBuilder, WholeRowFields, grouping::ReferenceCapture},

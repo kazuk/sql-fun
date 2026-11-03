@@ -1,9 +1,12 @@
 //! Analyzer-owned writable-view decisions from effective semantic definitions.
 use crate::sem::ResolutionFailure;
 use crate::sem::problem::ViewProblem;
-use crate::sem::{
-    AnalysisError, ColumnDefinition, ColumnName, FullName, ParseContext, SemScalarExpr, TableName,
-    ViewInsertSupport, ViewUpdateSupport,
+use crate::{
+    names::{ColumnName, FullName, TableName},
+    sem::{
+        AnalysisError, ColumnDefinition, ParseContext, SemScalarExpr, ViewInsertSupport,
+        ViewUpdateSupport,
+    },
 };
 
 /// Writable-view analysis with the caller's full diagnostic environment.
@@ -270,14 +273,15 @@ impl<'a> EvaluationView<'a> {
         seen: &mut Vec<FullName>,
     ) -> Result<Decision, ResolutionFailure> {
         let decision = if let Some(table) =
-            context.get_table(&crate::sem::TableName::from(source.clone()))
+            context.get_table(&crate::names::TableName::from(source.clone()))
         {
             let mut columns = Vec::new();
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
             }
             Decision::writable(&columns, true, true)
-        } else if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(source)) {
+        } else if let Some(view) = context.get_view(&crate::names::ViewName::from_full_name(source))
+        {
             if view.is_materialized() {
                 Decision::read_only()
             } else {
@@ -546,7 +550,7 @@ fn infer_view_arbiters(
         infer_view_arbiters(context, &relation, &mapped)?
     };
     if context
-        .get_table(&crate::sem::TableName::from(source.clone()))
+        .get_table(&crate::names::TableName::from(source.clone()))
         .is_some()
     {
         match inference.into_result() {
@@ -608,13 +612,13 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for ViewColumnMa
             table.get_column_def(mapped).cloned()
         } else if let Some(view) = self
             .context
-            .get_view(&crate::sem::ViewName::from_full_name(self.source))
+            .get_view(&crate::names::ViewName::from_full_name(self.source))
         {
             view.get_column_def(mapped)
         } else {
             None
         };
-        let alias = crate::sem::AliasName::from(self.source.name().as_str());
+        let alias = crate::names::AliasName::from(self.source.name().as_str());
         *expression =
             SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::table_column(
                 &alias,
@@ -742,5 +746,5 @@ fn lookup_bound_view<'a>(
             name,
         )));
     }
-    Ok(context.get_view(&crate::sem::ViewName::from_full_name(name)))
+    Ok(context.get_view(&crate::names::ViewName::from_full_name(name)))
 }

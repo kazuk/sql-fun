@@ -7,8 +7,8 @@ pub struct DynamicTypeReference {
 impl DynamicTypeReference {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         self.type_def.rename_relation(old, new);
     }

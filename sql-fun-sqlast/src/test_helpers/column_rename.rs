@@ -3,7 +3,8 @@ use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
-    sem::{AnalysisError, FullName, SchemaName},
+    names::{FullName, SchemaName},
+    sem::AnalysisError,
     test_helpers::{TestParseContext, ownership::apply_ownership_sql, source_span},
 };
 pub(crate) fn schema(statements: &[&str]) -> Result<SchemaFileContext, AnalysisError> {
@@ -93,7 +94,7 @@ impl crate::sem::traversal::SemanticVisitorMut for BoundColumns {
 pub(crate) fn whole_row_columns(
     expression: &crate::sem::SemScalarExpr,
     context: &impl ParseContext,
-) -> Vec<Vec<crate::sem::ColumnName>> {
+) -> Vec<Vec<crate::names::ColumnName>> {
     let mut visitor = WholeRowColumns {
         context,
         columns: Vec::new(),
@@ -103,7 +104,7 @@ pub(crate) fn whole_row_columns(
 }
 struct WholeRowColumns<'a, C> {
     context: &'a C,
-    columns: Vec<Vec<crate::sem::ColumnName>>,
+    columns: Vec<Vec<crate::names::ColumnName>>,
 }
 impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for WholeRowColumns<'_, C> {
     fn expression(

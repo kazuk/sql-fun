@@ -1,6 +1,7 @@
 use crate::{
     context::{ParseContext, RuleInfoRead},
-    sem::{FullName, RuleIdentity},
+    names::FullName,
+    sem::RuleIdentity,
 };
 
 #[rstest::rstest]
@@ -129,8 +130,8 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
     )?
     .into_context();
     context.set_search_path(&[
-        crate::sem::SchemaName::from("earlier"),
-        crate::sem::SchemaName::from("public"),
+        crate::names::SchemaName::from("earlier"),
+        crate::names::SchemaName::from("public"),
     ]);
     let pair = test_helpers::apply(context, "DROP RULE IF EXISTS audit ON item_view")?;
     let drop = pair.ast().rule_drop().unwrap();
@@ -150,7 +151,8 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
 mod test_helpers {
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
-        sem::{FullName, RuleIdentity, TableName, ViewName},
+        names::{FullName, TableName, ViewName},
+        sem::RuleIdentity,
     };
     pub(super) const CREATE_AUDIT: &str =
         "CREATE RULE audit AS ON INSERT TO item_view DO INSTEAD NOTHING";

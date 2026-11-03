@@ -1,9 +1,10 @@
 use crate::{
     ast::TryFromWithTokens,
     context::ParseContext,
+    names::AliasName,
     sem::{
         AliasSpec, AnalysisError, DataSource, FromClause, Nullable, ScalarAnalysisContext,
-        SemScalarExpr, WithClause, data_source::AliasName,
+        SemScalarExpr, WithClause,
     },
     syn::ScanToken,
 };
@@ -96,7 +97,7 @@ struct RowsFromExpression {
     invalid_expression: bool,
     #[serde(default)]
     placement_pending: bool,
-    columns: Vec<crate::sem::ColumnName>,
+    columns: Vec<crate::names::ColumnName>,
     output: super::TableFunctionOutput,
 }
 
@@ -113,7 +114,7 @@ impl DataSourceRowsFromFunc {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<crate::sem::ColumnName>, AnalysisError> {
+    ) -> Result<Vec<crate::names::ColumnName>, AnalysisError> {
         match &self.source {
             RowsFromSource::Invocation(source) => source.column_names(context, with),
             RowsFromSource::Expression(source) => Ok(source.columns.clone()),
@@ -144,7 +145,7 @@ impl DataSourceRowsFromFunc {
         let columns = value
             .composite_columns(context)
             .map(|columns| columns.names())
-            .unwrap_or_else(|| vec![crate::sem::ColumnName::from(name)]);
+            .unwrap_or_else(|| vec![crate::names::ColumnName::from(name)]);
         Ok(Self {
             source: RowsFromSource::Expression(Box::new(RowsFromExpression {
                 value,
@@ -251,7 +252,8 @@ impl DataSourceRowsFromFunc {
 mod test_expression_sources {
     use crate::{
         context::ParseContext,
-        sem::{AliasName, DataSourceRowFunctions, PgBuiltInType},
+        names::AliasName,
+        sem::{DataSourceRowFunctions, PgBuiltInType},
         test_helpers::{rows_from, sampling},
     };
 
@@ -480,7 +482,7 @@ impl DataSourceRowFunctions {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<crate::sem::ColumnName>, AnalysisError> {
+    ) -> Result<Vec<crate::names::ColumnName>, AnalysisError> {
         Ok(self.project(context, with)?.names())
     }
     fn known_column_names(&self) -> Option<super::function_columns::OutputColumnNames> {
@@ -493,7 +495,7 @@ impl DataSourceRowFunctions {
         }
         Some(names)
     }
-    pub(super) fn candidates(&self, name: &crate::sem::ColumnName) -> super::ColumnCandidates {
+    pub(super) fn candidates(&self, name: &crate::names::ColumnName) -> super::ColumnCandidates {
         let Some(names) = self.known_column_names() else {
             return super::ColumnCandidates::unknown();
         };
@@ -504,7 +506,7 @@ impl DataSourceRowFunctions {
         context: &'a mut C,
         with: &WithClause,
         alias: &AliasName,
-        name: &crate::sem::ColumnName,
+        name: &crate::names::ColumnName,
         nullable: bool,
     ) -> Result<(SemScalarExpr, &'a mut C), AnalysisError> {
         let expression = self

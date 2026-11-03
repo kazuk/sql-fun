@@ -2,11 +2,12 @@
 use crate::{
     ast::{CreateRule, Dialect, Expr, RuleEvent, StatementNode, SubqueryKind},
     context::ParseContext,
+    names::{TableName, ViewName},
     sem::{
         AliasSpec, AnalysisError, DataSource, FromClause, PgBuiltInType, ResolutionFailure,
         ResultColumn, ResultColumnCollection, RuleIdentity, ScalarAnalysisContext, SemAst,
-        SemScalarExpr, TableName, TypeReference, ViewLike, ViewName, WithClause,
-        problem::RuleProblem, traversal::SemanticVisitorMut,
+        SemScalarExpr, TypeReference, ViewLike, WithClause, problem::RuleProblem,
+        traversal::SemanticVisitorMut,
     },
 };
 

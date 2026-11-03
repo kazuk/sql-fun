@@ -165,7 +165,8 @@ mod test_helpers {
     use crate::test_helpers::{TestParseContext, source_span};
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{AnalysisError, ColumnDefinition, ColumnName, PgBuiltInType, SchemaName, SemAst},
+        names::{ColumnName, SchemaName},
+        sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SemAst},
     };
     pub(super) fn catalog(version: u32) -> TestParseContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":version.to_string(), "search_path":["public"]})).unwrap();

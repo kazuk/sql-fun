@@ -4,9 +4,10 @@ use crate::{
         OwnershipInfoRead, RoleInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
         ViewInfoRead,
     },
+    names::FullName,
     sem::{
-        AlterOwner, AnalysisError, CreateFunction, CreateSchema, FullName, ObjectKind,
-        OwnedObjectDefinition, Role,
+        AlterOwner, AnalysisError, CreateFunction, CreateSchema, ObjectKind, OwnedObjectDefinition,
+        Role,
     },
 };
 
@@ -94,7 +95,7 @@ impl OwnershipInfoRead for SchemaCatalog {
 impl SchemaFileContext {
     pub(super) fn change_dependent_sequence_owners(
         &mut self,
-        table: &crate::sem::TableName,
+        table: &crate::names::TableName,
         owner: &crate::sem::OwnerSpecification,
     ) {
         for mut sequence in self.sequences_owned_by(table) {
@@ -136,7 +137,7 @@ impl SchemaFileContext {
             definition.change_owner(owner);
             self.catalog.store_table(name, &definition);
             self.change_dependent_sequence_owners(
-                &crate::sem::TableName::from(name.clone()),
+                &crate::names::TableName::from(name.clone()),
                 owner,
             );
         }

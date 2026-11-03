@@ -2,10 +2,11 @@ use super::{CmdType, Merge, MergeMatchKind, MergeWhen, OverridingKind};
 use crate::{
     ast::{Alias, Expr, resolve::insert::InsertTargetBinding},
     context::ParseContext,
+    names::TableName,
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, FromClause, InsertClauseSemantics,
         MergeAction, MergeDestination, MergeStatement, MergeWhenCollection, PgBuiltInType,
-        ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr, TableName,
+        ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
         UpdateAssignmentCollection, WithClause, parameter_resolution::ParameterResolution,
     },
 };

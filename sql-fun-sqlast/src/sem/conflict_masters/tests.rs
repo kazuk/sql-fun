@@ -1,7 +1,8 @@
 use super::{lookup_collation, lookup_operator_class};
 use crate::{
     context::{BaseParseContext, ConflictInfoRead, SchemaFileContext},
-    sem::{FullName, ParseContext, SchemaName},
+    names::{FullName, SchemaName},
+    sem::ParseContext,
     test_helpers::conflict_masters as test_helpers,
 };
 

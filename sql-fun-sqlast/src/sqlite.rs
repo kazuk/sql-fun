@@ -297,7 +297,7 @@ mod test_schema_content_hash {
         use crate::context::ParseContext;
 
         pub(super) fn base_with_public_schema() -> crate::context::FrozenBaseContext {
-            use crate::sem::SchemaName;
+            use crate::names::SchemaName;
             let mut base = crate::test_helpers::TestParseContext::default()
                 .with_dialect(crate::ast::Dialect::sqlite());
             base.set_get_search_path_result(&[SchemaName::from("public")]);

@@ -1,4 +1,7 @@
-use crate::sem::{ColumnDefinition, ColumnName, ResultColumnCollection, SelectStatement};
+use crate::{
+    names::ColumnName,
+    sem::{ColumnDefinition, ResultColumnCollection, SelectStatement},
+};
 
 /// Resolved origin of each View output column, in projection order.
 /// This is semantic lineage, independent of operation-specific write capabilities.

@@ -17,13 +17,13 @@ use crate::{
         Subquery, SubqueryKind, TruthTest, TypeName,
     },
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName, OperatorName},
     sem::{
-        AliasName, AnalysisError, AnalysisProblem, ArithExpr, ArrayExpr, ArraySubscript, CaseExpr,
-        CoalesceExpr, CollateExpr, ColumnName, DistinctExpr, FullName, FuncCallExpr,
-        IndirectionExpr, MinMaxExpr, OperatorName, QueryNameResolution, QueryProblem,
-        ReferenceCapture, ResolvedOperator, ScalarAnalysisContext, ScalarConstExpr,
-        SelectStatement, SemScalarExpr, SqlValueExpr, SqliteCaseBuilder, TypeReference,
-        problem::RuleProblem,
+        AnalysisError, AnalysisProblem, ArithExpr, ArrayExpr, ArraySubscript, CaseExpr,
+        CoalesceExpr, CollateExpr, DistinctExpr, FuncCallExpr, IndirectionExpr, MinMaxExpr,
+        QueryNameResolution, QueryProblem, ReferenceCapture, ResolvedOperator,
+        ScalarAnalysisContext, ScalarConstExpr, SelectStatement, SemScalarExpr, SqlValueExpr,
+        SqliteCaseBuilder, TypeReference, problem::RuleProblem,
     },
 };
 
@@ -759,7 +759,7 @@ mod test_pattern_resolution {
             };
             assert_eq!(
                 helper.name(),
-                &crate::sem::FullName::with_schema("pg_catalog", name)
+                &crate::names::FullName::with_schema("pg_catalog", name)
             );
         }
         Ok(())

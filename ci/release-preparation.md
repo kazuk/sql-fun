@@ -17,17 +17,17 @@ crate versions are separate identities. Tag pushes do not start preparation.
 | Finalize release state | Adopt baseline and reset intent to `patch` | Preserve baseline and intent | Implemented, #329/#330 |
 | Record source `R` | Commit and push release-state changes on the release branch | Same | Implemented, #330 |
 | Release build and tag | Build/validate packages from `R`, retain assets, then tag `R` | Same | Implemented, #331 |
-| Prepare draft | Create draft and attach completed assets | Same, marked prerelease | Planned integration, #259 |
+| Prepare draft | Create draft and attach completed assets | Same, marked prerelease | Implemented, #259 |
 | Human publication | Review and publish the draft | Same | Maintainer gate |
 | Distribution | Publish crates, merge the entire release branch into `main`, deploy existing manual | Publish crates; never merge into `main` or deploy Pages | #260; crates/Pages implemented, stable merge integration still required |
 
 Preparation builds and validates distributable packages from recorded source
 `R`, retains the complete prepared asset set, and creates and pushes the
-immutable project tag at `R`. Draft GitHub Release creation remains downstream
-work under #259. Normal-CI binaries from `S` are never distributed.
+immutable project tag at `R`, then creates or repairs a draft GitHub Release
+with the complete public asset set. Normal-CI binaries from `S` are never distributed.
 
-When draft integration is complete, review the draft and its completed assets
-before publishing it manually. Publication authorizes #260 distribution.
+Review the draft and its completed assets before publishing it manually.
+Publication authorizes #260 distribution.
 Only a published **stable** release permits a history-preserving merge of the
 **entire release branch** into `main`. Prereleases never merge into `main`.
 There is no preparation-time main write or patch back-commit.
@@ -84,7 +84,7 @@ Preparation archives the adopted mdBook output as
 `sql-fun_<project-tag>_user-manual.tar.gz`, preserving its files at the archive
 root without rebuilding mdBook. Download it from the preparation run's
 `release-manual-<attempt>` Actions artifact. Missing input, archive or upload
-failure stops dependent preparation. A later draft step attaches this archive
+failure stops dependent preparation. The draft step attaches this archive
 unchanged; stable Pages consumes that exact asset after publication.
 
 ## Release packages and immutable tag
@@ -125,9 +125,35 @@ Recovery uses only available complete-set artifacts from the release preparation
 workflow for this release branch and original/recorded source. The most recently
 uploaded matching set is selected; absent, expired or incomplete data fails
 clearly without rebuilding, revalidation or extending retention. Ordinary
-Actions retention applies. The restored bytes are available to #259's later
-Draft creation/repair; preparation itself creates no GitHub Release. Retained
-assets and all generated build/assembly output stay outside the checkout.
+Actions retention applies. Draft creation/repair attaches the restored bytes
+without rebuilding them. Retained assets and all generated build/assembly
+output stay outside the checkout.
+
+## Draft review and publication
+
+The run summary links the draft and records the source revisions, retained
+artifact locator and required assets. New drafts use the project tag as their
+title and contain source information for review; snapshot drafts are marked
+prerelease. Preparation never publishes the draft.
+
+Before publishing, review the notes, stable/prerelease classification, tag and
+four required assets listed above. You can edit draft notes without losing
+them on a preparation rerun. Publishing authorizes distribution under #260:
+crates.io publication, then the stable-only complete release-branch merge,
+then stable-only deployment of the existing manual. The merge integration is
+still tracked in reopened #260; a prepared draft does not establish that
+post-publication distribution has completed.
+
+A rerun preserves an existing draft's title, notes and unrelated assets, and
+uploads only missing required filenames. It neither replaces nor deletes
+existing assets. A conflicting size, incomplete upload or wrong prerelease
+classification stops preparation for operator correction. An upload failure
+may leave a partial draft; correct the reported problem and rerun using the
+retained complete asset set. If that data is unavailable or expired, recovery
+fails without rebuilding or changing the tag. Already published Releases are
+left untouched; downstream failures are resumed through distribution, not
+producer draft repair. A rerun may still fail earlier if its retained inputs
+are unavailable.
 
 ## Safe reruns and failed attempts
 
@@ -168,7 +194,8 @@ API diagnostics use an authenticated GitHub CLI with repository Actions read
 access.
 
 The preparation job uses `GITHUB_TOKEN` with `contents: write` for release-branch
-and immutable-tag pushes, `actions: read` for input selection/downloads and
+and immutable-tag pushes and draft/asset writes, `actions: read` for input
+selection/downloads and
 `packages: read` for the CI-builder pull. Its pushes do not trigger recursive
 push workflows. Branch rules must permit normal release-ref and tag pushes;
 main bypass is not required.

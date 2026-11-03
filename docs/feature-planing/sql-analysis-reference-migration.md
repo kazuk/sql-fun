@@ -772,7 +772,7 @@ Corrections to the preliminary audit:
 | [#950](https://github.com/kazuk/sql-fun/issues/950) | `book/installation.md` |
 | [#947](https://github.com/kazuk/sql-fun/issues/947) | `book/diagnostics/sub_query_not_have_column_for_derived_column_name.md` — resolved on the updated base; no current limitation |
 | [#946](https://github.com/kazuk/sql-fun/issues/946) | `book/sql-analysis/expressions/operators-and-predicates.md` |
-| [#891](https://github.com/kazuk/sql-fun/issues/891) | `book/sql-analysis/statements.md` |
+| [#891](https://github.com/kazuk/sql-fun/issues/891) | Syntax support completed by #957; remaining analysis limitations are documented at `book/sql-analysis/statements.md` under #955 and #956. |
 | [#887](https://github.com/kazuk/sql-fun/issues/887) | `book/sql-analysis/statements/alter-table.md`, `book/sql-analysis/statements/create-table.md` |
 | [#879](https://github.com/kazuk/sql-fun/issues/879) | `book/diagnostics/README.md` |
 | [#865](https://github.com/kazuk/sql-fun/issues/865) | `book/sql-analysis/expressions.md` |
@@ -875,3 +875,20 @@ values for ON/DELETE/DEFAULT and other PRAGMA keywords; `ast/resolve.rs` lacks
 keyword literal resolution. The syntax reference now uses PRAGMA examples
 rather than the internal `Literal::Keyword` representation and keeps the
 separate #557 statement-analysis limitation explicit.
+
+## Integration after #957
+
+PR #957 merged before this reference migration. Its addition to the former
+monolithic `book/sql-analysis.md` is relocated to the utility-statement section
+of `book/sql-analysis/statements.md`, expressed in SQL/domain vocabulary. #891
+now describes completed syntax work; remaining interpretation belongs to #955
+and #956. Syntax inspection/editing APIs remain documented on their Rust types.
+
+Evidence: `ast/postgres.rs`, `ast/default_privileges.rs` and
+`ast/foreign_table.rs` perform common-AST conversion;
+`ast/engine_features.rs::utility_version_tests` and the three maintained cases
+in `tests/sqlast-regressions/postgres18-syntax-17.json` establish the version
+diagnostic before name resolution. `ast.rs` retains the explicit unimplemented
+semantic dispatch for these statements. Their syntax support therefore does not
+imply privilege validation, foreign-server lookup, LIKE expansion or catalog
+effects.

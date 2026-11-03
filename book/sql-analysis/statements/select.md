@@ -85,6 +85,25 @@ remain incomplete. SQLite syntax depth and UPDATE/DELETE grammar caveats are
 documented at the [overview](../../sql-analysis.md). PostgreSQL-only
 executable-star rewriting is separate from ordinary wildcard result analysis.
 
+### VALUES result metadata
+
+Multi-row VALUES does not yet reconcile output types and widths across every
+row ([#565](https://github.com/kazuk/sql-fun/issues/565)). Its exposed output
+metadata comes from the first row. For example, the output type of
+`VALUES (1), (1.5)` is not established by analyzing a common type across both
+rows. This also affects VALUES used as a derived source, set-operation operand
+or INSERT source; traversing later rows does not make the result shape complete.
+
+### Projection metadata API limitations
+
+Some resolved expressions can still panic when a SQLAST caller requests
+projection metadata ([#521](https://github.com/kazuk/sql-fun/issues/521)).
+`SemScalarExpr::get_column_name` remains unimplemented for SQL value expressions
+such as CURRENT_DATE; `get_column_def` has unfinished branches for other
+expression kinds. Successful expression resolution alone does not guarantee
+that these accessor calls succeed. This is an accessor limitation, not a claim
+that every CLI projection containing such an expression fails.
+
 ## Diagnostics
 
 - [query_set_column_count](../../diagnostics/query_set_column_count.md):

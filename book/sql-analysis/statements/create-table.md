@@ -48,6 +48,41 @@ recognized and version-gated. Temporal and new constraint
 enforcement/inheritance forms have retained syntax and explicit unsupported
 paths; grammar acceptance is not full constraint validation.
 
+### Remaining declaration limitations
+
+Table-level CHECK constraint binding/validation remains unimplemented
+([#525](https://github.com/kazuk/sql-fun/issues/525)), as does PostgreSQL EXCLUDE
+constraint analysis
+([#526](https://github.com/kazuk/sql-fun/issues/526)). These paths can panic;
+column CHECK handling does not implement table CHECK, and lack of static
+constraint analysis is separate from not checking live database rows.
+
+`CREATE TABLE name OF composite_type` retains its syntax but does not resolve
+and apply the typed table's column structure and dependent type association
+([#657](https://github.com/kazuk/sql-fun/issues/657)). Inheritance, partition
+bounds/keys and relation options such as ON COMMIT, access method and storage
+settings also lack complete semantic application
+([#546](https://github.com/kazuk/sql-fun/issues/546)). Declared columns alone do
+not model inherited/typed-table columns or partition relationships.
+
+Constraint modifier analysis is incomplete
+([#563](https://github.com/kazuk/sql-fun/issues/563)): initial deferral,
+validation/NO INHERIT flags, NULLS NOT DISTINCT, included columns and constraint
+index/storage options are not all retained and validated as analyzed constraint
+properties. Deferrable unique keys remain explicitly unimplemented. Retained
+foreign-key delete-column lists are supported metadata; that does not complete
+the other modifiers. Column declaration collations are analyzed as described
+above, but column compression and storage attributes are not yet applied by
+CREATE TABLE analysis
+([#564](https://github.com/kazuk/sql-fun/issues/564)).
+
+PostgreSQL 18 temporal keys (`WITHOUT OVERLAPS`), foreign-key PERIOD columns,
+NOT ENFORCED checks, table-level NOT NULL, inline NOT NULL NO INHERIT and new
+NOT NULL validation attributes do not have complete constraint semantics
+([#887](https://github.com/kazuk/sql-fun/issues/887)). Retention/version gating
+can precede an unimplemented path; accepting PostgreSQL 18 grammar does not
+establish successful catalog application.
+
 ## Diagnostics
 
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): a table,

@@ -52,6 +52,14 @@ advertised as SQLite analysis behavior. Special SQLite LIKE and COALESCE
 semantics are documented on their [predicate](operators-and-predicates.md) and
 [conditional](conditional.md) pages.
 
+Ordinary SQLite scalar function binding, min/max behavior and general
+function-dependent result/parameter inference remain unimplemented and can
+panic ([#505](https://github.com/kazuk/sql-fun/issues/505)). The dedicated
+COALESCE and LIKE paths are separate implemented subsets with their own
+remaining limitations; they do not supply general SQLite function analysis.
+SQLite table-valued functions have a separate
+[unimplemented source path](../clauses/from.md#sqlite-source-limitations).
+
 ## Diagnostics
 
 - [function_not_found]: the selected catalog cannot resolve the requested

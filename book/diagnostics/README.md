@@ -16,6 +16,36 @@ analysis paths do not imply an installed SQLite `analyze` workflow. Some codes
 require a custom catalog/context with the metadata stated on the page; those
 examples are explicitly illustrative rather than ordinary CLI reproductions.
 
+## Current diagnostic limitations
+
+Some detailed diagnostic renderers remain unimplemented
+([#522](https://github.com/kazuk/sql-fun/issues/522)). The CLI still provides the
+diagnostic code, severity and explanatory message through its general
+presentation path; complete source labels and detailed rendering are not
+available for every family. Some rule/trigger messages also group distinct
+causes, such as a missing target versus an unsuitable target or function,
+without identifying the precise reason. Further semantic-fact work for more
+precise diagnostics is tracked in
+[#717](https://github.com/kazuk/sql-fun/issues/717). The current message can state
+a true general failure without explaining its exact cause.
+
+Several error-reporting paths can still panic before producing a structured
+diagnostic ([#523](https://github.com/kazuk/sql-fun/issues/523)). Remaining cases
+include missing set-returning function result types, some COALESCE unknown-type
+or ambiguity paths, using an ordinary view where a materialized view is
+required, invalid operator-name syntax, unexpected dynamic types, table/CTE
+alias-count failures, foreign-key column-type mismatches and SQLite ignored
+MATCH-option reporting. Type canonicalization failure also has an unfinished
+fatal-error path. This list describes incomplete reporting helpers, not a claim
+that every SQL form in those families always reaches them. The diagnostic
+catalog below lists available codes; it does not guarantee that every failing
+analysis path can deliver one.
+
+Directly downloadable Markdown counterparts of the published HTML manual are
+not yet provided by the Pages publication workflow
+([#879](https://github.com/kazuk/sql-fun/issues/879)). Markdown files in the source
+repository do not establish corresponding `.md` URLs on the documentation site.
+
 ## Codes
 
 - [alter_column_duplicate_option](alter_column_duplicate_option.md)

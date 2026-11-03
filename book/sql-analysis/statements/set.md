@@ -23,6 +23,11 @@ that all effects on PostgreSQL semantics are modeled. SQLite PRAGMA and
 attachment changes are separate analysis boundaries; in particular
 rename-related PRAGMA behavior remains unmodeled.
 
+SQLite/Turso PRAGMA, ATTACH and DETACH semantic entry points remain
+unimplemented; see the
+[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+These paths do not acquire PostgreSQL semantics from similarly named commands.
+
 ## Diagnostics
 
 The single-expression path can emit the shared expression/name/type diagnostics.

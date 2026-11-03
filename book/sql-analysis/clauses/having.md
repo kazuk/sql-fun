@@ -25,6 +25,10 @@ legality and type-affinity checks remain incomplete. PostgreSQL aggregate/window
 legality is also not completely validated merely because names and GROUPING
 arguments resolve.
 
+Parameter-free PostgreSQL HAVING operands share the
+[boolean-validation gap](where.md#parameter-free-boolean-validation) tracked in
+[#575](https://github.com/kazuk/sql-fun/issues/575).
+
 ## Diagnostics
 
 [Name-resolution diagnostics](../expressions/names.md#diagnostics) report missing

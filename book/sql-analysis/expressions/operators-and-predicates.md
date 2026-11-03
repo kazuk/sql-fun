@@ -128,6 +128,32 @@ complete SQLite expression checking. SQLite BETWEEN analysis and
 GLOB/MATCH/REGEXP semantic analysis remain unimplemented. Parsing valid SQL is
 distinct from analysis support.
 
+### Remaining comparison and operator limitations
+
+SQLite's table-name shorthand `value IN table_name` and `NOT IN table_name`
+remain unimplemented and can panic
+([#496](https://github.com/kazuk/sql-fun/issues/496)). The supported value-list
+and subquery membership forms do not implement that shorthand.
+
+General quantified comparison subqueries (`ANY`/`SOME`/`ALL`) and row-comparison
+sublinks do not yet retain and analyze all comparison operands/operators
+([#571](https://github.com/kazuk/sql-fun/issues/571)). The membership path used
+for IN and supported equality-ANY forms is a separate implemented case; do not
+infer general quantified-comparison support from it. Multi-column ordered row
+comparisons additionally lack the catalog-backed B-tree operator-family
+membership and strategy facts required to establish their semantics
+([#792](https://github.com/kazuk/sql-fun/issues/792)). General reusable operator
+registration lookup and authoritative qualified identities for original
+overloads are still incomplete
+([#797](https://github.com/kazuk/sql-fun/issues/797)); an operator spelling or
+boolean result alone does not establish a valid row comparison.
+
+Schema-qualified PostgreSQL operator names such as `OPERATOR(pg_catalog.+)`
+currently encounter an incorrect name-conversion rejection
+([#946](https://github.com/kazuk/sql-fun/issues/946)). This is a limitation of
+sql-fun, although the syntax is valid PostgreSQL; it can fail before ordinary
+overload resolution or diagnostic delivery completes.
+
 ## Diagnostics
 
 - [undefined_operator]: the selected catalog does not establish the requested

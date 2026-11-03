@@ -26,6 +26,16 @@ boolean or implicit-cast constraints. SQLite expression and type-affinity analys
 remain incomplete. Grouping operations are checked for query-level placement;
 this does not establish complete aggregate/window legality checking.
 
+### Parameter-free boolean validation
+
+PostgreSQL boolean-context validation is incomplete for predicates without
+parameters ([#575](https://github.com/kazuk/sql-fun/issues/575)). For example,
+`SELECT 1 WHERE 1` can pass the expression-resolution boundary without the
+required boolean-type finding. The same gap affects HAVING and JOIN ON;
+parameter inference's boolean requirements do not establish that every known
+operand was checked. Successful name resolution is therefore not proof that a
+predicate is legal PostgreSQL. SQLite truthiness is a separate dialect rule.
+
 ## Diagnostics
 
 - [Name-resolution diagnostics](../expressions/names.md#diagnostics): missing or

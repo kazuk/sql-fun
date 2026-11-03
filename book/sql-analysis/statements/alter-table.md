@@ -103,6 +103,29 @@ remains separate work in [#529](https://github.com/kazuk/sql-fun/issues/529).
 PostgreSQL 18 constraint enforcement/inheritance transitions remain
 unimplemented ([#887](https://github.com/kazuk/sql-fun/issues/887)).
 
+### Other unimplemented alterations
+
+The following retained PostgreSQL operations do not yet have completed
+semantic resolution and catalog application; they can reach unimplemented
+paths. The supported column attributes and renames above are separate cases.
+
+| Operation | Missing behavior | Tracking issue |
+| --- | --- | --- |
+| DROP COLUMN | Column removal and dependent catalog changes; SQLite application is also unimplemented | [#531](https://github.com/kazuk/sql-fun/issues/531) |
+| ALTER / VALIDATE / DROP CONSTRAINT | Constraint state, deferrability and removal changes | [#533](https://github.com/kazuk/sql-fun/issues/533) |
+| Relation physical/storage settings | DROP CLUSTER, SET LOGGED/UNLOGGED, version-applicable DROP OIDS, access method, tablespace and relation options | [#534](https://github.com/kazuk/sql-fun/issues/534) |
+| ENABLE / DISABLE TRIGGER or RULE | ALWAYS/REPLICA and ALL/USER state changes where applicable | [#535](https://github.com/kazuk/sql-fun/issues/535) |
+| INHERIT / NO INHERIT and OF / NOT OF | Inheritance and typed-table associations | [#536](https://github.com/kazuk/sql-fun/issues/536) |
+| REPLICA IDENTITY | Mode and optional index binding/application | [#537](https://github.com/kazuk/sql-fun/issues/537) |
+| ENABLE / DISABLE / FORCE / NO FORCE ROW LEVEL SECURITY | Relation row-security state | [#538](https://github.com/kazuk/sql-fun/issues/538) |
+| ATTACH / DETACH PARTITION and DETACH PARTITION FINALIZE | Bounds, concurrency and parent/child relationships | [#539](https://github.com/kazuk/sql-fun/issues/539) |
+| ADD / SET / DROP IDENTITY | Identity-column transitions and sequence options | [#540](https://github.com/kazuk/sql-fun/issues/540) |
+
+ALTER FOREIGN TABLE command dispatch also remains unimplemented
+([#541](https://github.com/kazuk/sql-fun/issues/541)); ordinary-table support
+does not establish foreign-table alterations. ALTER TYPE's composite-type
+command path has its own [unimplemented dispatch](create-type.md#dialect-and-engine-specific-behavior).
+
 ## Diagnostics
 
 - [relation_not_found](../../diagnostics/relation_not_found.md): a required

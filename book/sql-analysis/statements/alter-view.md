@@ -24,6 +24,12 @@ trigger or rule ALTER VIEW operations are rejected by the view alteration path;
 broader ALTER VIEW operations remain incomplete. Do not infer support for SQLite
 ALTER VIEW or arbitrary PostgreSQL view alterations from CREATE VIEW support.
 
+Non-owner ALTER VIEW semantics remain incomplete
+([#544](https://github.com/kazuk/sql-fun/issues/544)). SET/RESET view options do
+not have completed semantic application; the implemented SET/DROP column-default
+operations above are exceptions to the older blanket non-owner limitation.
+Recognizing other ALTER VIEW syntax does not establish a catalog transition.
+
 ## Diagnostics
 
 - [view_not_found](../../diagnostics/view_not_found.md): the requested view is

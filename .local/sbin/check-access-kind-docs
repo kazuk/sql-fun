@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Internal server-api-spec validation: compare freshly generated names with the
+# dedicated reference table. Arguments also allow isolated acceptance checks.
+set -euo pipefail
+
+if (( $# != 2 )); then
+  echo "usage: check-access-kind-docs <server-api-spec.json> <access-kinds.md>" >&2
+  exit 2
+fi
+
+jq -er --rawfile reference "$2" '
+  def require(condition; message):
+    if condition then . else error(message) end;
+
+  [.methods[] | select(.name == "analyze_query")]
+  | require(length == 1; "expected exactly one analyze_query method")
+  | .[0].result.schema["$defs"].AccessKind.oneOf
+  | require(type == "array"; "AccessKind.oneOf must be an array")
+  | require(length > 0; "AccessKind.oneOf must not be empty")
+  | require(all(.[]; type == "object"); "invalid AccessKind variant schema")
+  | require(all(.[]; .type == "string" and (.const | type == "string"));
+      "each AccessKind variant must have a string const")
+  | map(.const)
+  | require(all(.[]; length > 0); "AccessKind names must not be empty")
+  | require(length == (unique | length); "duplicate AccessKind schema names")
+  | sort as $actual
+  | ($reference | split("<!-- access-kind-reference:start -->"))
+  | require(length == 2; "expected one access-kind reference start marker")
+  | .[1] | split("<!-- access-kind-reference:end -->")
+  | require(length == 2; "expected one access-kind reference end marker after start")
+  | .[0] | split("\n")
+  | map(select(test("^\\|\\s*`")))
+  | require(length > 0; "access-kind reference table must not be empty")
+  | require(all(.[]; test("^\\|\\s*`[^`]+`\\s*\\|"));
+      "malformed AccessKind table row")
+  | map(capture("^\\|\\s*`(?<name>[^`]+)`\\s*\\|").name)
+  | require(length == (unique | length); "duplicate documented AccessKind names")
+  | sort as $documented
+  | ($actual - $documented) as $missing
+  | ($documented - $actual) as $stale
+  | require(($missing | length) == 0 and ($stale | length) == 0;
+      "AccessKind documentation mismatch; missing: \($missing | join(", ")); stale: \($stale | join(", "))")
+  | "AccessKind reference covers all \($actual | length) schema variants."
+' "$1"

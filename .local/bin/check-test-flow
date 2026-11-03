@@ -297,11 +297,16 @@ function run_lint() {
 }
 
 function run_server_api_spec() {
+  require_command jq
   echo "== Generate server API spec document"
   cargo run -p sql-fun-server-api --features openrpc-schema,bin-deps \
     --bin openrpc-spec -- \
     --output-path "${GIT_ROOT}/server_api_spec.json" \
     --force
+  # Consume the freshly generated schema so enum changes cannot hide behind a
+  # stale tracked spec. Reuse this step in the standard local flow and CI.
+  "${GIT_ROOT}/.local/sbin/check-access-kind-docs" \
+    "${GIT_ROOT}/server_api_spec.json" "${GIT_ROOT}/book/access-kinds.md"
 }
 
 function run_deny() {

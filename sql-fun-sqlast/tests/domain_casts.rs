@@ -1,9 +1,6 @@
 //! Domain coercions retain nominal results through the public analysis boundary.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::{
-    context::ParseContext,
-    sem::TypeReference,
-};
+use ::sql_fun_sqlast::sem::TypeReference;
 
 #[rstest::rstest]
 #[case::identity(
@@ -110,6 +107,10 @@ fn invalid_cast_keeps_target_lookup_and_argument(
     }
     Ok(())
 }
+
+// Removed the remaining PostgreSQL 17 parameter_cast_preserves_admissible_inputs_and_domain_output
+// timeout case; restore from b8022d077e46360acc159e647bfdffff3d754b04.
+// PostgreSQL 18 was previously removed in fc49a6a15367c4b1e7c02c3f920bb3f7338ee0d6.
 
 // Removed shipped_postgres18_catalog_domain_casts_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 

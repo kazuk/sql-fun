@@ -84,12 +84,16 @@ Actions, or pull-request permission. The job's separate `GITHUB_TOKEN` remains
 contents read.
 
 The existing active `main` ruleset (`11504670`) authorizes Integration `5016922`
-with an always exception. The job verifies the token action's App identity and
-that existing exception before checkout with write credentials. This is an
-explicit reliance on existing repository policy, including its exception to
-PR/check requirements; granting contents write to `GITHUB_TOKEN` alone does not
-provide that authorization. Legacy branch protection must also permit the
-update. The workflow does not change protections or add exceptions. If App
+with an always exception, as inspected during implementation. The job verifies
+the token action's App ID against that authorized actor before checkout with
+write credentials. The restricted token cannot audit `bypass_actors`: GitHub
+returns that property only to callers with write access to the ruleset. The
+workflow does not request Administration permission just to read that list.
+The normal push is the authoritative authorization check under the rulesets
+and legacy branch protection in force at update time. This relies on existing
+repository policy, including its exception to PR/check requirements; granting
+contents write to `GITHUB_TOKEN` alone does not provide that authorization. The
+workflow does not change protections or add exceptions. If App
 identity, installation permissions, or repository policy differs, stop and
 resolve that configuration explicitly; do not substitute another credential.
 

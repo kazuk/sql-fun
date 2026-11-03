@@ -45,7 +45,7 @@ def inventory(tag):
     metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps', '--format-version=1'))
     version = next(p['version'] for p in metadata['packages'] if p['name'] == 'sql-fun-cli')
     stem = f'sql-fun-{version}-{TARGET}'
-    return [f'{stem}.tar.gz', f'sql-fun_{version.replace("-", "~", 1)}_amd64.deb',
+    return [f'{stem}.tar.gz', f'sql-fun_{version}_amd64.deb',
             f'{stem}-SHA256SUMS', f'sql-fun_{tag}_user-manual.tar.gz']
 
 

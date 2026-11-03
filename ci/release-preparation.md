@@ -94,12 +94,13 @@ After `R` is committed and pushed, preparation builds the supported Linux target
 artifact checks. A fresh external Cargo target directory prevents stale package
 selection. Individual crate versions come from Cargo metadata at `R`; the CLI
 crate owns the tarball/Debian package version, independently of the project tag.
-Debian prereleases replace the SemVer `-` with `~`.
+Package filenames use the CLI SemVer. Only the internal Debian package version
+replaces the prerelease `-` with `~`; `package-linux` owns that conversion.
 
 The complete public asset set contains:
 
 - `sql-fun-<CLI-version>-x86_64-unknown-linux-gnu.tar.gz`
-- `sql-fun_<Debian-version>_amd64.deb`
+- `sql-fun_<CLI-version>_amd64.deb`
 - `sql-fun-<CLI-version>-x86_64-unknown-linux-gnu-SHA256SUMS`
 - `sql-fun_<project-tag>_user-manual.tar.gz`
 

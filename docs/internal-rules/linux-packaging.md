@@ -38,10 +38,13 @@ The only supported target is currently `x86_64-unknown-linux-gnu` (`amd64` in
 Debian). Unsupported targets fail explicitly. Both executables are built together
 with locked dependencies, default features, and the release profile. Stripping
 happens once during the build; both archive formats contain identical executables.
-No crate versions are changed. The CLI SemVer supplies every artifact filename.
-Only the internal Debian version uses `~` in place of the SemVer prerelease
-separator; no additional Debian revision is appended. For example,
-`sql-fun_0.2.0-snapshot3_amd64.deb` contains Debian version `0.2.0~snapshot3`.
+No crate versions are changed. Ordinary CI packaging uses CLI SemVer filenames.
+Release preparation supplies an explicit project tag to the packaging script;
+all Release asset filenames use that tag while executable and package metadata
+versions remain crate versions. For example,
+`sql-fun_v0.1.0-snapshot4_amd64.deb` can contain Debian version `0.2.0~snapshot4`.
+Only the internal Debian version uses `~` in place of the CLI SemVer prerelease
+separator; no additional Debian revision is appended.
 
 Outputs are under Cargo's target directory (including `CARGO_TARGET_DIR` overrides),
 in `distributions/<target>/`:

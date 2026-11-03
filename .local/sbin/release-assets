@@ -42,10 +42,8 @@ def outside(path):
 
 
 def inventory(tag):
-    metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps', '--format-version=1'))
-    version = next(p['version'] for p in metadata['packages'] if p['name'] == 'sql-fun-cli')
-    stem = f'sql-fun-{version}-{TARGET}'
-    return [f'{stem}.tar.gz', f'sql-fun_{version}_amd64.deb',
+    stem = f'sql-fun-{tag}-{TARGET}'
+    return [f'{stem}.tar.gz', f'sql-fun_{tag}_amd64.deb',
             f'{stem}-SHA256SUMS', f'sql-fun_{tag}_user-manual.tar.gz']
 
 
@@ -63,7 +61,7 @@ def build(args, names):
     require(not run('git', 'diff', '--name-only') and not run('git', 'diff', '--cached', '--name-only'),
             'Release build requires a clean tracked worktree/index')
     environment = dict(os.environ, CARGO_TARGET_DIR=str(target))
-    subprocess.run(['.local/bin/package-linux', TARGET], env=environment, check=True, stdout=sys.stderr)
+    subprocess.run(['.local/bin/package-linux', TARGET, args.tag], env=environment, check=True, stdout=sys.stderr)
     # package-linux validates these exact outputs before exposing them.
     output = target / 'distributions' / TARGET
     args.directory.mkdir(parents=True)

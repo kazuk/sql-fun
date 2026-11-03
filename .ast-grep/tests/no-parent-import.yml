@@ -1,0 +1,14 @@
+id: no-parent-import
+valid:
+  - 'use crate::names::FullName;'
+  - 'use self::child::{Thing, Other as Local};'
+  - 'impl super::Hoge {}'
+  - 'pub(super) use crate::names::FullName;'
+  - 'pub(in super::super) use crate::names::FullName;'
+  - 'fn f() { let text = "use super::Thing;"; }'
+invalid:
+  - 'use super::Thing;'
+  - 'use super::{Thing, Other as Local};'
+  - 'pub use super::Thing;'
+  - 'use super::super::Thing;'
+  - 'use {super::Thing, crate::Other};'

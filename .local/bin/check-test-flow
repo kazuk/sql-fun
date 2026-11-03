@@ -291,6 +291,7 @@ function run_fmt() {
 
 function run_lint() {
   echo "== Linting"
+  "${GIT_ROOT}/.local/sbin/check-rust-imports"
   cargo clippy --no-deps --workspace --all-targets "${FEATURES[@]}" \
     -- -D warnings --allow unfulfilled_lint_expectations
   RUST_LOG=error taplo lint

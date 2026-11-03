@@ -158,9 +158,11 @@ impl Foo {
 
 #[cfg(test)]
 mod test_foo_new {
+    use crate::Foo;
+
     #[test]
     fn constructs_foo_with_value() {
-        let foo = super::Foo::new(10);
+        let foo = Foo::new(10);
         assert_eq!(10, foo.value);
     }
 }
@@ -316,6 +318,60 @@ fn parses_integer_with_surrounding_whitespace(
 ```
 
 ### Importing items
+
+Import items from the current crate at the module boundary. Use their local
+names for types, trait bounds, generic arguments, impl targets, expressions,
+patterns, constants and functions. This concentrates module dependencies in
+`use` declarations, reducing edits when modules move. If names collide, use
+`use ... as ...` rather than repeating the module path at each use site.
+
+```rust
+use crate::names::{FullName, TableName as LocalTableName};
+use crate::factory::make;
+
+fn build(name: FullName) -> LocalTableName {
+    make(name)
+}
+```
+
+The `import-local-path` ast-grep rule rejects `crate::`, `self::` and `super::`
+paths outside imports, including paths in ordinary expressions. These examples
+are rejected:
+
+```rust
+fn build(name: crate::names::FullName) {
+    crate::factory::make(name);
+    let limit = crate::constants::LIMIT;
+}
+```
+
+The trait name in `impl Trait for Type` may remain qualified. Its generic
+arguments and the target type still require imports:
+
+```rust
+use crate::names::{FullName, TableName};
+
+impl crate::traits::Convert<FullName> for TableName {}
+// Rejected: both the argument and the target repeat module dependencies.
+impl crate::traits::Convert<crate::names::FullName>
+    for crate::names::TableName {}
+```
+
+Use `crate::` for parent-module imports, including in tests; `use super::...`
+is rejected by `no-parent-import`. A child module dedicated to implementing
+inherent methods on its parent's type may use `impl super::Hoge { ... }`.
+This exception covers only the direct parent type, not arbitrary parent paths
+or a trait impl's target. Keep the module's purpose clear during review;
+ast-grep cannot resolve the type's definition or verify that purpose.
+
+The lint operates on Rust syntax, without name resolution or macro expansion.
+It checks explicitly rooted local paths; imported module paths such as
+`names::FullName`, external-crate paths and standard-library paths retain their
+existing conventions. Macro names, attributes and macro token trees are excluded:
+macros keep qualified names under the rule below, and generated references must
+preserve caller hygiene. Strings, comments, documentation examples and visibility
+restrictions such as `pub(in super::super)` are not importable references.
+Generated and vendored source files are excluded from the maintained-source scan.
 
 - `*` import is prohibited. (including `prelude` import)
 - macro importing is prohibited. (including derive / proc-macro)  

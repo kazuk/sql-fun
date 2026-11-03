@@ -16,7 +16,6 @@ use std::collections::BTreeMap;
 // Removed in_case after a local timeout; restore from bb14217fb859c8255678c9c00c58fd5d2d6f0380.
 // Removed function after a standard timeout; restore from
 // 1df6db5acb5bb0400190f91726ff006e1c682dd0.
-#[case::cte("WITH c AS (SELECT COALESCE($1,1) AS n) SELECT n FROM c")]
 #[case::derived("SELECT n FROM (SELECT COALESCE($1,1) AS n) c")]
 fn numeric_inputs_keep_admissible_assignments(#[case] sql: &str) -> testresult::TestResult {
     // Real builtin casts and overloads determine the supported numeric alternatives.

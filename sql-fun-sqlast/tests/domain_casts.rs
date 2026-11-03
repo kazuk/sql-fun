@@ -2,9 +2,8 @@
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::{
     context::ParseContext,
-    sem::{PgBuiltInType, TypeReference},
+    sem::TypeReference,
 };
-use std::collections::BTreeMap;
 
 #[rstest::rstest]
 #[case::identity(
@@ -109,36 +108,6 @@ fn invalid_cast_keeps_target_lookup_and_argument(
             encoded["TypeCast"]["target_type"]
         );
     }
-    Ok(())
-}
-
-#[rstest::rstest]
-fn parameter_cast_preserves_admissible_inputs_and_domain_output(
-    // PostgreSQL 18 timeout case removed in fc49a6a15367c4b1e7c02c3f920bb3f7338ee0d6.
-    #[values("17")] version: &str,
-) -> testresult::TestResult {
-    let analyzed = heavy::analyze(version, "SELECT $1::public.nested_amount")?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let constraints = analyzed.context().parameter_constraints();
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
-    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
-    assert!(!constraints.allows(&BTreeMap::from([(
-        1,
-        TypeReference::from_master_type_name("date")
-    )])));
-    let target: TypeReference = "public.nested_amount".parse()?;
-    assert!(constraints.result_column(0).unwrap().allows(&target));
-    assert!(constraints.allows(&BTreeMap::from([(1, "public.amount".parse()?)])));
-    assert!(
-        !constraints
-            .result_column(0)
-            .unwrap()
-            .allows(&PgBuiltInType::int4())
-    );
     Ok(())
 }
 

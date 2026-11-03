@@ -20,9 +20,13 @@ admits integer and bigint inputs with corresponding result alternatives; inspect
 nullability metadata remains conservative and does not yet prove that a non-null
 fallback makes the result non-null.
 
-When every CASE result branch is unresolved, the result domain remains open
-until input assignments are supplied to `ParameterConstraints::allows`. This
-also applies to ARRAY and GREATEST/LEAST. All-unknown SQL literals still resolve
+When every CASE result branch depends on unresolved parameters, the result
+domain can remain open. This also applies to ARRAY and GREATEST/LEAST.
+`ParameterConstraints::allows` checks explicit input assignments against the
+retained constraints; it does not supply analysis hints. All-unknown SQL
+literals, such as bare NULLs or untyped strings, instead select `text` as their
+common type: CASE and GREATEST/LEAST return `text`, while an ARRAY of those
+literals has type `text[]`.
 
 ### GREATEST and LEAST
 
@@ -35,8 +39,9 @@ implementation, such as `json`, produce diagnostics.
 Numbered parameters participate in common-type analysis, including nested
 expressions, subqueries, and nonrecursive CTEs. Several admissible input types
 can produce different result types; the analysis retains these alternatives.
-When every result operand is unresolved, the result domain remains open until
-input assignments are supplied to `ParameterConstraints::allows`. For example,
+When every result operand depends on unresolved parameters, the result domain
+can remain open. `ParameterConstraints::allows` can check explicit input
+assignments against the retained constraints. For example,
 `GREATEST($1,NULL)` admits explicitly typed integer, text, and other ordered
 inputs, while an all-unknown literal expression resolves to `text`. An explicit
 SQL cast can specify an operand's type. These expressions are separate from

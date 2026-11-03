@@ -109,6 +109,33 @@ def split(ts):
     return parts
 
 
+def has_import(ts, path):
+    """Match an unaliased module-level import, including nested use groups."""
+    target = lex(path)
+
+    def matches(items, prefix):
+        if '{' not in items:
+            return prefix + items == target
+        group = items.index('{')
+        if end(items, group) != len(items):
+            return False
+        return any(matches(part, prefix + items[:group])
+                   for part in split(items[group + 1:-1]))
+
+    i = 0
+    while i < len(ts):
+        if ts[i] == 'use':
+            stop = i + 1
+            while ts[stop] != ';':
+                stop = end(ts, stop) if ts[stop] in ('(', '[', '{') else stop + 1
+            if matches(ts[i + 1:stop], []):
+                return True
+            i = stop + 1
+        else:
+            i = end(ts, i) if ts[i] in ('(', '[', '{') else i + 1
+    return False
+
+
 # Variant/constructor identities, not a duplicate code-string registry.
 # Evidence and reasons: docs/internal-rules/diagnostic-reference-inventory.md.
 UNEMITTED = {
@@ -196,7 +223,7 @@ SOURCE_WITNESS = {
         "OwnershipLookup": 5
     },
     "sql-fun-sqlast/src/sem/problem.rs": {
-        "OwnershipLookup": 3,
+        "OwnershipLookup": 4,
         "OwnershipProblem": 1
     },
     "sql-fun-sqlast/src/sem/scalar_expr/column_ref.rs": {
@@ -485,13 +512,13 @@ pub fn target(target: impl Into<OwnershipLookup>) -> Self {
         raise InvalidSource('ownership payload construction changed')
     adapter = production(lex((root / 'sql-fun-sqlast/src/sem/problem.rs').read_text()))
     conversion = lex("""
-impl From<&crate::sem::OwnershipLookup> for diagnostic::OwnershipLookup {
-    fn from(value: &crate::sem::OwnershipLookup) -> Self {
+impl From<&OwnershipLookup> for diagnostic::OwnershipLookup {
+    fn from(value: &OwnershipLookup) -> Self {
         Self::new(value.code(), &value.diagnostic_message())
     }
 }
 """)
-    if not contains(adapter, conversion):
+    if not has_import(adapter, 'crate::sem::OwnershipLookup') or not contains(adapter, conversion):
         raise InvalidSource('ownership classification adapter changed')
     ts = production(lex((root / 'sql-fun-sqlast/src/ast/ownership.rs').read_text()))
     guard = lex("""

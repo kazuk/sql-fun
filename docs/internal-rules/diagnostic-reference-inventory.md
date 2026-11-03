@@ -231,6 +231,13 @@ emission effect before updating the witness. Do not mechanically regenerate it
 to make an unexplained failure pass. Formatting and ordinary unrelated source
 edits do not require witness updates.
 
+The #820 import migration preserves the ownership conversion and all producer
+branches. The adapter now imports `crate::sem::OwnershipLookup` instead of
+repeating that path in its impl and parameter. The structural guard checks the
+import binding (direct or grouped) as well as the conversion body. Its witness
+count increases from three to four solely because of the new import; no emitter
+or diagnostic classification is added.
+
 Production entry points come from the root/workspace Cargo manifests, including
 explicit binary paths and nested workspace members. The scanner follows ordinary
 modules and explicit path attributes, excluding test-only modules. Unsupported

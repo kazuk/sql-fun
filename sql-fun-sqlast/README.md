@@ -28,6 +28,14 @@ upstream parser directly and can change type semantics while
 unresolved. Cargo unifies features across dependents: every dependent must leave
 the workaround disabled for the upstream path to be selected.
 
+External SQLite parser errors may be returned verbatim, including
+implementation-oriented formatting. This applies to common parsing with
+`--no-default-features --features sqlite` and the legacy
+`SqliteDialect::parse` and `parse_schema_snapshot` APIs. Dependency error wording
+is not a stable sql-fun contract. This limitation does not exempt sql-fun-owned
+`DiagnosticMessage` or structured analysis diagnostics; see the crate API
+documentation for the diagnostic boundary.
+
 See the [installation prerequisites](../book/installation.md) for the native
 compiler and clang requirements when building from source.
 

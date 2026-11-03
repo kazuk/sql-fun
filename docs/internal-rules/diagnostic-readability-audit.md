@@ -96,8 +96,8 @@ behaviors with the selected `ParseContext` dialect. The inventory above is
 therefore a cross-dialect code catalogue, not a claim that every code is
 available in both dialects or a per-code dialect matrix. For example, PostgreSQL
 conversion and assignment paths coexist with SQLite parser, rename, and trigger
-paths. The bundled SQLite JOIN wording remains subject to the scope decision
-noted below; this summary does not resolve that decision.
+paths. The SQLite external-parser wording boundary follows the maintainer
+decision recorded below.
 
 Several older constructor helpers still terminate with `todo!()` rather than
 returning an `AnalysisProblem`; their call paths are not emitted diagnostic
@@ -141,9 +141,17 @@ Two remaining source observations must be kept narrow:
   immutable source remains unchanged. The existing generated-parser adaptation
   replaces the first formatter with the actual SQL word for the default common
   parser path. The external parser used by feature-off and legacy APIs still
-  retains its upstream error wording; the coordinator requested a maintainer
-  scope decision for these paths rather than silently changing the parser
-  selection contract or parsing Debug text.
+  retains its upstream error wording. The [maintainer decision][sqlite-decision]
+  accepts this as a documented external-parser limitation, not a remaining #924
+  defect or #717 deferral. The README and crate API documentation name these
+  paths and explain that dependency wording is unstable. Tests preserve failure
+  behavior without asserting exact external wording. Legacy depth-limit tests
+  use the exported limit and verify acceptance/rejection, without matching the
+  dependency's message or fixing a particular numeric limit. The JOIN-message
+  regression covers the locally owned adaptation only. Once sql-fun wraps an
+  error into its own structured diagnostic or `DiagnosticMessage`, the resulting
+  presentation remains subject to #924. Parser ownership and dependencies remain
+  unchanged; no dependency Debug text is parsed or rewritten.
 * `AstMutationError` in `ast/mutation.rs` has public `Display` messages that use
   `Dialect` and duplicate-name `Debug` formatting. The source audit found no
   non-test call site outside that module and no route from this error type into
@@ -219,3 +227,5 @@ This is captured output from the runner, with report decoration removed and
 a long line wrapped. Its
 fixture assertions verify codes and result semantics; message text is covered
 by the focused Rust tests, rather than a new fixture-message contract.
+
+[sqlite-decision]: https://github.com/kazuk/sql-fun/issues/924#issuecomment-6592597357

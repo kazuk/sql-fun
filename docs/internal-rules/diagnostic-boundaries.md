@@ -39,6 +39,26 @@ tracked by issue #522. `DiagnosticMessage::diagnostic_message` is a separate,
 exhaustive contract for explanatory text, so CLI presentation can report every
 problem even when detailed metadata is absent.
 
+## External SQLite parser errors
+
+The external `turso_parser` owns the wording of errors returned directly by its
+parser. The feature-off common parser (`--no-default-features --features sqlite`)
+and the legacy `SqliteDialect::parse` and `parse_schema_snapshot` paths may
+surface those strings verbatim, including implementation-oriented formatting.
+These dependency strings are not a stable sql-fun diagnostic contract. Document
+this limitation for Rust API callers; test failure/classification behavior
+without freezing exact dependency wording.
+
+The exemption ends when sql-fun constructs an `AnalysisProblem` or takes
+responsibility for a `DiagnosticMessage` explanation. Such owned diagnostics
+remain subject to the readable-description and structured-fact rules above,
+regardless of an error's external origin. The server's query diagnostic path
+uses common parsing with the default-enabled workaround; its locally adapted
+JOIN explanation is covered by an owned-message regression. Do not broaden
+parser ownership, fork/replace the dependency, or parse/rewrite dependency Debug
+strings as part of #924. No follow-up issue is needed solely for the documented
+external-parser limitation.
+
 ## Source and transport
 
 Schema loaders provide the statement text they actually analyze to

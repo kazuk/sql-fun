@@ -31,9 +31,11 @@ name, type, and nullability. Array types have a `[]` suffix. Unavailable SQL or
 query kinds and unresolved types are marked explicitly; collection counts show
 when no parameters, columns, or accesses were returned.
 
-Diagnostics are shown for every statement with SQL source context. Error
-diagnostics do not stop later inputs. Each input uses the same selected schema
-base, without inheriting changes from preceding inputs.
+Diagnostics are shown for every statement with SQL source context.
+See the [diagnostic reference](../diagnostics/README.md) for code meanings and
+suggested corrections. Error diagnostics do not stop later inputs. Each input
+uses the same selected schema base, without inheriting changes from preceding
+inputs.
 
 ## Relation and column access
 

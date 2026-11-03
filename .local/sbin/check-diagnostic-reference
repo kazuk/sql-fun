@@ -1,0 +1,568 @@
+#!/usr/bin/env python3
+"""Bounded, fail-closed source classifier and Markdown coverage validation.
+
+No compilation or SQL execution. Unknown classifier expressions require review;
+code strings are always taken from Rust, never from a parallel registry.
+"""
+import json
+from pathlib import Path
+import re
+import sys
+import tomllib
+
+
+class InvalidSource(ValueError):
+    pass
+
+
+def lex(source):
+    """Keep every code token; comments and literal braces cannot alter groups."""
+    pattern = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'|[A-Za-z_][A-Za-z_0-9]*|::|=>|\.\.|[^\s]', re.S)
+    raw_pattern = re.compile(r'(?:br|r)(#*)"')
+    result = []
+    i = 0
+    while i < len(source):
+        if source[i].isspace():
+            i += 1
+        elif source.startswith('//', i):
+            newline = source.find('\n', i)
+            i = len(source) if newline < 0 else newline
+        elif source.startswith('/*', i):
+            depth = 1
+            i += 2
+            while depth:
+                if i == len(source):
+                    raise InvalidSource('unterminated Rust comment')
+                if source.startswith('/*', i):
+                    depth += 1
+                    i += 2
+                elif source.startswith('*/', i):
+                    depth -= 1
+                    i += 2
+                else:
+                    i += 1
+        else:
+            raw = raw_pattern.match(source, i)
+            if raw:
+                marker = '"' + raw[1]
+                closing = source.find(marker, raw.end())
+                if closing < 0:
+                    raise InvalidSource('unterminated Rust raw string')
+                stop = closing + len(marker)
+                result.append(source[i:stop])
+                i = stop
+            else:
+                token = pattern.match(source, i)
+                if token is None:
+                    raise InvalidSource('unrecognized Rust token')
+                result.append(token[0])
+                i = token.end()
+    return result
+
+
+def end(ts, start):
+    closing = {'(': ')', '[': ']', '{': '}'}[ts[start]]
+    i = start + 1
+    while i < len(ts):
+        if ts[i] == closing:
+            return i + 1
+        i = end(ts, i) if ts[i] in ('(', '[', '{') else i + 1
+    raise InvalidSource('unbalanced Rust group')
+
+
+def production(ts):
+    result = []
+    i = 0
+    marker = lex('#[cfg(test)]')
+    while i < len(ts):
+        if ts[i:i + len(marker)] == marker:
+            i += len(marker)
+            if i + 1 < len(ts) and ts[i + 1] == ':':
+                while ts[i] != ',':
+                    i += 1
+                i += 1
+                continue
+            while i < len(ts) and ts[i] not in ('{', ';'):
+                i += 1
+            if i == len(ts):
+                raise InvalidSource('incomplete test-only item')
+            i = end(ts, i) if ts[i] == '{' else i + 1
+        else:
+            result.append(ts[i])
+            i += 1
+    return result
+
+
+def split(ts):
+    parts = []
+    start = i = 0
+    while i < len(ts):
+        if ts[i] in ('(', '[', '{'):
+            i = end(ts, i)
+        elif ts[i] == ',':
+            parts.append(ts[start:i])
+            start = i = i + 1
+        else:
+            i += 1
+    if ts[start:]:
+        parts.append(ts[start:])
+    return parts
+
+
+# Variant/constructor identities, not a duplicate code-string registry.
+# Evidence and reasons: docs/internal-rules/diagnostic-reference-inventory.md.
+UNEMITTED = {
+    'AnalysisProblem': {
+        'ExtensionNotFound': 'extension_not_found',
+        'NullabilityUnknown': 'nullability_unknown',
+        'ArgumentTypeMismatch': 'argument_type_mismatch',
+        'CaseWhenExprTypeUnknown': 'case_when_type_unknown',
+    },
+    'NameResolution': {'UndefinedColumn': None},
+    'TableFunctionProblem': {'CollationNotFound': 'collation_not_found'},
+}
+
+
+def match_arms(body):
+    arms = []
+    i = 0
+    while i < len(body):
+        start = i
+        arrow = body.index('=>', i)
+        i = arrow + 1
+        if body[i] == '{':
+            i = end(body, i)
+        else:
+            while i < len(body) and body[i] != ',':
+                i = end(body, i) if body[i] in ('(', '[') else i + 1
+        arms.append(body[start:i])
+        if i < len(body) and body[i] == ',':
+            i += 1
+    return arms
+
+
+# Source-symbol counts guard exclusion proofs and the dynamic ownership
+# boundary, not code strings. New imports, aliases, Self::variant references
+# and constructor calls require a source review; unrelated edits do not.
+SOURCE_WITNESS = {
+    "sql-fun-core/src/analysis_problem.rs": {
+        "ArgumentTypeMismatch": 4,
+        "CaseWhenExprTypeUnknown": 4,
+        "ExtensionNotFound": 4,
+        "NullabilityUnknown": 4,
+        "OwnershipLookup": 2,
+        "OwnershipProblem": 5,
+        "argument_type_mismatch": 1,
+        "case_when_type_unknown": 1,
+        "extension_not_found": 1,
+        "nullability_unknown": 1,
+        "ownership_target": 1
+    },
+    "sql-fun-core/src/analysis_problem/message.rs": {
+        "CollationNotFound": 1,
+        "OwnershipProblem": 2
+    },
+    "sql-fun-core/src/analysis_problem/name_resolution.rs": {
+        "CollationNotFound": 4,
+        "UndefinedColumn": 3,
+        "collation_not_found": 2
+    },
+    "sql-fun-core/src/analysis_problem/ownership.rs": {
+        "OwnershipLookup": 5,
+        "OwnershipProblem": 2
+    },
+    "sql-fun-core/src/analysis_problem/table_function.rs": {
+        "CollationNotFound": 4,
+        "collation_not_found": 1
+    },
+    "sql-fun-core/src/analysis_problem/values.rs": {
+        "OwnershipLookup": 3
+    },
+    "sql-fun-core/src/extensions/config_error.rs": {
+        "ExtensionNotFound": 2,
+        "extension_not_found": 1
+    },
+    "sql-fun-core/src/extensions/name_version_pair.rs": {
+        "extension_not_found": 1
+    },
+    "sql-fun-sqlast/src/ast/ownership.rs": {
+        "OwnershipLookup": 15,
+        "ownership_target": 1
+    },
+    "sql-fun-sqlast/src/sem.rs": {
+        "OwnershipLookup": 1
+    },
+    "sql-fun-sqlast/src/sem/alter_owner.rs": {
+        "OwnershipLookup": 5
+    },
+    "sql-fun-sqlast/src/sem/problem.rs": {
+        "OwnershipLookup": 3,
+        "OwnershipProblem": 1
+    },
+    "sql-fun-sqlast/src/sem/scalar_expr/column_ref.rs": {
+        "UndefinedColumn": 7
+    }
+}
+
+
+class Classifiers:
+    def __init__(self, root):
+        self.methods = {}
+        self.enums = {}
+        self.fields = {}
+        self.constants = {}
+        self.visited = set()
+        self.sources = {}
+        base = root / 'sql-fun-core/src/analysis_problem'
+        for path in [base.with_suffix('.rs'), *sorted(base.rglob('*.rs')),
+                     root / 'sql-fun-sqlast/src/sem/alter_owner.rs']:
+            ts = production(lex(path.read_text()))
+            self.sources[path.relative_to(root).as_posix()] = ts
+            self.read_items(ts, path)
+
+    def read_items(self, ts, path):
+        i = 0
+        while i < len(ts):
+            kind = ts[i]
+            if kind not in ('enum', 'struct', 'impl') or i + 2 >= len(ts):
+                i += 1
+                continue
+            name = ts[i + 1]
+            start = i + 2
+            while start < len(ts) and ts[start] not in ('{', ';'):
+                start += 1
+            if start == len(ts) or ts[start] == ';':
+                i += 1
+                continue
+            if kind == 'impl':
+                header = ts[i + 1:start]
+                if 'for' in header:
+                    name = header[header.index('for') + 1]
+                elif len(header) != 1:
+                    stop = end(ts, start)
+                    if contains(ts[start:stop], ['fn', 'code']):
+                        raise InvalidSource(f'unsupported classifier impl in {path}: {header}')
+                    i = stop
+                    continue
+            if path.name == 'alter_owner.rs' and name == 'OwnershipLookup':
+                name = 'SqlAstOwnershipLookup'
+            stop = end(ts, start)
+            body = ts[start + 1:stop - 1]
+            if kind == 'enum':
+                self.enums[name] = {}
+                for part in split(body):
+                    while part[:3] == ['#', '[', 'doc']:
+                        part = part[end(part, 1):]
+                    if not part or not re.fullmatch('[A-Za-z_][A-Za-z_0-9]*', part[0]):
+                        raise InvalidSource(f'unknown enum declaration {name}: {part}')
+                    self.enums[name][part[0]] = part[1:]
+            elif kind == 'struct':
+                self.fields[name] = {p[0]: p[2:] for p in split(body) if len(p) > 2 and p[1] == ':'}
+            else:
+                self.read_impl(name, body)
+            i = stop
+
+    def read_impl(self, owner, body):
+        i = 0
+        while i < len(body):
+            if body[i:i + 2] == ['const', 'CODE']:
+                stop = body.index(';', i)
+                if body[stop - 2] != '=' or not body[stop - 1].startswith('"'):
+                    raise InvalidSource(f'{owner}::CODE must be a string literal')
+                self.constants[owner] = body[stop - 1]
+                i = stop + 1
+            elif body[i] == 'fn':
+                name = body[i + 1]
+                start = body.index('{', i)
+                stop = end(body, start)
+                if name == 'code':
+                    if owner in self.methods:
+                        raise InvalidSource(f'duplicate classifier {owner}')
+                    self.methods[owner] = body[start + 1:stop - 1]
+                i = stop
+            else:
+                i = end(body, i) if body[i] in ('(', '[', '{') else i + 1
+
+    def codes(self, owner='AnalysisProblem'):
+        if owner in self.visited:
+            raise InvalidSource(f'repeated/cyclic delegation {owner}')
+        self.visited.add(owner)
+        if owner == 'OwnershipLookup':
+            if self.methods[owner] != lex('&self.code'):
+                raise InvalidSource('ownership string transport changed')
+            return self.codes('SqlAstOwnershipLookup')
+        return self.expression(owner, self.methods[owner])
+
+    def expression(self, owner, ts, payload=None):
+        if ts and ts[0] == '{' and end(ts, 0) == len(ts):
+            return self.expression(owner, ts[1:-1], payload)
+        if len(ts) == 1 and ts[0].startswith('"'):
+            code = json.loads(ts[0])
+            if not re.fullmatch('[a-z][a-z0-9_]*', code):
+                raise InvalidSource(f'invalid code {code}')
+            return {code}
+        if len(ts) == 3 and ts[1:] == ['::', 'CODE']:
+            return self.expression(owner, [self.constants[ts[0]]])
+        if ts == lex('problem.code()') and payload:
+            if len(payload) != 3 or payload[0] != '(' or payload[-1] != ')':
+                raise InvalidSource('expected single typed delegation payload')
+            return self.codes(payload[1])
+        if len(ts) == 7 and ts[:2] == ['self', '.'] and ts[3:] == lex('.code()'):
+            field = self.fields.get(owner, {}).get(ts[2])
+            if not field or len(field) != 1:
+                raise InvalidSource(f'unresolved field delegation {owner}')
+            return self.codes(field[0])
+        if ts[:3] == lex('match self {') and end(ts, 2) == len(ts):
+            return self.match_codes(owner, ts[3:-1])
+        if ts[:1] == ['if']:
+            return self.conditional_codes(owner, ts)
+        raise InvalidSource(f'unsupported classifier expression {owner}: {" ".join(ts)}')
+
+    def match_codes(self, owner, body):
+        result = set()
+        seen = set()
+        for arm in match_arms(body):
+            arrow = arm.index('=>')
+            pattern = arm[:arrow]
+            if pattern[:2] != ['Self', '::'] or len(pattern) < 3:
+                raise InvalidSource(f'unsupported match pattern {owner}: {pattern}')
+            variant = pattern[2]
+            if variant in seen or variant not in self.enums[owner]:
+                raise InvalidSource(f'unknown/duplicate variant {owner}::{variant}')
+            if pattern[3:] and pattern[3:] not in [lex(x) for x in ('(_)', '(..)', '(problem)', '{ .. }')]:
+                raise InvalidSource(f'unsupported variant binding {pattern}')
+            seen.add(variant)
+            values = self.expression(owner, arm[arrow + 1:], self.enums[owner][variant])
+            if variant not in UNEMITTED.get(owner, {}) and (owner, variant) != ('SqlAstOwnershipLookup', 'Resolved'):
+                result |= values
+        if seen != set(self.enums[owner]):
+            raise InvalidSource(f'non-exhaustive classifier {owner}')
+        return result
+
+    def conditional_codes(self, owner, ts):
+        start = ts.index('{')
+        stop = end(ts, start)
+        condition = lex('self.is_warning()') if owner == 'IndexProblem' else lex('let Some(target) = &self.target')
+        if owner not in ('IndexProblem', 'OwnershipProblem') or ts[1:start] != condition or ts[stop:stop + 2] != ['else', '{'] or end(ts, stop + 1) != len(ts):
+            raise InvalidSource(f'unknown conditional classifier {owner}')
+        left = ts[start + 1:stop - 1]
+        if owner == 'OwnershipProblem':
+            if left != lex('target.code()') or self.fields[owner].get('target') != lex('Option<OwnershipLookup>'):
+                raise InvalidSource('ownership delegation changed')
+            values = self.codes('OwnershipLookup')
+        else:
+            values = self.expression(owner, left)
+        return values | self.expression(owner, ts[stop + 2:-1])
+
+
+def contains(ts, pattern):
+    return any(ts[i:i + len(pattern)] == pattern for i in range(len(ts)))
+
+
+def production_sources(root):
+    """Follow non-test module declarations, including existing #[path] modules."""
+    seen = set()
+
+    def visit(path):
+        if path in seen:
+            return
+        seen.add(path)
+        ts = production(lex(path.read_text()))
+        yield path, ts
+        base = path.parent if path.stem in ('lib', 'main', 'mod') else path.with_suffix('')
+        try:
+            yield from modules(ts, base, path.parent)
+        except InvalidSource as error:
+            raise InvalidSource(f'{path}: {error}') from error
+
+    def modules(ts, base, attribute_base):
+        i = 0
+        override = None
+        while i < len(ts):
+            if ts[i:i + 4] == ['#', '[', 'path', '=']:
+                override = json.loads(ts[i + 4])
+                i = end(ts, i + 1)
+            elif ts[i] == 'mod' and i + 2 < len(ts) and re.fullmatch('[A-Za-z_][A-Za-z_0-9]*', ts[i + 1]):
+                name = ts[i + 1]
+                if ts[i + 2] == ';':
+                    choices = [attribute_base / override] if override else [base / (name + '.rs'), base / name / 'mod.rs']
+                    found = [p for p in choices if p.is_file()]
+                    if len(found) != 1:
+                        raise InvalidSource(f'unresolved module {base}/{name}')
+                    yield from visit(found[0].resolve())
+                    i += 3
+                elif ts[i + 2] == '{':
+                    stop = end(ts, i + 2)
+                    yield from modules(ts[i + 3:stop - 1], base / name, base / name)
+                    i = stop
+                else:
+                    raise InvalidSource(f'unsupported module declaration {name}')
+                override = None
+            elif ts[i] in ('(', '[', '{'):
+                i = end(ts, i)
+            else:
+                i += 1
+
+    for entry in cargo_entry_points(root):
+        yield from visit(entry.resolve())
+
+
+def cargo_entry_points(root):
+    """Resolve workspace library/binary entries without invoking Cargo."""
+    manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+    manifests = [root / 'Cargo.toml']
+    for member in manifest['workspace']['members']:
+        matches = list(root.glob(member + '/Cargo.toml'))
+        if not matches:
+            raise InvalidSource(f'workspace member manifest missing: {member}')
+        manifests.extend(matches)
+    entries = set()
+    for path in manifests:
+        package = tomllib.loads(path.read_text())
+        directory = path.parent
+        if package.get('package', {}).get('autolib', True):
+            if (directory / 'src/lib.rs').exists():
+                entries.add(directory / 'src/lib.rs')
+        if 'lib' in package:
+            entries.add(directory / package['lib'].get('path', 'src/lib.rs'))
+        if package.get('package', {}).get('autobins', True):
+            if (directory / 'src/main.rs').exists():
+                entries.add(directory / 'src/main.rs')
+            entries.update(directory.glob('src/bin/*.rs'))
+            entries.update(directory.glob('src/bin/*/main.rs'))
+        for binary in package.get('bin', []):
+            if 'path' in binary:
+                entries.add(directory / binary['path'])
+            elif binary.get('name') == package['package']['name']:
+                entries.add(directory / 'src/main.rs')
+            else:
+                choices = [directory / 'src/bin' / (binary['name'] + '.rs'),
+                           directory / 'src/bin' / binary['name'] / 'main.rs']
+                found = [candidate for candidate in choices if candidate.exists()]
+                if len(found) != 1:
+                    raise InvalidSource(f'unsupported binary entry in {path}: {binary}')
+                entries.update(found)
+    return entries
+
+
+def verify_exclusions(root, classifiers):
+    verify_ownership_contracts(root, classifiers)
+    verify_source_witness(root)
+
+
+def verify_ownership_contracts(root, classifiers):
+    """Follow the current string transport back to its typed producer."""
+    transport = classifiers.sources['sql-fun-core/src/analysis_problem/values.rs']
+    constructor = lex("""
+pub fn new(code: &str, message: &str) -> Self {
+    Self { code: code.to_owned(), message: message.to_owned(), }
+}
+""")
+    if not contains(transport, constructor):
+        raise InvalidSource('ownership string constructor changed')
+    clone = lex("""
+impl From<&Self> for OwnershipLookup {
+    fn from(v: &Self) -> Self { v.clone() }
+}
+""")
+    if not contains(transport, clone):
+        raise InvalidSource('ownership reference conversion changed')
+    wrapper = classifiers.sources['sql-fun-core/src/analysis_problem.rs']
+    target = lex("""
+pub fn ownership_target(target: impl Into<OwnershipLookup>) -> Self {
+    Self::Ownership(OwnershipProblem::target(target))
+}
+""")
+    if not contains(wrapper, target):
+        raise InvalidSource('ownership problem construction changed')
+    payload = classifiers.sources['sql-fun-core/src/analysis_problem/ownership.rs']
+    constructor = lex("""
+pub fn target(target: impl Into<OwnershipLookup>) -> Self {
+    Self { target: Some(target.into()), role: None, }
+}
+""")
+    if not contains(payload, constructor):
+        raise InvalidSource('ownership payload construction changed')
+    adapter = production(lex((root / 'sql-fun-sqlast/src/sem/problem.rs').read_text()))
+    conversion = lex("""
+impl From<&crate::sem::OwnershipLookup> for diagnostic::OwnershipLookup {
+    fn from(value: &crate::sem::OwnershipLookup) -> Self {
+        Self::new(value.code(), &value.diagnostic_message())
+    }
+}
+""")
+    if not contains(adapter, conversion):
+        raise InvalidSource('ownership classification adapter changed')
+    ts = production(lex((root / 'sql-fun-sqlast/src/ast/ownership.rs').read_text()))
+    guard = lex("""
+if target.identity().is_none() {
+    context.report_analysis_problem(AnalysisProblem::ownership_target(&target))?;
+}
+""")
+    if not contains(ts, guard) or ts.count('ownership_target') != 1:
+        raise InvalidSource('ownership success exclusion guard changed')
+    ts = classifiers.sources['sql-fun-sqlast/src/sem/alter_owner.rs']
+    if not contains(ts, lex('if let Self::Resolved(identity) = self { Some(identity) } else { None }')):
+        raise InvalidSource('ownership success identity changed')
+
+
+def verify_source_witness(root):
+    names = {name for variants in UNEMITTED.values() for name in variants}
+    names |= {name for variants in UNEMITTED.values() for name in variants.values() if name}
+    names |= {'OwnershipLookup', 'OwnershipProblem', 'ownership_target'}
+    observed = {}
+    for path, ts in production_sources(root):
+        relative = path.relative_to(root.resolve()).as_posix()
+        for i in range(len(ts) - 2):
+            if ts[i:i + 2] == ['include', '!']:
+                stop = end(ts, i + 2)
+                expression = ts[i:stop]
+                allowed = [lex('include!(concat!(env!("OUT_DIR"), "' + name + '"))')
+                           for name in ('/lexer.rs', '/parser.rs')]
+                if relative != 'sql-fun-sqlast/src/sqlite_parser.rs' or expression not in allowed:
+                    raise InvalidSource(f'unsupported included production source: {relative}')
+        counts = {name: ts.count(name) for name in sorted(names) if name in ts}
+        if counts:
+            observed[relative] = counts
+        if contains(ts, ['OwnershipLookup', 'as']):
+            raise InvalidSource(f'ownership alias requires producer review: {relative}')
+    if observed != SOURCE_WITNESS:
+        changed = sorted(path for path in observed.keys() | SOURCE_WITNESS.keys()
+                         if observed.get(path) != SOURCE_WITNESS.get(path))
+        raise InvalidSource(f'producer/exclusion evidence changed; review symbol uses in {changed}')
+
+
+def check(root):
+    classifiers = Classifiers(root)
+    codes = classifiers.codes()
+    if classifiers.visited != set(classifiers.methods):
+        raise InvalidSource(f'unreached classifiers: {sorted(set(classifiers.methods) - classifiers.visited)}')
+    verify_exclusions(root, classifiers)
+    directory = root / 'book/diagnostics'
+    files = list(directory.rglob('*.md'))
+    nested = [str(p.relative_to(directory)) for p in files if p.parent != directory]
+    if nested:
+        raise InvalidSource(f'diagnostic pages must use the flat code path: {sorted(nested)}')
+    pages = {p.stem for p in files if p.name != 'README.md'}
+    errors = []
+    for label, difference in [('missing pages', codes - pages), ('stale pages', pages - codes)]:
+        if difference:
+            errors.append(f'{label}: {", ".join(sorted(difference))}')
+    for name in ('SUMMARY.md', 'diagnostics/README.md'):
+        text = (root / 'book' / name).read_text()
+        prefix = r'(?:\./)?diagnostics/' if name == 'SUMMARY.md' else r'(?:\./)?'
+        links = re.findall(r'\]\(' + prefix + r'([a-z][a-z0-9_]*|README)\.md\)', text)
+        linked = set(links) - {'README'}
+        if linked != codes or len(links) != len(set(links)):
+            errors.append(f'{name}: missing={sorted(codes - linked)}, stale={sorted(linked - codes)}, duplicates={len(links) != len(set(links))}')
+    if errors:
+        raise InvalidSource('\n'.join(errors))
+    print(f'Diagnostic reference: {len(codes)} emitted codes, pages and navigation agree')
+
+
+if __name__ == '__main__':
+    try:
+        check(Path(__file__).resolve().parents[2])
+    except (InvalidSource, OSError, KeyError, ValueError, IndexError) as error:
+        print(f'Diagnostic reference check failed: {error}', file=sys.stderr)
+        sys.exit(1)

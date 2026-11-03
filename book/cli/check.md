@@ -224,6 +224,9 @@ instead of successful completion.
 
 ## SQL diagnostics
 
+Look up reported codes in the [diagnostic reference](../diagnostics/README.md)
+for causes, limitations, examples and suggested corrections.
+
 `check` reports every SQL analysis diagnostic on stderr, including errors,
 warnings, and advice for queries that cannot produce a lockfile entry. Each
 report identifies the Rust query function and its source file and line, and

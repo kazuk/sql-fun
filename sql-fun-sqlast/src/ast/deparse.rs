@@ -1,15 +1,19 @@
 //! Fallible SQL emission from the owned, potentially edited syntax tree.
+
 mod constraints;
 mod dml;
 mod expression;
 mod lexical;
 mod query;
+
 #[cfg(test)]
 mod simple_tests;
 mod statement;
 mod statement_simple;
 #[cfg(test)]
 mod tests;
+
+use crate::{identifier::QuotedIdentifier, names::FullName};
 
 use crate::ast::{Dialect, Statement};
 
@@ -117,7 +121,7 @@ impl SqlWriter {
         if name.contains('\0') || (self.is_postgres() && name.is_empty()) {
             return self.invalid("identifier", "identifier is empty or contains NUL");
         }
-        self.sql(&crate::identifier::QuotedIdentifier::from(name).to_string());
+        self.sql(&QuotedIdentifier::from(name).to_string());
         Ok(())
     }
     pub(in crate::ast) fn string(&mut self, value: &str) -> Result<(), DeparseError> {
@@ -227,10 +231,7 @@ impl Statement {
 }
 
 /// Render a semantic name using the same checked identifier emitter as the AST.
-pub(crate) fn render_full_name(
-    name: &crate::names::FullName,
-    dialect: Dialect,
-) -> Result<String, DeparseError> {
+pub(crate) fn render_full_name(name: &FullName, dialect: Dialect) -> Result<String, DeparseError> {
     let mut writer = SqlWriter::new(dialect);
     if let Some(catalog) = name.catalog() {
         writer.postgres_only("catalog-qualified name")?;

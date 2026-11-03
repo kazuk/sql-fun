@@ -1,3 +1,10 @@
+use crate::context::{
+    ConflictMasters,
+    base_context::{
+        BaseContext as BaseContextBaseContext, CastDefinition as BaseContextCastDefinition,
+        deserialize_from_path,
+    },
+};
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
@@ -31,9 +38,9 @@ type LoadedCasts = (TrieMap<TrieMap<CastDefinition>>, HashSet<FullName>);
 impl PgBuiltinCasts {
     pub(super) fn load<P: AsRef<Path>>(
         path: P,
-        masters: &crate::context::ConflictMasters,
+        masters: &ConflictMasters,
     ) -> Result<LoadedCasts, AnalysisError> {
-        let casts: CastMap = super::deserialize_from_path(path)?;
+        let casts: CastMap = deserialize_from_path(path)?;
 
         let mut result = TrieMap::new();
         let mut binary_ordered = HashSet::new();
@@ -65,7 +72,7 @@ impl PgBuiltinCasts {
 #[cfg(test)]
 mod loader_tests;
 
-impl CastInfoRead for super::BaseContext {
+impl CastInfoRead for BaseContextBaseContext {
     fn get_assignment_cast(
         &self,
         source: &TypeReference,
@@ -130,7 +137,7 @@ impl CastInfoRead for super::BaseContext {
         &self,
         source_type: &TypeReference,
         target_type: &TypeReference,
-    ) -> Option<super::CastDefinition> {
+    ) -> Option<BaseContextCastDefinition> {
         if !source_type.is_dynamic() && source_type == target_type {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
@@ -166,7 +173,7 @@ impl CastInfoRead for super::BaseContext {
         &self,
         source_type: &TypeReference,
         target_type: &TypeReference,
-    ) -> Option<super::CastDefinition> {
+    ) -> Option<BaseContextCastDefinition> {
         if !source_type.is_dynamic() && source_type == target_type {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }

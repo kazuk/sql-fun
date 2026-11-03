@@ -1,11 +1,13 @@
 #[cfg(feature = "sqlite")]
-use super::super::test_helpers::resolve;
-use super::super::test_helpers::source_namespace_statement;
-#[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
+#[cfg(feature = "sqlite")]
+use crate::ast::resolve::query::test_helpers::resolve;
 use crate::{
+    ast::resolve::query::test_helpers::{
+        source_namespace_statement, source_namespace_statement_at_version,
+    },
     names::FullName,
-    sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
+    sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr, TypeReference},
 };
 
 #[rstest::rstest]
@@ -96,7 +98,7 @@ fn unique_column_retains_its_occurrence(
     #[case] sql: &str,
     #[case] schema: &str,
     #[case] table: &str,
-    #[case] ty: crate::sem::TypeReference,
+    #[case] ty: TypeReference,
 ) {
     let analyzed = source_namespace_statement(sql);
     assert!(
@@ -541,7 +543,7 @@ fn a_join_alias_preserves_occurrence_identity() {
 #[case::new("new", false)]
 fn delete_row_images_keep_the_destination_occurrence(#[case] image: &str, #[case] not_null: bool) {
     let sql = format!("DELETE FROM a.t USING b.t RETURNING {image}.*");
-    let analyzed = super::super::test_helpers::source_namespace_statement_at_version(&sql, "18");
+    let analyzed = source_namespace_statement_at_version(&sql, "18");
     assert!(
         analyzed.context().reported_problems().is_empty(),
         "{:?}",
@@ -638,6 +640,8 @@ fn an_unresolved_join_input_blocks_qualified_binding() {
 }
 
 mod test_helpers {
+    use crate::sem::SemAst;
+
     use crate::{
         names::FullName,
         sem::{
@@ -645,7 +649,7 @@ mod test_helpers {
         },
     };
 
-    pub(super) fn result_columns(ast: &crate::sem::SemAst) -> ResultColumnCollection {
+    pub(super) fn result_columns(ast: &SemAst) -> ResultColumnCollection {
         if let Some(statement) = ast.as_update() {
             statement.result_columns().clone()
         } else if let Some(statement) = ast.as_delete() {

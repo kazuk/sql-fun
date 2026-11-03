@@ -1,6 +1,9 @@
-use super::{Direction, InitStep, StepCompletion, StepFuture};
-use crate::init::InitializationState;
-use crate::init::{conversation::Conversation, flow};
+use crate::init::{
+    InitializationState,
+    conversation::Conversation,
+    flow,
+    step::{Direction, InitStep, StepCompletion, StepFuture},
+};
 
 pub(in crate::init) struct HomeDirectoryStep;
 impl InitStep for HomeDirectoryStep {

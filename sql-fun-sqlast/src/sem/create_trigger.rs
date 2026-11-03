@@ -1,8 +1,13 @@
-use crate::context::BaseParseContext;
-use crate::sem::traversal::SemanticVisitorMut;
 use crate::{
-    names::{ColumnName, FullName},
-    sem::{AnalysisError, ColumnDefinition, ParseContext, SemAst, SemScalarExpr, TypeReference},
+    ast::Dialect,
+    context::BaseParseContext,
+    names::{ColumnName, FullName, LocalName, SchemaName, TableName},
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename, ParseContext, SemAst,
+        SemScalarExpr, SourcePathWithSpan, TypeReference,
+        problem::TriggerProblem,
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
+    },
 };
 
 /// Exact trigger lookup identity, including PostgreSQL's owning relation namespace.
@@ -22,15 +27,14 @@ impl TriggerIdentity {
     /// A schema-scoped SQLite trigger (ASCII case insensitive).
     pub fn sqlite(name: &FullName) -> Self {
         let schema = name.schema().map(Self::sqlite_schema);
-        let local =
-            crate::names::LocalName::from(name.name().as_str().to_ascii_lowercase().as_str());
+        let local = LocalName::from(name.name().as_str().to_ascii_lowercase().as_str());
         Self {
             name: FullName::new(&name.catalog().cloned(), &schema, &local),
             relation: None,
         }
     }
-    fn sqlite_schema(schema: &crate::names::SchemaName) -> crate::names::SchemaName {
-        crate::names::SchemaName::from(schema.as_str().to_ascii_lowercase().as_str())
+    fn sqlite_schema(schema: &SchemaName) -> SchemaName {
+        SchemaName::from(schema.as_str().to_ascii_lowercase().as_str())
     }
     /// Qualified object name.
     pub const fn name(&self) -> &FullName {
@@ -93,7 +97,7 @@ impl TriggerReferences {
         context: &'a impl BaseParseContext,
         target: &FullName,
     ) -> Vec<&'a CreateTrigger> {
-        let sqlite = crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite();
+        let sqlite = Dialect::from(context.metadata()) == Dialect::sqlite();
         let mut definitions = Vec::new();
         for name in &self.0 {
             let identity = if sqlite {
@@ -196,7 +200,7 @@ pub enum TriggerEvent {
     Truncate,
 }
 impl TriggerEvent {
-    fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    fn rename_column(&mut self, rename: &ColumnRename) {
         if let Self::Update(columns) = self {
             for column in columns {
                 if column.found {
@@ -270,7 +274,7 @@ pub enum TriggerBody {
 impl TriggerBody {
     fn rename_relation(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         if let Self::Commands(commands) = self {
             for command in commands {
@@ -381,36 +385,30 @@ pub struct CreateTrigger {
     if_not_exists: bool,
     temporary: bool,
     dependencies: TriggerDependencies,
-    source: Option<crate::sem::SourcePathWithSpan>,
+    source: Option<SourcePathWithSpan>,
 }
 impl CreateTrigger {
-    pub(crate) fn rename_column(
-        &mut self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Result<(), AnalysisError> {
-        self.rename_column_with(
-            rename,
-            &mut crate::sem::traversal::ColumnRenamer::new(rename),
-        )
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
+        self.rename_column_with(rename, &mut ColumnRenamer::new(rename))
     }
     pub(crate) fn rename_column_with(
         &mut self,
-        rename: &crate::sem::ColumnRename,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        rename: &ColumnRename,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         if &self.target == rename.table().full_name() {
             for event in &mut self.events {
                 event.rename_column(rename);
             }
         }
-        crate::sem::traversal::optional(&mut self.predicate, visitor)?;
+        optional(&mut self.predicate, visitor)?;
         self.body.rename_relation(visitor)
     }
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
+        old: &TableName,
+        new: &TableName,
     ) -> Result<(), AnalysisError> {
         if self.identity.relation.as_ref() == Some(old.full_name()) {
             self.identity.relation = Some(new.full_name().clone());
@@ -428,7 +426,7 @@ impl CreateTrigger {
                 transition.relation = new.full_name().clone();
             }
         }
-        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        let mut visitor = RelationRenamer::new(old, new);
         if let Some(predicate) = &mut self.predicate {
             predicate.walk(&mut visitor)?;
         }
@@ -497,7 +495,7 @@ impl CreateTrigger {
         target: &FullName,
         column: &ColumnName,
     ) -> Option<ColumnDefinition> {
-        let sqlite = context.dialect() == crate::ast::Dialect::sqlite();
+        let sqlite = context.dialect() == Dialect::sqlite();
         if let Some(table) = context.get_table_impl(target) {
             let mut index = 0;
             while let Some(definition) = table.get_column_at(index) {
@@ -549,7 +547,7 @@ impl CreateTrigger {
         &self.dependencies
     }
     /// Source statement location, when supplied by the caller.
-    pub const fn source(&self) -> Option<&crate::sem::SourcePathWithSpan> {
+    pub const fn source(&self) -> Option<&SourcePathWithSpan> {
         self.source.as_ref()
     }
     /// Exact named registration identity.
@@ -606,16 +604,16 @@ impl CreateTrigger {
                 return Ok(context);
             }
             if !self.replace || existing.constraint().is_some() || self.constraint.is_some() {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                    &crate::sem::problem::TriggerProblem::duplicate(self.identity()),
+                context.report_analysis_problem(AnalysisProblem::trigger(
+                    &TriggerProblem::duplicate(self.identity()),
                 ))?;
                 return Ok(context);
             }
         }
         if context.resolve_relation_name(&self.target).is_none() {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(&self.target),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::trigger(&TriggerProblem::target(
+                &self.target,
+            )))?;
             return Ok(context);
         }
         // DDL determines the association; storage only performs the supplied update.
@@ -671,10 +669,9 @@ impl crate::sem::traversal::SemanticVisitorMut for TriggerDependencies {
 }
 #[cfg(test)]
 mod anonymous_dependency_tests {
-    use super::TriggerDependencies;
     use crate::{
         names::FullName,
-        sem::{ScalarConstExpr, SemScalarExpr},
+        sem::{ScalarConstExpr, SemScalarExpr, create_trigger::TriggerDependencies},
     };
 
     #[test]

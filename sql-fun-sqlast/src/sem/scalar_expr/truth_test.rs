@@ -1,7 +1,10 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::sem::{
     AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
-    ParseContext, PgBuiltInType, SemScalarExpr, TypeReference, problem::TruthTestProblem,
+    ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
+    parameter_resolution::ParameterResolution,
+    problem::TruthTestProblem,
+    scalar_expr::SemScalarExprNode,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
 };
 
 /// A SQL truth predicate with its analyzed operand and boolean coercion.
@@ -149,22 +152,19 @@ impl TruthTestExpr {
         &self.types
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.argument.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.argument.visit(visitor)
     }
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &impl ParseContext,
     ) {
         let (node, types) = parameters.truth_test(context, &self.argument, &self.types);

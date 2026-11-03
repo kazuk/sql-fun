@@ -469,6 +469,8 @@ where
 
 #[cfg(test)]
 mod eof_tests {
+    use crate::buffers::JsonLinesStreamReader;
+
     #[rstest::rstest]
     #[case::empty("", 0)]
     #[case::one("{}\n", 1)]
@@ -478,7 +480,7 @@ mod eof_tests {
         #[case] input: &str,
         #[case] count: usize,
     ) -> ::testresult::TestResult {
-        let mut reader = super::JsonLinesStreamReader::new_async(
+        let mut reader = JsonLinesStreamReader::new_async(
             std::io::Cursor::new(input.to_owned()),
             3,
             128,
@@ -504,7 +506,7 @@ mod eof_tests {
     #[case::missing_newline("{}")]
     #[tokio::test(flavor = "multi_thread")]
     async fn truncated_frame_remains_error(#[case] input: &str) -> ::testresult::TestResult {
-        let mut reader = super::JsonLinesStreamReader::new_async(
+        let mut reader = JsonLinesStreamReader::new_async(
             std::io::Cursor::new(input.to_owned()),
             3,
             128,

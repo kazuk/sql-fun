@@ -89,13 +89,15 @@ fn comment_psql_commands(mut text: String) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::sql_file::comment_psql_commands;
+
     #[rstest::rstest]
     #[case::normal("\\restrict abc\nSELECT 1;\n", "-- strict abc\nSELECT 1;\n")]
     #[case::indented("  \\x\r\nSELECT 1;", "  --\r\nSELECT 1;")]
     #[case::short("\\", " ")]
     #[case::unicode("\\é\n", "-- \n")]
     fn preserves_command_offsets(#[case] input: &str, #[case] expected: &str) {
-        let actual = super::comment_psql_commands(input.to_owned());
+        let actual = comment_psql_commands(input.to_owned());
         assert_eq!(actual, expected);
         assert_eq!(actual.len(), input.len());
     }

@@ -1,11 +1,19 @@
 //! Small explicit catalog and SQL fixtures for foreign-key binding contracts.
+
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+#[cfg(feature = "sqlite")]
+use crate::parse_statements;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::create_cache_context;
 use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
     names::{ColumnName, FullName, SchemaName, TableName},
-    sem::ForeignKeyColumnConstraint,
-    test_helpers::{TestParseContext, ownership::apply_ownership_sql, source_span},
+    sem::{ForeignKeyColumnConstraint, PgBuiltInType},
+    syn::Constraint,
+    test_helpers::{SynBuilder, TestParseContext, ownership::apply_ownership_sql, source_span},
 };
 
 pub(crate) fn context() -> SchemaFileContext {
@@ -15,8 +23,8 @@ pub(crate) fn context() -> SchemaFileContext {
     .unwrap();
     let mut base = TestParseContext::default().with_metadata(&metadata);
     base.set_search_path(&[SchemaName::from("a"), SchemaName::from("b")]);
-    base.setup_type(crate::sem::PgBuiltInType::int4());
-    base.setup_type(crate::sem::PgBuiltInType::text());
+    base.setup_type(PgBuiltInType::int4());
+    base.setup_type(PgBuiltInType::text());
     child(&base.freeze())
 }
 
@@ -165,9 +173,9 @@ pub(crate) fn name(schema: &str, local: &str) -> TableName {
     TableName::from(FullName::with_schema(schema, local))
 }
 
-pub(crate) fn postgres_constraint(sql: &str) -> crate::syn::Constraint {
+pub(crate) fn postgres_constraint(sql: &str) -> Constraint {
     use crate::syn::{ListOpt, Opt};
-    let node = crate::test_helpers::SynBuilder::new().parse(sql);
+    let node = SynBuilder::new().parse(sql);
     let alter = node.as_alter_table_stmt().as_inner().expect("ALTER TABLE");
     let commands = alter.get_cmds().as_inner().expect("commands");
     commands[0]
@@ -186,15 +194,15 @@ pub(crate) fn sqlite_context() -> SchemaFileContext {
     .unwrap();
     let mut base = TestParseContext::default()
         .with_metadata(&metadata)
-        .with_dialect(crate::ast::Dialect::sqlite());
+        .with_dialect(Dialect::sqlite());
     base.set_search_path(&[SchemaName::from("main")]);
     child(&base.freeze())
 }
 
 #[cfg(feature = "sqlite")]
 pub(crate) fn apply_sqlite(context: SchemaFileContext, sql: &str) -> SchemaFileContext {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    crate::parse_statements(sql, crate::ast::Dialect::sqlite())
+    let mut cache_context = create_cache_context();
+    parse_statements(sql, Dialect::sqlite())
         .next()
         .unwrap()
         .expect("SQLite SQL")

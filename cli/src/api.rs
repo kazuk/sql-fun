@@ -88,7 +88,7 @@ fn resolve_executable(explicit: Option<std::ffi::OsString>) -> Result<PathBuf, :
 
 #[cfg(test)]
 mod test_executable {
-    use super::resolve_executable;
+    use crate::api::resolve_executable;
 
     #[test]
     fn relative_reference_can_precede_cargo_build() {
@@ -168,7 +168,7 @@ impl ApiInput {
 
 #[cfg(test)]
 mod test_input {
-    use super::ApiInput;
+    use crate::api::ApiInput;
 
     #[rstest::rstest]
     #[case::omitted(r#"{"method":"echo","params":{}}"#, true)]
@@ -280,7 +280,7 @@ impl<W: AsyncWrite + Unpin> ResponseOutput<W> {
 
 #[cfg(test)]
 mod test_output {
-    use super::{ResponseOutput, test_helpers};
+    use crate::api::{ResponseOutput, test_helpers};
 
     #[rstest::rstest]
     #[tokio::test]
@@ -375,7 +375,7 @@ where
 
 #[cfg(test)]
 mod test_bridge {
-    use super::{bridge, test_helpers};
+    use crate::api::{bridge, test_helpers};
     use ::tokio::io::{AsyncReadExt, BufReader};
 
     #[tokio::test]

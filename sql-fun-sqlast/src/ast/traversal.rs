@@ -1,12 +1,15 @@
 //! Mutable traversal of common SQL query syntax, independent of analysis passes.
-use crate::ast::projection::ProjectionScope;
-use crate::ast::{
-    Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte, CteBody,
-    Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FromGroup, FromItem, Grouping, InTable,
-    IndexExpression, Indirection, Insert, Into, Join, NamedArgument, NullTest, OperatorExpr, Order,
-    Query, QueryBody, Raise, Select, SetQuery, Slice, Subquery, SyntaxOption, SyntaxValue,
-    TableFunction, TableFunctions, TableSample, Target, TruthTest, TypeName, TypedColumn, Update,
-    Window, With,
+
+use crate::{
+    ast::{
+        Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte,
+        CteBody, Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FromGroup, FromItem,
+        Grouping, InTable, IndexExpression, Indirection, Insert, Into, Join, NamedArgument,
+        NullTest, OperatorExpr, Order, Query, QueryBody, Raise, Select, SetQuery, Slice, Subquery,
+        SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target, TruthTest,
+        TypeName, TypedColumn, Update, Window, With, projection::ProjectionScope,
+    },
+    stack::with_stack as stack_with_stack,
 };
 
 use crate::ast::StatementNode;
@@ -214,7 +217,7 @@ impl WalkSqlMut for QueryBody {
 impl WalkSqlMut for Expr {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
         visitor.expression(self);
-        crate::stack::with_stack(|| match self {
+        stack_with_stack(|| match self {
             Self::Literal(_)
             | Self::Column(_)
             | Self::Star(_)
@@ -249,7 +252,7 @@ impl WalkSqlMut for Expr {
 impl WalkSqlMut for FromItem {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
         visitor.source(self);
-        crate::stack::with_stack(|| match self {
+        stack_with_stack(|| match self {
             Self::Relation(_) => {}
             Self::Query(node) => node.walk_sql_mut(visitor),
             Self::Join(node) => node.walk_sql_mut(visitor),
@@ -264,7 +267,7 @@ impl WalkSqlMut for FromItem {
 
 impl WalkSqlMut for Grouping {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
-        crate::stack::with_stack(|| match self {
+        stack_with_stack(|| match self {
             Self::Expression(node) => node.walk_sql_mut(visitor),
             Self::Empty => {}
             Self::Rollup(nodes) | Self::Cube(nodes) | Self::Sets(nodes) | Self::Simple(nodes) => {
@@ -314,7 +317,7 @@ impl WalkSqlMut for Target {
 }
 impl WalkSqlMut for Query {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
-        crate::stack::with_stack(|| {
+        stack_with_stack(|| {
             visitor.enter_query(self);
             self.with.walk_sql_mut(visitor);
             self.body.walk_with_order(visitor, &mut self.order);

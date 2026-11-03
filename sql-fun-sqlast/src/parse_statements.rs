@@ -1,14 +1,21 @@
 //! Parsing SQL text into owned common statements.
 
 mod postgres;
+
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
 pub(crate) use self::postgres::split_postgres_statements;
 
-use crate::StringSpan;
-use crate::ast::{Dialect, Statement, StatementKind};
-use crate::sem::AnalysisError;
+use crate::parse_statements::postgres::parse;
+#[cfg(feature = "sqlite")]
+use crate::parse_statements::sqlite::parse as sqlite_parse;
+
+use crate::{
+    StringSpan,
+    ast::{Dialect, Statement, StatementKind},
+    sem::AnalysisError,
+};
 
 /// A failed statement conversion, statement syntax error, or terminal boundary failure.
 ///
@@ -190,11 +197,11 @@ pub fn parse_statements(
 ) -> impl Iterator<Item = Result<Statement, ParseStatementError>> + '_ {
     let statements: Box<dyn Iterator<Item = Result<Statement, ParseStatementError>> + '_> =
         if dialect == Dialect::postgres() {
-            Box::new(self::postgres::parse(sql))
+            Box::new(parse(sql))
         } else {
             #[cfg(feature = "sqlite")]
             {
-                Box::new(self::sqlite::parse(sql))
+                Box::new(sqlite_parse(sql))
             }
             #[cfg(not(feature = "sqlite"))]
             {

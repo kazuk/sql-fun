@@ -1,4 +1,4 @@
-use crate::sem::TypeReference;
+use crate::{names::TableName, sem::TypeReference};
 
 /// A structural array with a fully retained element type.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -7,11 +7,7 @@ pub struct ArrayTypeDefinition {
 }
 
 impl ArrayTypeDefinition {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.element.rename_relation(old, new);
     }
 

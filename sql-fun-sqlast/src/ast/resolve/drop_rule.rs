@@ -4,8 +4,8 @@ use crate::{
     context::ParseContext,
     names::{FullName, ViewName},
     sem::{
-        AnalysisError, DropDependencyBehavior, ResolutionFailure, RuleIdentity, SemAst,
-        problem::RuleProblem,
+        AnalysisError, DropDependencyBehavior, DropRule as SemDropRule, ResolutionFailure,
+        RuleIdentity, SemAst, problem::RuleProblem,
     },
 };
 
@@ -13,14 +13,14 @@ impl DropRule {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::DropRule>, AnalysisError> {
+    ) -> Result<Option<SemDropRule>, AnalysisError> {
         let result = self.resolve_definition(context);
         ResolutionFailure::finish(result, context)
     }
     fn resolve_definition(
         &self,
         context: &impl ParseContext,
-    ) -> Result<crate::sem::DropRule, ResolutionFailure> {
+    ) -> Result<SemDropRule, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let requested_target = self.relation.full_name()?;
         let behavior = match self.behavior {
@@ -29,7 +29,7 @@ impl DropRule {
         };
         let Some(target) = context.resolve_relation_name(&requested_target) else {
             if self.if_exists {
-                return Ok(crate::sem::DropRule::new(
+                return Ok(SemDropRule::new(
                     &requested,
                     &requested_target,
                     None,
@@ -51,7 +51,7 @@ impl DropRule {
         requested_target: &FullName,
         target: &FullName,
         behavior: DropDependencyBehavior,
-    ) -> Result<crate::sem::DropRule, ResolutionFailure> {
+    ) -> Result<SemDropRule, ResolutionFailure> {
         let identity = RuleIdentity::new(target, requested.name().as_str());
         let found = context.rule(&identity).is_some();
         if identity.name().name().as_str() == "_RETURN"
@@ -67,7 +67,7 @@ impl DropRule {
         if !found && !self.if_exists {
             return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
         }
-        Ok(crate::sem::DropRule::new(
+        Ok(SemDropRule::new(
             requested,
             requested_target,
             Some(&identity),

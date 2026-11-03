@@ -1,10 +1,12 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::PrimaryKeyColumnConstraint as SqlitePrimaryKeyColumnConstraint;
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
         ConflictClause, Deferrable, ParseContext,
     },
-    syn::{ConstrType, Opt},
+    syn::{ConstrType, Constraint, Opt},
 };
 
 /// primary key constraint
@@ -17,7 +19,7 @@ pub struct PrimaryKeyColumnConstraint {
 }
 
 impl PrimaryKeyColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -63,7 +65,7 @@ impl PrimaryKeyColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -96,7 +98,7 @@ impl PrimaryKeyColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::PrimaryKeyColumnConstraint,
+        syn: &SqlitePrimaryKeyColumnConstraint,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,

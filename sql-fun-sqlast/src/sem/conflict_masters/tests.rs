@@ -1,8 +1,14 @@
-use super::{lookup_collation, lookup_operator_class};
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+#[cfg(feature = "sqlite")]
+use crate::context::FrozenBaseContext;
 use crate::{
     context::{BaseParseContext, ConflictInfoRead, SchemaFileContext},
     names::{FullName, SchemaName},
-    sem::ParseContext,
+    sem::{
+        CatalogNameLookup, ParseContext,
+        conflict_masters::{lookup_collation, lookup_operator_class},
+    },
     test_helpers::conflict_masters as test_helpers,
 };
 
@@ -146,7 +152,7 @@ fn frozen_custom_context_preserves_completed_ambiguity() {
         FullName::with_schema("one", "custom"),
         FullName::with_schema("two", "custom"),
     ];
-    let outcome = crate::sem::CatalogNameLookup::ambiguous(&requested, &candidates);
+    let outcome = CatalogNameLookup::ambiguous(&requested, &candidates);
     context.set_collation_lookup(&requested, &outcome);
     let frozen = context.freeze();
     assert_eq!(frozen.lookup_collation(&requested), outcome);
@@ -177,10 +183,10 @@ fn unqualified_lookup_skips_temporary_namespaces() {
 #[test]
 #[should_panic(expected = "PostgreSQL master definitions must be supplied")]
 fn unavailable_postgres_service_is_not_a_completed_missing_lookup() {
-    let parent = test_helpers::base_without_masters(crate::ast::Dialect::sqlite()).unwrap();
+    let parent = test_helpers::base_without_masters(Dialect::sqlite()).unwrap();
     let args = parent.get_args().clone();
     let metadata = test_helpers::Masters::new().context().metadata().clone();
-    let frozen = crate::context::FrozenBaseContext::from(parent);
+    let frozen = FrozenBaseContext::from(parent);
     let child = SchemaFileContext::new(
         std::path::Path::new("postgres.sql"),
         &frozen,
@@ -198,7 +204,7 @@ fn active_sqlite_dialect_does_not_use_frozen_postgres_namespace() {
     let args = parent.get_args().clone();
     let sqlite = test_helpers::Masters::new()
         .context()
-        .with_dialect(crate::ast::Dialect::sqlite());
+        .with_dialect(Dialect::sqlite());
     let frozen = parent.freeze();
     let child = SchemaFileContext::new(
         std::path::Path::new("sqlite.sql"),

@@ -1,5 +1,6 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{InputTypeConstraint, TypeReference};
+use crate::sem::{
+    InputTypeConstraint, ParameterConstraints, TypeReference, scalar_expr::SemScalarExprNode,
+};
 
 /// A numbered SQL input with its assigned or inferred SQL type domain.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -44,7 +45,7 @@ impl ParamRef {
     pub(super) const fn canonicalize_grouping_key(&mut self) {
         self.node = 0;
     }
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         self.constraint = constraints.node_domain(self.node).clone();
     }
 }

@@ -5,18 +5,26 @@
 //! for the comma form. Every event must match one owned TypeName. Absolute
 //! boundaries select only that type's spelling; no statement source is retained.
 
-use crate::StringSpan;
-use crate::ast::document::DocumentExpr;
-use crate::ast::{
-    Access, AlterCommand, AlterRelation, Assignment, BooleanExpr, Call, Case, CaseArm, Cast,
-    Collate, Column, ColumnConstraint, Conflict, Cte, CteBody, Delete, DerivedTable, Expr, Frame,
-    FrameBound, FromGroup, FromItem, Grouping, InTable, IndexExpression, Indirection, Insert, Join,
-    NamedArgument, NullTest, OperatorExpr, Order, Query, QueryBody, Raise, Select, SetQuery, Slice,
-    Statement, StatementNode, Subquery, Table, TableConstraint, TableFunction, TableFunctions,
-    Target, TruthTest, TypeName, TypedColumn, Update, View, Window, With,
+use crate::{
+    ast::{CreateTrigger, TriggerBody},
+    sem::with_stack,
 };
-use crate::sem::AnalysisError;
+
+#[cfg(feature = "sqlite")]
 use crate::sqlite_parser::TypeSpan;
+use crate::{
+    StringSpan,
+    ast::{
+        Access, AlterCommand, AlterRelation, Assignment, BooleanExpr, Call, Case, CaseArm, Cast,
+        Collate, Column, ColumnConstraint, Conflict, Cte, CteBody, Delete, DerivedTable, Expr,
+        Frame, FrameBound, FromGroup, FromItem, Grouping, InTable, IndexExpression, Indirection,
+        Insert, Join, NamedArgument, NullTest, OperatorExpr, Order, Query, QueryBody, Raise,
+        Select, SetQuery, Slice, Statement, StatementNode, Subquery, Table, TableConstraint,
+        TableFunction, TableFunctions, Target, TruthTest, TypeName, TypedColumn, Update, View,
+        Window, With, document::DocumentExpr,
+    },
+    sem::AnalysisError,
+};
 
 impl Statement {
     pub(crate) fn retain_sqlite_type_syntax(
@@ -41,8 +49,7 @@ impl Statement {
 
 #[cfg(test)]
 mod test_statement_type_retention {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     use ::rusqlite::types::Value;
 
@@ -288,7 +295,7 @@ impl SqliteTypeRetainer<'_> {
 trait RetainSqliteTypes {
     #[inline]
     fn retain_types(&mut self, retainer: &mut SqliteTypeRetainer<'_>) -> Result<(), AnalysisError> {
-        crate::sem::with_stack(|| self.retain_types_inner(retainer))
+        with_stack(|| self.retain_types_inner(retainer))
     }
 
     fn retain_types_inner(
@@ -955,7 +962,7 @@ impl RetainSqliteTypes for Delete {
     }
 }
 
-impl RetainSqliteTypes for crate::ast::CreateTrigger {
+impl RetainSqliteTypes for CreateTrigger {
     fn retain_types_inner(
         &mut self,
         retainer: &mut SqliteTypeRetainer<'_>,
@@ -965,7 +972,7 @@ impl RetainSqliteTypes for crate::ast::CreateTrigger {
     }
 }
 
-impl RetainSqliteTypes for crate::ast::TriggerBody {
+impl RetainSqliteTypes for TriggerBody {
     fn retain_types_inner(
         &mut self,
         retainer: &mut SqliteTypeRetainer<'_>,

@@ -1,10 +1,27 @@
 #[cfg(test)]
 mod impl_analyze_range_var_node;
 
-use crate::ast::TryFromWithTokens;
-use crate::sem::data_source::DataSource;
+#[cfg(test)]
+use crate::ast::DerivedTable;
+#[cfg(test)]
+use crate::ast::Join;
+#[cfg(test)]
+use crate::ast::TableFunctions;
+#[cfg(test)]
+use crate::ast::XmlTable;
+#[cfg(test)]
+use crate::syn::JoinExpr;
+#[cfg(test)]
+use crate::syn::RangeFunction;
+#[cfg(test)]
+use crate::syn::RangeSubselect;
+#[cfg(test)]
+use crate::syn::RangeTableFunc;
+use crate::{ast::FromItem, syn::Node as SynNode};
+
 use crate::{
-    sem::{AnalysisError, FromClause, ParseContext, WithClause},
+    ast::TryFromWithTokens,
+    sem::{AnalysisError, FromClause, ParseContext, WithClause, data_source::DataSource},
     syn::ScanToken,
 };
 
@@ -15,16 +32,13 @@ impl DataSource {
     #[cfg(test)]
     fn analyze_range_subselect<TParseContext>(
         mut context: TParseContext,
-        range_subsel: crate::syn::RangeSubselect,
+        range_subsel: RangeSubselect,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::FromItem::query(crate::ast::DerivedTable::try_from_with_tokens(
-            &range_subsel,
-            tokens,
-        )?);
+        let syntax = FromItem::query(DerivedTable::try_from_with_tokens(&range_subsel, tokens)?);
         let outcome =
             syntax.resolve_source(&mut context, &WithClause::default(), &FromClause::default());
         Ok((outcome?, context))
@@ -33,6 +47,8 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_analyze_range_subselect {
+    use crate::{sem::data_source::analyze::DataSource, syn::NodeInner};
+
     use crate::{
         context::MutSourcePathWithSpan,
         sem::SourcePathWithSpan,
@@ -51,10 +67,8 @@ mod test_analyze_range_subselect {
         let builder = SynBuilder::new();
         test_context.set_source_path_with_span(&source_span);
 
-        let res_target = builder.res_target(
-            "name",
-            crate::syn::NodeInner::AConst(builder.const_int4(10)).into(),
-        );
+        let res_target =
+            builder.res_target("name", NodeInner::AConst(builder.const_int4(10)).into());
         let query = builder.select_stmt(
             WithClauseOpt::none(),
             NodeList::from(Vec::<Node>::new()),
@@ -64,7 +78,7 @@ mod test_analyze_range_subselect {
         let range_subselect = builder.range_subselect(alias_spec, query);
         let tokens = IVec::default();
 
-        super::DataSource::analyze_range_subselect(test_context, range_subselect, &tokens)?;
+        DataSource::analyze_range_subselect(test_context, range_subselect, &tokens)?;
         Ok(())
     }
 }
@@ -75,14 +89,13 @@ impl DataSource {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        join_expr: crate::syn::JoinExpr,
+        join_expr: JoinExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax =
-            crate::ast::FromItem::join(crate::ast::Join::try_from_with_tokens(&join_expr, tokens)?);
+        let syntax = FromItem::join(Join::try_from_with_tokens(&join_expr, tokens)?);
         let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
@@ -90,6 +103,8 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_analyze_join_expr {
+    use crate::sem::data_source::analyze::DataSource;
+
     use crate::{
         names::{ColumnName, FullName, SchemaName},
         sem::{ColumnDefinition, FromClause, SourcePathWithSpan, TypeReference, WithClause},
@@ -142,7 +157,7 @@ mod test_analyze_join_expr {
         let from_clause = FromClause::default();
         let tokens = IVec::default();
 
-        let (_ds, _) = super::DataSource::analyze_join_expr(
+        let (_ds, _) = DataSource::analyze_join_expr(
             test_context,
             &with_clause,
             &from_clause,
@@ -160,14 +175,13 @@ impl DataSource {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        node: crate::syn::RangeTableFunc,
+        node: RangeTableFunc,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax =
-            crate::ast::FromItem::xml(crate::ast::XmlTable::try_from_with_tokens(&node, tokens)?);
+        let syntax = FromItem::xml(XmlTable::try_from_with_tokens(&node, tokens)?);
         let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
@@ -175,6 +189,8 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_data_source_analyze_range_table_func {
+    use crate::sem::data_source::analyze::{DataSource as AnalyzeDataSource, FromClause};
+
     use crate::{
         names::SchemaName,
         sem::{DataSource, WithClause},
@@ -197,9 +213,9 @@ mod test_data_source_analyze_range_table_func {
         let range_table_func = builder.build_range_table_func(func_call_node, alias);
         let tokens = IVec::default();
         let with_clause = WithClause::default();
-        let from_clause = super::FromClause::default();
+        let from_clause = FromClause::default();
 
-        let (ds, _) = super::DataSource::analyze_range_table_func(
+        let (ds, _) = AnalyzeDataSource::analyze_range_table_func(
             test_context,
             &with_clause,
             &from_clause,
@@ -225,15 +241,13 @@ impl DataSource {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        node: crate::syn::RangeFunction,
+        node: RangeFunction,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::FromItem::functions(
-            crate::ast::TableFunctions::try_from_with_tokens(&node, tokens)?,
-        );
+        let syntax = FromItem::functions(TableFunctions::try_from_with_tokens(&node, tokens)?);
         let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
@@ -241,6 +255,11 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_data_source_analyze_range_func_rows_from {
+    use crate::{
+        names::FullName,
+        sem::data_source::analyze::{DataSource as AnalyzeDataSource, FromClause},
+    };
+
     use crate::{
         names::SchemaName,
         sem::{AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, WithClause},
@@ -262,9 +281,9 @@ mod test_data_source_analyze_range_func_rows_from {
         let range_function = builder.build_range_function(func_call_node, "rows_alias", true);
         let tokens = IVec::default();
         let with_clause = WithClause::default();
-        let from_clause = super::FromClause::default();
+        let from_clause = FromClause::default();
 
-        let (ds, _) = super::DataSource::analyze_range_func_rows_from(
+        let (ds, _) = AnalyzeDataSource::analyze_range_func_rows_from(
             test_context,
             &with_clause,
             &from_clause,
@@ -278,7 +297,7 @@ mod test_data_source_analyze_range_func_rows_from {
             &AliasSpec::from_names("rows_alias", &[]),
         );
         invocation.record_function_name(
-            &crate::names::FullName::from_local_name(&func_name.local_name()),
+            &FullName::from_local_name(&func_name.local_name()),
             &func_name,
         );
         let expected_rows_func = DataSourceRowsFromFunc::invocation(&invocation);
@@ -298,15 +317,13 @@ impl DataSource {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        node: crate::syn::RangeFunction,
+        node: RangeFunction,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::FromItem::functions(
-            crate::ast::TableFunctions::try_from_with_tokens(&node, tokens)?,
-        );
+        let syntax = FromItem::functions(TableFunctions::try_from_with_tokens(&node, tokens)?);
         let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
@@ -314,6 +331,8 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_data_source_analyze_range_functions {
+    use crate::sem::data_source::analyze::{DataSource as AnalyzeDataSource, FromClause};
+
     use crate::{
         names::SchemaName,
         sem::{DataSource, WithClause},
@@ -336,9 +355,9 @@ mod test_data_source_analyze_range_functions {
         let range_function = builder.build_range_function(functions_node, "set_alias", false);
         let tokens = IVec::default();
         let with_clause = WithClause::default();
-        let from_clause = super::FromClause::default();
+        let from_clause = FromClause::default();
 
-        let (ds, _) = super::DataSource::analyze_range_func(
+        let (ds, _) = AnalyzeDataSource::analyze_range_func(
             test_context,
             &with_clause,
             &from_clause,
@@ -364,13 +383,13 @@ impl DataSource {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        node: crate::syn::Node,
+        node: SynNode,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::FromItem::try_from_with_tokens(&node, tokens)?;
+        let syntax = FromItem::try_from_with_tokens(&node, tokens)?;
         let result = syntax.resolve_source(&mut context, with_clause, from_clause);
         Ok((result?, context))
     }

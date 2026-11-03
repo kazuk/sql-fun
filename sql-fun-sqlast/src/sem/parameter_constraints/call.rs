@@ -1,10 +1,23 @@
 //! Deferred overload relations. Retained ranks are inference facts, not a catalog.
-use super::{ConstraintGraph, InputTypeConstraint, SignatureAlternative, default_types};
-use crate::sem::overload_rank::OverloadRank;
-use crate::sem::parameter_resolution::Signature;
-use crate::sem::{ParseContext, TypeReference};
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::Arc;
+
+use crate::{
+    CacheContext,
+    ast::Dialect,
+    context::BaseParseContext,
+    sem::{
+        CastContext, ParseContext, TypeReference,
+        overload_rank::OverloadRank,
+        parameter_constraints::{
+            ConstraintGraph, InputTypeConstraint, SignatureAlternative, default_types,
+        },
+        parameter_resolution::Signature,
+        with_stack,
+    },
+};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+};
 
 #[derive(Clone, Debug)]
 struct RankedSignature {
@@ -15,7 +28,7 @@ struct RankedSignature {
 impl RankedSignature {
     fn prepare(
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         signature: &Signature,
         candidates: &HashSet<TypeReference>,
     ) -> Self {
@@ -36,7 +49,7 @@ impl RankedSignature {
 
     fn ranks(
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         signature: &Signature,
         index: usize,
         sources: impl Iterator<Item = TypeReference>,
@@ -88,7 +101,7 @@ impl RankedSignature {
     fn retain_sources(
         &mut self,
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         sources: &HashSet<TypeReference>,
     ) {
         for index in 0..self.sources.len() {
@@ -117,7 +130,7 @@ impl RankedSignature {
 
 /// Original per-source array cast calculation, shared with the session cache.
 pub(crate) fn array_cast_ranks(
-    context: &impl crate::context::BaseParseContext,
+    context: &impl BaseParseContext,
     source: &TypeReference,
 ) -> HashMap<TypeReference, OverloadRank> {
     let mut targets = context.get_implicit_castable(source);
@@ -169,7 +182,7 @@ impl ArrayCastRanks {
     fn retain_source(
         &mut self,
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         source: &TypeReference,
     ) {
         if self.0.contains_key(source) {
@@ -269,7 +282,7 @@ impl RankedSignatures {
     fn retain_sources(
         &mut self,
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         sources: &HashSet<TypeReference>,
     ) {
         for entry in &mut self.0 {
@@ -290,7 +303,7 @@ impl RankedSignatures {
         mut sources: HashMap<TypeReference, OverloadRank>,
     ) {
         sources.entry(target.clone()).or_insert_with(|| {
-            OverloadRank::from(crate::sem::CastContext::no_conversion()).instantiated_operator()
+            OverloadRank::from(CastContext::no_conversion()).instantiated_operator()
         });
         self.0.push(RankedSignature {
             signature: Signature::new(&[target.clone(), target.clone()], result),
@@ -325,7 +338,7 @@ struct CallFacts {
 impl CallFacts {
     fn prepare(
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         signatures: &[Signature],
         inputs: &[InputTypeConstraint],
     ) -> Self {
@@ -357,7 +370,7 @@ impl CallFacts {
             .cloned()
             .collect();
         let mut facts = Self {
-            postgres_defaults: context.dialect() == crate::ast::Dialect::postgres(),
+            postgres_defaults: context.dialect() == Dialect::postgres(),
             concrete: RankedSignatures(concrete),
             arrays,
             array_casts: ArrayCastRanks::default(),
@@ -381,7 +394,7 @@ impl CallFacts {
     fn retain_array_source(
         &mut self,
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         source: &TypeReference,
     ) {
         if !self.arrays.is_empty() {
@@ -392,7 +405,7 @@ impl CallFacts {
     fn retain<'a>(
         &mut self,
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         types: impl Iterator<Item = &'a TypeReference>,
     ) {
         let mut sources = HashSet::new();
@@ -501,8 +514,12 @@ impl CallFacts {
 
 #[cfg(test)]
 mod call_facts_tests {
-    use super::{CallFacts, InputTypeConstraint, default_types};
-    use crate::test_helpers::parameter_calls as test_helpers;
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        sem::parameter_constraints::call::{CallFacts, InputTypeConstraint, default_types},
+        test_helpers::parameter_calls as test_helpers,
+    };
 
     #[test]
     fn unrelated_catalog_growth_does_not_instantiate_array_comparisons() {
@@ -513,7 +530,7 @@ mod call_facts_tests {
         }
         let facts = CallFacts::prepare(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &signatures,
             &[InputTypeConstraint::any(), InputTypeConstraint::any()],
         );
@@ -538,7 +555,7 @@ pub(super) struct CallConstraint {
 impl CallConstraint {
     pub(super) fn prepare(
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         nodes: &[usize],
         signatures: &[Signature],
         inputs: &[InputTypeConstraint],
@@ -556,7 +573,7 @@ impl CallConstraint {
     pub(super) fn retain<'a>(
         &mut self,
         context: &impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         types: impl Iterator<Item = &'a TypeReference>,
     ) {
         Arc::make_mut(&mut self.facts).retain(context, cache, types);
@@ -626,10 +643,23 @@ impl CallConstraint {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConstraintGraph, InputTypeConstraint};
-    use crate::sem::ParameterConstraints;
-    use crate::sem::{PgBuiltInType, TypeReference};
-    use crate::test_helpers::parameter_calls as test_helpers;
+    use crate::{
+        sem::{OperatorDefinition, parameter_resolution::Signature},
+        test_helpers::{
+            create_cache_context,
+            domain_casts::{
+                context as domain_casts_context, domain as domain_casts_domain, operators,
+            },
+        },
+    };
+
+    use crate::{
+        sem::{
+            ParameterConstraints, PgBuiltInType, TypeReference,
+            parameter_constraints::call::{ConstraintGraph, InputTypeConstraint},
+        },
+        test_helpers::parameter_calls as test_helpers,
+    };
     use std::collections::BTreeMap;
 
     #[test]
@@ -642,7 +672,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -684,7 +714,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -713,14 +743,14 @@ mod tests {
         graph.restrict(result, &InputTypeConstraint::exact(&PgBuiltInType::bool()));
         let mut array_signatures = signatures[8..].to_vec();
         if scalar_alternative {
-            array_signatures.push(crate::sem::parameter_resolution::Signature::new(
+            array_signatures.push(Signature::new(
                 &[PgBuiltInType::int4(), PgBuiltInType::int4()],
                 &PgBuiltInType::int4(),
             ));
         }
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &array_signatures,
             "array comparison",
@@ -740,7 +770,7 @@ mod tests {
     fn concrete_array_declaration_precedes_polymorphic_instantiation() {
         let (context, mut signatures) = test_helpers::comparison();
         let array = PgBuiltInType::int4().array_type();
-        signatures.push(crate::sem::parameter_resolution::Signature::new(
+        signatures.push(Signature::new(
             &[array.clone(), array.clone()],
             &PgBuiltInType::int4(),
         ));
@@ -752,7 +782,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "custom comparison",
@@ -775,7 +805,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -798,18 +828,15 @@ mod tests {
         let date = TypeReference::from_master_type_name("date");
         context.setup_type(date.clone());
         let signatures = [
-            crate::sem::parameter_resolution::Signature::new(std::slice::from_ref(&date), &date),
-            crate::sem::parameter_resolution::Signature::new(
-                &[PgBuiltInType::int4()],
-                &PgBuiltInType::int4(),
-            ),
+            Signature::new(std::slice::from_ref(&date), &date),
+            Signature::new(&[PgBuiltInType::int4()], &PgBuiltInType::int4()),
         ];
         let mut graph = ConstraintGraph::default();
         let input = graph.parameter(1);
         let result = graph.node(&InputTypeConstraint::exact(&date));
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[input, result],
             &signatures,
             "result-constrained call",
@@ -831,7 +858,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
@@ -857,14 +884,14 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "comparison",
         );
         let custom: TypeReference = "public.custom[]".parse().unwrap();
         graph.restrict(left, &InputTypeConstraint::exact(&custom));
-        graph.prepare_projections(&context, &mut crate::test_helpers::create_cache_context());
+        graph.prepare_projections(&context, &mut create_cache_context());
         graph.solve().unwrap();
         graph.report_inference_problems(&mut context).unwrap();
         assert!(context.reported_problems().is_empty());
@@ -879,14 +906,10 @@ mod tests {
         #[case] result_type: &str,
         #[values(false, true)] intermediate_solve: bool,
     ) {
-        let mut context = crate::test_helpers::domain_casts::context();
-        let domain = crate::test_helpers::domain_casts::domain(
-            &mut context,
-            "amount",
-            Some(&PgBuiltInType::int4()),
-        );
-        let overloads = crate::test_helpers::domain_casts::operators(&domain);
-        let signatures = crate::sem::OperatorDefinition::binary(&overloads).parameter_signatures();
+        let mut context = domain_casts_context();
+        let domain = domain_casts_domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let overloads = operators(&domain);
+        let signatures = OperatorDefinition::binary(&overloads).parameter_signatures();
         let mut graph = ConstraintGraph::default();
         let left = graph.parameter(1);
         let right = graph.parameter(2);
@@ -894,7 +917,7 @@ mod tests {
         graph.restrict(left, &InputTypeConstraint::exact(&domain));
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "domain comparison",
@@ -921,22 +944,16 @@ mod tests {
 
     #[test]
     fn exact_domain_over_array_precedes_an_instantiated_array_operator() {
-        let mut context = crate::test_helpers::domain_casts::context();
-        let domain = crate::test_helpers::domain_casts::domain(
+        let mut context = domain_casts_context();
+        let domain = domain_casts_domain(
             &mut context,
             "amounts",
             Some(&PgBuiltInType::int4().array_type()),
         );
         let anyarray = TypeReference::from_master_type_name("anyarray");
         let signatures = [
-            crate::sem::parameter_resolution::Signature::new(
-                &[domain.clone(), domain.clone()],
-                &PgBuiltInType::text(),
-            ),
-            crate::sem::parameter_resolution::Signature::new(
-                &[anyarray.clone(), anyarray],
-                &PgBuiltInType::bool(),
-            ),
+            Signature::new(&[domain.clone(), domain.clone()], &PgBuiltInType::text()),
+            Signature::new(&[anyarray.clone(), anyarray], &PgBuiltInType::bool()),
         ];
         let mut graph = ConstraintGraph::default();
         let left = graph.parameter(1);
@@ -946,7 +963,7 @@ mod tests {
         let result = graph.node(&InputTypeConstraint::any());
         graph.call(
             &context,
-            &mut crate::test_helpers::create_cache_context(),
+            &mut create_cache_context(),
             &[left, right, result],
             &signatures,
             "domain array comparison",
@@ -983,7 +1000,7 @@ fn combine(
         let domains = choice.extend_domains(domains);
         let mut excluded = excluded.to_vec();
         excluded.push(choice.excluded.clone());
-        crate::sem::with_stack(|| {
+        with_stack(|| {
             combine(
                 signatures,
                 choices,

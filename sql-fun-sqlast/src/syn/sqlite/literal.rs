@@ -142,8 +142,11 @@ impl From<LiteralIn> for Literal {
 
 #[cfg(test)]
 mod test_parser_blob_payload {
-    use super::Literal;
+    #[cfg(feature = "sqlite")]
     use crate::syn::sqlite::Expr;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::literal::Literal;
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     #[rstest::rstest]

@@ -1,5 +1,5 @@
 use crate::{
-    ast::ReturningOption,
+    ast::{ReturningOption, postgres::required},
     sem::AnalysisError,
     syn::{self, ListOpt, Opt},
 };
@@ -18,8 +18,7 @@ impl ReturningOption {
     }
 
     fn from_postgres_node(node: &syn::Node) -> Result<Self, AnalysisError> {
-        let option =
-            super::postgres::required(node.as_returning_option().as_inner(), "RETURNING option")?;
+        let option = required(node.as_returning_option().as_inner(), "RETURNING option")?;
         Self::try_from(&option)
     }
 }

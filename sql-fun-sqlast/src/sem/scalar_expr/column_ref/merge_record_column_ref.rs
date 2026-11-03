@@ -1,5 +1,5 @@
 use crate::{
-    names::ColumnName,
+    names::{AliasName, ColumnName},
     sem::{
         ColumnDefinition, TypeReference,
         data_source::MergeRecordRole,
@@ -16,11 +16,7 @@ pub struct MergeRecordColumnRef {
 }
 
 impl MergeRecordColumnRef {
-    pub(super) fn with_reference_name(
-        mut self,
-        alias: &crate::names::AliasName,
-        column: &ColumnName,
-    ) -> Self {
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
         self.source = Box::new((*self.source).with_reference_name(alias, column));
         self
     }

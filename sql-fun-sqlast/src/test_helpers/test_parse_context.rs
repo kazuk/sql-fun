@@ -1,14 +1,30 @@
 mod cast_info;
 mod conflict_info;
 
-use crate::context::BaseParseContext;
+use crate::{
+    AstAndContextPair,
+    ast::Dialect,
+    context::{
+        ConflictMasters, CursorBindings, FrozenBaseContext, ParameterTypeHints, RuleInfoRead,
+        SourceAccessService, ownership::OwnershipCatalog,
+    },
+    sem::{
+        AlterIndex, AlterOwner, AnalysisState, CatalogNameLookup, CreateRule, CreateTrigger,
+        CursorInfo, InsertArbiter, InsertInferenceModifiers, Kind, ObjectKind,
+        OwnedObjectDefinition, ParameterConstraints, Role, RuleIdentity, SamplingMethodLookup,
+        TriggerIdentity, ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport, ViewUpdateSupport,
+        ownership::model_definitions, problem::TriggerProblem,
+        search_path::expand_search_path_inst,
+    },
+};
+
 use crate::{
     StringSpan,
     context::{
-        DiagnosticContext, FunctionInfoRead, FunctionInfoWrite, GetSourcePathWithSpanOpt,
-        IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead, ParseContext, SearchPathRead,
-        SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite, TypeInfoRead,
-        TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        BaseParseContext, DiagnosticContext, FunctionInfoRead, FunctionInfoWrite,
+        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead,
+        ParseContext, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
+        TableInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     names::{FullName, OperatorName, SchemaName, TableName, ValidOperatorName},
     sem::{
@@ -28,17 +44,17 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Clone, Debug, Default)]
 pub struct TestParseContext {
-    rules: HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
-    ownership: crate::context::ownership::OwnershipCatalog,
-    triggers: HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
-    masters: Option<crate::context::ConflictMasters>,
-    function_set_properties: HashMap<(FullName, crate::sem::OverloadVariant), bool>,
-    sampling_methods: Option<HashMap<FullName, crate::sem::SamplingMethodLookup>>,
-    collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
-    operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
+    rules: HashMap<RuleIdentity, Option<CreateRule>>,
+    ownership: OwnershipCatalog,
+    triggers: HashMap<TriggerIdentity, Option<CreateTrigger>>,
+    masters: Option<ConflictMasters>,
+    function_set_properties: HashMap<(FullName, OverloadVariant), bool>,
+    sampling_methods: Option<HashMap<FullName, SamplingMethodLookup>>,
+    collation_results: HashMap<FullName, CatalogNameLookup>,
+    operator_class_results: HashMap<(FullName, String), CatalogNameLookup>,
     expected_conflict_target: Option<TableName>,
-    expected_conflict_modifiers: Option<Vec<crate::sem::InsertInferenceModifiers>>,
-    conflict_arbiters: Vec<crate::sem::InsertArbiter>,
+    expected_conflict_modifiers: Option<Vec<InsertInferenceModifiers>>,
+    conflict_arbiters: Vec<InsertArbiter>,
     metadata: Option<::sql_fun_core::SqlFunMetadata>,
     implicit_cast_results: HashMap<TypeReference, HashMap<TypeReference, Option<CastDefinition>>>,
     implicit_castable_results: HashMap<TypeReference, HashSet<TypeReference>>,
@@ -49,10 +65,10 @@ pub struct TestParseContext {
     array_elements: HashMap<TypeReference, TypeReference>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
-    view_delete_support: HashMap<FullName, crate::sem::ViewDeleteSupport>,
-    view_update_support: HashMap<FullName, crate::sem::ViewUpdateSupport>,
-    view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
-    view_merge_support: HashMap<FullName, crate::sem::ViewMergeSupport>,
+    view_delete_support: HashMap<FullName, ViewDeleteSupport>,
+    view_update_support: HashMap<FullName, ViewUpdateSupport>,
+    view_insert_support: HashMap<FullName, ViewInsertSupport>,
+    view_merge_support: HashMap<FullName, ViewMergeSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     aggregate_functions: HashSet<FullName>,
     sequence_definitions: HashMap<FullName, CreateSequence>,
@@ -61,10 +77,10 @@ pub struct TestParseContext {
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
-    cursors: crate::context::CursorBindings,
-    analysis_state: crate::sem::AnalysisState,
-    parameter_constraints: crate::sem::ParameterConstraints,
-    parameter_type_hints: crate::context::ParameterTypeHints,
+    cursors: CursorBindings,
+    analysis_state: AnalysisState,
+    parameter_constraints: ParameterConstraints,
+    parameter_type_hints: ParameterTypeHints,
     report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
     table_ref_types: Vec<TableName>,
@@ -80,26 +96,22 @@ impl TestParseContext {
     pub(crate) fn set_function_returns_set(
         &mut self,
         name: &FullName,
-        overload: &crate::sem::OverloadVariant,
+        overload: &OverloadVariant,
         returns_set: bool,
     ) {
         self.function_set_properties
             .insert((name.clone(), overload.clone()), returns_set);
     }
 
-    pub(crate) fn set_sampling_method(
-        &mut self,
-        name: &FullName,
-        method: &crate::sem::SamplingMethodLookup,
-    ) {
+    pub(crate) fn set_sampling_method(&mut self, name: &FullName, method: &SamplingMethodLookup) {
         self.sampling_methods
             .get_or_insert_default()
             .insert(name.clone(), method.clone());
     }
 
     /// Select this fixture's analysis environment explicitly.
-    pub(crate) fn with_dialect(mut self, dialect: crate::ast::Dialect) -> Self {
-        let selected = if dialect == crate::ast::Dialect::sqlite() {
+    pub(crate) fn with_dialect(mut self, dialect: Dialect) -> Self {
+        let selected = if dialect == Dialect::sqlite() {
             "SQLite"
         } else {
             "postgres"
@@ -398,21 +410,13 @@ impl FunctionInfoRead for TestParseContext {
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
         self.aggregate_functions.contains(name)
     }
-    fn function_returns_set(
-        &self,
-        name: &FullName,
-        overload: &crate::sem::OverloadVariant,
-    ) -> bool {
+    fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         self.function_set_properties
             .get(&(name.clone(), overload.clone()))
             .copied()
             .expect("explicit mock returns_set metadata")
     }
-    fn function_preserves_view_rows(
-        &self,
-        name: &FullName,
-        overload: &crate::sem::OverloadVariant,
-    ) -> bool {
+    fn function_preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         if let Some(preserves_rows) = self
             .function_row_properties
             .get(&(name.clone(), overload.clone()))
@@ -454,38 +458,28 @@ impl DiagnosticContext for TestParseContext {
 }
 
 impl crate::context::RuleInfoRead for TestParseContext {
-    fn local_rule(
-        &self,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Option<Option<&crate::sem::CreateRule>> {
+    fn local_rule(&self, identity: &RuleIdentity) -> Option<Option<&CreateRule>> {
         self.rules.get(identity).map(Option::as_ref)
     }
-    fn rule_parent(&self) -> Option<&dyn crate::context::RuleInfoRead> {
+    fn rule_parent(&self) -> Option<&dyn RuleInfoRead> {
         None
     }
 }
 impl crate::context::RuleInfoWrite for TestParseContext {
-    fn store_rule(
-        &mut self,
-        identity: &crate::sem::RuleIdentity,
-        definition: Option<&crate::sem::CreateRule>,
-    ) {
+    fn store_rule(&mut self, identity: &RuleIdentity, definition: Option<&CreateRule>) {
         self.rules.insert(identity.clone(), definition.cloned());
     }
-    fn store_rule_view(&mut self, target: &FullName, view: &crate::sem::ViewLike) {
+    fn store_rule_view(&mut self, target: &FullName, view: &ViewLike) {
         self.view_definitions
             .insert(target.clone(), Some(view.clone()));
     }
 }
 
 impl crate::context::TriggerInfoRead for TestParseContext {
-    fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
+    fn trigger_is_cancelled(&self, identity: &TriggerIdentity) -> bool {
         self.triggers.get(identity).is_some_and(Option::is_none)
     }
-    fn trigger(
-        &self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Option<&crate::sem::CreateTrigger> {
+    fn trigger(&self, identity: &TriggerIdentity) -> Option<&CreateTrigger> {
         if let Some(trigger) = self.triggers.get(identity) {
             trigger.as_ref()
         } else {
@@ -596,10 +590,7 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl crate::context::TriggerInfoWrite for TestParseContext {
-    fn register_trigger(
-        mut self,
-        trigger: &crate::sem::CreateTrigger,
-    ) -> Result<Self, AnalysisError> {
+    fn register_trigger(mut self, trigger: &CreateTrigger) -> Result<Self, AnalysisError> {
         self.triggers
             .insert(trigger.identity().clone(), Some(trigger.clone()));
         Ok(self)
@@ -614,16 +605,13 @@ impl crate::context::TriggerInfoWrite for TestParseContext {
         } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
             view.associate_trigger(name);
         } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
+            self.report_analysis_problem(AnalysisProblem::trigger(&TriggerProblem::target(
+                target,
+            )))?;
         }
         Ok(self)
     }
-    fn cancel_trigger(
-        mut self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Result<Self, AnalysisError> {
+    fn cancel_trigger(mut self, identity: &TriggerIdentity) -> Result<Self, AnalysisError> {
         self.triggers.insert(identity.clone(), None);
         Ok(self)
     }
@@ -637,9 +625,9 @@ impl crate::context::TriggerInfoWrite for TestParseContext {
         } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
             view.dissociate_trigger(name);
         } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
+            self.report_analysis_problem(AnalysisProblem::trigger(&TriggerProblem::target(
+                target,
+            )))?;
         }
         Ok(self)
     }
@@ -653,88 +641,79 @@ impl crate::context::ParameterTypeHintRead for TestParseContext {
 
 impl crate::context::ParameterTypeHintWrite for TestParseContext {
     fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
-        self.parameter_type_hints = crate::context::ParameterTypeHints::resolve(hints, self)?;
+        self.parameter_type_hints = ParameterTypeHints::resolve(hints, self)?;
         Ok(())
     }
 }
 
 impl ParseContext for TestParseContext {
-    fn lookup_sampling_method(&self, name: &FullName) -> crate::sem::SamplingMethodLookup {
+    fn lookup_sampling_method(&self, name: &FullName) -> SamplingMethodLookup {
         let Some(methods) = &self.sampling_methods else {
-            return crate::sem::SamplingMethodLookup::unavailable();
+            return SamplingMethodLookup::unavailable();
         };
-        crate::sem::search_path::expand_search_path_inst(self, name, |key| {
-            methods.get(key).cloned()
-        })
-        .unwrap_or_else(crate::sem::SamplingMethodLookup::not_found)
+        expand_search_path_inst(self, name, |key| methods.get(key).cloned())
+            .unwrap_or_else(SamplingMethodLookup::not_found)
     }
 
-    fn apply_creation_group<F>(
-        self,
-        operation: F,
-    ) -> Result<crate::AstAndContextPair<Self>, AnalysisError>
+    fn apply_creation_group<F>(self, operation: F) -> Result<AstAndContextPair<Self>, AnalysisError>
     where
-        F: FnOnce(Self) -> Result<crate::AstAndContextPair<Self>, AnalysisError>,
+        F: FnOnce(Self) -> Result<AstAndContextPair<Self>, AnalysisError>,
     {
         // Schema publication tests use SchemaFileContext. This fixture records
         // direct calls rather than implementing the production catalog layers.
         operation(self)
     }
-    fn insert_role(&mut self, role: &crate::sem::Role) {
+    fn insert_role(&mut self, role: &Role) {
         self.ownership.insert_role(role);
     }
-    fn insert_owned_object(&mut self, definition: &crate::sem::OwnedObjectDefinition) {
+    fn insert_owned_object(&mut self, definition: &OwnedObjectDefinition) {
         self.ownership.insert(definition);
     }
-    fn apply_alter_owner(
-        mut self,
-        alteration: &crate::sem::AlterOwner,
-    ) -> Result<Self, AnalysisError> {
+    fn apply_alter_owner(mut self, alteration: &AlterOwner) -> Result<Self, AnalysisError> {
         if let Some(identity) = alteration.applied_identity() {
-            let definition =
-                crate::sem::OwnedObjectDefinition::new(identity, Some(alteration.owner()));
+            let definition = OwnedObjectDefinition::new(identity, Some(alteration.owner()));
             self.ownership.insert(&definition);
         }
         Ok(self)
     }
 
-    fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {
+    fn resolve_cursor(&self, name: &str) -> Option<&CursorInfo> {
         self.cursors.cursor(name)
     }
-    fn bind_cursor(&mut self, name: &str, info: &crate::sem::CursorInfo) {
+    fn bind_cursor(&mut self, name: &str, info: &CursorInfo) {
         self.cursors.bind(name, info);
     }
     fn remove_cursor(&mut self, name: &str) {
         self.cursors.remove(name);
     }
-    fn analysis_state(&self) -> &crate::sem::AnalysisState {
+    fn analysis_state(&self) -> &AnalysisState {
         &self.analysis_state
     }
-    fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState {
+    fn analysis_state_mut(&mut self) -> &mut AnalysisState {
         &mut self.analysis_state
     }
 
-    fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints {
+    fn parameter_constraints(&self) -> &ParameterConstraints {
         &self.parameter_constraints
     }
 
-    fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    fn set_parameter_constraints(&mut self, constraints: &ParameterConstraints) {
         self.parameter_constraints = constraints.clone();
     }
 
-    fn retain_catalog(&self) -> crate::context::FrozenBaseContext {
+    fn retain_catalog(&self) -> FrozenBaseContext {
         let mut catalog = self.clone();
         catalog.cursors = Default::default();
         catalog.analysis_state = Default::default();
         catalog.freeze()
     }
 
-    fn freeze(mut self) -> crate::context::FrozenBaseContext {
+    fn freeze(mut self) -> FrozenBaseContext {
         self.problems.clear();
-        self.parameter_constraints = crate::sem::ParameterConstraints::default();
+        self.parameter_constraints = ParameterConstraints::default();
         self.parameter_type_hints = Default::default();
         self.report_failure_after = None;
-        crate::context::FrozenBaseContext::new(self)
+        FrozenBaseContext::new(self)
     }
 
     fn set_search_path(&mut self, search_path: &[SchemaName]) {
@@ -745,10 +724,7 @@ impl ParseContext for TestParseContext {
         todo!()
     }
 
-    fn set_source_file(
-        &mut self,
-        _source_access_service: Box<dyn crate::context::SourceAccessService>,
-    ) {
+    fn set_source_file(&mut self, _source_access_service: Box<dyn SourceAccessService>) {
         todo!()
     }
 
@@ -771,7 +747,7 @@ impl ParseContext for TestParseContext {
         todo!()
     }
 
-    fn apply_alter_index(mut self, index: &crate::sem::AlterIndex) -> Result<Self, AnalysisError> {
+    fn apply_alter_index(mut self, index: &AlterIndex) -> Result<Self, AnalysisError> {
         if let Some(replacement) = index.replacement() {
             self.create_indexes
                 .retain(|existing| existing.name() != replacement.name());
@@ -788,10 +764,10 @@ impl ParseContext for TestParseContext {
 
 #[cfg(test)]
 mod test_search_path {
-    use super::TestParseContext;
     use crate::{
         context::{ParseContext, SearchPathRead},
         names::SchemaName,
+        test_helpers::test_parse_context::TestParseContext,
     };
 
     #[test]
@@ -871,40 +847,32 @@ impl TestParseContext {
 }
 
 impl TestParseContext {
-    pub(crate) fn set_view_insert_support(
-        &mut self,
-        name: &FullName,
-        support: &crate::sem::ViewInsertSupport,
-    ) {
+    pub(crate) fn set_view_insert_support(&mut self, name: &FullName, support: &ViewInsertSupport) {
         self.view_insert_support
             .insert(name.clone(), support.clone());
     }
 }
 impl crate::context::ViewInsertInfoRead for TestParseContext {
-    fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
+    fn view_insert_support(&self, view: &FullName) -> Option<&ViewInsertSupport> {
         self.view_insert_support.get(view)
     }
 }
 
 impl crate::context::ViewUpdateInfoRead for TestParseContext {
-    fn view_update_support(&self, view: &FullName) -> Option<&crate::sem::ViewUpdateSupport> {
+    fn view_update_support(&self, view: &FullName) -> Option<&ViewUpdateSupport> {
         self.view_update_support.get(view)
     }
 }
 
 impl TestParseContext {
-    pub(crate) fn set_view_update_support(
-        &mut self,
-        name: &FullName,
-        support: &crate::sem::ViewUpdateSupport,
-    ) {
+    pub(crate) fn set_view_update_support(&mut self, name: &FullName, support: &ViewUpdateSupport) {
         self.view_update_support
             .insert(name.clone(), support.clone());
     }
 }
 
 impl crate::context::ViewDeleteInfoRead for TestParseContext {
-    fn view_delete_support(&self, view: &FullName) -> crate::sem::ViewDeleteSupport {
+    fn view_delete_support(&self, view: &FullName) -> ViewDeleteSupport {
         self.view_delete_support
             .get(view)
             .expect("explicit view DELETE capability fixture")
@@ -913,7 +881,7 @@ impl crate::context::ViewDeleteInfoRead for TestParseContext {
 }
 
 impl crate::context::ViewMergeInfoRead for TestParseContext {
-    fn view_merge_support(&self, view: &FullName) -> crate::sem::ViewMergeSupport {
+    fn view_merge_support(&self, view: &FullName) -> ViewMergeSupport {
         self.view_merge_support
             .get(view)
             .expect("explicit view MERGE capability fixture")
@@ -922,39 +890,31 @@ impl crate::context::ViewMergeInfoRead for TestParseContext {
 }
 
 impl TestParseContext {
-    pub(crate) fn set_view_delete_support(
-        &mut self,
-        name: &FullName,
-        support: &crate::sem::ViewDeleteSupport,
-    ) {
+    pub(crate) fn set_view_delete_support(&mut self, name: &FullName, support: &ViewDeleteSupport) {
         self.view_delete_support
             .insert(name.clone(), support.clone());
     }
 
-    pub(crate) fn set_view_merge_support(
-        &mut self,
-        name: &FullName,
-        support: &crate::sem::ViewMergeSupport,
-    ) {
+    pub(crate) fn set_view_merge_support(&mut self, name: &FullName, support: &ViewMergeSupport) {
         self.view_merge_support
             .insert(name.clone(), support.clone());
     }
 }
 
 impl crate::context::RoleInfoRead for TestParseContext {
-    fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
+    fn role_by_name(&self, name: &str) -> Option<&Role> {
         self.ownership.role(name)
     }
 }
 impl crate::context::OwnershipInfoRead for TestParseContext {
     fn ownership_definitions(
         &self,
-        kind: crate::sem::ObjectKind,
+        kind: ObjectKind,
         name: &FullName,
-    ) -> Vec<crate::sem::OwnedObjectDefinition> {
+    ) -> Vec<OwnedObjectDefinition> {
         let supplied = self.ownership.definitions(kind, name);
         if supplied.is_empty() {
-            crate::sem::ownership::model_definitions(self, kind, name)
+            model_definitions(self, kind, name)
         } else {
             supplied
         }
@@ -968,15 +928,15 @@ impl crate::context::OwnershipInfoRead for TestParseContext {
 }
 
 impl crate::context::ObjectInfoRead for TestParseContext {
-    fn object_kind(&self, name: &crate::names::FullName) -> Option<crate::sem::Kind> {
+    fn object_kind(&self, name: &FullName) -> Option<Kind> {
         if self.get_table_impl(name).is_some() {
-            Some(crate::sem::Kind::table())
+            Some(Kind::table())
         } else if self.get_view_impl(name).is_some() {
-            Some(crate::sem::Kind::view())
+            Some(Kind::view())
         } else if self.get_sequence_impl(name).is_some() {
-            Some(crate::sem::Kind::sequence())
+            Some(Kind::sequence())
         } else if self.get_index_impl(name).is_some() {
-            Some(crate::sem::Kind::index())
+            Some(Kind::index())
         } else {
             None
         }

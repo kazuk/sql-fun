@@ -1,7 +1,12 @@
-use super::test_helpers::{catalog, resolve};
 use crate::{
+    ast::document::merge::tests::test_helpers::{catalog, resolve},
     names::{ColumnName, FullName, TableName},
-    sem::{ColumnDefinition, MergeRecordRole, MergeStatement, PgBuiltInType},
+    sem::{
+        ColumnConstraint, ColumnDefinition, GeneratedColumnConstraint, GeneratedColumnMode,
+        IdentityColumnConstraint, IdentityColumnMode, MergeRecordRole, MergeStatement,
+        PgBuiltInType, ScalarConstExpr,
+    },
+    test_helpers::{TestParseContext, source_span},
 };
 
 #[rstest::rstest]
@@ -22,7 +27,7 @@ fn insert_target_subscripts_use_when_visibility(#[case] index: &str, #[case] acc
     );
 }
 
-fn array_catalog() -> crate::test_helpers::TestParseContext {
+fn array_catalog() -> TestParseContext {
     let mut context = catalog(17);
     let array = PgBuiltInType::int4().array_type();
     context.setup_type(array.clone());
@@ -37,7 +42,7 @@ fn array_catalog() -> crate::test_helpers::TestParseContext {
             ),
             ColumnDefinition::new(&Some(ColumnName::from("a")), Some(&array), Some(false), &[]),
         ],
-        &crate::test_helpers::source_span(),
+        &source_span(),
     );
     context
 }
@@ -320,12 +325,12 @@ fn assert_rejected(sql: &str, version: u32) {
     );
 }
 
-fn assignment_catalog(version: u32) -> crate::test_helpers::TestParseContext {
+fn assignment_catalog(version: u32) -> TestParseContext {
     let mut context = catalog(version);
-    let identity = crate::sem::IdentityColumnConstraint::new(
+    let identity = IdentityColumnConstraint::new(
         &TableName::from(FullName::with_schema("public", "identity_items")),
         &ColumnName::from("id"),
-        crate::sem::IdentityColumnMode::always(),
+        IdentityColumnMode::always(),
     );
     context.setup_table(
         "identity_items",
@@ -333,16 +338,16 @@ fn assignment_catalog(version: u32) -> crate::test_helpers::TestParseContext {
             &Some(ColumnName::from("id")),
             Some(&PgBuiltInType::int4()),
             Some(true),
-            &[crate::sem::ColumnConstraint::identity(identity)],
+            &[ColumnConstraint::identity(identity)],
         )],
-        &crate::test_helpers::source_span(),
+        &source_span(),
     );
 
-    let generated = crate::sem::GeneratedColumnConstraint::new(
+    let generated = GeneratedColumnConstraint::new(
         &TableName::from(FullName::with_schema("public", "generated_items")),
         &ColumnName::from("g"),
-        crate::sem::ScalarConstExpr::null(),
-        Some(crate::sem::GeneratedColumnMode::stored()),
+        ScalarConstExpr::null(),
+        Some(GeneratedColumnMode::stored()),
     );
     context.setup_table(
         "generated_items",
@@ -350,14 +355,14 @@ fn assignment_catalog(version: u32) -> crate::test_helpers::TestParseContext {
             &Some(ColumnName::from("g")),
             Some(&PgBuiltInType::int4()),
             Some(false),
-            &[crate::sem::ColumnConstraint::generated(generated)],
+            &[ColumnConstraint::generated(generated)],
         )],
-        &crate::test_helpers::source_span(),
+        &source_span(),
     );
     context
 }
 
-fn strict_catalog(version: u32) -> crate::test_helpers::TestParseContext {
+fn strict_catalog(version: u32) -> TestParseContext {
     let mut context = catalog(version);
     context.setup_table(
         "strict_items",
@@ -367,7 +372,7 @@ fn strict_catalog(version: u32) -> crate::test_helpers::TestParseContext {
             Some(true),
             &[],
         )],
-        &crate::test_helpers::source_span(),
+        &source_span(),
     );
     context
 }

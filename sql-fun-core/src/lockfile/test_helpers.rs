@@ -1,4 +1,6 @@
-use super::{LockfileDocument, LockfileEntry, LockfileStatement, QueryParameter, ResultSetField};
+use crate::lockfile::{
+    LockfileDocument, LockfileEntry, LockfileStatement, QueryParameter, ResultSetField,
+};
 
 pub(super) fn entry(name: &str, count: usize) -> LockfileEntry {
     let statements = (0..count)

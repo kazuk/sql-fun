@@ -1,4 +1,4 @@
-use super::DiagnosticMetadata;
+use crate::analysis_problem::{DiagnosticMetadata, MinMaxProblem};
 
 /// Structured violations in SELECT clauses, distinct from retained name bindings.
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
@@ -60,7 +60,7 @@ pub struct SetWidthProblem {
 pub struct SetTypeProblem {
     operation: String,
     column: usize,
-    problem: super::MinMaxProblem,
+    problem: MinMaxProblem,
 }
 
 impl QueryProblem {
@@ -75,7 +75,7 @@ impl QueryProblem {
     }
     /// Report a column's common-type failure without discarding its cause.
     #[must_use]
-    pub fn set_type(operation: &str, column: usize, problem: &super::MinMaxProblem) -> Self {
+    pub fn set_type(operation: &str, column: usize, problem: &MinMaxProblem) -> Self {
         Self::SetType(SetTypeProblem {
             operation: operation.to_owned(),
             column,

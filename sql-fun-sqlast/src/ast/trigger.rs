@@ -1,13 +1,19 @@
 //! CREATE/DROP TRIGGER syntax conversion, without catalog access.
 
-use crate::ast::{
-    CreateTrigger, Expr, Name, Relation, TriggerBody, TriggerConstraint, TriggerEvent,
-    TriggerFunction, TriggerGranularity, TriggerTiming, TriggerTransition, TryFromWithTokens,
-    TryFromWithTokensOpt,
+#[cfg(feature = "sqlite")]
+use crate::ast::StatementNode as AstStatementNode;
+use crate::ast::{DropBehavior, DropTrigger, postgres::required};
+
+use crate::{
+    ast::{
+        CreateTrigger, Expr, Name, Relation, TriggerBody, TriggerConstraint, TriggerEvent,
+        TriggerFunction, TriggerGranularity, TriggerTiming, TriggerTransition, TryFromWithTokens,
+        TryFromWithTokensOpt,
+    },
+    sem::AnalysisError,
+    syn,
+    syn::{ListOpt, Opt},
 };
-use crate::sem::AnalysisError;
-use crate::syn;
-use crate::syn::{ListOpt, Opt};
 
 use ::sql_fun_core::IVec;
 
@@ -18,11 +24,10 @@ impl TryFromWithTokens<&syn::CreateTrigStmt> for CreateTrigger {
         value: &syn::CreateTrigStmt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let relation =
-            super::postgres::required(value.get_relation().as_inner(), "trigger target")?;
+        let relation = required(value.get_relation().as_inner(), "trigger target")?;
         let mut transitions = Vec::new();
         for node in value.get_transition_rels().as_inner().unwrap_or_default() {
-            let transition = super::postgres::required(
+            let transition = required(
                 node.as_trigger_transition().as_inner(),
                 "trigger transition relation",
             )?;
@@ -151,7 +156,7 @@ impl TriggerBody {
     }
 
     #[cfg(feature = "sqlite")]
-    const fn commands(value: Vec<super::StatementNode>) -> Self {
+    const fn commands(value: Vec<AstStatementNode>) -> Self {
         Self::Commands(value)
     }
 }
@@ -225,16 +230,13 @@ impl TriggerFunction {
     fn arguments(value: syn::NodeListOpt) -> Result<Vec<String>, AnalysisError> {
         let mut arguments = Vec::new();
         for node in value.as_inner().unwrap_or_default() {
-            arguments.push(super::postgres::required(
-                node.as_string().get_sval(),
-                "trigger argument",
-            )?);
+            arguments.push(required(node.as_string().get_sval(), "trigger argument")?);
         }
         Ok(arguments)
     }
 }
 
-impl TryFrom<&syn::DropStmt> for super::DropTrigger {
+impl TryFrom<&syn::DropStmt> for DropTrigger {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::DropStmt) -> Result<Self, Self::Error> {
@@ -261,9 +263,7 @@ impl TryFrom<&syn::DropStmt> for super::DropTrigger {
             name: Name::from_parts(&[name]),
             relation: Some(Name::from_parts(&parts)),
             if_exists: value.get_missing_ok(),
-            behavior: Some(super::DropBehavior::try_from(
-                value.get_behavior().as_inner(),
-            )?),
+            behavior: Some(DropBehavior::try_from(value.get_behavior().as_inner())?),
         })
     }
 }
@@ -272,7 +272,7 @@ impl TryFrom<&syn::DropStmt> for super::DropTrigger {
 mod drop_tests;
 
 #[cfg(feature = "sqlite")]
-impl TryFrom<&syn::sqlite::DropTriggerStatement> for super::DropTrigger {
+impl TryFrom<&syn::sqlite::DropTriggerStatement> for DropTrigger {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::sqlite::DropTriggerStatement) -> Result<Self, Self::Error> {

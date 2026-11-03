@@ -1,11 +1,13 @@
 //! Small owned catalog and public analysis comparisons for cache contracts.
+
 use crate::{
     AstAndContextPair, CacheContext,
     ast::Dialect,
     context::{FrozenBaseContext, ParseContext, SchemaFileContext},
     names::SchemaName,
+    parse_statements,
     sem::PgBuiltInType,
-    test_helpers::{TestParseContext, domain_casts},
+    test_helpers::{TestParseContext, domain_casts, schema_layer},
 };
 use std::collections::BTreeMap;
 
@@ -25,8 +27,7 @@ pub(crate) fn base() -> FrozenBaseContext {
         context.setup_binary(operator, "int4", "int4", "bool", true);
     }
     context.setup_binary("+", "int4", "int4", "int4", true);
-    let mut context =
-        crate::test_helpers::schema_layer(std::path::Path::new("cache.sql"), &context.freeze());
+    let mut context = schema_layer(std::path::Path::new("cache.sql"), &context.freeze());
     domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
     context.freeze()
 }
@@ -36,8 +37,8 @@ pub(crate) fn analyze(
     base: &FrozenBaseContext,
     cache: &mut CacheContext,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-    let context = crate::test_helpers::schema_layer(std::path::Path::new("query.sql"), base);
-    Ok(crate::parse_statements(sql, Dialect::postgres())
+    let context = schema_layer(std::path::Path::new("query.sql"), base);
+    Ok(parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
         .analyze(context, cache)?)

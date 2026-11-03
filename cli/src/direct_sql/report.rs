@@ -61,7 +61,7 @@ impl Case {
 
 #[cfg(test)]
 mod test_console {
-    use super::Case;
+    use crate::direct_sql::report::Case;
 
     #[test]
     fn indents_each_detail_line_and_separates_failure_cases() -> ::testresult::TestResult {
@@ -158,7 +158,7 @@ pub(super) fn write_report(path: &Path, cases: &[Case]) -> Result<(), ::anyhow::
 
 #[cfg(test)]
 mod tests {
-    use super::{Case, write_report};
+    use crate::direct_sql::report::{Case, write_report};
     #[test]
     fn report_is_parseable_with_pass_failure_error_and_special_text() -> ::testresult::TestResult {
         let directory = ::tempfile::tempdir()?;

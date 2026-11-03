@@ -1,5 +1,7 @@
 //! SQL input constraints are independent of parameter hints and Rust code generation.
+
 use self::test_helpers::heavy;
+use crate::test_helpers::create_cache_context;
 use ::sql_fun_sqlast::{ast::Dialect, context::ParseContext, parse_statements, sem::PgBuiltInType};
 use std::collections::BTreeMap;
 
@@ -64,7 +66,7 @@ mod test_helpers {
 fn real_catalog_contexts_produce_constraints(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
     let analyzed = statement.analyze(heavy::context()?, &mut cache_context)?;
     assert!(
@@ -89,7 +91,7 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
         names::FullName,
         sem::TypeReference,
     };
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let definition = parse_statements(
         "create type public.mood as enum ('happy')",
         Dialect::postgres(),
@@ -151,7 +153,7 @@ fn explicit_assignment_inspection_keeps_declared_cast_sources(
     #[case] sql: &str,
     #[case] source: &str,
 ) -> testresult::TestResult {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     // Actual overload declarations and declared casts are the contract here.
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()

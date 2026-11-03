@@ -1,6 +1,14 @@
-use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, SemScalarExpr, TypeReference,
-    scalar_expr::SemScalarExprNode,
+use crate::{
+    ast::Dialect,
+    names::OperatorName,
+    sem::{
+        AnalysisError, AnalysisProblem, ArithExpr, InputTypeConstraint, MinMaxExpr,
+        ParameterConstraints, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr,
+        TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
+    },
 };
 
 use std::collections::HashSet;
@@ -47,10 +55,11 @@ impl SqliteCaseBuilder {
 
 #[cfg(test)]
 mod test_sqlite_case_builder_is_not_null {
+    use crate::sem::scalar_expr::case_expr::SqliteCaseBuilder;
 
     #[test]
     fn test_is_not_null_any_false() {
-        let mut acontext = super::SqliteCaseBuilder::new();
+        let mut acontext = SqliteCaseBuilder::new();
 
         acontext.nullabilities = vec![Some(true), Some(false)];
         assert_eq!(Some(false), acontext.is_not_null());
@@ -58,7 +67,7 @@ mod test_sqlite_case_builder_is_not_null {
 
     #[test]
     fn test_is_not_null_all_some() {
-        let mut acontext = super::SqliteCaseBuilder::new();
+        let mut acontext = SqliteCaseBuilder::new();
 
         acontext.nullabilities = vec![Some(true), Some(true)];
         assert_eq!(Some(true), acontext.is_not_null());
@@ -66,7 +75,7 @@ mod test_sqlite_case_builder_is_not_null {
 
     #[test]
     fn test_is_not_null_with_unknown() {
-        let mut acontext = super::SqliteCaseBuilder::new();
+        let mut acontext = SqliteCaseBuilder::new();
 
         acontext.nullabilities = vec![Some(true), None];
         assert_eq!(None, acontext.is_not_null());
@@ -176,35 +185,32 @@ impl SqliteCaseBuilder {
 }
 
 impl CaseExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        crate::sem::traversal::optional(&mut self.arg_expr, visitor)?;
+    ) -> Result<(), AnalysisError> {
+        optional(&mut self.arg_expr, visitor)?;
         for arm in &mut self.when_exprs {
             arm.walk(visitor)?;
         }
-        crate::sem::traversal::optional(&mut self.default_expr, visitor)?;
+        optional(&mut self.default_expr, visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        crate::sem::traversal::visit_optional(&self.arg_expr, visitor)?;
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visit_optional(&self.arg_expr, visitor)?;
         for arm in &self.when_exprs {
             arm.visit(visitor)?;
         }
-        crate::sem::traversal::visit_optional(&self.default_expr, visitor)?;
+        visit_optional(&self.default_expr, visitor)?;
         Ok(())
     }
 }
 
 impl CaseWhen {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.when_value.walk(visitor)?;
         self.result.walk(visitor)?;
         if let Some(comparison) = &mut self.comparison {
@@ -212,10 +218,7 @@ impl CaseWhen {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.when_value.visit(visitor)?;
         self.result.visit(visitor)?;
         if let Some(comparison) = &self.comparison {
@@ -228,8 +231,8 @@ impl CaseWhen {
 impl CaseExpr {
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if self.types.is_none()
             && self
@@ -248,7 +251,7 @@ impl CaseExpr {
         }
         // SQLite's heterogeneous CASE results do not impose PostgreSQL cast or
         // boolean requirements. Preserve its existing unresolved result metadata.
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             return Ok(());
         }
         if self
@@ -275,7 +278,7 @@ impl CaseExpr {
         self.node
     }
 
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         let Some(node) = self.node else {
             return;
         };
@@ -297,7 +300,7 @@ impl CaseExpr {
             if arm.comparison.is_none()
                 && constraints.node_domain(*node).admissible_types() != Some(&[])
             {
-                Self::coerce(&mut arm.when_value, &crate::sem::PgBuiltInType::bool());
+                Self::coerce(&mut arm.when_value, &PgBuiltInType::bool());
             }
         }
         self.is_not_null = self.result_nullability();
@@ -400,20 +403,17 @@ impl CaseWhen {
 }
 
 impl CaseExpr {
-    fn bind_comparisons(
-        &mut self,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<(), AnalysisError> {
-        if context.dialect() != crate::ast::Dialect::postgres() {
+    fn bind_comparisons(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
+        if context.dialect() != Dialect::postgres() {
             return Ok(());
         }
         let Some(argument) = self.arg_expr.as_ref() else {
             return Ok(());
         };
         for arm in &mut self.when_exprs {
-            let name = crate::names::OperatorName::from_parts(None, "=");
-            let binding = crate::sem::ResolvedOperator::resolve(context, &name, true, true);
-            let (mut comparison, _) = crate::sem::ArithExpr::build_op(
+            let name = OperatorName::from_parts(None, "=");
+            let binding = ResolvedOperator::resolve(context, &name, true, true);
+            let (mut comparison, _) = ArithExpr::build_op(
                 context,
                 &name,
                 Some(argument.clone()),
@@ -427,7 +427,7 @@ impl CaseExpr {
 
     // SQLite's fully typed expressions retain their dialect-specific resolver.
     pub(crate) fn resolve_postgres_or_untyped(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         argument: &Option<SemScalarExpr>,
         arms: &[(SemScalarExpr, SemScalarExpr)],
         otherwise: &Option<SemScalarExpr>,
@@ -438,7 +438,7 @@ impl CaseExpr {
             || arms
                 .iter()
                 .any(|(condition, result)| unknown(condition) || unknown(result));
-        if context.dialect() != crate::ast::Dialect::postgres() && !untyped {
+        if context.dialect() != Dialect::postgres() && !untyped {
             return Ok(None);
         }
         let mut when_exprs = Vec::new();
@@ -454,7 +454,7 @@ impl CaseExpr {
         );
         value.bind_comparisons(context)?;
         value.types = Some(InputTypeConstraint::any());
-        if context.dialect() == crate::ast::Dialect::postgres() {
+        if context.dialect() == Dialect::postgres() {
             // Eager typing keeps the result available to enclosing resolvers.
             // Parameter-dependent errors retain the existing graph diagnostic.
             let pending = |value: &SemScalarExpr| {

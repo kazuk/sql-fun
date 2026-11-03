@@ -133,7 +133,7 @@ impl HighlighterTheme {
 mod test_highlighter_theme_from_toml_str {
     use ::testresult::TestResult;
 
-    use super::HighlighterTheme;
+    use crate::highlighter_theme::HighlighterTheme;
 
     #[rstest::rstest]
     #[case::identifier("identifier")]
@@ -214,7 +214,7 @@ impl HighlighterStyle {
 mod test_highlighter_style {
     use ::testresult::TestResult;
 
-    use super::HighlighterTheme;
+    use crate::highlighter_theme::HighlighterTheme;
 
     #[test]
     fn applies_bold_with_other_attributes() -> TestResult {

@@ -1,8 +1,9 @@
-use crate::sem::problem::CollateProblem;
 use crate::{
     ast::Dialect,
     context::ParseContext,
-    sem::{AnalysisError, AnalysisProblem, CatalogNameLookup, TypeReference},
+    sem::{
+        AnalysisError, AnalysisProblem, CatalogNameLookup, TypeReference, problem::CollateProblem,
+    },
 };
 
 /// Completed explicit declaration collation lookup and applicability decision.
@@ -133,11 +134,15 @@ impl DeclarationCollation {
 
 #[cfg(test)]
 mod tests {
-    use super::DeclarationCollation;
+    use crate::{ast::Dialect, sem::PgBuiltInType};
+
     use crate::{
         context::{BaseParseContext, TypeInfoRead},
         names::{FullName, TableName},
-        sem::{CatalogNameLookup, TypeDefinition, TypeReference},
+        sem::{
+            CatalogNameLookup, TypeDefinition, TypeReference,
+            declaration_collation::DeclarationCollation,
+        },
         test_helpers::{
             TestParseContext, collate, declaration_collation::context,
             ownership::apply_ownership_sql,
@@ -186,7 +191,7 @@ mod tests {
         #[case] code: Option<&str>,
         #[values(false, true)] unresolved_type: bool,
     ) -> testresult::TestResult {
-        let mut context = collate::context(crate::ast::Dialect::postgres());
+        let mut context = collate::context(Dialect::postgres());
         let name = FullName::from_local_name("missing");
         let lookup = if ambiguous {
             CatalogNameLookup::ambiguous(
@@ -202,7 +207,7 @@ mod tests {
         let ty = if unresolved_type {
             None
         } else {
-            Some(crate::sem::PgBuiltInType::int4())
+            Some(PgBuiltInType::int4())
         };
         let validation = DeclarationCollation::validate(&context, ty.as_ref(), Some(&lookup));
         validation.report(&mut context, ty.as_ref())?;

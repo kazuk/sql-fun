@@ -100,8 +100,10 @@ impl ChildProcess {
 
 #[cfg(test)]
 mod test_child_process_read_line_from {
-    use super::ChildProcess;
-    use crate::test_helpers::{make_duplex_stream, write_lines};
+    use crate::{
+        child_proc::ChildProcess,
+        test_helpers::{make_duplex_stream, write_lines},
+    };
     use tokio::io::BufReader;
 
     #[tokio::test]
@@ -162,8 +164,10 @@ impl ChildProcess {
 
 #[cfg(test)]
 mod test_child_process_read_from_buffer {
-    use super::{ChildProcess, LinesBufReader};
-    use crate::test_helpers::{make_duplex_stream, write_lines};
+    use crate::{
+        child_proc::{ChildProcess, LinesBufReader},
+        test_helpers::{make_duplex_stream, write_lines},
+    };
 
     #[tokio::test]
     async fn reads_lines_until_eof() {
@@ -212,8 +216,10 @@ impl ChildProcess {
 
 #[cfg(test)]
 mod test_child_process_read_to_eof_from {
-    use super::{ChildProcess, LinesBufReader};
-    use crate::test_helpers::{make_duplex_stream, write_lines};
+    use crate::{
+        child_proc::{ChildProcess, LinesBufReader},
+        test_helpers::{make_duplex_stream, write_lines},
+    };
 
     #[tokio::test]
     async fn collects_remaining_lines() {
@@ -295,8 +301,7 @@ impl ChildProcess {
 #[cfg(test)]
 #[cfg(unix)]
 mod test_child_process_poll_exit {
-    use super::ChildProcess;
-    use crate::StdStream;
+    use crate::{StdStream, child_proc::ChildProcess};
     use std::collections::HashMap;
 
     #[tokio::test]

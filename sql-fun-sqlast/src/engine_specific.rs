@@ -1,5 +1,19 @@
 //! DB Engine specific syntax hooks
 
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::CreateSequenceStatement;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::DropSequenceStatement;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ExplainQueryPlan;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ExprFunctionCall;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::PragmaStatement;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::Type;
+use crate::{ast::Dialect, context::ParseContext, sem::AnalysisProblem};
+
 use crate::sem::AnalysisError;
 
 #[cfg(feature = "sqlite")]
@@ -56,12 +70,12 @@ pub trait TursoSequenceFeature {
     /// Notify that a sequence is created.
     fn create_sequence_used(
         &mut self,
-        statement: &crate::syn::sqlite::CreateSequenceStatement,
+        statement: &CreateSequenceStatement,
     ) -> Result<(), AnalysisError>;
     /// Notify that a sequence is dropped.
     fn drop_sequence_used(
         &mut self,
-        statement: &crate::syn::sqlite::DropSequenceStatement,
+        statement: &DropSequenceStatement,
     ) -> Result<(), AnalysisError>;
 }
 
@@ -71,7 +85,7 @@ pub trait TursoOrderedSetAggregateFeature {
     /// Notify that a function uses WITHIN GROUP ordering.
     fn ordered_set_aggregate_used(
         &mut self,
-        expression: &crate::syn::sqlite::ExprFunctionCall,
+        expression: &ExprFunctionCall,
     ) -> Result<(), AnalysisError>;
 }
 
@@ -79,47 +93,35 @@ pub trait TursoOrderedSetAggregateFeature {
 #[cfg(feature = "sqlite")]
 pub trait TursoMvccGcFeature {
     /// Notify that the MVCC garbage-collection threshold pragma is used.
-    fn mvcc_gc_threshold_used(
-        &mut self,
-        pragma: &crate::syn::sqlite::PragmaStatement,
-    ) -> Result<(), AnalysisError>;
+    fn mvcc_gc_threshold_used(&mut self, pragma: &PragmaStatement) -> Result<(), AnalysisError>;
 }
 
 /// Turso JSON EXPLAIN QUERY PLAN syntax notification.
 #[cfg(feature = "sqlite")]
 pub trait TursoEqpFeature {
     /// Notify that JSON query-plan output is requested.
-    fn json_eqp_used(
-        &mut self,
-        command: &crate::syn::sqlite::ExplainQueryPlan,
-    ) -> Result<(), AnalysisError>;
+    fn json_eqp_used(&mut self, command: &ExplainQueryPlan) -> Result<(), AnalysisError>;
 }
 
 /// Turso MVCC group-commit pragma notification.
 #[cfg(feature = "sqlite")]
 pub trait TursoMvccGroupCommitFeature {
     /// Notify that the MVCC group-commit pragma is used.
-    fn mvcc_group_commit_used(
-        &mut self,
-        pragma: &crate::syn::sqlite::PragmaStatement,
-    ) -> Result<(), AnalysisError>;
+    fn mvcc_group_commit_used(&mut self, pragma: &PragmaStatement) -> Result<(), AnalysisError>;
 }
 
 /// Turso FTS merge-threshold pragma notification.
 #[cfg(feature = "sqlite")]
 pub trait TursoFtsMergeThresholdFeature {
     /// Notify that the FTS merge-threshold pragma is used.
-    fn fts_merge_threshold_used(
-        &mut self,
-        pragma: &crate::syn::sqlite::PragmaStatement,
-    ) -> Result<(), AnalysisError>;
+    fn fts_merge_threshold_used(&mut self, pragma: &PragmaStatement) -> Result<(), AnalysisError>;
 }
 
 /// Turso array type syntax notification.
 #[cfg(feature = "sqlite")]
 pub trait TursoArrayTypeFeature {
     /// Notify that a type has parser-provided array dimensions.
-    fn array_type_used(&mut self, ty: &crate::syn::sqlite::Type) -> Result<(), AnalysisError>;
+    fn array_type_used(&mut self, ty: &Type) -> Result<(), AnalysisError>;
 }
 
 /// PostgreSQL 18 syntax recognized independently of the selected target engine.
@@ -162,27 +164,25 @@ pub trait Postgres18Feature {
     fn postgres18_syntax_used(&mut self, syntax: Postgres18Syntax) -> Result<bool, AnalysisError>;
 }
 
-impl<T: crate::context::ParseContext> Postgres18Feature for T {
+impl<T: ParseContext> Postgres18Feature for T {
     fn postgres18_syntax_used(&mut self, syntax: Postgres18Syntax) -> Result<bool, AnalysisError> {
         let selected = self
             .metadata()
             .engine_version()
             .as_ref()
             .map(ToString::to_string);
-        let compatible = self.dialect() == crate::ast::Dialect::postgres()
+        let compatible = self.dialect() == Dialect::postgres()
             && selected.as_deref().is_some_and(|version| {
                 version
                     .parse::<::sql_fun_core::PostgresVersion>()
                     .is_ok_and(|version| version.major() >= 18)
             });
         if !compatible {
-            self.report_analysis_problem(
-                crate::sem::AnalysisProblem::incompatible_engine_version(
-                    syntax.description(),
-                    18,
-                    selected.as_deref(),
-                ),
-            )?;
+            self.report_analysis_problem(AnalysisProblem::incompatible_engine_version(
+                syntax.description(),
+                18,
+                selected.as_deref(),
+            ))?;
         }
         Ok(compatible)
     }

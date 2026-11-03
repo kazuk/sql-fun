@@ -1,10 +1,17 @@
 //! Semantic regressions through both parser frontends on explicit small stacks.
 //! Parsing/conversion gets 2 MiB; resolution also exercises 512 KiB host threads.
 
-use super::test_helpers::{AnalysisFixture, postgres};
-use crate::ast::Dialect;
-use crate::sem::PgBuiltInType;
-use crate::test_helpers::{on_small_stack, small_stack_regression};
+#[cfg(feature = "sqlite")]
+use crate::ast::tests::test_helpers::sqlite;
+
+use crate::{
+    ast::{
+        Dialect,
+        tests::test_helpers::{AnalysisFixture, postgres},
+    },
+    sem::PgBuiltInType,
+    test_helpers::{on_small_stack, small_stack_regression},
+};
 
 #[rstest::rstest]
 #[case::left_joins("left_joins")]
@@ -42,26 +49,26 @@ fn sqlite_small_stack(
 ) {
     small_stack_regression(stack_size, || {
         let sql = test_helpers::query(scenario);
-        let syntax =
-            on_small_stack(|| super::test_helpers::sqlite(&sql).expect("legal SQLite query"));
+        let syntax = on_small_stack(|| sqlite(&sql).expect("legal SQLite query"));
         test_helpers::assert_result(&syntax, Dialect::sqlite(), scenario);
     });
 }
 
 mod test_helpers {
-    use crate::ast::Query;
-    use {
-        super::{AnalysisFixture, Dialect, PgBuiltInType},
-        crate::names::ColumnName,
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        ast::{
+            Query,
+            tests::stack_regressions::{AnalysisFixture, Dialect, PgBuiltInType},
+        },
+        names::ColumnName,
     };
 
     pub(super) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
         let mut catalog = AnalysisFixture::context().with_dialect(dialect);
         let result = syntax
-            .resolve(
-                &mut catalog,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut catalog, &mut create_cache_context())
             .expect("normal query analysis");
         let column = result
             .get_result_column_def(&ColumnName::from("n"))

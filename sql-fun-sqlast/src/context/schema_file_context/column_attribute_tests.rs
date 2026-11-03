@@ -1,8 +1,14 @@
 //! SQL-to-semantics and catalog-chain regressions; no external server is required.
+
 use crate::{
     context::{BaseParseContext, ParseContext},
-    names::ColumnName,
+    names::{ColumnName, FullName as NamesFullName, TableName as NamesTableName},
+    sem::{
+        AlterObjSubCommand, ColumnConstraint as SemColumnConstraint,
+        ColumnDefinition as SemColumnDefinition,
+    },
     syn::{ListOpt, Opt},
+    test_helpers::SynBuilder,
 };
 
 #[rstest::rstest]
@@ -120,7 +126,7 @@ fn nullability_reaches_subsequent_queries(
     let constraint = column
         .constraints()
         .iter()
-        .find_map(crate::sem::ColumnConstraint::as_nullability)
+        .find_map(SemColumnConstraint::as_nullability)
         .expect("nullability constraint");
     assert_eq!(constraint.is_not_null(), expected);
     test_helpers::assert_select_nullability(result.into_context(), "a", Some(expected))?;
@@ -189,7 +195,7 @@ fn column_options_persist_and_reset(
     assert_eq!(column.distinct_estimate(), distinct);
     assert_eq!(column.inherited_distinct_estimate(), inherited);
     let json = ::serde_json::to_string(column)?;
-    let restored: crate::sem::ColumnDefinition = ::serde_json::from_str(&json)?;
+    let restored: SemColumnDefinition = ::serde_json::from_str(&json)?;
     assert_eq!(restored, *column);
     assert_eq!(column.clone(), restored);
     Ok(())
@@ -318,7 +324,7 @@ fn canonical_binding_survives_freezing_and_preserves_quoted_names() -> testresul
     let context = test_helpers::seed(r#"CREATE TABLE public."T"("A" integer)"#, "17")?;
     let context = test_helpers::child(context.freeze());
     let result = test_helpers::apply(context, r#"ALTER TABLE "T" ALTER "A" SET STATISTICS 25"#)?;
-    let target = crate::names::TableName::from(crate::names::FullName::with_schema("public", "T"));
+    let target = NamesTableName::from(NamesFullName::with_schema("public", "T"));
     let statement = result.ast().alter_table_statement().unwrap();
     assert_eq!(statement.resolved_target(), Some(&target));
     let context = test_helpers::child(result.into_context().freeze());
@@ -428,13 +434,12 @@ fn a_failed_repeated_drop_expression_is_atomic() -> testresult::TestResult {
 #[test]
 fn standalone_semantic_command_api_resolves_column_attributes() -> testresult::TestResult {
     let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
-    let node =
-        crate::test_helpers::SynBuilder::new().parse("ALTER TABLE t ALTER a SET STATISTICS 42");
+    let node = SynBuilder::new().parse("ALTER TABLE t ALTER a SET STATISTICS 42");
     let statement = node.as_alter_table_stmt().as_inner().unwrap();
     let commands = statement.get_cmds().as_inner().unwrap();
     let command = commands[0].as_alter_table_cmd().as_inner().unwrap();
     let subtype = command.get_subtype().as_inner().unwrap();
-    let (command, context) = crate::sem::AlterObjSubCommand::analyze_alter_table_cmd(
+    let (command, context) = AlterObjSubCommand::analyze_alter_table_cmd(
         context,
         &test_helpers::table_name(),
         command,
@@ -481,7 +486,7 @@ fn legacy_column_json_shape_remains_readable() -> testresult::TestResult {
     let original = test_helpers::column(&context, "a");
     let json = ::serde_json::to_value(original)?;
     assert!(json.get("attributes").is_none());
-    let restored: crate::sem::ColumnDefinition = ::serde_json::from_value(json)?;
+    let restored: SemColumnDefinition = ::serde_json::from_value(json)?;
     assert_eq!(&restored, original);
     Ok(())
 }
@@ -489,7 +494,15 @@ fn legacy_column_json_shape_remains_readable() -> testresult::TestResult {
 mod test_helpers {
     // pg_query 6 uses PostgreSQL 17 grammar. Seed the supported semantic catalog
     // mode directly so PostgreSQL 18 virtual-column restrictions are exercised.
-    pub(super) fn virtual_column_context() -> crate::context::SchemaFileContext {
+    use crate::{
+        names::{FullName, SchemaName},
+        sem::PgBuiltInType as SemPgBuiltInType,
+        test_helpers::{
+            TestParseContext, create_cache_context, ownership::ownership_statement, source_span,
+        },
+    };
+
+    pub(super) fn virtual_column_context() -> SchemaFileContext {
         use crate::{
             context::TableInfoWrite,
             sem::{
@@ -515,7 +528,7 @@ mod test_helpers {
             )],
             CreateTableMode::from_if_not_exists(false),
             false,
-            &crate::test_helpers::source_span(),
+            &source_span(),
         );
         context.insert_create_table(table_name().full_name(), &table);
         context
@@ -530,14 +543,13 @@ mod test_helpers {
         sem::{AnalysisError, AstAndContextPair, ColumnDefinition},
     };
     pub(super) fn table_name() -> TableName {
-        TableName::from(crate::names::FullName::with_schema("public", "t"))
+        TableName::from(FullName::with_schema("public", "t"))
     }
     pub(super) fn context(version: &str) -> SchemaFileContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":version, "search_path":["public"]})).unwrap();
-        let mut inventory =
-            crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
-        inventory.set_search_path(&[crate::names::SchemaName::from("public")]);
-        inventory.setup_type(crate::sem::PgBuiltInType::int4());
+        let mut inventory = TestParseContext::default().with_metadata(&metadata);
+        inventory.set_search_path(&[SchemaName::from("public")]);
+        inventory.setup_type(SemPgBuiltInType::int4());
         child(inventory.freeze())
     }
     pub(super) fn child(parent: FrozenBaseContext) -> SchemaFileContext {
@@ -547,15 +559,14 @@ mod test_helpers {
             parent.get_args(),
             parent.metadata(),
         );
-        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        context.set_source_path_with_span(&source_span());
         context
     }
     pub(super) fn apply(
         context: SchemaFileContext,
         sql: &str,
     ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        crate::test_helpers::ownership::ownership_statement(sql)?
-            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())
+        ownership_statement(sql)?.resolve_and_apply(context, &mut create_cache_context())
     }
     pub(super) fn seed(sql: &str, version: &str) -> Result<SchemaFileContext, AnalysisError> {
         Ok(apply(context(version), sql)?.into_context())

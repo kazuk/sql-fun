@@ -7,6 +7,8 @@ pub(super) mod request_peer;
 #[path = "../api_helpers.rs"]
 pub(super) mod api;
 
+pub(crate) use self::api::cli_executable;
+
 use std::path::{Path, PathBuf};
 
 /// Owns only suite input and output files; does not parse a catalog or start services.

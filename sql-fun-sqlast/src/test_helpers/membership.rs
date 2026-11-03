@@ -1,9 +1,15 @@
 use crate::{
+    StringSpan,
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-    names::SchemaName,
-    sem::{PgBuiltInType, SourcePathWithSpan, TypeCategory, TypeDefinition},
-    test_helpers::TestParseContext,
+    names::{FullName, OperatorName, SchemaName},
+    parse_statements,
+    sem::{
+        BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition, OverloadVariant,
+        PgBuiltInType, SelectStatement, SemScalarExpr, SourcePathWithSpan, TypeCategory,
+        TypeDefinition, TypeReference,
+    },
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// Small catalog for membership binding and inference tests.
@@ -35,13 +41,13 @@ fn base_context(dialect: Dialect) -> TestParseContext {
         PgBuiltInType::text(),
         PgBuiltInType::bool(),
     ]
-    .map(|ty| crate::sem::BinaryOperatorDefinition::new(&ty, &ty, &PgBuiltInType::bool(), true));
+    .map(|ty| BinaryOperatorDefinition::new(&ty, &ty, &PgBuiltInType::bool(), true));
     for name in ["=", "<>"] {
         base.set_get_operator_op_result(
-            &crate::names::OperatorName::from_parts(None, name),
+            &OperatorName::from_parts(None, name),
             true,
             true,
-            Some(&crate::sem::OperatorDefinition::binary(&definitions)),
+            Some(&OperatorDefinition::binary(&definitions)),
         );
     }
     base
@@ -70,12 +76,12 @@ fn apply_schema(
     sql: &str,
     mut context: SchemaFileContext,
 ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
-        &crate::StringSpan::new(0, sql.len()),
+        &StringSpan::new(0, sql.len()),
     ));
-    for statement in crate::parse_statements(sql, Dialect::postgres()) {
+    for statement in parse_statements(sql, Dialect::postgres()) {
         context = statement?
             .analyze(context, &mut cache_context)?
             .into_context();
@@ -87,9 +93,9 @@ fn apply_schema(
 pub(crate) fn query(
     sql: &str,
     context: SchemaFileContext,
-) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let analyzed = crate::parse_statements(sql, context.dialect())
+) -> Result<(SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
+    let mut cache_context = create_cache_context();
+    let analyzed = parse_statements(sql, context.dialect())
         .next()
         .unwrap()?
         .analyze(context, &mut cache_context)?;
@@ -97,7 +103,7 @@ pub(crate) fn query(
     Ok((query, analyzed.into_context()))
 }
 
-pub(crate) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(crate) fn expression(query: &SelectStatement) -> &SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)
@@ -111,20 +117,15 @@ pub(crate) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::Se
 pub(crate) fn composite_schema() -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
     let mut base = base_context(Dialect::postgres());
     for name in ["singleton", "pair"] {
-        let ty = crate::sem::TypeReference::concrete_type_ref(
-            &crate::names::FullName::with_schema("public", name),
-            false,
-        );
+        let ty = TypeReference::concrete_type_ref(&FullName::with_schema("public", name), false);
         base.set_get_implicit_cast_result(
             &ty,
             &ty,
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::no_conversion(),
-            )),
+            Some(CastDefinition::new(CastContext::no_conversion())),
         );
         base.setup_function(
             &format!("take_{name}"),
-            &[crate::sem::OverloadVariant::new(
+            &[OverloadVariant::new(
                 &Some(PgBuiltInType::int4()),
                 &vec![crate::sem::FunctionParam::new_input_param(
                     &None,

@@ -3,13 +3,18 @@ mod impl_build_binary_op;
 mod impl_build_op_all;
 mod impl_build_op_any;
 
+use crate::sem::{
+    ParseContext,
+    scalar_expr::arith_expr::{BinaryOpCallSite, UndefinedOperatorCallSite},
+};
+
 use self::bin_cast_candidate::BinaryCastCandidate;
 
-use crate::sem::scalar_expr::arith_expr::ArithExpr;
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorDefinition, SemScalarExpr,
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorDefinition,
+        SemScalarExpr, scalar_expr::arith_expr::ArithExpr,
     },
 };
 
@@ -38,14 +43,14 @@ impl ResolvedBinaryOperator {
         name: &OperatorName,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(operator) = self.operator_def {
-            super::BinaryOpCallSite::from_operator_definition_resolved(
+            BinaryOpCallSite::from_operator_definition_resolved(
                 context, name, operator, self.lexpr, self.rexpr,
             )
         } else {
-            super::UndefinedOperatorCallSite::undefined_operator_resolved(
+            UndefinedOperatorCallSite::undefined_operator_resolved(
                 context,
                 name,
                 Some(self.lexpr),
@@ -64,7 +69,7 @@ impl ArithExpr {
         rexpr: SemScalarExpr,
     ) -> Result<ResolvedBinaryOperator, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(left_type) = lexpr.get_type()
             && let Some(right_type) = rexpr.get_type()

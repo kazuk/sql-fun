@@ -1,25 +1,28 @@
-use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
+use crate::{
+    AstAndContextPair,
+    ast::{Dialect, resolve::query::test_helpers::catalog},
+    context::{BaseParseContext, ParseContext, SchemaFileContext},
+    names::FullName,
+    parse_statements,
+    sem::{CastContext, CastDefinition, OverloadVariant, PgBuiltInType, TypeReference},
+    test_helpers::create_cache_context,
+};
 
 /// Explicit small composite fixtures; no builtin catalog or live database.
-pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileContext> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let mut base = super::super::super::test_helpers::catalog();
+pub(super) fn composite_query(sql: &str) -> AstAndContextPair<SchemaFileContext> {
+    let mut cache_context = create_cache_context();
+    let mut base = catalog();
     for name in ["singleton", "pair", "container"] {
-        let ty = crate::sem::TypeReference::concrete_type_ref(
-            &crate::names::FullName::with_schema("public", name),
-            false,
-        );
+        let ty = TypeReference::concrete_type_ref(&FullName::with_schema("public", name), false);
         base.set_get_implicit_cast_result(
             &ty,
             &ty,
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::no_conversion(),
-            )),
+            Some(CastDefinition::new(CastContext::no_conversion())),
         );
         base.setup_function(
             &format!("take_{name}"),
-            &[crate::sem::OverloadVariant::new(
-                &Some(crate::sem::PgBuiltInType::int4()),
+            &[OverloadVariant::new(
+                &Some(PgBuiltInType::int4()),
                 &vec![crate::sem::FunctionParam::new_input_param(
                     &None,
                     &Some(ty),
@@ -38,9 +41,9 @@ pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileC
         &args,
         &metadata,
     );
-    for statement in crate::parse_statements(
+    for statement in parse_statements(
         "CREATE TYPE singleton AS (n integer); CREATE TYPE pair AS (n integer, m integer); CREATE TYPE container AS (item singleton)",
-        crate::ast::Dialect::postgres(),
+        Dialect::postgres(),
     ) {
         context = statement
             .unwrap()
@@ -48,7 +51,7 @@ pub(super) fn composite_query(sql: &str) -> crate::AstAndContextPair<SchemaFileC
             .unwrap()
             .into_context();
     }
-    crate::parse_statements(sql, crate::ast::Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()

@@ -1,6 +1,7 @@
-use super::super::test_helpers::column_scope_query;
-use crate::ast::Dialect;
-use crate::sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr};
+use crate::{
+    ast::{Dialect, resolve::query::test_helpers::column_scope_query},
+    sem::{AnalysisError, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
+};
 
 #[rstest::rstest]
 #[case::original("SELECT (SELECT id FROM missing.items) FROM outer_items;")]
@@ -169,10 +170,7 @@ struct Bindings {
 }
 
 impl crate::sem::traversal::SemanticVisitorMut for Bindings {
-    fn expression(
-        &mut self,
-        expression: &mut SemScalarExpr,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if expression.output_index().is_some() {
             self.outputs += 1;
         }

@@ -4,6 +4,8 @@
 #[path = "../../../sql-fun-client/tests/test_helpers/heavy.rs"]
 mod lifecycle;
 
+use crate::api_helpers::{executable::cli_executable, responses, schema::SchemaFixture};
+
 use std::{path::Path, process::Stdio, time::Duration};
 
 use ::tokio::io::AsyncWriteExt;
@@ -25,11 +27,7 @@ impl ApiServer {
     }
 
     #[allow(dead_code, reason = "used by the direct SQL integration target")]
-    pub fn sql_command(
-        &self,
-        schema: &super::schema::SchemaFixture,
-        verb: &str,
-    ) -> ::tokio::process::Command {
+    pub fn sql_command(&self, schema: &SchemaFixture, verb: &str) -> ::tokio::process::Command {
         let mut command = self.cli_command();
         let request = schema.request();
         command.args([
@@ -51,7 +49,7 @@ impl ApiServer {
     }
 
     fn cli_command(&self) -> ::tokio::process::Command {
-        let mut command = ::tokio::process::Command::new(super::executable::cli_executable());
+        let mut command = ::tokio::process::Command::new(cli_executable());
         command
             .env("USER", self.0.user())
             .env("SQL_FUN_SERVER", self.0.executable())
@@ -69,7 +67,7 @@ impl ApiServer {
     /// Run schema initialization through the CLI's real client/server transport.
     pub async fn initialize_schema(
         &self,
-        schema: &super::schema::SchemaFixture,
+        schema: &SchemaFixture,
     ) -> ::testresult::TestResult<::sql_fun_server_api::payloads::SchemaContext> {
         let request = ::serde_json::json!({
             "method": "initialize_schema_context", "params": schema.request()
@@ -80,7 +78,7 @@ impl ApiServer {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let mut replies = super::responses(&output);
+        let mut replies = responses(&output);
         assert_eq!(replies.len(), 1);
         Ok(::serde_json::from_value(
             replies.remove(0)["result"].clone(),
@@ -177,8 +175,7 @@ impl BridgeSession {
 
 /// Verify query handles on a persistent bridge, reusing the lifecycle test server.
 pub async fn verify_query_analysis_session(server: &ApiServer) -> ::testresult::TestResult {
-    let schema =
-        super::schema::SchemaFixture::with_query_schema("CREATE TABLE entries(id int4 NOT NULL);")?;
+    let schema = SchemaFixture::with_query_schema("CREATE TABLE entries(id int4 NOT NULL);")?;
     let mut bridge = BridgeSession::start(server)?;
     let initialized = bridge
         .rpc("initialize_schema_context", schema.request())

@@ -1,4 +1,7 @@
-use crate::{AnalyzeArgs, ApiArgs, CheckArgs, ExtractArgs, TestArgs};
+use crate::{
+    AnalyzeArgs, ApiArgs, CheckArgs, ExtractArgs, RunnableCommand, SqlFunCliArgs, TestArgs,
+    init::initialize,
+};
 use sql_fun_core::InitializeArgs;
 
 /// daemon control args
@@ -116,9 +119,7 @@ impl CliSubCommand {
             Self::Api(args) => args.execute().await,
             Self::Analyze(args) => args.execute(common).await,
             Self::Test(args) => args.execute(common).await,
-            Self::Initialize(args) => {
-                Ok(crate::init::initialize(common, args, metadata_file_from_cli).await?)
-            }
+            Self::Initialize(args) => Ok(initialize(common, args, metadata_file_from_cli).await?),
             Self::Check(args) => Ok(args.execute(common).await?),
             Self::Extract(args) => args.execute().await,
             _ => unreachable!("expected builtin command"),
@@ -127,8 +128,8 @@ impl CliSubCommand {
 
     pub(crate) async fn execute_external(
         &self,
-        runnable: &crate::RunnableCommand,
-        args: &crate::SqlFunCliArgs,
+        runnable: &RunnableCommand,
+        args: &SqlFunCliArgs,
     ) -> Result<std::process::ExitCode, anyhow::Error> {
         match self {
             Self::External(external_args) => {

@@ -1,9 +1,10 @@
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ParseContext,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
+        ParseContext,
     },
-    syn::{ConstrType, Opt},
+    syn::{ConstrType, Constraint, Opt},
 };
 
 /// Identity column mode
@@ -46,7 +47,7 @@ impl IdentityColumnMode {
 mod identity_column_mode_from_postgres_generate_when {
     use testresult::TestResult;
 
-    use super::IdentityColumnMode;
+    use crate::sem::column_constraints::identity_constraint::IdentityColumnMode;
 
     #[rstest::rstest]
     #[case("a", IdentityColumnMode::Always)]
@@ -76,7 +77,7 @@ pub struct IdentityColumnConstraint {
 }
 
 impl IdentityColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -125,7 +126,7 @@ impl IdentityColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,

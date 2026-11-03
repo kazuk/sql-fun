@@ -9,6 +9,16 @@ mod table_rename;
 mod sql_emission;
 
 use crate::{
+    CacheContext,
+    ast::{
+        AlterCommand, AlterRelationKind, Column as AstColumn, IndexExpression, Into as AstInto,
+        PartitionBound, Query, Relation as AstRelation, Role as AstRole, TableConstraint,
+        VariableSet,
+    },
+    sem::{AlterSequence, ColumnRename, ForeignKeyTarget},
+};
+
+use crate::{
     AstAndContextPair, StringSpan,
     context::ParseContext,
     names::{ColumnName, FullName, LocalName, TableName, ViewName},
@@ -31,7 +41,7 @@ use crate::{
     },
 };
 
-use super::{Dialect, Expr, Name, StatementNode, SyntaxOption, TypeName};
+use crate::ast::{Dialect, Expr, Name, StatementNode, SyntaxOption, TypeName};
 
 impl From<&FullName> for Name {
     fn from(value: &FullName) -> Self {
@@ -49,7 +59,7 @@ impl From<&FullName> for Name {
 
 impl super::AlterRelation {
     pub(crate) const fn with_view_kind(mut self, materialized: bool) -> Self {
-        self.kind = super::AlterRelationKind::view(materialized);
+        self.kind = AlterRelationKind::view(materialized);
         self
     }
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
@@ -142,7 +152,7 @@ impl super::AlterRelationKind {
         self,
         context: &mut impl ParseContext,
         name: &FullName,
-        syntax_commands: &[super::AlterCommand],
+        syntax_commands: &[AlterCommand],
         source: Option<&SourcePathWithSpan>,
         if_exists: bool,
     ) -> Result<SemAst, AnalysisError> {
@@ -159,7 +169,7 @@ impl super::AlterRelationKind {
     fn resolve_index(
         context: &mut impl ParseContext,
         name: &FullName,
-        syntax_commands: &[super::AlterCommand],
+        syntax_commands: &[AlterCommand],
         if_exists: bool,
     ) -> Result<SemAst, AnalysisError> {
         let mut operations = Vec::new();
@@ -173,7 +183,7 @@ impl super::AlterRelationKind {
     fn resolve_table(
         context: &mut impl ParseContext,
         name: &FullName,
-        syntax_commands: &[super::AlterCommand],
+        syntax_commands: &[AlterCommand],
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
         let Some(source) = source else {
@@ -195,7 +205,7 @@ impl super::AlterRelationKind {
     fn resolve_view(
         context: &mut impl ParseContext,
         name: &FullName,
-        syntax_commands: &[super::AlterCommand],
+        syntax_commands: &[AlterCommand],
         materialized: bool,
     ) -> Result<SemAst, AnalysisError> {
         let view = ViewName::from_full_name(name);
@@ -218,7 +228,7 @@ impl super::AlterRelationKind {
     fn resolve_sequence(
         context: &mut impl ParseContext,
         name: &FullName,
-        syntax_commands: &[super::AlterCommand],
+        syntax_commands: &[AlterCommand],
     ) -> Result<SemAst, AnalysisError> {
         if context.get_sequence(name).is_none() {
             context.report_analysis_problem(AnalysisProblem::sequence_not_found(name))?;
@@ -227,9 +237,7 @@ impl super::AlterRelationKind {
             .iter()
             .map(|command| command.resolve_owner(context))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(SemAst::alter_sequence(&crate::sem::AlterSequence::new(
-            name, &commands,
-        )))
+        Ok(SemAst::alter_sequence(&AlterSequence::new(name, &commands)))
     }
 }
 
@@ -325,7 +333,7 @@ impl super::AlterCommand {
     fn resolve_constraint(
         context: &mut impl ParseContext,
         table: &TableName,
-        constraint: &super::TableConstraint,
+        constraint: &TableConstraint,
     ) -> Result<AlterObjSubCommand, AnalysisError> {
         // Constraint-created indexes need the matched key even when the stored
         // table declaration remains unqualified.
@@ -370,7 +378,7 @@ impl super::AlterCommand {
     fn resolve_add_column(
         context: &mut impl ParseContext,
         table: &TableName,
-        column: &super::Column,
+        column: &AstColumn,
     ) -> Result<AlterObjSubCommand, AnalysisError> {
         let column = column.resolve(context, table)?;
         if let Some(name) = column.name() {
@@ -383,7 +391,7 @@ impl super::AlterCommand {
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
-        column: &super::Column,
+        column: &AstColumn,
     ) -> Result<AlterObjSubCommand, AnalysisError> {
         let name = ColumnName::from(name);
         Self::missing_column(context, table, &name)?;
@@ -399,7 +407,7 @@ impl super::AlterCommand {
         from: &str,
         to: &str,
     ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let (_, rename) = crate::sem::ColumnRename::resolve(
+        let (_, rename) = ColumnRename::resolve(
             context,
             table,
             &ColumnName::from(from),
@@ -428,7 +436,7 @@ pub(crate) struct PostgresAlterCommand {
     definition: AlterDefinition,
     missing_ok: bool,
     cascade: bool,
-    legacy: Option<Box<super::AlterCommand>>,
+    legacy: Option<Box<AlterCommand>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -498,11 +506,11 @@ pub(crate) enum AlterDefinition {
     Text(String),
     Options(Vec<SyntaxOption>),
     GenericOptions(Vec<GenericOption>),
-    Column(super::Column),
+    Column(AstColumn),
     ColumnType(AlterColumnType),
-    Constraint(super::TableConstraint),
+    Constraint(TableConstraint),
     ConstraintFlags(AlterConstraintFlags),
-    Role(super::Role),
+    Role(AstRole),
     Relation(Name),
     Type(TypeName),
     Replica(ReplicaIdentity),
@@ -531,7 +539,7 @@ impl AlterDefinition {
         Self::GenericOptions(values)
     }
 
-    pub(super) const fn column(value: super::Column) -> Self {
+    pub(super) const fn column(value: AstColumn) -> Self {
         Self::Column(value)
     }
 
@@ -539,7 +547,7 @@ impl AlterDefinition {
         Self::ColumnType(value)
     }
 
-    pub(super) const fn constraint(value: super::TableConstraint) -> Self {
+    pub(super) const fn constraint(value: TableConstraint) -> Self {
         Self::Constraint(value)
     }
 
@@ -547,7 +555,7 @@ impl AlterDefinition {
         Self::ConstraintFlags(value)
     }
 
-    pub(super) const fn role(value: super::Role) -> Self {
+    pub(super) const fn role(value: AstRole) -> Self {
         Self::Role(value)
     }
 
@@ -606,7 +614,7 @@ pub(crate) struct ReplicaIdentity {
 #[derive(Clone, Debug)]
 pub(crate) struct AlterPartition {
     relation: Name,
-    bound: Option<super::PartitionBound>,
+    bound: Option<PartitionBound>,
     concurrent: bool,
 }
 #[derive(Clone, Debug)]
@@ -623,7 +631,7 @@ impl PostgresAlterCommand {
         definition: &AlterDefinition,
         missing_ok: bool,
         cascade: bool,
-        legacy: Option<&super::AlterCommand>,
+        legacy: Option<&AlterCommand>,
     ) -> Self {
         Self {
             operation,
@@ -692,11 +700,7 @@ impl ReplicaIdentity {
     }
 }
 impl AlterPartition {
-    pub(super) fn new(
-        relation: &Name,
-        bound: Option<&super::PartitionBound>,
-        concurrent: bool,
-    ) -> Self {
+    pub(super) fn new(relation: &Name, bound: Option<&PartitionBound>, concurrent: bool) -> Self {
         Self {
             relation: relation.clone(),
             bound: bound.cloned(),
@@ -755,7 +759,7 @@ impl super::TableConstraint {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(table))?;
         }
         for key in &keys {
-            super::AlterCommand::missing_column(context, table, key)?;
+            AlterCommand::missing_column(context, table, key)?;
         }
         if self.constraint.is_unique_key() && self.extras.deferrable {
             todo!("deferrable unique-key catalog representation");
@@ -845,14 +849,14 @@ impl super::ForeignReference {
         let requested = TableName::from(self.table.full_name()?);
         let explicit = self.referenced_columns();
         let (binding, target_columns, target_valid) = if let Some(pending) = pending {
-            crate::sem::ForeignKeyTarget::resolve_declared_reference(
+            ForeignKeyTarget::resolve_declared_reference(
                 context,
                 &requested,
                 explicit.as_deref(),
                 pending,
             )?
         } else {
-            let binding = crate::sem::ForeignKeyTarget::resolve_relation(context, &requested)?;
+            let binding = ForeignKeyTarget::resolve_relation(context, &requested)?;
             let (columns, valid) =
                 binding.referenced_columns(context, &requested, explicit.as_deref())?;
             (binding, columns, valid)
@@ -1033,7 +1037,7 @@ impl super::Table {
             }
         }
         self.resolve_foreign_keys(context, &mut table)?;
-        if context.dialect() == crate::ast::Dialect::postgres() {
+        if context.dialect() == Dialect::postgres() {
             table.apply_primary_key_nullability();
         }
         Ok(table)
@@ -1057,6 +1061,8 @@ impl super::Table {
 
 #[cfg(test)]
 mod test_create_table_foreign_keys {
+    use crate::test_helpers::ownership::apply_ownership_sql;
+
     use crate::{context::TableInfoRead, names::ColumnName, test_helpers::foreign_keys as fk};
 
     #[test]
@@ -1066,7 +1072,7 @@ mod test_create_table_foreign_keys {
             fk::context(),
             "CREATE TABLE a.parent(x integer, y integer, PRIMARY KEY(x,y), UNIQUE(y,x))",
         );
-        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+        let pair = apply_ownership_sql(
             context,
             "CREATE TABLE a.child(x integer, y integer, CONSTRAINT fk FOREIGN KEY(y,x) REFERENCES parent(y,x), FOREIGN KEY(x,y) REFERENCES parent, FOREIGN KEY(y,x) REFERENCES parent(y,x))",
         )?;
@@ -1111,7 +1117,7 @@ mod test_create_table_foreign_keys {
         #[case] bound: bool,
     ) -> testresult::TestResult {
         let context = fk::parents();
-        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+        let pair = apply_ownership_sql(
             context,
             &format!(
                 "CREATE TABLE a.child(id integer, CONSTRAINT fk FOREIGN KEY({source}) REFERENCES {reference})"
@@ -1481,7 +1487,7 @@ impl super::ForeignReference {
         };
         let target_column = ColumnName::from(target_column.as_str());
         let (binding, target_type) =
-            crate::sem::ForeignKeyTarget::resolve_column(context, &target, &target_column)?;
+            ForeignKeyTarget::resolve_column(context, &target, &target_column)?;
         Ok(ColumnConstraint::foreign_key(
             ForeignKeyColumnConstraint::new(
                 table,
@@ -1501,8 +1507,8 @@ impl super::ForeignReference {
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableAs {
-    into: super::Into,
-    query: super::Query,
+    into: AstInto,
+    query: Query,
     materialized: bool,
     if_not_exists: bool,
     skip_data: bool,
@@ -1510,8 +1516,8 @@ pub(crate) struct TableAs {
 
 impl TableAs {
     pub(super) const fn new(
-        into: super::Into,
-        query: super::Query,
+        into: AstInto,
+        query: Query,
         materialized: bool,
         if_not_exists: bool,
     ) -> Self {
@@ -1532,7 +1538,7 @@ impl TableAs {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let Some(source) = context.get_source_path_with_span().cloned() else {
             return AnalysisError::raise_unexpected_none("source span");
@@ -1543,7 +1549,7 @@ impl TableAs {
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let mut query = self.query.resolve(&mut context, cache)?;
@@ -1600,9 +1606,9 @@ impl TableAs {
 #[derive(Clone, Debug)]
 pub(crate) struct Index {
     name: String,
-    relation: super::Relation,
-    keys: Vec<super::IndexExpression>,
-    includes: Vec<super::IndexExpression>,
+    relation: AstRelation,
+    keys: Vec<IndexExpression>,
+    includes: Vec<IndexExpression>,
     unique: bool,
     predicate: Option<Expr>,
     options: Vec<SyntaxOption>,
@@ -1617,9 +1623,9 @@ impl Index {
     #[expect(clippy::too_many_arguments)]
     pub(super) fn new(
         name: &str,
-        relation: super::Relation,
-        keys: Vec<super::IndexExpression>,
-        includes: Vec<super::IndexExpression>,
+        relation: AstRelation,
+        keys: Vec<IndexExpression>,
+        includes: Vec<IndexExpression>,
         unique: bool,
         predicate: Option<Expr>,
         options: Vec<SyntaxOption>,
@@ -1657,14 +1663,14 @@ impl Index {
 
     #[cfg(test)]
     pub(crate) fn resolve_elements(
-        elements: &[super::IndexExpression],
+        elements: &[IndexExpression],
         context: &mut impl ParseContext,
     ) -> Result<IndexElementCollection, AnalysisError> {
         Self::resolve_elements_in(elements, context, &ScalarAnalysisContext::default())
     }
 
     fn resolve_elements_in(
-        elements: &[super::IndexExpression],
+        elements: &[IndexExpression],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<IndexElementCollection, AnalysisError> {
@@ -1759,7 +1765,7 @@ pub(crate) struct Schema {
     name: String,
     elements: Vec<StatementNode>,
     if_not_exists: bool,
-    authorization: Option<super::Role>,
+    authorization: Option<AstRole>,
 }
 
 impl Schema {
@@ -1772,7 +1778,7 @@ impl Schema {
         }
     }
 
-    pub(super) fn with_authorization(mut self, authorization: Option<super::Role>) -> Self {
+    pub(super) fn with_authorization(mut self, authorization: Option<AstRole>) -> Self {
         self.authorization = authorization;
         self
     }
@@ -1780,14 +1786,14 @@ impl Schema {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         context.apply_creation_group(|context| self.resolve_group(context, cache))
     }
     fn resolve_group<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         if context.schema_definition(&self.name).is_some() {
             let schema = CreateSchema::new(&self.name, &[]).with_if_not_exists(self.if_not_exists);
@@ -1855,7 +1861,7 @@ pub(crate) enum FunctionOption {
     Cost(Expr),
     Rows(Expr),
     Support(Name),
-    Setting(super::VariableSet),
+    Setting(VariableSet),
 }
 
 impl FunctionOption {
@@ -2114,10 +2120,11 @@ impl Function {
 
 #[cfg(test)]
 mod test_function_null_input_semantics {
-    use super::Function;
-    use crate::ast::TryFromWithTokens;
-    use crate::syn::Opt;
-    use crate::test_helpers::{SynBuilder, TestParseContext};
+    use crate::{
+        ast::{TryFromWithTokens, ddl::Function},
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext},
+    };
     use sql_fun_core::IVec;
 
     #[rstest::rstest]
@@ -2147,7 +2154,7 @@ pub(crate) struct Domain {
     name: Name,
     base: TypeName,
     base_span: StringSpan,
-    constraints: Vec<super::TableConstraint>,
+    constraints: Vec<TableConstraint>,
     collation: Name,
 }
 
@@ -2246,11 +2253,14 @@ impl CompositeField {
 
 #[cfg(test)]
 mod test_composite_field_resolution {
-    use super::CompositeType;
-    use crate::ast::TryFromWithTokens;
-    use crate::sem::{PgBuiltInType, TypeReference};
-    use crate::syn::Opt;
-    use crate::test_helpers::{SynBuilder, TestParseContext};
+    use crate::names::{FullName, TableName};
+
+    use crate::{
+        ast::{TryFromWithTokens, ddl::CompositeType},
+        sem::{PgBuiltInType, TypeReference},
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext},
+    };
     use ::sql_fun_core::IVec;
 
     #[rstest::rstest]
@@ -2272,10 +2282,7 @@ mod test_composite_field_resolution {
         let field = composite.fields[0]
             .resolve(
                 &mut context,
-                &crate::names::TableName::from(crate::names::FullName::with_schema(
-                    "public",
-                    "array_value",
-                )),
+                &TableName::from(FullName::with_schema("public", "array_value")),
             )
             .unwrap();
         assert_eq!(field.name(), "items");
@@ -2296,7 +2303,7 @@ impl Domain {
         name: Name,
         base: TypeName,
         base_span: StringSpan,
-        constraints: Vec<super::TableConstraint>,
+        constraints: Vec<TableConstraint>,
         collation: Name,
     ) -> Self {
         Self {
@@ -2332,7 +2339,7 @@ impl Domain {
         let category = if let Some(base) = context.get_type(&base_name) {
             if self.base.array_bounds.is_empty() {
                 base.category(context)
-            } else if context.dialect() == crate::ast::Dialect::postgres() {
+            } else if context.dialect() == Dialect::postgres() {
                 TypeCategory::try_from('A').ok()
             } else {
                 None
@@ -2371,6 +2378,8 @@ impl Domain {
 
 #[cfg(test)]
 mod domain_tests {
+    use crate::test_helpers::create_cache_context;
+
     use crate::{
         ast::{StatementNode, TryFromWithTokens},
         sem::SemAst,
@@ -2386,10 +2395,7 @@ mod domain_tests {
             &IVec::default(),
         )?;
         let mut context = TestParseContext::default();
-        let domain = syntax.resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )?;
+        let domain = syntax.resolve(&mut context, &mut create_cache_context())?;
         assert!(matches!(domain, SemAst::CreateDomain(_)));
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())

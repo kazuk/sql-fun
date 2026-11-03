@@ -245,7 +245,7 @@ fn qualify_view_rules(views: &mut Value) -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod test_view_rule_qualification {
-    use super::qualify_view_rules;
+    use crate::extract::catalog::qualify_view_rules;
 
     #[test]
     fn qualifies_only_the_checked_target_prefix() {

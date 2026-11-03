@@ -1,4 +1,4 @@
-use super::DiagnosticMetadata;
+use crate::analysis_problem::DiagnosticMetadata;
 
 /// Invalid table-function invocations or caller-supplied output definitions.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ::serde::Serialize, ::serde::Deserialize)]

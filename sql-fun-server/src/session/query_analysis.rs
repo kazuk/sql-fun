@@ -1,6 +1,10 @@
 //! Query-local analysis over a retained schema; no catalog discovery or inference solver.
-use super::facade::Session;
-use crate::InitializedSchema;
+
+use crate::{
+    InitializedSchema,
+    cte_realization::{RealizedCteQuery, realize_cte_catalog},
+    session::facade::Session,
+};
 use ::sql_fun_core::{
     DiagnosticPresentation, PlaceholderedSql, analysis_problem::QueryAnalysisStage,
 };
@@ -89,7 +93,7 @@ impl Bindings {
             hints,
         })
     }
-    fn from_realized(query: &crate::cte_realization::RealizedCteQuery) -> Self {
+    fn from_realized(query: &RealizedCteQuery) -> Self {
         Self {
             names: query
                 .bindings()
@@ -749,7 +753,7 @@ fn analyze(
             .try_map_cte_queries(|_, _| Ok::<_, std::convert::Infallible>(()))
             .expect("infallible inspection");
         if !ctes.is_empty() {
-            return match crate::cte_realization::realize_cte_catalog(&query, catalog, dialect) {
+            return match realize_cte_catalog(&query, catalog, dialect) {
                 Ok(realized) => {
                     let bindings = Bindings::from_realized(&realized);
                     if let Err(error) =
@@ -885,6 +889,8 @@ fn collect_requested_accesses(
 
 #[cfg(test)]
 mod test_access_invocation {
+    use crate::session::query_analysis::collect_requested_accesses;
+
     #[test]
     fn default_and_false_never_invoke_the_collector() {
         let omitted = ::serde_json::json!({"context_handle":"c", "query":{"Text":"SELECT 1"}});
@@ -896,7 +902,7 @@ mod test_access_invocation {
             let args: ::sql_fun_server_api::payloads::AnalyzeQueryArgs =
                 ::serde_json::from_value(value).unwrap();
             let calls = std::cell::Cell::new(0);
-            let result = super::collect_requested_accesses(*args.analyze_access(), || {
+            let result = collect_requested_accesses(*args.analyze_access(), || {
                 calls.set(calls.get() + 1);
                 Ok(::sql_fun_sqlast::sem::QueryAccess::default())
             });

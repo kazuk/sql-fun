@@ -1,15 +1,19 @@
-use crate::ast::postgres::{nonempty, required};
-use crate::ast::{
-    Access, Alias, Assignment, CommitAction, Conflict, ConflictAction, Cte, CteBody, Cycle, Delete,
-    DerivedTable, Expr, Frame, FrameBound, FrameExclusion, FrameMode, FromItem, Grouping,
-    IndexExpression, Insert, Into, Join, JoinKind, JsonTable, Lock, LockStrength, LockWait, Merge,
-    Name, Order, OverridingKind, Query, QueryBody, Relation, Search, Select, SetOperation,
-    SetQuery, SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target,
-    TryCollectFromWithTokens, TryFromOpt, TryFromWithTokens, TryFromWithTokensOpt, TypeName,
-    TypedColumn, Update, Window, With, XmlTable,
+use crate::{
+    ast::{
+        Access, Alias, Assignment, CommitAction, Conflict, ConflictAction, Cte, CteBody, CteColumn,
+        Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FrameExclusion, FrameMode, FromItem,
+        Grouping, IndexExpression, Insert, Into, Join, JoinKind, JsonTable, Lock, LockStrength,
+        LockWait, Merge, Name, Order, OverridingKind, Query, QueryBody, Relation, ReturningOption,
+        Search, Select, SetOperation, SetQuery, SyntaxOption, SyntaxValue, TableFunction,
+        TableFunctions, TableSample, Target, TryCollectFromWithTokens, TryFromOpt,
+        TryFromWithTokens, TryFromWithTokensOpt, TypeName, TypedColumn, Update, Window, With,
+        XmlTable,
+        postgres::{nonempty, required},
+    },
+    sem::{AnalysisError, with_stack},
+    syn,
+    syn::{ListOpt, Opt, ScanToken},
 };
-use crate::syn::{ListOpt, Opt};
-use crate::{sem::AnalysisError, syn};
 
 use ::sql_fun_core::IVec;
 
@@ -18,9 +22,9 @@ impl TryFromWithTokens<&syn::SelectStmt> for Query {
 
     fn try_from_with_tokens(
         value: &syn::SelectStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::convert_postgres(value, tokens))
+        with_stack(|| Self::convert_postgres(value, tokens))
     }
 }
 
@@ -28,7 +32,7 @@ impl Query {
     #[inline(never)]
     fn convert_postgres(
         value: &syn::SelectStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         Ok(Self {
             with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
@@ -49,7 +53,7 @@ impl TryFromWithTokens<(SetOperation, &syn::SelectStmt)> for SetQuery {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: (SetOperation, &syn::SelectStmt),
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let operation = value.0;
         let value = value.1;
@@ -73,7 +77,7 @@ impl TryFromWithTokens<Vec<syn::Node>> for QueryBody {
 
     fn try_from_with_tokens(
         rows: Vec<syn::Node>,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let mut values = Vec::new();
         for row in rows {
@@ -91,7 +95,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Window {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut windows = Vec::new();
         for window in nodes.as_inner().unwrap_or_default() {
@@ -109,7 +113,7 @@ impl TryFromWithTokens<&syn::SelectStmt> for QueryBody {
 
     fn try_from_with_tokens(
         value: &syn::SelectStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         if let Some(operation) = SetOperation::postgres(value.get_op().as_inner())? {
             return Ok(Self::Set(Box::new(SetQuery::try_from_with_tokens(
@@ -172,7 +176,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Target {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut targets = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -193,7 +197,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Order {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut orders = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -235,7 +239,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Grouping {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut groups = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -269,7 +273,7 @@ impl TryFromWithTokens<syn::WithClauseOpt> for With {
 
     fn try_from_with_tokens(
         value: syn::WithClauseOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let Some(value) = value.as_inner() else {
             return Ok(Self::default());
@@ -293,13 +297,11 @@ impl TryFromWithTokens<&syn::CommonTableExpr> for Cte {
 
     fn try_from_with_tokens(
         value: &syn::CommonTableExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: value.get_ctename(),
-            columns: crate::ast::CteColumn::from_names(
-                &Name::try_from(value.get_aliascolnames())?.0,
-            ),
+            columns: CteColumn::from_names(&Name::try_from(value.get_aliascolnames())?.0),
             materialized: match value.get_ctematerialized().as_inner() {
                 Some(syn::CteMaterialize::Always) => Some(true),
                 Some(syn::CteMaterialize::Never) => Some(false),
@@ -357,7 +359,7 @@ impl TryFromWithTokens<&syn::CteCycleClause> for Cycle {
 
     fn try_from_with_tokens(
         value: &syn::CteCycleClause,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             columns: Name::try_from(value.get_cycle_col_list())?.0,
@@ -402,7 +404,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for FromItem {
     type Error = AnalysisError;
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         nodes
             .as_inner()
@@ -418,7 +420,7 @@ impl TryFromWithTokens<&syn::RangeTableSample> for TableSample {
 
     fn try_from_with_tokens(
         sample: &syn::RangeTableSample,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             relation: FromItem::try_from_with_tokens(&sample.get_relation(), tokens)?,
@@ -434,18 +436,15 @@ impl TryFromWithTokens<&syn::Node> for FromItem {
 
     fn try_from_with_tokens(
         node: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::convert_postgres(node, tokens))
+        with_stack(|| Self::convert_postgres(node, tokens))
     }
 }
 
 impl FromItem {
     #[inline(never)]
-    fn convert_postgres(
-        node: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+    fn convert_postgres(node: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
         if let Some(relation) = node.as_range_var().as_inner() {
             return Ok(Self::relation(Relation::try_from(&relation)?));
         }
@@ -496,7 +495,7 @@ impl TryFromWithTokens<&syn::RangeFunction> for TableFunctions {
 
     fn try_from_with_tokens(
         value: &syn::RangeFunction,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let mut calls = Vec::new();
         for node in value.get_functions().as_inner().unwrap_or_default() {
@@ -535,7 +534,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for TypedColumn {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut columns = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -562,7 +561,7 @@ impl TryFromWithTokens<&syn::WindowDef> for Window {
 
     fn try_from_with_tokens(
         value: &syn::WindowDef,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             reference_only: false,
@@ -580,7 +579,7 @@ impl TryFromWithTokensOpt<&syn::WindowDef> for Frame {
 
     fn try_from_with_tokens_opt(
         value: &syn::WindowDef,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         // Decode the parser's flags at the boundary; the common AST stores SQL concepts.
         let flags = value.get_frame_options();
@@ -692,7 +691,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Assignment {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut assignments = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -712,7 +711,7 @@ impl TryFromWithTokens<&syn::InsertStmt> for Insert {
 
     fn try_from_with_tokens(
         value: &syn::InsertStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             or_conflict: None,
@@ -738,9 +737,7 @@ impl TryFromWithTokens<&syn::InsertStmt> for Insert {
                 .as_inner()
                 .map(|conflict| Conflict::try_from_with_tokens(&conflict, tokens))
                 .transpose()?,
-            returning_options: crate::ast::ReturningOption::from_postgres(
-                &value.get_returning_clause(),
-            )?,
+            returning_options: ReturningOption::from_postgres(&value.get_returning_clause())?,
             returning: Target::try_collect_from_with_tokens(
                 value.get_returning_clause().get_exprs(),
                 tokens,
@@ -754,7 +751,7 @@ impl TryFromWithTokens<&syn::UpdateStmt> for Update {
 
     fn try_from_with_tokens(
         value: &syn::UpdateStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             or_conflict: None,
@@ -766,9 +763,7 @@ impl TryFromWithTokens<&syn::UpdateStmt> for Update {
             assignments: Assignment::try_collect_from_with_tokens(value.get_target_list(), tokens)?,
             from: FromItem::try_collect_from_with_tokens(value.get_from_clause(), tokens)?,
             predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
-            returning_options: crate::ast::ReturningOption::from_postgres(
-                &value.get_returning_clause(),
-            )?,
+            returning_options: ReturningOption::from_postgres(&value.get_returning_clause())?,
             returning: Target::try_collect_from_with_tokens(
                 value.get_returning_clause().get_exprs(),
                 tokens,
@@ -782,7 +777,7 @@ impl TryFromWithTokens<&syn::DeleteStmt> for Delete {
 
     fn try_from_with_tokens(
         value: &syn::DeleteStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
@@ -792,9 +787,7 @@ impl TryFromWithTokens<&syn::DeleteStmt> for Delete {
             )?)?,
             using: FromItem::try_collect_from_with_tokens(value.get_using_clause(), tokens)?,
             predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
-            returning_options: crate::ast::ReturningOption::from_postgres(
-                &value.get_returning_clause(),
-            )?,
+            returning_options: ReturningOption::from_postgres(&value.get_returning_clause())?,
             returning: Target::try_collect_from_with_tokens(
                 value.get_returning_clause().get_exprs(),
                 tokens,
@@ -808,7 +801,7 @@ impl TryFromWithTokens<&syn::OnConflictClause> for Conflict {
 
     fn try_from_with_tokens(
         value: &syn::OnConflictClause,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let mut inference = Vec::new();
         let mut inference_predicate = None;
@@ -840,7 +833,7 @@ impl TryFromWithTokens<&syn::IndexElem> for IndexExpression {
 
     fn try_from_with_tokens(
         value: &syn::IndexElem,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: nonempty(value.get_name()),
@@ -864,7 +857,7 @@ impl TryFromWithTokens<&syn::IntoClause> for Into {
 
     fn try_from_with_tokens(
         value: &syn::IntoClause,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             relation: Relation::try_from(&required(value.get_rel().as_inner(), "INTO relation")?)?,
@@ -883,7 +876,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for SyntaxOption {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut options = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -907,7 +900,7 @@ impl TryFromWithTokens<&syn::Node> for SyntaxValue {
 
     fn try_from_with_tokens(
         node: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         if let Some(value) = node.as_type_name().as_inner() {
             Ok(Self::Type(TypeName::try_from_with_tokens(&value, tokens)?))
@@ -977,7 +970,7 @@ impl TryFromWithTokens<&syn::RangeSubselect> for DerivedTable {
 
     fn try_from_with_tokens(
         query: &syn::RangeSubselect,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             query: Query::try_from_with_tokens(
@@ -998,7 +991,7 @@ impl TryFromWithTokens<&syn::JoinExpr> for Join {
 
     fn try_from_with_tokens(
         join: &syn::JoinExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let condition = Expr::try_from_with_tokens_opt(join.get_quals(), tokens)?;
         let using = Name::try_from(join.get_using_clause())?.0;

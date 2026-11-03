@@ -1,5 +1,7 @@
-use super::freeze;
-use super::test_helpers::{invocation, layout, rendered};
+use crate::ast::wildcard::rows_source::{
+    freeze,
+    test_helpers::{invocation, layout, rendered},
+};
 
 #[rstest::rstest]
 #[case::plain(false)]

@@ -1,4 +1,9 @@
-use crate::sem::{InputTypeConstraint, SemScalarExpr, TypeReference};
+use crate::sem::{
+    AnalysisError, FuncCallExpr, IndirectionExpr, InputTypeConstraint, ParameterConstraints,
+    QueryNameResolution, ResolvedOperator, SemScalarExpr, TypeReference,
+    scalar_expr::func_call::FunctionBinding,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
 
 /// A parameter-dependent expression whose admissible types remain SQL constraints.
 /// Rust type selection is a later processing stage.
@@ -6,13 +11,13 @@ use crate::sem::{InputTypeConstraint, SemScalarExpr, TypeReference};
 pub struct ConstrainedExpr {
     operation: String,
     #[serde(default)]
-    operator_binding: Option<Box<crate::sem::ResolvedOperator>>,
+    operator_binding: Option<Box<ResolvedOperator>>,
     #[serde(default)]
-    cast_binding: Option<crate::sem::QueryNameResolution>,
+    cast_binding: Option<QueryNameResolution>,
     #[serde(default)]
-    semantic_call: Option<Box<crate::sem::scalar_expr::func_call::FunctionBinding>>,
+    semantic_call: Option<Box<FunctionBinding>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    indirection: Option<Box<crate::sem::IndirectionExpr>>,
+    indirection: Option<Box<IndirectionExpr>>,
     arguments: Vec<SemScalarExpr>,
     types: InputTypeConstraint,
     not_null: Option<bool>,
@@ -43,34 +48,34 @@ impl ConstrainedExpr {
             name: name.to_owned(),
         }
     }
-    pub(crate) fn retain_indirection(&mut self, value: &crate::sem::IndirectionExpr) {
+    pub(crate) fn retain_indirection(&mut self, value: &IndirectionExpr) {
         self.name = value.projection_name().to_owned();
         self.indirection = Some(Box::new(value.clone()));
     }
     /// Structured array or composite access retained during parameter inference.
-    pub fn indirection(&self) -> Option<&crate::sem::IndirectionExpr> {
+    pub fn indirection(&self) -> Option<&IndirectionExpr> {
         self.indirection.as_deref()
     }
-    pub(crate) fn retain_semantic_call(&mut self, call: &crate::sem::FuncCallExpr) {
+    pub(crate) fn retain_semantic_call(&mut self, call: &FuncCallExpr) {
         self.name = call.name().local_name();
         self.semantic_call = Some(Box::new(call.binding_snapshot()));
     }
     /// Original function binding and modifiers, when this represents a function.
-    pub fn function_binding(&self) -> Option<&crate::sem::scalar_expr::func_call::FunctionBinding> {
+    pub fn function_binding(&self) -> Option<&FunctionBinding> {
         self.semantic_call.as_deref()
     }
-    pub(crate) fn retain_cast_binding(&mut self, binding: &crate::sem::QueryNameResolution) {
+    pub(crate) fn retain_cast_binding(&mut self, binding: &QueryNameResolution) {
         self.cast_binding = Some(binding.clone());
     }
     /// Target-name resolution for a parameter-dependent cast.
-    pub const fn cast_binding(&self) -> Option<&crate::sem::QueryNameResolution> {
+    pub const fn cast_binding(&self) -> Option<&QueryNameResolution> {
         self.cast_binding.as_ref()
     }
-    pub(crate) fn retain_operator_binding(&mut self, binding: &crate::sem::ResolvedOperator) {
+    pub(crate) fn retain_operator_binding(&mut self, binding: &ResolvedOperator) {
         self.operator_binding = Some(Box::new(binding.clone()));
     }
     /// Completed operator lookup for a parameter-dependent operator expression.
-    pub fn operator_binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+    pub fn operator_binding(&self) -> Option<&ResolvedOperator> {
         self.operator_binding.as_deref()
     }
     /// SQL operation represented by this expression.
@@ -101,10 +106,10 @@ impl ConstrainedExpr {
 }
 
 impl ConstrainedExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         if let Some(indirection) = &mut self.indirection {
             indirection.walk(visitor)?;
         }
@@ -116,10 +121,7 @@ impl ConstrainedExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let Some(indirection) = &self.indirection {
             indirection.visit(visitor)?;
         }
@@ -140,7 +142,7 @@ impl ConstrainedExpr {
             binding.canonicalize_grouping_key();
         }
     }
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         let domain = constraints.node_domain(self.node);
         if !domain.is_any() {
             self.types = domain.clone();

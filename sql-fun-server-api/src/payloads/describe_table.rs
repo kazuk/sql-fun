@@ -1,3 +1,4 @@
+use crate::payloads::CollectionReference;
 use std::path::PathBuf;
 
 use crate::{
@@ -52,10 +53,10 @@ pub struct DescribeTableResponse {
 }
 
 impl super::CollectionTraversal for DescribeTableResponse {
-    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+    fn collections(&self) -> Vec<&dyn CollectionReference> {
         vec![&self.columns, &self.constraints]
     }
-    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+    fn collections_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         vec![&mut self.columns, &mut self.constraints]
     }
 }

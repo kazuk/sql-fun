@@ -1,9 +1,11 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
-    context::{BaseParseContext, TypeInfoRead, TypeInfoWrite},
+    context::{
+        BaseParseContext, TypeInfoRead, TypeInfoWrite,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
+    },
     names::{FullName, TableName},
-    sem::{CreateCompositeType, CreateDomain, CreateEnum, TypeDefinition, TypeReference},
+    sem::{CreateCompositeType, CreateDomain, CreateEnum, Kind, TypeDefinition, TypeReference},
 };
 
 impl TypeInfoRead for SchemaCatalog {
@@ -76,7 +78,7 @@ impl TypeInfoWrite for SchemaFileContext {
             .insert_create_composite_type(name, create_comp_type);
         self.catalog
             .objects
-            .insert(&name.to_string(), crate::sem::Kind::composite_type());
+            .insert(&name.to_string(), Kind::composite_type());
     }
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {

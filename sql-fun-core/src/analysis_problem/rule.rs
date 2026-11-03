@@ -1,4 +1,4 @@
-use super::{DebugName, DiagnosticMessage, DiagnosticMetadata, RuleIdentity};
+use crate::analysis_problem::{DebugName, DiagnosticMessage, DiagnosticMetadata, RuleIdentity};
 
 /// Structured rule-definition or application failure.
 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
@@ -51,7 +51,7 @@ impl RuleProblem {
 
 #[cfg(test)]
 mod metadata_tests {
-    use super::RuleProblem;
+    use crate::analysis_problem::rule::RuleProblem;
 
     #[rstest::rstest]
     #[case::target(

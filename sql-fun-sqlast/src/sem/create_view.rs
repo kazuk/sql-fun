@@ -1,3 +1,14 @@
+use crate::{
+    names::TableName,
+    sem::{
+        AnalysisProblem, ColumnRename, OwnerSpecification, ResultColumnCollection, RuleIdentity,
+        RuleReferences, SemScalarExpr, TriggerReferences, ViewCheckOption, ViewColumnLineage,
+        ViewOption,
+        problem::ViewProblem,
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
+    },
+    syn::ViewStmt,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -9,9 +20,9 @@ use crate::{
     syn::{Opt, ScanToken},
 };
 
-use {
-    super::{AnalysisError, ParseContext, SelectStatement, SemAst},
-    crate::names::FullName,
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ParseContext, SelectStatement, SemAst},
 };
 
 /// analyzed [`crate::syn::ViewStmt`]
@@ -23,31 +34,25 @@ pub struct CreateView {
 
     name: FullName,
     query: SelectStatement,
-    lineage: crate::sem::ViewColumnLineage,
-    options: Vec<crate::sem::ViewOption>,
-    check_option: crate::sem::ViewCheckOption,
-    defaults: Vec<(ColumnName, crate::sem::SemScalarExpr)>,
-    triggers: crate::sem::TriggerReferences,
-    rules: crate::sem::RuleReferences,
+    lineage: ViewColumnLineage,
+    options: Vec<ViewOption>,
+    check_option: ViewCheckOption,
+    defaults: Vec<(ColumnName, SemScalarExpr)>,
+    triggers: TriggerReferences,
+    rules: RuleReferences,
     alter_statements: Vec<AlterView>,
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     materialized: bool,
 }
 
 impl CreateView {
-    pub(crate) fn rename_column(
-        &mut self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Result<(), AnalysisError> {
-        self.rename_column_with(
-            rename,
-            &mut crate::sem::traversal::ColumnRenamer::new(rename),
-        )
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
+        self.rename_column_with(rename, &mut ColumnRenamer::new(rename))
     }
     pub(crate) fn rename_column_with(
         &mut self,
-        rename: &crate::sem::ColumnRename,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        rename: &ColumnRename,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.lineage.rename_column(rename, &self.query)?;
         self.query.walk(visitor)?;
@@ -59,10 +64,10 @@ impl CreateView {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
+        old: &TableName,
+        new: &TableName,
     ) -> Result<(), AnalysisError> {
-        let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
+        let mut visitor = RelationRenamer::new(old, new);
         self.query.walk(&mut visitor)?;
         for (_, value) in &mut self.defaults {
             value.walk(&mut visitor)?;
@@ -71,18 +76,14 @@ impl CreateView {
     }
 
     /// View options from its defining declaration.
-    pub fn options(&self) -> &[crate::sem::ViewOption] {
+    pub fn options(&self) -> &[ViewOption] {
         &self.options
     }
     /// Declared CHECK OPTION.
-    pub const fn check_option(&self) -> crate::sem::ViewCheckOption {
+    pub const fn check_option(&self) -> ViewCheckOption {
         self.check_option
     }
-    pub(crate) fn with_options(
-        mut self,
-        options: &[crate::sem::ViewOption],
-        check: crate::sem::ViewCheckOption,
-    ) -> Self {
+    pub(crate) fn with_options(mut self, options: &[ViewOption], check: ViewCheckOption) -> Self {
         self.options = options.to_vec();
         self.check_option = check;
         self
@@ -92,10 +93,10 @@ impl CreateView {
         &self.query
     }
     /// Proven output-column lineage, independent of writability policy.
-    pub const fn column_lineage(&self) -> &crate::sem::ViewColumnLineage {
+    pub const fn column_lineage(&self) -> &ViewColumnLineage {
         &self.lineage
     }
-    pub(crate) fn with_column_lineage(mut self, lineage: &crate::sem::ViewColumnLineage) -> Self {
+    pub(crate) fn with_column_lineage(mut self, lineage: &ViewColumnLineage) -> Self {
         self.lineage = lineage.clone();
         self
     }
@@ -111,10 +112,10 @@ impl CreateView {
     pub(crate) fn change_column_default(
         &mut self,
         name: &ColumnName,
-        value: Option<&crate::sem::SemScalarExpr>,
-    ) -> Result<(), crate::sem::problem::ViewProblem> {
+        value: Option<&SemScalarExpr>,
+    ) -> Result<(), ViewProblem> {
         if !self.query.has_column(name) {
-            return Err(crate::sem::problem::ViewProblem::unknown_default_column(
+            return Err(ViewProblem::unknown_default_column(
                 &self.name,
                 name.as_str(),
             ));
@@ -147,9 +148,9 @@ impl CreateView {
         self.replace = value;
         self
     }
-    pub(crate) fn replace_rule_query(&mut self, query: &crate::sem::SelectStatement) {
+    pub(crate) fn replace_rule_query(&mut self, query: &SelectStatement) {
         self.query = query.clone();
-        self.lineage = crate::sem::ViewColumnLineage::from_query(query);
+        self.lineage = ViewColumnLineage::from_query(query);
     }
     pub(crate) fn retain_relation_state(&mut self, previous: &Self) {
         self.triggers = previous.triggers.clone();
@@ -158,41 +159,41 @@ impl CreateView {
         self.owner = previous.owner.clone();
         self.alter_statements = previous.alter_statements.clone();
     }
-    pub(crate) fn retain_rule_references(&mut self, references: &crate::sem::RuleReferences) {
+    pub(crate) fn retain_rule_references(&mut self, references: &RuleReferences) {
         self.rules = references.clone();
     }
     /// Rule links owned by this relation; resolve against the effective context.
-    pub const fn rules(&self) -> &crate::sem::RuleReferences {
+    pub const fn rules(&self) -> &RuleReferences {
         &self.rules
     }
-    pub(crate) fn associate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+    pub(crate) fn associate_rule(&mut self, identity: &RuleIdentity) {
         self.rules.associate(identity);
     }
-    pub(crate) fn dissociate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+    pub(crate) fn dissociate_rule(&mut self, identity: &RuleIdentity) {
         self.rules.dissociate(identity);
     }
 
     /// Retained ownership; None means no ownership information was supplied.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
     /// Fully qualified trigger references associated with this relation.
-    pub const fn triggers(&self) -> &crate::sem::TriggerReferences {
+    pub const fn triggers(&self) -> &TriggerReferences {
         &self.triggers
     }
-    pub(crate) fn associate_trigger(&mut self, name: &crate::names::FullName) {
+    pub(crate) fn associate_trigger(&mut self, name: &FullName) {
         self.triggers.associate(name);
     }
-    pub(crate) fn dissociate_trigger(&mut self, name: &crate::names::FullName) {
+    pub(crate) fn dissociate_trigger(&mut self, name: &FullName) {
         self.triggers.dissociate(name);
     }
 
-    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+    pub(crate) fn result_columns(&self) -> &ResultColumnCollection {
         self.query.result_columns()
     }
 
@@ -210,15 +211,15 @@ impl CreateView {
             if_not_exists: false,
             replace: false,
             name: name.clone(),
-            triggers: crate::sem::TriggerReferences::default(),
-            rules: crate::sem::RuleReferences::default(),
+            triggers: TriggerReferences::default(),
+            rules: RuleReferences::default(),
             query: query.clone(),
-            lineage: crate::sem::ViewColumnLineage::from_query(query),
+            lineage: ViewColumnLineage::from_query(query),
             defaults: Vec::new(),
             options: Vec::new(),
-            check_option: crate::sem::ViewCheckOption::none(),
+            check_option: ViewCheckOption::none(),
             alter_statements: alter_statements.to_owned(),
-            owner: owner.as_deref().map(crate::sem::OwnerSpecification::named),
+            owner: owner.as_deref().map(OwnerSpecification::named),
             materialized,
         }
     }
@@ -273,7 +274,7 @@ impl CreateView {
     pub fn analyze_create_view<TParseContext>(
         context: TParseContext,
         parent_schema: &Option<String>,
-        syn: crate::syn::ViewStmt,
+        syn: ViewStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
@@ -316,8 +317,8 @@ impl AlterObjSubCommand {
         if view.has_column(name) {
             return Ok(true);
         }
-        context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-            &crate::sem::problem::ViewProblem::unknown_default_column(&view.name, name.as_str()),
+        context.report_analysis_problem(AnalysisProblem::view(
+            &ViewProblem::unknown_default_column(&view.name, name.as_str()),
         ))?;
         Ok(false)
     }

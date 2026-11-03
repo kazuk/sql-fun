@@ -1,6 +1,7 @@
 use crate::{
+    ast::Dialect,
     names::{AliasName, ColumnName, FullName, TableName},
-    sem::{ParseContext, TypeReference},
+    sem::{ColumnDefinition, ParseContext, TypeReference},
 };
 
 /// A PostgreSQL system attribute bound to a table occurrence, not a declared column.
@@ -23,7 +24,7 @@ impl SystemColumnRef {
         context: &impl ParseContext,
         column: &ColumnName,
     ) -> Option<TypeReference> {
-        if context.dialect() != crate::ast::Dialect::postgres() {
+        if context.dialect() != Dialect::postgres() {
             return None;
         }
         let name = match column.as_str() {
@@ -84,7 +85,7 @@ impl super::ColumnReference for SystemColumnRef {
         Some(!self.source_nullable)
     }
 
-    fn get_column_def(&self) -> &Option<crate::sem::ColumnDefinition> {
+    fn get_column_def(&self) -> &Option<ColumnDefinition> {
         &None
     }
 
@@ -94,7 +95,7 @@ impl super::ColumnReference for SystemColumnRef {
 }
 
 impl SystemColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

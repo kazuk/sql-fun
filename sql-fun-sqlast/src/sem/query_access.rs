@@ -1,9 +1,10 @@
 //! Optional access-purpose extraction from completed semantic bindings.
+
 use crate::{
     names::{ColumnName, FullName, TableName, ViewName},
     sem::{
         AccessKind, AliasSpec, AnalysisError, ParseContext, SemAst, SemScalarExpr,
-        traversal::SemanticVisitor,
+        data_source::JoinExprDataSource, traversal::SemanticVisitor,
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -125,9 +126,9 @@ impl AccessGraph {
 mod test_access_graph {
     #[test]
     fn cyclic_outputs_preserve_all_reachable_columns() {
-        use {
-            super::{AccessColumn, AccessGraph, AccessInput, AccessObjectKind},
-            crate::names::{ColumnName, FullName},
+        use crate::{
+            names::{ColumnName, FullName},
+            sem::query_access::{AccessColumn, AccessGraph, AccessInput, AccessObjectKind},
         };
         let mut graph = AccessGraph::default();
         let x = graph.output();
@@ -201,8 +202,9 @@ impl QueryAccess {
 
 #[cfg(test)]
 mod tests {
-    use super::AccessKind;
-    use crate::test_helpers::query_access;
+    use crate::{ast::Dialect, sem::query_access::AccessObjectKind};
+
+    use crate::{sem::query_access::AccessKind, test_helpers::query_access};
 
     #[rstest::rstest]
     #[case::select(
@@ -552,7 +554,7 @@ mod tests {
         let accesses = query_access::analyze_in(
             "SELECT v.id, f.f, m.id FROM v CROSS JOIN f() CROSS JOIN m",
             query_access::object_context(),
-            crate::ast::Dialect::postgres(),
+            Dialect::postgres(),
         );
         assert!(
             accesses
@@ -561,9 +563,9 @@ mod tests {
                 .all(|access| access.relation().local_name() != "a")
         );
         for (name, column, kind) in [
-            ("v", "id", super::AccessObjectKind::view()),
-            ("m", "id", super::AccessObjectKind::materialized_view()),
-            ("f", "f", super::AccessObjectKind::function()),
+            ("v", "id", AccessObjectKind::view()),
+            ("m", "id", AccessObjectKind::materialized_view()),
+            ("f", "f", AccessObjectKind::function()),
         ] {
             assert!(
                 accesses
@@ -585,7 +587,7 @@ mod tests {
         let accesses = query_access::analyze_in(
             "SELECT r.x FROM ROWS FROM (f()) AS r(x)",
             query_access::object_context(),
-            crate::ast::Dialect::postgres(),
+            Dialect::postgres(),
         );
         assert!(
             accesses
@@ -712,9 +714,8 @@ mod tests {
     #[cfg(feature = "sqlite")]
     #[test]
     fn sqlite_uses_existing_semantic_bindings() {
-        let context = query_access::context().with_dialect(crate::ast::Dialect::sqlite());
-        let accesses =
-            query_access::analyze_in("SELECT id FROM a", context, crate::ast::Dialect::sqlite());
+        let context = query_access::context().with_dialect(Dialect::sqlite());
+        let accesses = query_access::analyze_in("SELECT id FROM a", context, Dialect::sqlite());
         assert!(accesses.records().iter().any(|value| {
             value.relation().local_name() == "a"
                 && value
@@ -1033,7 +1034,7 @@ impl<C: ParseContext> SemanticVisitor for AccessCollector<'_, C> {
         let boundary = self.scope().source_order.len();
         self.joins.last_mut().expect("join entered").1 = boundary;
     }
-    fn access_join(&mut self, join: &crate::sem::data_source::JoinExprDataSource) {
+    fn access_join(&mut self, join: &JoinExprDataSource) {
         self.join_purposes.push(self.purpose);
         if self.scopes.len() == 1 {
             self.purpose = self.purpose.join_purpose();

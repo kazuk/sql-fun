@@ -1,6 +1,8 @@
-use crate::StreamingCollection;
-use crate::async_tokio::streaming::RequestSender;
-use crate::payloads::{CollectionHandle, CollectionPage, CollectionReference, CollectionTraversal};
+use crate::{
+    JsonRpcError, StreamingCollection, TcpJsonRpcClientAsyncError,
+    async_tokio::streaming::RequestSender,
+    payloads::{CollectionHandle, CollectionPage, CollectionReference, CollectionTraversal},
+};
 use std::{collections::HashMap, fmt::Write, future::Future, pin::Pin};
 
 /// A response completion operation, including recursively nested collection items.
@@ -44,13 +46,13 @@ impl From<::serde_json::Error> for TypedResponseError {
         Self::message(&error.to_string())
     }
 }
-impl From<crate::JsonRpcError> for TypedResponseError {
-    fn from(error: crate::JsonRpcError) -> Self {
+impl From<JsonRpcError> for TypedResponseError {
+    fn from(error: JsonRpcError) -> Self {
         Self::message(&error.to_string())
     }
 }
-impl From<crate::TcpJsonRpcClientAsyncError> for TypedResponseError {
-    fn from(error: crate::TcpJsonRpcClientAsyncError) -> Self {
+impl From<TcpJsonRpcClientAsyncError> for TypedResponseError {
+    fn from(error: TcpJsonRpcClientAsyncError) -> Self {
         Self::message(&error.to_string())
     }
 }

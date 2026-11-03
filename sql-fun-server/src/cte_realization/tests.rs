@@ -1,8 +1,13 @@
 #[path = "test_helpers.rs"]
 mod test_helpers;
 
+use crate::{
+    cte_realization::ParameterHintConflict, schema_cache::test_helpers::SchemaProject,
+    test_helpers::create_cache_context,
+};
+
 use self::test_helpers::resolved;
-use super::realize_cte_catalog;
+use crate::cte_realization::realize_cte_catalog;
 use ::sql_fun_core::PlaceholderedSql;
 use ::sql_fun_sqlast::{
     ParseStatementError, PlaceholderedSqlRenderError,
@@ -261,8 +266,8 @@ fn realized_query_analysis_ignores_parameter_hints(
     #[case] cte_parameter: &str,
     #[case] base_parameter: &str,
 ) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let project = crate::schema_cache::test_helpers::SchemaProject::new();
+    let mut cache_context = create_cache_context();
+    let project = SchemaProject::new();
     let cte = format!("select ${{{cte_parameter}}} + 1 as n");
     let base = format!("select n, ${{{base_parameter}}} + 2 as m from chosen");
     let realized = realize_cte_catalog(
@@ -406,7 +411,7 @@ fn rejects_conflicting_explicit_hints(
     .unwrap_err();
     let conflict = error
         .source
-        .downcast_ref::<super::ParameterHintConflict>()
+        .downcast_ref::<ParameterHintConflict>()
         .expect("structured hint conflict");
     assert_eq!(conflict.name().as_str(), "p");
     assert_eq!(conflict.first_hint(), "uuid");
@@ -420,9 +425,9 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
         names::FullName,
         sem::{PgBuiltInType, TypeReference},
     };
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
 
-    let project = crate::schema_cache::test_helpers::SchemaProject::new();
+    let project = SchemaProject::new();
     let realized = realize_cte_catalog(
         &PlaceholderedSql::from_query(
             "select n, ${base:kind} as m, ${shared:int4} as repeated from chosen",

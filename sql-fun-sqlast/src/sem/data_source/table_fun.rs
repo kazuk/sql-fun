@@ -2,15 +2,16 @@ use crate::{
     context::ParseContext,
     names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasSpec, AnalysisError, ColumnCollection, ColumnReferenceExpr, DataSource, Nullable,
-        OverloadVariant, QueryName, QueryNameResolution, SemScalarExpr, TableFunctionProblem,
-        TypeReference, WildcardTypedRecord, WithClause, WithTypmod, traversal::SemanticVisitorMut,
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnCollection, ColumnReferenceExpr,
+        DataSource, Nullable, OverloadVariant, QueryName, QueryNameResolution, SemScalarExpr,
+        TableFunctionProblem, TypeReference, WildcardTypedRecord, WithClause, WithTypmod,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
 use ::sql_fun_core::IVec;
 
-use super::TableFunctionOutput;
+use crate::sem::data_source::TableFunctionOutput;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableFunctionDataSource {
@@ -100,10 +101,7 @@ impl TableFunctionDataSource {
         self.args = args.into();
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let Some(name) = &self.function_name
             && let Some(name) = name.resolution().function_identity()
         {
@@ -261,7 +259,7 @@ impl DataSource {
             _ => false,
         };
         if invalid {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::table_function(
+            context.report_analysis_problem(AnalysisProblem::table_function(
                 TableFunctionProblem::invalid_expression(),
             ))?;
         }

@@ -1,13 +1,17 @@
-use super::{DeparseError, SqlEmit, SqlWriter};
-use crate::ast::{
-    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, CurrentOf,
-    Expr, Grouping, InTable, Indirection, Literal, NamedArgument, NullTest, OperatorExpr,
-    OperatorKind, Raise, RaiseAction, Slice, SqlValue, Subquery, SubqueryKind, TruthTest,
+use crate::{
+    ast::{
+        Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate,
+        CurrentOf, Expr, Grouping, InTable, Indirection, Literal, Name, NamedArgument, NullTest,
+        OperatorExpr, OperatorKind, Raise, RaiseAction, Slice, SqlValue, Subquery, SubqueryKind,
+        TruthTest,
+        deparse::{DeparseError, SqlEmit, SqlWriter},
+    },
+    sem::with_stack,
 };
 
 impl SqlEmit for Expr {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-        crate::sem::with_stack(|| match self {
+        with_stack(|| match self {
             Self::Literal(value) => value.emit(writer),
             Self::Column(value) => value.emit(writer),
             Self::Star(value) => Self::emit_star(value, writer),
@@ -56,7 +60,7 @@ impl SqlEmit for Expr {
 }
 
 impl Expr {
-    fn emit_star(name: &crate::ast::Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_star(name: &Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if !writer.is_postgres() && name.0.len() > 1 {
             return writer.invalid(
                 "qualified star",
@@ -119,8 +123,7 @@ impl Expr {
 
 #[cfg(test)]
 mod test_expression_emission {
-    use crate::ast::Dialect;
-    use crate::parse_statements;
+    use crate::{ast::Dialect, parse_statements};
 
     #[rstest::rstest]
     #[case::right_associative_subtraction("SELECT a - (b - c)")]
@@ -598,11 +601,7 @@ impl SqlEmit for Call {
 }
 
 impl CallKind {
-    fn emit_name(
-        &self,
-        name: &crate::ast::Name,
-        writer: &mut SqlWriter,
-    ) -> Result<(), DeparseError> {
+    fn emit_name(&self, name: &Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::Ordinary => name.emit(writer),
             Self::Coalesce => Self::emit_coalesce(name, writer),
@@ -610,7 +609,7 @@ impl CallKind {
         }
     }
 
-    fn emit_coalesce(name: &crate::ast::Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_coalesce(name: &Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if !name.is_local("coalesce") {
             return writer.invalid("COALESCE", "special call has an inconsistent name");
         }
@@ -618,7 +617,7 @@ impl CallKind {
         Ok(())
     }
 
-    fn emit_min_max(name: &crate::ast::Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_min_max(name: &Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("GREATEST/LEAST")?;
         if name.is_local("greatest") {
             writer.sql("GREATEST");

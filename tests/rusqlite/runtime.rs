@@ -1,6 +1,6 @@
 //! Focused generated-code error and interruption contracts.
 
-use super::{
+use crate::{
     builders::{MutableFallibleRow, QueryError},
     find_users,
 };

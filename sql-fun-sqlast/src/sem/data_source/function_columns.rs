@@ -3,7 +3,9 @@ use crate::{
     names::{ColumnName, FullName},
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnCollection,
-        ColumnDefinition, OverloadVariant, TableFunctionProblem, TypeReference,
+        ColumnDefinition, DataSource, DeclarationCollation, OverloadVariant, PgBuiltInType,
+        TableFunctionProblem, TypeReference, WithTypmod,
+        data_source::{ProjectionColumn, QualifiedSource},
     },
 };
 
@@ -18,10 +20,10 @@ pub(crate) struct TableFunctionOutput {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 struct RecordColumn {
     name: ColumnName,
-    requested_type: crate::sem::WithTypmod<TypeReference>,
+    requested_type: WithTypmod<TypeReference>,
     resolved_type: Option<TypeReference>,
     collation: Option<CatalogNameLookup>,
-    validation: crate::sem::DeclarationCollation,
+    validation: DeclarationCollation,
 }
 
 impl TableFunctionOutput {
@@ -60,7 +62,7 @@ impl TableFunctionOutput {
             )?;
         }
         let resolved_type = context.canonicalize_type_ref(requested_type);
-        let mut declaration = crate::sem::WithTypmod::new(requested_type, modifiers);
+        let mut declaration = WithTypmod::new(requested_type, modifiers);
         if let Some(resolved) = &resolved_type {
             declaration.interpret_postgres(resolved);
             if let Some(message) = declaration.validation_error() {
@@ -74,11 +76,8 @@ impl TableFunctionOutput {
             )?;
         }
         let collation = collation.map(|name| context.lookup_collation(name));
-        let validation = crate::sem::DeclarationCollation::validate(
-            context,
-            resolved_type.as_ref(),
-            collation.as_ref(),
-        );
+        let validation =
+            DeclarationCollation::validate(context, resolved_type.as_ref(), collation.as_ref());
         validation.report(context, resolved_type.as_ref())?;
         self.columns.push(&ColumnDefinition::new(
             &Some(name.clone()),
@@ -132,10 +131,7 @@ impl TableFunctionOutput {
         }
         Ok(())
     }
-    pub(super) fn declaration_at(
-        &self,
-        index: usize,
-    ) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+    pub(super) fn declaration_at(&self, index: usize) -> Option<&WithTypmod<TypeReference>> {
         self.declarations
             .get(index)
             .map(|column| &column.requested_type)
@@ -145,7 +141,7 @@ impl TableFunctionOutput {
         &self,
         column: &ColumnName,
         alias: &AliasSpec,
-    ) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+    ) -> Option<&WithTypmod<TypeReference>> {
         let index = OutputColumnNames::from(self.names()).matching_index(column, alias)?;
         self.declarations
             .get(index)
@@ -167,7 +163,7 @@ impl TableFunctionOutput {
     pub(crate) fn append_ordinality(&mut self) {
         self.columns.push(&ColumnDefinition::new(
             &Some(ColumnName::from("ordinality")),
-            Some(&crate::sem::PgBuiltInType::int8()),
+            Some(&PgBuiltInType::int8()),
             Some(true),
             &[],
         ));
@@ -225,16 +221,16 @@ impl From<Vec<ColumnName>> for OutputColumnNames {
 impl OutputColumnNames {
     pub(super) fn project<'a>(
         self,
-        source: &'a crate::sem::DataSource,
+        source: &'a DataSource,
         alias: &AliasSpec,
         nullable: bool,
         context: &impl ParseContext,
-    ) -> Vec<super::ProjectionColumn<'a>> {
+    ) -> Vec<ProjectionColumn<'a>> {
         let names = self.with_derived_names(alias);
         let duplicates = names.has_duplicates();
         let mut columns = Vec::new();
         for (index, name) in names.0.into_iter().enumerate() {
-            let source = super::QualifiedSource::new(source, alias.name())
+            let source = QualifiedSource::new(source, alias.name())
                 .with_nullability(nullable)
                 .with_projection_ordinal(index);
             let record = if duplicates {
@@ -242,7 +238,7 @@ impl OutputColumnNames {
             } else {
                 None
             };
-            columns.push(super::ProjectionColumn::new(&source, &name, &record));
+            columns.push(ProjectionColumn::new(&source, &name, &record));
         }
         columns
     }
@@ -265,10 +261,7 @@ impl OutputColumnNames {
     pub(super) fn append_names(&mut self, names: &[ColumnName]) {
         self.0.extend_from_slice(names);
     }
-    pub(super) fn append_function_columns(
-        &mut self,
-        source: &crate::sem::DataSource,
-    ) -> Option<()> {
+    pub(super) fn append_function_columns(&mut self, source: &DataSource) -> Option<()> {
         self.0.extend(source.known_function_columns()?);
         Some(())
     }

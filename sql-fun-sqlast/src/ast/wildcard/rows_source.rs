@@ -1,10 +1,14 @@
 //! Freeze a combined function source without changing its zip or row interface.
 
-use crate::ast::wildcard::WildcardRewriteError;
-use crate::ast::{
-    Call, Cte, DerivedTable, Expr, FromItem, Join, Name, Query, Relation, TableFunctions, Target,
+use crate::sem::WildcardRowsProjection;
+
+use crate::{
+    ast::{
+        Call, Cte, DerivedTable, Expr, FromItem, Join, Name, Query, Relation, TableFunctions,
+        Target, wildcard::WildcardRewriteError,
+    },
+    sem::WildcardRowsSource,
 };
-use crate::sem::WildcardRowsSource;
 
 /// Keep each invocation once, number its rows, and zip the fixed outputs by row.
 /// All helper fields stay inside the returned derived source.
@@ -59,7 +63,7 @@ impl<'a> RowsProjectionBuilder<'a> {
     fn freeze_function(
         &mut self,
         index: usize,
-        projection: &crate::sem::WildcardRowsProjection<'_>,
+        projection: &WildcardRowsProjection<'_>,
     ) -> Result<(), WildcardRewriteError> {
         let alias = self.names.next();
         // Scalar default output labels follow the source alias. The known single
@@ -92,7 +96,7 @@ impl<'a> RowsProjectionBuilder<'a> {
 
     fn project_fields(
         &mut self,
-        projection: &crate::sem::WildcardRowsProjection<'_>,
+        projection: &WildcardRowsProjection<'_>,
         input_alias: &str,
         output_alias: &str,
     ) -> Vec<Target> {

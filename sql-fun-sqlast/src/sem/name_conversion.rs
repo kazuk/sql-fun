@@ -1,49 +1,52 @@
 //! Syntax conversion and diagnostic adapters for shared SQL identities.
-use crate::names::{
-    CatalogName, ColumnName, FullName, LocalName, OperatorName, SchemaName, TableName,
-    ValidOperatorName, ViewName,
-};
-use crate::sem::{AnalysisError, ParseContext, error::ProblemLikeError};
+
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::{Name, QualifiedName};
-use crate::syn::{ListOpt, Node, NodeListOpt, RangeVar, TypeName};
+use crate::{
+    names::{
+        CatalogName, ColumnName, FullName, LocalName, OperatorName, SchemaName, TableName,
+        ValidOperatorName, ViewName,
+    },
+    sem::{AnalysisError, ParseContext, error::ProblemLikeError},
+    syn::{ListOpt, Node, NodeListOpt, RangeVar, String as SynString, TypeName},
+};
 
 fn nonempty(value: String) -> Option<String> {
     if value.is_empty() { None } else { Some(value) }
 }
 
 #[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::Name> for CatalogName {
+impl TryFrom<&Name> for CatalogName {
     type Error = AnalysisError;
 
-    fn try_from(value: &crate::syn::sqlite::Name) -> Result<Self, Self::Error> {
+    fn try_from(value: &Name) -> Result<Self, Self::Error> {
         Ok(Self::from(value.value()))
     }
 }
 
 #[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::Name> for SchemaName {
+impl TryFrom<&Name> for SchemaName {
     type Error = AnalysisError;
 
-    fn try_from(value: &crate::syn::sqlite::Name) -> Result<Self, Self::Error> {
+    fn try_from(value: &Name) -> Result<Self, Self::Error> {
         Ok(Self::from(value.value()))
     }
 }
 
 #[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::Name> for LocalName {
+impl TryFrom<&Name> for LocalName {
     type Error = AnalysisError;
 
-    fn try_from(value: &crate::syn::sqlite::Name) -> Result<Self, Self::Error> {
+    fn try_from(value: &Name) -> Result<Self, Self::Error> {
         Ok(Self::from(value.value()))
     }
 }
 
 #[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::QualifiedName> for FullName {
+impl TryFrom<&QualifiedName> for FullName {
     type Error = AnalysisError;
 
-    fn try_from(value: &crate::syn::sqlite::QualifiedName) -> Result<Self, Self::Error> {
+    fn try_from(value: &QualifiedName) -> Result<Self, Self::Error> {
         Ok(Self::new(
             &None,
             &value.db_name().map(SchemaName::try_from).transpose()?,
@@ -65,8 +68,8 @@ impl TryFrom<&Node> for ColumnName {
 }
 
 #[cfg(feature = "sqlite")]
-impl From<&crate::syn::sqlite::Name> for ColumnName {
-    fn from(value: &crate::syn::sqlite::Name) -> Self {
+impl From<&Name> for ColumnName {
+    fn from(value: &Name) -> Self {
         Self::new(value.value())
     }
 }
@@ -123,10 +126,7 @@ impl TryFrom<NodeListOpt> for FullName {
         let Some(name_elements) = value.map(|v| v.as_string()) else {
             AnalysisError::raise_unexpected_none("node_list")?
         };
-        let elements: Vec<String> = name_elements
-            .iter()
-            .map(crate::syn::String::get_sval)
-            .collect();
+        let elements: Vec<String> = name_elements.iter().map(SynString::get_sval).collect();
         match elements.len() {
             3 => Ok(Self::with_catalog(&elements[0], &elements[1], &elements[2])),
             2 => Ok(Self::with_schema(&elements[0], &elements[1])),
@@ -166,6 +166,8 @@ impl TryFrom<RangeVar> for FullName {
 
 #[cfg(test)]
 mod range_var_tests {
+    use crate::syn::RangeVar;
+
     use crate::names::FullName;
 
     #[test]
@@ -175,7 +177,7 @@ mod range_var_tests {
             relname: "items".to_owned(),
             ..Default::default()
         };
-        let relation = crate::syn::RangeVar::from(relation);
+        let relation = RangeVar::from(relation);
         assert!(FullName::try_from(relation).is_err());
     }
 }
@@ -187,7 +189,7 @@ impl TryFrom<TypeName> for FullName {
         let Some(names) = value.get_names().map(|v| v.as_string()) else {
             AnalysisError::raise_unexpected_none("type_name.names")?
         };
-        let names: Vec<String> = names.iter().map(crate::syn::String::get_sval).collect();
+        let names: Vec<String> = names.iter().map(SynString::get_sval).collect();
 
         match names.len() {
             3 => Ok(Self::with_catalog(&names[0], &names[1], &names[2])),
@@ -266,8 +268,13 @@ mod canonical_parse_tests {
 
 #[cfg(test)]
 mod sql_name_conversion_tests {
-    use crate::ast::Dialect;
-    use crate::names::FullName;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::Stmt;
+    #[cfg(feature = "sqlite")]
+    use crate::test_helpers::SqliteSynBuilder;
+    use crate::test_helpers::SynBuilder;
+
+    use crate::{ast::Dialect, names::FullName};
     #[rstest::rstest]
     #[case::dot(FullName::with_schema("a.b", "c"))]
     #[case::quote(FullName::with_schema("a", "b\"c"))]
@@ -280,8 +287,7 @@ mod sql_name_conversion_tests {
     ) -> testresult::TestResult {
         use crate::syn::ListOpt;
         for spelling in [name.to_string(), name.to_sql(Dialect::postgres())?] {
-            let node =
-                crate::test_helpers::SynBuilder::new().parse(&format!("SELECT * FROM {spelling}"));
+            let node = SynBuilder::new().parse(&format!("SELECT * FROM {spelling}"));
             let relation = node
                 .as_select_stmt()
                 .get_from_clause()
@@ -295,7 +301,7 @@ mod sql_name_conversion_tests {
     #[test]
     fn postgres_case_folding_belongs_to_sql_parsing() -> testresult::TestResult {
         use crate::syn::ListOpt;
-        let node = crate::test_helpers::SynBuilder::new().parse("SELECT * FROM Mixed");
+        let node = SynBuilder::new().parse("SELECT * FROM Mixed");
         let relations = node
             .as_select_stmt()
             .get_from_clause()
@@ -325,8 +331,8 @@ mod sql_name_conversion_tests {
             "CREATE TABLE {} (id INTEGER)",
             name.to_sql(Dialect::sqlite())?
         );
-        let statement = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(&sql);
-        let crate::syn::sqlite::Stmt::CreateTable(table) = statement else {
+        let statement = SqliteSynBuilder.parse_as_stmt(&sql);
+        let Stmt::CreateTable(table) = statement else {
             panic!("CREATE TABLE")
         };
         assert_eq!(FullName::try_from(table.table_name())?, name);

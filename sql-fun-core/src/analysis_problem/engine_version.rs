@@ -1,4 +1,4 @@
-use super::DiagnosticMessage;
+use crate::analysis_problem::DiagnosticMessage;
 
 /// Syntax version requirement and the explicitly selected target.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]

@@ -1,6 +1,13 @@
 //! Owning access to projection collections and their lexical source scopes.
-use crate::ast::traversal::{AstVisitorMut, WalkSqlMut};
-use crate::ast::{FromItem, StatementNode, Target};
+
+use crate::{
+    ast::{
+        Alias, DerivedTable, FromGroup, FromItem, Join, Relation, StatementNode, TableFunction,
+        TableFunctions, TableSample, Target,
+        traversal::{AstVisitorMut, WalkSqlMut},
+    },
+    stack::with_stack,
+};
 
 #[derive(Debug)]
 pub(in crate::ast) enum ProjectionError {
@@ -479,7 +486,7 @@ impl FromItem {
         alias: &str,
         visitor: &mut impl FnMut(&mut Self),
     ) {
-        crate::stack::with_stack(|| {
+        with_stack(|| {
             if let Some(name) = self.visible_alias() {
                 if name == alias {
                     visitor(self);
@@ -509,7 +516,7 @@ impl FromItem {
         }
     }
     pub(in crate::ast) fn normalize_projection_groups(&mut self) {
-        crate::stack::with_stack(|| {
+        with_stack(|| {
             let normalized = match self {
                 Self::Join(node) => node.normalize_source(),
                 Self::Group(node) => node.normalize_source(),
@@ -524,12 +531,12 @@ impl FromItem {
         matches!(self, Self::Query(_))
     }
 }
-impl crate::ast::Alias {
+impl Alias {
     pub(in crate::ast) fn visible_name(&self) -> &str {
         &self.name
     }
 }
-impl crate::ast::Relation {
+impl Relation {
     fn visible_alias(&self) -> Option<&str> {
         if let Some(alias) = &self.alias {
             Some(alias.visible_name())
@@ -538,14 +545,14 @@ impl crate::ast::Relation {
         }
     }
 }
-impl crate::ast::DerivedTable {
+impl DerivedTable {
     fn visible_alias(&self) -> Option<&str> {
-        self.alias.as_ref().map(crate::ast::Alias::visible_name)
+        self.alias.as_ref().map(Alias::visible_name)
     }
 }
-impl crate::ast::Join {
+impl Join {
     fn visible_alias(&self) -> Option<&str> {
-        self.alias.as_ref().map(crate::ast::Alias::visible_name)
+        self.alias.as_ref().map(Alias::visible_name)
     }
     fn visit_visible_children(&mut self, alias: &str, visitor: &mut impl FnMut(&mut FromItem)) {
         self.left.visit_visible_alias(alias, visitor);
@@ -556,9 +563,9 @@ impl crate::ast::Join {
         self.right.normalize_projection_groups();
     }
 }
-impl crate::ast::FromGroup {
+impl FromGroup {
     fn visible_alias(&self) -> Option<&str> {
-        self.alias.as_ref().map(crate::ast::Alias::visible_name)
+        self.alias.as_ref().map(Alias::visible_name)
     }
     fn visit_visible_children(&mut self, alias: &str, visitor: &mut impl FnMut(&mut FromItem)) {
         for source in &mut self.items {
@@ -578,7 +585,7 @@ impl crate::ast::FromGroup {
         }
     }
 }
-impl crate::ast::TableFunctions {
+impl TableFunctions {
     fn visible_alias(&self) -> Option<&str> {
         if let Some(alias) = &self.alias {
             Some(alias.visible_name())
@@ -589,12 +596,12 @@ impl crate::ast::TableFunctions {
         }
     }
 }
-impl crate::ast::TableFunction {
+impl TableFunction {
     fn visible_alias(&self) -> Option<&str> {
         self.expression.projection_function_alias()
     }
 }
-impl crate::ast::TableSample {
+impl TableSample {
     fn visible_alias(&self) -> Option<&str> {
         self.relation.visible_alias()
     }
@@ -672,13 +679,13 @@ impl ScopeRecord {
     }
 }
 
-impl crate::ast::Join {
+impl Join {
     fn normalize_source(&mut self) -> Option<FromItem> {
         self.normalize_projection_groups();
         None
     }
 }
-impl crate::ast::FromGroup {
+impl FromGroup {
     fn normalize_source(&mut self) -> Option<FromItem> {
         self.normalize_projection_groups();
         self.take_single_derived_source()

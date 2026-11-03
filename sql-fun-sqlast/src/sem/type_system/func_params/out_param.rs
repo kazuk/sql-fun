@@ -1,3 +1,8 @@
+use crate::{
+    names::TableName,
+    sem::type_system::{SimpleInferResult, func_params::output_field_definition},
+    syn::FunctionParameter,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -11,7 +16,9 @@ use crate::{
     syn::{Opt, ScanToken},
 };
 
-use super::{FunctionParam, FunctionParameterTrait, ParameterBindResult};
+use crate::sem::type_system::func_params::{
+    FunctionParam, FunctionParameterTrait, ParameterBindResult,
+};
 
 impl FunctionParam {
     /// create new output parameter instance
@@ -47,11 +54,7 @@ pub struct FunctionParamOut {
 }
 
 impl FunctionParamOut {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(ty) = &mut self.param_type {
             ty.rename_relation(old, new);
         }
@@ -67,7 +70,7 @@ impl FunctionParamOut {
     /// Returns a nullable output field when both its name and type are known.
     /// Returns `None` if either is absent; no name or type is synthesized.
     pub fn composite_field_definition(&self) -> Option<CompositeFieldDefinition> {
-        super::output_field_definition(self.name.as_ref(), self.param_type.as_ref())
+        output_field_definition(self.name.as_ref(), self.param_type.as_ref())
     }
 
     pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {
@@ -103,7 +106,7 @@ impl FunctionParameterTrait for FunctionParamOut {
 
     fn from_syn<TParseContext>(
         context: TParseContext,
-        param: crate::syn::FunctionParameter,
+        param: FunctionParameter,
         _tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
@@ -141,10 +144,7 @@ impl FunctionParameterTrait for FunctionParamOut {
         false
     }
 
-    fn apply_simple_infer_result(
-        &mut self,
-        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    ) {
+    fn apply_simple_infer_result(&mut self, simple_infer_result: &SimpleInferResult) {
         if let Some(ty) = self.param_type.as_mut() {
             simple_infer_result.apply(ty);
         }

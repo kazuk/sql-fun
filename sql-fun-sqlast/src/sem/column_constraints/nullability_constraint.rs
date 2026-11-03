@@ -1,10 +1,12 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::NotNullColumnConstraint;
 use crate::{
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
         ConflictClause, ParseContext, Validity,
     },
-    syn::{ConstrType, Opt},
+    syn::{ConstrType, Constraint, Opt},
 };
 
 /// `NULL` / `NOT NULL` constraint
@@ -18,7 +20,7 @@ pub struct ColumnNullabilityConstraint {
 }
 
 impl ColumnNullabilityConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -85,7 +87,7 @@ impl ColumnNullabilityConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -116,7 +118,7 @@ impl ColumnNullabilityConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::NotNullColumnConstraint,
+        syn: &NotNullColumnConstraint,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,

@@ -1,5 +1,8 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, PgBuiltInType, SelectStatement, TypeReference};
+use crate::sem::{
+    AnalysisError, PgBuiltInType, SelectStatement, TypeReference,
+    scalar_expr::SemScalarExprNode,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
 
 /// An EXISTS predicate whose result is non-null boolean, independently of its
 /// query's projection types, column count, or number of rows.
@@ -34,16 +37,13 @@ impl SemScalarExprNode for ExistsExpr {
 }
 
 impl ExistsExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.query.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.query.visit(visitor)
     }
 }

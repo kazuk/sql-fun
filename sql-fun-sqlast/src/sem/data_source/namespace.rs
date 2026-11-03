@@ -1,8 +1,9 @@
 use crate::{
+    ast::Dialect,
     names::{AliasName, ColumnName, FullName},
     sem::{
         AnalysisError, AnalysisProblem, DataSource, ParseContext, WithClause,
-        data_source::{AliasSpec, QualifiedSource},
+        data_source::{AliasSpec, MergeRecordRole, QualifiedSource},
     },
 };
 use ::sql_fun_core::LookupResult;
@@ -35,7 +36,7 @@ impl<'a> SourceBinding<'a> {
         if self.alias.name() != other.alias.name() {
             return false;
         }
-        if context.dialect() == crate::ast::Dialect::postgres()
+        if context.dialect() == Dialect::postgres()
             && let (Some(left), Some(right)) = (&self.relation, &other.relation)
         {
             return left == right;
@@ -65,7 +66,7 @@ impl<'a> SourceNamespace<'a> {
         self
     }
 
-    pub(super) fn with_merge(mut self, role: super::MergeRecordRole, nullable: bool) -> Self {
+    pub(super) fn with_merge(mut self, role: MergeRecordRole, nullable: bool) -> Self {
         self.bindings = self
             .bindings
             .into_iter()

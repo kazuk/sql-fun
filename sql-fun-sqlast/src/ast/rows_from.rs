@@ -1,5 +1,10 @@
 //! Common AST operations for fixed projections of zipped function sources.
 
+use crate::{
+    StringSpan,
+    ast::{Alias, Select},
+};
+
 use crate::ast::{
     Call, CallKind, Cte, CteBody, DeparseError, Dialect, Expr, FromItem, Join, JoinKind, Literal,
     Name, OperatorExpr, OperatorKind, Order, Query, QueryBody, Relation, Statement, StatementNode,
@@ -20,7 +25,7 @@ impl TableFunctions {
         }
         Some(Self {
             calls: vec![call],
-            alias: Some(crate::ast::Alias::projection(alias)),
+            alias: Some(Alias::projection(alias)),
             lateral: false,
             ordinality: false,
             rows_from: true,
@@ -33,7 +38,7 @@ impl TableFunctions {
         Statement::from_node(
             StatementNode::query(query),
             Dialect::postgres(),
-            crate::StringSpan::default(),
+            StringSpan::default(),
         )
         .deparse_sql(Dialect::postgres())
     }
@@ -111,7 +116,7 @@ impl QueryBody {
     }
 }
 
-impl crate::ast::Select {
+impl Select {
     fn set_projection_predicate(&mut self, predicate: &Expr) {
         self.predicate = Some(predicate.clone());
     }

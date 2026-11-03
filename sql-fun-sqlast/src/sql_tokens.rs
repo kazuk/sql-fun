@@ -88,6 +88,7 @@ const fn postgres_kind(kind: ::pg_query::protobuf::Token) -> TokenKind {
 #[cfg(feature = "sqlite")]
 fn sqlite_tokens(source: &str) -> Result<Vec<SqlToken>, TokenizeSqlError> {
     #[cfg(feature = "workaround_turso_9791")]
+    #[cfg(feature = "sqlite")]
     use crate::sqlite_parser::Lexer;
     #[cfg(not(feature = "workaround_turso_9791"))]
     use ::turso_parser::lexer::Lexer;
@@ -170,7 +171,7 @@ fn sqlite_kind(kind: ::turso_parser::token::TokenType, text: &str) -> TokenKind 
 
 #[cfg(test)]
 mod tests {
-    use super::tokenize_sql;
+    use crate::sql_tokens::tokenize_sql;
     use ::sql_fun_core::SqlDialect;
     #[cfg(feature = "sqlite")]
     use ::sql_fun_core::TokenKind;

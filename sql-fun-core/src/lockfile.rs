@@ -468,7 +468,7 @@ impl LockfileDocument {
 
 #[cfg(test)]
 mod test_document {
-    use super::{
+    use crate::lockfile::{
         Lockfile, LockfileDocument, LockfileEntry,
         test_helpers::{Fixture, entry},
     };

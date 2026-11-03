@@ -1,12 +1,16 @@
 use crate::TcpJsonRpcClientAsync;
 
-use std::os::unix::process::CommandExt;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::time::Duration;
+use std::{
+    os::unix::process::CommandExt,
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::Duration,
+};
 
-use ::tokio::process::{Child, Command};
-use ::tokio::time::{Instant, sleep_until, timeout_at};
+use ::tokio::{
+    process::{Child, Command},
+    time::{Instant, sleep_until, timeout_at},
+};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(40);
 const ATTEMPT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -138,9 +142,10 @@ impl ConnectionOptions {
 
 #[cfg(test)]
 mod test_options {
-    use super::{ConnectionOptions, DEFAULT_TIMEOUT};
-    use std::path::Path;
-    use std::time::Duration;
+    use crate::connection::connect;
+
+    use crate::connection::{ConnectionOptions, DEFAULT_TIMEOUT};
+    use std::{path::Path, time::Duration};
 
     #[test]
     fn default_timeout_is_forty_seconds() {
@@ -192,7 +197,7 @@ mod test_options {
             .server_command("exit 97")
             .timeout(timeout)
             .build();
-        let error = super::connect(&options).await.unwrap_err();
+        let error = connect(&options).await.unwrap_err();
         assert!(error.to_string().starts_with("invalid input:"));
         assert!(!error.is_timeout());
     }

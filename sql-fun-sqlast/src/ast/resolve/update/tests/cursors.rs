@@ -1,19 +1,19 @@
-use super::test_helpers::catalog;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::test_helpers::TestParseContext;
 use crate::{
+    ast::{Dialect, resolve::update::tests::test_helpers::catalog},
+    context::ParseContext,
     names::{FullName, TableName},
+    parse_statements,
     sem::{CursorInfo, SemAst},
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {
-    crate::parse_statements(sql, Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
         .node
-        .resolve(context, &mut crate::test_helpers::create_cache_context())
+        .resolve(context, &mut create_cache_context())
         .unwrap()
 }
 

@@ -1,8 +1,13 @@
 //! Creation-time foreign-key bindings, independent of subsequent search paths.
+
 use crate::{
+    ast::Dialect,
     context::ParseContext,
-    names::{ColumnName, TableName},
-    sem::{AnalysisError, AnalysisProblem, TypeReference},
+    names::{ColumnName, FullName as NamesFullName, TableName},
+    sem::{
+        AnalysisError, AnalysisProblem, CreateTable, TypeReference,
+        search_path::expand_relation_search_path,
+    },
 };
 
 /// A completed target lookup: `None` means the relation was unresolved.
@@ -20,7 +25,7 @@ impl ForeignKeyTarget {
     }
 
     fn canonical_relation(context: &impl ParseContext, name: TableName) -> TableName {
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             TableName::from(name.full_name().sqlite_identity())
         } else {
             name
@@ -50,10 +55,10 @@ impl ForeignKeyTarget {
         context: &mut impl ParseContext,
         requested: &TableName,
         explicit: Option<&[ColumnName]>,
-        pending: &crate::sem::CreateTable,
+        pending: &CreateTable,
     ) -> Result<(Self, Option<Vec<ColumnName>>, bool), AnalysisError> {
         let identity = context.creation_name(pending.name().full_name(), pending.temporary())?;
-        let lookup = if context.dialect() == crate::ast::Dialect::sqlite() {
+        let lookup = if context.dialect() == Dialect::sqlite() {
             let Some(schema) = identity.schema() else {
                 AnalysisError::raise_unexpected_none("SQLite creation schema")?;
                 AnalysisError::never();
@@ -62,21 +67,20 @@ impl ForeignKeyTarget {
         } else {
             requested.full_name().clone()
         };
-        let canonical =
-            crate::sem::search_path::expand_relation_search_path(context, &lookup, |key| {
-                let matches = if context.dialect() == crate::ast::Dialect::sqlite() {
-                    key.sqlite_eq(&identity)
-                } else {
-                    key == &identity
-                };
-                if matches {
-                    Some(TableName::from(identity.clone()))
-                } else {
-                    context.resolve_table_name(&TableName::from(key.clone()))
-                }
-            });
+        let canonical = expand_relation_search_path(context, &lookup, |key| {
+            let matches = if context.dialect() == Dialect::sqlite() {
+                key.sqlite_eq(&identity)
+            } else {
+                key == &identity
+            };
+            if matches {
+                Some(TableName::from(identity.clone()))
+            } else {
+                context.resolve_table_name(&TableName::from(key.clone()))
+            }
+        });
         let target = Self(canonical.map(|name| Self::canonical_relation(context, name)));
-        if target.relation().is_none() && context.dialect() == crate::ast::Dialect::postgres() {
+        if target.relation().is_none() && context.dialect() == Dialect::postgres() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
         }
         let (columns, valid) = if target.references_identity(context, &identity) {
@@ -89,13 +93,9 @@ impl ForeignKeyTarget {
         Ok((target, columns, valid))
     }
 
-    fn references_identity(
-        &self,
-        context: &impl ParseContext,
-        identity: &crate::names::FullName,
-    ) -> bool {
+    fn references_identity(&self, context: &impl ParseContext, identity: &NamesFullName) -> bool {
         self.relation().is_some_and(|name| {
-            if context.dialect() == crate::ast::Dialect::sqlite() {
+            if context.dialect() == Dialect::sqlite() {
                 name.full_name().sqlite_eq(identity)
             } else {
                 name.full_name() == identity
@@ -145,7 +145,7 @@ impl ForeignKeyTarget {
         } else {
             Ok((
                 explicit.map(<[ColumnName]>::to_vec),
-                context.dialect() == crate::ast::Dialect::sqlite(),
+                context.dialect() == Dialect::sqlite(),
             ))
         }
     }

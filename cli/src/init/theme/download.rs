@@ -116,8 +116,7 @@ impl Downloader {
 
 #[cfg(test)]
 mod test_download {
-    use super::Downloader;
-    use crate::test_helpers::theme::ThemeFixture;
+    use crate::{init::theme::download::Downloader, test_helpers::theme::ThemeFixture};
 
     #[rstest::rstest]
     #[case::curl(true)]

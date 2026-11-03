@@ -1,4 +1,7 @@
-use super::{choice, error::InitError, install, prompt::PromptRequest, step::PromptInput};
+use crate::{
+    extract::detect_server,
+    init::{choice, error::InitError, install, prompt::PromptRequest, step::PromptInput},
+};
 
 use std::path::Path;
 
@@ -132,8 +135,7 @@ impl PostgresSetup {
             None
         };
         let (title, options) = if let Some(connection) = args.database_url() {
-            let detected =
-                crate::extract::detect_server(connection, args.timeout_seconds()).await?;
+            let detected = detect_server(connection, args.timeout_seconds()).await?;
             if let Some(selected) = versions {
                 anyhow::ensure!(
                     selected == [detected],
@@ -182,7 +184,7 @@ impl PostgresSetup {
 
 #[cfg(test)]
 mod test_choices {
-    use super::PostgresSetup;
+    use crate::init::postgres::PostgresSetup;
     use ::clap::Parser;
     use ::sql_fun_core::InitializeArgs;
 

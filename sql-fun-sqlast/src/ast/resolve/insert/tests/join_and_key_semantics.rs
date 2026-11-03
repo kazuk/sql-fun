@@ -1,5 +1,8 @@
-use crate::ast::Dialect;
-use crate::{names::ColumnName, sem::PgBuiltInType};
+use crate::{
+    ast::{Dialect, resolve::insert::tests::test_helpers::analyze},
+    names::ColumnName,
+    sem::PgBuiltInType,
+};
 
 #[rstest::rstest]
 #[case::on(
@@ -19,7 +22,7 @@ use crate::{names::ColumnName, sem::PgBuiltInType};
     2
 )]
 fn expands_qualified_join_star(#[case] sql: &str, #[case] width: usize) {
-    let (statement, context) = super::test_helpers::analyze(sql, Dialect::postgres());
+    let (statement, context) = analyze(sql, Dialect::postgres());
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -70,25 +73,25 @@ fn retains_one_arbiter_and_correct_key_nullability(
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::sem::SemAst;
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        ast::resolve::insert::tests::test_helpers::catalog, parse_statements,
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{ast::Dialect, sem::SemAst, test_helpers::TestParseContext};
 
     pub(super) fn analyze_keyed(definition: &str, returning: &str) -> (SemAst, TestParseContext) {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let dialect = Dialect::postgres();
         let mut context =
-            crate::parse_statements(&format!("CREATE TABLE review579({definition})"), dialect)
+            parse_statements(&format!("CREATE TABLE review579({definition})"), dialect)
                 .next()
                 .unwrap()
                 .unwrap()
-                .analyze(
-                    super::super::test_helpers::catalog(dialect),
-                    &mut cache_context,
-                )
+                .analyze(catalog(dialect), &mut cache_context)
                 .unwrap()
                 .into_context();
-        let statement = crate::parse_statements(
+        let statement = parse_statements(
             &format!(
                 "INSERT INTO review579 VALUES(1) ON CONFLICT(id) DO NOTHING RETURNING {returning}"
             ),
@@ -98,10 +101,7 @@ mod test_helpers {
         .unwrap()
         .unwrap()
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut create_cache_context())
         .unwrap();
         (statement, context)
     }

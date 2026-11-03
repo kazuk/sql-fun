@@ -1,11 +1,11 @@
 use crate::{
-    ast::TryFromWithTokens,
-    names::FullName,
+    ast::{AlterRelation, TryFromWithTokens},
+    names::{FullName, TableName},
     sem::{AstAndContextPair, alter_table::AlterObjSubCommand},
-    syn::Opt,
+    syn::{AlterSeqStmt, AlterTableStmt, Opt},
 };
 
-use super::{AnalysisError, ParseContext, SemAst};
+use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::AlterSeqStmt`]
 #[derive(Debug, Clone, derive_getters::Getters)]
@@ -17,7 +17,7 @@ pub struct AlterSequence {
 }
 
 impl AlterSequence {
-    pub(crate) fn with_owned_by(mut self, relation: Option<&crate::names::TableName>) -> Self {
+    pub(crate) fn with_owned_by(mut self, relation: Option<&TableName>) -> Self {
         self.owned_by = Some(SequenceDependency::from(relation));
         self
     }
@@ -36,7 +36,7 @@ impl AlterSequence {
     pub fn analyze_alter_seq<TParseContext>(
         mut context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::AlterSeqStmt,
+        syn: AlterSeqStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -62,27 +62,27 @@ impl AlterSequence {
     pub fn analyze_alter_seq_statement<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::AlterTableStmt,
+        syn: AlterTableStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
+        AlterRelation::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
             .resolve_and_apply(context)
     }
 }
 
 /// An explicit sequence dependency, distinguishing OWNED BY NONE from an omitted edit.
 #[derive(Clone, Debug)]
-pub struct SequenceDependency(Option<crate::names::TableName>);
-impl From<Option<&crate::names::TableName>> for SequenceDependency {
-    fn from(relation: Option<&crate::names::TableName>) -> Self {
+pub struct SequenceDependency(Option<TableName>);
+impl From<Option<&TableName>> for SequenceDependency {
+    fn from(relation: Option<&TableName>) -> Self {
         Self(relation.cloned())
     }
 }
 impl SequenceDependency {
     /// Bound owning relation; None is the explicit OWNED BY NONE choice.
-    pub const fn relation(&self) -> Option<&crate::names::TableName> {
+    pub const fn relation(&self) -> Option<&TableName> {
         self.0.as_ref()
     }
 }

@@ -1,4 +1,4 @@
-use crate::payloads::CollectionHandle;
+use crate::payloads::{CollectionHandle, CollectionPage, CollectionReference, CollectionTraversal};
 
 /// collection
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -44,21 +44,21 @@ impl<T> Collection<T> {
     }
 }
 
-impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+impl<T: CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
     crate::payloads::CollectionTraversal for Collection<T>
 {
-    fn collections(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+    fn collections(&self) -> Vec<&dyn CollectionReference> {
         vec![self]
     }
-    fn collections_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+    fn collections_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         vec![self]
     }
 }
-impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+impl<T: CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
     crate::payloads::CollectionReference for Collection<T>
 {
-    fn page(&self) -> Option<crate::payloads::CollectionPage> {
-        Some(crate::payloads::CollectionPage::new(
+    fn page(&self) -> Option<CollectionPage> {
+        Some(CollectionPage::new(
             &self.handle,
             self.total_length,
             self.offset,
@@ -86,11 +86,11 @@ impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + '
         }
         Ok(())
     }
-    fn children(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
-        crate::payloads::CollectionTraversal::collections(&self.items)
+    fn children(&self) -> Vec<&dyn CollectionReference> {
+        CollectionTraversal::collections(&self.items)
     }
-    fn children_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
-        crate::payloads::CollectionTraversal::collections_mut(&mut self.items)
+    fn children_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
+        CollectionTraversal::collections_mut(&mut self.items)
     }
     fn finish(&mut self) {
         // Server pages retain their wire representation; only clients own completion state.

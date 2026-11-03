@@ -1,4 +1,4 @@
-use super::DiagnosticMetadata;
+use crate::analysis_problem::DiagnosticMetadata;
 
 /// Recoverable inconsistency between SQL-derived parameter requirements.
 #[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]

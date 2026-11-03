@@ -1,8 +1,8 @@
 //! Connector API tests supplement the executable macro fixtures.
 
-use super::ConnectorSpec;
-use crate::test_helpers::{
-    GeneratedFunction, RenderFunction, assert_stub, lockfile_entry, query_spec,
+use crate::{
+    connectors::ConnectorSpec,
+    test_helpers::{GeneratedFunction, RenderFunction, assert_stub, lockfile_entry, query_spec},
 };
 #[cfg(feature = "sqlite")]
 use ::sql_fun_core::SqlDialect;

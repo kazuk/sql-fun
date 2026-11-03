@@ -1,10 +1,11 @@
-use super::{SqlEmit, SqlWriter};
 use crate::ast::{
-    Assignment, Conflict, ConflictAction, Delete, Expr, Insert, OverridingKind, Relation, Update,
+    Assignment, Conflict, ConflictAction, Delete, Expr, Insert, OverridingKind, Relation,
+    ReturningOption, Update,
+    deparse::{DeparseError, SqlEmit, SqlWriter},
 };
 
 impl SqlEmit for Insert {
-    fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         self.with.emit(writer)?;
         writer.sql("INSERT");
         if let Some(conflict) = &self.or_conflict {
@@ -50,7 +51,7 @@ impl SqlEmit for Insert {
         }
         if !self.returning.is_empty() {
             writer.sql(" RETURNING ");
-            crate::ast::ReturningOption::emit_options(&self.returning_options, writer)?;
+            ReturningOption::emit_options(&self.returning_options, writer)?;
             writer.list(&self.returning, ", ")?;
         }
         Ok(())
@@ -58,7 +59,7 @@ impl SqlEmit for Insert {
 }
 
 impl SqlEmit for Update {
-    fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         self.with.emit(writer)?;
         writer.sql("UPDATE");
         if let Some(conflict) = &self.or_conflict {
@@ -88,7 +89,7 @@ impl SqlEmit for Update {
         }
         if !self.returning.is_empty() {
             writer.sql(" RETURNING ");
-            crate::ast::ReturningOption::emit_options(&self.returning_options, writer)?;
+            ReturningOption::emit_options(&self.returning_options, writer)?;
             writer.list(&self.returning, ", ")?;
         }
         Ok(())
@@ -96,7 +97,7 @@ impl SqlEmit for Update {
 }
 
 impl SqlEmit for Delete {
-    fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         self.with.emit(writer)?;
         writer.sql("DELETE FROM ");
         self.relation.emit(writer)?;
@@ -111,7 +112,7 @@ impl SqlEmit for Delete {
         }
         if !self.returning.is_empty() {
             writer.sql(" RETURNING ");
-            crate::ast::ReturningOption::emit_options(&self.returning_options, writer)?;
+            ReturningOption::emit_options(&self.returning_options, writer)?;
             writer.list(&self.returning, ", ")?;
         }
         Ok(())
@@ -119,10 +120,7 @@ impl SqlEmit for Delete {
 }
 
 impl Assignment {
-    pub(in crate::ast) fn emit_target(
-        &self,
-        writer: &mut SqlWriter,
-    ) -> Result<(), super::DeparseError> {
+    pub(in crate::ast) fn emit_target(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.ident(&self.name)?;
         for access in &self.indirection {
             access.emit(writer)?;
@@ -130,7 +128,7 @@ impl Assignment {
         Ok(())
     }
 
-    fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         self.emit_target(writer)?;
         writer.sql(" = ");
         match &self.value {
@@ -142,7 +140,7 @@ impl Assignment {
     pub(in crate::ast) fn emit_list(
         writer: &mut SqlWriter,
         assignments: &[Self],
-    ) -> Result<(), super::DeparseError> {
+    ) -> Result<(), DeparseError> {
         let mut index = 0;
         while index < assignments.len() {
             if index != 0 {
@@ -219,7 +217,7 @@ impl Assignment {
         Ok(())
     }
 
-    fn render_source(source: &Expr, writer: &SqlWriter) -> Result<String, super::DeparseError> {
+    fn render_source(source: &Expr, writer: &SqlWriter) -> Result<String, DeparseError> {
         let mut scratch = SqlWriter::new(writer.dialect());
         source.emit(&mut scratch)?;
         Ok(scratch.sql)
@@ -227,7 +225,7 @@ impl Assignment {
 }
 
 impl SqlEmit for Conflict {
-    fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if self.next.is_some() && writer.is_postgres() {
             return writer.invalid(
                 "ON CONFLICT",
@@ -303,7 +301,7 @@ impl SqlEmit for Conflict {
 }
 
 impl ConflictAction {
-    fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::None => writer.invalid("ON CONFLICT action", "a conflict action is required"),
             Self::Nothing => {
@@ -319,7 +317,7 @@ impl ConflictAction {
 }
 
 impl OverridingKind {
-    pub(in crate::ast) fn emit(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    pub(in crate::ast) fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::NotSet => Ok(()),
             Self::UserValue => {
@@ -337,7 +335,7 @@ impl OverridingKind {
 }
 
 impl Relation {
-    fn emit_insert_target(&self, writer: &mut SqlWriter) -> Result<(), super::DeparseError> {
+    fn emit_insert_target(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if writer.is_postgres() && !self.inherit {
             return writer.invalid("INSERT target", "PostgreSQL INSERT targets cannot use ONLY");
         }
@@ -355,11 +353,11 @@ impl Relation {
     }
 }
 
-impl crate::ast::ReturningOption {
+impl ReturningOption {
     pub(in crate::ast) fn emit_options(
         options: &[Self],
         writer: &mut SqlWriter,
-    ) -> Result<(), super::DeparseError> {
+    ) -> Result<(), DeparseError> {
         if !options.is_empty() {
             writer.postgres_only("RETURNING row aliases")?;
             writer.sql("WITH (");
@@ -378,6 +376,8 @@ impl crate::ast::ReturningOption {
 
 #[cfg(test)]
 mod test_returning_options {
+    use crate::test_helpers::assert_postgres_structure;
+
     #[rstest::rstest]
     #[case::insert("INSERT INTO t VALUES (1) RETURNING WITH (OLD AS o, NEW AS n) o.id, n.id")]
     #[case::update("UPDATE t SET id = 1 RETURNING WITH (NEW AS n, OLD AS o) o.id, n.id")]
@@ -389,6 +389,6 @@ mod test_returning_options {
         "WITH changed AS (DELETE FROM t RETURNING WITH (OLD AS o) o.id) SELECT * FROM changed"
     )]
     fn preserves_row_aliases_and_expressions(#[case] sql: &str) {
-        crate::test_helpers::assert_postgres_structure(sql);
+        assert_postgres_structure(sql);
     }
 }

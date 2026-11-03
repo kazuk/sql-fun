@@ -1,3 +1,4 @@
+use crate::args::resolve_sql_fun_home_path;
 use std::{
     collections::HashMap,
     os::unix::fs::MetadataExt,
@@ -203,9 +204,9 @@ mod test_apply_envs {
     use std::path::Path;
     use testresult::TestResult;
 
-    use super::{MetadataArgs, SqlFunArgsBuilder};
     use crate::{
         SqlDialect, SqlFunArgsError,
+        args::metadata_args::{MetadataArgs, SqlFunArgsBuilder},
         test_helpers::{
             TestMetadataEnvs, TestProjectDir, parse_postgres_metadata,
             write_metadata_project_with_cte,
@@ -305,9 +306,9 @@ impl MetadataArgs {
 
     pub(crate) fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
         if let Some(path) = &self.sql_fun_home {
-            super::resolve_sql_fun_home_path(path)
+            resolve_sql_fun_home_path(path)
         } else {
-            super::resolve_sql_fun_home_path(Path::new("~/.sql-fun"))
+            resolve_sql_fun_home_path(Path::new("~/.sql-fun"))
         }
     }
 
@@ -350,8 +351,7 @@ impl MetadataArgs {
 
 #[cfg(test)]
 mod test_metadata_file_raw {
-    use super::MetadataArgsBuilder;
-    use crate::SqlFunArgsError;
+    use crate::{SqlFunArgsError, args::metadata_args::MetadataArgsBuilder};
 
     #[test]
     fn returns_default_toml_metadata_file_name() {
@@ -432,8 +432,10 @@ impl MetadataArgs {
 mod test_metadata_file {
     use testresult::TestResult;
 
-    use super::MetadataArgsBuilder;
-    use crate::test_helpers::{TestProjectDir, write_test_manifest};
+    use crate::{
+        args::metadata_args::MetadataArgsBuilder,
+        test_helpers::{TestProjectDir, write_test_manifest},
+    };
 
     #[test]
     fn returns_existing_absolute_metadata_file_path() -> TestResult {
@@ -486,10 +488,12 @@ impl MetadataArgs {
 mod test_schema_file {
     use testresult::TestResult;
 
-    use super::MetadataArgsBuilder;
-    use crate::test_helpers::{
-        TestMetadataProject, TestProjectDir, write_metadata_project, write_sql_fixture,
-        write_test_manifest,
+    use crate::{
+        args::metadata_args::MetadataArgsBuilder,
+        test_helpers::{
+            TestMetadataProject, TestProjectDir, write_metadata_project, write_sql_fixture,
+            write_test_manifest,
+        },
     };
 
     #[test]
@@ -546,8 +550,10 @@ impl MetadataArgs {
 
 #[cfg(test)]
 mod test_sql_dialect {
-    use super::MetadataArgsBuilder;
-    use crate::{SqlDialect, SqlFunArgsError, test_helpers::parse_postgres_metadata};
+    use crate::{
+        SqlDialect, SqlFunArgsError, args::metadata_args::MetadataArgsBuilder,
+        test_helpers::parse_postgres_metadata,
+    };
 
     #[test]
     fn falls_back_to_metadata_sql_dialect() {
@@ -606,8 +612,10 @@ impl MetadataArgs {
 mod test_cte_catalog_dir {
     use testresult::TestResult;
 
-    use super::MetadataArgsBuilder;
-    use crate::test_helpers::{TestProjectDir, parse_postgres_metadata_with_cte_catalog};
+    use crate::{
+        args::metadata_args::MetadataArgsBuilder,
+        test_helpers::{TestProjectDir, parse_postgres_metadata_with_cte_catalog},
+    };
 
     #[test]
     fn prefers_argument_cte_catalog_dir_over_metadata_value() -> TestResult {
@@ -720,10 +728,12 @@ mod test_get_envs {
 
     use testresult::TestResult;
 
-    use super::MetadataArgsBuilder;
-    use crate::test_helpers::{
-        TestMetadataEnvs, TestProjectDir, parse_postgres_metadata_with_cte_catalog,
-        write_metadata_project_with_cte,
+    use crate::{
+        args::metadata_args::MetadataArgsBuilder,
+        test_helpers::{
+            TestMetadataEnvs, TestProjectDir, parse_postgres_metadata_with_cte_catalog,
+            write_metadata_project_with_cte,
+        },
     };
 
     #[test]

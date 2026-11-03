@@ -1,12 +1,15 @@
 use crate::{
+    StringSpan,
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     names::{OperatorName, SchemaName},
+    parse_statements,
     sem::{
-        BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, SourcePathWithSpan,
-        TypeCategory, TypeDefinition,
+        AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType,
+        SelectStatement, SemScalarExpr, SourcePathWithSpan, TypeCategory, TypeDefinition,
+        TypeReference,
     },
-    test_helpers::TestParseContext,
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// Small catalog with independently selected integer/text comparisons.
@@ -70,13 +73,13 @@ fn comparison_context(operators: &[&str], mixed_bounds: bool) -> SchemaFileConte
 }
 
 pub(crate) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context(&[">=", "<=", "<", ">"]);
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
-        &crate::StringSpan::new(0, sql.len()),
+        &StringSpan::new(0, sql.len()),
     ));
-    for statement in crate::parse_statements(sql, Dialect::postgres()) {
+    for statement in parse_statements(sql, Dialect::postgres()) {
         context = statement?
             .analyze(context, &mut cache_context)?
             .into_context();
@@ -88,9 +91,9 @@ pub(crate) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error:
 pub(crate) fn query(
     sql: &str,
     context: SchemaFileContext,
-) -> Result<(crate::sem::SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let analyzed = crate::parse_statements(sql, Dialect::postgres())
+) -> Result<(SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
+    let mut cache_context = create_cache_context();
+    let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
         .analyze(context, &mut cache_context)?;
@@ -98,7 +101,7 @@ pub(crate) fn query(
     Ok((query, analyzed.into_context()))
 }
 
-pub(crate) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::SemScalarExpr {
+pub(crate) fn expression(query: &SelectStatement) -> &SemScalarExpr {
     query
         .result_columns()
         .get_column_at(0)
@@ -109,8 +112,8 @@ pub(crate) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::Se
 
 /// Inspect retained comparison lookups without repeating name resolution.
 pub(crate) fn comparison_bindings(
-    expression: &crate::sem::SemScalarExpr,
-) -> Result<Vec<String>, crate::sem::AnalysisError> {
+    expression: &SemScalarExpr,
+) -> Result<Vec<String>, AnalysisError> {
     let mut names = Bindings::inspect(expression)?.names;
     names.sort();
     Ok(names)
@@ -118,19 +121,19 @@ pub(crate) fn comparison_bindings(
 
 /// Types of each comparison's retained, coerced operand pair.
 pub(crate) fn comparison_argument_types(
-    expression: &crate::sem::SemScalarExpr,
-) -> Result<Vec<[Option<crate::sem::TypeReference>; 2]>, crate::sem::AnalysisError> {
+    expression: &SemScalarExpr,
+) -> Result<Vec<[Option<TypeReference>; 2]>, AnalysisError> {
     Ok(Bindings::inspect(expression)?.argument_types)
 }
 
 #[derive(Default)]
 struct Bindings {
     names: Vec<String>,
-    argument_types: Vec<[Option<crate::sem::TypeReference>; 2]>,
+    argument_types: Vec<[Option<TypeReference>; 2]>,
 }
 
 impl Bindings {
-    fn inspect(expression: &crate::sem::SemScalarExpr) -> Result<Self, crate::sem::AnalysisError> {
+    fn inspect(expression: &SemScalarExpr) -> Result<Self, AnalysisError> {
         let mut expression = expression.clone();
         let mut bindings = Self::default();
         expression.walk(&mut bindings)?;
@@ -139,10 +142,7 @@ impl Bindings {
 }
 
 impl crate::sem::traversal::SemanticVisitorMut for Bindings {
-    fn expression(
-        &mut self,
-        expression: &mut crate::sem::SemScalarExpr,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if let Some(binding) = expression.operator_binding() {
             assert!(binding.resolution().is_resolved());
             let encoded = ::serde_json::to_value(binding).unwrap();

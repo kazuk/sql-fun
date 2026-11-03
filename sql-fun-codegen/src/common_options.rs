@@ -99,6 +99,8 @@ impl SqlFunOptions {
 
 #[cfg(test)]
 mod test_sql_fun_options {
+    use crate::SqlQueryOptions;
+
     use syn::ItemFn;
 
     #[rstest::rstest]
@@ -133,7 +135,7 @@ pub async fn select_user_by_id(client: Client, id: u64) -> Result<User, tokio_po
     ) -> testresult::TestResult {
         let item_fn: ItemFn = syn::parse_str(rust_source)?;
         let attr = &item_fn.attrs[0];
-        let sql_fun_options = attr.parse_args::<crate::SqlQueryOptions>()?;
+        let sql_fun_options = attr.parse_args::<SqlQueryOptions>()?;
         let sql_fun_options = sql_fun_options.common_options;
         assert_eq!(sql_fun_options.sql(), expect_sql);
         assert_eq!(sql_fun_options.sql_file(), expect_sql_file);

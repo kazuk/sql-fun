@@ -2,6 +2,8 @@
 #[path = "api_helpers.rs"]
 mod test_helpers;
 
+use self::test_helpers as api_helpers;
+
 use self::test_helpers::{heavy, responses};
 use std::time::Duration;
 

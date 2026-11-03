@@ -1,6 +1,23 @@
 mod column_def;
 
 pub use self::column_def::ColumnDefinition;
+
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ColumnsAndConstraint;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::CreateTableStatement;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::DropTableStatement;
+use crate::{
+    ast::{Dialect, Table},
+    sem::{
+        ColumnAttributeAction, ColumnRename, CreateIndex, ForeignKeyConstraint, IndirectionExpr,
+        SemScalarExpr, TypeReference,
+        traversal::{RelationRenamer, SemanticVisitorMut},
+    },
+    syn::{CreateStmt, DropStmt},
+};
+
 use crate::names::{ColumnName, TableName};
 use sql_fun_core::IVec;
 use std::collections::HashMap;
@@ -50,14 +67,14 @@ impl ColumnCollection {
 
     pub(crate) fn project_expression(
         &self,
-        base: &crate::sem::SemScalarExpr,
-    ) -> Vec<(ColumnName, crate::sem::SemScalarExpr)> {
+        base: &SemScalarExpr,
+    ) -> Vec<(ColumnName, SemScalarExpr)> {
         self.0
             .iter()
             .map(|field| {
                 (
                     field.name().as_ref().expect("composite field name").clone(),
-                    crate::sem::IndirectionExpr::projected_member(base, field),
+                    IndirectionExpr::projected_member(base, field),
                 )
             })
             .collect()
@@ -74,7 +91,7 @@ impl ColumnCollection {
             })
         })
     }
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) {
         for column in &mut self.0 {
             column.rename_column_name(rename);
         }
@@ -86,7 +103,7 @@ impl ColumnCollection {
 
     fn rename_expressions(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.0 {
             column.rename_expressions(visitor)?;
@@ -111,7 +128,7 @@ impl ColumnCollection {
     }
 
     /// Ordered field targets, only when every declaration has a resolved type.
-    pub(crate) fn field_types(&self) -> Option<Vec<crate::sem::TypeReference>> {
+    pub(crate) fn field_types(&self) -> Option<Vec<TypeReference>> {
         self.0
             .iter()
             .map(ColumnDefinition::get_type_cloned)
@@ -121,7 +138,7 @@ impl ColumnCollection {
     pub(crate) fn matches_type_structure_with(
         &self,
         other: &Self,
-        matches: impl Fn(&crate::sem::TypeReference, &crate::sem::TypeReference) -> bool,
+        matches: impl Fn(&TypeReference, &TypeReference) -> bool,
     ) -> bool {
         self.0.len() == other.0.len()
             && self.0.iter().zip(&other.0).all(|(left, right)| {
@@ -147,10 +164,7 @@ impl ColumnCollection {
             .collect()
     }
 
-    pub(crate) fn scalar_function_output(
-        name: &ColumnName,
-        ty: &crate::sem::TypeReference,
-    ) -> Self {
+    pub(crate) fn scalar_function_output(name: &ColumnName, ty: &TypeReference) -> Self {
         Self(vec![ColumnDefinition::new(
             &Some(name.clone()),
             Some(ty),
@@ -228,9 +242,9 @@ impl ColumnCollection {
 
 #[cfg(test)]
 mod column_collection_tests {
-    use {
-        super::{ColumnCollection, ColumnDefinition},
-        crate::names::ColumnName,
+    use crate::{
+        names::ColumnName,
+        sem::create_table::{ColumnCollection, ColumnDefinition},
     };
 
     #[test]
@@ -296,9 +310,14 @@ pub struct CreateTable {
 
 #[cfg(test)]
 mod test_create_table_clone {
-    use crate::context::BaseParseContext;
-    use crate::test_helpers::TestParseContext;
-    use crate::{context::TableInfoWrite, names::ColumnName, sem::ParseContext};
+    use crate::test_helpers::schema_layer;
+
+    use crate::{
+        context::{BaseParseContext, TableInfoWrite},
+        names::ColumnName,
+        sem::ParseContext,
+        test_helpers::TestParseContext,
+    };
     use std::path::Path;
 
     #[test]
@@ -310,7 +329,7 @@ mod test_create_table_clone {
         let cloned = table.clone();
         assert_eq!(cloned.primary_key_columns(), vec![&id]);
 
-        let mut context = crate::test_helpers::schema_layer(
+        let mut context = schema_layer(
             Path::new("schema.sql"),
             &TestParseContext::default().freeze(),
         );
@@ -321,6 +340,8 @@ mod test_create_table_clone {
     }
 
     mod test_helpers {
+        use crate::test_helpers::source_span;
+
         use crate::{
             names::{ColumnName, FullName, TableName},
             sem::{
@@ -332,7 +353,7 @@ mod test_create_table_clone {
         pub(super) fn table_with_primary_key() -> Result<CreateTable, AnalysisError> {
             let name = TableName::from(FullName::with_schema("public", "items"));
             let id = ColumnName::from("id");
-            let source = crate::test_helpers::source_span();
+            let source = source_span();
             let mut table = CreateTable::new(
                 &name,
                 vec![ColumnDefinition::new(
@@ -370,7 +391,7 @@ impl CreateTable {
     }
     pub(crate) fn rename_column_dependencies(
         &mut self,
-        rename: &crate::sem::ColumnRename,
+        rename: &ColumnRename,
         owned: bool,
     ) -> Result<(), AnalysisError> {
         for column in &mut self.columns.0 {
@@ -397,7 +418,7 @@ impl CreateTable {
         new: &TableName,
     ) -> Result<(), AnalysisError> {
         self.columns
-            .rename_expressions(&mut crate::sem::traversal::RelationRenamer::new(old, new))
+            .rename_expressions(&mut RelationRenamer::new(old, new))
     }
 
     /// Applied ALTER statements in source order, retaining their original bindings and spans.
@@ -478,7 +499,7 @@ impl CreateTable {
     pub(crate) fn declared_indexes(
         &self,
         name: &FullName,
-    ) -> Result<Vec<crate::sem::CreateIndex>, AnalysisError> {
+    ) -> Result<Vec<CreateIndex>, AnalysisError> {
         let mut indexes = Vec::new();
         for constraint in self.constraints.values() {
             if !constraint.name().is_empty() {
@@ -562,7 +583,7 @@ impl CreateTable {
     pub(crate) fn apply_column_attributes(
         &mut self,
         column: &ColumnName,
-        action: &crate::sem::ColumnAttributeAction,
+        action: &ColumnAttributeAction,
     ) {
         if let Some(column) = self.columns.get_column_mut(column) {
             action.apply(&self.name, column);
@@ -655,7 +676,7 @@ impl CreateTable {
     /// Inspect retained table-level foreign keys, including unnamed declarations.
     ///
     /// Iteration order is unspecified; column order within each key is retained.
-    pub fn foreign_keys(&self) -> impl Iterator<Item = &crate::sem::ForeignKeyConstraint> {
+    pub fn foreign_keys(&self) -> impl Iterator<Item = &ForeignKeyConstraint> {
         self.constraints
             .values()
             .filter_map(Constraint::as_foreign_key)
@@ -740,15 +761,14 @@ impl CreateTable {
     pub fn analyze_create_stmt<TParseContext>(
         context: TParseContext,
         parent_schema: &Option<String>,
-        create: crate::syn::CreateStmt,
+        create: CreateStmt,
         tokens: &IVec<ScanToken>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Table::try_from_with_tokens(&create, tokens)?
-            .resolve_and_apply_at(context, source_span)
+        Table::try_from_with_tokens(&create, tokens)?.resolve_and_apply_at(context, source_span)
     }
 
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
@@ -766,15 +786,14 @@ impl CreateTable {
         table_name: &TableName,
         mode: &CreateTableMode,
         temporary: bool,
-        syn: crate::syn::sqlite::ColumnsAndConstraint,
+        syn: ColumnsAndConstraint,
         _tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax =
-            crate::ast::Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
+        let syntax = Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
         let table = syntax.resolve(&mut context, source_span)?;
         Ok((table, context))
     }
@@ -782,6 +801,8 @@ impl CreateTable {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_columns_and_constraint {
+    use crate::sem::create_table::CreateTable;
+
     use crate::{
         names::SchemaName,
         sem::{CreateTableMode, SourcePathWithSpan},
@@ -813,7 +834,7 @@ mod test_analyze_columns_and_constraint {
         let CreateTableBody::ColumnsAndConstraint(body) = body else {
             panic!("expected column definitions");
         };
-        let (table, _) = super::CreateTable::analyze_columns_and_constraint(
+        let (table, _) = CreateTable::analyze_columns_and_constraint(
             test_context,
             &None,
             &sem_builder().table_name("users"),
@@ -846,7 +867,7 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Table::try_from(&syn)?
+        Table::try_from(&syn)?
             .named(table_name.full_name(), *mode, temporary)
             .resolve_and_apply_at(context, source_span)
     }
@@ -859,25 +880,27 @@ impl CreateTable {
     pub fn analyze_create_table<TParseContext>(
         context: TParseContext,
         parent_schema: &Option<String>,
-        syn: crate::syn::sqlite::CreateTableStatement,
+        syn: CreateTableStatement,
         tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Table::try_from(&syn)?.resolve_and_apply_at(context, source_span)
+        Table::try_from(&syn)?.resolve_and_apply_at(context, source_span)
     }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_create_table {
+    use crate::{ast::Dialect, sem::create_table::CreateTable as CreateTableCreateTable};
+
     use assert_matches::assert_matches;
     use testresult::TestResult;
 
-    use crate::context::BaseParseContext;
     use crate::{
         AstAndContextPair,
+        context::BaseParseContext,
         names::{FullName, SchemaName, TableName},
         sem::{CreateTableMode, SemAst, SourcePathWithSpan},
         syn::sqlite::Stmt,
@@ -915,7 +938,7 @@ mod test_analyze_create_table {
         #[case] temporary: bool,
     ) -> TestResult {
         let sem_builder = sem_builder();
-        let mut test_context = test_context.with_dialect(crate::ast::Dialect::sqlite());
+        let mut test_context = test_context.with_dialect(Dialect::sqlite());
         test_context.set_get_search_path_result(&[SchemaName::from("main")]);
 
         let stmt = sqlite_syn.parse_as_stmt(sql);
@@ -924,13 +947,14 @@ mod test_analyze_create_table {
             panic!("expect CreateTable: {stmt:?}");
         };
         let tokens = Vec::default().into();
-        let AstAndContextPair(sem_ast, result_context) = super::CreateTable::analyze_create_table(
-            test_context,
-            &None,
-            ct,
-            &tokens,
-            &source_span,
-        )?;
+        let AstAndContextPair(sem_ast, result_context) =
+            CreateTableCreateTable::analyze_create_table(
+                test_context,
+                &None,
+                ct,
+                &tokens,
+                &source_span,
+            )?;
         assert_matches!(sem_ast, SemAst::CreateTable(_));
         let Some(create_table) = sem_ast.as_create_table() else {
             panic!("expect CreateTable")
@@ -1002,7 +1026,7 @@ impl DropTable {
     ///
     pub fn analyze_drop_stmt<TParseContext>(
         mut context: TParseContext,
-        syn: crate::syn::DropStmt,
+        syn: DropStmt,
         _tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
@@ -1086,7 +1110,7 @@ impl DropTable {
     #[cfg(feature = "sqlite")]
     pub fn analyze_drop_table<TParseContext>(
         mut context: TParseContext,
-        syn: crate::syn::sqlite::DropTableStatement,
+        syn: DropTableStatement,
         _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
@@ -1105,6 +1129,8 @@ impl DropTable {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_drop_table_analyze_drop_table {
+    use crate::sem::create_table::DropTable;
+
     use crate::{
         AstAndContextPair,
         syn::sqlite::DropTableStatement,
@@ -1121,7 +1147,7 @@ mod test_drop_table_analyze_drop_table {
         let statement = DropTableStatement::new(true, table_name);
         let tokens = Vec::default().into();
         let AstAndContextPair(ast, result_context) =
-            super::DropTable::analyze_drop_table(test_context, statement, &tokens)?;
+            DropTable::analyze_drop_table(test_context, statement, &tokens)?;
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable")
         };
@@ -1147,7 +1173,7 @@ impl CreateTable {
             self.primary_key_columns().into_iter().cloned().collect()
         };
         // SQLite checks parent-key validity when preparing DML, not CREATE TABLE.
-        let valid = if context.dialect() == crate::ast::Dialect::postgres() {
+        let valid = if context.dialect() == Dialect::postgres() {
             if explicit.is_none() && columns.is_empty() {
                 context.report_analysis_problem(
                     AnalysisProblem::foreign_key_referenced_primary_key_missing(requested),
@@ -1170,7 +1196,7 @@ impl CreateTable {
         let mut valid = true;
         for column in columns {
             if self
-                .find_column(column, context.dialect() == crate::ast::Dialect::sqlite())
+                .find_column(column, context.dialect() == Dialect::sqlite())
                 .is_none()
             {
                 valid = false;
@@ -1185,12 +1211,14 @@ impl CreateTable {
 
 #[cfg(test)]
 mod test_foreign_key_reference_columns {
+    use crate::test_helpers::ownership::apply_ownership_sql;
+
     use crate::{context::TableInfoRead, test_helpers::foreign_keys as fk};
 
     #[test]
     fn omitted_reference_columns_require_a_postgres_primary_key() -> testresult::TestResult {
         let context = fk::apply(fk::context(), "CREATE TABLE a.parent(id integer)");
-        let pair = crate::test_helpers::ownership::apply_ownership_sql(
+        let pair = apply_ownership_sql(
             context,
             "CREATE TABLE a.child(parent_id integer, FOREIGN KEY(parent_id) REFERENCES parent)",
         )?;

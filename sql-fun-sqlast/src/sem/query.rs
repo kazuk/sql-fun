@@ -1,8 +1,15 @@
 //! Clause structure retained after name resolution.
-use crate::sem::traversal::SemanticVisitorMut;
+
 use crate::{
-    names::{AliasName, OperatorName},
-    sem::{AnalysisError, ResultColumnCollection, SelectStatement, SemScalarExpr},
+    ast::Dialect,
+    names::{AliasName, ColumnName, FullName, OperatorName, TableName},
+    sem::{
+        AccessKind, AnalysisError, CteStatement, InputTypeConstraint, InsertTarget,
+        OperatorDefinition, ParseContext, QueryProblem, ResultColumnCollection, SelectStatement,
+        SemScalarExpr, TypeReference,
+        parameter_resolution::{ParameterResolution, Signature},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
 };
 
 /// The completed outcome of resolving a clause name.
@@ -15,9 +22,9 @@ pub enum QueryNameResolution {
     /// An operator name found in the catalog (overload selection is separate).
     Operator(OperatorName),
     /// Reference to a function definition, independently of overload selection.
-    Function(crate::names::FullName),
+    Function(FullName),
     /// Reference to a catalog type.
-    Type(crate::sem::TypeReference),
+    Type(TypeReference),
     /// SQLite cast names denote affinity, independently of a type catalog.
     Affinity(String),
     /// Lookup found no definition.
@@ -26,17 +33,13 @@ pub enum QueryNameResolution {
     Ambiguous,
 }
 impl QueryNameResolution {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Self::Type(reference) = self {
             reference.rename_relation(old, new);
         }
     }
 
-    pub(crate) const fn function_identity(&self) -> Option<&crate::names::FullName> {
+    pub(crate) const fn function_identity(&self) -> Option<&FullName> {
         if let Self::Function(name) = self {
             Some(name)
         } else {
@@ -44,14 +47,14 @@ impl QueryNameResolution {
         }
     }
 
-    pub(crate) fn type_reference(value: &crate::sem::TypeReference) -> Self {
+    pub(crate) fn type_reference(value: &TypeReference) -> Self {
         Self::Type(value.clone())
     }
     pub(crate) fn affinity(value: &str) -> Self {
         Self::Affinity(value.to_owned())
     }
 
-    pub(crate) fn function(name: &crate::names::FullName) -> Self {
+    pub(crate) fn function(name: &FullName) -> Self {
         Self::Function(name.clone())
     }
     pub(crate) const fn window(index: usize) -> Self {
@@ -75,10 +78,10 @@ impl QueryNameResolution {
             _ => None,
         }
     }
-    pub(crate) fn reference_problem(&self, name: &str) -> Option<crate::sem::QueryProblem> {
+    pub(crate) fn reference_problem(&self, name: &str) -> Option<QueryProblem> {
         match self {
-            Self::NotFound => Some(crate::sem::QueryProblem::reference_not_found(name)),
-            Self::Ambiguous => Some(crate::sem::QueryProblem::ambiguous_reference(name)),
+            Self::NotFound => Some(QueryProblem::reference_not_found(name)),
+            Self::Ambiguous => Some(QueryProblem::ambiguous_reference(name)),
             _ => None,
         }
     }
@@ -159,10 +162,7 @@ impl QueryOrder {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.expression.visit(visitor)?;
         if let Some(operator) = &self.using {
             visitor.order_operator(&self.expression, operator)?;
@@ -221,10 +221,7 @@ impl QueryGrouping {
             }
         }
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Expression(expression) => expression.visit(visitor),
             Self::Empty => Ok(()),
@@ -284,7 +281,7 @@ impl QueryFrameBound {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         mode: &str,
@@ -352,8 +349,8 @@ pub struct QueryWindow {
 impl QueryWindow {
     pub(crate) fn ordering_type(
         &self,
-        inherited: &[Option<crate::sem::TypeReference>],
-    ) -> Option<crate::sem::TypeReference> {
+        inherited: &[Option<TypeReference>],
+    ) -> Option<TypeReference> {
         match self.order.as_slice() {
             [order] => order.expression.get_type(),
             [] => {
@@ -425,10 +422,7 @@ impl QueryWindow {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for expression in &self.partition {
             expression.visit(visitor)?;
         }
@@ -520,11 +514,8 @@ impl SelectClauses {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_distinct());
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_purpose(AccessKind::select_distinct());
         if let Some(distinct) = &self.distinct {
             if distinct.is_empty() {
                 visitor.distinct_outputs();
@@ -533,11 +524,11 @@ impl SelectClauses {
                 expression.visit(visitor)?;
             }
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_grouping());
+        visitor.access_purpose(AccessKind::select_grouping());
         for group in &self.group {
             group.visit(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_group_filter());
+        visitor.access_purpose(AccessKind::select_group_filter());
         if let Some(having) = &self.having {
             having.visit(visitor)?;
             visitor.predicate(having);
@@ -554,11 +545,11 @@ impl SelectClauses {
         }
         Ok(())
     }
-    pub(crate) fn visit_windows<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_windows<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_window());
+        visitor.access_purpose(AccessKind::select_window());
         for window in &self.windows {
             window.visit(visitor)?;
             visitor.window_definition(window);
@@ -657,10 +648,7 @@ impl FunctionModifiers {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for order in &self.order {
             order.visit(visitor)?;
         }
@@ -792,7 +780,7 @@ impl SemanticQuery {
     pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         for entry in &mut self.with {
             entry.walk(visitor)?;
@@ -811,25 +799,25 @@ impl SemanticQuery {
         }
         Ok(())
     }
-    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         for entry in &self.with {
             entry.visit(visitor)?;
         }
         self.body.visit_body_assigned(visitor, targets)?;
-        visitor.access_purpose(crate::sem::AccessKind::select_ordering());
+        visitor.access_purpose(AccessKind::select_ordering());
         for order in &self.order {
             order.visit(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_limit());
+        visitor.access_purpose(AccessKind::select_limit());
         if let Some(limit) = &self.limit {
             limit.visit(visitor)?;
             visitor.row_count(limit);
         }
-        visitor.access_purpose(crate::sem::AccessKind::select_offset());
+        visitor.access_purpose(AccessKind::select_offset());
         if let Some(offset) = &self.offset {
             offset.visit(visitor)?;
             visitor.row_count(offset);
@@ -849,7 +837,7 @@ impl SemanticValues {
         &mut self,
         visitor: &mut V,
         index: usize,
-        ty: &crate::sem::TypeReference,
+        ty: &TypeReference,
     ) -> Result<(), AnalysisError> {
         for row in &mut self.rows {
             if let Some(value) = row.get_mut(index) {
@@ -864,7 +852,7 @@ impl SemanticValues {
         if let Some(first) = rows.first() {
             for (index, value) in first.iter().enumerate() {
                 columns.push_column(
-                    &crate::names::ColumnName::from(format!("column{}", index + 1).as_str()),
+                    &ColumnName::from(format!("column{}", index + 1).as_str()),
                     value,
                 );
             }
@@ -884,7 +872,7 @@ impl SemanticValues {
     pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         for (row_index, row) in self.rows.iter_mut().enumerate() {
             for (index, value) in row.iter_mut().enumerate() {
@@ -897,10 +885,7 @@ impl SemanticValues {
                         .columns
                         .get_column_at(index)
                         .expect("VALUES output position");
-                    let name = column
-                        .column_name()
-                        .as_ref()
-                        .map_or("", crate::names::ColumnName::as_str);
+                    let name = column.column_name().as_ref().map_or("", ColumnName::as_str);
                     visitor.output(name, value);
                     self.columns.refresh_value(index, value);
                 }
@@ -908,10 +893,10 @@ impl SemanticValues {
         }
         Ok(())
     }
-    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         for row in &self.rows {
             for (index, value) in row.iter().enumerate() {
@@ -920,10 +905,7 @@ impl SemanticValues {
                     visitor.assignment(value, target)?;
                 }
                 if let Some(column) = self.columns.get_column_at(index) {
-                    let name = column
-                        .column_name()
-                        .as_ref()
-                        .map_or("", crate::names::ColumnName::as_str);
+                    let name = column.column_name().as_ref().map_or("", ColumnName::as_str);
                     visitor.values_output(index, name, value);
                 }
             }
@@ -938,14 +920,14 @@ pub struct QueryCte {
     name: String,
     columns: Vec<String>,
     materialized: Option<bool>,
-    statement: crate::sem::CteStatement,
+    statement: CteStatement,
 }
 impl QueryCte {
     pub(crate) fn new(
         name: &str,
         columns: Vec<String>,
         materialized: Option<bool>,
-        statement: crate::sem::CteStatement,
+        statement: CteStatement,
     ) -> Self {
         Self {
             name: name.to_owned(),
@@ -967,7 +949,7 @@ impl QueryCte {
         self.materialized
     }
     /// Resolved statement.
-    pub const fn statement(&self) -> &crate::sem::CteStatement {
+    pub const fn statement(&self) -> &CteStatement {
         &self.statement
     }
     pub(crate) fn walk<V: SemanticVisitorMut>(
@@ -984,10 +966,7 @@ impl QueryCte {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let Some(columns) = self.statement.result_columns() {
             visitor.enter_cte(&self.name, &columns.names());
             visitor.source_outputs(&columns.names());
@@ -1006,7 +985,7 @@ impl QueryCte {
 pub struct ResolvedOperator {
     name: OperatorName,
     resolution: QueryNameResolution,
-    signatures: Vec<crate::sem::parameter_resolution::Signature>,
+    signatures: Vec<Signature>,
 }
 impl ResolvedOperator {
     pub(crate) fn canonicalize_grouping_key(&mut self) {
@@ -1014,7 +993,7 @@ impl ResolvedOperator {
     }
 
     pub(crate) fn resolve(
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         name: &OperatorName,
         left: bool,
         right: bool,
@@ -1023,9 +1002,9 @@ impl ResolvedOperator {
     }
     /// Complete name binding from an already performed catalog lookup.
     pub(crate) fn from_definition(
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         name: &OperatorName,
-        operator: Option<&crate::sem::OperatorDefinition>,
+        operator: Option<&OperatorDefinition>,
     ) -> Self {
         if let Some(operator) = operator {
             Self {
@@ -1047,10 +1026,7 @@ impl ResolvedOperator {
             }
         }
     }
-    pub(crate) fn resolve_comparison(
-        context: &impl crate::sem::ParseContext,
-        name: &OperatorName,
-    ) -> Self {
+    pub(crate) fn resolve_comparison(context: &impl ParseContext, name: &OperatorName) -> Self {
         Self::resolve(context, name, true, true)
     }
     /// Name lookup outcome; overload/type selection is a subsequent operation.
@@ -1059,8 +1035,8 @@ impl ResolvedOperator {
     }
     pub(crate) fn infer(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
@@ -1069,7 +1045,7 @@ impl ResolvedOperator {
         {
             return Ok(None);
         }
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             return Ok(Some(parameters.sqlite_operator(&self.name, left, right)));
         }
         let arguments = Self::arguments(left, right);
@@ -1084,7 +1060,7 @@ impl ResolvedOperator {
             parameters.operation(
                 &self.name.to_string(),
                 &arguments,
-                &crate::sem::InputTypeConstraint::any(),
+                &InputTypeConstraint::any(),
                 None,
             )
         };
@@ -1104,18 +1080,18 @@ impl ResolvedOperator {
 /// A table declared by SELECT INTO, not a reference to an existing table.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SelectDestination {
-    name: crate::names::FullName,
+    name: FullName,
     persistence: String,
 }
 impl SelectDestination {
-    pub(crate) fn new(name: &crate::names::FullName, persistence: &str) -> Self {
+    pub(crate) fn new(name: &FullName, persistence: &str) -> Self {
         Self {
             name: name.clone(),
             persistence: persistence.to_owned(),
         }
     }
     /// Declared destination name.
-    pub const fn name(&self) -> &crate::names::FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
     /// PostgreSQL persistence marker supplied by the parser.

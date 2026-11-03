@@ -4,7 +4,7 @@ use ::anyhow::Context;
 use ::serde_json::Value;
 use ::sql_fun_client::payloads::{AnalyzeQueryResponse, ResultSetColumn};
 
-use super::input::{SqlInputs, load_value};
+use crate::direct_sql::input::{SqlInputs, load_value};
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -173,7 +173,7 @@ impl Expectation {
 
 #[cfg(test)]
 mod tests {
-    use super::Expectation;
+    use crate::direct_sql::expectation::Expectation;
     #[rstest::rstest]
     #[case::empty_codes("[]", true)]
     #[case::object(r#"{"diagnostics":[]}"#, true)]
@@ -204,7 +204,7 @@ mod tests {
 mod test_helpers;
 #[cfg(test)]
 mod test_comparison {
-    use super::{Expectation, test_helpers};
+    use crate::direct_sql::expectation::{Expectation, test_helpers};
 
     #[test]
     fn differences_separate_codes_and_expected_actual_column_fields() -> ::testresult::TestResult {

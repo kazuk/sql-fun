@@ -1,9 +1,14 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
-    context::{FunctionInfoRead, FunctionInfoWrite, ParseContext},
+    context::{
+        FunctionInfoRead, FunctionInfoWrite, OwnershipInfoRead, ParseContext,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
+    },
     names::FullName,
-    sem::{AnalysisError, CreateFunction, FunctionOverloadCollection},
+    sem::{
+        AnalysisError, AnalysisProblem, CreateFunction, FunctionOverloadCollection,
+        OverloadVariant, problem::CreationProblem,
+    },
 };
 
 #[derive(Clone, Debug, Default)]
@@ -52,11 +57,7 @@ impl FunctionInfoRead for SchemaCatalog {
             false
         }
     }
-    fn function_returns_set(
-        &self,
-        name: &FullName,
-        overload: &crate::sem::OverloadVariant,
-    ) -> bool {
+    fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         let arguments = overload.input_bindings();
         for definition in self.functions.definitions(name) {
             let selected = definition
@@ -69,11 +70,7 @@ impl FunctionInfoRead for SchemaCatalog {
         self.base.function_returns_set(name, overload)
     }
 
-    fn function_preserves_view_rows(
-        &self,
-        name: &FullName,
-        overload: &crate::sem::OverloadVariant,
-    ) -> bool {
+    fn function_preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         if let Some(preserves) = self
             .function_view_rows
             .get(&(name.clone(), overload.clone()))
@@ -97,7 +94,7 @@ impl FunctionInfoRead for SchemaCatalog {
     }
 
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
-        let definitions = crate::context::OwnershipInfoRead::routine_definitions(self, name);
+        let definitions = OwnershipInfoRead::routine_definitions(self, name);
         if definitions.is_empty() {
             return None;
         }
@@ -117,9 +114,11 @@ impl FunctionInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_expression_classification {
-    use crate::context::{BaseParseContext, FunctionInfoRead, ParseContext};
-    use crate::names::FullName;
-    use crate::test_helpers::{ownership::apply_ownership_sql, sampling::schema_context};
+    use crate::{
+        context::{BaseParseContext, FunctionInfoRead, ParseContext},
+        names::FullName,
+        test_helpers::{ownership::apply_ownership_sql, sampling::schema_context},
+    };
 
     #[rstest::rstest]
     #[case::scalar("integer", "", false, true)]
@@ -170,13 +169,13 @@ impl FunctionInfoWrite for SchemaFileContext {
         name: &FullName,
         create_function: &CreateFunction,
     ) -> Result<Self, AnalysisError> {
-        let existing = crate::context::OwnershipInfoRead::routine_definitions(&self, name);
+        let existing = OwnershipInfoRead::routine_definitions(&self, name);
         let mut candidates = Vec::new();
         for mut candidate in create_function.split_definitions() {
             if let Some(previous) = candidate.previous_definition(&existing, &candidates) {
                 if !create_function.replace() || !candidate.can_replace(previous) {
-                    self.report_analysis_problem(crate::sem::AnalysisProblem::creation(
-                        crate::sem::problem::CreationProblem::routine(
+                    self.report_analysis_problem(AnalysisProblem::creation(
+                        CreationProblem::routine(
                             name,
                             &candidate.ownership_identity(name),
                             &self.creation_span(),

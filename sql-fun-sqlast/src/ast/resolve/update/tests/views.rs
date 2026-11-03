@@ -1,7 +1,9 @@
-use crate::ast::Dialect;
 use crate::{
+    ast::{Dialect, resolve::update::tests::test_helpers::catalog},
     names::{ColumnName, FullName},
-    sem::{ViewLike, ViewUpdateSupport},
+    parse_statements,
+    sem::{CreateView, ViewLike, ViewUpdateSupport},
+    test_helpers::create_cache_context,
 };
 
 #[rstest::rstest]
@@ -21,21 +23,18 @@ fn respects_update_capabilities(
     #[case] returning: bool,
     #[case] valid: bool,
 ) {
-    let mut context = super::test_helpers::catalog(Dialect::postgres());
-    let view_query = crate::parse_statements("SELECT id,label FROM items", Dialect::postgres())
+    let mut context = catalog(Dialect::postgres());
+    let view_query = parse_statements("SELECT id,label FROM items", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut create_cache_context())
         .unwrap()
         .into_select_statemtnt()
         .unwrap();
     let name = FullName::with_schema("public", "writable_items");
-    let view = crate::sem::CreateView::new(&name, &view_query, &[], &None, false);
+    let view = CreateView::new(&name, &view_query, &[], &None, false);
     context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
     let support = if writable {
         ViewUpdateSupport::writable(
@@ -46,15 +45,12 @@ fn respects_update_capabilities(
         ViewUpdateSupport::read_only()
     };
     context.set_view_update_support(&name, &support);
-    let result = crate::parse_statements(sql, Dialect::postgres())
+    let result = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        );
+        .resolve(&mut context, &mut create_cache_context());
     assert_eq!(
         context.reported_problem_count() == 0,
         valid,

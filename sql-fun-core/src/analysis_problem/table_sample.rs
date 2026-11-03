@@ -1,4 +1,4 @@
-use super::{DiagnosticMessage, DiagnosticMetadata};
+use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata};
 
 /// A TABLESAMPLE binding, input, or capability problem.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

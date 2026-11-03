@@ -30,6 +30,15 @@ pub use self::{
 };
 
 #[cfg(any(test, feature = "sqlite"))]
+use crate::ast::ColumnConstraint as AstColumnConstraint;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::ColumnConstraint as SqliteColumnConstraint;
+use crate::{
+    sem::{ColumnRename, traversal::SemanticVisitorMut},
+    syn::Constraint as SynConstraint,
+};
+
+#[cfg(any(test, feature = "sqlite"))]
 use ::sql_fun_core::IVec;
 
 #[cfg(test)]
@@ -89,7 +98,7 @@ pub enum ColumnConstraint {
 }
 
 impl ColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         match self {
             Self::Nullability(value) => value.rename_column(rename, owned),
             Self::Default(value) => value.rename_column(rename, owned),
@@ -109,7 +118,7 @@ impl ColumnConstraint {
 
     pub(crate) fn rename_expression(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Default(value) => value.rename_expression(visitor),
@@ -227,7 +236,6 @@ impl ColumnConstraintTrait for ColumnConstraint {
 
 #[cfg(test)]
 mod test_column_constraint_trait_for_column_constraint {
-    use super::ColumnNullabilityConstraint;
     use crate::{
         sem::{
             AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
@@ -236,6 +244,7 @@ mod test_column_constraint_trait_for_column_constraint {
             ExclusionColumnConstraint, ForeignKeyColumnConstraint, GeneratedColumnConstraint,
             GeneratedColumnMode, IdentityColumnConstraint, IdentityColumnMode,
             PrimaryKeyColumnConstraint, UniqueColumnConstraint,
+            column_constraints::ColumnNullabilityConstraint,
         },
         test_helpers::{SemValueBuilder, sem_builder},
     };
@@ -561,13 +570,13 @@ impl ColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &SynConstraint,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::ColumnConstraint::try_from_with_tokens(syn, tokens)?.resolve_and_report(
+        AstColumnConstraint::try_from_with_tokens(syn, tokens)?.resolve_and_report(
             context,
             table_name,
             column_name,
@@ -690,17 +699,13 @@ impl ColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::ColumnConstraint,
+        syn: &SqliteColumnConstraint,
         _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::ColumnConstraint::try_from(syn)?.resolve_and_report(
-            context,
-            table_name,
-            column_name,
-        )
+        AstColumnConstraint::try_from(syn)?.resolve_and_report(context, table_name, column_name)
     }
 }
 
@@ -750,7 +755,7 @@ impl Validity {
     }
 
     /// create from [`crate::syn::Constraint`]
-    pub const fn from_constraint(syn: &crate::syn::Constraint) -> Self {
+    pub const fn from_constraint(syn: &SynConstraint) -> Self {
         Self::new(syn.get_skip_validation(), syn.get_initially_valid())
     }
 }
@@ -771,9 +776,7 @@ impl Deferrable {
     }
 
     /// from [`crate::syn::Constraint`]
-    pub fn try_from_constraint(
-        syn: &crate::syn::Constraint,
-    ) -> Result<Option<Self>, AnalysisError> {
+    pub fn try_from_constraint(syn: &SynConstraint) -> Result<Option<Self>, AnalysisError> {
         let r = if syn.get_deferrable() {
             Some(Self::new(syn.get_initdeferred()))
         } else {

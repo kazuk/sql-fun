@@ -1,14 +1,15 @@
 #[cfg(test)]
 mod test_rendering;
 
+use crate::{QueryRequirement, row_builder::RowBuilder, rust_syn::ParameterBindings};
+
 use std::str::FromStr;
 
 use proc_macro2::{Span, TokenStream};
 use sql_fun_core::{SqlDialect, lockfile::LockfileStatement};
 use syn::{Ident, LitInt, LitStr};
 
-use crate::rust_syn::GeneratedIdentifiers;
-use crate::{QueryFunctionSpec, error::SqlFunCodegenError};
+use crate::{QueryFunctionSpec, error::SqlFunCodegenError, rust_syn::GeneratedIdentifiers};
 
 pub trait ConnectorCodeGenerator: std::fmt::Debug {
     fn render_query_one(&self, spec: &QueryFunctionSpec)
@@ -52,7 +53,7 @@ impl ConnectorSpec {
 
 #[cfg(test)]
 mod test_connector_realize {
-    use super::ConnectorSpec;
+    use crate::connectors::ConnectorSpec;
     use ::sql_fun_core::SqlDialect;
 
     #[rstest::rstest]
@@ -95,7 +96,7 @@ impl ConnectorSpec {
 
 #[cfg(test)]
 mod test_async_requirement {
-    use super::ConnectorSpec;
+    use crate::connectors::ConnectorSpec;
     use ::sql_fun_core::SqlDialect;
 
     #[test]
@@ -122,7 +123,7 @@ impl ConnectorSpec {
 
 #[cfg(test)]
 mod test_interrupt_attribute {
-    use super::ConnectorSpec;
+    use crate::connectors::ConnectorSpec;
     use ::sql_fun_core::SqlDialect;
 
     #[test]
@@ -290,7 +291,7 @@ impl TokioPostgresCodeGenerator {
 impl TokioPostgresCodeGenerator {
     fn builder_setter_calls(
         lockfile_entry: &LockfileStatement,
-        builder: &crate::row_builder::RowBuilder<'_>,
+        builder: &RowBuilder<'_>,
         result: &Ident,
     ) -> Vec<TokenStream> {
         let mut calls = Vec::new();
@@ -327,8 +328,7 @@ impl TokioPostgresCodeGenerator {
 
 #[cfg(test)]
 mod test_option_row_type {
-    use super::TokioPostgresCodeGenerator;
-    use crate::test_helpers::query_spec;
+    use crate::{connectors::TokioPostgresCodeGenerator, test_helpers::query_spec};
 
     #[rstest::rstest]
     #[case::option("Option<Row>", "Row")]
@@ -467,8 +467,7 @@ impl TokioPostgresCodeGenerator {
 
 #[cfg(test)]
 mod test_query_many_arguments {
-    use super::TokioPostgresCodeGenerator;
-    use crate::test_helpers::query_spec;
+    use crate::{connectors::TokioPostgresCodeGenerator, test_helpers::query_spec};
 
     #[rstest::rstest]
     #[case::inline("fn query<F: Fn(Vec<Row>, Row) -> Fut>(mut rows: Vec<Row>, handler: F) {}")]
@@ -556,7 +555,7 @@ impl TokioPostgresCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = spec.row_type();
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
+        let builder = RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
         let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder, &result);
@@ -622,7 +621,7 @@ impl TokioPostgresCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = Self::option_row_type(spec);
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
+        let builder = RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
         let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder, &result);
@@ -695,7 +694,7 @@ impl TokioPostgresCodeGenerator {
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let (collector, handler, row_type) = Self::query_many_arguments(spec)?;
         let row_type = &row_type;
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
+        let builder = RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
         let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder, &result);
@@ -827,8 +826,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function =
-                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
+            let function = QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -846,8 +844,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function =
-                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
+            let function = QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -865,8 +862,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function =
-                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
+            let function = QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -881,8 +877,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function =
-                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
+            let function = QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -891,8 +886,10 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
 
 #[cfg(test)]
 mod test_statement_capability {
-    use super::{ConnectorCodeGenerator, TokioPostgresCodeGenerator};
-    use crate::test_helpers::query_spec;
+    use crate::{
+        connectors::{ConnectorCodeGenerator, TokioPostgresCodeGenerator},
+        test_helpers::query_spec,
+    };
     use ::sql_fun_core::lockfile::{LockfileEntry, LockfileStatement};
 
     #[test]
@@ -932,7 +929,7 @@ impl RusqliteCodeGenerator {
 impl RusqliteCodeGenerator {
     fn builder_setter_calls(
         lockfile_entry: &LockfileStatement,
-        builder: &crate::row_builder::RowBuilder<'_>,
+        builder: &RowBuilder<'_>,
         result: &Ident,
     ) -> Vec<TokenStream> {
         let mut calls = Vec::new();
@@ -1031,7 +1028,7 @@ impl RusqliteCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = spec.row_type();
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
+        let builder = RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
         let setters = Self::builder_setter_calls(lockfile_entry, &builder, &result);
@@ -1072,7 +1069,7 @@ impl RusqliteCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = TokioPostgresCodeGenerator::option_row_type(spec);
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
+        let builder = RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
         let setters = Self::builder_setter_calls(lockfile_entry, &builder, &result);
@@ -1116,7 +1113,7 @@ impl RusqliteCodeGenerator {
         let (collector, handler, row_type) =
             TokioPostgresCodeGenerator::query_many_arguments(spec)?;
         let row_type = &row_type;
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
+        let builder = RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
         let setters = Self::builder_setter_calls(lockfile_entry, &builder, &result);
@@ -1178,7 +1175,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::QueryRequirement::emit_stub_function(
+            let function = QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -1200,7 +1197,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::QueryRequirement::emit_stub_function(
+            let function = QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -1222,7 +1219,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::QueryRequirement::emit_stub_function(
+            let function = QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -1241,7 +1238,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::QueryRequirement::emit_stub_function(
+            let function = QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -1257,7 +1254,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
 // contract, so SQL/query expansion can evolve independently of Rust value sources.
 // execute_sql is only the final SQL literal; bind_parameters is the binding contract.
 fn parameters(
-    bindings: &crate::rust_syn::ParameterBindings,
+    bindings: &ParameterBindings,
     lockfile_entry: &LockfileStatement,
 ) -> Vec<TokenStream> {
     lockfile_entry
@@ -1269,8 +1266,7 @@ fn parameters(
 
 #[cfg(test)]
 mod test_parameters {
-    use super::parameters;
-    use crate::{rust_syn::ItemFunction, test_helpers::lockfile_entry};
+    use crate::{connectors::parameters, rust_syn::ItemFunction, test_helpers::lockfile_entry};
 
     #[test]
     fn follows_lockfile_order_without_inspecting_sql() {

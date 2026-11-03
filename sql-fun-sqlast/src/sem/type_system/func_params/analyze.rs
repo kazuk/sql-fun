@@ -1,3 +1,4 @@
+use crate::{ast::FunctionParameter as AstFunctionParameter, syn::FunctionParameter};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -15,14 +16,13 @@ impl FunctionParam {
     /// Returns [`AnalysisError`] when the function parameter mode or type is missing or invalid.
     pub fn analyze<TParseContext>(
         context: TParseContext,
-        param: crate::syn::FunctionParameter,
+        param: FunctionParameter,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::FunctionParameter::try_from_with_tokens(&param, tokens)?
-            .resolve_and_report(context)
+        AstFunctionParameter::try_from_with_tokens(&param, tokens)?.resolve_and_report(context)
     }
 }
 
@@ -77,7 +77,7 @@ impl super::FunctionParam {
     ///
     /// Returns [`AnalysisError`] when the parameter is missing its type or uses an invalid identifier.
     pub fn analyze_as_column_definition(
-        param: &crate::syn::FunctionParameter,
+        param: &FunctionParameter,
     ) -> Result<ColumnDefinition, AnalysisError> {
         let Some(arg_type) = param.get_arg_type().as_inner() else {
             AnalysisError::raise_unexpected_none("functionparameter.arg_type")?
@@ -97,7 +97,7 @@ impl super::FunctionParam {
     /// # Errors
     ///
     /// Returns [`AnalysisError`] when the parameter mode is missing.
-    pub fn is_output_param(param: &crate::syn::FunctionParameter) -> Result<bool, AnalysisError> {
+    pub fn is_output_param(param: &FunctionParameter) -> Result<bool, AnalysisError> {
         let Some(mode) = param.get_mode().as_inner() else {
             AnalysisError::raise_unexpected_none("functionparameter.mode")?
         };

@@ -26,42 +26,42 @@ mod truth_test;
 mod update;
 mod values;
 mod view;
-pub use self::alter_column::{AlterColumnProblem, ColumnAttributeProblem};
-pub use self::array::ArrayProblem;
-pub use self::call_argument::CallArgumentProblem;
-pub use self::collate::CollateProblem;
-pub use self::creation::CreationProblem;
-pub use self::delete::{
-    CursorNameProblem, CursorTargetMismatchProblem, DeleteProblem, DeleteProblemKind,
+pub use self::{
+    alter_column::{AlterColumnProblem, ColumnAttributeProblem},
+    array::ArrayProblem,
+    call_argument::CallArgumentProblem,
+    collate::CollateProblem,
+    creation::CreationProblem,
+    delete::{CursorNameProblem, CursorTargetMismatchProblem, DeleteProblem, DeleteProblemKind},
+    distinct::DistinctProblem,
+    engine_version::EngineVersionProblem,
+    facts::{
+        ArgumentBindingCollection, ExpressionList, OperatorDefinition, OperatorSignature,
+        OptionalExpression, SemScalarExpr, TypeList,
+    },
+    index::{IndexProblem, IndexProblemKind},
+    insert::{InsertProblem, InsertProblemKind},
+    membership::MembershipProblem,
+    min_max::MinMaxProblem,
+    name_resolution::{DomainBaseTypeNameNotFound, FunctionNotFound, NameResolution},
+    overload_resolution::OverloadResolution,
+    ownership::OwnershipProblem,
+    parameter_constraint::ParameterConstraintProblem,
+    query::QueryProblem,
+    rule::{RuleDefinitionProblem, RuleProblem},
+    table_function::TableFunctionProblem,
+    table_sample::TableSampleProblem,
+    trigger::TriggerProblem,
+    truth_test::TruthTestProblem,
+    update::{UpdateProblem, UpdateProblemKind},
+    values::{
+        AExprKind, AliasName, ColumnName, CteName, DebugName, DefElemKey, DiagnosticLabel,
+        DiagnosticMetadata, DiagnosticSeverity, FullName, Kind, OperatorName, OwnershipIdentity,
+        OwnershipLookup, RuleIdentity, StringSpan, TableName, TriggerIdentity, TypeDefinition,
+        TypeName, TypeReference, ViewName,
+    },
+    view::ViewProblem,
 };
-pub use self::distinct::DistinctProblem;
-pub use self::engine_version::EngineVersionProblem;
-pub use self::facts::{
-    ArgumentBindingCollection, ExpressionList, OperatorDefinition, OperatorSignature,
-    OptionalExpression, SemScalarExpr, TypeList,
-};
-pub use self::index::{IndexProblem, IndexProblemKind};
-pub use self::insert::{InsertProblem, InsertProblemKind};
-pub use self::membership::MembershipProblem;
-pub use self::min_max::MinMaxProblem;
-pub use self::name_resolution::{DomainBaseTypeNameNotFound, FunctionNotFound, NameResolution};
-pub use self::overload_resolution::OverloadResolution;
-pub use self::ownership::OwnershipProblem;
-pub use self::parameter_constraint::ParameterConstraintProblem;
-pub use self::query::QueryProblem;
-pub use self::rule::{RuleDefinitionProblem, RuleProblem};
-pub use self::table_function::TableFunctionProblem;
-pub use self::table_sample::TableSampleProblem;
-pub use self::trigger::TriggerProblem;
-pub use self::truth_test::TruthTestProblem;
-pub use self::update::{UpdateProblem, UpdateProblemKind};
-pub use self::values::{
-    AExprKind, AliasName, ColumnName, CteName, DebugName, DefElemKey, DiagnosticLabel,
-    DiagnosticMetadata, DiagnosticSeverity, FullName, Kind, OperatorName, OwnershipIdentity,
-    OwnershipLookup, RuleIdentity, StringSpan, TableName, TriggerIdentity, TypeDefinition,
-    TypeName, TypeReference, ViewName,
-};
-pub use self::view::ViewProblem;
 /// Explanatory text available for every semantic diagnostic, without source labels.
 pub trait DiagnosticMessage {
     /// Describe the problem using the facts retained by its semantic payload.
@@ -687,7 +687,11 @@ fn undefined_operator_message(
 
 #[cfg(test)]
 mod diagnostic_message_tests {
-    use super::{AExprKind, AnalysisProblem, DiagnosticMessage, RuleProblem, TriggerProblem};
+    use crate::analysis_problem::SemScalarExpr;
+
+    use crate::analysis_problem::{
+        AExprKind, AnalysisProblem, DiagnosticMessage, RuleProblem, TriggerProblem,
+    };
 
     #[test]
     fn unresolved_binding_messages_agree_and_remain_errors() {
@@ -719,8 +723,8 @@ mod diagnostic_message_tests {
         let problem = AnalysisProblem::undefined_operator(
             AExprKind::new("operator"),
             "+",
-            Some(super::SemScalarExpr::new("literal", None, Some(true))),
-            None::<super::SemScalarExpr>,
+            Some(SemScalarExpr::new("literal", None, Some(true))),
+            None::<SemScalarExpr>,
         );
 
         assert_eq!(
@@ -962,12 +966,14 @@ impl AnalysisProblem {
 
 #[cfg(test)]
 mod coalesce_diagnostic_tests {
-    use super::{AnalysisProblem, DiagnosticSeverity};
+    use crate::analysis_problem::SemScalarExpr;
+
+    use crate::analysis_problem::{AnalysisProblem, DiagnosticSeverity};
 
     #[test]
     fn unreachable_argument_is_a_serializable_warning() {
-        let later = super::SemScalarExpr::new("literal", None, None);
-        let first = super::SemScalarExpr::new("literal", None, Some(true));
+        let later = SemScalarExpr::new("literal", None, None);
+        let first = SemScalarExpr::new("literal", None, Some(true));
         let problem = AnalysisProblem::unreachable_coalesce_argument(&later, &first);
         assert_eq!(problem.code(), "unreachable_coalesce_argument");
         assert_eq!(problem.severity(), DiagnosticSeverity::Warning);
@@ -981,7 +987,9 @@ mod coalesce_diagnostic_tests {
 
 #[cfg(test)]
 mod test_transport {
-    use super::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity, StringSpan};
+    use crate::analysis_problem::{
+        AnalysisProblem, DiagnosticMessage, DiagnosticSeverity, StringSpan,
+    };
 
     #[test]
     fn transports_typed_diagnostic_without_source_or_rendered_output() {

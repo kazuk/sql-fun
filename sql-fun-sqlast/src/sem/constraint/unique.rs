@@ -1,3 +1,4 @@
+use crate::{sem::ColumnRename, syn::Constraint as SynConstraint};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -17,7 +18,7 @@ pub struct UniqueConstraint {
 }
 
 impl UniqueConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             let mut keys: Vec<_> = self.keys.iter().cloned().collect();
             rename.rename_names(&mut keys);
@@ -75,7 +76,7 @@ where
     fn analyze(
         context: &mut TParseContext,
         target_table: Option<&TableName>,
-        constraint: crate::syn::Constraint,
+        constraint: SynConstraint,
     ) -> Result<Constraint, AnalysisError> {
         let name = constraint.get_conname();
         let Some(keys) = constraint

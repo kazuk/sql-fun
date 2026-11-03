@@ -1,4 +1,4 @@
-use super::{DebugName, DiagnosticMessage, DiagnosticMetadata, TriggerIdentity};
+use crate::analysis_problem::{DebugName, DiagnosticMessage, DiagnosticMetadata, TriggerIdentity};
 /// Structured trigger-definition validation failure.
 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
@@ -62,7 +62,7 @@ impl TriggerProblem {
 
 #[cfg(test)]
 mod metadata_tests {
-    use super::TriggerProblem;
+    use crate::analysis_problem::trigger::TriggerProblem;
 
     #[rstest::rstest]
     #[case::missing(

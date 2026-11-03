@@ -1,4 +1,4 @@
-use super::{ColumnName, DiagnosticMetadata, DiagnosticSeverity, TableName};
+use crate::analysis_problem::{ColumnName, DiagnosticMetadata, DiagnosticSeverity, TableName};
 
 /// A completed ALTER COLUMN binding or validation outcome.
 #[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]

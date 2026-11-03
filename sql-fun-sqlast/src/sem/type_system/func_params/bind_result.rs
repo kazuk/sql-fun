@@ -1,10 +1,14 @@
-use crate::sem::{
-    FunctionParam, ParseContext, TypeReference,
-    type_system::{
-        CommonInferContext, SimpleInferContext, TypeError,
-        func_params::{
-            in_out_param::FunctionParamInOut, in_param::FunctionParamIn,
-            variadic_param::FunctionParamVariadic,
+use crate::{
+    context::BaseParseContext,
+    sem::{
+        FunctionParam, ParseContext, TypeReference,
+        overload_rank::OverloadRank,
+        type_system::{
+            CommonInferContext, SimpleInferContext, TypeError,
+            func_params::{
+                in_out_param::FunctionParamInOut, in_param::FunctionParamIn,
+                variadic_param::FunctionParamVariadic,
+            },
         },
     },
 };
@@ -78,9 +82,9 @@ impl ParameterBindResult {
 
     pub(crate) fn overload_rank(
         &self,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
         declaration: &Self,
-    ) -> Option<crate::sem::overload_rank::OverloadRank> {
+    ) -> Option<OverloadRank> {
         use crate::sem::overload_rank::OverloadRank;
         let declared_target = declaration.call_argument_type();
         match self {
@@ -136,7 +140,7 @@ impl ParameterBindResult {
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         match self {
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
@@ -153,7 +157,7 @@ impl ParameterBindResult {
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
-        catalog: &impl crate::context::BaseParseContext,
+        catalog: &impl BaseParseContext,
     ) -> Result<(), TypeError> {
         match self {
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
@@ -174,7 +178,7 @@ impl ParameterBindResult {
         self.test_catalog_castability(context)
     }
 
-    pub(crate) fn test_catalog_castability<TCatalog: crate::context::BaseParseContext>(
+    pub(crate) fn test_catalog_castability<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<i32, TypeError> {
@@ -188,12 +192,11 @@ impl ParameterBindResult {
 
 #[cfg(test)]
 mod test_parameter_bind_result {
-    use crate::sem::type_system::func_params::bind_result::ParameterBindResult;
     use crate::sem::{
         SemScalarExpr, TypeReference,
         type_system::func_params::{
-            in_out_param::FunctionParamInOut, in_param::FunctionParamIn,
-            variadic_param::FunctionParamVariadic,
+            bind_result::ParameterBindResult, in_out_param::FunctionParamInOut,
+            in_param::FunctionParamIn, variadic_param::FunctionParamVariadic,
         },
     };
 

@@ -1,4 +1,4 @@
-use super::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
+use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
 
 /// Invalid input to a `PostgreSQL` truth predicate.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -48,7 +48,7 @@ impl DiagnosticMessage for TruthTestProblem {
 
 #[cfg(test)]
 mod message_tests {
-    use super::{DiagnosticMessage, TruthTestProblem};
+    use crate::analysis_problem::truth_test::{DiagnosticMessage, TruthTestProblem};
 
     #[test]
     fn quotes_the_literal_value_without_rust_debug_escapes() {

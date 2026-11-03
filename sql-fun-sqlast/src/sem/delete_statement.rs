@@ -3,19 +3,26 @@ mod destination;
 mod row;
 mod view_support;
 
-pub use self::cursor::DeleteCursor;
-pub(crate) use self::cursor::DeletePredicate;
-pub(crate) use self::destination::DeleteDestination;
-pub use self::row::{DeleteRowColumn, DeleteRowVersion};
-pub use self::view_support::ViewDeleteSupport;
+pub use self::{
+    cursor::DeleteCursor,
+    row::{DeleteRowColumn, DeleteRowVersion},
+    view_support::ViewDeleteSupport,
+};
+pub(crate) use self::{cursor::DeletePredicate, destination::DeleteDestination};
 
-use crate::ast::TryFromWithTokens;
-use crate::sem::traversal::SemanticVisitorMut;
 use crate::{
+    CacheContext,
+    ast::{Delete, Dialect, StatementNode},
+    sem::{AccessKind, traversal::SemanticVisitor},
+    syn::DeleteStmt,
+};
+
+use crate::{
+    ast::TryFromWithTokens,
     names::TableName,
     sem::{
         AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection, SemAst,
-        SemScalarExpr,
+        SemScalarExpr, traversal::SemanticVisitorMut,
     },
 };
 
@@ -135,10 +142,7 @@ impl DeleteStatement {
         visitor.leave_dml();
         result
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_dml();
         visitor.enter_query();
         let result = self.visit_body(visitor);
@@ -158,25 +162,19 @@ impl DeleteStatement {
         visitor.dml_returning(&mut self.returning)?;
         Ok(())
     }
-    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_action(
-            self.target.full_name(),
-            crate::sem::AccessKind::delete_rows(),
-        );
-        visitor.access_purpose(crate::sem::AccessKind::delete_source());
+    fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_action(self.target.full_name(), AccessKind::delete_rows());
+        visitor.access_purpose(AccessKind::delete_source());
         visitor.table_binding(&self.target);
         for cte in &self.with {
             cte.visit(visitor)?;
         }
         self.from.visit(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::delete_filter());
+        visitor.access_purpose(AccessKind::delete_filter());
         if let Some(predicate) = &self.predicate {
             predicate.visit(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::delete_returning());
+        visitor.access_purpose(AccessKind::delete_returning());
         visitor.dml_returning(&self.returning)?;
         Ok(())
     }
@@ -189,11 +187,11 @@ impl DeleteStatement {
 pub fn analyze_delete_statement<T: ParseContext>(
     mut context: T,
     _parent_schema: &Option<String>,
-    syn: crate::syn::DeleteStmt,
+    syn: DeleteStmt,
 ) -> Result<(SemAst, T), AnalysisError> {
-    AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
-    let syntax = crate::ast::Delete::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = crate::ast::StatementNode::Delete(syntax)
-        .resolve(&mut context, &mut crate::CacheContext::new())?;
+    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+    let syntax = Delete::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
+    let statement =
+        StatementNode::Delete(syntax).resolve(&mut context, &mut CacheContext::new())?;
     Ok((statement, context))
 }

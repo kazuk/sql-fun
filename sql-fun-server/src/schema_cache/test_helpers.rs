@@ -1,4 +1,7 @@
-use super::{SchemaCacheService, SchemaSelection};
+use crate::{
+    Api,
+    schema_cache::{InitializedSchema, SchemaCacheService, SchemaContextKey, SchemaSelection},
+};
 use ::sql_fun_core::{Hasher, SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 use std::{
     collections::HashMap,
@@ -16,7 +19,7 @@ impl SchemaProject {
     pub(crate) async fn initialized_schema(
         &self,
         service: &SchemaCacheService,
-    ) -> std::sync::Arc<super::InitializedSchema> {
+    ) -> std::sync::Arc<InitializedSchema> {
         let dump = self.schema(
             "registry.sql",
             "CREATE TABLE retained (id int4, value int4);",
@@ -159,7 +162,7 @@ connector = 'orders-connector'
         SchemaSelection::new(datasource, &args, &metadata, extensions, dump, expected).unwrap()
     }
     pub(super) fn schema_environment(&self) -> (SqlFunArgs, SqlFunMetadata) {
-        super::SchemaCacheService::schema_environment(
+        SchemaCacheService::schema_environment(
             self.home(),
             &"17".parse().unwrap(),
             &["public".to_owned()],
@@ -182,8 +185,8 @@ connector = 'orders-connector'
     pub(super) fn builtin_sql(&self) -> PathBuf {
         self.home().join("postgres/17/schema.sql")
     }
-    pub(super) fn builtin_key(&self) -> super::SchemaContextKey {
-        super::SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None)
+    pub(super) fn builtin_key(&self) -> SchemaContextKey {
+        SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()], None)
             .layer(
                 &Self::hash(&self.builtin_sql()),
                 &self.builtin_sql().canonicalize().unwrap(),
@@ -198,19 +201,19 @@ connector = 'orders-connector'
 /// A synchronized synthetic root load, used to test cancellation at the RPC
 /// boundary without delays or a full builtin catalog.
 pub(crate) struct SuspendedRoot {
-    api: std::sync::Arc<crate::Api>,
+    api: std::sync::Arc<Api>,
     home: PathBuf,
-    key: super::SchemaContextKey,
+    key: SchemaContextKey,
     resume: ::tokio::sync::oneshot::Sender<()>,
     task: ::tokio::task::JoinHandle<()>,
 }
 
 impl SchemaProject {
-    pub(crate) async fn suspend_root(&self, api: &std::sync::Arc<crate::Api>) -> SuspendedRoot {
+    pub(crate) async fn suspend_root(&self, api: &std::sync::Arc<Api>) -> SuspendedRoot {
         let home = self.home().to_path_buf();
         let version = "17".parse().unwrap();
         let search_path = vec!["public".to_owned()];
-        let key = super::SchemaContextKey::root(&version, &search_path, None);
+        let key = SchemaContextKey::root(&version, &search_path, None);
         let root =
             SchemaCacheService::load_root(&home, &version, &search_path, None, &key).unwrap();
         let (resume, resumed) = ::tokio::sync::oneshot::channel();

@@ -1,7 +1,11 @@
-use crate::sem::scalar_expr::indirect::IndirectionExpr;
 use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
-    syn::{Opt, ScanToken},
+    sem::{
+        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::indirect::IndirectionExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
+    },
+    syn::{AIndices, Node, Opt, ScanToken},
 };
 
 use ::sql_fun_core::IVec;
@@ -64,7 +68,7 @@ impl ArraySlice {
         Self::slice_resolved(array, lower, upper, context)
     }
 
-    pub(super) fn slice_resolved<TContext: crate::sem::ParseContext>(
+    pub(super) fn slice_resolved<TContext: ParseContext>(
         array: SemScalarExpr,
         lower: Option<SemScalarExpr>,
         upper: Option<SemScalarExpr>,
@@ -86,7 +90,7 @@ impl ArraySlice {
     fn analyze_index<TParseContext>(
         context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
-        index: crate::syn::Node,
+        index: Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
     where
@@ -104,7 +108,7 @@ impl ArraySlice {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         arg: SemScalarExpr,
-        indices: crate::syn::AIndices,
+        indices: AIndices,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
     where
@@ -122,28 +126,25 @@ impl ArraySlice {
 }
 
 impl ArraySlice {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.array.walk(visitor)?;
-        crate::sem::traversal::optional(&mut self.lower, visitor)?;
-        crate::sem::traversal::optional(&mut self.upper, visitor)?;
+        optional(&mut self.lower, visitor)?;
+        optional(&mut self.upper, visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.array.visit(visitor)?;
-        crate::sem::traversal::visit_optional(&self.lower, visitor)?;
-        crate::sem::traversal::visit_optional(&self.upper, visitor)?;
+        visit_optional(&self.lower, visitor)?;
+        visit_optional(&self.upper, visitor)?;
         Ok(())
     }
 }
 
 impl ArraySlice {
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk_assignment_target<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -154,7 +155,7 @@ impl ArraySlice {
         }
         Ok(())
     }
-    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_assignment_target<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -170,8 +171,8 @@ impl ArraySlice {
 impl ArraySlice {
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> SemScalarExpr {
         let bounds: Vec<_> = self.lower.iter().chain(&self.upper).collect();
         let mut result = parameters.array_access(context, &self.array, &bounds, true);

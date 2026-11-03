@@ -1,7 +1,10 @@
 use crate::{
     context::ParseContext,
     names::{ColumnName, FullName},
-    sem::{AnalysisError, AnalysisProblem, QueryProblem, SemScalarExpr},
+    sem::{
+        AnalysisError, AnalysisProblem, QueryProblem, SemScalarExpr,
+        scalar_expr::column_ref::ColumnReferenceExpr,
+    },
 };
 
 /// A completed failed lookup retaining the logical relation qualifier and column.
@@ -92,7 +95,7 @@ impl QualifiedColumnFailure {
             failure.kind.problem(&format!("{qualifier}.{column}")),
         ))?;
         Ok(SemScalarExpr::column_reference(
-            super::ColumnReferenceExpr::qualified_failure(&failure),
+            ColumnReferenceExpr::qualified_failure(&failure),
         ))
     }
 

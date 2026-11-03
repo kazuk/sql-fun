@@ -1,3 +1,6 @@
+use crate::sem::ColumnRename;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::CollateColumnConstraint as SqliteCollateColumnConstraint;
 #[cfg(feature = "sqlite")]
 use sql_fun_core::IVec;
 
@@ -20,7 +23,7 @@ pub struct CollateColumnConstraint {
 }
 
 impl CollateColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -69,7 +72,7 @@ impl CollateColumnConstraint {
         mut context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::CollateColumnConstraint,
+        syn: &SqliteCollateColumnConstraint,
         _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where

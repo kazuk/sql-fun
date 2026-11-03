@@ -1,14 +1,15 @@
-use crate::ast::Dialect;
-use crate::test_helpers::TestParseContext;
 use crate::{
+    ast::Dialect,
     names::{ColumnName, FullName},
+    parse_statements,
     sem::{
         ColumnDefinition, CreateTableAs, CreateView, PgBuiltInType, SemAst, ViewLike,
         ViewMergeSupport, ViewMergeTriggers,
     },
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
-use super::test_helpers::{catalog, resolve};
+use crate::ast::document::merge::tests::test_helpers::{catalog, resolve};
 
 const VIEW_NAME: &str = "writable_items";
 
@@ -172,12 +173,12 @@ fn view_catalog(version: u32, support: &ViewMergeSupport) -> TestParseContext {
 }
 
 fn install_view(context: &mut TestParseContext, materialized: bool) {
-    let query = crate::parse_statements("SELECT id,label FROM items", Dialect::postgres())
+    let query = parse_statements("SELECT id,label FROM items", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
         .node
-        .resolve(context, &mut crate::test_helpers::create_cache_context())
+        .resolve(context, &mut create_cache_context())
         .unwrap()
         .into_select_statemtnt()
         .unwrap();

@@ -1,7 +1,7 @@
 use crate::{
     names::{AliasName, ColumnName, FullName},
     sem::{AnalysisError, ParseContext},
-    syn::ListOpt,
+    syn::{Alias, ListOpt},
 };
 
 use ::itertools::Itertools;
@@ -16,10 +16,7 @@ pub struct AliasSpec {
 }
 
 impl AliasSpec {
-    pub(crate) fn visible_column_names(
-        &self,
-        columns: &[crate::names::ColumnName],
-    ) -> Vec<crate::names::ColumnName> {
+    pub(crate) fn visible_column_names(&self, columns: &[ColumnName]) -> Vec<ColumnName> {
         columns
             .iter()
             .enumerate()
@@ -27,11 +24,7 @@ impl AliasSpec {
             .collect()
     }
 
-    pub(super) fn projection_name(
-        &self,
-        index: usize,
-        original: &crate::names::ColumnName,
-    ) -> crate::names::ColumnName {
+    pub(super) fn projection_name(&self, index: usize, original: &ColumnName) -> ColumnName {
         self.derived_column_at(index).unwrap_or(original).clone()
     }
 
@@ -75,7 +68,7 @@ impl AliasSpec {
     pub fn analyze<TParseContext>(
         context: TParseContext,
         rel_fullname: &FullName,
-        alias: &crate::syn::Alias,
+        alias: &Alias,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -107,7 +100,7 @@ impl AliasSpec {
     /// analyze Alias syn node without default alias name
     pub fn analyze_without_relname<TParseContext>(
         context: TParseContext,
-        alias: &crate::syn::Alias,
+        alias: &Alias,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -157,7 +150,7 @@ impl AliasSpec {
 
 #[cfg(test)]
 mod test_alias_provenance {
-    use super::AliasSpec;
+    use crate::sem::data_source::alias::AliasSpec;
 
     #[rstest::rstest]
     #[case::implicit(AliasSpec::from_local_name("t"), false)]

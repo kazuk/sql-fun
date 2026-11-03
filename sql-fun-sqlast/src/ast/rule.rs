@@ -1,12 +1,16 @@
 //! Context-free PostgreSQL rule syntax conversion, without writable-view analysis.
 
-use crate::ast::{
-    CreateRule, Expr, Name, Relation, RuleEvent, StatementNode, TryFromWithTokens,
-    TryFromWithTokensOpt,
+use crate::ast::{DropBehavior, DropRule, postgres::required};
+
+use crate::{
+    ast::{
+        CreateRule, Expr, Name, Relation, RuleEvent, StatementNode, TryFromWithTokens,
+        TryFromWithTokensOpt,
+    },
+    sem::AnalysisError,
+    syn,
+    syn::{ListOpt, Opt},
 };
-use crate::sem::AnalysisError;
-use crate::syn;
-use crate::syn::{ListOpt, Opt};
 
 use ::sql_fun_core::IVec;
 
@@ -17,7 +21,7 @@ impl TryFromWithTokens<&syn::RuleStmt> for CreateRule {
         value: &syn::RuleStmt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        let relation = super::postgres::required(value.get_relation().as_inner(), "rule target")?;
+        let relation = required(value.get_relation().as_inner(), "rule target")?;
         Ok(Self {
             name: Name::from_parts(&[value.get_rulename()]),
             relation: Relation::try_from(&relation)?,
@@ -79,7 +83,7 @@ impl TryFrom<Option<syn::CmdType>> for RuleEvent {
     }
 }
 
-impl TryFrom<&syn::DropStmt> for super::DropRule {
+impl TryFrom<&syn::DropStmt> for DropRule {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::DropStmt) -> Result<Self, Self::Error> {
@@ -106,7 +110,7 @@ impl TryFrom<&syn::DropStmt> for super::DropRule {
             name: Name::from_parts(&[name]),
             relation: Name::from_parts(&parts),
             if_exists: value.get_missing_ok(),
-            behavior: super::DropBehavior::try_from(value.get_behavior().as_inner())?,
+            behavior: DropBehavior::try_from(value.get_behavior().as_inner())?,
         })
     }
 }

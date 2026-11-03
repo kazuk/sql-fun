@@ -1,8 +1,16 @@
 //! End-to-end emission invariants, using the independent frontends and SQLite runtime.
-use crate::ast::{CteDefinition, Dialect, HaveWithClause, Statement};
+
+use crate::{
+    ast::{
+        CteDefinition, Dialect, Expr as AstExpr, HaveWithClause, Literal as AstLiteral, QueryBody,
+        Statement, StatementNode,
+    },
+    parse_statements,
+    test_helpers::{on_small_stack, small_stack_regression},
+};
 
 fn statement(sql: &str, dialect: Dialect) -> Statement {
-    crate::parse_statements(sql, dialect)
+    parse_statements(sql, dialect)
         .next()
         .expect("one statement")
         .expect(sql)
@@ -144,7 +152,7 @@ fn sqlite_executes_emitted_sql(#[case] sql: &str) {
 #[test]
 fn unsupported_node_is_structured_and_does_not_return_partial_sql() {
     let mut value = statement("alter table t add column x int", Dialect::postgres());
-    let crate::ast::StatementNode::AlterRelation(relation) = &mut value.node else {
+    let StatementNode::AlterRelation(relation) = &mut value.node else {
         panic!("alter fixture");
     };
     relation.commands = vec![crate::ast::AlterCommand::Unsupported(
@@ -162,14 +170,13 @@ fn unsupported_node_is_structured_and_does_not_return_partial_sql() {
 #[test]
 fn rejects_invalid_retained_literal_without_a_panic() {
     let mut value = statement("select 'valid'", Dialect::postgres());
-    let crate::ast::StatementNode::Query(query) = &mut value.node else {
+    let StatementNode::Query(query) = &mut value.node else {
         panic!("query fixture");
     };
-    let crate::ast::QueryBody::Select(select) = &mut query.body else {
+    let QueryBody::Select(select) = &mut query.body else {
         panic!("select fixture");
     };
-    select.targets[0].expression =
-        crate::ast::Expr::Literal(crate::ast::Literal::String("\0".to_owned()));
+    select.targets[0].expression = AstExpr::Literal(AstLiteral::String("\0".to_owned()));
     let error = value.deparse_sql(Dialect::postgres()).unwrap_err();
     assert!(error.is_invalid_syntax());
     assert!(!error.is_unsupported());
@@ -180,13 +187,13 @@ fn rejects_invalid_retained_literal_without_a_panic() {
 #[test]
 fn rejects_turso_array_extension_as_invalid_sqlite_syntax() {
     let mut value = statement("select 1", Dialect::sqlite());
-    let crate::ast::StatementNode::Query(query) = &mut value.node else {
+    let StatementNode::Query(query) = &mut value.node else {
         panic!("query fixture");
     };
-    let crate::ast::QueryBody::Select(select) = &mut query.body else {
+    let QueryBody::Select(select) = &mut query.body else {
         panic!("select fixture");
     };
-    select.targets[0].expression = crate::ast::Expr::Array(vec![crate::ast::Expr::Literal(
+    select.targets[0].expression = AstExpr::Array(vec![crate::ast::Expr::Literal(
         crate::ast::Literal::Integer(1),
     )]);
     let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
@@ -210,7 +217,7 @@ fn unavailable_dialect_has_its_own_classification() {
 #[cfg_attr(feature = "sqlite", case::sqlite_expression(Dialect::sqlite(), false))]
 #[cfg_attr(feature = "sqlite", case::sqlite_compound(Dialect::sqlite(), true))]
 fn emits_deep_owned_trees_on_small_stacks(#[case] dialect: Dialect, #[case] compound: bool) {
-    crate::test_helpers::small_stack_regression(512 * 1024, || {
+    small_stack_regression(512 * 1024, || {
         let sql = if compound {
             std::iter::repeat_n("SELECT 1", 40)
                 .collect::<Vec<_>>()
@@ -223,9 +230,9 @@ fn emits_deep_owned_trees_on_small_stacks(#[case] dialect: Dialect, #[case] comp
             format!("SELECT {expr}")
         };
         // Keep expression depth within the locked protobuf/frontend decoding limits.
-        let value = crate::test_helpers::on_small_stack(|| statement(&sql, dialect));
+        let value = on_small_stack(|| statement(&sql, dialect));
         let emitted = value.deparse_sql(dialect).unwrap();
-        let parsed = crate::test_helpers::on_small_stack(|| statement(&emitted, dialect));
+        let parsed = on_small_stack(|| statement(&emitted, dialect));
         assert_eq!(parsed.deparse_sql(dialect).unwrap(), emitted);
     });
 }

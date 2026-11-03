@@ -1,5 +1,4 @@
-use crate::context::BaseParseContext;
-use crate::{names::ColumnName, sem::PgBuiltInType};
+use crate::{context::BaseParseContext, names::ColumnName, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case("select q.ax as n from (a) as q", false, true)]
@@ -95,10 +94,12 @@ fn parenthesized_sources_report_duplicate_group_aliases() -> testresult::TestRes
 }
 
 mod test_helpers {
-    use crate::context::BaseParseContext;
+    use crate::AstAndContextPair;
+
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
     use crate::{
-        context::MutSourcePathWithSpan,
+        context::{BaseParseContext, MutSourcePathWithSpan},
         names::{ColumnName, SchemaName},
         sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SelectStatement, SemAst},
     };
@@ -146,7 +147,7 @@ mod test_helpers {
     pub(super) fn analyze(sql: &str) -> Result<(SelectStatement, TestParseContext), AnalysisError> {
         let context = selected_context();
         let statement = SqliteSynBuilder.parse_as_stmt(sql);
-        let crate::AstAndContextPair(ast, context) = SemAst::semantic_analysis_sqlite_stmt(
+        let AstAndContextPair(ast, context) = SemAst::semantic_analysis_sqlite_stmt(
             context,
             statement,
             &::sql_fun_core::IVec::default(),

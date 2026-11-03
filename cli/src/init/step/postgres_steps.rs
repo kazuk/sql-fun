@@ -1,5 +1,9 @@
-use super::{Direction, InitStep, StepFuture};
-use crate::init::{InitializationState, conversation::Conversation, flow};
+use crate::init::{
+    InitializationState,
+    conversation::Conversation,
+    flow,
+    step::{Direction, InitStep, StepFuture},
+};
 
 pub(in crate::init) struct PostgresSteps;
 impl InitStep for PostgresSteps {

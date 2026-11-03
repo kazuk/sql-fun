@@ -5,7 +5,7 @@ use crate::{
     sem::{CastDefinition, TypeReference},
 };
 
-use super::TestParseContext;
+use crate::test_helpers::test_parse_context::TestParseContext;
 
 impl TestParseContext {
     /// setup [CastInfoRead::get_implicit_cast] result

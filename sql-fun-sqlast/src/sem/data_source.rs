@@ -45,6 +45,11 @@ pub(crate) use self::{
     qualified::QualifiedSource,
 };
 
+use crate::sem::{
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+    with_stack,
+};
+
 use crate::{
     context::ParseContext,
     names::{AliasName, ColumnName},
@@ -87,7 +92,7 @@ pub enum DataSource {
 
 impl DataSource {
     pub(crate) fn projection_shape_is_resolved(&self) -> bool {
-        crate::sem::with_stack(|| match self {
+        with_stack(|| match self {
             Self::RangeTableSample(sample) => sample.source().projection_shape_is_resolved(),
             Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
             Self::DeferredTableFunc(source) => source.projection_shape_is_resolved(),
@@ -327,10 +332,10 @@ impl DataSource {
 }
 
 impl DataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         match self {
             Self::CteQuery(v) => v.walk(visitor)?,
             Self::Table(v) => v.walk(visitor)?,
@@ -348,10 +353,7 @@ impl DataSource {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::CteQuery(v) => v.visit(visitor)?,
             Self::Table(v) => v.visit(visitor)?,

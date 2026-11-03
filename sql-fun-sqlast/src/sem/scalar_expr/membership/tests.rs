@@ -1,5 +1,14 @@
-use crate::sem::{ParseContext, PgBuiltInType, SemScalarExpr};
-use crate::test_helpers::membership::{context, expression, query, schema};
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::membership::context_for;
+use crate::{
+    ast::Dialect,
+    parse_statements,
+    sem::{ParseContext, PgBuiltInType, SemScalarExpr},
+    test_helpers::{
+        create_cache_context,
+        membership::{composite_schema, context, expression, query, schema},
+    },
+};
 use std::collections::BTreeMap;
 
 #[rstest::rstest]
@@ -127,10 +136,7 @@ fn sqlite_membership_has_integer_result(
 ) -> testresult::TestResult {
     let db = ::rusqlite::Connection::open_in_memory()?;
     assert_eq!(db.query_row(sql, [], |row| row.get::<_, i64>(0))?, expected);
-    let (query, context) = query(
-        sql,
-        crate::test_helpers::membership::context_for(crate::ast::Dialect::sqlite()),
-    )?;
+    let (query, context) = query(sql, context_for(Dialect::sqlite()))?;
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
     Ok(())
@@ -143,7 +149,7 @@ fn deferred_star_validates_final_query_width(
     #[case] name: &str,
     #[case] valid: bool,
 ) -> testresult::TestResult {
-    let context = crate::test_helpers::membership::composite_schema()?;
+    let context = composite_schema()?;
     let (query, context) = query(
         &format!("SELECT 1 IN (SELECT ($1).*) AS result, take_{name}($1)"),
         context,
@@ -168,12 +174,12 @@ fn deferred_star_validates_final_query_width(
 
 #[test]
 fn rejection_does_not_stop_following_statement() -> testresult::TestResult {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context();
     let mut statements = Vec::new();
-    for statement in crate::parse_statements(
+    for statement in parse_statements(
         "SELECT 1 IN (SELECT 1,2); SELECT 1 IN (1)",
-        crate::ast::Dialect::postgres(),
+        Dialect::postgres(),
     ) {
         let analyzed = statement?.analyze(context, &mut cache_context)?;
         statements.push(analyzed.ast().clone().into_select_statemtnt().unwrap());
@@ -190,10 +196,7 @@ fn rejection_does_not_stop_following_statement() -> testresult::TestResult {
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_membership_does_not_impose_operand_affinity() -> testresult::TestResult {
-    let (_, context) = query(
-        "SELECT $1 IN ($2)",
-        crate::test_helpers::membership::context_for(crate::ast::Dialect::sqlite()),
-    )?;
+    let (_, context) = query("SELECT $1 IN ($2)", context_for(Dialect::sqlite()))?;
     assert!(context.parameter_constraints().allows(&BTreeMap::from([
         (1, PgBuiltInType::int4()),
         (2, PgBuiltInType::text())

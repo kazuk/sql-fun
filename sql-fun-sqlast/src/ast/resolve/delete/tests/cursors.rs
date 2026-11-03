@@ -1,19 +1,19 @@
-use super::test_helpers::catalog;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::test_helpers::TestParseContext;
 use crate::{
+    ast::{Dialect, Expr, StatementNode, resolve::delete::tests::test_helpers::catalog},
+    context::ParseContext,
     names::{FullName, TableName},
+    parse_statements,
     sem::{CursorInfo, SemAst},
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {
-    crate::parse_statements(sql, Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
         .node
-        .resolve(context, &mut crate::test_helpers::create_cache_context())
+        .resolve(context, &mut create_cache_context())
         .unwrap()
 }
 
@@ -175,26 +175,23 @@ fn portal_names_follow_identifier_rules(
 #[test]
 fn retains_unsupported_procedural_cursor_parameter() {
     let mut context = catalog(Dialect::postgres());
-    let mut statement = crate::parse_statements(
+    let mut statement = parse_statements(
         "DELETE FROM items WHERE CURRENT OF portal",
         Dialect::postgres(),
     )
     .next()
     .unwrap()
     .unwrap();
-    let crate::ast::StatementNode::Delete(delete) = &mut statement.node else {
+    let StatementNode::Delete(delete) = &mut statement.node else {
         panic!("DELETE")
     };
-    let Some(crate::ast::Expr::CurrentOf(cursor)) = &mut delete.predicate else {
+    let Some(Expr::CurrentOf(cursor)) = &mut delete.predicate else {
         panic!("CURRENT OF")
     };
     cursor.parameter = 3;
     let result = statement
         .node
-        .resolve(
-            &mut context,
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .resolve(&mut context, &mut create_cache_context())
         .unwrap();
     assert_eq!(
         result

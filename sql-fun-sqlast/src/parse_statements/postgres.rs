@@ -1,10 +1,14 @@
 mod boundaries;
 
-use crate::ast::{Dialect, Statement, StatementNode, TryFromWithTokens};
-use crate::parse_statements::ParseStatementError;
-use crate::sem::AnalysisError;
-use crate::syn::{ListOpt, Opt, ParseResult};
-use crate::{PostgresDialect, StringSpan};
+use crate::{ast::StatementKind, parse_statements::postgres::boundaries::discover};
+
+use crate::{
+    PostgresDialect, StringSpan,
+    ast::{Dialect, Statement, StatementNode, TryFromWithTokens},
+    parse_statements::ParseStatementError,
+    sem::AnalysisError,
+    syn::{ListOpt, Opt, ParseResult},
+};
 
 use std::vec::IntoIter;
 
@@ -17,7 +21,7 @@ pub(super) fn parse(
 ) -> impl Iterator<Item = Result<Statement, ParseStatementError>> + '_ {
     PostgresStatements {
         sql,
-        ranges: self::boundaries::discover(sql).into_iter(),
+        ranges: discover(sql).into_iter(),
     }
 }
 
@@ -51,6 +55,8 @@ impl std::iter::FusedIterator for PostgresStatements<'_> {}
 
 #[cfg(test)]
 mod test_postgres_statements {
+    use crate::parse_statements::postgres::parse as postgres_parse;
+
     #[rstest::rstest]
     #[case::empty("")]
     #[case::whitespace(" \t\n")]
@@ -67,7 +73,7 @@ mod test_postgres_statements {
     #[case::dollar_quote("SELECT $body$first;second$body$; SELECT 2;")]
     #[case::comment("SELECT 1 /* ; */; -- ;\nSELECT 2;")]
     fn preserves_quoted_and_commented_semicolons(#[case] sql: &str) {
-        let mut statements = super::parse(sql);
+        let mut statements = postgres_parse(sql);
         assert!(
             statements
                 .next()
@@ -89,7 +95,7 @@ mod test_postgres_statements {
     fn preserves_dollar_quoted_function_body() {
         let sql =
             "CREATE FUNCTION sample() RETURNS integer AS $$ SELECT 1; $$ LANGUAGE SQL; SELECT 2;";
-        let mut statements = super::parse(sql);
+        let mut statements = postgres_parse(sql);
         assert!(statements.next().expect("function statement").is_ok());
         assert!(
             statements
@@ -105,7 +111,7 @@ mod test_postgres_statements {
     #[case::unterminated_string("SELECT 1; SELECT 'unfinished")]
     #[case::nul_byte("SELECT 1; SELECT '\0'; SELECT 3;")]
     fn yields_a_single_error_when_syntax_prevents_splitting(#[case] sql: &str) {
-        let mut statements = super::parse(sql);
+        let mut statements = postgres_parse(sql);
         let error = statements.next().expect("syntax error").unwrap_err();
         assert!(error.is_syntax());
         assert!(error.is_boundary_discovery());
@@ -119,7 +125,7 @@ mod test_postgres_statements {
     fn statements_outlive_the_input_and_iterator() {
         let statement = {
             let sql = String::from("SELECT 'owned text'");
-            super::parse(&sql).next().expect("statement").unwrap()
+            postgres_parse(&sql).next().expect("statement").unwrap()
         };
         assert!(statement.is_query());
     }
@@ -144,17 +150,17 @@ fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatem
     let statement = StatementNode::try_from_with_tokens(&node, &tokens).map_err(|error| {
         let failure = ParseStatementError::conversion(span, &error);
         if node.as_select_stmt().as_inner().is_some() {
-            failure.with_statement_kind(crate::ast::StatementKind::query())
+            failure.with_statement_kind(StatementKind::query())
         } else if node.as_insert_stmt().as_inner().is_some() {
-            failure.with_statement_kind(crate::ast::StatementKind::insert())
+            failure.with_statement_kind(StatementKind::insert())
         } else if node.as_update_stmt().as_inner().is_some() {
-            failure.with_statement_kind(crate::ast::StatementKind::update())
+            failure.with_statement_kind(StatementKind::update())
         } else if node.as_delete_stmt().as_inner().is_some() {
-            failure.with_statement_kind(crate::ast::StatementKind::delete())
+            failure.with_statement_kind(StatementKind::delete())
         } else if node.as_merge_stmt().as_inner().is_some() {
-            failure.with_statement_kind(crate::ast::StatementKind::merge())
+            failure.with_statement_kind(StatementKind::merge())
         } else if node.as_truncate_stmt().as_inner().is_some() {
-            failure.with_statement_kind(crate::ast::StatementKind::truncate())
+            failure.with_statement_kind(StatementKind::truncate())
         } else {
             failure
         }
@@ -164,11 +170,13 @@ fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatem
 
 #[cfg(test)]
 mod test_parse_statement {
+    use crate::{StringSpan, parse_statements::postgres::parse_statement};
+
     #[rstest::rstest]
     #[case::multiple("SELECT 1; SELECT 2;")]
     #[case::no_statement("/* no statement */")]
     fn rejects_a_range_without_exactly_one_statement(#[case] sql: &str) {
-        let error = super::parse_statement(sql, crate::StringSpan::new(0, sql.len())).unwrap_err();
+        let error = parse_statement(sql, StringSpan::new(0, sql.len())).unwrap_err();
         assert!(error.is_boundary_discovery());
         assert!(!error.is_recoverable());
         assert_eq!(error.span().get_from(sql), Some(sql));

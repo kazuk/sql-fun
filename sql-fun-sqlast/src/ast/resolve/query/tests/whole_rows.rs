@@ -462,6 +462,15 @@ fn scalar_source_fields_do_not_make_a_composite(#[case] sql: &str, #[case] code:
 
 mod test_helpers {
     use crate::{
+        StringSpan,
+        ast::resolve::query::test_helpers::catalog,
+        context::{MutSourcePathWithSpan, SchemaFileContext},
+        parse_statements,
+        sem::{AnalysisError, CastContext, CastDefinition, SourcePathWithSpan},
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
         ast::{Dialect, StatementNode},
         context::ParseContext,
         names::FullName,
@@ -484,10 +493,7 @@ mod test_helpers {
         #[derive(Default)]
         struct RowReferences(Vec<usize>);
         impl crate::sem::traversal::SemanticVisitorMut for RowReferences {
-            fn expression(
-                &mut self,
-                value: &mut SemScalarExpr,
-            ) -> Result<(), crate::sem::AnalysisError> {
+            fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
                 if let Some(row) = value.as_whole_row() {
                     self.0.push(row.levels_up().unwrap());
                 }
@@ -506,16 +512,16 @@ mod test_helpers {
             .expression()
             .unwrap()
     }
-    pub(super) fn view_query(sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
+    pub(super) fn view_query(sql: &str) -> (SelectStatement, SchemaFileContext) {
         schema_query("CREATE VIEW v AS SELECT 1 AS n", sql)
     }
-    pub(super) fn alias_query(sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
+    pub(super) fn alias_query(sql: &str) -> (SelectStatement, SchemaFileContext) {
         schema_query(
             "CREATE VIEW v AS SELECT 1 AS n; CREATE TABLE t(n integer NOT NULL); CREATE VIEW w AS SELECT 1 AS n, 'a'::text AS label; CREATE VIEW nested AS SELECT identity_v(v.*) AS payload FROM v",
             sql,
         )
     }
-    pub(super) fn assert_catalog_view_field(context: &crate::context::SchemaFileContext) {
+    pub(super) fn assert_catalog_view_field(context: &SchemaFileContext) {
         let ty = TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
         let columns = ty.row_columns(context).unwrap();
         assert!(
@@ -534,18 +540,16 @@ mod test_helpers {
                 .is_none()
         );
     }
-    fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, crate::context::SchemaFileContext) {
+    fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, SchemaFileContext) {
         use crate::context::BaseParseContext;
-        let mut cache_context = crate::test_helpers::create_cache_context();
-        let mut base = super::super::super::test_helpers::catalog();
+        let mut cache_context = create_cache_context();
+        let mut base = catalog();
         let nominal =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
         base.set_get_implicit_cast_result(
             &nominal,
             &nominal,
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::no_conversion(),
-            )),
+            Some(CastDefinition::new(CastContext::no_conversion())),
         );
         base.setup_function(
             "identity_v",
@@ -558,20 +562,17 @@ mod test_helpers {
         );
         let args = base.get_args().clone();
         let metadata = base.metadata().clone();
-        let mut context = crate::context::SchemaFileContext::new(
+        let mut context = SchemaFileContext::new(
             std::path::Path::new("whole_rows.sql"),
             &base.freeze(),
             &args,
             &metadata,
         );
-        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
+        MutSourcePathWithSpan::set_source_path_with_span(
             &mut context,
-            &crate::sem::SourcePathWithSpan::new(
-                "whole_rows.sql",
-                &crate::StringSpan::new(0, ddl.len()),
-            ),
+            &SourcePathWithSpan::new("whole_rows.sql", &StringSpan::new(0, ddl.len())),
         );
-        for statement in crate::parse_statements(ddl, Dialect::postgres()) {
+        for statement in parse_statements(ddl, Dialect::postgres()) {
             context = statement
                 .unwrap()
                 .analyze(context, &mut cache_context)
@@ -584,7 +585,7 @@ mod test_helpers {
         let row_type =
             TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
         assert!(row_type.row_columns(&context).is_some());
-        let statement = crate::parse_statements(sql, Dialect::postgres())
+        let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap();
@@ -593,19 +594,18 @@ mod test_helpers {
         };
         context.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut context, None);
-        let result = context
-            .infer_query_parameter_types(result, &mut crate::test_helpers::create_cache_context());
+        let result = context.infer_query_parameter_types(result, &mut create_cache_context());
         let query = context.finish_analysis(result).unwrap();
         (query, context)
     }
     pub(super) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
-        let mut cache_context = crate::test_helpers::create_cache_context();
-        let mut context = super::super::super::test_helpers::catalog();
+        let mut cache_context = create_cache_context();
+        let mut context = catalog();
         for ddl in [
             "CREATE TABLE pg_catalog.pg_attribute(n integer)",
             "CREATE TABLE pg_catalog.pg_type(n integer)",
         ] {
-            context = crate::parse_statements(ddl, Dialect::postgres())
+            context = parse_statements(ddl, Dialect::postgres())
                 .next()
                 .unwrap()
                 .unwrap()
@@ -673,7 +673,7 @@ mod test_helpers {
                 false,
             )],
         );
-        let statement = crate::parse_statements(sql, Dialect::postgres())
+        let statement = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap();
@@ -682,8 +682,7 @@ mod test_helpers {
         };
         context.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut context, None);
-        let result = context
-            .infer_query_parameter_types(result, &mut crate::test_helpers::create_cache_context());
+        let result = context.infer_query_parameter_types(result, &mut create_cache_context());
         let query = context.finish_analysis(result).unwrap();
         (query, context)
     }

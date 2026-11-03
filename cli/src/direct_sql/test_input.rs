@@ -1,4 +1,4 @@
-use super::{
+use crate::direct_sql::{
     expectation::Expectation,
     input::{SqlInputs, load_value},
 };
@@ -77,7 +77,7 @@ impl TestInputs {
 
 #[cfg(test)]
 mod tests {
-    use super::TestInputs;
+    use crate::direct_sql::test_input::TestInputs;
 
     #[rstest::rstest]
     #[case::empty("[]")]
@@ -123,8 +123,7 @@ mod tests {
 
 #[cfg(test)]
 mod test_selection {
-    use super::TestInputs;
-    use crate::test_helpers::direct_sql::StructuredFile;
+    use crate::{direct_sql::test_input::TestInputs, test_helpers::direct_sql::StructuredFile};
 
     #[rstest::rstest]
     fn selected_cases_use_existing_structured_formats(

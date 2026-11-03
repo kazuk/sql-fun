@@ -1,11 +1,14 @@
+use crate::TcpJsonRpcClientAsync;
 use ::serde_json::Value;
-use ::tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use ::tokio::net::{TcpListener, TcpStream};
+use ::tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::{TcpListener, TcpStream},
+};
 
 /// A bounded wire peer for token-specific continuation and release failures.
 /// Uses the real client worker without starting a service or loading a catalog.
 pub(super) struct TokenPeer {
-    client: crate::TcpJsonRpcClientAsync,
+    client: TcpJsonRpcClientAsync,
     task: ::tokio::task::JoinHandle<usize>,
 }
 impl TokenPeer {
@@ -58,12 +61,11 @@ impl TokenPeer {
             releases
         });
         let client =
-            crate::TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await.unwrap())
-                .unwrap();
+            TcpJsonRpcClientAsync::try_from(TcpStream::connect(address).await.unwrap()).unwrap();
         Self { client, task }
     }
 
-    pub(super) fn client(&mut self) -> &mut crate::TcpJsonRpcClientAsync {
+    pub(super) fn client(&mut self) -> &mut TcpJsonRpcClientAsync {
         &mut self.client
     }
 

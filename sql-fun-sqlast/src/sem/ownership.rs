@@ -1,6 +1,8 @@
 //! Semantic identities and ownership of PostgreSQL catalog objects.
+
 use crate::{
-    names::FullName,
+    context::BaseParseContext,
+    names::{FullName, OperatorName, SchemaName},
     sem::{ObjectKind, TypeReference},
 };
 
@@ -201,8 +203,8 @@ impl std::fmt::Display for OwnershipIdentity {
                     crate::identifier::CanonicalIdentifier::from(catalog.as_str())
                 )?;
             }
-            let name = crate::names::OperatorName::from_parts(
-                self.name.schema().map(crate::names::SchemaName::as_str),
+            let name = OperatorName::from_parts(
+                self.name.schema().map(SchemaName::as_str),
                 self.name.name().as_str(),
             );
             write!(f, "{name}")?;
@@ -422,7 +424,7 @@ impl ObjectKind {
     }
 }
 
-pub(crate) fn model_definitions<C: crate::context::BaseParseContext + ?Sized>(
+pub(crate) fn model_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -440,7 +442,7 @@ pub(crate) fn model_definitions<C: crate::context::BaseParseContext + ?Sized>(
     }
 }
 
-fn table_definitions<C: crate::context::BaseParseContext + ?Sized>(
+fn table_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -451,7 +453,7 @@ fn table_definitions<C: crate::context::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn sequence_definitions<C: crate::context::BaseParseContext + ?Sized>(
+fn sequence_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -462,7 +464,7 @@ fn sequence_definitions<C: crate::context::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn view_definitions<C: crate::context::BaseParseContext + ?Sized>(
+fn view_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -476,7 +478,7 @@ fn view_definitions<C: crate::context::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn schema_definitions<C: crate::context::BaseParseContext + ?Sized>(
+fn schema_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -487,7 +489,7 @@ fn schema_definitions<C: crate::context::BaseParseContext + ?Sized>(
     ownership_snapshot(kind, name, definition.owner())
 }
 
-fn type_definitions<C: crate::context::BaseParseContext + ?Sized>(
+fn type_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,
@@ -515,7 +517,7 @@ fn type_definitions<C: crate::context::BaseParseContext + ?Sized>(
     ownership_snapshot(actual_kind, name, owner)
 }
 
-fn routine_definitions<C: crate::context::BaseParseContext + ?Sized>(
+fn routine_definitions<C: BaseParseContext + ?Sized>(
     context: &C,
     kind: ObjectKind,
     name: &FullName,

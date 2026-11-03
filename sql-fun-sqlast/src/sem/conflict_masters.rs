@@ -1,5 +1,4 @@
-use crate::context::BaseParseContext;
-use crate::{names::FullName, sem::CatalogNameLookup};
+use crate::{ast::Dialect, context::BaseParseContext, names::FullName, sem::CatalogNameLookup};
 
 /// Qualified collation identity, including encoding eligibility.
 #[derive(Debug, Clone, Eq, PartialEq, serde::Deserialize)]
@@ -274,7 +273,7 @@ pub(crate) fn lookup_collation(
     context: &impl BaseParseContext,
     name: &FullName,
 ) -> CatalogNameLookup {
-    if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
+    if Dialect::from(context.metadata()) == Dialect::sqlite() {
         return context.lookup_sqlite_collation(name);
     }
     lookup_postgres(context, name, |key| {
@@ -287,7 +286,7 @@ pub(crate) fn lookup_operator_class(
     name: &FullName,
     method: &str,
 ) -> CatalogNameLookup {
-    if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
+    if Dialect::from(context.metadata()) == Dialect::sqlite() {
         return CatalogNameLookup::missing(name);
     }
     lookup_postgres(context, name, |key| {

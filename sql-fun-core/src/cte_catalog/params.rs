@@ -1,5 +1,7 @@
-use super::CteName;
-use crate::placehlodered_sql::{ParameterName, PlaceholderTypeHint};
+use crate::{
+    cte_catalog::CteName,
+    placehlodered_sql::{ParameterName, PlaceholderTypeHint},
+};
 use std::collections::{HashMap, hash_map::Entry};
 
 /// renaming definition

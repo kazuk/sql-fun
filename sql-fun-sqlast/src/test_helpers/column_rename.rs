@@ -1,18 +1,27 @@
 //! Lightweight schema-chain fixtures for column rename contracts.
+
+#[cfg(feature = "sqlite")]
+use crate::AstAndContextPair;
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+#[cfg(feature = "sqlite")]
+use crate::parse_statements;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::create_cache_context;
 use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,
     },
-    names::{FullName, SchemaName},
-    sem::AnalysisError,
+    names::{ColumnName, FullName, SchemaName},
+    sem::{AnalysisError, PgBuiltInType, SemScalarExpr, TypeReference},
     test_helpers::{TestParseContext, ownership::apply_ownership_sql, source_span},
 };
 pub(crate) fn schema(statements: &[&str]) -> Result<SchemaFileContext, AnalysisError> {
     let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"postgres", "dialect":"postgres", "version":"17", "search_path":["public"]})).unwrap();
     let mut base = TestParseContext::default().with_metadata(&metadata);
     base.set_search_path(&[SchemaName::from("public")]);
-    base.setup_type(crate::sem::PgBuiltInType::int4());
-    base.setup_type(crate::sem::TypeReference::from_master_type_name("trigger"));
+    base.setup_type(PgBuiltInType::int4());
+    base.setup_type(TypeReference::from_master_type_name("trigger"));
     let frozen = base.freeze();
     let mut context = child(&frozen);
     for sql in statements {
@@ -33,7 +42,7 @@ pub(crate) fn sqlite_schema(statements: &[&str]) -> Result<SchemaFileContext, An
     let metadata = ::serde_json::from_value(::serde_json::json!({"engine":"SQLite", "dialect":"SQLite", "version":"3", "search_path":["main"]})).unwrap();
     let mut base = TestParseContext::default()
         .with_metadata(&metadata)
-        .with_dialect(crate::ast::Dialect::sqlite());
+        .with_dialect(Dialect::sqlite());
     base.set_search_path(&[SchemaName::from("main")]);
     let mut context = child(&base.freeze());
     for sql in statements {
@@ -50,9 +59,9 @@ pub(crate) fn sqlite_schema(statements: &[&str]) -> Result<SchemaFileContext, An
 pub(crate) fn sqlite(
     context: SchemaFileContext,
     sql: &str,
-) -> Result<crate::AstAndContextPair<SchemaFileContext>, AnalysisError> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    crate::parse_statements(sql, crate::ast::Dialect::sqlite())
+) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
+    let mut cache_context = create_cache_context();
+    parse_statements(sql, Dialect::sqlite())
         .next()
         .unwrap()
         .expect("valid SQLite syntax")
@@ -71,7 +80,7 @@ pub(crate) fn child(base: &FrozenBaseContext) -> SchemaFileContext {
 }
 
 /// Observe semantic column bindings without depending on expression nesting.
-pub(crate) fn bound_columns(expression: &crate::sem::SemScalarExpr) -> Vec<String> {
+pub(crate) fn bound_columns(expression: &SemScalarExpr) -> Vec<String> {
     let mut visitor = BoundColumns::default();
     expression.clone().walk(&mut visitor).unwrap();
     visitor.0
@@ -79,10 +88,7 @@ pub(crate) fn bound_columns(expression: &crate::sem::SemScalarExpr) -> Vec<Strin
 #[derive(Default)]
 struct BoundColumns(Vec<String>);
 impl crate::sem::traversal::SemanticVisitorMut for BoundColumns {
-    fn expression(
-        &mut self,
-        expression: &mut crate::sem::SemScalarExpr,
-    ) -> Result<(), AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if let Some((_, column, _)) = expression.namespace_reference() {
             self.0.push(column.as_str().to_owned());
         }
@@ -92,9 +98,9 @@ impl crate::sem::traversal::SemanticVisitorMut for BoundColumns {
 
 /// Inspect retained whole-row field names through the semantic composite API.
 pub(crate) fn whole_row_columns(
-    expression: &crate::sem::SemScalarExpr,
+    expression: &SemScalarExpr,
     context: &impl ParseContext,
-) -> Vec<Vec<crate::names::ColumnName>> {
+) -> Vec<Vec<ColumnName>> {
     let mut visitor = WholeRowColumns {
         context,
         columns: Vec::new(),
@@ -104,13 +110,10 @@ pub(crate) fn whole_row_columns(
 }
 struct WholeRowColumns<'a, C> {
     context: &'a C,
-    columns: Vec<Vec<crate::names::ColumnName>>,
+    columns: Vec<Vec<ColumnName>>,
 }
 impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for WholeRowColumns<'_, C> {
-    fn expression(
-        &mut self,
-        expression: &mut crate::sem::SemScalarExpr,
-    ) -> Result<(), AnalysisError> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if expression.as_whole_row().is_some() {
             self.columns
                 .push(expression.composite_columns(self.context).unwrap().names());

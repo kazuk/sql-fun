@@ -1,9 +1,11 @@
 use crate::{
     context::ParseContext,
-    names::{AliasName, ColumnName},
+    names::{AliasName, ColumnName, FullName},
     sem::{
         AliasSpec, AnalysisError, DataSource, Nullable, SemScalarExpr, WithClause,
+        data_source::{ColumnCandidates, ProjectionColumn, QualifiedSource},
         scalar_expr::ColumnReferenceExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -59,8 +61,8 @@ impl MergeRecordDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::names::FullName,
-    ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
+        name: &FullName,
+    ) -> Result<Option<QualifiedSource<'a>>, ()> {
         Ok(self
             .source
             .qualified_source(context, name)?
@@ -155,7 +157,7 @@ impl MergeRecordDataSource {
         column: &ColumnName,
         context: &C,
         with: &WithClause,
-    ) -> super::ColumnCandidates {
+    ) -> ColumnCandidates {
         self.source
             .aliases_for_column_resolved(column, context, with)
     }
@@ -165,7 +167,7 @@ impl MergeRecordDataSource {
         context: &impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
-    ) -> Result<Vec<super::ProjectionColumn<'_>>, AnalysisError> {
+    ) -> Result<Vec<ProjectionColumn<'_>>, AnalysisError> {
         Ok(self
             .source
             .projection_names(context, with, qualifier)?
@@ -200,16 +202,13 @@ impl MergeRecordDataSource {
         Ok((expression, context))
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.source.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.source.visit(visitor)
     }
 }

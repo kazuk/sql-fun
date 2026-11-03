@@ -19,8 +19,6 @@ mod session;
 #[cfg(test)]
 mod test_helpers;
 
-use crate::buffers::JsonLinesStreamReader;
-
 pub use self::{
     buffers::{PipeBuffer, ReadableBuffer},
     cache::Cache,
@@ -32,6 +30,10 @@ pub use self::{
         SchemaContextKey, SchemaLoadError, SchemaSelection,
     },
 };
+
+use crate::{buffers::ReaderError, session::SessionWrapper};
+
+use crate::buffers::JsonLinesStreamReader;
 
 use self::{
     client_lifecycle::ClientLifecycle,
@@ -269,7 +271,7 @@ async fn serve_client_with_api(
     response_json.push('\n');
     write_half.write_all(response_json.as_bytes()).await?;
 
-    let wrapper = self::session::SessionWrapper::new();
+    let wrapper = SessionWrapper::new();
     wrapper
         .session_handler(
             request_reader,
@@ -304,7 +306,7 @@ pub enum ServerError {
 
     /// reader error
     #[error(transparent)]
-    Reader(#[from] crate::buffers::ReaderError),
+    Reader(#[from] ReaderError),
 
     /// authentication failed
     #[error("Authentication Failed: {0}")]

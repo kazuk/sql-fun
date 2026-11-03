@@ -1,7 +1,7 @@
 use crate::SqlFunArgsError;
 use std::path::PathBuf;
 
-use super::SqlFunArgs;
+use crate::args::SqlFunArgs;
 
 impl SqlFunArgs {
     /// get home dir path

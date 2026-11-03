@@ -1,10 +1,10 @@
 //! EXISTS behavior at the query-analysis boundary using a small catalog.
-use super::super::test_helpers::resolve;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
+
 use crate::{
+    ast::{Dialect, resolve::query::test_helpers::resolve},
+    context::ParseContext,
     names::ColumnName,
-    sem::{PgBuiltInType, SelectStatement, SemScalarExpr},
+    sem::{AnalysisError, PgBuiltInType, SelectStatement, SemScalarExpr},
 };
 
 #[rstest::rstest]
@@ -69,7 +69,7 @@ fn child_parameter_is_independent_of_boolean_result(#[case] sql: &str) {
 struct Parameters(Vec<u32>);
 
 impl crate::sem::traversal::SemanticVisitorMut for Parameters {
-    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), crate::sem::AnalysisError> {
+    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         if let SemScalarExpr::Param(parameter) = value {
             self.0.push(parameter.position());
         }
@@ -132,7 +132,7 @@ struct Bindings {
 }
 
 impl crate::sem::traversal::SemanticVisitorMut for Bindings {
-    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), crate::sem::AnalysisError> {
+    fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         use crate::sem::ColumnReferenceExpr;
         match value {
             SemScalarExpr::ColumnRef(ColumnReferenceExpr::SubQueryColumn(reference)) => {

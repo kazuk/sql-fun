@@ -1,12 +1,18 @@
 use crate::{
-    ast::TryFromWithTokens,
+    ast::{Expr, TryFromWithTokens},
     context::ParseContext,
-    names::AliasName,
+    names::{AliasName, ColumnName as NamesColumnName},
     sem::{
-        AliasSpec, AnalysisError, DataSource, FromClause, Nullable, ScalarAnalysisContext,
-        SemScalarExpr, WithClause,
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, FromClause, FuncCallExpr, Nullable,
+        QueryName, ScalarAnalysisContext, SemScalarExpr, TableFunctionProblem,
+        WildcardRowsFunction, WildcardRowsSource, WithClause,
+        data_source::{
+            ColumnCandidates, ProjectionColumn, TableFunctionOutput,
+            function_columns::OutputColumnNames, projection::ProjectionColumns,
+        },
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::ScanToken,
+    syn::{FuncCall, Node, ScanToken},
 };
 
 use ::sql_fun_core::IVec;
@@ -17,7 +23,7 @@ pub struct DataSourceRowFunctions {
     alias: AliasSpec,
     functions: IVec<DataSourceRowsFromFunc>,
     ordinality: bool,
-    outer_definition: super::TableFunctionOutput,
+    outer_definition: TableFunctionOutput,
 }
 
 impl DataSourceRowFunctions {
@@ -52,7 +58,7 @@ impl DataSourceRowFunctions {
         Self {
             functions: functions.clone(),
             ordinality: false,
-            outer_definition: super::TableFunctionOutput::default(),
+            outer_definition: TableFunctionOutput::default(),
             alias: alias.clone(),
         }
     }
@@ -64,7 +70,7 @@ impl DataSourceRowFunctions {
 
     /// Names retained on resolved invocations, in call order.
     /// Deferred or unresolved calls without a resolved invocation are omitted.
-    pub fn resolved_function_names(&self) -> Vec<crate::sem::QueryName> {
+    pub fn resolved_function_names(&self) -> Vec<QueryName> {
         self.functions
             .iter()
             .filter_map(|function| function.source()?.resolved_function_name().cloned())
@@ -97,8 +103,8 @@ struct RowsFromExpression {
     invalid_expression: bool,
     #[serde(default)]
     placement_pending: bool,
-    columns: Vec<crate::names::ColumnName>,
-    output: super::TableFunctionOutput,
+    columns: Vec<NamesColumnName>,
+    output: TableFunctionOutput,
 }
 
 impl DataSourceRowsFromFunc {
@@ -114,7 +120,7 @@ impl DataSourceRowsFromFunc {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<crate::names::ColumnName>, AnalysisError> {
+    ) -> Result<Vec<NamesColumnName>, AnalysisError> {
         match &self.source {
             RowsFromSource::Invocation(source) => source.column_names(context, with),
             RowsFromSource::Expression(source) => Ok(source.columns.clone()),
@@ -124,8 +130,8 @@ impl DataSourceRowsFromFunc {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<crate::sem::WildcardRowsFunction, AnalysisError> {
-        Ok(crate::sem::WildcardRowsFunction::from_columns(
+    ) -> Result<WildcardRowsFunction, AnalysisError> {
+        Ok(WildcardRowsFunction::from_columns(
             &self.column_names(context, with)?,
         ))
     }
@@ -153,14 +159,14 @@ impl DataSourceRowsFromFunc {
                 invalid_expression,
                 placement_pending,
                 columns,
-                output: super::TableFunctionOutput::default(),
+                output: TableFunctionOutput::default(),
             })),
         })
     }
     pub(crate) fn apply_output(
         &mut self,
         context: &mut impl ParseContext,
-        output: &super::TableFunctionOutput,
+        output: &TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
         match &mut self.source {
             RowsFromSource::Invocation(source) => source.apply_function_output(context, output),
@@ -174,7 +180,7 @@ impl DataSourceRowsFromFunc {
         }
     }
     /// Preserved invocation when its signature is deferred.
-    pub fn deferred_function(&self) -> Option<&crate::sem::FuncCallExpr> {
+    pub fn deferred_function(&self) -> Option<&FuncCallExpr> {
         self.source()?
             .deferred_function()
             .map(|source| source.call())
@@ -214,13 +220,13 @@ impl DataSourceRowsFromFunc {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        func_call: crate::syn::FuncCall,
+        func_call: FuncCall,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::Expr::try_from_with_tokens(&func_call, tokens)?;
+        let syntax = Expr::try_from_with_tokens(&func_call, tokens)?;
         let result = syntax.resolve_rows(
             &mut context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
@@ -233,13 +239,13 @@ impl DataSourceRowsFromFunc {
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
-        function: crate::syn::Node,
+        function: Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::Expr::try_from_with_tokens(&function, tokens)?;
+        let syntax = Expr::try_from_with_tokens(&function, tokens)?;
         let result = syntax.resolve_rows(
             &mut context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
@@ -250,6 +256,8 @@ impl DataSourceRowsFromFunc {
 
 #[cfg(test)]
 mod test_expression_sources {
+    use crate::sem::DataSourceRowsFromFunc;
+
     use crate::{
         context::ParseContext,
         names::AliasName,
@@ -309,7 +317,7 @@ mod test_expression_sources {
         let source = rows_from::source(&query, "r");
         let value = ::serde_json::to_value(&source.functions()[0]).unwrap();
         assert!(value["source"].get("CallTableFunc").is_some());
-        let restored: crate::sem::DataSourceRowsFromFunc = ::serde_json::from_value(value).unwrap();
+        let restored: DataSourceRowsFromFunc = ::serde_json::from_value(value).unwrap();
         assert_eq!(&restored, &source.functions()[0]);
     }
 
@@ -399,7 +407,7 @@ mod test_expression_sources {
 }
 
 impl DataSourceRowFunctions {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -410,10 +418,7 @@ impl DataSourceRowFunctions {
         self.functions = functions.into();
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_rows_functions();
         for function in self.functions.iter() {
             function.visit(visitor)?;
@@ -423,7 +428,7 @@ impl DataSourceRowFunctions {
     }
 }
 impl DataSourceRowsFromFunc {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -433,10 +438,7 @@ impl DataSourceRowsFromFunc {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match &self.source {
             RowsFromSource::Invocation(source) => source.visit(visitor)?,
             RowsFromSource::Expression(source) => source.value.visit(visitor)?,
@@ -450,8 +452,8 @@ impl DataSourceRowFunctions {
         &'a self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<super::projection::ProjectionColumns<'a>, AnalysisError> {
-        let mut columns = super::projection::ProjectionColumns::default();
+    ) -> Result<ProjectionColumns<'a>, AnalysisError> {
+        let mut columns = ProjectionColumns::default();
         for function in &self.functions {
             function.append_projection(context, with, &mut columns)?;
         }
@@ -467,7 +469,7 @@ impl DataSourceRowFunctions {
                 .iter()
                 .map(|function| function.wildcard_layout(context, with))
                 .collect::<Result<Vec<_>, _>>()?;
-            let source = crate::sem::WildcardRowsSource::new(
+            let source = WildcardRowsSource::new(
                 self.alias.name(),
                 &functions,
                 &columns.names(),
@@ -482,11 +484,11 @@ impl DataSourceRowFunctions {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<crate::names::ColumnName>, AnalysisError> {
+    ) -> Result<Vec<NamesColumnName>, AnalysisError> {
         Ok(self.project(context, with)?.names())
     }
-    fn known_column_names(&self) -> Option<super::function_columns::OutputColumnNames> {
-        let mut names = super::function_columns::OutputColumnNames::default();
+    fn known_column_names(&self) -> Option<OutputColumnNames> {
+        let mut names = OutputColumnNames::default();
         for function in &self.functions {
             function.append_known_column_names(&mut names)?;
         }
@@ -495,18 +497,18 @@ impl DataSourceRowFunctions {
         }
         Some(names)
     }
-    pub(super) fn candidates(&self, name: &crate::names::ColumnName) -> super::ColumnCandidates {
+    pub(super) fn candidates(&self, name: &NamesColumnName) -> ColumnCandidates {
         let Some(names) = self.known_column_names() else {
-            return super::ColumnCandidates::unknown();
+            return ColumnCandidates::unknown();
         };
-        super::ColumnCandidates::from(names.candidates(name, &self.alias))
+        ColumnCandidates::from(names.candidates(name, &self.alias))
     }
     pub(super) fn bind_column<'a, C: ParseContext>(
         &self,
         context: &'a mut C,
         with: &WithClause,
         alias: &AliasName,
-        name: &crate::names::ColumnName,
+        name: &NamesColumnName,
         nullable: bool,
     ) -> Result<(SemScalarExpr, &'a mut C), AnalysisError> {
         let expression = self
@@ -533,7 +535,7 @@ impl DataSourceRowsFromFunc {
         &'a self,
         context: &impl ParseContext,
         with: &WithClause,
-        columns: &mut super::projection::ProjectionColumns<'a>,
+        columns: &mut ProjectionColumns<'a>,
     ) -> Result<(), AnalysisError> {
         match &self.source {
             RowsFromSource::Invocation(source) => columns.append_source(source, context, with),
@@ -549,16 +551,13 @@ impl DataSourceRowFunctions {
 }
 
 impl DataSourceRowFunctions {
-    pub(super) fn retain_outer_definition(&mut self, definition: &super::TableFunctionOutput) {
+    pub(super) fn retain_outer_definition(&mut self, definition: &TableFunctionOutput) {
         self.outer_definition = definition.clone();
     }
 }
 
 impl DataSourceRowsFromFunc {
-    fn append_known_column_names(
-        &self,
-        names: &mut super::function_columns::OutputColumnNames,
-    ) -> Option<()> {
+    fn append_known_column_names(&self, names: &mut OutputColumnNames) -> Option<()> {
         match &self.source {
             RowsFromSource::Invocation(source) => names.append_function_columns(source),
             RowsFromSource::Expression(source) => source.append_known_column_names(names),
@@ -572,7 +571,7 @@ impl DataSourceRowFunctions {
         context: &impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
-    ) -> Result<Vec<super::ProjectionColumn<'_>>, AnalysisError> {
+    ) -> Result<Vec<ProjectionColumn<'_>>, AnalysisError> {
         if qualifier.is_some_and(|name| !self.matches_alias(name)) {
             return Ok(Vec::new());
         }
@@ -584,7 +583,7 @@ impl DataSourceRowFunctions {
     pub(super) fn apply_output(
         &mut self,
         context: &mut impl ParseContext,
-        output: &super::TableFunctionOutput,
+        output: &TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
         let mut functions = self.functions.to_vec();
         for function in &mut functions {
@@ -655,8 +654,8 @@ impl DataSourceRowsFromFunc {
         value.walk(&mut visitor)?;
         let invalid = visitor.invalid;
         if invalid {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::table_function(
-                crate::sem::TableFunctionProblem::invalid_expression(),
+            context.report_analysis_problem(AnalysisProblem::table_function(
+                TableFunctionProblem::invalid_expression(),
             ))?;
         }
         Ok(invalid)
@@ -676,7 +675,7 @@ impl RowsFromExpression {
     fn apply_output(
         &mut self,
         context: &mut impl ParseContext,
-        output: &super::TableFunctionOutput,
+        output: &TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
         self.output = output.clone();
         self.output.validate_requirement(context, false)
@@ -684,15 +683,12 @@ impl RowsFromExpression {
     fn append_projection(
         &self,
         context: &impl ParseContext,
-        columns: &mut super::projection::ProjectionColumns<'_>,
+        columns: &mut ProjectionColumns<'_>,
     ) -> Result<(), AnalysisError> {
         columns.append_expression(&self.value, &self.name, context);
         Ok(())
     }
-    fn append_known_column_names(
-        &self,
-        names: &mut super::function_columns::OutputColumnNames,
-    ) -> Option<()> {
+    fn append_known_column_names(&self, names: &mut OutputColumnNames) -> Option<()> {
         names.append_names(&self.columns);
         Some(())
     }

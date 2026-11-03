@@ -1,4 +1,7 @@
-use crate::{names::FullName, sem::TypeReference};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ParseContext, TypeReference, problem::TableSampleProblem},
+};
 
 /// Offline facts for one PostgreSQL `(internal) RETURNS tsm_handler` handler.
 /// The parameter types describe TABLESAMPLE inputs, not the dummy handler argument.
@@ -92,11 +95,11 @@ impl SamplingMethodLookup {
     }
     pub(crate) fn validate_clause(
         &self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         name: &FullName,
         count: usize,
         repeatable: bool,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         use crate::sem::{AnalysisProblem, problem::TableSampleProblem};
         if let Some(problem) = self.problem(name) {
             context.report_analysis_problem(AnalysisProblem::table_sample(problem))?;
@@ -118,10 +121,7 @@ impl SamplingMethodLookup {
         }
         Ok(())
     }
-    pub(crate) fn problem(
-        &self,
-        name: &FullName,
-    ) -> Option<crate::sem::problem::TableSampleProblem> {
+    pub(crate) fn problem(&self, name: &FullName) -> Option<TableSampleProblem> {
         use crate::sem::problem::TableSampleProblem;
         match self {
             Self::Found(_) => None,

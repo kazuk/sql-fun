@@ -1,17 +1,20 @@
 use crate::{
     names::FullName,
     syn::{
-        AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
-        AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType,
-        BooleanBuilder, CaseExpr, CaseWhen, CoercionFormOpt, ConstrType, Constraint,
-        ConstraintBuilder, DropBehavior, DropBehaviorOpt, DropStmt, DropStmtBuilder,
-        FuncCallBuilder, FunctionParameter, FunctionParameterBuilder, FunctionParameterMode,
-        IndexElemBuilder, IndexStmtBuilder, IntegerBuilder, IntoClauseOpt, JoinExpr,
-        LimitOptionOpt, ListBuilder, ListOpt, Node, NodeInner, NodeList, NodeOpt, ObjectType,
-        ParseResult, RangeFunction, RangeFunctionBuilder, RangeSubselect, RangeSubselectBuilder,
-        RangeTableFunc, RangeTableFuncBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt,
-        SelectStmtOpt, SetOperation, SortByDirOpt, SortByNullsOpt, StringBuilder, TypeName,
-        TypeNameOpt, WindowDefOpt, WithClauseOpt,
+        AConst, AConstInner, AExpr, AExprBuilder, AExprKind, Alias, AliasBuilder, AliasOpt,
+        AlterTableCmd, AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType,
+        BooleanBuilder, CaseExpr, CaseExprBuilder, CaseWhen, CaseWhenBuilder, CoercionFormOpt,
+        ColumnRef, ColumnRefBuilder, ConstrType, ConstrTypeOpt, Constraint, ConstraintBuilder,
+        DropBehavior, DropBehaviorOpt, DropStmt, DropStmtBuilder, FuncCall, FuncCallBuilder,
+        FunctionParameter, FunctionParameterBuilder, FunctionParameterMode, IndexElem,
+        IndexElemBuilder, IndexStmt, IndexStmtBuilder, IntegerBuilder, IntoClauseOpt, JoinExpr,
+        JoinExprBuilder, JoinType, LimitOptionOpt, ListBuilder, ListOpt, Node, NodeInner, NodeList,
+        NodeOpt, ObjectType, ParseResult, RangeFunction, RangeFunctionBuilder, RangeSubselect,
+        RangeSubselectBuilder, RangeTableFunc, RangeTableFuncBuilder, RangeVar, RangeVarBuilder,
+        RangeVarOpt, ResTarget, ResTargetBuilder, RoleSpec, RoleSpecBuilder, RoleSpecOpt,
+        RoleSpecType, SelectStmt, SelectStmtBuilder, SelectStmtOpt, SetOperation, SortByDirOpt,
+        SortByNullsOpt, String as SynString, StringBuilder, TypeName, TypeNameBuilder, TypeNameOpt,
+        WindowDefOpt, WithClauseOpt,
     },
 };
 
@@ -26,8 +29,8 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::String] value
-    pub fn string(&self, value: &str) -> crate::syn::String {
-        crate::syn::String::from(
+    pub fn string(&self, value: &str) -> SynString {
+        SynString::from(
             StringBuilder::default()
                 .sval(String::from(value))
                 .build()
@@ -36,7 +39,7 @@ impl SynBuilder {
     }
 
     /// wrap [create::syn::String] to [NodeInner::String] variant
-    pub fn as_string_node(&self, string: crate::syn::String) -> Node {
+    pub fn as_string_node(&self, string: SynString) -> Node {
         Node::from(NodeInner::from(string))
     }
 
@@ -51,7 +54,7 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::FuncCall] with common defaults
-    pub fn func_call(&self, funcname: NodeList, args: NodeList) -> crate::syn::FuncCall {
+    pub fn func_call(&self, funcname: NodeList, args: NodeList) -> FuncCall {
         FuncCallBuilder::default()
             .funcname(funcname)
             .args(args)
@@ -78,7 +81,7 @@ impl SynBuilder {
         }
         let names = self.as_node_list(&names);
 
-        let type_name = crate::syn::TypeNameBuilder::default()
+        let type_name = TypeNameBuilder::default()
             .names(names)
             .type_oid(0)
             .setof(false)
@@ -128,7 +131,7 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::RangeVar]
-    pub fn range_var(&self, full_name: &FullName, alias: &AliasOpt) -> crate::syn::RangeVar {
+    pub fn range_var(&self, full_name: &FullName, alias: &AliasOpt) -> RangeVar {
         let catalog = full_name
             .catalog()
             .map(|c| c.to_string())
@@ -138,7 +141,7 @@ impl SynBuilder {
             .map(|s| s.to_string())
             .unwrap_or_default();
         let rel_name = full_name.local_name().to_string();
-        crate::syn::RangeVarBuilder::default()
+        RangeVarBuilder::default()
             .catalogname(catalog)
             .schemaname(schema)
             .relname(rel_name)
@@ -152,11 +155,11 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::RoleSpec]
-    pub fn role_spec(&self, role_name: &str) -> crate::syn::RoleSpec {
-        crate::syn::RoleSpecBuilder::default()
+    pub fn role_spec(&self, role_name: &str) -> RoleSpec {
+        RoleSpecBuilder::default()
             .rolename(role_name.to_string())
             .location(0)
-            .roletype(crate::syn::RoleSpecType::RolespecCstring.into())
+            .roletype(RoleSpecType::RolespecCstring.into())
             .build()
             .unwrap()
             .into()
@@ -217,7 +220,7 @@ impl SynBuilder {
             .into()
     }
 
-    fn constraint_builder(contype: crate::syn::ConstrTypeOpt) -> ConstraintBuilder {
+    fn constraint_builder(contype: ConstrTypeOpt) -> ConstraintBuilder {
         let mut builder = ConstraintBuilder::default();
         builder
             .contype(contype)
@@ -416,7 +419,7 @@ impl SynBuilder {
         name: &str,
         ordering: SortByDirOpt,
         index_col_name: Option<&str>,
-    ) -> crate::syn::IndexElem {
+    ) -> IndexElem {
         IndexElemBuilder::default()
             .name(name.to_string())
             .expr(Node::none())
@@ -437,7 +440,7 @@ impl SynBuilder {
         expr: Node,
         ordering: SortByDirOpt,
         index_col_name: Option<&str>,
-    ) -> crate::syn::IndexElem {
+    ) -> IndexElem {
         IndexElemBuilder::default()
             .name(String::default())
             .expr(expr)
@@ -453,7 +456,7 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::NodeList] of [crate::syn::IndexElem]
-    pub fn index_elem_list(&self, items: Vec<crate::syn::IndexElem>) -> NodeList {
+    pub fn index_elem_list(&self, items: Vec<IndexElem>) -> NodeList {
         let nodes: Vec<Node> = items
             .into_iter()
             .map(|item| Node::from(NodeInner::IndexElem(item)))
@@ -469,7 +472,7 @@ impl SynBuilder {
         index_params: NodeList,
         index_including_params: NodeList,
         unique: bool,
-    ) -> crate::syn::IndexStmt {
+    ) -> IndexStmt {
         IndexStmtBuilder::default()
             .idxname(idxname.to_string())
             .relation(relation)
@@ -536,7 +539,7 @@ impl SynBuilder {
             .collect();
         let target_list = NodeList::from(nodes);
 
-        crate::syn::SelectStmtBuilder::default()
+        SelectStmtBuilder::default()
             .with_clause(with_clause)
             .from_clause(from_clause)
             .target_list(target_list)
@@ -564,7 +567,7 @@ impl SynBuilder {
 
     /// create [crate::syn::ResTarget]
     pub fn res_target(&self, name: &str, val: Node) -> ResTarget {
-        crate::syn::ResTargetBuilder::default()
+        ResTargetBuilder::default()
             .name(name.to_string())
             .indirection(NodeList::default())
             .val(val)
@@ -600,7 +603,7 @@ impl SynBuilder {
 
     /// create [crate::syn::CaseExpr]
     pub fn case_expr(&self, arg: NodeOpt, args: NodeList, default: NodeOpt) -> CaseExpr {
-        crate::syn::CaseExprBuilder::default()
+        CaseExprBuilder::default()
             .xpr(Node::none())
             .casetype(0)
             .casecollid(0)
@@ -615,7 +618,7 @@ impl SynBuilder {
 
     /// create [crate::syn::CaseWhen]
     pub fn case_when(&self, expr: NodeOpt, result: NodeOpt) -> CaseWhen {
-        crate::syn::CaseWhenBuilder::default()
+        CaseWhenBuilder::default()
             .xpr(Node::none())
             .expr(expr)
             .result(result)
@@ -632,8 +635,8 @@ impl SynBuilder {
         right: &NodeOpt,
         qualifications: &NodeOpt,
     ) -> JoinExpr {
-        crate::syn::JoinExprBuilder::default()
-            .jointype(crate::syn::JoinType::JoinInner.into())
+        JoinExprBuilder::default()
+            .jointype(JoinType::JoinInner.into())
             .is_natural(false)
             .larg(left.clone())
             .rarg(right.clone())
@@ -648,10 +651,10 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::AExpr]
-    pub fn binary(&self, operator: &str, left: Node, right: Node) -> crate::syn::AExpr {
+    pub fn binary(&self, operator: &str, left: Node, right: Node) -> AExpr {
         let name = self.as_node_list(&[self.as_string_node(self.string(operator))]);
 
-        crate::syn::AExprBuilder::default()
+        AExprBuilder::default()
             .kind(AExprKind::AexprOp.into())
             .name(name)
             .lexpr(left)
@@ -665,12 +668,12 @@ impl SynBuilder {
     }
 
     /// create equals [crate::syn::AExpr] as [crate::syn::Node]
-    pub fn operator_equals(&self, left: Node, right: Node) -> crate::syn::Node {
+    pub fn operator_equals(&self, left: Node, right: Node) -> Node {
         NodeInner::AExpr(self.binary("=", left, right)).into()
     }
 
     /// create a [crate::syn::NodeList] of [crate::syn::String]
-    pub fn string_node_list(&self, items: &[&str]) -> crate::syn::NodeList {
+    pub fn string_node_list(&self, items: &[&str]) -> NodeList {
         let mut nodes = Vec::new();
         for item in items {
             let item = self.string(item);
@@ -680,9 +683,9 @@ impl SynBuilder {
     }
 
     /// create [crate::syn::ColumnRef]
-    pub fn column_ref(&self, rel_name: &str, col_name: &str) -> crate::syn::ColumnRef {
+    pub fn column_ref(&self, rel_name: &str, col_name: &str) -> ColumnRef {
         let fields = self.string_node_list(&[rel_name, col_name]);
-        crate::syn::ColumnRefBuilder::default()
+        ColumnRefBuilder::default()
             .fields(fields)
             .location(0)
             .build()
@@ -767,7 +770,7 @@ impl SynBuilder {
     }
 
     /// parse sql to statement node
-    pub fn parse(&self, sql: &str) -> crate::syn::Node {
+    pub fn parse(&self, sql: &str) -> Node {
         let parse_result = pg_query::parse(sql, ::pg_query::ParserOptions::default()).unwrap();
         let parse_result = ParseResult::from(parse_result.protobuf);
         parse_result.get_stmts().get(0).get_stmt()

@@ -1,4 +1,5 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{AliasName, ColumnName, FullName, SchemaName},
     sem::{
@@ -7,13 +8,16 @@ use crate::{
         RuleEvent, RuleIdentity, SemScalarExpr, WholeRowExpr, WithClause,
         data_source::{MergeRecordRole, QualifiedSource, WildcardProjection},
         problem::{RuleProblem, TriggerProblem},
-        scalar_expr::column_ref::UndefinedAliasColumnRef,
+        scalar_expr::{
+            column_ref::{QualifiedColumnFailure, UndefinedAliasColumnRef},
+            grouping::GroupingScope,
+        },
     },
 };
 
 use std::borrow::Cow;
 
-use super::grouping::ReferenceCapture;
+use crate::sem::scalar_expr::grouping::ReferenceCapture;
 
 /// Expression-local scope used during scalar semantic analysis.
 ///
@@ -27,7 +31,7 @@ pub struct ScalarAnalysisContext<'a> {
     from_clause: Cow<'a, FromClause>,
     parent: Option<Box<Self>>,
     windows: Vec<String>,
-    grouping: super::grouping::GroupingScope,
+    grouping: GroupingScope,
     output_aliases: Option<ResultColumnCollection>,
     delete_returning_target: Option<AliasName>,
     postgres_returning: bool,
@@ -66,21 +70,26 @@ impl ScalarAnalysisContext<'_> {
 
 #[cfg(test)]
 mod unimplemented_returning_image_tests {
+    use crate::{
+        names::AliasName,
+        sem::{FromClause, WithClause, scalar_expr::context::ScalarAnalysisContext},
+        test_helpers::TestParseContext,
+    };
+
     #[rstest::rstest]
     #[should_panic(expected = "RETURNING destination row-image expressions")]
     fn unbound_images_reach_todo(#[values("old", "new")] name: &str) {
-        let mut context =
-            crate::test_helpers::TestParseContext::default().with_postgres_version("18");
-        let with_clause = crate::sem::WithClause::default();
-        let from_clause = crate::sem::FromClause::default();
-        let mut scope = super::ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut context = TestParseContext::default().with_postgres_version("18");
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut scope = ScalarAnalysisContext::new(&with_clause, &from_clause);
         scope.set_postgres_returning(&context);
-        let _ = scope.notify_unbound_row_image(&mut context, &crate::names::AliasName::from(name));
+        let _ = scope.notify_unbound_row_image(&mut context, &AliasName::from(name));
     }
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
-    pub(crate) const fn grouping_scope(&self) -> &super::grouping::GroupingScope {
+    pub(crate) const fn grouping_scope(&self) -> &GroupingScope {
         &self.grouping
     }
     pub(crate) const fn set_grouping_query(&mut self, id: usize) {
@@ -315,7 +324,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         context: &mut impl ParseContext,
         name: &FullName,
     ) -> Result<FullName, AnalysisError> {
-        if context.dialect() != crate::ast::Dialect::sqlite() {
+        if context.dialect() != Dialect::sqlite() {
             return Ok(name.clone());
         }
         let Some(schema) = self.trigger_namespace() else {
@@ -369,7 +378,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             from_clause: Cow::Borrowed(from_clause),
             parent: None,
             windows: Vec::new(),
-            grouping: super::grouping::GroupingScope::new(),
+            grouping: GroupingScope::new(),
             output_aliases: None,
             delete_returning_target: None,
             postgres_returning: false,
@@ -390,7 +399,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             from_clause: Cow::Borrowed(from_clause),
             parent: parent.map(|parent| Box::new(parent.clone_scope())),
             windows: Vec::new(),
-            grouping: super::grouping::GroupingScope::nested(parent.map(|scope| &scope.grouping)),
+            grouping: GroupingScope::nested(parent.map(|scope| &scope.grouping)),
             output_aliases: None,
             delete_returning_target: None,
             postgres_returning: false,
@@ -463,7 +472,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         }
     }
     pub(crate) fn set_postgres_returning(&mut self, context: &impl ParseContext) {
-        self.postgres_returning = context.dialect() == crate::ast::Dialect::postgres();
+        self.postgres_returning = context.dialect() == Dialect::postgres();
     }
 
     pub(crate) fn check_returning_star(
@@ -498,7 +507,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         if self.rule_rows_visible() {
             return;
         }
-        if context.dialect() != crate::ast::Dialect::postgres() {
+        if context.dialect() != Dialect::postgres() {
             return;
         }
         self.postgres_returning = true;
@@ -558,7 +567,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         name: &str,
         context: &impl ParseContext,
     ) -> QueryNameResolution {
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             return self
                 .windows
                 .iter()
@@ -604,7 +613,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             from_clause: Cow::Owned(from_clause),
             parent: None,
             windows: Vec::new(),
-            grouping: super::grouping::GroupingScope::new(),
+            grouping: GroupingScope::new(),
             output_aliases: None,
             delete_returning_target: None,
             postgres_returning: false,
@@ -617,7 +626,7 @@ impl<'a> ScalarAnalysisContext<'a> {
 }
 
 fn postgres_18_or_later(context: &impl ParseContext) -> bool {
-    if context.dialect() != crate::ast::Dialect::postgres() {
+    if context.dialect() != Dialect::postgres() {
         return false;
     }
     let Some(version) = context.metadata().engine_version() else {
@@ -636,10 +645,10 @@ impl ScalarAnalysisContext<'_> {
         qualifier: &FullName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        use super::column_ref::QualifiedColumnFailure;
+        use crate::sem::scalar_expr::column_ref::QualifiedColumnFailure;
         let mut relation = qualifier.clone();
         if let Some(catalog) = qualifier.catalog() {
-            if context.dialect() == crate::ast::Dialect::sqlite() {
+            if context.dialect() == Dialect::sqlite() {
                 return QualifiedColumnFailure::invalid(context, qualifier, column);
             }
             let Some(database) = context.metadata().database_name() else {
@@ -660,7 +669,7 @@ impl ScalarAnalysisContext<'_> {
         requested: &FullName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        use super::column_ref::QualifiedColumnFailure;
+        use crate::sem::scalar_expr::column_ref::QualifiedColumnFailure;
         // Row-image environments expose OLD/NEW aliases rather than relation names.
         let source = if self.qualified_only {
             Ok(None)
@@ -732,7 +741,7 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut TContext), AnalysisError> {
         if let Some(alias) = alias {
-            if self.qualified_only && context.dialect() == crate::ast::Dialect::sqlite() {
+            if self.qualified_only && context.dialect() == Dialect::sqlite() {
                 let normalized = AliasName::from(alias.as_str().to_ascii_lowercase().as_str());
                 if let Some((source, _)) = self.from_clause.resolve_alias(&normalized) {
                     let canonical = source
@@ -747,7 +756,7 @@ impl ScalarAnalysisContext<'_> {
 
             match self.from_clause.namespace().resolve_name(alias) {
                 Err(()) => {
-                    let expression = super::column_ref::QualifiedColumnFailure::ambiguous(
+                    let expression = QualifiedColumnFailure::ambiguous(
                         context,
                         &FullName::from_local_name(alias.as_str()),
                         column,
@@ -850,12 +859,11 @@ impl ScalarAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_resolve_column_ref {
-    use crate::sem::scalar_expr::context::ScalarAnalysisContext;
     use crate::{
         names::{AliasName, ColumnName},
         sem::{
             ColumnDefinition, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr, SubQueryColumnRef,
-            WithClause,
+            WithClause, scalar_expr::context::ScalarAnalysisContext,
         },
         test_helpers::TestParseContext,
     };

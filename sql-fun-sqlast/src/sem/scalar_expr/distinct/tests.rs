@@ -1,5 +1,12 @@
 mod test_helpers;
 
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+use crate::{
+    sem::{CastContext, CastDefinition, ScalarConstExpr, scalar_expr::distinct::DistinctExpr},
+    test_helpers::TestParseContext,
+};
+
 use self::test_helpers::{context, expression, query, schema};
 use crate::sem::{ParseContext, PgBuiltInType, SemScalarExpr};
 use std::collections::BTreeMap;
@@ -165,7 +172,7 @@ fn sqlite_predicates_preserve_operands_without_catalog_equality(
         connection.query_row(&sql, [], |row| row.get::<_, i32>(0))?,
         oracle
     );
-    let context = test_helpers::context_for(crate::ast::Dialect::sqlite());
+    let context = test_helpers::context_for(Dialect::sqlite());
     let (query, context) = query(&sql, context)?;
     let test = expression(&query).as_distinct().unwrap();
     assert_eq!(test.negated(), negated);
@@ -190,7 +197,7 @@ fn sqlite_predicates_preserve_operands_without_catalog_equality(
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_comparisons_do_not_constrain_input_affinity() -> testresult::TestResult {
-    let context = test_helpers::context_for(crate::ast::Dialect::sqlite());
+    let context = test_helpers::context_for(Dialect::sqlite());
     let (_, context) = query("SELECT ?1 IS DISTINCT FROM 1, ?1 IS NOT NULL", context)?;
     for ty in [
         PgBuiltInType::int4(),
@@ -212,11 +219,11 @@ fn sqlite_comparisons_do_not_constrain_input_affinity() -> testresult::TestResul
 fn custom_equality_strictness_does_not_guarantee_non_null(
     #[case] strict: bool,
 ) -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
+    let mut context = TestParseContext::default();
     context.setup_type(PgBuiltInType::int4());
     context.setup_binary("=", "int4", "int4", "bool", strict);
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate = SemScalarExpr::distinct(super::DistinctExpr::resolve(
+    let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+    let predicate = SemScalarExpr::distinct(DistinctExpr::resolve(
         &mut context,
         value.clone(),
         value,
@@ -229,11 +236,11 @@ fn custom_equality_strictness_does_not_guarantee_non_null(
 
 #[test]
 fn non_boolean_equality_is_rejected_and_retained() -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
+    let mut context = TestParseContext::default();
     context.setup_type(PgBuiltInType::int4());
     context.setup_binary("=", "int4", "int4", "int4", true);
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate = super::DistinctExpr::resolve(&mut context, value.clone(), value, false)?;
+    let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+    let predicate = DistinctExpr::resolve(&mut context, value.clone(), value, false)?;
     assert!(context.has_reported_problem("distinct_equality_result"));
     assert_eq!(predicate.types().admissible_types(), Some([].as_slice()));
     assert_eq!(
@@ -245,19 +252,17 @@ fn non_boolean_equality_is_rejected_and_retained() -> testresult::TestResult {
 
 #[test]
 fn retains_implicit_equality_coercions() -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
+    let mut context = TestParseContext::default();
     context.setup_type(PgBuiltInType::int4());
     context.setup_type(PgBuiltInType::int8());
     context.set_get_implicit_cast_result(
         &PgBuiltInType::int4(),
         &PgBuiltInType::int8(),
-        Some(crate::sem::CastDefinition::new(
-            crate::sem::CastContext::implicit(),
-        )),
+        Some(CastDefinition::new(CastContext::implicit())),
     );
     context.setup_binary("=", "int8", "int8", "bool", true);
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate = super::DistinctExpr::resolve(&mut context, value.clone(), value, false)?;
+    let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+    let predicate = DistinctExpr::resolve(&mut context, value.clone(), value, false)?;
     assert_eq!(
         predicate.left().unwrap().get_type(),
         Some(PgBuiltInType::int8())
@@ -271,9 +276,9 @@ fn retains_implicit_equality_coercions() -> testresult::TestResult {
 
 #[test]
 fn missing_equality_retains_failed_binding() -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
-    let value = SemScalarExpr::new_const(crate::sem::ScalarConstExpr::new_integer(1));
-    let predicate = super::DistinctExpr::resolve(&mut context, value.clone(), value, false)?;
+    let mut context = TestParseContext::default();
+    let value = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+    let predicate = DistinctExpr::resolve(&mut context, value.clone(), value, false)?;
     assert!(context.has_reported_problem("undefined_operator"));
     assert!(
         !predicate

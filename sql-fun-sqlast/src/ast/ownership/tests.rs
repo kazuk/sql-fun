@@ -1,17 +1,18 @@
-use crate::context::BaseParseContext;
-use crate::context::ParseContext;
-use crate::syn::Opt;
 use crate::{
-    context::{OwnershipInfoRead, RoleInfoRead, TableInfoRead, TypeInfoRead},
+    context::{
+        BaseParseContext, MutSourcePathWithSpan, OwnershipInfoRead, ParseContext, RoleInfoRead,
+        TableInfoRead, TypeInfoRead,
+    },
     names::{FullName, SchemaName, TableName},
     sem::{
-        AlterOwner, ObjectKind, OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, Role,
-        TypeReference,
+        AlterOwner, ObjectKind, OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity,
+        PgBuiltInType as SemPgBuiltInType, Role, TypeReference,
     },
+    syn::Opt,
     test_helpers::{
-        SynBuilder,
+        SynBuilder, TestParseContext, create_cache_context,
         ownership::{apply_ownership_sql, ownership_context, ownership_statement},
-        schema_layer,
+        schema_layer, source_span,
     },
 };
 
@@ -60,7 +61,7 @@ fn resolves_and_applies_catalog_object_classes(
         FullName::from_local_name(local)
     };
     let identity = if signed {
-        OwnershipIdentity::with_arguments(kind, &name, &[Some(crate::sem::PgBuiltInType::int4())])
+        OwnershipIdentity::with_arguments(kind, &name, &[Some(SemPgBuiltInType::int4())])
     } else if let Some(method) = method {
         OwnershipIdentity::with_access_method(kind, &name, method)
     } else {
@@ -266,10 +267,7 @@ fn missing_roles_and_targets_are_explicit_and_never_apply() -> testresult::TestR
 fn resolution_does_not_apply_and_legacy_entry_point_shares_the_result() -> testresult::TestResult {
     let mut context = apply_ownership_sql(ownership_context(), "CREATE SCHEMA app")?.into_context();
     let statement = ownership_statement("ALTER SCHEMA app OWNER TO alice")?;
-    let semantics = statement.resolve(
-        &mut context,
-        &mut crate::test_helpers::create_cache_context(),
-    )?;
+    let semantics = statement.resolve(&mut context, &mut create_cache_context())?;
     assert!(
         semantics
             .ownership_change()
@@ -520,10 +518,7 @@ fn dependent_sequence_owners_follow_table_changes_across_layers() -> testresult:
         .into_context();
     let base = context.freeze();
     let mut context = schema_layer(std::path::Path::new("next.sql"), &base);
-    crate::context::MutSourcePathWithSpan::set_source_path_with_span(
-        &mut context,
-        &crate::test_helpers::source_span(),
-    );
+    MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
     let result = apply_ownership_sql(context, "ALTER TABLE public.t OWNER TO bob")?;
     let name = FullName::with_schema("public", "s");
     let definitions = result
@@ -716,7 +711,7 @@ fn all_missing_argument_type_names_are_retained() -> testresult::TestResult {
 
 #[test]
 fn failure_to_accept_a_diagnostic_aborts_before_any_owner_update() -> testresult::TestResult {
-    let mut context = crate::test_helpers::TestParseContext::default();
+    let mut context = TestParseContext::default();
     let identity =
         OwnershipIdentity::named(ObjectKind::from(37), &FullName::from_local_name("app"));
     context.insert_owned_object(&OwnedObjectDefinition::new(
@@ -724,10 +719,8 @@ fn failure_to_accept_a_diagnostic_aborts_before_any_owner_update() -> testresult
         Some(&OwnerSpecification::session_user()),
     ));
     context.reject_diagnostics_after(0);
-    let result = ownership_statement("ALTER SCHEMA app OWNER TO missing")?.resolve(
-        &mut context,
-        &mut crate::test_helpers::create_cache_context(),
-    );
+    let result = ownership_statement("ALTER SCHEMA app OWNER TO missing")?
+        .resolve(&mut context, &mut create_cache_context());
     assert!(result.is_err());
     assert_eq!(
         context.ownership_definitions(ObjectKind::from(37), identity.name())[0].owner(),

@@ -4,12 +4,12 @@ mod concrete_type;
 mod dynamic_type;
 mod type_ref;
 
-pub use self::array::ArrayTypeDefinition;
-pub use self::{category::TypeCategory, type_ref::TypeReference};
+pub use self::{array::ArrayTypeDefinition, category::TypeCategory, type_ref::TypeReference};
 
-use crate::context::BaseParseContext;
+use crate::ast::Dialect;
+
 use crate::{
-    context::ParseContext,
+    context::{BaseParseContext, ParseContext},
     names::{ColumnName, FullName, LocalName, SchemaName, TableName},
     sem::{ColumnCollection, CreateCompositeType, CreateDomain, CreateEnum, OwnerSpecification},
 };
@@ -68,8 +68,12 @@ impl std::fmt::Display for TypeDefinition {
 
 #[cfg(test)]
 mod builtin_type_definition_tests {
-    use super::TypeDefinition;
-    use crate::{names::FullName, sem::TypeReference};
+    use crate::test_helpers::TestParseContext;
+
+    use crate::{
+        names::FullName,
+        sem::{TypeReference, pg_type::TypeDefinition},
+    };
 
     #[rstest::rstest]
     fn nullable_fact_survives_serialization(
@@ -77,7 +81,7 @@ mod builtin_type_definition_tests {
     ) {
         let definition =
             TypeDefinition::builtin(&FullName::with_schema("public", "custom"), expected);
-        let context = crate::test_helpers::TestParseContext::default();
+        let context = TestParseContext::default();
         let serialized = serde_json::to_value(&definition).unwrap();
         assert!(serialized["Builtin"].get("collatable").is_some());
         assert_eq!(
@@ -131,7 +135,7 @@ impl TypeDefinition {
     /// Missing metadata, unresolved domains, and non-PostgreSQL contexts
     /// return `None`, distinct from the PostgreSQL codes `X` and `U`.
     pub fn category(&self, context: &impl BaseParseContext) -> Option<TypeCategory> {
-        if crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::postgres() {
+        if Dialect::from(context.metadata()) != Dialect::postgres() {
             return None;
         }
         self.intrinsic_category()
@@ -152,8 +156,15 @@ impl TypeDefinition {
 
 #[cfg(test)]
 mod category_tests {
-    use super::TypeDefinition;
-    use crate::{context::BaseParseContext, names::FullName, test_helpers::TestParseContext};
+    #[cfg(feature = "sqlite")]
+    use crate::ast::Dialect;
+    #[cfg(feature = "sqlite")]
+    use crate::sem::TypeCategory;
+
+    use crate::{
+        context::BaseParseContext, names::FullName, sem::pg_type::TypeDefinition,
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn category_follows_selected_definition_and_search_path() {
@@ -187,9 +198,9 @@ mod category_tests {
     #[cfg(feature = "sqlite")]
     fn postgres_metadata_does_not_classify_sqlite_types() {
         let name = FullName::with_schema("pg_catalog", "int4");
-        let category = crate::sem::TypeCategory::try_from('N').unwrap();
+        let category = TypeCategory::try_from('N').unwrap();
         let definition = TypeDefinition::builtin_with_category(&name, Some(category), None);
-        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let context = TestParseContext::default().with_dialect(Dialect::sqlite());
         assert_eq!(definition.category(&context), None);
     }
 }
@@ -246,11 +257,7 @@ mod definition_collation_tests {
 }
 
 impl TypeDefinition {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
             Self::Array(value) => value.rename_relation(old, new),
             Self::CompositeType(value) => value.rename_relation(old, new),
@@ -450,10 +457,12 @@ impl TypeDefinition {
 
 #[cfg(test)]
 mod anonymous_compatibility_tests {
-    use crate::test_helpers::dynamic_types::record;
+    use crate::sem::TypeReference;
+
     use crate::{
         names::FullName,
         sem::{ColumnCollection, PgBuiltInType, TypeDefinition},
+        test_helpers::dynamic_types::record,
     };
 
     #[rstest::rstest]
@@ -464,7 +473,7 @@ mod anonymous_compatibility_tests {
         #[case] expected: bool,
     ) {
         let left = record(&PgBuiltInType::int4());
-        let right = record(&crate::sem::TypeReference::from_master_type_name(field));
+        let right = record(&TypeReference::from_master_type_name(field));
         let left = left.type_definition().unwrap();
         let right = right.type_definition().unwrap();
         assert_eq!(left.compatible_with(right), expected);
@@ -561,6 +570,8 @@ impl TypeDefinition {
 
 #[cfg(test)]
 mod domain_member_tests {
+    use crate::test_helpers::{TestParseContext, dynamic_types::record as dynamic_types_record};
+
     use crate::{
         names::FullName,
         sem::{CreateDomain, CreateEnum, TypeDefinition, TypeReference},
@@ -591,9 +602,9 @@ mod domain_member_tests {
 
     #[test]
     fn owned_domain_layers_resolve_without_a_catalog_name() {
-        let context = crate::test_helpers::TestParseContext::default();
+        let context = TestParseContext::default();
         let field = composite_domains::reference("scalar_d");
-        let record = crate::test_helpers::dynamic_types::record(&field);
+        let record = dynamic_types_record(&field);
         let inner = TypeReference::dynamic(&TypeDefinition::from(&CreateDomain::new(
             &composite_domains::reference("inner"),
             &Some(record),
@@ -651,7 +662,7 @@ mod domain_member_tests {
 
 #[cfg(test)]
 mod array_definition_tests {
-    use super::{PgBuiltInType, TypeDefinition, TypeReference};
+    use crate::sem::pg_type::{PgBuiltInType, TypeDefinition, TypeReference};
 
     #[rstest::rstest]
     #[case::same_element("int4", true)]
@@ -750,8 +761,9 @@ impl PgBuiltInType {
 
 #[cfg(test)]
 mod tests {
-    use crate::names::FullName;
-    use crate::syn::NodeListOpt;
+    use crate::syn::{Node, NodeInner, String as SynString};
+
+    use crate::{names::FullName, syn::NodeListOpt};
 
     fn build_string_node_list_opt(strings: &[&str]) -> NodeListOpt {
         use crate::syn::StringBuilder;
@@ -762,9 +774,9 @@ mod tests {
                 .sval(String::from(*string))
                 .build()
                 .unwrap();
-            let string_value = crate::syn::String::from(string_value);
-            let string_node = crate::syn::NodeInner::from(string_value);
-            let string_node = crate::syn::Node::from(string_node);
+            let string_value = SynString::from(string_value);
+            let string_node = NodeInner::from(string_value);
+            let string_node = Node::from(string_node);
             string_values.push(string_node);
         }
         NodeListOpt::from(string_values)

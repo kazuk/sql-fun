@@ -1,5 +1,4 @@
-use crate::async_tokio::read_response;
-use crate::{JsonRpcRequest, JsonRpcResponse};
+use crate::{JsonRpcRequest, JsonRpcResponse, async_tokio::read_response};
 
 use std::{collections::HashMap, convert::Infallible, future::Future, pin::Pin, sync::Arc};
 
@@ -46,7 +45,7 @@ impl RequestAdmission {
 
 #[cfg(test)]
 mod admission_tests {
-    use super::RequestAdmission;
+    use crate::async_tokio::streaming::coordination::RequestAdmission;
     use std::time::Duration;
 
     #[tokio::test]

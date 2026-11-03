@@ -62,7 +62,7 @@ impl PgFunctionProto {
 
 #[cfg(test)]
 mod test_function_properties {
-    use super::PgFunctionProto;
+    use crate::context::base_context::builtin_fun::PgFunctionProto;
 
     #[rstest::rstest]
     #[case::scalar("f", false, true)]
@@ -446,7 +446,9 @@ mod test_declared_builtin_results {
     }
 
     mod test_helpers {
-        use super::super::{PgBuiltInFunctions, PgFunctionDetail, PgFunctionProto};
+        use crate::context::base_context::builtin_fun::{
+            PgBuiltInFunctions, PgFunctionDetail, PgFunctionProto,
+        };
         use std::collections::HashMap;
 
         pub(super) fn functions_with_scalar_and_output_overloads() -> PgBuiltInFunctions {
@@ -482,7 +484,7 @@ mod test_builtin_function_details {
 
     use crate::names::FullName;
 
-    use super::PgBuiltInFunctions;
+    use crate::context::base_context::builtin_fun::PgBuiltInFunctions;
 
     #[test]
     fn keeps_each_record_returning_overload() {

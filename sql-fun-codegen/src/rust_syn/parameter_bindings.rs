@@ -164,7 +164,7 @@ impl ParameterBindings {
 
 #[cfg(test)]
 mod tests {
-    use super::ParameterBindings;
+    use crate::rust_syn::parameter_bindings::ParameterBindings;
 
     #[rstest::rstest]
     #[case("type", "r#type")]

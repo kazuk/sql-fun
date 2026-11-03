@@ -1,5 +1,7 @@
 pub(super) mod heavy;
 
+use crate::test_helpers::heavy as connection_heavy;
+
 use crate::schema_cache::test_helpers::SchemaProject;
 
 /// A small int4 catalog with the comparison used by the RPC scenarios.
@@ -31,7 +33,7 @@ pub(super) fn query_file(project: &SchemaProject, sql: &str) -> std::path::PathB
 
 /// Check registration and release without duplicating the registry's paging tests.
 pub(super) async fn verify_query_collection_lifecycle(
-    connection: &mut crate::test_helpers::heavy::Connection,
+    connection: &mut connection_heavy::Connection,
     queries: &::serde_json::Value,
 ) {
     use ::serde_json::json;

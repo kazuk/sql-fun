@@ -1,3 +1,4 @@
+use crate::extract::{bundle::import, catalog::write_json, publication::Publication};
 use std::{
     io::{Seek, Write},
     path::Path,
@@ -10,7 +11,7 @@ pub(super) struct BundleFixture {
 impl BundleFixture {
     pub(super) fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
-        super::catalog::write_json(
+        write_json(
             &root.path().join("metadata.json"),
             &serde_json::json!({"format_version": 1, "server_version_num": 170_009}),
         )
@@ -43,7 +44,7 @@ impl BundleFixture {
         file.write_all(header.as_bytes())?;
         file.seek(std::io::SeekFrom::Current(i64::try_from(size)?))?;
         file.write_all(&[0; 1024])?;
-        super::bundle::import(&bundle, self.path())
+        import(&bundle, self.path())
     }
 
     pub(super) fn import_entries(
@@ -63,7 +64,7 @@ impl BundleFixture {
             archive.append(&header, *bytes)?;
         }
         archive.finish()?;
-        super::bundle::import(&bundle, self.path())
+        import(&bundle, self.path())
     }
 }
 
@@ -78,11 +79,8 @@ impl PublicationFixture {
         }
     }
 
-    pub(super) fn prepare(
-        &self,
-        revision: &str,
-    ) -> Result<super::publication::Publication, anyhow::Error> {
-        let stage = super::publication::Publication::new(&self.root.path().join("catalog"))?;
+    pub(super) fn prepare(&self, revision: &str) -> Result<Publication, anyhow::Error> {
+        let stage = Publication::new(&self.root.path().join("catalog"))?;
         std::fs::write(stage.path().join(revision), revision)?;
         Ok(stage)
     }

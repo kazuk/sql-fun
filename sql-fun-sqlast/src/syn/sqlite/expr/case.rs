@@ -1,4 +1,5 @@
-use super::Expr;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 use turso_parser::ast::Expr as ExprIn;
 
 /// case when

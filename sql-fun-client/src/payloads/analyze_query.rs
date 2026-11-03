@@ -1,3 +1,4 @@
+use crate::payloads::CollectionReference;
 use std::path::PathBuf;
 
 use url::Url;
@@ -66,7 +67,9 @@ impl AnalyzeQueryArgs {
 
 #[cfg(test)]
 mod test_catalog_request_transport {
-    use super::AnalyzeQueryArgs;
+    use crate::payloads::ContextHandle;
+
+    use crate::payloads::analyze_query::AnalyzeQueryArgs;
 
     #[rstest::rstest]
     #[case::omitted(false)]
@@ -112,7 +115,7 @@ mod test_catalog_request_transport {
         catalog["cte_queries"]["a_visible"] =
             ::serde_json::to_value(PlaceholderedSql::from_query("SELECT id FROM z_dependency"))
                 .unwrap();
-        let handle = crate::payloads::ContextHandle::from("context-1".to_owned());
+        let handle = ContextHandle::from("context-1".to_owned());
         let request = AnalyzeQueryArgs::with_catalog(
             &handle,
             &base.encode(),
@@ -151,7 +154,9 @@ impl AnalyzeQueryArgs {
 
 #[cfg(test)]
 mod test_access_request {
-    use super::AnalyzeQueryArgs;
+    use crate::payloads::ContextHandle;
+
+    use crate::payloads::analyze_query::AnalyzeQueryArgs;
     #[test]
     fn access_analysis_requires_explicit_true() {
         for option in [None, Some(false), Some(true)] {
@@ -163,10 +168,7 @@ mod test_access_request {
             let args: AnalyzeQueryArgs = ::serde_json::from_value(value).unwrap();
             assert_eq!(*args.analyze_access(), option == Some(true));
         }
-        let args = AnalyzeQueryArgs::new(
-            &crate::payloads::ContextHandle::from("c".to_owned()),
-            "SELECT 1",
-        );
+        let args = AnalyzeQueryArgs::new(&ContextHandle::from("c".to_owned()), "SELECT 1");
         assert!(!args.analyze_access());
         assert!(args.with_access_analysis().analyze_access());
     }
@@ -180,10 +182,10 @@ pub struct AnalyzeQueryResponse {
 }
 
 impl super::CollectionTraversal for AnalyzeQueryResponse {
-    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+    fn collections(&self) -> Vec<&dyn CollectionReference> {
         vec![&self.queries]
     }
-    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+    fn collections_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         vec![&mut self.queries]
     }
 }
@@ -238,7 +240,7 @@ pub struct AnalyzeQueryItem {
 }
 
 impl super::CollectionTraversal for AnalyzeQueryItem {
-    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+    fn collections(&self) -> Vec<&dyn CollectionReference> {
         vec![
             &self.probrems,
             &self.column_access,
@@ -246,7 +248,7 @@ impl super::CollectionTraversal for AnalyzeQueryItem {
             &self.result_columns,
         ]
     }
-    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+    fn collections_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         vec![
             &mut self.probrems,
             &mut self.column_access,
@@ -329,20 +331,21 @@ impl super::CollectionTraversal for ColumnAccess {}
 
 #[cfg(test)]
 mod test_access_record {
+    use crate::payloads::{
+        ObjectKind,
+        analyze_query::{AccessKind, ColumnAccess, RelationName},
+    };
+
     #[test]
     fn accesses_have_exactly_four_semantic_fields() {
         for (column, kind, wire_kind) in [
-            (None, super::AccessKind::read_rows(), "ReadRows"),
-            (
-                Some("id"),
-                super::AccessKind::select_output(),
-                "SelectOutput",
-            ),
+            (None, AccessKind::read_rows(), "ReadRows"),
+            (Some("id"), AccessKind::select_output(), "SelectOutput"),
         ] {
-            let access = super::ColumnAccess::new(
+            let access = ColumnAccess::new(
                 kind,
-                crate::payloads::ObjectKind::table(),
-                &super::RelationName::new(None, Some("public"), "a"),
+                ObjectKind::table(),
+                &RelationName::new(None, Some("public"), "a"),
                 column,
             );
             let value = ::serde_json::to_value(access).unwrap();
@@ -474,8 +477,10 @@ impl ResultSetColumn {
 
 #[cfg(test)]
 mod test_analyze_query_contract {
-    use super::{AnalyzeQueryArgs, ParameterDescribe, ResultSetColumn};
-    use crate::payloads::{Nullability, TypeReference};
+    use crate::payloads::{
+        Nullability, TypeReference,
+        analyze_query::{AnalyzeQueryArgs, ParameterDescribe, ResultSetColumn},
+    };
 
     #[test]
     fn resolved_catalog_round_trips_through_existing_core_type() {

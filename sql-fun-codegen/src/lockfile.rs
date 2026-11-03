@@ -68,8 +68,7 @@ impl LockfileProvider {
 
 #[cfg(test)]
 mod test_lockfile_provider {
-    use super::LockfileProvider;
-    use crate::test_helpers::LockfileProject;
+    use crate::{lockfile::LockfileProvider, test_helpers::LockfileProject};
 
     #[rstest::rstest]
     #[case::explicit_without_default(true, false)]

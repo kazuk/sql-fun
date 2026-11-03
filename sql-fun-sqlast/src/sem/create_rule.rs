@@ -1,8 +1,13 @@
-use crate::context::BaseParseContext;
-use crate::sem::traversal::SemanticVisitorMut;
 use crate::{
-    names::FullName,
-    sem::{AnalysisError, ParseContext, SemAst, SemScalarExpr},
+    context::BaseParseContext,
+    names::{FullName, LocalName, TableName, ViewName},
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnRename, ParseContext, SelectStatement, SemAst,
+        SemScalarExpr, SourcePathWithSpan, ViewColumnLineage,
+        problem::RuleProblem,
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
+        view_write::WriteEvent,
+    },
 };
 
 /// PostgreSQL rule identity: a rule name in one resolved relation's namespace.
@@ -12,11 +17,7 @@ pub struct RuleIdentity {
     name: FullName,
 }
 impl RuleIdentity {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if &self.target == old.full_name() {
             self.target = new.full_name().clone();
         }
@@ -29,7 +30,7 @@ impl RuleIdentity {
             name: FullName::new(
                 &target.catalog().cloned(),
                 &target.schema().cloned(),
-                &crate::names::LocalName::from(name),
+                &LocalName::from(name),
             ),
         }
     }
@@ -68,11 +69,7 @@ mod identity_display_tests {
 #[derive(Debug, Clone, Default)]
 pub struct RuleReferences(Vec<RuleIdentity>);
 impl RuleReferences {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         for identity in &mut self.0 {
             identity.rename_relation(old, new);
         }
@@ -130,12 +127,12 @@ impl RuleEvent {
         Self::Delete
     }
 
-    pub(crate) const fn write_event(self) -> Option<crate::sem::view_write::WriteEvent> {
+    pub(crate) const fn write_event(self) -> Option<WriteEvent> {
         match self {
             Self::Select => None,
-            Self::Insert => Some(crate::sem::view_write::WriteEvent::insert()),
-            Self::Update => Some(crate::sem::view_write::WriteEvent::update()),
-            Self::Delete => Some(crate::sem::view_write::WriteEvent::delete()),
+            Self::Insert => Some(WriteEvent::insert()),
+            Self::Update => Some(WriteEvent::update()),
+            Self::Delete => Some(WriteEvent::delete()),
         }
     }
     pub(crate) fn permits_row(self, alias: &str) -> bool {
@@ -156,31 +153,28 @@ pub struct CreateRule {
     predicate: Option<SemScalarExpr>,
     actions: Vec<SemAst>,
     dependencies: RuleDependencies,
-    source: Option<crate::sem::SourcePathWithSpan>,
-    select_lineage: Option<crate::sem::ViewColumnLineage>,
+    source: Option<SourcePathWithSpan>,
+    select_lineage: Option<ViewColumnLineage>,
 }
 impl CreateRule {
-    pub(crate) fn rename_column(
-        &mut self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         if let Some(lineage) = &mut self.select_lineage
             && let Some(action) = self.actions.first()
             && let Some(query) = action.select_statement()
         {
             lineage.rename_column(rename, query)?;
         }
-        self.walk(&mut crate::sem::traversal::ColumnRenamer::new(rename))?;
+        self.walk(&mut ColumnRenamer::new(rename))?;
         self.retain_dependencies()
     }
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
+        old: &TableName,
+        new: &TableName,
     ) -> Result<(), AnalysisError> {
         self.identity.rename_relation(old, new);
-        self.walk(&mut crate::sem::traversal::RelationRenamer::new(old, new))?;
+        self.walk(&mut RelationRenamer::new(old, new))?;
         self.retain_dependencies()
     }
 
@@ -210,7 +204,7 @@ impl CreateRule {
     pub(crate) fn replace_view_definition(
         context: &impl ParseContext,
         target: &FullName,
-        query: &crate::sem::SelectStatement,
+        query: &SelectStatement,
     ) -> Result<Option<Self>, AnalysisError> {
         let identity = RuleIdentity::new(target, "_RETURN");
         if context.rule(&identity).is_none() {
@@ -227,7 +221,7 @@ impl CreateRule {
         )
         .map(Some)
     }
-    pub(crate) fn retain_select_lineage(&mut self, lineage: &crate::sem::ViewColumnLineage) {
+    pub(crate) fn retain_select_lineage(&mut self, lineage: &ViewColumnLineage) {
         self.select_lineage = Some(lineage.clone());
     }
     /// Registered object identity.
@@ -263,7 +257,7 @@ impl CreateRule {
         &self.dependencies
     }
     /// Source location, when provided by the caller.
-    pub const fn source(&self) -> Option<&crate::sem::SourcePathWithSpan> {
+    pub const fn source(&self) -> Option<&SourcePathWithSpan> {
         self.source.as_ref()
     }
     pub(crate) const fn replaces_unconditionally(&self) -> bool {
@@ -303,26 +297,24 @@ impl CreateRule {
 
     pub(crate) fn apply<C: ParseContext>(&self, mut context: C) -> Result<C, AnalysisError> {
         if !self.replace && context.rule(&self.identity).is_some() {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                &crate::sem::problem::RuleProblem::duplicate(&self.identity),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::duplicate(
+                &self.identity,
+            )))?;
             return Ok(context);
         }
         if context.resolve_relation_name(self.target()).is_none() {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                &crate::sem::problem::RuleProblem::target(self.target()),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::target(
+                self.target(),
+            )))?;
             return Ok(context);
         }
         // DDL chooses both operations; storage does not interpret rule semantics.
         let mut context = context.associate_rule(self.identity.target(), &self.identity)?;
         let context = if self.event == RuleEvent::select() {
-            let Some(view) =
-                context.get_view(&crate::names::ViewName::from_full_name(self.target()))
-            else {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
-                    &crate::sem::problem::RuleProblem::target(self.target()),
-                ))?;
+            let Some(view) = context.get_view(&ViewName::from_full_name(self.target())) else {
+                context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::target(
+                    self.target(),
+                )))?;
                 return Ok(context);
             };
             let query = self.actions[0]

@@ -1,17 +1,18 @@
 //! DELETE analysis through the public catalog and statement APIs.
-use crate::context::BaseParseContext;
-use crate::context::ParseContext;
+
 use crate::{
     ast::Dialect,
-    names::{ColumnName, FullName, TableName},
+    context::{BaseParseContext, ParseContext},
+    names::{AliasName, ColumnName, FullName, TableName},
     parse_statements,
-    sem::PgBuiltInType,
+    sem::{CteStatement, DataSource, PgBuiltInType, SelectStatement},
+    test_helpers::create_cache_context,
 };
 
 #[test]
 fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
 -> Result<(), Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = test_helpers::context();
     for statement in parse_statements(
         "CREATE TABLE items(id integer NOT NULL, label text); CREATE TABLE sources(id integer, label text)",
@@ -44,20 +45,20 @@ fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
             .allows(&PgBuiltInType::bool())
     );
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let crate::sem::SelectStatement::Query(boundary) = &query else {
+    let SelectStatement::Query(boundary) = &query else {
         panic!("query boundary")
     };
-    let crate::sem::CteStatement::Delete(delete) = boundary.with()[0].statement() else {
+    let CteStatement::Delete(delete) = boundary.with()[0].statement() else {
         panic!("DELETE CTE")
     };
     assert_eq!(delete.target().to_string(), "public.items");
     for (alias, relation) in [("i", "items"), ("s", "sources")] {
         let source = delete
             .from()
-            .resolve_alias(&crate::names::AliasName::from(alias))
+            .resolve_alias(&AliasName::from(alias))
             .unwrap()
             .0;
-        let crate::sem::DataSource::Table(table) = source else {
+        let DataSource::Table(table) = source else {
             panic!("catalog table")
         };
         let expected = TableName::from(FullName::with_schema("public", relation));
@@ -91,11 +92,17 @@ fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
 }
 
 mod test_helpers {
-    use crate::test_helpers::{TestParseContext, source_span};
-    use crate::{context::MutSourcePathWithSpan, names::SchemaName, sem::PgBuiltInType};
+    use crate::ast::Dialect;
+
+    use crate::{
+        context::MutSourcePathWithSpan,
+        names::SchemaName,
+        sem::PgBuiltInType,
+        test_helpers::{TestParseContext, source_span},
+    };
 
     pub(super) fn context() -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());
+        let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
         context.set_source_path_with_span(&source_span());
         context.set_get_search_path_result(&[
             SchemaName::from("public"),

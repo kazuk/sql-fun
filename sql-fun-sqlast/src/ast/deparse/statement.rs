@@ -1,11 +1,15 @@
-use super::{DeparseError, SqlEmit, SqlWriter};
-use crate::ast::{
-    PartitionBound, PartitionDatum, PartitionSpec, StatementNode, Table, TableExtras,
+use crate::{
+    ast::{
+        PartitionBound, PartitionDatum, PartitionSpec, StatementNode, SyntaxOption, Table,
+        TableExtras,
+        deparse::{DeparseError, SqlEmit, SqlWriter},
+    },
+    sem::{CreateTableMode, with_stack},
 };
 
 impl SqlEmit for StatementNode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-        crate::sem::with_stack(|| match self {
+        with_stack(|| match self {
             Self::Query(v) => v.emit(writer),
             Self::Insert(v) => v.emit(writer),
             Self::Update(v) => v.emit(writer),
@@ -37,7 +41,7 @@ impl SqlEmit for StatementNode {
     }
 }
 
-impl SqlEmit for crate::sem::CreateTableMode {
+impl SqlEmit for CreateTableMode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::Default => {}
@@ -201,7 +205,7 @@ impl SqlEmit for PartitionDatum {
         Ok(())
     }
 }
-impl crate::ast::SyntaxOption {
+impl SyntaxOption {
     fn emit_sqlite_table_option(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         if self.value.is_some() || self.namespace.is_some() {
             return w.invalid("SQLite table option", "unexpected option payload");

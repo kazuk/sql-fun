@@ -1,13 +1,13 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     context::{
         OwnershipInfoRead, RoleInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
         ViewInfoRead,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
     },
-    names::FullName,
+    names::{FullName, TableName},
     sem::{
         AlterOwner, AnalysisError, CreateFunction, CreateSchema, ObjectKind, OwnedObjectDefinition,
-        Role,
+        OwnerSpecification, OwnershipIdentity, Role, ownership::model_definitions,
     },
 };
 
@@ -58,7 +58,7 @@ impl OwnershipInfoRead for SchemaCatalog {
         {
             return Vec::new();
         }
-        let modeled = crate::sem::ownership::model_definitions(self, kind, name);
+        let modeled = model_definitions(self, kind, name);
         let mut definitions = self.ownership.definitions(kind, name);
         if !modeled.is_empty() {
             // Current-layer inventory overrides precede modeled/base snapshots.
@@ -95,8 +95,8 @@ impl OwnershipInfoRead for SchemaCatalog {
 impl SchemaFileContext {
     pub(super) fn change_dependent_sequence_owners(
         &mut self,
-        table: &crate::names::TableName,
-        owner: &crate::sem::OwnerSpecification,
+        table: &TableName,
+        owner: &OwnerSpecification,
     ) {
         for mut sequence in self.sequences_owned_by(table) {
             sequence.change_owner(owner);
@@ -127,27 +127,16 @@ impl SchemaFileContext {
         }
         Ok(self)
     }
-    fn change_table_owner(
-        &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
-    ) {
+    fn change_table_owner(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         let name = identity.name();
         if let Some(mut definition) = self.get_table_impl(name).cloned() {
             definition.change_owner(owner);
             self.catalog.store_table(name, &definition);
-            self.change_dependent_sequence_owners(
-                &crate::names::TableName::from(name.clone()),
-                owner,
-            );
+            self.change_dependent_sequence_owners(&TableName::from(name.clone()), owner);
         }
     }
 
-    fn change_sequence_owner(
-        &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
-    ) {
+    fn change_sequence_owner(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         let name = identity.name();
         if let Some(mut definition) = self.get_sequence_impl(name).cloned() {
             definition.change_owner(owner);
@@ -157,8 +146,8 @@ impl SchemaFileContext {
 
     fn change_view_owner(
         &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
+        identity: &OwnershipIdentity,
+        owner: &OwnerSpecification,
     ) -> Result<(), AnalysisError> {
         let name = identity.name();
         if let Some(mut definition) = self.get_view_impl(name).cloned() {
@@ -168,11 +157,7 @@ impl SchemaFileContext {
         Ok(())
     }
 
-    fn change_type_owner(
-        &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
-    ) {
+    fn change_type_owner(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         let name = identity.name();
         if let Some(mut definition) = self.get_type_impl(name).cloned() {
             if definition.change_owner(owner) {
@@ -185,11 +170,7 @@ impl SchemaFileContext {
         }
     }
 
-    fn change_schema_owner(
-        &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
-    ) {
+    fn change_schema_owner(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         let name = identity.name();
         if let Some(mut definition) = self.schema_definition(name.name().as_str()).cloned() {
             definition.change_owner(owner);
@@ -201,11 +182,7 @@ impl SchemaFileContext {
         }
     }
 
-    fn change_routine_owner(
-        &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
-    ) {
+    fn change_routine_owner(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         let name = identity.name();
         if let Some(mut definition) = self
             .routine_definitions(name)
@@ -219,11 +196,7 @@ impl SchemaFileContext {
         }
     }
 
-    fn retain_owner_override(
-        &mut self,
-        identity: &crate::sem::OwnershipIdentity,
-        owner: &crate::sem::OwnerSpecification,
-    ) {
+    fn retain_owner_override(&mut self, identity: &OwnershipIdentity, owner: &OwnerSpecification) {
         self.catalog
             .ownership
             .insert(&OwnedObjectDefinition::new(identity, Some(owner)));

@@ -1,3 +1,5 @@
+#[cfg(feature = "sqlite")]
+use crate::context::ViewInfoRead as ContextViewInfoRead;
 use crate::{
     ast::Dialect,
     context::{ParseContext, TableInfoRead, TriggerInfoRead},
@@ -390,7 +392,7 @@ fn associates_trigger_names_with_views(
         FullName::with_schema("public", "item_view")
     };
     let context = test_helpers::apply(sql, test_helpers::layer(&root))?.into_context();
-    let view = crate::context::ViewInfoRead::get_view_impl(&context, &target).unwrap();
+    let view = ContextViewInfoRead::get_view_impl(&context, &target).unwrap();
     let references = view.triggers().unwrap();
     assert_eq!(references.names().len(), 1);
     assert_eq!(references.resolve(&context, &target)[0].target(), &target);
@@ -634,6 +636,14 @@ fn postgres_cte_lookup_preserves_quoted_case(
 
 mod test_helpers {
     use crate::{
+        AstAndContextPair,
+        context::ParseContext,
+        parse_statements,
+        sem::{CreateTableAs, CreateView, SelectStatement, SemAst, ViewLike},
+        test_helpers::{create_cache_context, source_span},
+    };
+
+    use crate::{
         ast::Dialect,
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
         names::{ColumnName, FullName, SchemaName, TableName},
@@ -644,9 +654,7 @@ mod test_helpers {
         test_helpers::TestParseContext,
     };
 
-    pub(super) fn bound_sources(
-        query: &mut crate::sem::SelectStatement,
-    ) -> Result<Vec<String>, AnalysisError> {
+    pub(super) fn bound_sources(query: &mut SelectStatement) -> Result<Vec<String>, AnalysisError> {
         #[derive(Default)]
         struct BoundSources(Vec<String>);
         impl crate::sem::traversal::SemanticVisitorMut for BoundSources {
@@ -672,30 +680,20 @@ mod test_helpers {
         };
         context.set_get_search_path_result(&[SchemaName::from(schema)]);
         add_tables(&mut context, schema);
-        let statement = crate::parse_statements("SELECT id FROM items", dialect)
+        let statement = parse_statements("SELECT id FROM items", dialect)
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .unwrap();
         let query = statement.into_select_statemtnt().unwrap();
         let view_name = FullName::with_schema(schema, "item_view");
-        let view = crate::sem::CreateView::new(&view_name, &query, &[], &None, false);
-        context.set_get_view_impl_result(&view_name, &Some(crate::sem::ViewLike::from(&view)));
+        let view = CreateView::new(&view_name, &query, &[], &None, false);
+        context.set_get_view_impl_result(&view_name, &Some(ViewLike::from(&view)));
         let materialized_name = FullName::with_schema(schema, "item_matview");
-        let materialized = crate::sem::CreateTableAs::new(
-            &materialized_name,
-            &crate::sem::SemAst::select(&query),
-            true,
-        );
-        context.set_get_view_impl_result(
-            &materialized_name,
-            &Some(crate::sem::ViewLike::from(&materialized)),
-        );
+        let materialized = CreateTableAs::new(&materialized_name, &SemAst::select(&query), true);
+        context.set_get_view_impl_result(&materialized_name, &Some(ViewLike::from(&materialized)));
 
         let overload = OverloadVariant::new(
             &Some(TypeReference::from_full_name(FullName::with_schema(
@@ -740,7 +738,7 @@ mod test_helpers {
                 vec![column],
                 CreateTableMode::from_if_not_exists(false),
                 false,
-                &crate::test_helpers::source_span(),
+                &source_span(),
             );
             context.set_get_table_impl_result(&name, &Some(table));
         }
@@ -756,24 +754,24 @@ mod test_helpers {
     pub(super) fn resolve(
         sql: &str,
         context: &mut TestParseContext,
-    ) -> Result<crate::sem::SemAst, AnalysisError> {
-        crate::parse_statements(sql, crate::context::ParseContext::dialect(context))
+    ) -> Result<SemAst, AnalysisError> {
+        parse_statements(sql, ParseContext::dialect(context))
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(context, &mut crate::test_helpers::create_cache_context())
+            .resolve(context, &mut create_cache_context())
     }
     pub(super) fn apply(
         sql: &str,
         context: SchemaFileContext,
-    ) -> Result<crate::AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        crate::parse_statements(sql, crate::context::ParseContext::dialect(&context))
+    ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
+        parse_statements(sql, ParseContext::dialect(&context))
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())
+            .resolve_and_apply(context, &mut create_cache_context())
     }
     #[cfg(feature = "sqlite")]
     pub(super) fn sqlite_oracle() -> Result<::rusqlite::Connection, ::rusqlite::Error> {

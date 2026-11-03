@@ -1,3 +1,4 @@
+use crate::extract::initialize_catalog;
 use std::{
     fs::{self, File},
     io::ErrorKind,
@@ -162,8 +163,12 @@ impl InstallationStage {
 
 #[cfg(test)]
 mod test_publication {
-    use super::{installed, validate};
-    use crate::test_helpers::installation::InstallationFixture;
+    use crate::init::install::InstallationStage;
+
+    use crate::{
+        init::install::{installed, validate},
+        test_helpers::installation::InstallationFixture,
+    };
     use std::{fs, sync::Barrier, thread};
 
     #[test]
@@ -173,7 +178,7 @@ mod test_publication {
         let second = fixture.prepare("second");
         let ready = Barrier::new(2);
         let outcomes = thread::scope(|scope| {
-            let publish = |stage: super::InstallationStage| {
+            let publish = |stage: InstallationStage| {
                 validate(&stage.candidate(), &stage.version).unwrap();
                 assert!(!installed(&stage.destination, &stage.version).unwrap());
                 ready.wait();
@@ -288,7 +293,7 @@ pub(super) async fn install(
         false
     } else {
         let stage = InstallationStage::new(&destination, version)?;
-        crate::extract::initialize_catalog(args, version, &stage.candidate()).await?;
+        initialize_catalog(args, version, &stage.candidate()).await?;
         stage.publish()?
     };
     let status = if published {

@@ -1,5 +1,12 @@
-use crate::sem::scalar_expr::indirect::IndirectionExpr;
-use crate::sem::{AnalysisError, ParseContext, SemScalarExpr, TypeReference};
+use crate::{
+    names::ColumnName,
+    sem::{
+        AnalysisError, ColumnRename, ParseContext, SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::{RowExpr, indirect::IndirectionExpr},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
+};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MemberRef {
@@ -14,7 +21,7 @@ pub struct MemberRef {
 }
 
 impl MemberRef {
-    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(super) fn rename_column(&mut self, rename: &ColumnRename) {
         if self.base.get_type().is_some_and(|ty| {
             ty == TypeReference::concrete_type_ref(rename.table().full_name(), false)
         }) && self
@@ -22,7 +29,7 @@ impl MemberRef {
             .as_whole_row()
             .is_none_or(|row| row.has_renamed_field(rename))
         {
-            let mut name = crate::names::ColumnName::from(self.member.as_str());
+            let mut name = ColumnName::from(self.member.as_str());
             rename.rename_name(&mut name);
             self.member = name.as_str().to_owned();
         }
@@ -80,10 +87,10 @@ impl MemberRef {
         ty: &TypeReference,
     ) -> Result<(Option<TypeReference>, Option<bool>), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(columns) = source.composite_columns(context)
-            && let Some(field) = columns.get_column_def(&crate::names::ColumnName::from(member))
+            && let Some(field) = columns.get_column_def(&ColumnName::from(member))
         {
             Ok((field.get_type_cloned(), field.is_not_null()))
         } else {
@@ -105,7 +112,7 @@ impl MemberRef {
         Self::member_resolved(source, member, context)
     }
 
-    pub(super) fn member_resolved<TContext: crate::sem::ParseContext>(
+    pub(super) fn member_resolved<TContext: ParseContext>(
         source: SemScalarExpr,
         member: String,
         context: &mut TContext,
@@ -126,6 +133,8 @@ impl MemberRef {
 
 #[cfg(test)]
 mod domain_member_tests {
+    use crate::test_helpers::{column_rename::schema, create_cache_context, dynamic_types::record};
+
     use crate::{
         ast::Dialect,
         context::ParseContext,
@@ -145,7 +154,7 @@ mod domain_member_tests {
         #[case] field_type: &str,
         #[values(false, true)] frozen: bool,
     ) {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let analyzed = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
@@ -203,7 +212,7 @@ mod domain_member_tests {
 
     #[test]
     fn encountered_domain_assignments_prepare_nested_members_after_analysis() {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let analyzed = parse_statements("SELECT (($1).item).n, $2::outer_d", Dialect::postgres())
             .next()
             .unwrap()
@@ -227,26 +236,17 @@ mod domain_member_tests {
     }
     #[test]
     fn previously_unknown_owned_domains_keep_nested_parameter_relationships() {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let analyzed = parse_statements("SELECT (($1).n).n, ($1).n", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
-            .analyze(
-                crate::test_helpers::column_rename::schema(&[]).unwrap(),
-                &mut cache,
-            )
+            .analyze(schema(&[]).unwrap(), &mut cache)
             .unwrap();
         let constraints = analyzed.context().parameter_constraints().clone();
         drop(analyzed);
-        let inner = composite_domains::owned_domain(
-            "inner",
-            &crate::test_helpers::dynamic_types::record(&PgBuiltInType::int4()),
-        );
-        let outer = composite_domains::owned_domain(
-            "outer",
-            &crate::test_helpers::dynamic_types::record(&inner),
-        );
+        let inner = composite_domains::owned_domain("inner", &record(&PgBuiltInType::int4()));
+        let outer = composite_domains::owned_domain("outer", &record(&inner));
         assert!(constraints.allows(&BTreeMap::from([(1, outer)])));
         assert!(!constraints.allows(&BTreeMap::from([(1, inner)])));
     }
@@ -292,7 +292,7 @@ mod domain_member_tests {
         #[case] base: &str,
         #[case] diagnostic: AnalysisProblem,
     ) {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let analyzed = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
@@ -327,24 +327,21 @@ mod domain_member_tests {
 }
 
 impl MemberRef {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.base.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.base.visit(visitor)?;
         Ok(())
     }
 }
 
 impl MemberRef {
-    pub(super) fn row_constructor(&self) -> Option<&crate::sem::scalar_expr::RowExpr> {
+    pub(super) fn row_constructor(&self) -> Option<&RowExpr> {
         self.base
             .row_constructor()?
             .field(&self.member)?
@@ -357,7 +354,7 @@ impl MemberRef {
 
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
     ) -> Option<SemScalarExpr> {
         if let Some(row) = self.base.row_constructor()
             && let Some(field) = row.field(&self.member)
@@ -377,14 +374,14 @@ impl MemberRef {
 }
 
 impl MemberRef {
-    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk_assignment_target<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.base.walk_assignment_target(visitor)?;
         Ok(())
     }
-    pub(super) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_assignment_target<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {

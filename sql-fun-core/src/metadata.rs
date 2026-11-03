@@ -1,3 +1,4 @@
+use crate::{CodegenOptions, RewriteOptions};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -85,8 +86,9 @@ impl InitializationDatasources {
 
 #[cfg(test)]
 mod test_initialization_candidates {
-    use super::InitializationDatasources;
-    use crate::test_helpers::initialization_choices_project;
+    use crate::{
+        metadata::InitializationDatasources, test_helpers::initialization_choices_project,
+    };
 
     #[rstest::rstest]
     #[case::connector_only("connector = 'tokio-postgres'", &[])]
@@ -239,7 +241,7 @@ impl PostgresEngineVersion {
 
 #[cfg(test)]
 mod test_postgres_engine_version_paths {
-    use super::PostgresEngineVersion;
+    use crate::metadata::PostgresEngineVersion;
     use std::path::{Path, PathBuf};
 
     #[rstest::rstest]
@@ -356,10 +358,10 @@ impl RoleInventory {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct SqlFunMetadata {
     #[serde(flatten)]
-    codegen_options: crate::CodegenOptions,
+    codegen_options: CodegenOptions,
 
     #[serde(default)]
-    rewrite_options: crate::RewriteOptions,
+    rewrite_options: RewriteOptions,
 
     /// Datasource name
     #[serde(skip)]
@@ -466,13 +468,13 @@ impl SqlFunMetadata {
 
     /// Code generation options configured for this datasource.
     #[must_use]
-    pub const fn codegen_options(&self) -> &crate::CodegenOptions {
+    pub const fn codegen_options(&self) -> &CodegenOptions {
         &self.codegen_options
     }
 
     /// Executable SQL rewrite choices configured for this datasource.
     #[must_use]
-    pub const fn rewrite_options(&self) -> &crate::RewriteOptions {
+    pub const fn rewrite_options(&self) -> &RewriteOptions {
         &self.rewrite_options
     }
 
@@ -687,6 +689,8 @@ mod test_codegen_metadata {
 
 #[cfg(test)]
 mod test_role_metadata {
+    use crate::metadata::{InitializationDatasources, RoleInventory};
+
     use crate::test_helpers::{initialization_choices_project, metadata_with_codegen_options};
 
     #[rstest::rstest]
@@ -697,9 +701,7 @@ mod test_role_metadata {
     fn preserves_explicit_inventory(#[case] input: &str, #[case] expected: Option<Vec<&str>>) {
         let metadata = metadata_with_codegen_options(input).unwrap();
         let selected = metadata.get("default").unwrap();
-        let names = selected
-            .roles()
-            .map(super::RoleInventory::definitions::<String>);
+        let names = selected.roles().map(RoleInventory::definitions::<String>);
         assert_eq!(
             names,
             expected.map(|names| names.into_iter().map(String::from).collect())
@@ -719,8 +721,7 @@ mod test_role_metadata {
             "[package.metadata.database.app]\nengine = 'PostgreSQL'\ndialect = 'postgres'\n{input}"
         ));
         let declarations =
-            super::InitializationDatasources::load_from(&project.path().join("Cargo.toml"))
-                .unwrap();
+            InitializationDatasources::load_from(&project.path().join("Cargo.toml")).unwrap();
         assert!(declarations.selected_metadata("app").is_err());
     }
 
@@ -730,8 +731,7 @@ mod test_role_metadata {
             "[package.metadata.database.app]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nroles = ['owner']\n[package.metadata.database.other]\nroles = 42",
         );
         let declarations =
-            super::InitializationDatasources::load_from(&project.path().join("Cargo.toml"))
-                .unwrap();
+            InitializationDatasources::load_from(&project.path().join("Cargo.toml")).unwrap();
         let selected = declarations.selected_metadata("app").unwrap();
         assert_eq!(selected.roles().unwrap().definitions::<String>(), ["owner"]);
         assert!(declarations.selected_metadata("other").is_err());

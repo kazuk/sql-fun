@@ -49,6 +49,8 @@ impl AlterCommand {
 
 #[cfg(test)]
 mod applicability_tests {
+    use crate::ast::StatementNode;
+
     use crate::{
         ParseContext,
         context::TableInfoRead,
@@ -62,7 +64,7 @@ mod applicability_tests {
     fn suppressed_problems_do_not_authorize_application() -> testresult::TestResult {
         let mut context = schema(&["CREATE TABLE t(a integer, b integer)"])?;
         let syntax = ownership_statement("ALTER TABLE t RENAME a TO b")?;
-        let crate::ast::StatementNode::AlterRelation(relation) = syntax else {
+        let StatementNode::AlterRelation(relation) = syntax else {
             panic!("ALTER TABLE");
         };
         context.begin_parameter_type_analysis();

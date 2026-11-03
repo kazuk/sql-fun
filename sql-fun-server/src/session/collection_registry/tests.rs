@@ -1,7 +1,7 @@
 mod test_helpers;
 
 use self::test_helpers::{BorrowedTrie, ObservedSource, registry};
-use super::{HandleIdAllocator, MappedSource};
+use crate::session::collection_registry::{HandleIdAllocator, MappedSource};
 use std::sync::atomic::AtomicU64;
 
 use ::serde_json::Value;

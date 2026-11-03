@@ -1,6 +1,8 @@
 //! Parser-to-owned-AST regression cases for the published 0.8.1 grammar.
 
-use super::{Expr, Name, Stmt};
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::{Expr, Name, Stmt};
+#[cfg(feature = "sqlite")]
 use crate::test_helpers::{SqliteArrayTypeGate, SqliteSynBuilder};
 
 fn assert_bracket_name(name: &Name, expected: &str) {

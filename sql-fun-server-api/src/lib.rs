@@ -6,16 +6,15 @@ mod collection_management;
 /// payload object definitions
 pub mod payloads;
 
+pub use self::collection_management::Collection;
+#[cfg(feature = "openrpc-schema")]
+pub use self::rpc_schema::register_methods;
+
 use crate::payloads::{
     AnalyzeQueryArgs, AnalyzeQueryResponse, CollectionHandle, DescribeTableArgs,
     DescribeTableResponse, EchoArgs, InitializeSchemaArgs, ListObjectArgs, ObjectSummary,
     ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken, TokenizeSqlArgs,
 };
-
-pub use self::collection_management::Collection;
-
-#[cfg(feature = "openrpc-schema")]
-pub use self::rpc_schema::register_methods;
 
 use std::{convert::Infallible, error::Error as StdError};
 
@@ -184,6 +183,12 @@ pub trait SqlFunServerApi {
 mod rpc_schema {
 
     /// JSON-RPC method definition for `initialize_schema_context` method
+    use crate::AnalyzeQueryArgs;
+    use crate::{
+        AnalyzeQueryResponse, Collection, EchoArgs, InitializeSchemaArgs, ListObjectArgs,
+        ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken,
+        TokenizeSqlArgs,
+    };
     use typed_openrpc::RpcMethod;
 
     pub struct InitializeSchemaContextMethod;
@@ -192,16 +197,16 @@ mod rpc_schema {
         const NAME: &'static str = "initialize_schema_context";
         const SUMMARY: &'static str = "load schema dump file for semantic analysis";
 
-        type Params = super::InitializeSchemaArgs;
-        type Result = super::SchemaContext;
+        type Params = InitializeSchemaArgs;
+        type Result = SchemaContext;
     }
 
     pub struct TokenizeSqlMethod;
     impl RpcMethod for TokenizeSqlMethod {
         const NAME: &'static str = "tokenize_sql";
         const SUMMARY: &'static str = "tokenize original SQL without schema analysis";
-        type Params = super::TokenizeSqlArgs;
-        type Result = super::Collection<super::SqlToken>;
+        type Params = TokenizeSqlArgs;
+        type Result = Collection<SqlToken>;
     }
 
     pub struct EchoMethod;
@@ -210,8 +215,8 @@ mod rpc_schema {
         const NAME: &'static str = "echo";
         const SUMMARY: &'static str = "return parameters unchanged for diagnostics";
 
-        type Params = super::EchoArgs;
-        type Result = super::EchoArgs;
+        type Params = EchoArgs;
+        type Result = EchoArgs;
     }
 
     pub struct ReadCollectionMethod;
@@ -220,8 +225,8 @@ mod rpc_schema {
         const NAME: &'static str = "read_collection";
         const SUMMARY: &'static str = "read a collection";
 
-        type Params = super::ReadCollectionArgs;
-        type Result = super::Collection<serde_json::Value>;
+        type Params = ReadCollectionArgs;
+        type Result = Collection<serde_json::Value>;
     }
 
     pub struct ReleaseCollectionMethod;
@@ -230,7 +235,7 @@ mod rpc_schema {
         const NAME: &'static str = "release_collection";
         const SUMMARY: &'static str = "release a collection";
 
-        type Params = super::ReleaseCollectionArgs;
+        type Params = ReleaseCollectionArgs;
         type Result = ();
     }
 
@@ -240,8 +245,8 @@ mod rpc_schema {
         const NAME: &'static str = "analyze_query";
         const SUMMARY: &'static str = "analyze a query";
 
-        type Params = super::AnalyzeQueryArgs;
-        type Result = super::AnalyzeQueryResponse;
+        type Params = AnalyzeQueryArgs;
+        type Result = AnalyzeQueryResponse;
     }
 
     pub struct ListObjectMethod;
@@ -250,8 +255,8 @@ mod rpc_schema {
         const NAME: &'static str = "list_object";
         const SUMMARY: &'static str = "list schema objects";
 
-        type Params = super::ListObjectArgs;
-        type Result = super::Collection<super::ObjectSummary>;
+        type Params = ListObjectArgs;
+        type Result = Collection<ObjectSummary>;
     }
 
     /// register all JSON-RPC methods
@@ -268,10 +273,12 @@ mod rpc_schema {
 
 #[cfg(all(test, feature = "openrpc-schema"))]
 mod test_tokenize_openrpc {
+    use crate::register_methods;
+
     #[test]
     fn registers_tokenization_with_required_inputs_and_collection_result() {
         let mut registry = ::typed_openrpc::Registry::new();
-        super::register_methods(&mut registry);
+        register_methods(&mut registry);
         let info = ::typed_openrpc::OpenRpcInfo {
             title: "test".to_owned(),
             version: "test".to_owned(),

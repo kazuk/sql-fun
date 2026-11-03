@@ -1,3 +1,4 @@
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::{Expr, IndexedColumn, Name, ResolveType, SortOrder, SortedColumn};
 
 /// primary key constraint
@@ -599,7 +600,9 @@ impl TableConstraint {
 
 #[cfg(test)]
 mod test_constraint_conversion {
-    use super::{ColumnConstraint, GeneratedColumnType, TableConstraint};
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::constraints::{ColumnConstraint, GeneratedColumnType, TableConstraint};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
     use ::turso_parser::ast::{
         ColumnConstraint as ColumnConstraintIn, Expr as ExprIn, Literal as LiteralIn,

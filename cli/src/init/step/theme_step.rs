@@ -1,5 +1,8 @@
-use super::{Direction, InitStep, StepFuture};
-use crate::init::{InitializationState, theme::ThemePlan};
+use crate::init::{
+    InitializationState,
+    step::{Direction, InitStep, StepFuture},
+    theme::ThemePlan,
+};
 
 /// Inspect only the confirmed home's mandatory theme and collect its operation.
 pub(in crate::init) struct ThemeStep;

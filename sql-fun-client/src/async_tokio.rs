@@ -3,12 +3,16 @@ pub(crate) mod streaming;
 #[cfg(test)]
 mod test_helpers;
 
+use crate::{CompleteResponse, CompletionContext, TypedResponseError};
+
 use self::streaming::Streaming;
 
 use crate::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
-use ::tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use ::tokio::net::TcpStream;
+use ::tokio::{
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::TcpStream,
+};
 
 /// Errors from submission, transport, or graceful completion.
 #[derive(Debug, thiserror::Error)]
@@ -145,8 +149,8 @@ impl TcpJsonRpcClientAsync {
         callback: F,
     ) -> Result<(), TcpJsonRpcClientAsyncError>
     where
-        R: crate::CompleteResponse + ::serde::de::DeserializeOwned + Send + 'static,
-        F: FnOnce(Result<R, crate::TypedResponseError>) -> Fut + Send + 'static,
+        R: CompleteResponse + ::serde::de::DeserializeOwned + Send + 'static,
+        F: FnOnce(Result<R, TypedResponseError>) -> Fut + Send + 'static,
         Fut: std::future::Future<Output = Result<(), std::convert::Infallible>> + Send + 'static,
     {
         self.start_streaming()?;
@@ -160,10 +164,10 @@ impl TcpJsonRpcClientAsync {
                 Box::new(move |response| {
                     Box::pin(async move {
                         let _typed = typed;
-                        let mut context = crate::CompletionContext::new(completion_sender);
+                        let mut context = CompletionContext::new(completion_sender);
                         let result = async {
                             let response = response
-                                .map_err(|message| crate::TypedResponseError::message(&message))?;
+                                .map_err(|message| TypedResponseError::message(&message))?;
                             let value = response.into_result()?;
                             let mut value: R = ::serde_json::from_value(value)?;
                             value.register_collections(&mut context);
@@ -262,7 +266,7 @@ impl TcpJsonRpcClientAsync {
 
 #[cfg(test)]
 mod streaming_tests {
-    use super::test_helpers;
+    use crate::async_tokio::test_helpers;
     use std::time::Duration;
 
     #[rstest::rstest]
@@ -495,7 +499,7 @@ mod streaming_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::test_helpers;
+    use crate::async_tokio::test_helpers;
     use std::time::Duration;
 
     #[rstest::rstest]

@@ -1,15 +1,20 @@
 use crate::{
     StringSpan,
+    ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
     names::SchemaName,
-    sem::{CastContext, CastDefinition, ParseContext, PgBuiltInType, SourcePathWithSpan},
-    test_helpers::TestParseContext,
+    parse_statements,
+    sem::{
+        CastContext, CastDefinition, InputTypeConstraint, ParseContext, PgBuiltInType,
+        SourcePathWithSpan,
+    },
+    test_helpers::{TestParseContext, create_cache_context},
 };
 
 /// An in-memory base with four scalar types, one assignment cast, and integer
 /// addition. No builtin catalog or function/operator metadata is loaded.
 pub(super) fn context() -> SchemaFileContext {
-    let mut base = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());
+    let mut base = TestParseContext::default().with_dialect(Dialect::postgres());
     base.set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
     for ty in [
         PgBuiltInType::int4(),
@@ -39,13 +44,13 @@ pub(super) fn schema(
     sql: &str,
     frozen: bool,
 ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = context();
     context.set_source_path_with_span(&SourcePathWithSpan::new(
         "schema.sql",
         &StringSpan::new(0, sql.len()),
     ));
-    for statement in crate::parse_statements(sql, crate::ast::Dialect::postgres()) {
+    for statement in parse_statements(sql, Dialect::postgres()) {
         context = statement?
             .analyze(context, &mut cache_context)?
             .into_context();
@@ -65,7 +70,7 @@ pub(super) fn schema(
 
 pub(super) fn serialized_parameter_domains(
     value: &::serde_json::Value,
-) -> Vec<crate::sem::InputTypeConstraint> {
+) -> Vec<InputTypeConstraint> {
     let mut domains = Vec::new();
     match value {
         ::serde_json::Value::Object(fields) => {

@@ -1,11 +1,13 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
-    context::{ParseContext, TableInfoRead, TableInfoWrite},
+    context::{
+        ParseContext, TableInfoRead, TableInfoWrite,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
+    },
     names::{FullName, TableName},
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, CreateTable,
-        search_path::expand_relation_search_path,
+        AlterTable, AnalysisError, AnalysisProblem, CreateIndex, CreateTable, DropTable, Kind,
+        problem::CreationProblem, search_path::expand_relation_search_path,
     },
 };
 
@@ -91,33 +93,26 @@ impl TableInfoWrite for SchemaFileContext {
         };
 
         if let Some(name) = alter_table.conflicting_constraint(&table) {
-            self.report_analysis_problem(AnalysisProblem::creation(
-                crate::sem::problem::CreationProblem::constraint(
-                    &key,
-                    &FullName::from_local_name(&name),
-                    &self.creation_span(),
-                ),
-            ))?;
+            self.report_analysis_problem(AnalysisProblem::creation(CreationProblem::constraint(
+                &key,
+                &FullName::from_local_name(&name),
+                &self.creation_span(),
+            )))?;
             return Ok(self);
         }
         let implicit_changes = table.apply_alter(alter_table)?;
         let mut indexes = Vec::new();
         for change in implicit_changes {
             let index = change.into_index().with_table_identity(&key);
-            if !self.permits_relation_creation(
-                index.name(),
-                crate::sem::Kind::index(),
-                false,
-                false,
-            )? {
+            if !self.permits_relation_creation(index.name(), Kind::index(), false, false)? {
                 return Ok(self);
             }
-            if crate::sem::CreateIndex::contains_name(&indexes, index.name()) {
+            if CreateIndex::contains_name(&indexes, index.name()) {
                 self.report_analysis_problem(AnalysisProblem::creation(
-                    crate::sem::problem::CreationProblem::relation(
+                    CreationProblem::relation(
                         index.name(),
-                        crate::sem::Kind::index(),
-                        crate::sem::Kind::index(),
+                        Kind::index(),
+                        Kind::index(),
                         &self.creation_span(),
                     ),
                 ))?;
@@ -135,10 +130,7 @@ impl TableInfoWrite for SchemaFileContext {
         Ok(self)
     }
 
-    fn apply_drop_table(
-        mut self,
-        drop_table: &crate::sem::DropTable,
-    ) -> Result<Self, AnalysisError> {
+    fn apply_drop_table(mut self, drop_table: &DropTable) -> Result<Self, AnalysisError> {
         let table_names = drop_table.table_names();
         for table_name in table_names {
             let Some((key, table)) = self.table_for_update(table_name) else {
@@ -159,6 +151,8 @@ impl TableInfoWrite for SchemaFileContext {
 
 #[cfg(test)]
 mod test_drop_catalog_key {
+    use crate::test_helpers::schema_layer;
+
     use crate::{
         context::{BaseParseContext, ParseContext, TableInfoRead, TableInfoWrite},
         names::{FullName, TableName},
@@ -179,7 +173,7 @@ mod test_drop_catalog_key {
         let mut context = test_helpers::unqualified_tables()?;
         if inherited {
             let base = context.freeze();
-            context = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &base);
+            context = schema_layer(std::path::Path::new("child.sql"), &base);
         }
         test_helpers::set_search_path(&mut context, path);
         let name = TableName::from(target.parse::<FullName>()?);
@@ -206,6 +200,8 @@ mod test_drop_catalog_key {
     }
 
     mod test_helpers {
+        use crate::test_helpers::{TestParseContext, schema_layer, source_span};
+
         use crate::{
             context::{ParseContext, SchemaFileContext},
             names::{FullName, SchemaName, TableName},
@@ -213,15 +209,14 @@ mod test_drop_catalog_key {
         };
 
         pub(super) fn unqualified_tables() -> Result<SchemaFileContext, AnalysisError> {
-            let root = crate::test_helpers::TestParseContext::default().freeze();
-            let mut context =
-                crate::test_helpers::schema_layer(std::path::Path::new("parent.sql"), &root);
+            let root = TestParseContext::default().freeze();
+            let mut context = schema_layer(std::path::Path::new("parent.sql"), &root);
             let table = CreateTable::new(
                 &TableName::from("items".parse::<FullName>()?),
                 Vec::new(),
                 CreateTableMode::from_if_not_exists(false),
                 false,
-                &crate::test_helpers::source_span(),
+                &source_span(),
             );
             for schema in ["a", "b"] {
                 context.set_search_path(&[SchemaName::from(schema)]);

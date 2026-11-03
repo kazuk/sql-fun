@@ -1,9 +1,17 @@
-use crate::ast::{Query, TryFromWithTokens};
-use crate::syn::Opt;
-use crate::test_helpers::{SynBuilder, TestParseContext};
+#[cfg(feature = "sqlite")]
+use crate::sem::CastContext;
+#[cfg(feature = "sqlite")]
+use crate::sem::CastDefinition;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::Stmt;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::SqliteSynBuilder;
 use crate::{
-    names::OperatorName,
-    sem::{AnalysisError, OperatorDefinition, PgBuiltInType},
+    ast::{Query, TryFromWithTokens},
+    names::{OperatorName, SchemaName},
+    sem::{AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType},
+    syn::Opt,
+    test_helpers::{SynBuilder, TestParseContext, source_span},
 };
 
 use ::sql_fun_core::IVec;
@@ -18,9 +26,7 @@ pub(super) fn postgres(sql: &str) -> Result<Query, AnalysisError> {
 
 #[cfg(feature = "sqlite")]
 pub(super) fn sqlite(sql: &str) -> Result<Query, AnalysisError> {
-    let crate::syn::sqlite::Stmt::Select(query) =
-        crate::test_helpers::SqliteSynBuilder.parse_as_stmt(sql)
-    else {
+    let Stmt::Select(query) = SqliteSynBuilder.parse_as_stmt(sql) else {
         panic!("SELECT fixture");
     };
     Query::try_from(&query)
@@ -33,7 +39,7 @@ impl AnalysisFixture {
     pub(super) fn with_qualified_addition() -> TestParseContext {
         let mut catalog = Self::context();
         let integer = PgBuiltInType::int4();
-        let definition = OperatorDefinition::binary(&[crate::sem::BinaryOperatorDefinition::new(
+        let definition = OperatorDefinition::binary(&[BinaryOperatorDefinition::new(
             &integer, &integer, &integer, true,
         )]);
         catalog.set_get_operator_op_result(
@@ -51,16 +57,14 @@ impl AnalysisFixture {
         catalog.set_get_implicit_cast_result(
             &PgBuiltInType::int4(),
             &PgBuiltInType::text(),
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::implicit(),
-            )),
+            Some(CastDefinition::new(CastContext::implicit())),
         );
         catalog
     }
     pub(super) fn with_index_table() -> TestParseContext {
         let mut catalog = Self::context();
-        catalog.set_get_search_path_result(&[crate::names::SchemaName::from("public")]);
-        catalog.setup_table("items", &[], &crate::test_helpers::source_span());
+        catalog.set_get_search_path_result(&[SchemaName::from("public")]);
+        catalog.setup_table("items", &[], &source_span());
         catalog
     }
 

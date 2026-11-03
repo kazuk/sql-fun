@@ -1,7 +1,8 @@
 use crate::{
+    CacheContext,
     ast::{
-        Alias, Assignment, Conflict, ConflictAction, Dialect, Expr, IndexExpression, Insert, Name,
-        OverridingKind, Query, QueryBody,
+        Access, Alias, Assignment, Conflict, ConflictAction, Dialect, Expr, IndexExpression,
+        Insert, Name, OverridingKind, Query, QueryBody,
     },
     context::ParseContext,
     names::{ColumnName, TableName, ViewName},
@@ -20,7 +21,7 @@ impl Insert {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<Option<InsertStatement>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|value| {
@@ -458,7 +459,7 @@ impl InsertTargetCollection {
                 let destination =
                     Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
                         .resolve_column(context, scope)?;
-                let destination = crate::ast::Access::resolve_sequence(
+                let destination = Access::resolve_sequence(
                     &assignment.indirection,
                     context,
                     expression_scope,

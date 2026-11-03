@@ -1,7 +1,10 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::sem::{
-    AnalysisError, AnalysisProblem, InputTypeConstraint, ParseContext, PgBuiltInType,
-    SemScalarExpr, TypeReference,
+    AnalysisError, AnalysisProblem, InputTypeConstraint, ParameterConstraints, ParseContext,
+    PgBuiltInType, SemScalarExpr, TypeReference,
+    parameter_resolution::ParameterResolution,
+    problem::MinMaxProblem,
+    scalar_expr::SemScalarExprNode,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
 };
 
 /// PostgreSQL GREATEST or LEAST, retaining analyzed operands and output constraints.
@@ -27,9 +30,7 @@ impl MinMaxExpr {
             node: None,
         };
         if arguments.is_empty() {
-            context.report_analysis_problem(AnalysisProblem::min_max(
-                crate::sem::problem::MinMaxProblem::empty(),
-            ))?;
+            context.report_analysis_problem(AnalysisProblem::min_max(MinMaxProblem::empty()))?;
         } else if arguments.iter().all(|arg| Self::input_type(arg).is_some()) {
             let inputs: Vec<_> = arguments.iter().filter_map(Self::input_type).collect();
             match Self::common_type(context, &inputs) {
@@ -104,7 +105,7 @@ impl MinMaxExpr {
     pub(crate) fn category(
         context: &impl ParseContext,
         ty: &TypeReference,
-    ) -> Result<(char, bool), crate::sem::problem::MinMaxProblem> {
+    ) -> Result<(char, bool), MinMaxProblem> {
         if ty.is_array() == Some(true) {
             return Ok(('A', false));
         }
@@ -121,8 +122,7 @@ impl MinMaxExpr {
         } else {
             None
         };
-        let category =
-            category.ok_or_else(|| crate::sem::problem::MinMaxProblem::missing_type_facts(ty))?;
+        let category = category.ok_or_else(|| MinMaxProblem::missing_type_facts(ty))?;
         if ty.is_dynamic() {
             return Ok((category.code(), false));
         }
@@ -167,7 +167,7 @@ impl MinMaxExpr {
         context: &impl ParseContext,
         candidate: &TypeReference,
         input: &TypeReference,
-    ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
+    ) -> Result<TypeReference, MinMaxProblem> {
         if *candidate == Self::unknown() {
             return Ok(input.clone());
         }
@@ -191,11 +191,9 @@ impl MinMaxExpr {
         (input_category, _): (char, bool),
         forward: bool,
         backward: bool,
-    ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
+    ) -> Result<TypeReference, MinMaxProblem> {
         if category != input_category {
-            return Err(crate::sem::problem::MinMaxProblem::incompatible(
-                candidate, input,
-            ));
+            return Err(MinMaxProblem::incompatible(candidate, input));
         }
         if !preferred && forward && !backward {
             return Ok(input.clone());
@@ -255,13 +253,13 @@ impl MinMaxExpr {
     pub(crate) fn common_type(
         context: &impl ParseContext,
         inputs: &[TypeReference],
-    ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
+    ) -> Result<TypeReference, MinMaxProblem> {
         let target = Self::select_common_type(context, inputs)?;
         match Self::ordered(context, &target) {
             Some(true) => {}
-            Some(false) => return Err(crate::sem::problem::MinMaxProblem::not_ordered(&target)),
+            Some(false) => return Err(MinMaxProblem::not_ordered(&target)),
             None => {
-                return Err(crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target));
+                return Err(MinMaxProblem::missing_comparison_facts(&target));
             }
         }
         Ok(target)
@@ -271,9 +269,9 @@ impl MinMaxExpr {
     pub(crate) fn select_common_type(
         context: &impl ParseContext,
         inputs: &[TypeReference],
-    ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
+    ) -> Result<TypeReference, MinMaxProblem> {
         let Some(first) = inputs.first() else {
-            return Err(crate::sem::problem::MinMaxProblem::empty());
+            return Err(MinMaxProblem::empty());
         };
         let target = if *first != Self::unknown() && inputs.iter().all(|ty| ty == first) {
             first.clone()
@@ -291,9 +289,7 @@ impl MinMaxExpr {
         };
         for input in inputs {
             if !Self::can_coerce(context, input, &target) {
-                return Err(crate::sem::problem::MinMaxProblem::incompatible(
-                    input, &target,
-                ));
+                return Err(MinMaxProblem::incompatible(input, &target));
             }
         }
         Ok(target)
@@ -309,7 +305,7 @@ impl MinMaxExpr {
         }
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -318,10 +314,7 @@ impl MinMaxExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for argument in &self.arguments {
             argument.visit(visitor)?;
         }
@@ -330,7 +323,7 @@ impl MinMaxExpr {
 
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if self
@@ -347,7 +340,7 @@ impl MinMaxExpr {
     pub(super) const fn canonicalize_grouping_key(&mut self) {
         self.node = None;
     }
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         if let Some(node) = self.node {
             self.types = constraints.node_domain(node).clone();
             if let Some(ty) = self.types.single_type() {
@@ -359,9 +352,18 @@ impl MinMaxExpr {
 
 #[cfg(test)]
 mod comparison_knowledge_tests {
-    use super::MinMaxExpr;
-    use crate::sem::{AnalysisProblem, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        sem::{InputTypeConstraint, parameter_resolution::ParameterResolution},
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        sem::{
+            AnalysisProblem, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+            scalar_expr::min_max::MinMaxExpr,
+        },
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn absent_comparison_knowledge_reports_missing_metadata() {
@@ -376,10 +378,10 @@ mod comparison_knowledge_tests {
     #[test]
     fn absent_comparison_knowledge_does_not_eliminate_parameter_types() {
         let mut context = TestParseContext::default();
-        let mut cache = crate::test_helpers::create_cache_context();
-        let mut parameters = crate::sem::parameter_resolution::ParameterResolution::new(&mut cache);
+        let mut cache = create_cache_context();
+        let mut parameters = ParameterResolution::new(&mut cache);
         let arguments = [
-            parameters.parameter(1, &crate::sem::InputTypeConstraint::any()),
+            parameters.parameter(1, &InputTypeConstraint::any()),
             SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),
         ];
         let (_, types) = parameters

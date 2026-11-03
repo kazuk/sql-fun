@@ -1,5 +1,7 @@
-use crate::payloads::{SqlToken, TokenizeSqlArgs};
-use crate::{Collection, TcpJsonRpcClientAsync, TypedResponseError};
+use crate::{
+    Collection, TcpJsonRpcClientAsync, TypedResponseError,
+    payloads::{SqlToken, TokenizeSqlArgs},
+};
 use ::sql_fun_core::{SqlDialect, SqlToken as CoreToken, TokenStream};
 
 impl TcpJsonRpcClientAsync {
@@ -105,7 +107,7 @@ mod test_helpers;
 
 #[cfg(test)]
 mod transport_tests {
-    use super::test_helpers::{TokenPeer, continuation};
+    use crate::tokenize_sql::test_helpers::{TokenPeer, continuation};
     use ::sql_fun_core::SqlDialect;
 
     #[tokio::test]

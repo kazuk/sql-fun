@@ -15,11 +15,6 @@ impl InitStep for ConfirmInstallStep {
         Box::pin(async move {
             state.prepare_plans()?;
             state.validate_complete()?;
-            state
-                .theme
-                .as_ref()
-                .expect("collected theme plan")
-                .review()?;
             if state.args.assume_yes() {
                 return Ok(StepCompletion::next());
             }
@@ -28,7 +23,8 @@ impl InitStep for ConfirmInstallStep {
                     "Initialize sql-fun development support?",
                     &["Ok".to_owned(), "Cancel".to_owned()],
                     &[],
-                );
+                )
+                .with_explanation(&state.review()?);
                 let answer = state.input.answer(&request)?;
                 if let Some(indices) = answer.selected_indices() {
                     if indices == [0] {

@@ -192,6 +192,7 @@ impl Input {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PromptRequest {
     title: String,
+    explanation: String,
     input: Input,
     automatic: Option<PromptResponse>,
 }
@@ -205,6 +206,7 @@ impl PromptRequest {
     pub fn confirm(title: &str) -> Self {
         Self {
             title: title.to_owned(),
+            explanation: String::new(),
             input: Input::confirm(),
             automatic: None,
         }
@@ -213,9 +215,16 @@ impl PromptRequest {
     pub fn text(title: &str, default: &str) -> Self {
         Self {
             title: title.to_owned(),
+            explanation: String::new(),
             input: Input::text(default),
             automatic: None,
         }
+    }
+
+    /// Decision context is rendered on every attempt, before the question.
+    pub fn with_explanation(mut self, explanation: &str) -> Self {
+        explanation.clone_into(&mut self.explanation);
+        self
     }
 
     pub fn with_retained_selection(mut self, retained: &[String]) -> Self {
@@ -236,6 +245,7 @@ impl PromptRequest {
     pub fn multi_select(title: &str, options: &[String], defaults: &[usize]) -> Self {
         Self {
             title: title.to_owned(),
+            explanation: String::new(),
             input: Input::multi_select(options, defaults),
             automatic: None,
         }
@@ -253,6 +263,9 @@ impl PromptRequest {
     pub fn run(&self) -> Result<PromptResponse, InitError> {
         if let Some(response) = self.automatic_response() {
             return Ok(response.clone());
+        }
+        if !self.explanation.is_empty() {
+            println!("{}", self.explanation);
         }
         self.input.run(&self.title)
     }

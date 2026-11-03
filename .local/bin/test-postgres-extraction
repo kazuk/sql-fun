@@ -109,6 +109,14 @@ class InitTerminal:
         self.wait(marker, since)
         self.wait("Ctrl+C: cancel.", since)
 
+    def context_before(self, question, *fragments, since=0):
+        """Decision context must precede the current question, including on Back."""
+        rendered = self.rendered(since)
+        question_at = rendered.rindex(question.encode())
+        context = rendered[:question_at]
+        for fragment in fragments:
+            assert fragment.encode() in context, f"missing decision context {fragment!r}: {rendered!r}"
+
     def send(self, keys, next_prompt):
         start = len(self.transcript)
         os.write(self.master, keys)
@@ -149,14 +157,17 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
     terminal = InitTerminal(binary, project, home, metadata=manifest if ambient_metadata else None)
     try:
         terminal.prompt("sql-fun home directory (SQL_FUN_HOME)?")
+        terminal.context_before("sql-fun home directory (SQL_FUN_HOME)?", "SQL_FUN_HOME", "Suggested location:", str(home))
         terminal.send(b"\r", f"Use {home}")
-        terminal.send(b"y\r", "Choose engines")
+        start = terminal.send(b"y\r", "Choose engines")
+        terminal.context_before("Choose engines", "PostgreSQL:", "SQLite:", "no SQLite engine data", str(home), since=start)
         assert not home.exists(), "home must not be created during questions"
         terminal.wait("[ ] postgres")
         terminal.wait("[ ] sqlite")
         assert b"Choose datasources" not in terminal.rendered(), "bare init must not inspect project metadata"
         terminal.send(b"\r", "Select at least one option explicitly.")
-        terminal.send(b"\x1b[B \r", "Initialize sql-fun development support?")
+        start = terminal.send(b"\x1b[B \r", "Initialize sql-fun development support?")
+        terminal.context_before("Initialize sql-fun development support?", "Review setup", "Engines (execution order): sqlite", "Theme destination:", str(home), since=start)
         assert not home.exists(), "home must not be created before final Ok"
         terminal.send(b"\r", "Choose exactly one action explicitly")
         terminal.finish(b" \r", 0)
@@ -175,11 +186,13 @@ def validate_theme_navigation(binary, destination):
     try:
         terminal.prompt("home directory")
         terminal.send(b"\r", f"Use {home}")
-        terminal.send(b"y\r", "Choose highlighter theme operation")
+        start = terminal.send(b"y\r", "Choose highlighter theme operation")
+        terminal.context_before("Choose highlighter theme operation", str(home / "highlighter/default.toml"), "HTTPS access", "Create/Edit theme", since=start)
         terminal.send(b"\r", "Select at least one option explicitly")
         terminal.send(b" \r", "Initialize sql-fun development support?")
         assert not home.exists()
-        terminal.send(b"\x1b", "Choose highlighter theme operation")
+        start = terminal.send(b"\x1b", "Choose highlighter theme operation")
+        terminal.context_before("Choose highlighter theme operation", str(home / "highlighter/default.toml"), "HTTPS access", since=start)
         terminal.send(b"\r", "Initialize sql-fun development support?")
         assert not home.exists()
         terminal.finish(b" \r", 0)
@@ -202,10 +215,14 @@ def validate_theme_navigation(binary, destination):
     print("Theme init: explicit choice, retained Back, pre-confirmation isolation and cancellation passed", flush=True)
 
 
-def validate_theme_editor(binary, destination):
-    project = destination / "theme-editor"
+def validate_theme_editor(binary, destination, invalid_existing=False):
+    project = destination / ("theme-editor-invalid" if invalid_existing else "theme-editor")
     project.mkdir()
     home = project / "home"
+    if invalid_existing:
+        (home / "highlighter").mkdir(parents=True)
+        (home / "highlighter/default.toml").write_text("[[invalid")
+    before = home_snapshot(home)
     editor = project / "editor"
     editor.write_text("#!/bin/sh\nprintf \"keyword = { foreground = 'blue' }\" > \"$1\"\n")
     editor.chmod(0o755)
@@ -214,17 +231,34 @@ def validate_theme_editor(binary, destination):
         terminal.prompt("home directory")
         terminal.send(b"\r", f"Use {home}")
         terminal.send(b"y\r", "Choose highlighter theme operation")
-        terminal.send(b"\x1b[B \r", "Theme editor executable")
+        if invalid_existing:
+            terminal.context_before("Choose highlighter theme operation", "existing theme is invalid", "Downloading cannot overwrite")
+            terminal.send(b" \r", "Theme editor executable")
+        else:
+            terminal.send(b"\x1b[B \r", "Theme editor executable")
+        terminal.context_before("Theme editor executable", "temporary", "without shell arguments", str(home / "highlighter/default.toml"))
         terminal.send(str(editor).encode() + b"\r", "Initialize sql-fun development support?")
-        assert not home.exists(), "editor must not run before final authorization"
+        assert home_snapshot(home) == before, "editor must not run before final authorization"
         terminal.send(b"\x1b", "Theme editor executable")
-        terminal.send(b"\r", "Initialize sql-fun development support?")
-        assert not home.exists()
+        start = terminal.send(b"\r", "Initialize sql-fun development support?")
+        terminal.context_before("Initialize sql-fun development support?", "Create/Edit theme", "Theme editor:", str(editor), since=start)
+        assert home_snapshot(home) == before
         terminal.finish(b" \r", 0)
         assert (home / "highlighter/default.toml").read_text() == "keyword = { foreground = 'blue' }"
     finally:
         terminal.close()
-    print("Theme editor: explicit executable, retained Back and post-confirmation validated installation passed", flush=True)
+    before = home_snapshot(home)
+    terminal = InitTerminal(binary, project, home, ["--sql-fun-home", str(home), "--engines", "sqlite"], theme_choice=True)
+    try:
+        terminal.prompt(f"Use {home}")
+        start = terminal.send(b"y\r", "Initialize sql-fun development support?")
+        terminal.context_before("Initialize sql-fun development support?", "kept unchanged", "Retain validated existing theme", since=start)
+        assert b"Choose highlighter theme operation" not in terminal.rendered(start)
+        terminal.finish(b" \r", 0)
+        assert home_snapshot(home) == before
+    finally:
+        terminal.close()
+    print(f"Theme editor (invalid_existing={invalid_existing}): explicit editor, Back, validated apply and retention passed", flush=True)
 
 
 def home_snapshot(home):
@@ -327,7 +361,8 @@ def validate_supplied_init_navigation(binary, destination):
                             "--engines", "postgres,sqlite", "--docker", "--engine-versions", "17,18"])
     try:
         terminal.prompt(f"Use {home}")
-        terminal.send(b"y\r", "Initialize sql-fun development support?")
+        start = terminal.send(b"y\r", "Initialize sql-fun development support?")
+        terminal.context_before("Initialize sql-fun development support?", "Engines supplied by --engines", "PostgreSQL source supplied by --docker", "PostgreSQL versions supplied by --engine-versions", str(home / "postgres/17"), str(home / "postgres/18"), since=start)
         # Entire nonprompt nested branches must not trap backward traversal.
         terminal.send(b"\x1b", f"Use {home}")
         terminal.send(b"\x1b", f"Use {home}")
@@ -352,7 +387,8 @@ def validate_datasource_init_navigation(binary, destination):
     try:
         terminal.prompt("home directory")
         terminal.send(b"\r", f"Use {home}")
-        terminal.send(b"y\r", "Choose datasources")
+        start = terminal.send(b"y\r", "Choose datasources")
+        terminal.context_before("Choose datasources", str(manifest), "A datasource is", "local: engine sqlite", "pg: engine PostgreSQL; PostgreSQL target 17", since=start)
         terminal.send(b" \r", "Initialize sql-fun development support?")
         terminal.send(b"\x1b", "Choose datasources")
         terminal.send(b"\r", "Initialize sql-fun development support?")
@@ -363,7 +399,9 @@ def validate_datasource_init_navigation(binary, destination):
         terminal.send(b"\x1b", "versions to initialize")
         terminal.send(b"\x1b", "builtin source")
         terminal.send(b"\x1b", "Choose datasources")
-        terminal.send(b" \x1b[B \r", "Initialize sql-fun development support?")
+        start = terminal.send(b" \x1b[B \r", "Initialize sql-fun development support?")
+        terminal.context_before("Initialize sql-fun development support?", "local: engine sqlite", "Engines (execution order): sqlite", since=start)
+        assert b"PostgreSQL source:" not in terminal.rendered(start)
         terminal.finish(b"\x1b[B \r", 1)
         assert not home.exists()
         assert manifest.read_text() == declarations
@@ -417,9 +455,14 @@ def validate_server_init_navigation(binary, destination, connection, major):
         terminal.send(b"\r", f"Use {home}")
         terminal.send(b"y\r", "Choose engines")
         terminal.send(b" \r", "builtin source")
-        terminal.send(b"\x1b[B \r", "libpq connection string")
-        terminal.send(connection.encode() + b"\r", "connected PostgreSQL version")
-        terminal.send(b" \r", "Initialize sql-fun development support?")
+        start = terminal.send(b"\x1b[B \r", "libpq connection string")
+        terminal.context_before("PostgreSQL libpq connection string", "before", "password file", since=start)
+        terminal.send(b"\r", "a server connection is required")
+        start = terminal.send(connection.encode() + b"\r", "connected PostgreSQL version")
+        terminal.context_before("Choose the connected PostgreSQL version", "Checking the version", f"Connected server: PostgreSQL {major}", str(home / "postgres" / major), since=start)
+        start = terminal.send(b" \r", "Initialize sql-fun development support?")
+        terminal.context_before("Initialize sql-fun development support?", "PostgreSQL source: Existing PostgreSQL server", "Server connection: entered in this session; value not repeated", since=start)
+        assert connection.encode() not in terminal.rendered(start)
         terminal.send(b"\x1b", "connected PostgreSQL version")
         terminal.send(b"\x1b", "libpq connection string")
         # The retained connection is editable, and reconfirmation preserves the version.
@@ -442,6 +485,38 @@ def validate_server_init_navigation(binary, destination, connection, major):
     finally:
         terminal.close()
     print(f"Init PostgreSQL {major}: connection re-entry, retained version and source invalidation passed", flush=True)
+    validate_supplied_server_init(binary, destination, connection, major, major)
+    other = next(version for version in IMAGES if version != major)
+    validate_supplied_server_init(binary, destination, connection, major, other)
+
+
+def validate_supplied_server_init(binary, destination, connection, detected, requested):
+    """Supplied targets must be visible before connecting, even when they mismatch."""
+    project = destination / f"supplied-server-{detected}-{requested}"
+    project.mkdir()
+    home = project / "home"
+    terminal = InitTerminal(binary, project, home, ["--sql-fun-home", str(home),
+                            "--engines", "postgres", "--database-url", connection,
+                            "--engine-versions", requested], tools=True)
+    try:
+        terminal.prompt(f"Use {home}")
+        if detected == requested:
+            start = terminal.send(b"y\r", "Initialize sql-fun development support?")
+            terminal.context_before("Initialize sql-fun development support?", "Server connection: supplied with --database-url; value not repeated", since=start)
+        else:
+            start = len(terminal.transcript)
+            os.write(terminal.master, b"y\r")
+            terminal.wait(f"selected versions {requested} must match connected PostgreSQL {detected}", start)
+        terminal.context_before("Checking the version", f"PostgreSQL versions supplied by --engine-versions: {requested}", str(home / "postgres" / requested), since=start)
+        assert connection.encode() not in terminal.rendered(start)
+        if detected == requested:
+            terminal.finish(b"\x1b[B \r", 1)
+        else:
+            assert terminal.process.wait(timeout=5) == 1
+        assert not home.exists()
+    finally:
+        terminal.close()
+    print(f"Supplied PostgreSQL {requested} vs server {detected}: context precedes validation; no writes", flush=True)
 
 
 def validate_masters(directory):
@@ -771,6 +846,7 @@ def main():
     validate_interactive_init(args.binary, destination, "ambient", "not valid TOML [", True)
     validate_theme_navigation(args.binary, destination)
     validate_theme_editor(args.binary, destination)
+    validate_theme_editor(args.binary, destination, invalid_existing=True)
     validate_init_navigation(args.binary, destination)
     validate_init_navigation(args.binary, destination, existing=True)
     validate_init_cancellation(args.binary, destination)

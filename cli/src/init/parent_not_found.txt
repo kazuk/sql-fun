@@ -1,1 +1,1 @@
-{path} not exist
+The parent directory {path} does not exist.

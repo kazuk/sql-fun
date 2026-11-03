@@ -1,8 +1,9 @@
 Welcome to sql-fun
 
-Follow the prompts to choose the sql-fun home directory and the engines or
-project datasources whose development support you want to initialize.
-
-PostgreSQL setup installs required builtin metadata. SQLite setup is still
-under development. Application schemas and migrations remain managed by your
-own tools.
+This setup prepares local data used to check SQL and colors used in diagnostics.
+It does not create application tables or run migrations.
+First choose what to configure, then review and approve the operations.
+Questions may read explicitly selected configuration or contact your selected
+PostgreSQL server to validate its version. Files are changed and installation
+tools are run only after final Ok.
+Setup guide: https://kazuk.github.io/sql-fun/cli/init.html

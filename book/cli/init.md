@@ -9,6 +9,13 @@ Cargo.toml or discover project metadata.
 sql-fun init
 ```
 
+The sql-fun home (`SQL_FUN_HOME`) stores the local data sql-fun uses to analyze
+SQL, together with the theme that colors diagnostics. An engine is the database
+system your SQL targets. A datasource is a named database configuration in your
+project metadata; selecting one prepares support for its engine and version.
+Initialization does not create application tables, run migrations, or change
+your project's configuration.
+
 First choose the sql-fun home directory, then explicitly choose engines.
 Use `--engines postgres`, `--engines sqlite`, or `--engines postgres,sqlite`
 to supply the engine choice directly.
@@ -42,6 +49,18 @@ to reconfirm an unchanged answer. Changing a selection clears affected dependent
 answers. For example, switching PostgreSQL sources clears the source-specific
 connection and version choices, and changing a connection requires confirming
 the server version again. Unrelated answers remain available.
+
+Each question explains its choices before asking for an answer, including
+relevant prerequisites and destination paths. Supplied CLI answers skip their
+questions; interactive setup explains their consequences before continuing.
+Back revisits show context for the current answers.
+
+The final review shows the resolved home and whether it will be created or
+reused, selected engines and datasources, PostgreSQL source and per-version
+installation paths, and the diagnostic-theme operation. It also identifies
+external tools and network access required by those operations. Connection
+strings are not repeated in this review. SQLite remains available for selection,
+with its current setup limitation explained before selection and in the review.
 
 After all answers have been validated, explicitly select **Ok** or **Cancel**
 with Space, then press Enter. Neither action is selected initially or when you
@@ -78,7 +97,8 @@ edit; directories, symlinks and unsupported destinations are rejected.
 There is no Skip option. On failure, init reports failure and preserves existing
 user data. Correct the reported problem and rerun.
 
-The final review shows the action, path, and download URL or editor. No theme is
+The theme section of the final review shows the action, path, and download URL
+or editor. No theme is
 downloaded, staged, edited or installed before final Ok. Back retains the chosen
 action for editing; changing home requires checking the new destination.
 

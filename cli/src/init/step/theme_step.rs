@@ -13,7 +13,12 @@ impl InitStep for ThemeStep {
         direction: Direction,
     ) -> StepFuture<'a> {
         Box::pin(async move {
-            let mut plan = ThemePlan::inspect(state.home.home())?;
+            let mut plan = ThemePlan::inspect(state.home.home()).map_err(|error| {
+                error.context(format!(
+                    "Cannot use diagnostic theme under {}. Correct the destination and rerun",
+                    state.home.home().display()
+                ))
+            })?;
             let automatic = plan.choose(&state.args, state.theme.as_ref(), state.input.as_mut())?;
             state.theme = Some(plan);
             Ok(direction.completed(automatic))

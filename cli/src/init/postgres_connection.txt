@@ -1,0 +1,6 @@
+Enter the PostgreSQL server to read builtin catalogs from.
+Use a PostgreSQL connection URL or libpq key=value fields, for example:
+  host=db.example.org user=catalog_reader sslmode=verify-full
+Prefer a password file rather than putting a password in the connection string.
+Continuing will use psql to connect now and validate the server version, before
+final Ok. This does not install files or read your application schema.

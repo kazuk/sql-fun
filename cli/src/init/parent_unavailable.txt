@@ -1,1 +1,1 @@
-can not to get parent
+Cannot resolve the parent of this home path.

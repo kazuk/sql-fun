@@ -444,6 +444,27 @@ directly:
   before implementation begins. For each planned addition, check whether it
   changes what the reader needs to know or do. Recheck this when reviewing the
   final documentation diff.
+- Whenever work discovers an unimplemented SQL feature or limitation, either
+  leave it unimplemented and create or update a tracking GitHub issue **and**
+  update the corresponding user-facing SQL Analysis Reference page in the same
+  work, or complete the full relevant behavior within the authorized scope with
+  regression tests and documentation of the supported behavior. For a remaining
+  limitation, describe the specific observable behavior and link its issue;
+  a general partial-support disclaimer or internal-only note is insufficient.
+  No unimplemented note is required when no limitation remains.
+- When an implementation completes an existing limitation, update or remove its
+  obsolete limitation text as part of that implementation.
+- Verify actual support against the current code and maintained tests, including
+  partially implemented features; do not copy issue wording uncritically.
+  Distinguish legal SQL, parser/common-AST acceptance, semantic interpretation,
+  and catalog effects. Valid SQL must not be described as invalid merely because
+  sql-fun has not implemented its analysis.
+- Express SQL specifications in user-facing SQL/domain vocabulary. Internal API
+  symbols and implementation mechanics belong in rustdoc or internal evidence,
+  not specification prose.
+- This maintenance rule applies to limitations discovered during work. It does
+  not require finding every currently unknown unimplemented SQL feature or make
+  all open feature issues blockers for the v0.1 release.
 
 ## SQL Analysis Context Architecture
 

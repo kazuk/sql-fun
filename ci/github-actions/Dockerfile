@@ -44,6 +44,10 @@ RUN test "$(dpkg --print-architecture)" = amd64 \
 RUN cargo binstall --locked --force --root /opt/tools \
     cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb
 
+# Install only ast-grep; its sg alias conflicts with the system group utility.
+RUN cargo binstall --locked --force --root /opt/tools --bin ast-grep -- ast-grep@0.51.1 \
+    && test "$(/opt/tools/bin/ast-grep --version)" = 'ast-grep 0.51.1'
+
 # #826: a same-path struct does not replace a trait that is still public API.
 # Keep the upstream lockfile and package version; identify the corrected CLI.
 RUN <<'SH'
@@ -226,6 +230,7 @@ RUN curl -LsSf https://github.com/rvben/rumdl/releases/download/v0.2.76/rumdl-v0
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
 
 RUN cargo deb --version \
+    && test "$(ast-grep --version)" = 'ast-grep 0.51.1' \
     && test "$(cargo semver-checks --version)" = 'cargo-semver-checks 0.51.0-sqlfun.1'
 
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz

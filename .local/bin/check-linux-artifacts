@@ -2,21 +2,22 @@
 # Inspect generated packages without installing or starting either executable.
 set -euo pipefail
 
-if (( $# != 4 )); then
-    echo "usage: check-linux-artifacts OUTPUT_DIR TARGET VERSION RELEASE_DIR" >&2
+if (( $# != 4 && $# != 5 )); then
+    echo "usage: check-linux-artifacts OUTPUT_DIR TARGET VERSION RELEASE_DIR [ARTIFACT_VERSION]" >&2
     exit 2
 fi
 output_dir=$(realpath "$1")
 package_target=$2
 package_version=$3
 release_dir=$(realpath "$4")
+artifact_version=${5:-$package_version}
 case "$package_target" in
     x86_64-unknown-linux-gnu) deb_arch=amd64; elf_machine='Advanced Micro Devices X86-64' ;;
     *) echo "unsupported packaging target: $package_target" >&2; exit 2 ;;
 esac
 deb_version=${package_version/-/'~'}
-deb="$output_dir/sql-fun_${package_version}_${deb_arch}.deb"
-tarball="$output_dir/sql-fun-${package_version}-${package_target}.tar.gz"
+deb="$output_dir/sql-fun_${artifact_version}_${deb_arch}.deb"
+tarball="$output_dir/sql-fun-${artifact_version}-${package_target}.tar.gz"
 extracted=$(mktemp -d)
 trap 'rm -rf "$extracted"' EXIT
 (

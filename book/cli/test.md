@@ -7,6 +7,9 @@ datasource selection, schema levels, and server prerequisites as
 [`sql-fun analyze`](analyze.md), and never creates or validates Rust query lockfiles.
 Its legacy SQL-source form also uses the same input syntax as `analyze`.
 
+`test` does not request the optional relation/column access analysis that
+[`analyze`](analyze.md#relation-and-column-access) enables by default.
+
 ## Named case arrays
 
 Pass a JSON, TOML, or YAML case array without `--expect` to keep each SQL input

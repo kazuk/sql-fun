@@ -5,11 +5,11 @@ use ::tokio::{
     net::{TcpListener, TcpStream},
 };
 
-pub(super) struct SessionInputs {
+pub(crate) struct SessionInputs {
     file: ::tempfile::NamedTempFile,
 }
 impl SessionInputs {
-    pub(super) fn new(queries: &[&str]) -> ::testresult::TestResult<Self> {
+    pub(crate) fn new(queries: &[&str]) -> ::testresult::TestResult<Self> {
         let file = ::tempfile::NamedTempFile::with_suffix(".json")?;
         std::fs::write(
             file.path(),
@@ -19,20 +19,11 @@ impl SessionInputs {
         )?;
         Ok(Self { file })
     }
-    pub(super) fn expectations(
-        &self,
-        inputs: &super::input::SqlInputs,
-    ) -> ::testresult::TestResult<Vec<super::expectation::Expectation>> {
-        Ok(super::expectation::Expectation::load(
-            &format!("{}#$.expected", self.file.path().display()),
-            inputs,
-        )?)
+    pub(crate) fn expectations(&self) -> String {
+        format!("{}#$.expected", self.file.path().display())
     }
-    pub(super) fn inputs(&self) -> ::testresult::TestResult<super::input::SqlInputs> {
-        Ok(super::input::SqlInputs::load(&format!(
-            "{}#$.queries",
-            self.file.path().display()
-        ))?)
+    pub(crate) fn selection(&self) -> String {
+        format!("{}#$.queries", self.file.path().display())
     }
 }
 
@@ -40,12 +31,12 @@ fn page(items: &[Value]) -> Value {
     ::serde_json::json!({"handle":"test","total_length":items.len(),"offset":0,"require_release":false,"items":items})
 }
 
-pub(super) fn context() -> SchemaContext {
+pub(crate) fn context() -> SchemaContext {
     ::serde_json::from_value(::serde_json::json!({"context_handle":"test-context","schema_dump_hash":null,"problems":page(&[])})).unwrap()
 }
 
 /// A small protocol peer injects deterministic RPC/transport failures without a service.
-pub(super) async fn peer() -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<()>) {
+pub(crate) async fn peer() -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let task = ::tokio::spawn(async move {
@@ -80,7 +71,7 @@ pub(super) async fn peer() -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<
     )
 }
 
-pub(super) fn renderer() -> ::testresult::TestResult<crate::DiagnosticRenderer> {
+pub(crate) fn renderer() -> ::testresult::TestResult<crate::DiagnosticRenderer> {
     let args = ::sql_fun_core::SqlFunArgs::builder(&std::collections::HashMap::new())?
         .term_color(::sql_fun_core::TerminalColor::Never)
         .build()?;

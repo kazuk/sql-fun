@@ -20,6 +20,9 @@ use ::sql_fun_core::{SchemaLevel, SqlFunArgs};
 pub struct AnalyzeArgs {
     #[command(flatten)]
     input: InputArgs,
+    /// Disable relation/column access analysis and its output.
+    #[arg(long)]
+    no_column_access: bool,
 }
 /// Check diagnostic sets and result-column contracts for explicit SQL inputs.
 #[derive(Debug, Clone, clap::Args)]
@@ -46,7 +49,14 @@ struct InputArgs {
 impl AnalyzeArgs {
     pub(crate) async fn execute(&self, args: &SqlFunArgs) -> Result<ExitCode, ::anyhow::Error> {
         let inputs = SqlInputs::load(&self.input.input)?;
-        let cases = execute(args, self.input.schema_level, &inputs, None).await;
+        let cases = execute(
+            args,
+            self.input.schema_level,
+            &inputs,
+            None,
+            !self.no_column_access,
+        )
+        .await;
         finish(&cases, None, false)
     }
 }
@@ -58,6 +68,7 @@ impl TestArgs {
             self.input.schema_level,
             inputs.sql(),
             Some(inputs.expectations()),
+            false,
         )
         .await;
         finish(&cases, self.junit_xml.as_deref(), true)
@@ -102,6 +113,7 @@ async fn execute(
     level: SchemaLevel,
     inputs: &SqlInputs,
     expectations: Option<&[Expectation]>,
+    analyze_access: bool,
 ) -> Vec<Case> {
     let mut cases: Vec<_> = inputs
         .queries()
@@ -136,7 +148,16 @@ async fn execute(
             return cases;
         }
     };
-    execute_session(client, context, renderer, inputs, expectations, cases).await
+    execute_session(
+        client,
+        context,
+        renderer,
+        inputs,
+        expectations,
+        analyze_access,
+        cases,
+    )
+    .await
 }
 
 async fn execute_session(
@@ -145,6 +166,7 @@ async fn execute_session(
     renderer: crate::DiagnosticRenderer,
     inputs: &SqlInputs,
     expectations: Option<&[Expectation]>,
+    analyze_access: bool,
     mut cases: Vec<Case>,
 ) -> Vec<Case> {
     for (index, query) in inputs.queries().iter().enumerate() {
@@ -155,6 +177,11 @@ async fn execute_session(
                 .as_ref()
                 .context("schema initialization returned no context handle")?;
             let request = AnalyzeQueryArgs::new(handle, query);
+            let request = if analyze_access {
+                request.with_access_analysis()
+            } else {
+                request
+            };
             let response: AnalyzeQueryResponse =
                 request_typed(&mut client, "analyze_query", &request).await?;
             let prepared = prepare_tokens(&mut client, &response).await;
@@ -174,6 +201,7 @@ async fn execute_session(
                     &mut std::io::stdout().lock(),
                     &inputs.identity(index),
                     &response,
+                    analyze_access,
                 )?;
             }
             if let Some(error) = prepared.error() {
@@ -215,6 +243,47 @@ async fn execute_session(
     cases
 }
 
+#[cfg(test)]
+mod test_execute_session {
+    use super::{Case, Expectation, SqlInputs, execute_session};
+    use crate::test_helpers::direct_sql::session as test_helpers;
+    #[rstest::rstest]
+    #[case::rpc_continues(vec!["ok", "api_error", "ok"], 2, 1)]
+    #[case::terminal_marks_remaining(vec!["ok", "transport_error", "ok"], 1, 2)]
+    #[tokio::test]
+    async fn independent_cases_keep_their_outcomes_after_execution_errors(
+        #[case] queries: Vec<&str>,
+        #[case] passes: usize,
+        #[case] errors: usize,
+    ) -> ::testresult::TestResult {
+        let fixture = test_helpers::SessionInputs::new(&queries)?;
+        let inputs = SqlInputs::load(&fixture.selection())?;
+        let expected = Expectation::load(&fixture.expectations(), &inputs)?;
+        let renderer = test_helpers::renderer()?;
+        let (client, peer) = test_helpers::peer().await;
+        let cases = inputs
+            .queries()
+            .iter()
+            .enumerate()
+            .map(|(index, _)| Case::new(&inputs.identity(index)))
+            .collect();
+        let cases = execute_session(
+            client,
+            test_helpers::context(),
+            renderer,
+            &inputs,
+            Some(&expected),
+            false,
+            cases,
+        )
+        .await;
+        peer.await?;
+        assert_eq!(cases.iter().filter(|case| case.passed()).count(), passes);
+        assert_eq!(cases.iter().filter(|case| case.has_error()).count(), errors);
+        Ok(())
+    }
+}
+
 async fn initialize(
     client: &mut TcpJsonRpcClientAsync,
     request: &::sql_fun_client::payloads::InitializeSchemaArgs,
@@ -248,45 +317,4 @@ async fn initialize(
         "schema initialization returned no context handle"
     );
     Ok(context)
-}
-
-#[cfg(test)]
-mod test_helpers;
-#[cfg(test)]
-mod tests {
-    use super::{Case, execute_session, test_helpers};
-    #[rstest::rstest]
-    #[case::rpc_continues(vec!["ok", "api_error", "ok"], 2, 1)]
-    #[case::terminal_marks_remaining(vec!["ok", "transport_error", "ok"], 1, 2)]
-    #[tokio::test]
-    async fn independent_cases_keep_their_outcomes_after_execution_errors(
-        #[case] queries: Vec<&str>,
-        #[case] passes: usize,
-        #[case] errors: usize,
-    ) -> ::testresult::TestResult {
-        let fixture = test_helpers::SessionInputs::new(&queries)?;
-        let inputs = fixture.inputs()?;
-        let expected = fixture.expectations(&inputs)?;
-        let renderer = test_helpers::renderer()?;
-        let (client, peer) = test_helpers::peer().await;
-        let cases = inputs
-            .queries()
-            .iter()
-            .enumerate()
-            .map(|(index, _)| Case::new(&inputs.identity(index)))
-            .collect();
-        let cases = execute_session(
-            client,
-            test_helpers::context(),
-            renderer,
-            &inputs,
-            Some(&expected),
-            cases,
-        )
-        .await;
-        peer.await?;
-        assert_eq!(cases.iter().filter(|case| case.passed()).count(), passes);
-        assert_eq!(cases.iter().filter(|case| case.has_error()).count(), errors);
-        Ok(())
-    }
 }

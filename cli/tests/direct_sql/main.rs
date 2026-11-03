@@ -1,10 +1,46 @@
-//! Direct SQL commands exercise the real authenticated client and server.
+//! Direct SQL CLI request contracts and real-server integration tests.
 mod test_helpers;
 
 use self::test_helpers::{
     Suite,
     api::{heavy, schema::SchemaFixture},
 };
+
+#[rstest::rstest]
+#[case::analyze(vec!["analyze", "queries.json#$.queries"], true)]
+#[case::opt_out(vec!["analyze", "queries.json#$.queries", "--no-column-access"], false)]
+#[case::named_test(vec!["test", "cases.json"], false)]
+#[case::legacy_test(vec!["test", "queries.json#$.queries", "--expect", "queries.json#$.expected"], false)]
+#[tokio::test]
+async fn command_requests_access_only_for_default_analyze(
+    #[case] options: Vec<&str>,
+    #[case] access: bool,
+) -> ::testresult::TestResult {
+    let (output, requests) = test_helpers::request_peer::run(&options).await?;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(requests.len(), 2);
+    for (index, request) in requests.iter().enumerate() {
+        assert_eq!(request["query"]["Text"], format!("SELECT {}", index + 1));
+        assert_eq!(
+            request.get("analyze_access"),
+            if access {
+                Some(&::serde_json::Value::Bool(true))
+            } else {
+                None
+            }
+        );
+    }
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_eq!(
+        stdout.matches("Column access (0):").count(),
+        if access { 2 } else { 0 }
+    );
+    Ok(())
+}
 
 #[tokio::test]
 #[ignore = "High CI disk usage from server builds"]
@@ -283,7 +319,10 @@ async fn analyze_displays_statement_results_and_accesses() -> ::testresult::Test
     );
     assert!(stdout.contains("Result columns (0):"), "{stdout}");
     assert!(stdout.contains("public.events (Table)"), "{stdout}");
-    assert!(stdout.contains("Column access (0):"), "{stdout}");
+    assert!(
+        stdout.contains("public.events.id (Table): SelectOutput"),
+        "{stdout}"
+    );
     Ok(())
 }
 

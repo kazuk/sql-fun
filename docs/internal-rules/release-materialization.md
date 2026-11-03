@@ -169,8 +169,8 @@ without repeating the create operation. Existing drafts retain their metadata
 and unrelated assets.
 The helper lists assets by Release ID, requires existing expected assets to be
 uploaded with the prepared size and SHA-256 digest, and uploads only missing
-inventory names without `--clobber`. It re-reads state after upload responses and failed
-creation responses whose server-side effects may already have completed.
+inventory names without `--clobber`. It re-reads state after upload responses and
+failed creation responses whose server-side effects may already have completed.
 The shared asset check hashes retained local files and rejects absent, unusable
 or mismatched server digests during reconciliation, after upload and at final
 completion. Incomplete or conflicting assets fail without replacement; producer

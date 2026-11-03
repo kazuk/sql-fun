@@ -7,3 +7,7 @@ title = "sql-fun user manual"
 [build]
 build-dir = "user_manual"
 create-missing = true
+
+[output.html]
+
+[output.markdown]

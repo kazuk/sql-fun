@@ -1,6 +1,6 @@
 [package]
 name = "sql-fun-client"
-version = "0.1.0"
+version = "0.2.0-snapshot1"
 edition = "2024"
 license = "MIT"
 description = "callable client for sql-fun-server-api"

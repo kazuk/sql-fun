@@ -1,0 +1,17 @@
+id: no-parent-import
+language: Rust
+severity: error
+message: "Import from crate:: instead of super:: to make the module boundary explicit."
+rule:
+  kind: super
+  inside:
+    kind: use_declaration
+    stopBy: end
+  not:
+    any:
+      - inside:
+          kind: visibility_modifier
+          stopBy: end
+      - inside:
+          kind: scoped_identifier
+          field: name

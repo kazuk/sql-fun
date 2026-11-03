@@ -55,6 +55,22 @@ cargo install --locked --force \
   sccache cargo-sort cargo-edit cargo-expand cargo-binstall typos-cli
 ```
 
+The standard lint step also requires **ast-grep 0.51.1**. The development/CI
+image includes it. Outside that image, install only its unambiguous executable
+(the `sg` alias conflicts with the system group utility):
+
+```sh
+cargo install --locked --version 0.51.1 --bin ast-grep ast-grep
+ast-grep --version
+```
+
+The existing `check-test-flow` lint step runs the repository's Rust import-path
+rules and their small syntax fixtures before Clippy. It scans all maintained
+Rust sources, including when `--changed-only` is supplied. It excludes generated
+SQL syntax, vendored parser files, ignored build outputs and submodules.
+See the [import convention](docs/internal-rules/rust-coding-guideline.md#importing-items)
+for permitted paths and syntax limitations.
+
 `mdbook` is required by the documentation build. The `doc` check-flow step
 builds both the Rust API documentation and the user manual.
 

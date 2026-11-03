@@ -61,11 +61,24 @@ def draft_assets(args, release, files):
     return set(existing)
 
 
+def release_notes(args):
+    # The shared manifest reads exact publishable workspace versions at R.
+    crates = run('.local/bin/release-crate-manifest').splitlines()
+    table = '\n'.join(f'| `{name}` | `{version}` |'
+                      for name, version in (line.split('\t') for line in crates))
+    return (f'Prepared product release {args.tag}.\n\n'
+            f'Original source: {args.source}\nMaterialized release source: {args.revision}\n\n'
+            '## Included crate versions\n\n'
+            '| Crate | Version |\n| --- | --- |\n'
+            f'{table}\n\n'
+            'Asset filenames identify the product release; crate versions above identify '
+            'the included components.\n\n'
+            'Review the prepared assets before manually publishing this draft.\n')
+
+
 def create_draft(args):
+    notes = release_notes(args)
     confirm_tag(args)
-    notes = (f'Prepared product release {args.tag}.\n\n'
-             f'Original source: {args.source}\nMaterialized release source: {args.revision}\n\n'
-             'Review the prepared assets before manually publishing this draft.\n')
     # Consume the create response directly: a newly created draft may not yet
     # appear in the paginated Release listing (observed in live preparation).
     payload = dict(tag_name=args.tag, draft=True, name=args.tag, body=notes,

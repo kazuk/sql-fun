@@ -116,8 +116,10 @@ second bump; it does not introduce a prerelease lifecycle workaround.
 `release-assets build` uses the committed checkout at `R`, a fresh external Cargo
 target directory, and the already packaged manual. `package-linux` owns the
 release build and package checks; assembly copies only the expected validated
-outputs, renaming checksum metadata without changing its bytes. The CLI crate
-version owns package names; project identity owns the manual name. The complete
+outputs, renaming checksum metadata without changing its bytes. All public
+filenames use the exact project tag. `release-assets` passes it explicitly to
+`package-linux`; package metadata and executable versions still come from the
+materialized crates. The complete
 external directory contains exactly four nonempty public files; internal
 baseline/state data is excluded.
 
@@ -157,6 +159,9 @@ Authenticated paginated Release listings distinguish absent drafts from API
 failures. After confirmation of the immutable remote tag, an absent Release
 is created with an explicit REST `draft: true`, title/notes and parsed
 prerelease status, immediately after confirming the existing remote tag.
+New notes include exact publishable workspace crate versions from the existing
+`release-crate-manifest` helper at `R`, so reviewers can distinguish product
+identity from component versions.
 Successful creation consumes the returned Release record directly: live
 validation showed that an immediate list query can omit the new draft.
 A failed/ambiguous create response is reconciled against the existing listing

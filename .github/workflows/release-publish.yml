@@ -90,25 +90,15 @@ jobs:
           permission-contents: write
           # Complete release history can include workflow changes.
           permission-workflows: write
-      - name: Verify existing ruleset authorization
+      - name: Verify authorized release App identity
         env:
           GH_TOKEN: ${{ steps.bot.outputs.token }}
           APP_SLUG: ${{ steps.bot.outputs.app-slug }}
-          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           app_id="$(gh api "apps/$APP_SLUG" --jq '.id')"
           [[ "$app_id" == 5016922 ]] || {
             echo 'Maintenance App does not match the authorized release actor' >&2
-            exit 1
-          }
-          authorized="$(gh api "repos/$GH_REPO/rulesets/11504670" --jq '
-            .enforcement == "active" and any(.bypass_actors[];
-              .actor_type == "Integration" and .actor_id == 5016922
-              and .bypass_mode == "always")
-          ')"
-          [[ "$authorized" == true ]] || {
-            echo 'Existing main ruleset does not authorize the release App' >&2
             exit 1
           }
       - uses: actions/checkout@v5

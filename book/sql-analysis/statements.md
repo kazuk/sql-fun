@@ -82,10 +82,18 @@ additional [PRAGMA-state limitation](statements/alter-table.md#rename-table).
 
 ## Other PostgreSQL utility statements
 
-Analysis remains unimplemented
-for `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` and
-`CREATE FOREIGN TABLE (... LIKE ...)`
-([#891](https://github.com/kazuk/sql-fun/issues/891)). These valid PostgreSQL
-forms can reach an unimplemented analysis failure before semantic analysis;
-parser recognition and engine-version checks do not supply their missing
-privilege or foreign-table semantics.
+`ALTER DEFAULT PRIVILEGES` and `CREATE FOREIGN TABLE` support syntax recognition
+and SQL text generation, including PostgreSQL 18's `ON LARGE OBJECTS` and
+foreign-table `LIKE` forms. With an explicitly configured PostgreSQL 17 target,
+those two new forms report
+[incompatible_engine_version](../diagnostics/incompatible_engine_version.md).
+Recognizing the syntax does not establish that SQL analysis is complete.
+
+`ALTER DEFAULT PRIVILEGES` does not yet resolve named roles and schemas,
+validate privileges and grantees, or change the analysis catalog
+([#955](https://github.com/kazuk/sql-fun/issues/955)). `CREATE FOREIGN TABLE` does
+not yet validate its definition, resolve its foreign server, expand `LIKE`
+columns, or publish a foreign-table definition for later analysis
+([#956](https://github.com/kazuk/sql-fun/issues/956)). For engine-compatible
+forms, analysis can still terminate without a structured semantic diagnostic.
+These limitations do not make the corresponding SQL invalid in PostgreSQL.

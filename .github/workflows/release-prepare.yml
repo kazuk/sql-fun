@@ -201,7 +201,7 @@ jobs:
             else
               echo 'Matching-tag recovery: CI inputs and all producer work skipped.'
             fi
-            echo 'main was not modified. Draft integration remains downstream work.'
+            echo 'main was not modified. Prepared assets will be attached to a draft.'
             echo 'Materialized crate versions:'
             echo '```text'
             cat "$versions"
@@ -261,7 +261,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY" --ref "$RELEASE_REF" \
             --directory "$RUNNER_TEMP/prepared-release-assets" >> "$GITHUB_OUTPUT"
 
-      - name: Hand off prepared assets for downstream Draft integration
+      - name: Hand off prepared assets for draft preparation
         id: assets
         env:
           ASSET_DIRECTORY: ${{ steps.build.outputs.directory || steps.restored.outputs.directory }}
@@ -293,5 +293,21 @@ jobs:
             echo "Immutable remote tag: $RELEASE_TAG at $RECORDED_REVISION ($mode)"
             echo "Prepared assets: $ASSET_INVENTORY"
             echo "Actions artifact: $name (ID $ARTIFACT_ID, run $PRODUCER_RUN)"
-            echo 'Complete assets are available for downstream Draft integration; no Release was created.'
+            echo 'Complete assets are available for draft preparation.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare or repair draft GitHub Release
+        id: draft
+        env:
+          RELEASE_TAG: ${{ steps.assets.outputs.tag }}
+          RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
+          SOURCE_SHA: ${{ steps.assets.outputs.source }}
+          RECORDED_REVISION: ${{ steps.assets.outputs.revision }}
+          ASSET_DIRECTORY: ${{ steps.assets.outputs.directory }}
+          ASSET_INVENTORY: ${{ steps.assets.outputs.inventory }}
+        run: |
+          uv run --no-project --no-config --python 3.12 .local/sbin/prepare-release-draft \
+            --repository "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" \
+            --classification "$RELEASE_CLASSIFICATION" --source "$SOURCE_SHA" \
+            --revision "$RECORDED_REVISION" --directory "$ASSET_DIRECTORY" \
+            --inventory "$ASSET_INVENTORY" >> "$GITHUB_OUTPUT"

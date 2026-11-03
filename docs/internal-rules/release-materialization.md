@@ -160,12 +160,13 @@ prerelease status, immediately after confirming the existing remote tag.
 Successful creation consumes the returned Release record directly: live
 validation showed that an immediate list query can omit the new draft.
 A failed/ambiguous create response is reconciled against the existing listing
-without repeating the create operation. Existing drafts retain their metadata and unrelated assets.
+without repeating the create operation. Existing drafts retain their metadata
+and unrelated assets.
 The helper lists assets by Release ID, requires existing expected assets to be
 uploaded with the prepared size, and uploads only missing inventory names
 without `--clobber`. It re-reads state after upload responses and failed
-creation responses whose server-side effects may already have completed. Incomplete or
-conflicting assets fail without replacement; producer package validation is
+creation responses whose server-side effects may already have completed.
+Incomplete or conflicting assets fail without replacement; producer package validation is
 not repeated. A final inventory read confirms all required draft assets.
 
 Before each upload, the helper rechecks draft state and the remote tag. A
@@ -181,7 +182,6 @@ Reopened #260 owns publication-triggered crates → stable full-branch merge →
 Pages ordering, protected-main access and downstream retry evidence. Producer
 completion requires the complete draft and preserved branch/tag/asset handoff;
 it does not depend on completing #260 or a live publication trial.
-
 
 A full GitHub workflow rerun can remove artifacts from its previous attempt.
 Live validation observed the initial complete-set artifact become unavailable

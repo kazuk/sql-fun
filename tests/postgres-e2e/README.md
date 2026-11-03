@@ -42,10 +42,18 @@ database/container and server namespace, so existing database contents are
 irrelevant. Concurrent runs use distinct lockfiles and share Cargo's build
 directory locking. No seeded rows or result assertions in shell are needed.
 
-The runner copies the repository's PostgreSQL 18 builtin catalog into a
-temporary `SQL_FUN_HOME`. As a temporary workaround for [#718](https://github.com/kazuk/sql-fun/issues/718),
-it also copies the existing default highlighter theme to the path expected by
-`check`. Remove that provisioning when #718 is fixed.
+The runner starts with an absent test-owned `SQL_FUN_HOME` and runs
+`sql-fun init --yes --install-default-theme` against its disposable PostgreSQL 18
+server. This installs builtin metadata and downloads the theme from the published
+GitHub Pages manual. These online checks require access to that site and `curl`
+or `wget` with TLS support; download failure fails the E2E without a fixture
+fallback. The existing CLI download limits apply.
+
+Before checking the executable queries, the runner checks the isolated
+`theme-diagnostic` example with `--term-color ansi` and verifies its unresolved
+parameter diagnostic, failure status, and ANSI rendering. The successful
+`check → cargo run` path then uses the same initialized home. The invalid example
+is extracted for analysis only and is never executed as a database query.
 
 The inventory's relation/column access maps group responsible query identities
 under the exact AccessKind names. `inventory.hbs` renders this model as a Markdown

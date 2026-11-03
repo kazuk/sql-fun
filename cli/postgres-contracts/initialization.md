@@ -2,19 +2,20 @@
 
 This contract runs against an installed `sql-fun` executable with Docker and
 PostgreSQL client tools available. The version list must track the stable
-initialization targets in `PostgresVersionInventory`.
+initialization targets in `PostgresVersionInventory`. This online contract
+requires access to the published manual theme asset; it does not use a fixture.
 
 ## Setup
 
 ```scrut
 $ mkdir "$TMPDIR/postgres-initialization-contract" && cd "$TMPDIR/postgres-initialization-contract"
-> mkdir -p home/highlighter && cp "$SQL_FUN_TEST_THEME" home/highlighter/default.toml
+> test ! -e home
 ```
 
 ## Initialize every supported PostgreSQL version
 
 ```scrut
-$ sql-fun init --yes --engines postgres --docker \
+$ sql-fun init --yes --install-default-theme --engines postgres --docker \
 > --sql-fun-home "$TMPDIR/postgres-initialization-contract/home" \
 > --engine-versions 17,18 \
 > --docker-host-address "$SQL_FUN_TEST_DOCKER_HOST" \
@@ -45,5 +46,15 @@ $ home="$TMPDIR/postgres-initialization-contract/home"
 >     test -s "$home/postgres/$version/$artifact"
 >   done
 > done
+[0]
+```
+
+## Install the published theme through init
+
+Successful init validates the downloaded TOML and its renderer colors. The fresh
+home must contain the resulting local file, without manual provisioning.
+
+```scrut
+$ test -s "$TMPDIR/postgres-initialization-contract/home/highlighter/default.toml"
 [0]
 ```

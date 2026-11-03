@@ -44,8 +44,12 @@ inventory="$fixture_dir/sql-fun.default.${run_dir##*/}.toml"
 function cleanup() {
   local status=$? running_pid
   trap - EXIT
-  if (( status != 0 )) && [[ -f "$run_dir/server.log" ]]; then
-    cat "$run_dir/server.log" >&2
+  if (( status != 0 )); then
+    for log in "$run_dir/server.log" "$run_dir/diagnostic.stderr"; do
+      if [[ -f "$log" ]]; then
+        cat "$log" >&2
+      fi
+    done
   fi
   for running_pid in $(jobs -pr); do
     if [[ "$running_pid" == "$server_pid" ]]; then
@@ -93,10 +97,6 @@ fi
 psql -X -w "$SQL_FUN_E2E_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$fixture_dir/schema.sql"
 
 export SQL_FUN_HOME="$run_dir/home"
-mkdir -p "$SQL_FUN_HOME/postgres" "$SQL_FUN_HOME/highlighter"
-cp -R "$repo_root/sql-fun-home/postgres/18" "$SQL_FUN_HOME/postgres/18"
-# Preserve the canonical post-init fixture's relative home layout.
-cp -R "$repo_root/sql-fun-home/highlighter/." "$SQL_FUN_HOME/highlighter/"
 export USER="${run_dir##*/}"
 export SQL_FUN_SERVER="$server_binary"
 export SQL_FUN_METADATA_FILE="$fixture_dir/Cargo.toml"
@@ -107,6 +107,13 @@ unset SQL_FUN_METADATA_FORMAT SQL_FUN_CTE_CATALOG_DIR SQL_FUN_PG_SEARCH_PATH
 unset SQL_FUN_POSTGRES_VERSION SQL_FUN_EXTENSIONS SQL_FUN_BUILTIN_SCHEMA SQL_FUN_EXTENSIONS_DIR
 unset SQL_FUN_LOG_FILE SQL_FUN_LOG_LEVEL SQL_FUN_HIGHLIGHTER_THEME SQL_FUN_NO_BUILTIN
 unset SQL_FUN_OUTPUT_FORMAT SQL_FUN_TERM_COLOR
+
+# Exercise the published theme download through production init, without fixtures.
+test ! -e "$SQL_FUN_HOME"
+"$cli_binary" init --yes --install-default-theme --engines postgres \
+  --sql-fun-home "$SQL_FUN_HOME" --engine-versions 18 \
+  --database-url "$SQL_FUN_E2E_DATABASE_URL"
+test -s "$SQL_FUN_HOME/highlighter/default.toml"
 
 # Own the server child so cleanup never signals a developer's server.
 "$server_binary" --server-idle-timeout 0 </dev/null >"$run_dir/server.log" 2>&1 &
@@ -128,6 +135,19 @@ if [[ ! -s "$run_dir/sql-fun-server.pid" ]]; then
 fi
 
 cd "$fixture_dir"
+# An invalid query proves that the installed theme is used for real diagnostics.
+diagnostic_status=0
+"$cli_binary" --term-color ansi check --example theme-diagnostic \
+  >"$run_dir/diagnostic.stdout" 2>"$run_dir/diagnostic.stderr" || diagnostic_status=$?
+if (( diagnostic_status != 1 )); then
+  cat "$run_dir/diagnostic.stderr" >&2
+  echo "Expected SQL diagnostic exit status 1, got $diagnostic_status" >&2
+  exit 1
+fi
+grep -F 'parameter_type_unresolved' "$run_dir/diagnostic.stderr"
+grep -F 'Original SQL:' "$run_dir/diagnostic.stderr"
+grep -F $'\e[' "$run_dir/diagnostic.stderr"
+
 "$cli_binary" check --bin sql-fun-postgres-e2e
 test -s "$lockfile"
 test -s "$inventory"

@@ -522,6 +522,8 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
 // Removed configured_roles_bind_and_apply_through_direct_context::folded after a CI timeout.
 // Deletion commit: e187de28a0d534b2b20a27201ec6c905388673e0; recover from its parent.
 #[rstest::rstest]
+// Removed quoted/escaped_quote cases after CI timeouts.
+// Deletion commit: 5e2a1836584afda654602779b3bf71cc215d595c; recover from its parent.
 #[case::unicode(r#""所有者""#, "所有者")]
 #[case::dot(r#""a.b""#, "a.b")]
 fn configured_roles_bind_and_apply_through_direct_context(
@@ -606,6 +608,9 @@ fn current_inventory_does_not_inherit_frozen_project_roles(#[case] declaration: 
     let later = SchemaProject::apply_sql(failed.into_context(), "CREATE SCHEMA later");
     assert!(later.context().schema_definition("later").is_some());
 }
+
+// Removed role_inventory_partitions_cached_bindings_and_diagnostics after a CI timeout.
+// Deletion commit: 5e2a1836584afda654602779b3bf71cc215d595c; recover from its parent.
 
 #[test]
 fn explicitly_registered_roles_survive_current_inventory_changes() {

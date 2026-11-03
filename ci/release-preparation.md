@@ -93,15 +93,17 @@ After `R` is committed and pushed, preparation builds the supported Linux target
 `x86_64-unknown-linux-gnu` using the existing locked packaging command and its
 artifact checks. A fresh external Cargo target directory prevents stale package
 selection. Individual crate versions come from Cargo metadata at `R`; the CLI
-crate owns the tarball/Debian package version, independently of the project tag.
-Package filenames use the CLI SemVer. Only the internal Debian package version
-replaces the prerelease `-` with `~`; `package-linux` owns that conversion.
+crate owns the Debian metadata version, independently of the project tag.
+All public asset filenames use the exact project tag, including its `v` prefix.
+Release preparation supplies that tag to `package-linux`, which generates and
+validates those filenames directly. Only the internal Debian package version
+replaces the CLI prerelease `-` with `~`; `package-linux` owns that conversion.
 
 The complete public asset set contains:
 
-- `sql-fun-<CLI-version>-x86_64-unknown-linux-gnu.tar.gz`
-- `sql-fun_<CLI-version>_amd64.deb`
-- `sql-fun-<CLI-version>-x86_64-unknown-linux-gnu-SHA256SUMS`
+- `sql-fun-<project-tag>-x86_64-unknown-linux-gnu.tar.gz`
+- `sql-fun_<project-tag>_amd64.deb`
+- `sql-fun-<project-tag>-x86_64-unknown-linux-gnu-SHA256SUMS`
 - `sql-fun_<project-tag>_user-manual.tar.gz`
 
 Package filenames and bytes remain as validated. Only the checksum metadata
@@ -134,7 +136,8 @@ output stay outside the checkout.
 
 The run summary links the draft and records the source revisions, retained
 artifact locator and required assets. New drafts use the project tag as their
-title and contain source information for review; snapshot drafts are marked
+title and contain source information plus a table of exact publishable workspace
+crate versions from `R` for review; snapshot drafts are marked
 prerelease. Preparation never publishes the draft.
 
 Before publishing, review the notes, stable/prerelease classification, tag and

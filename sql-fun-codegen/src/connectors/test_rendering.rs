@@ -49,7 +49,7 @@ fn renders_postgres_operations(
         observation.assert_method(method, &[syn::parse_quote!("opaque SQL"), params]);
     }
     assert!(!observation.has_macro("todo"));
-    assert_ne!(observation.string_constant("__SQL_FUN_SOURCE_FILE"), "");
+    assert!(observation.has_macro("file"));
 }
 
 #[cfg(feature = "sqlite")]

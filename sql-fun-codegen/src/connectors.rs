@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test_rendering;
 
-use std::{path::Path, str::FromStr};
+use std::str::FromStr;
 
 use proc_macro2::{Span, TokenStream};
 use sql_fun_core::{SqlDialect, lockfile::LockfileStatement};
@@ -281,74 +281,9 @@ impl TokioPostgresCodeGenerator {
 }
 
 impl TokioPostgresCodeGenerator {
-    fn source_file() -> LitStr {
-        let source_file = Span::call_site().local_file();
-        let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR");
-        Self::source_file_for(
-            source_file.as_deref(),
-            manifest_dir.as_deref().map(Path::new),
-        )
-    }
-}
-
-impl TokioPostgresCodeGenerator {
-    // Keep ambient span/environment acquisition separate from deterministic mapping.
-    fn source_file_for(source_file: Option<&Path>, manifest_dir: Option<&Path>) -> LitStr {
-        let path = if let Some(source_file) = source_file
-            && let Some(manifest_dir) = manifest_dir
-            && let Ok(relative_path) = source_file.strip_prefix(manifest_dir)
-            && let Some(path) = relative_path.to_str()
-        {
-            path
-        } else {
-            "<unknown>"
-        };
-
-        LitStr::new(path, Span::call_site())
-    }
-}
-
-#[cfg(test)]
-mod test_source_file_for {
-    use super::TokioPostgresCodeGenerator;
-    use std::path::Path;
-
-    #[rstest::rstest]
-    #[case::relative(
-        Some("/workspace/project/src/query.rs"),
-        Some("/workspace/project"),
-        "src/query.rs"
-    )]
-    #[case::outside_manifest(Some("/elsewhere/query.rs"), Some("/workspace/project"), "<unknown>")]
-    #[case::shared_prefix(
-        Some("/workspace/project-two/query.rs"),
-        Some("/workspace/project"),
-        "<unknown>"
-    )]
-    #[case::no_source(None, Some("/workspace/project"), "<unknown>")]
-    #[case::no_manifest(Some("/workspace/project/src/query.rs"), None, "<unknown>")]
-    fn maps_source_without_process_environment(
-        #[case] source: Option<&str>,
-        #[case] manifest: Option<&str>,
-        #[case] expected: &str,
-    ) {
-        let literal = TokioPostgresCodeGenerator::source_file_for(
-            source.map(Path::new),
-            manifest.map(Path::new),
-        );
-        assert_eq!(literal.value(), expected);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn non_utf8_source_is_unknown() {
-        use std::{ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf};
-        let source = PathBuf::from(OsString::from_vec(b"/workspace/invalid-\xff.rs".to_vec()));
-        let literal = TokioPostgresCodeGenerator::source_file_for(
-            Some(&source),
-            Some(Path::new("/workspace")),
-        );
-        assert_eq!(literal.value(), "<unknown>");
+    fn source_file() -> TokenStream {
+        // Resolve in the caller just like line!(), preserving compiler path remapping.
+        quote::quote!(::core::file!())
     }
 }
 

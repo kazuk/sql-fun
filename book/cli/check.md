@@ -65,8 +65,10 @@ The TOML contains:
   format and selected input identity.
 - `[[queries]]`: Rust `function`, `source_file`, `source_line`, query/CTE
   `fingerprint`, and statement count `statements`. This also lists queries with
-  no object accesses. Source fields preserve extractor values, including
-  `<unknown>` when a file name is unavailable.
+  no object accesses. For proc-macro declarations, source fields identify the
+  Rust macro invocation using the compiler-reported file path and line. Paths
+  are normally relative to the defining crate and respect compiler path remapping.
+  Other extracted inputs can retain `<unknown>` when a file name is unavailable.
 - `[[relations]]`: SQL object `kind`, optional `catalog`/`schema`, and `name`.
   Names are logical identifier components; embedded dots are not separators.
 - Each relation's `accesses` is a mapping from an exact AccessKind name to an

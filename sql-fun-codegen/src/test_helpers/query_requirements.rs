@@ -1,4 +1,4 @@
-use super::QueryRequirement;
+use crate::QueryRequirement;
 
 use crate::{
     QueryFunctionKind, QueryFunctionSpec, ResultType, connectors::ConnectorSpec,
@@ -7,7 +7,7 @@ use crate::{
 use ::proc_macro2::TokenStream;
 use ::sql_fun_core::{CodegenOptions, PlaceholderedSql, ResolvedCteCatalog};
 
-pub(super) fn specification() -> QueryFunctionSpec {
+pub(crate) fn specification() -> QueryFunctionSpec {
     let query = PlaceholderedSql::from_query(
         "/* 日本語 */ select ${id:int4}, ${id}, ${other:text} from users -- retained\n",
     );
@@ -35,7 +35,7 @@ pub(super) fn specification() -> QueryFunctionSpec {
 }
 
 #[cfg(feature = "sqlite")]
-pub(super) fn sqlite_specification() -> QueryFunctionSpec {
+pub(crate) fn sqlite_specification() -> QueryFunctionSpec {
     let metadata: sql_fun_core::SqlFunMetadata = toml::from_str(
         r#"engine = "SQLite"
 dialect = "SQLite"
@@ -59,7 +59,7 @@ fn resolved_cte() -> ResolvedCteCatalog {
     serde_json::from_value(value).unwrap()
 }
 
-pub(super) fn expanded_body() -> syn::Block {
+pub(crate) fn expanded_body() -> syn::Block {
     let spec = specification();
     let generated = QueryRequirement::emit_stub_function(
         &spec,
@@ -67,20 +67,26 @@ pub(super) fn expanded_body() -> syn::Block {
         &syn::parse_quote!("src/queries.rs"),
     )
     .unwrap();
-    expand_line(&generated).block.as_ref().clone()
+    expand_location(&generated).block.as_ref().clone()
 }
 
-pub(super) fn expand_line(generated: &TokenStream) -> syn::ItemFn {
-    // Model the expanded line! literal; panic expansion does not carry
+pub(crate) fn expand_location(generated: &TokenStream) -> syn::ItemFn {
+    // Model the expanded file! and line! literals; panic expansion does not carry
     // protocol data and is deliberately irrelevant to the reader.
-    syn::parse_str(&generated.to_string().replace("line ! ()", "42u32")).unwrap()
+    syn::parse_str(
+        &generated
+            .to_string()
+            .replace(":: core :: file ! ()", "\"src/queries.rs\"")
+            .replace("line ! ()", "42u32"),
+    )
+    .unwrap()
 }
 
-pub(super) fn source(body: &syn::Block) -> syn::File {
+pub(crate) fn source(body: &syn::Block) -> syn::File {
     syn::parse_quote!(fn lookup() #body)
 }
 
-pub(super) fn replace_marker(body: &mut syn::Block, name: &str, replacement: TokenStream) {
+pub(crate) fn replace_marker(body: &mut syn::Block, name: &str, replacement: TokenStream) {
     let position = body.stmts.iter().position(|statement| {
         matches!(statement, syn::Stmt::Item(syn::Item::Const(item)) if item.ident == name)
     }).unwrap();

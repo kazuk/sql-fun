@@ -38,9 +38,7 @@ column options, and applying column attributes through ALTER INDEX or ALTER
 FOREIGN TABLE or materialized views remain unimplemented. Version-dependent
 validation for custom PostgreSQL version identifiers remains unimplemented.
 Inheritance and partition propagation are also outside the currently modeled
-schema behavior. The semantic API exposes completed column bindings, requested
-settings, validation outcomes, and statement applicability for the implemented
-operations.
+schema behavior.
 
 ### Rename table
 
@@ -68,8 +66,7 @@ later statements in explicitly supplied schema files. The column keeps its
 position, type, nullability, defaults and other analyzed attributes. Retained
 constraints, foreign keys, index references and dependent query bindings follow
 the column; independently named objects and explicit query aliases keep their
-names. PostgreSQL view output names remain fixed. Original declaration and
-previous ALTER source information remain available as history.
+names. PostgreSQL view output names remain fixed.
 
 An absent source column or occupied destination produces a diagnostic and leaves
 the catalog unchanged. PostgreSQL rejects renaming a column to itself and
@@ -82,7 +79,7 @@ expression-derived implicit output names, such as `a+1`
 ([#867](https://github.com/kazuk/sql-fun/issues/867)), or reconstructing
 wildcard outputs after `NATURAL JOIN` column matching changes
 ([#868](https://github.com/kazuk/sql-fun/issues/868)), stop with an explicit
-unimplemented-operation panic (`todo!()`). These SQLite-only paths do not affect
+analysis failure. These SQLite-only paths do not affect
 PostgreSQL column renames.
 
 Propagation covers dependencies already retained by semantic analysis. This
@@ -121,10 +118,11 @@ paths. The supported column attributes and renames above are separate cases.
 | ATTACH / DETACH PARTITION and DETACH PARTITION FINALIZE | Bounds, concurrency and parent/child relationships | [#539](https://github.com/kazuk/sql-fun/issues/539) |
 | ADD / SET / DROP IDENTITY | Identity-column transitions and sequence options | [#540](https://github.com/kazuk/sql-fun/issues/540) |
 
-ALTER FOREIGN TABLE command dispatch also remains unimplemented
+ALTER FOREIGN TABLE analysis also remains unimplemented
 ([#541](https://github.com/kazuk/sql-fun/issues/541)); ordinary-table support
 does not establish foreign-table alterations. ALTER TYPE's composite-type
-command path has its own [unimplemented dispatch](create-type.md#dialect-and-engine-specific-behavior).
+analysis has its own [unsupported
+analysis](create-type.md#dialect-and-engine-specific-behavior).
 
 ## Diagnostics
 

@@ -2,10 +2,9 @@
 
 ## Overview
 
-PostgreSQL enum declarations retain the ordered labels and register a nominal
-type for subsequent analysis. Composite declarations retain their named ordered
-fields and resolve each field's type, including array identity and requested
-modifiers.
+PostgreSQL enum declarations define a named type with labels in written order
+for subsequent analysis. Composite declarations define named fields in written
+order and check each field's type, including arrays and declaration modifiers.
 
 ```sql
 CREATE TYPE public.item_state AS ENUM ('open', 'closed');
@@ -26,12 +25,12 @@ enum/composite implementation. Defining a type does not install database
 input/output functions or validate values at runtime. Unimplemented
 base/range-type grammar must not be inferred from enum/composite support.
 
-PostgreSQL ALTER TYPE operations dispatched as composite-type alterations remain
-unimplemented and can panic
+PostgreSQL ALTER TYPE operations that alter composite types remain unimplemented
+and can terminate analysis
 ([#543](https://github.com/kazuk/sql-fun/issues/543)). CREATE TYPE metadata does
 not establish ALTER TYPE catalog transitions. SQLite/Turso CREATE/DROP TYPE
-entry points are separately listed in the
-[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+operations are separately listed in the [statement support
+inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
 
 ## Diagnostics
 

@@ -12,10 +12,11 @@ references rather than substituting output aliases.
 SELECT a + 1 AS shifted FROM (SELECT 1 AS a) AS source ORDER BY shifted;
 ```
 
-Analysis retains ascending/descending direction, explicit NULLS ordering and
-supported PostgreSQL USING operator bindings. Operand expressions and USING
-operators contribute parameter constraints. It does not execute a sort, establish
-runtime collation behavior, or guarantee a deterministic order from tied keys.
+ORDER BY accepts ascending/descending direction and explicit NULLS ordering.
+Analysis resolves supported PostgreSQL USING operators. Operand expressions and
+USING operators contribute parameter constraints. It does not execute a sort,
+establish runtime collation behavior, or guarantee a deterministic order from
+tied keys.
 
 ## Dialect and engine-specific behavior
 

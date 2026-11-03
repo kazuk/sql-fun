@@ -34,29 +34,29 @@ standalone composite types also occupy that namespace. Other types and routine
 overloads follow their own namespace rules. Names in different schemas remain
 distinct.
 
-Supported `IF NOT EXISTS` forms preserve existing definitions. PostgreSQL
-`OR REPLACE` permits compatible view and routine replacements; it does not permit
+Supported `IF NOT EXISTS` forms preserve existing definitions. PostgreSQL `OR
+REPLACE` permits compatible view and routine replacements; it does not permit
 replacing an unrelated object kind. SQLite table/view names are compared without
 ASCII case distinctions, including quoted names. SQLite `CREATE INDEX` semantic
 analysis and automatically generated database index names remain unsupported.
-SQLite tables with repeated constraint names also remain unsupported by the
-retained schema model, although SQLite itself permits them.
+SQLite tables with repeated constraint names also remain unsupported by schema
+analysis, although SQLite itself permits them.
 
-[DROP TABLE](statements/drop-table.md) is retained as schema metadata; it does not
-remove the definition or free its name for another CREATE. Supply the intended
-schema definitions rather than treating schema files as a migration history.
+[DROP TABLE](statements/drop-table.md) is retained as schema metadata; it does
+not remove the definition or free its name for another CREATE. Supply the
+intended schema definitions rather than treating schema files as a migration
+history.
 
 The [conflicting_creation](../diagnostics/conflicting_creation.md) diagnostic
 reports an object-identity conflict. Statement-specific existence diagnostics
-and permitted no-op or replacement behavior are described on the statement pages.
+and permitted no-op or replacement behavior are described on the statement
+pages.
 
 ## Unimplemented SQLite and Turso statement analysis
 
-The SQLite/Turso frontend retains statement forms whose semantic entry points
-are still unimplemented. The following operations cannot yet be used to obtain
-analyzed statements or apply their intended catalog/state changes; encountering
-these entry points can panic. Tokenizing or parsing a statement is a separate
-capability.
+The following SQLite/Turso statements are recognized but cannot yet be analyzed
+or used to change the schema known to subsequent analysis. Using them can
+terminate analysis instead of producing a structured diagnostic.
 
 | Statement family | Missing analysis | Tracking issue |
 | --- | --- | --- |
@@ -73,19 +73,19 @@ capability.
 | Sequences | CREATE SEQUENCE and DROP SEQUENCE | [#560](https://github.com/kazuk/sql-fun/issues/560) |
 | Domains | CREATE DOMAIN and DROP DOMAIN | [#561](https://github.com/kazuk/sql-fun/issues/561) |
 
-This inventory describes the frontend's retained forms, including Turso
+This inventory includes recognized Turso
 extensions; it does not assert that every form is legal in stock SQLite.
 PostgreSQL support for a similarly named statement does not implement these
-SQLite/Turso entry points. In particular, an explicit PRAGMA cannot currently
+SQLite/Turso operations. In particular, an explicit PRAGMA cannot currently
 establish connection state for later analysis. Rename propagation has the
 additional [PRAGMA-state limitation](statements/alter-table.md#rename-table).
 
 ## Other PostgreSQL utility statements
 
-Common syntax conversion and downstream interpretation remain unimplemented
+Analysis remains unimplemented
 for `ALTER DEFAULT PRIVILEGES ... ON LARGE OBJECTS` and
 `CREATE FOREIGN TABLE (... LIKE ...)`
 ([#891](https://github.com/kazuk/sql-fun/issues/891)). These valid PostgreSQL
-forms can reach an unimplemented conversion panic before semantic analysis;
+forms can reach an unimplemented analysis failure before semantic analysis;
 parser recognition and engine-version checks do not supply their missing
 privilege or foreign-table semantics.

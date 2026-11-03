@@ -5,47 +5,43 @@
 PostgreSQL parameter-dependent CASE expressions constrain searched WHEN
 conditions to boolean and simple CASE operands through equality overloads.
 Result branches use implicit common-type conversion, considering ELSE before
-THEN branches in source order. Omitted ELSE retains a nullable NULL result.
-Input and result domains can contain several alternatives; inspect them through
-`ParameterConstraints` rather than assuming a single result type. For example,
-`CASE WHEN true THEN $1 ELSE 1 END` accepts integer and bigint inputs with
-corresponding numeric result alternatives.
+THEN branches in source order. Omitted ELSE contributes a nullable NULL result.
+Accepted input types and the resulting output type can have several
+alternatives. For example, `CASE WHEN true THEN $1 ELSE 1 END` accepts integer
+and bigint inputs with corresponding numeric result alternatives.
 
 PostgreSQL COALESCE uses the same common-type constraints, considering operands
 in source order. All operands participate, even after a known non-null operand;
-unreachable operands produce a warning. The analyzed expression retains its
-operands and determined implicit conversions. For example, `COALESCE($1,1)`
-admits integer and bigint inputs with corresponding result alternatives; inspect
-`ParameterConstraints::result_column` when no single result is known. COALESCE
-nullability metadata remains conservative and does not yet prove that a non-null
-fallback makes the result non-null.
+unreachable operands produce a warning. Implicit conversions participate in
+determining the result type. For example, `COALESCE($1,1)` admits integer and
+bigint inputs with corresponding result alternatives. COALESCE nullability
+metadata remains conservative and does not yet prove that a non-null fallback
+makes the result non-null.
 
-When every CASE result branch depends on unresolved parameters, the result
-domain can remain open. This also applies to ARRAY and GREATEST/LEAST.
-`ParameterConstraints::allows` checks explicit input assignments against the
-retained constraints; it does not supply analysis hints. All-unknown SQL
-literals, such as bare NULLs or untyped strings, instead select `text` as their
-common type: CASE and GREATEST/LEAST return `text`, while an ARRAY of those
-literals has type `text[]`.
+When every CASE result branch depends on parameters whose types are unknown,
+analysis may be unable to determine a result type. This also applies to ARRAY
+and GREATEST/LEAST. Supply explicit input type hints or SQL casts where a
+definite type is required. All-unknown SQL literals, such as bare NULLs or
+untyped strings, instead select `text` as their common type: CASE and
+GREATEST/LEAST return `text`, while an ARRAY of those literals has type
+`text[]`.
 
 ### GREATEST and LEAST
 
 `GREATEST` and `LEAST` analyze every operand and report a PostgreSQL common
 result type, implicit coercions, and nullability. NULL operands are ignored; a
 guaranteed non-null operand makes the result non-null. All-unknown literal
-inputs resolve to `text`. Incompatible types and types without a comparison
-implementation, such as `json`, produce diagnostics.
+inputs resolve to `text`. Incompatible types and types that do not support
+ordering, such as `json`, produce diagnostics.
 
 Numbered parameters participate in common-type analysis, including nested
 expressions, subqueries, and nonrecursive CTEs. Several admissible input types
-can produce different result types; the analysis retains these alternatives.
-When every result operand depends on unresolved parameters, the result domain
-can remain open. `ParameterConstraints::allows` can check explicit input
-assignments against the retained constraints. For example,
-`GREATEST($1,NULL)` admits explicitly typed integer, text, and other ordered
-inputs, while an all-unknown literal expression resolves to `text`. An explicit
-SQL cast can specify an operand's type. These expressions are separate from
-aggregate `MIN` /`MAX` and SQLite scalar `min` /`max`.
+can produce different result types. When every result operand depends on
+parameters whose types are unknown, analysis may be unable to determine a result
+type. For example, `GREATEST($1,NULL)` admits explicitly typed integer, text,
+and other ordered inputs, while an all-unknown literal expression resolves to
+`text`. An explicit SQL cast can specify an operand's type. These expressions
+are separate from aggregate `MIN` /`MAX` and SQLite scalar `min` /`max`.
 
 Mixed-type selection uses PostgreSQL type categories and the preferred-type
 flags in builtin cast metadata. If analysis reports missing type or comparison
@@ -58,7 +54,7 @@ The common-type and equality constraints above describe PostgreSQL. SQLite CASE
 can report a common type when result branches already have matching types, but
 does not use PostgreSQL boolean or implicit-cast constraints.
 Parameter-dependent SQLite result typing remains incomplete. SQLite COALESCE
-retains its operands without PostgreSQL common-type conversions;
+does not apply PostgreSQL common-type conversions;
 heterogeneous/parameter-dependent result typing remains incomplete and its
 inputs remain unconstrained by COALESCE. SQLite COALESCE requires at least two
 arguments. PostgreSQL GREATEST/LEAST are separate from aggregate MIN/MAX and

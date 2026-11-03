@@ -76,6 +76,14 @@ mod identity_display_tests {
 }
 
 /// Names of triggers attached to one relation; definitions live only in the context.
+///
+/// Use a table's `triggers()` or an ordinary view's `triggers()` to read the
+/// stored names. [`Self::resolve`] resolves them
+/// through the same effective context as direct
+/// [`crate::context::TriggerInfoRead::trigger`] lookup. Changes in a child schema layer
+/// preserve frozen parents and sibling contexts. Registering these definitions
+/// does not itself calculate view writability.
+///
 #[derive(Debug, Clone, Default)]
 pub struct TriggerReferences(Vec<FullName>);
 impl TriggerReferences {

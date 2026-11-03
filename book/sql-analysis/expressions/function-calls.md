@@ -4,11 +4,11 @@
 
 Function analysis resolves the requested name against the selected catalog and
 search path, analyzes supplied arguments and selects an applicable overload.
-Argument positions and named arguments are retained independently of whether an
-overload can be selected. Duplicate named arguments and positional arguments
-following named arguments are diagnosed. Applicable declarations can include
-defaulted and variadic arguments; declared return types determine result typing.
-Supported implicit argument conversions are retained in the analyzed call.
+Arguments are checked even when no applicable function signature can be
+selected. Duplicate named arguments and positional arguments following named
+arguments are diagnosed. Applicable declarations can include defaulted and
+variadic arguments; declared return types determine result typing. Supported
+implicit argument conversions participate in determining the call's type.
 
 ```sql
 SELECT length('abc') AS characters
@@ -21,13 +21,13 @@ alternatives do not authorize choosing a client binding. See
 limits.
 
 Supported PostgreSQL polymorphic families include simple anyelement/anyarray
-relationships and compatible-family common types. Typed arrays and anonymous
-rows can participate without inventing catalog names for structural values.
-Concrete-versus-polymorphic candidate ranking remains significant even when both
-declarations accept an operand. A structural match alone does not select the
-overload. Unresolved polymorphic relationships are deferred where supported;
-requiring an unbounded catalog search is an explicit inference limitation, not
-evidence that the SQL is invalid.
+relationships and compatible-family common types. Typed arrays and anonymous row
+values can participate in these calls. Concrete-versus-polymorphic candidate
+ranking remains significant even when both declarations accept an operand. A
+structural match alone does not select the overload. Unresolved polymorphic
+relationships are deferred where supported; requiring an unbounded catalog
+search is an explicit inference limitation, not evidence that the SQL is
+invalid.
 
 Aggregate FILTER/ordering and OVER modifiers retain and resolve their applicable
 expressions. See [WINDOW](../clauses/window.md),

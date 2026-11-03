@@ -15,6 +15,25 @@ use crate::{
 
 /// Writable-view analysis with the caller's full diagnostic environment.
 /// Catalog definitions remain unchanged; semantic problems are reported here.
+///
+/// API consumers construct `ViewWriteEvaluation::new(&mut context)` with the
+/// existing analysis context, then call [`Self::insert`], [`Self::update`], or
+/// [`Self::evaluate`] with an already-bound View `FullName`. Evaluation follows
+/// the View's effective semantic Trigger/Rule references and does not register
+/// capabilities or resolve a new search path. `ViewInsertSupport::analyze` and
+/// `ViewUpdateSupport::analyze` use this same service. The service reports
+/// semantic problems through that context and returns `Ok(None)` when evaluation
+/// cannot finish because of a semantic problem. A read-only view still yields
+/// `Ok(Some(support))`; a write to that view reports a problem. Invalid
+/// statements leave an explicitly unresolved result so later statements can
+/// still be analyzed. `AnalysisError` is reserved for unrecoverable failures,
+/// including internal parser/analysis contract violations and diagnostic
+/// delivery failures. Frozen contexts store analysis results; writable-view
+/// analysis requires an active `ParseContext`.
+///
+/// The analyzer retains write capabilities in `InsertStatement::view_support`
+/// and `UpdateStatement::view_support` for SQLAST API callers.
+///
 pub struct ViewWriteEvaluation<'a, C: ParseContext> {
     context: &'a mut C,
 }

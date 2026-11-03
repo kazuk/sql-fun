@@ -26,9 +26,9 @@ syntax. ALTER SEQUENCE IF EXISTS syntax does not currently establish a
 no-diagnostic absent-target behavior; the implementation still reports a missing
 sequence. SQLite does not have this PostgreSQL sequence-analysis path.
 
-SQLite/Turso CREATE SEQUENCE and DROP SEQUENCE semantic entry points remain
-unimplemented; see the
-[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+SQLite/Turso CREATE SEQUENCE and DROP SEQUENCE analysis remains unimplemented;
+see the [statement support
+inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
 These paths do not acquire PostgreSQL semantics from similarly named commands.
 
 ## Diagnostics

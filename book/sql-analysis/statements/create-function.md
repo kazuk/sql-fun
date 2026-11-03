@@ -3,10 +3,10 @@
 ## Overview
 
 PostgreSQL routine declarations populate overload metadata for later
-[function-call](../expressions/function-calls.md) analysis. The implemented
-paths retain parameter names and modes, input/output types, default expressions,
-scalar or set-returning result metadata, and explicit strictness. STRICT and
-RETURNS NULL ON NULL INPUT mark strict calls; CALLED ON NULL INPUT does not.
+[function-call](../expressions/function-calls.md) analysis. Supported
+declarations describe parameter names and modes, input/output types, default
+expressions, scalar or set-returning results, and explicit strictness. STRICT
+and RETURNS NULL ON NULL INPUT mark strict calls; CALLED ON NULL INPUT does not.
 OUT/INOUT/TABLE outputs can determine an omitted return declaration; procedures
 have no function result type.
 
@@ -16,8 +16,8 @@ RETURNS integer LANGUAGE sql STRICT AS 'SELECT value';
 ```
 
 Routine signatures participate in their own overload namespace and supported OR
-REPLACE behavior. SQL bodies and language/options retained by parsing are not
-automatically inspected or executed by this declaration analyzer. A declared
+REPLACE behavior. Recognized SQL bodies and language/options are not
+automatically validated or executed during declaration analysis. A declared
 trigger function's metadata can be used by [CREATE TRIGGER](triggers.md); body
 text is not evidence of trigger correctness.
 
@@ -34,17 +34,17 @@ that every valid routine declaration is rejected or fully checked.
 ### Declaration validation gaps
 
 Routine declaration analysis is incomplete
-([#640](https://github.com/kazuk/sql-fun/issues/640)). It retains overload metadata
-but does not validate SQL body references/statements or all retained language
-and routine options. Constructing that metadata does not establish complete
-agreement between explicit return declarations and output-parameter result
-shapes. Lack of sql-fun body validation does not determine when PostgreSQL
-validates a language-specific body.
+([#640](https://github.com/kazuk/sql-fun/issues/640)). It retains overload
+metadata but does not validate SQL body references/statements or all retained
+language and routine options. Constructing that metadata does not establish
+complete agreement between explicit return declarations and output-parameter
+result shapes. Lack of sql-fun body validation does not determine when
+PostgreSQL validates a language-specific body.
 
 Unknown parameter type references and missing scalar return types can remain
 unresolved in overload metadata without the required missing-type diagnostic
 ([#566](https://github.com/kazuk/sql-fun/issues/566)). A missing set-returning
-result type instead reaches the unfinished reporting helper described below.
+result type instead terminates analysis as described below.
 A returned declaration is therefore not proof that all declared type references
 and explicit-versus-derived outputs were validated. The OUT/INOUT/TABLE and
 procedure metadata support described above remains distinct from these gaps.
@@ -55,6 +55,6 @@ procedure metadata support described above remains distinct from these gaps.
   signature conflicts with an existing routine identity or replacement kind.
 
 Defaults use shared expression diagnostics. A missing set-returning result type
-reaches an explicitly unimplemented reporting helper; it is not currently a
+terminates analysis; it is not currently a
 successful declaration or an emitted function-lookup diagnostic. Declaration
 analysis is not a complete body validator.

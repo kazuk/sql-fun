@@ -14,8 +14,8 @@ Use these pages for rules shared by statements and clauses:
 A SQL construct can be legal for its database while its analysis is partial or
 unsupported. Each page distinguishes the selected dialect's analyzed behavior
 from its support boundaries and links diagnostics actually reported on those
-paths. Result type and nullability are static metadata; analysis does not execute
-expressions or choose a runtime value.
+paths. Result type and nullability are static metadata; analysis does not
+execute expressions or choose a runtime value.
 
 ## SQL/JSON and SQL/XML support boundary
 
@@ -29,19 +29,23 @@ analyzing them as ordinary function calls. Ordinary catalog functions that
 accept JSON or XML values have their own function-call analysis; that does not
 establish support for these special SQL forms.
 
-The resolved semantic representations for SQL/JSON and SQL/XML are also
-unfinished ([#864](https://github.com/kazuk/sql-fun/issues/864),
+Complete analysis of these SQL/JSON and SQL/XML forms remains unfinished
+([#864](https://github.com/kazuk/sql-fun/issues/864),
 [#865](https://github.com/kazuk/sql-fun/issues/865)); syntax preservation or
 round-trip rendering is not evidence of a resolved document expression.
-[FROM](clauses/from.md#document-table-sources) describes the separate
-JSON_TABLE and XMLTABLE output-shape limitations.
+[FROM](clauses/from.md#document-table-sources) describes the separate JSON_TABLE
+and XMLTABLE output-shape limitations.
 
 ## SQLite literal limitations
 
-SQLite BLOB literals such as `X'4142'` do not yet produce analyzed BLOB values
-([#497](https://github.com/kazuk/sql-fun/issues/497)). Retained keyword literals
-also have an unimplemented literal-analysis path
-([#498](https://github.com/kazuk/sql-fun/issues/498)). These paths can panic;
-parser acceptance of their spelling does not establish semantic support.
-This limitation concerns the frontend's keyword-literal representation, not all
-SQL value expressions or every literal supported by other analysis paths.
+SQLite BLOB literals such as `X'4142'` are not yet supported by expression
+analysis ([#497](https://github.com/kazuk/sql-fun/issues/497)) and can terminate
+analysis instead of producing a structured diagnostic.
+
+Keyword-valued PRAGMA settings, such as `PRAGMA foreign_keys = ON` and
+`PRAGMA journal_mode = DELETE`, also lack value analysis
+([#498](https://github.com/kazuk/sql-fun/issues/498)). PRAGMA statements are
+separately [unsupported as statements](statements.md#unimplemented-sqlite-and-turso-statement-analysis);
+recognizing a keyword value does not make those settings effective in later
+analysis. This limitation does not imply that all SQL value expressions or
+other supported literals are unavailable.

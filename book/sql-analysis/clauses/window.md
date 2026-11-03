@@ -2,9 +2,9 @@
 
 ## Overview
 
-Window analysis retains named definitions, OVER references, inherited window
-references, PARTITION BY, window ordering, frame modes/bounds and exclusions.
-References record successful, missing or ambiguous lookup. Definition expressions,
+Window analysis resolves named definitions, OVER references and inherited
+window references, and analyzes PARTITION BY, ordering and frame offsets.
+Missing or ambiguous references can produce diagnostics. Definition expressions,
 function modifiers and frame offsets participate in parameter analysis.
 
 ```sql
@@ -21,17 +21,18 @@ ordering information participates in these constraints.
 
 ## Dialect and engine-specific behavior
 
-PostgreSQL window definitions inherit from preceding definitions; duplicate named
-definitions are diagnosed. SQLite uses its own window-name binding rules,
-including retained forward inheritance outcomes, and window definitions do not
-gain SELECT projection aliases. Do not infer identical diagnostic behavior for
-missing SQLite inherited names from PostgreSQL behavior.
+PostgreSQL window definitions inherit from preceding definitions; duplicate
+named definitions are diagnosed. SQLite uses its own window-name binding rules,
+including references to definitions appearing later, and window definitions do
+not gain SELECT projection aliases. Do not infer identical diagnostic behavior
+for missing SQLite inherited names from PostgreSQL behavior.
 
 Parameter-dependent RANGE ordering and custom RANGE operator classes are not
-fully analyzed: custom in_range metadata is not generally available. Retaining a
-frame, mode or exclusion does not establish complete frame, aggregate or window
-legality checking. SQLite offsets do not acquire PostgreSQL parameter constraints.
-Analysis describes metadata without evaluating the window's rows.
+fully analyzed: the declarations needed to check custom RANGE offsets are not
+generally available. Frame modes, bounds and exclusions do not yet have complete
+frame, aggregate or window legality checking. SQLite offsets do not acquire
+PostgreSQL parameter constraints. Analysis describes metadata without evaluating
+the window's rows.
 
 ## Diagnostics
 
@@ -47,4 +48,5 @@ Analysis describes metadata without evaluating the window's rows.
 
 PARTITION/ORDER/frame operands also use their ordinary
 [name](../expressions/names.md#diagnostics),
-[function](../expressions/function-calls.md#diagnostics) and operator diagnostics.
+[function](../expressions/function-calls.md#diagnostics) and operator
+diagnostics.

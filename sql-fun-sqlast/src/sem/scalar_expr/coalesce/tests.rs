@@ -227,6 +227,17 @@ fn incompatible_concrete_operands_retain_a_failed_type_domain() -> testresult::T
         .find(|p| p.code() == "coalesce_expr_type_unknown")
         .unwrap();
     assert!(failure.render_metadata().is_some());
+    let payload = ::serde_json::to_value(failure)?;
+    assert_eq!(payload["CoalesceExprTypeUnknown"][0]["kind"], "literal");
+    assert_eq!(
+        payload["CoalesceExprTypeUnknown"][0]["type_reference"],
+        "pg_catalog.int4"
+    );
+    assert_eq!(
+        payload["CoalesceExprTypeUnknown"][1]["type_reference"],
+        "pg_catalog.bool"
+    );
+    assert_eq!(payload["CoalesceExprTypeUnknown"][1]["not_null"], true);
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let coalesce = query
         .result_columns()

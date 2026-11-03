@@ -114,8 +114,8 @@ impl UndefinedOperatorAllCallSite {
         context.report_analysis_problem(AnalysisProblem::undefined_operator(
             AExprKind::AexprOpAll,
             name,
-            &Some(lexpr.clone()),
-            &Some(rexpr.clone()),
+            Some(&lexpr),
+            Some(&rexpr),
         ))?;
         let call_site = Self {
             operator_name: name.clone(),

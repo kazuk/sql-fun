@@ -9,7 +9,7 @@ pub(super) fn parse(tokens: &TypeTokens) -> Result<TypeReference, AnalysisError>
     }
     let ((name, array), remaining) = (simple_name(), array_suffix())
         .parse(tokens.as_slice())
-        .map_err(|error| invalid(&format!("invalid PostgreSQL type syntax: {error:?}")))?;
+        .map_err(|_| invalid("invalid PostgreSQL client type hint syntax"))?;
     if let Some(token) = remaining.first() {
         return Err(if token.is_symbol("(") {
             typmod()

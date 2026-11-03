@@ -99,10 +99,8 @@ mod test_binary_op_call_site {
         test_helpers::{TestParseContext, test_context},
     };
 
-    use ::testresult::TestResult;
-
     #[rstest::rstest]
-    fn test_from_operator_definition(test_context: TestParseContext) -> TestResult {
+    fn test_from_operator_definition(test_context: TestParseContext) -> ::testresult::TestResult {
         let type_ref = TypeReference::from_master_type_name("int4");
 
         let operator_def = BinaryOperatorDefinition::new(&type_ref, &type_ref, &type_ref, true);
@@ -202,8 +200,8 @@ impl UndefinedOperatorCallSite {
         context.report_analysis_problem(AnalysisProblem::undefined_operator(
             AExprKind::AexprOp,
             name,
-            &lexpr,
-            &rexpr,
+            lexpr.as_ref(),
+            rexpr.as_ref(),
         ))?;
         let call_site = Self {
             operator_name: name.clone(),

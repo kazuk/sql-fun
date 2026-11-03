@@ -187,6 +187,100 @@ impl OwnershipIdentity {
     }
 }
 
+impl std::fmt::Display for OwnershipIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ", self.kind.owner_kind_label())?;
+        if self.kind == ObjectKind::OPERATOR {
+            if let Some(catalog) = self.name.catalog() {
+                write!(
+                    f,
+                    "{}.",
+                    crate::identifier::CanonicalIdentifier::from(catalog.as_str())
+                )?;
+            }
+            let name = crate::sem::OperatorName::from_parts(
+                self.name.schema().map(crate::sem::SchemaName::as_str),
+                self.name.name().as_str(),
+            );
+            write!(f, "{name}")?;
+        } else {
+            write!(f, "{}", self.name)?;
+        }
+        if let Some(arguments) = &self.arguments {
+            f.write_str("(")?;
+            for (index, argument) in arguments.iter().enumerate() {
+                if index > 0 {
+                    f.write_str(", ")?;
+                }
+                if let Some(ty) = argument {
+                    write!(f, "{ty}")?;
+                } else if self.kind == ObjectKind::OPERATOR {
+                    f.write_str("NONE")?;
+                } else {
+                    f.write_str("unresolved type")?;
+                }
+            }
+            f.write_str(")")?;
+        }
+        if let Some(method) = &self.access_method {
+            write!(
+                f,
+                " USING {}",
+                crate::identifier::CanonicalIdentifier::from(method.as_str())
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod identity_display_tests {
+    use crate::sem::{FullName, ObjectKind, OwnershipIdentity, PgBuiltInType};
+
+    #[test]
+    fn preserves_omitted_and_explicit_signatures() {
+        let name: FullName = "public.compute".parse().unwrap();
+        assert_eq!(
+            OwnershipIdentity::named(ObjectKind::FUNCTION, &name).to_string(),
+            "function public.compute"
+        );
+        assert_eq!(
+            OwnershipIdentity::with_arguments(ObjectKind::FUNCTION, &name, &[]).to_string(),
+            "function public.compute()"
+        );
+        assert_eq!(
+            OwnershipIdentity::with_arguments(
+                ObjectKind::FUNCTION,
+                &name,
+                &[Some(PgBuiltInType::int4())]
+            )
+            .to_string(),
+            "function public.compute(pg_catalog.int4)"
+        );
+    }
+
+    #[test]
+    fn presents_operator_operands_and_access_method() {
+        let name: FullName = r#"public."+""#.parse().unwrap();
+        let identity = OwnershipIdentity::with_arguments(
+            ObjectKind::OPERATOR,
+            &name,
+            &[None, Some(PgBuiltInType::int4())],
+        );
+        assert_eq!(
+            identity.to_string(),
+            "operator public.+(NONE, pg_catalog.int4)"
+        );
+        let name: FullName = r#"public."sort.values""#.parse().unwrap();
+        let identity =
+            OwnershipIdentity::with_access_method(ObjectKind::OPERATOR_CLASS, &name, "a\"b");
+        assert_eq!(
+            identity.to_string(),
+            r#"operator class public."sort.values" USING "a""b""#
+        );
+    }
+}
+
 /// Minimal retained definition for catalog classes without a richer DDL model.
 /// Registration establishes existence; ALTER OWNER never registers an absent target.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -226,6 +320,39 @@ impl OwnedObjectDefinition {
 }
 
 impl ObjectKind {
+    const fn owner_kind_label(self) -> &'static str {
+        match self {
+            Self::AGGREGATE => "aggregate",
+            Self::COLLATION => "collation",
+            Self::CONVERSION => "conversion",
+            Self::DATABASE => "database",
+            Self::DOMAIN => "domain",
+            Self::EVENT_TRIGGER => "event trigger",
+            Self::FOREIGN_DATA_WRAPPER => "foreign data wrapper",
+            Self::FOREIGN_SERVER => "foreign server",
+            Self::FUNCTION => "function",
+            Self::LANGUAGE => "language",
+            Self::LARGE_OBJECT => "large object",
+            Self::MATERIALIZED_VIEW => "materialized view",
+            Self::OPERATOR_CLASS => "operator class",
+            Self::OPERATOR => "operator",
+            Self::OPERATOR_FAMILY => "operator family",
+            Self::PROCEDURE => "procedure",
+            Self::PUBLICATION => "publication",
+            Self::ROUTINE => "routine",
+            Self::SCHEMA => "schema",
+            Self::SEQUENCE => "sequence",
+            Self::SUBSCRIPTION => "subscription",
+            Self::STATISTICS => "statistics",
+            Self::TABLE => "table",
+            Self::TABLESPACE => "tablespace",
+            Self::TEXT_SEARCH_CONFIGURATION => "text search configuration",
+            Self::TEXT_SEARCH_DICTIONARY => "text search dictionary",
+            Self::TYPE => "type",
+            Self::VIEW => "view",
+            _ => "object",
+        }
+    }
     pub(crate) fn accepts_owner_kind(self, actual: Self) -> bool {
         self == actual
             || (self == Self::ROUTINE && matches!(actual, Self::FUNCTION | Self::PROCEDURE))

@@ -17,7 +17,7 @@ use crate::ast::{Dialect, Statement};
 ///
 /// Classification and node context are available without parsing display text.
 #[derive(Debug, thiserror::Error)]
-#[error("{dialect:?} SQL rendering at {node}: {message}")]
+#[error("{dialect} SQL rendering at {node}: {message}")]
 pub struct DeparseError {
     dialect: Dialect,
     node: String,

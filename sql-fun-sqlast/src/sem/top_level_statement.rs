@@ -58,7 +58,9 @@ impl SemAst {
                 DropTable::analyze_drop_stmt(context, statement, tokens)
             }
             _ => {
-                AnalysisError::raise_unexpected_input(&format!("{drop_type:?}"))?;
+                AnalysisError::raise_unexpected_input(
+                    "DROP object type is not supported by this analyzer",
+                )?;
                 AnalysisError::never()
             }
         }

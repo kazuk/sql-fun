@@ -40,6 +40,27 @@ impl RuleIdentity {
     }
 }
 
+impl std::fmt::Display for RuleIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} on {}", self.name, self.target)
+    }
+}
+
+#[cfg(test)]
+mod identity_display_tests {
+    use crate::sem::{FullName, RuleIdentity};
+
+    #[test]
+    fn includes_relation_namespace_and_escaped_name() {
+        let target: FullName = r#"public."line.items""#.parse().unwrap();
+        let identity = RuleIdentity::new(&target, "rule\"name");
+        assert_eq!(
+            identity.to_string(),
+            r#"public."rule""name" on public."line.items""#
+        );
+    }
+}
+
 /// Target-owned links to rule definitions in the effective context.
 #[derive(Debug, Clone, Default)]
 pub struct RuleReferences(Vec<RuleIdentity>);

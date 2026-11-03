@@ -70,6 +70,24 @@ return errors. This API does not promise every statement supported by the
 underlying parsers or catalog resolution. Successfully converted legal syntax can
 be rendered with `Statement::deparse_sql` as described below.
 
+### SQLite parser error wording
+
+The external `turso_parser` controls its own error strings. Common parsing with
+`--no-default-features --features sqlite` (without another dependent enabling
+`workaround_turso_9791`) and the legacy `SqliteDialect::parse` and
+`SqliteDialect::parse_schema_snapshot` APIs may return these strings verbatim,
+including implementation-oriented formatting. The legacy APIs use the external
+parser even when the workaround is enabled. Treat dependency-generated wording
+as an unstable parser limitation; use the applicable error classification and
+recovery behavior rather than matching exact messages.
+
+This boundary concerns dependency errors, not sql-fun's owned analysis
+diagnostics. `DiagnosticMessage` explanations and structured `AnalysisProblem`
+details must use readable SQL-level descriptions when existing facts suffice.
+An adapter that incorporates an external error into such a diagnostic assumes
+responsibility for that presentation; external origin does not exempt the
+resulting diagnostic.
+
 ## Insert a catalog CTE
 
 Use [`ast::HaveWithClause`] to edit a statement's WITH clause and the checked

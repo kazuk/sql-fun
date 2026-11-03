@@ -206,6 +206,40 @@ pub enum StatementKind {
     AlterRelation,
 }
 
+impl std::fmt::Display for StatementKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::DropRule => "DROP RULE",
+            Self::CreateTrigger => "CREATE TRIGGER",
+            Self::CreateRule => "CREATE RULE",
+            Self::DropTrigger => "DROP TRIGGER",
+            Self::Query => "query",
+            Self::Insert => "INSERT",
+            Self::Update => "UPDATE",
+            Self::Delete => "DELETE",
+            Self::Merge => "MERGE",
+            Self::Truncate => "TRUNCATE",
+            Self::View => "view definition",
+            Self::Extension => "CREATE EXTENSION",
+            Self::VariableSet => "configuration statement",
+            Self::EnumType => "CREATE TYPE AS ENUM",
+            Self::Sequence => "CREATE SEQUENCE",
+            Self::DropTable => "DROP TABLE",
+            Self::AlterSequence => "ALTER SEQUENCE",
+            Self::Comment => "COMMENT",
+            Self::AlterOwner => "ALTER OWNER",
+            Self::CompositeType => "CREATE TYPE",
+            Self::Domain => "CREATE DOMAIN",
+            Self::Function => "function or procedure definition",
+            Self::Schema => "CREATE SCHEMA",
+            Self::Index => "CREATE INDEX",
+            Self::TableAs => "query-backed relation definition",
+            Self::Table => "CREATE TABLE",
+            Self::AlterRelation => "relation alteration",
+        })
+    }
+}
+
 impl StatementKind {
     /// The TRUNCATE category, independently of common-AST conversion support.
     pub const fn truncate() -> Self {

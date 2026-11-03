@@ -179,7 +179,7 @@ impl DiagnosticMessage for TriggerProblem {
                 format!("event column {column} does not exist on trigger target {target}")
             }
             Self::Function(name) => {
-                format!("trigger function {name} is missing or cannot be called without arguments")
+                format!("trigger function {name} is missing or is not usable as a trigger function")
             }
             Self::Options(target, rule) => {
                 format!("trigger {target} has incompatible options: {rule}")

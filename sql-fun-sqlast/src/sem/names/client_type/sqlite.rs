@@ -9,7 +9,7 @@ pub(super) fn parse(tokens: &TypeTokens) -> Result<TypeReference, AnalysisError>
         many::<Vec<_>, _, _>(TypeToken::punctuation("[").skip(TypeToken::punctuation("]"))),
     )
         .parse(tokens.as_slice())
-        .map_err(|error| invalid(&format!("invalid SQLite type syntax: {error:?}")))?;
+        .map_err(|_| invalid("invalid SQLite client type hint syntax"))?;
     if let Some(token) = remaining.first() {
         return Err(if token.is_symbol("(") {
             typmod()

@@ -3654,40 +3654,139 @@
               ]
             },
             "ArgumentBindingCollection": {
-              "description": "Retained diagnostic text for `ArgumentBindingCollection`.",
-              "type": "string"
+              "description": "Ordered supplied argument types, retaining unknown arguments explicitly.",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TypeReference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
             },
             "OperatorDefinition": {
-              "description": "Retained diagnostic text for `OperatorDefinition`.",
+              "description": "The actual operator name and its declared overloads.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/OperatorName"
+                },
+                "signatures": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/OperatorSignature"
+                  }
+                },
+                "left_operand": {
+                  "type": "boolean"
+                },
+                "right_operand": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "signatures",
+                "left_operand",
+                "right_operand"
+              ]
+            },
+            "OperatorName": {
+              "description": "Retained diagnostic text for `OperatorName`.",
               "type": "string"
+            },
+            "OperatorSignature": {
+              "description": "A declared operator candidate signature, with its existing strictness fact.",
+              "type": "object",
+              "properties": {
+                "operands": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                },
+                "result": {
+                  "$ref": "#/$defs/TypeReference"
+                },
+                "strict": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "operands",
+                "result",
+                "strict"
+              ]
             },
             "DefElemKey": {
               "description": "Retained diagnostic text for `DefElemKey`.",
               "type": "string"
             },
             "SemScalarExpr": {
-              "description": "Retained diagnostic text for `SemScalarExpr`.",
-              "type": "string"
+              "description": "Known properties of an analyzed expression, without an internal expression dump.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "identity": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type_reference": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TypeReference"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "not_null": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
             },
             "ExpressionList": {
-              "description": "Retained diagnostic text for `ExpressionList`.",
-              "type": "string"
+              "description": "Ordered expression facts in an expression requiring a common type.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SemScalarExpr"
+              }
             },
             "AExprKind": {
               "description": "Retained diagnostic text for `AExprKind`.",
               "type": "string"
             },
-            "OperatorName": {
-              "description": "Retained diagnostic text for `OperatorName`.",
-              "type": "string"
-            },
             "OptionalExpression": {
-              "description": "Retained diagnostic text for `OptionalExpression`.",
-              "type": "string"
+              "description": "An operand's presence and known facts. An absent operand is not an unknown type.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SemScalarExpr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "TypeList": {
-              "description": "Retained diagnostic text for `TypeList`.",
-              "type": "string"
+              "description": "Ordered known types of incompatible CASE results.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TypeReference"
+              }
             },
             "TypeDefinition": {
               "description": "Retained diagnostic text for `TypeDefinition`.",
@@ -7755,40 +7854,139 @@
               ]
             },
             "ArgumentBindingCollection": {
-              "description": "Retained diagnostic text for `ArgumentBindingCollection`.",
-              "type": "string"
+              "description": "Ordered supplied argument types, retaining unknown arguments explicitly.",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TypeReference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
             },
             "OperatorDefinition": {
-              "description": "Retained diagnostic text for `OperatorDefinition`.",
+              "description": "The actual operator name and its declared overloads.",
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/OperatorName"
+                },
+                "signatures": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/OperatorSignature"
+                  }
+                },
+                "left_operand": {
+                  "type": "boolean"
+                },
+                "right_operand": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "signatures",
+                "left_operand",
+                "right_operand"
+              ]
+            },
+            "OperatorName": {
+              "description": "Retained diagnostic text for `OperatorName`.",
               "type": "string"
+            },
+            "OperatorSignature": {
+              "description": "A declared operator candidate signature, with its existing strictness fact.",
+              "type": "object",
+              "properties": {
+                "operands": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/TypeReference"
+                  }
+                },
+                "result": {
+                  "$ref": "#/$defs/TypeReference"
+                },
+                "strict": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "operands",
+                "result",
+                "strict"
+              ]
             },
             "DefElemKey": {
               "description": "Retained diagnostic text for `DefElemKey`.",
               "type": "string"
             },
             "SemScalarExpr": {
-              "description": "Retained diagnostic text for `SemScalarExpr`.",
-              "type": "string"
+              "description": "Known properties of an analyzed expression, without an internal expression dump.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "identity": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type_reference": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TypeReference"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "not_null": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
             },
             "ExpressionList": {
-              "description": "Retained diagnostic text for `ExpressionList`.",
-              "type": "string"
+              "description": "Ordered expression facts in an expression requiring a common type.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SemScalarExpr"
+              }
             },
             "AExprKind": {
               "description": "Retained diagnostic text for `AExprKind`.",
               "type": "string"
             },
-            "OperatorName": {
-              "description": "Retained diagnostic text for `OperatorName`.",
-              "type": "string"
-            },
             "OptionalExpression": {
-              "description": "Retained diagnostic text for `OptionalExpression`.",
-              "type": "string"
+              "description": "An operand's presence and known facts. An absent operand is not an unknown type.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SemScalarExpr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "TypeList": {
-              "description": "Retained diagnostic text for `TypeList`.",
-              "type": "string"
+              "description": "Ordered known types of incompatible CASE results.",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TypeReference"
+              }
             },
             "TypeDefinition": {
               "description": "Retained diagnostic text for `TypeDefinition`.",

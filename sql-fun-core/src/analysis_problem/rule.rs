@@ -1,4 +1,4 @@
-use super::{DebugName, DiagnosticMetadata, RuleIdentity};
+use super::{DebugName, DiagnosticMessage, DiagnosticMetadata, RuleIdentity};
 
 /// Structured rule-definition or application failure.
 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
@@ -45,7 +45,32 @@ impl RuleProblem {
     }
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
-        DiagnosticMetadata::from(format!("invalid rule statement: {self:?}"))
+        DiagnosticMetadata::from(self.diagnostic_message())
+    }
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::RuleProblem;
+
+    #[rstest::rstest]
+    #[case::target(
+        RuleProblem::target("public.items"),
+        "rule target public.items does not resolve to a supported relation"
+    )]
+    #[case::duplicate(
+        RuleProblem::duplicate("public.changed on public.items"),
+        "rule public.changed on public.items already exists"
+    )]
+    #[case::definition(
+        RuleProblem::definition("public.changed on public.items", "SELECT requires INSTEAD"),
+        "rule public.changed on public.items is invalid: SELECT requires INSTEAD"
+    )]
+    fn metadata_explains_the_retained_failure(
+        #[case] problem: RuleProblem,
+        #[case] expected: &str,
+    ) {
+        assert_eq!(problem.render_metadata().message(), expected);
     }
 }
 

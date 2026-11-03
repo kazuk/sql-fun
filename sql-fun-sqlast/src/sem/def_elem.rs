@@ -27,6 +27,40 @@ impl DefElemKey {
     }
 }
 
+impl std::fmt::Display for DefElemKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if !self.namespace.is_empty() {
+            write!(
+                f,
+                "{}.",
+                crate::identifier::CanonicalIdentifier::from(self.namespace.as_str())
+            )?;
+        }
+        write!(
+            f,
+            "{}",
+            crate::identifier::CanonicalIdentifier::from(self.name.as_str())
+        )
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::DefElemKey;
+
+    #[rstest::rstest]
+    #[case::local("", "strict", "strict")]
+    #[case::qualified("storage", "enabled", "storage.enabled")]
+    #[case::escaped("a.b", "a\"b", r#""a.b"."a""b""#)]
+    fn presents_logical_option_components(
+        #[case] namespace: &str,
+        #[case] name: &str,
+        #[case] expected: &str,
+    ) {
+        assert_eq!(DefElemKey::new(namespace, name).to_string(), expected);
+    }
+}
+
 impl From<&crate::syn::DefElem> for DefElemKey {
     fn from(value: &crate::syn::DefElem) -> Self {
         Self::new(&value.get_defnamespace(), &value.get_defname())

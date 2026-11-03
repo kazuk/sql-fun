@@ -1648,7 +1648,7 @@ impl Expr {
         if let Some(value) = Option::<Literal>::from(node) {
             return Ok(Self::Literal(value));
         }
-        AnalysisError::raise_unexpected_input(&format!("expression syntax: {node:?}"))
+        AnalysisError::raise_unexpected_input("unsupported PostgreSQL expression syntax")
     }
 }
 

@@ -40,8 +40,22 @@ impl DiagnosticMessage for TruthTestProblem {
         match self {
             Self::OperandType(ty) => format!("truth-test operand must be type boolean, not {ty}"),
             Self::InvalidLiteral(value) => {
-                format!("invalid input syntax for type boolean: {value:?}")
+                format!("invalid input syntax for type boolean: \"{value}\"")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::{DiagnosticMessage, TruthTestProblem};
+
+    #[test]
+    fn quotes_the_literal_value_without_rust_debug_escapes() {
+        let problem = TruthTestProblem::invalid_literal(r#"a"b\c"#);
+        assert_eq!(
+            problem.diagnostic_message(),
+            r#"invalid input syntax for type boolean: "a"b\c""#
+        );
     }
 }

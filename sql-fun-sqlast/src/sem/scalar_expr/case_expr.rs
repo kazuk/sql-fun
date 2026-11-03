@@ -483,7 +483,7 @@ impl CaseExpr {
                     }
                     Err(_) if !dependent => {
                         context.report_analysis_problem(
-                            AnalysisProblem::incompatible_case_values(inputs),
+                            AnalysisProblem::incompatible_case_values(inputs.iter()),
                         )?;
                         value.types = Some(InputTypeConstraint::types([]));
                     }

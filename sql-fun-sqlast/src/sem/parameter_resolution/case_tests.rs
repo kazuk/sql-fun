@@ -395,6 +395,11 @@ fn incompatible_known_results_keep_specific_diagnostic(
     let problems = analyzed.context().problems();
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert_eq!(problems[0].code(), "incompatible_case_values");
+    let payload = ::serde_json::to_value(&problems[0])?;
+    assert_eq!(
+        payload["IncompatibleCaseValues"],
+        ::serde_json::json!(["pg_catalog.bool", "pg_catalog.int4"])
+    );
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = query.result_columns().get_column_at(0).unwrap();
     assert!(column.col_type().is_none());

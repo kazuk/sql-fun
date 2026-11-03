@@ -67,7 +67,7 @@ impl AnalysisError {
 
     fn dialect_mismatch(parsed: crate::ast::Dialect, configured: crate::ast::Dialect) -> Self {
         Self::UnexpectedInput(format!(
-            "statement dialect {parsed:?} does not match analysis metadata dialect {configured:?}"
+            "statement dialect {parsed} does not match analysis metadata dialect {configured}"
         ))
     }
 

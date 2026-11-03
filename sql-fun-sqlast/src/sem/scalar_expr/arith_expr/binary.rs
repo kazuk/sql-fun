@@ -56,6 +56,7 @@ impl ResolvedBinaryOperator {
 impl ArithExpr {
     pub(super) fn resolve_overload_binary<TParseContext>(
         context: &mut TParseContext,
+        name: &OperatorName,
         operator_def: OperatorDefinition,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
@@ -66,8 +67,13 @@ impl ArithExpr {
         if let Some(left_type) = lexpr.get_type()
             && let Some(right_type) = rexpr.get_type()
         {
-            let filtered =
-                BinaryCastCandidate::resolve(context, &operator_def, &left_type, &right_type)?;
+            let filtered = BinaryCastCandidate::resolve(
+                context,
+                name,
+                &operator_def,
+                &left_type,
+                &right_type,
+            )?;
             if filtered.is_empty() {
                 return Ok(ResolvedBinaryOperator::new(None, lexpr, rexpr));
             }

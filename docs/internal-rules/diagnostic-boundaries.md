@@ -15,14 +15,22 @@ owning semantic objects:
 | --- | --- |
 | Qualified names, table/column/view/alias names | Distinct string-backed name wrappers |
 | Type references and definitions | Distinct diagnostic type wrappers |
-| Expressions and argument bindings | Diagnostic text wrappers, without a duplicate AST |
+| Expressions | Owned SQL construct/optional identity, optional type, and independent optional nullability |
+| Argument bindings and CASE types | Ordered diagnostic type lists with unknown arguments retained explicitly |
+| Operator candidates | Actual operator name and declared operand/result types and strictness |
 | Rule, trigger, and ownership identities | Typed identity text |
 | Existing reliable source locations | Statement-relative diagnostic byte spans |
 
-The conversion preserves retained identity text, including values originally
-formed with Rust debug formatting. These values are diagnostic evidence; they
-must not be parsed back into semantic facts to drive resolution or catalog
-application. Issue #717 tracks the missing structured facts.
+Conversions use intentional SQL-facing descriptions and existing semantic facts,
+never Rust Debug serialization. Diagnostic expression facts are a compact owned
+summary, not a duplicate semantic AST or reconstructed SQL. Missing operands and
+present expressions with unknown types remain distinct. Type and identity text
+is diagnostic evidence; it must not be parsed back to drive resolution or catalog
+application. Diagnostic payload and transport cleanup belongs to #924 when the
+producer already has the facts. Only facts requiring additional semantic analysis
+belong to #717; record their exact producer and missing analysis before deferral.
+See the [readability audit](diagnostic-readability-audit.md) for the migration and
+emitted-family inventory.
 
 `AnalysisProblem::code` and `severity` are available independently of rendering.
 `render_metadata` supplies the currently implemented message and labels without
@@ -30,6 +38,26 @@ invoking a renderer. An absent value denotes an unimplemented detailed renderer
 tracked by issue #522. `DiagnosticMessage::diagnostic_message` is a separate,
 exhaustive contract for explanatory text, so CLI presentation can report every
 problem even when detailed metadata is absent.
+
+## External SQLite parser errors
+
+The external `turso_parser` owns the wording of errors returned directly by its
+parser. The feature-off common parser (`--no-default-features --features sqlite`)
+and the legacy `SqliteDialect::parse` and `parse_schema_snapshot` paths may
+surface those strings verbatim, including implementation-oriented formatting.
+These dependency strings are not a stable sql-fun diagnostic contract. Document
+this limitation for Rust API callers; test failure/classification behavior
+without freezing exact dependency wording.
+
+The exemption ends when sql-fun constructs an `AnalysisProblem` or takes
+responsibility for a `DiagnosticMessage` explanation. Such owned diagnostics
+remain subject to the readable-description and structured-fact rules above,
+regardless of an error's external origin. The server's query diagnostic path
+uses common parsing with the default-enabled workaround; its locally adapted
+JOIN explanation is covered by an owned-message regression. Do not broaden
+parser ownership, fork/replace the dependency, or parse/rewrite dependency Debug
+strings as part of #924. No follow-up issue is needed solely for the documented
+external-parser limitation.
 
 ## Source and transport
 

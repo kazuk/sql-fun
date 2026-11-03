@@ -1075,13 +1075,13 @@ impl ResolvedOperator {
         let result = if self.resolution.is_resolved() {
             parameters.call(
                 context,
-                &format!("{:?}", self.name),
+                &self.name.to_string(),
                 &arguments,
                 &self.signatures,
             )?
         } else {
             parameters.operation(
-                &format!("{:?}", self.name),
+                &self.name.to_string(),
                 &arguments,
                 &crate::sem::InputTypeConstraint::any(),
                 None,

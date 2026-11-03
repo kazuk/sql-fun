@@ -473,7 +473,7 @@ impl FromItem {
         if let Some(value) = node.as_json_table().as_inner() {
             return Ok(Self::json(JsonTable::try_from_with_tokens(&value, tokens)?));
         }
-        AnalysisError::raise_unexpected_input(&format!("FROM syntax: {node:?}"))
+        AnalysisError::raise_unexpected_input("unsupported PostgreSQL FROM item syntax")
     }
 }
 

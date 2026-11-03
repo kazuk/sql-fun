@@ -321,6 +321,52 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// Available SQL identity without deparsing or resolving the expression again.
+    pub(crate) fn diagnostic_identity(&self) -> Option<String> {
+        match self {
+            Self::FuncCall(value) => Some(value.name().to_string()),
+            Self::ColumnRef(value) => Some(value.get_column_name().to_string()),
+            Self::SourceColumn(value) => Some(value.name().to_string()),
+            Self::Param(value) => Some(format!("${}", value.position())),
+            _ => None,
+        }
+    }
+
+    /// SQL construct description for diagnostics; does not deparse or reanalyze the expression.
+    pub(crate) const fn diagnostic_kind(&self) -> &'static str {
+        match self {
+            Self::SourceColumn(_) | Self::ColumnRef(_) => "column reference",
+            Self::WholeRow(_) => "whole-row reference",
+            Self::Row(_) => "row constructor",
+            Self::Array(_) => "array constructor",
+            Self::ArraySubquery(_) => "array subquery",
+            Self::Const(_) => "literal",
+            Self::FuncCall(_) => "function call",
+            Self::Grouping(_) => "GROUPING expression",
+            Self::Arith(_) => "operator expression",
+            Self::TypeCast(_) => "cast expression",
+            Self::Case(_) => "CASE expression",
+            Self::Boolean(_) => "boolean expression",
+            Self::NullTest(_) => "NULL test",
+            Self::TruthTest(_) => "truth test",
+            Self::Distinct(_) => "distinctness predicate",
+            Self::Membership(_) => "IN predicate",
+            Self::SubLink(_) => "subquery expression",
+            Self::Exists(_) => "EXISTS predicate",
+            Self::Coalesce(_) => "COALESCE expression",
+            Self::MinMax(_) => "GREATEST/LEAST expression",
+            Self::Collate(_) => "COLLATE expression",
+            Self::SqlValue(_) => "SQL value expression",
+            Self::Param(_) => "parameter",
+            Self::Constrained(_) => "type-constrained expression",
+            Self::NamedArg(_) => "named argument",
+            Self::Indirection(_) => "member or array access",
+            Self::ImplicitCast(_) => "implicitly cast expression",
+            Self::List(_) => "expression list",
+            Self::MergeAction => "MERGE action",
+            Self::Unexpected(_) => "unrecognized expression",
+        }
+    }
     pub(crate) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
         if let Self::ColumnRef(value) = self {
             value.matches_column(rename)

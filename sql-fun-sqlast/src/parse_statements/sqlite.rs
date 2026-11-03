@@ -21,6 +21,21 @@ pub(super) fn parse(
     }
 }
 
+#[cfg(all(test, feature = "workaround_turso_9791"))]
+mod diagnostic_tests {
+    #[test]
+    fn unsupported_join_reports_the_sql_word_without_result_debug() {
+        let sql = "SELECT 1 FROM t LEFT surprising JOIN u";
+        let error = super::parse(sql).next().unwrap().unwrap_err();
+        assert_eq!(error.to_string(), "unsupported JOIN type: surprising");
+        assert!(error.is_syntax());
+        assert!(error.is_boundary_discovery());
+        assert!(!error.is_recoverable());
+        assert_eq!(error.span().offset(), 0);
+        assert_eq!(error.span().len(), sql.len());
+    }
+}
+
 struct SqliteStatements<'a> {
     parser: Parser<'a>,
     input: &'a str,

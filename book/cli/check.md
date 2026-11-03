@@ -59,6 +59,9 @@ column. Purposes describe the enclosing top-level operation: column references
 inside a scalar subquery in SELECT output retain `SelectOutput`, including
 references written in that subquery's WHERE.
 
+See the [SQL access-purpose reference](../access-kinds.md) for every purpose,
+SQL examples, and the attribution rules for nested queries and CTEs.
+
 The TOML contains:
 
 - `inventory_version`, `datasource`, `schema_variant`, `schema_dump_hash`: artifact

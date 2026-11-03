@@ -54,6 +54,9 @@ column, relation kind, and purpose; every returned role is shown even when the
 same column has several roles. Purpose names describe why the top-level statement
 needs the access, including references inside nested expressions and subqueries.
 
+See the [SQL access-purpose reference](../access-kinds.md) for the complete
+vocabulary, SQL examples, and analysis boundaries.
+
 To avoid the additional server-side analysis and omit its display, use:
 
 ```sh

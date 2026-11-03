@@ -3,8 +3,33 @@ set -euo pipefail
 # The canonical post-init image owns theme content. The manual only distributes it.
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
-mdbook build
-mkdir -p user_manual/highlighter
-cp sql-fun-home/highlighter/default.toml user_manual/highlighter/default.toml
-cmp sql-fun-home/highlighter/default.toml user_manual/highlighter/default.toml
-[[ -f user_manual/index.html ]] || { echo 'manual has no root index.html' >&2; exit 1; }
+temporary="$(mktemp -d)"
+trap 'rm -rf "$temporary"' EXIT
+mdbook build --dest-dir "$temporary/rendered"
+[[ -d "$temporary/rendered/markdown" ]] || { echo 'manual has no Markdown output' >&2; exit 1; }
+
+# Multiple renderers introduce html/ and markdown/ directories. Assemble the
+# existing artifact layout here so release consumers can archive it unchanged.
+manual="$temporary/manual"
+mkdir -p "$manual"
+cp -a "$temporary/rendered/html/." "$manual/"
+find "$temporary/rendered/markdown" -type f -name '*.md' -print0 > "$temporary/chapters"
+while IFS= read -r -d '' chapter; do
+  relative="${chapter#"$temporary/rendered/markdown/"}"
+  destination="$manual/$relative"
+  [[ ! -e "$destination" && ! -L "$destination" ]] || {
+    echo "Markdown output would overwrite an HTML asset: $relative" >&2
+    exit 1
+  }
+  mkdir -p "$(dirname "$destination")"
+  cp "$chapter" "$destination"
+done < "$temporary/chapters"
+
+mkdir -p "$manual/highlighter"
+cp sql-fun-home/highlighter/default.toml "$manual/highlighter/default.toml"
+cmp sql-fun-home/highlighter/default.toml "$manual/highlighter/default.toml"
+[[ -f "$manual/index.html" ]] || { echo 'manual has no root index.html' >&2; exit 1; }
+
+# Publish only the completed, fresh tree; obsolete pages must not survive builds.
+rm -rf user_manual
+mv "$manual" user_manual

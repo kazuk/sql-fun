@@ -87,6 +87,15 @@ root without rebuilding mdBook. Download it from the preparation run's
 failure stops dependent preparation. The draft step attaches this archive
 unchanged; stable Pages consumes that exact asset after publication.
 
+The adopted manual is assembled from mdBook's HTML and Markdown renderers using
+the same book source. The archive retains `index.html` at its root, together
+with HTML navigation, styling, static assets and `highlighter/default.toml`.
+Generated Markdown chapters retain their source-relative paths alongside the
+HTML pages: for example, `diagnostics/function_not_found.md` and
+`diagnostics/function_not_found.html`. Diagnostic Markdown paths follow
+`diagnostics/<diagnostic_code>.md`. There is no enclosing `html/` or `markdown/`
+directory in the archive, and Markdown files contain preprocessed Markdown text.
+
 ## Release packages and immutable tag
 
 After `R` is committed and pushed, preparation builds the supported Linux target

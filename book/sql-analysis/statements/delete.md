@@ -2,14 +2,12 @@
 
 ## Overview
 
-PostgreSQL and SQLite DELETE analysis retains the qualified target, WITH
-queries, predicate bindings and RETURNING columns. PostgreSQL USING sources,
-ONLY/inheritance and positioned `WHERE CURRENT OF` are represented explicitly.
-Analysis does not delete rows or remove schema definitions. Without RETURNING, a
-DELETE has no result columns. Invalid DELETE SQL produces inspectable analysis
-problems; a missing destination retains its requested name and an explicit
-failed lookup outcome. Read-only destinations retain their bindings and
-capability decision. Analyzer failures remain separate from SQL diagnostics.
+PostgreSQL and SQLite DELETE analysis checks the target, WITH queries, predicate
+and RETURNING columns. PostgreSQL USING sources, ONLY/inheritance and positioned
+`WHERE CURRENT OF` are recognized. Analysis does not delete rows or remove
+schema definitions. Without RETURNING, a DELETE has no result columns. Invalid
+DELETE SQL produces inspectable analysis problems, including missing or
+read-only destinations. Analyzer failures remain separate from SQL diagnostics.
 
 [RETURNING](../clauses/returning.md) follows the shared target/source visibility
 and dialect rules; PostgreSQL USING sources are visible. Explicit SQLite
@@ -23,12 +21,12 @@ The configured engine version governs PostgreSQL RETURNING `old`/`new` names:
 these implicit row references are available starting with PostgreSQL 18.
 Explicit source aliases named `old` or `new` remain ordinary source bindings.
 The old image retains target-column nullability; the new image is nullable for
-DELETE. The shared [RETURNING support boundary](../clauses/returning.md) distinguishes
-PostgreSQL 18 parser retention from unimplemented renamed-image binding.
+DELETE. The shared [RETURNING support boundary](../clauses/returning.md)
+distinguishes PostgreSQL 18 parser retention from unimplemented renamed-image
+binding.
 
-API consumers can supply DELETE-specific view capabilities through
-`ViewDeleteInfoRead`: deletability and RETURNING support are independent of
-INSERT/UPDATE capabilities. Materialized views are read-only. The bundled
+For view targets, permission to DELETE and support for RETURNING are independent
+of INSERT/UPDATE support. Materialized views are read-only. The bundled
 catalog still lacks the trigger/rule metadata needed to establish ordinary-view
 DELETE capabilities, so its view-capability lookup remains unimplemented.
 Production catalog support and integration tests are tracked in

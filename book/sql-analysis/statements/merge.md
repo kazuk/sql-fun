@@ -2,8 +2,8 @@
 
 ## Overview
 
-PostgreSQL MERGE analysis retains its target, USING source, ON condition and
-ordered WHEN actions. PostgreSQL 15 and 16 support MATCHED and NOT MATCHED
+PostgreSQL MERGE analysis checks its target, USING source, ON condition and WHEN
+actions in written order. PostgreSQL 15 and 16 support MATCHED and NOT MATCHED
 actions. PostgreSQL 17 adds NOT MATCHED BY SOURCE, RETURNING and MERGE inside
 nonrecursive data-modifying CTEs. The configured engine version governs these
 features; SQLite does not support MERGE.
@@ -23,28 +23,28 @@ record. A source row can be absent when an action runs for NOT MATCHED BY
 SOURCE. Starting with PostgreSQL 18, implicit `old` and `new` references expose
 target row images. The old image is nullable when INSERT is possible, and the
 new image is nullable when DELETE is possible. Explicit relation aliases named
-`old` or `new` take precedence. Renamed images follow the shared
-[RETURNING support boundary](../clauses/returning.md). The parser normalizes
-plain `NOT MATCHED` and `NOT MATCHED BY TARGET` to the same syntax node, so
-analysis cannot diagnose use of the explicit `BY TARGET` spelling against
-PostgreSQL 15 or 16; that spelling requires PostgreSQL 17.
+`old` or `new` take precedence. Renamed images follow the shared [RETURNING
+support boundary](../clauses/returning.md). Analysis does not distinguish plain
+`NOT MATCHED` from the explicit `NOT MATCHED BY TARGET` spelling when checking
+PostgreSQL 15 or 16 compatibility. The explicit `BY TARGET` spelling requires
+PostgreSQL 17, but its use against older versions is not diagnosed.
 
 A MERGE CTE exposes only RETURNING columns, with any explicit CTE column
 aliases. A MERGE CTE without RETURNING may be unreferenced but cannot be read as
 a relation. Data-modifying CTEs must occur at the top level. Parameters across
 ON, WHEN conditions, action values and RETURNING participate in one analysis.
-The shared [expression](../expressions.md), subquery and catalog limitations also
-apply to MERGE; analysis does not execute its actions.
+The shared [expression](../expressions.md), subquery and catalog limitations
+also apply to MERGE; analysis does not execute its actions.
 
-API consumers supply view-target facts through `ViewMergeInfoRead`. PostgreSQL
-17 and later permit automatically updatable views without INSTEAD OF triggers,
-or views with an INSTEAD OF trigger for every action type named by the MERGE.
-Views with rules and materialized views are rejected. Effective writable-column
-metadata governs action assignments. These facts are independent of ordinary DML
-capability flags. The bundled production catalogs lack this metadata; production
+For view targets, PostgreSQL 17 and later permit automatically updatable views
+without INSTEAD OF triggers, or views with an INSTEAD OF trigger for every
+action type named by the MERGE. Views with rules and materialized views are
+rejected. Effective writable-column metadata governs action assignments.
+INSERT/UPDATE/DELETE support alone does not establish that a view supports
+MERGE. The bundled production catalogs lack this metadata; production
 view-target support and integration tests are tracked in
-[#609](https://github.com/kazuk/sql-fun/issues/609). Custom contexts can provide
-it.
+[#609](https://github.com/kazuk/sql-fun/issues/609). Library callers can
+explicitly supply the view declarations needed for this analysis.
 
 See the shared [WITH](../clauses/with.md), [FROM](../clauses/from.md) and
 [RETURNING](../clauses/returning.md) pages for their common rules.
@@ -52,9 +52,9 @@ See the shared [WITH](../clauses/with.md), [FROM](../clauses/from.md) and
 ## Dialect and engine-specific behavior
 
 MERGE is PostgreSQL-only. The configured PostgreSQL version controls the 15/16
-versus 17+ features and PostgreSQL 18 row images described above. An available
-parse tree or custom view-capability provider is not evidence that the
-production catalog can complete that same path.
+versus 17+ features and PostgreSQL 18 row images described above. A
+recognized SQL form is not evidence that the supplied catalogs can complete
+its analysis.
 
 ## Diagnostics
 

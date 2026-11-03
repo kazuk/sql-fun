@@ -11,6 +11,29 @@ use crate::{
 /// These methods must return completed lookups, never guess a binding from its
 /// spelling. A catalog that cannot perform a lookup must explicitly remain
 /// unimplemented at its implementation boundary.
+///
+/// Explicit conflict collation/operator-class references retain their completed
+/// catalog lookups, including missing and ambiguous outcomes. Custom analysis
+/// contexts provide these lookups and modifier-aware arbiter inference through
+/// `ConflictInfoRead`; SQL spellings are not treated as resolved identities.
+/// Production PostgreSQL catalogs load collation and operator-class definitions
+/// from `collations.json` and `operator_classes.json` in the explicitly selected
+/// catalog generation. Both files are required; incomplete or malformed
+/// generations fail to load. Name lookup honors qualification, the current
+/// search path, database encoding, and the requested access method.
+/// `ConflictInfoRead` provides purpose-specific `database_collation`,
+/// `collation_definition`, and `operator_class_definition` reads for
+/// database-default provenance and qualified definitions with
+/// operator-family/type relations. The provider determines which declarations
+/// are eligible for the database encoding and requested access method. Frozen
+/// catalogs retain the same read services.
+///
+/// SQLite lookup uses its connection-local, case-insensitive collation
+/// namespace. BINARY, NOCASE, and RTRIM are available. API consumers must
+/// explicitly declare custom names with [`crate::context::BaseContext::declare_sqlite_collation`]
+/// before freezing the base; this declaration records availability for analysis
+/// and does not install a runtime collation or inspect a connection.
+///
 pub trait ConflictInfoRead {
     /// Source database encoding and default-collation provenance, absent for SQLite.
     fn database_collation(&self) -> Option<&DatabaseCollation>;

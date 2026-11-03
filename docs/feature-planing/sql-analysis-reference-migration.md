@@ -576,12 +576,12 @@ tests or recurring checks were added.
 | 534–538 | An empty constructor requires an explicit array cast, such as ARRAY[]::integer[]. The cast also supplies the element type to nested constructors, including nested empty arrays. Nested arrays have the same … | `arrays-and-rows.md` | PostgreSQL | Correct #572 claim: ARRAY(query) is implemented; evidence A. |
 | 540–542 | Arrays of anonymous records are supported. PostgreSQL subscripting yields a generic record without accessible field names; use a named composite element type when subsequent SQL needs field references. | `arrays-and-rows.md` | PostgreSQL | Correct #572 claim: ARRAY(query) is implemented; evidence A. |
 | 544–546 | Numbered parameters participate in constructor analysis. The result retains admissible input and output types and their relationships; explicit casts constrain the target type. ARRAY(SELECT ...) is … | `arrays-and-rows.md` | PostgreSQL | Correct #572 claim: ARRAY(query) is implemented; evidence A. |
-| 550–557 | SQLAST API callers can install explicit SQL input types on a mutable context before calling Statement::analyze. Import ParameterTypeHintWrite and call … | `parameters.md#sqlast-api-callers` | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
-| 559–569 | Type hints accept SQL type names for the context's explicitly selected dialect, then resolve them using its catalog and search path. PostgreSQL examples include INTEGER, double precision, character … | `parameters.md#sqlast-api-callers` | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
-| 571–575 | Parameter types describe client-protocol type identities. PostgreSQL parameter OIDs carry no type modifiers, so declarations such as varchar(100), numeric(10,2), timestamp(2) with time zone, and … | `parameters.md#sqlast-api-callers` | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
-| 577–582 | Callers that only need to interpret spelling can use parse_client_type(input, &context) from sql_fun_sqlast::sem. This shared API returns a TypeReference without catalog lookup or search-path … | `parameters.md#sqlast-api-callers` | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
-| 584–586 | Malformed or unresolved names return an error and preserve the complete previous setup. Successful setup replaces all previous hints, including when passed an empty slice or only None entries. | `parameters.md#sqlast-api-callers` | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
-| 588–596 | Create an independent sql_fun_sqlast::context::SchemaFileContext over the shared sql_fun_sqlast::context::FrozenBaseContext catalog for each query. If reusing a mutable context, explicitly install the … | `parameters.md#sqlast-api-callers` | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
+| 550–557 | SQLAST API callers can install explicit SQL input types on a mutable context before calling Statement::analyze. Import ParameterTypeHintWrite and call … | `context/type_hint.rs` rustdoc | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
+| 559–569 | Type hints accept SQL type names for the context's explicitly selected dialect, then resolve them using its catalog and search path. PostgreSQL examples include INTEGER, double precision, character … | `context/type_hint.rs` rustdoc | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
+| 571–575 | Parameter types describe client-protocol type identities. PostgreSQL parameter OIDs carry no type modifiers, so declarations such as varchar(100), numeric(10,2), timestamp(2) with time zone, and … | `context/type_hint.rs` rustdoc | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
+| 577–582 | Callers that only need to interpret spelling can use parse_client_type(input, &context) from sql_fun_sqlast::sem. This shared API returns a TypeReference without catalog lookup or search-path … | `context/type_hint.rs` rustdoc | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
+| 584–586 | Malformed or unresolved names return an error and preserve the complete previous setup. Successful setup replaces all previous hints, including when passed an empty slice or only None entries. | `context/type_hint.rs` rustdoc | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
+| 588–596 | Create an independent sql_fun_sqlast::context::SchemaFileContext over the shared sql_fun_sqlast::context::FrozenBaseContext catalog for each query. If reusing a mutable context, explicitly install the … | `context/type_hint.rs` rustdoc | PostgreSQL / SQLite API | Retain; identify SQLAST API reader; evidence P. |
 | 598–604 | Numbered parameters ($1 in PostgreSQL and ?1 in SQLite) can be used across supported nonrecursive CTEs and the outer statement, including INSERT sources, RETURNING, and conflict predicates. Repeated … | `parameters.md` | PostgreSQL; explicitly noted SQLite boundaries | Retain; evidence P. |
 | 606–617 | PostgreSQL analysis accounts for implicit casts in operator and ordinary function calls. A parameter or a parameter-dependent result column may have several admissible types. These domains describe … | `parameters.md` | PostgreSQL; explicitly noted SQLite boundaries | Retain; evidence P. |
 | 619–624 | The public analyze_query API must finalize an application's input binding contract. If SQL inference or a supported explicit input type hint does not establish one input type, it returns … | `parameters.md` | PostgreSQL; explicitly noted SQLite boundaries | Retain; evidence P. |
@@ -829,3 +829,49 @@ Corrections to the preliminary audit:
 | [#490](https://github.com/kazuk/sql-fun/issues/490) | `book/sql-analysis/clauses/from.md` |
 | [#489](https://github.com/kazuk/sql-fun/issues/489) | `book/sql-analysis/expressions.md` |
 | [#317](https://github.com/kazuk/sql-fun/issues/317) | `book/sql-analysis/clauses/from.md` |
+
+## Specification vocabulary review (PR #953)
+
+The review request at
+[PR #953](https://github.com/kazuk/sql-fun/pull/953#issuecomment-6598020652) applies to every
+manual page added or rewritten by this PR. The intended SQL-reference reader is
+a query/schema author deciding whether analysis supports their SQL and what
+input types, result descriptions and diagnostics to expect. Source code and
+maintained tests remain evidence, not specification terminology.
+
+Reviewed the landing page, all statement/clause/expression pages, navigation,
+and the changed installation, CLI, diagnostics and protocol API pages. Replaced
+Rust inspection calls and representation details with observable input/result
+types, lookup rules, schema effects and failure boundaries. The existing issue
+links and dialect/version limitations remain. Public Rust setup and catalog
+usage moved to rustdoc on the exported `ParameterTypeHintWrite`,
+`ParameterConstraints`, `ConflictInfoRead`, `ViewWriteEvaluation`, `RuleInfoRead`,
+`RuleInfoWrite` and `TriggerReferences` APIs. Their documentation serves library
+implementers, not SQL syntax readers. No separate manual API page is added.
+
+Evidence continues to be the source and maintained tests recorded above. In
+particular, `sem/parameter_constraints.rs` supplies the inspection contracts;
+`sem/scalar_expr/{case_expr,min_max,array}.rs` establish common-type behavior
+and the difference between unknown literals and unresolved parameter types.
+`ParameterConstraints::allows` checks assignments without setting hints;
+`ParameterConstraints::result_column` and `col_type()` describe library result
+inspection, so they no longer explain SQL semantics in the syntax reference.
+The earlier PostgreSQL 18 oracle result `text|text[]|text|text` for all-NULL
+CASE/ARRAY/GREATEST/LEAST remains applicable.
+
+Rule/trigger identity and context-layer mechanics, including `SemAst::rule()`,
+`SemAst::rule_drop()`, `SemAst::trigger()`, `SemAst::trigger_drop()` and
+`TriggerIdentity`, are implementation evidence. The syntax pages instead state
+relation-scoped versus schema-scoped naming and visibility to subsequent schema
+analysis. SELECT's #521 limitation remains documented as incomplete result-column
+reporting: `SemScalarExpr::get_column_name` and `get_column_def` are the affected
+implementation accessors. DELETE/MERGE view support still has the #589/#609
+production-catalog limitations; `ViewDeleteInfoRead` and `ViewMergeInfoRead` are
+extension interfaces, not SQL constructs. No analyzer behavior or maintained test
+execution paths were changed by this review revision.
+
+For #498, `sqlite_parser/upstream/parser.rs::parse_pragma_value` emits keyword
+values for ON/DELETE/DEFAULT and other PRAGMA keywords; `ast/resolve.rs` lacks
+keyword literal resolution. The syntax reference now uses PRAGMA examples
+rather than the internal `Literal::Keyword` representation and keeps the
+separate #557 statement-analysis limitation explicit.

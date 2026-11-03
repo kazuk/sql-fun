@@ -20,8 +20,9 @@ writability and RETURNING capability are separate decisions: a write being
 permitted does not by itself establish that RETURNING is supported. See
 [view analysis](../statements/create-view.md).
 
-Executable-SQL [wildcard expansion](../statements/select.md#wildcard-projection-expansion)
-is opt-in and distinct from result-column expansion.
+Executable-SQL [wildcard
+expansion](../statements/select.md#wildcard-projection-expansion) is opt-in and
+distinct from result-column expansion.
 
 ## Dialect and engine-specific behavior
 
@@ -31,12 +32,12 @@ General SQLite expression/type-affinity limitations apply to its outputs.
 
 Implicit PostgreSQL row images depend on the configured engine version and
 statement. [DELETE](../statements/delete.md) owns its old/new image visibility
-and nullability; [MERGE](../statements/merge.md) owns its action-dependent images.
-Their PostgreSQL 18 support does not establish row-image support for every DML
-statement.
+and nullability; [MERGE](../statements/merge.md) owns its action-dependent
+images. Their PostgreSQL 18 support does not establish row-image support for
+every DML statement.
 
-PostgreSQL 18 RETURNING row-image alias syntax is retained by the current parser
-and renderer, but semantic binding of renamed images remains unimplemented
+PostgreSQL 18 RETURNING row-image alias syntax is recognized, but resolving
+renamed images remains unimplemented
 ([#621](https://github.com/kazuk/sql-fun/issues/621)). Parser retention does not
 establish support for RETURNING WITH (OLD AS ..., NEW AS ...). Ordinary DML and
 MERGE retain their own analysis boundaries.
@@ -47,13 +48,14 @@ MERGE retain their own analysis boundaries.
 [update_semantics](../../diagnostics/update_semantics.md) and
 [delete_semantics](../../diagnostics/delete_semantics.md) report invalid
 statement-specific qualifiers or qualified stars, including SQLite restrictions.
-[Name-resolution diagnostics](../expressions/names.md#diagnostics) apply to missing
-or ambiguous output references. A star in an invalid expression position or over
-a known scalar can produce
+[Name-resolution diagnostics](../expressions/names.md#diagnostics) apply to
+missing or ambiguous output references. A star in an invalid expression position
+or over a known scalar can produce
 [query_invalid_star_projection_placement](../../diagnostics/query_invalid_star_projection_placement.md)
-or [query_star_projection_requires_composite_type](../../diagnostics/query_star_projection_requires_composite_type.md).
+or
+[query_star_projection_requires_composite_type](../../diagnostics/query_star_projection_requires_composite_type.md).
 
-Output expression diagnostics and
-[parameter finalization](../expressions/parameters.md#diagnostics) remain separate
-from writable-target checks; known output metadata can survive an unresolved
-input binding or another semantic problem.
+Output expression diagnostics and [parameter
+finalization](../expressions/parameters.md#diagnostics) remain separate from
+writable-target checks; known output metadata can survive an unresolved input
+binding or another semantic problem.

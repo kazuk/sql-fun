@@ -2,10 +2,10 @@
 
 ## Overview
 
-A nonrecursive `WITH` defines named query results for the statement and later CTEs.
-Bodies are analyzed in declaration order; explicit CTE column aliases rename the
-exposed outputs. Nested queries share the statement's parameter numbering and
-explicit input hints. Repeated parameters contribute to the same
+A nonrecursive `WITH` defines named query results for the statement and later
+CTEs. Bodies are analyzed in declaration order; explicit CTE column aliases
+rename the exposed outputs. Nested queries share the statement's parameter
+numbering and explicit input hints. Repeated parameters contribute to the same
 [parameter constraints](../expressions/parameters.md).
 
 ```sql
@@ -16,24 +16,24 @@ SELECT n FROM next_value;
 PostgreSQL INSERT, UPDATE, DELETE and MERGE bodies expose only their
 [RETURNING](returning.md) columns. A modifying CTE without RETURNING may be
 unreferenced, but cannot be read as a relation. A data-modifying CTE must be at
-the top level; retaining a nested body does not make its placement valid.
-Materialization annotations are retained, not an execution plan or a promise that
-sql-fun evaluates the body. [Reusable CTE](../../reusable_cte.md) describes the
-separate application workflow.
+the top level; a nested modifying body is invalid. Materialization annotations
+do not cause sql-fun to evaluate the body or produce an execution plan.
+[Reusable CTE](../../reusable_cte.md) describes the separate application
+workflow.
 
 ## Dialect and engine-specific behavior
 
 PostgreSQL MERGE bodies require configured PostgreSQL 17 or later. Ordinary
 supported nonrecursive CTEs participate in SELECT and DML analysis. Recursive
-binding remains incomplete: retaining `WITH RECURSIVE` syntax does not establish
+analysis remains incomplete: recognition of `WITH RECURSIVE` does not establish
 recursive name resolution, SEARCH/CYCLE semantics, or recursive type checking.
 MERGE with recursive WITH remains unsupported.
 
 With the `sqlite` feature, SQLite supports nonrecursive SELECT CTEs and WITH
 before INSERT, UPDATE and DELETE. SQLite does not permit these modifying
-statements as CTE bodies. SQLAST support does not establish that the CLI/server
-supports the same datasource initialization path; see the
-[analysis overview](../../sql-analysis.md).
+statements as CTE bodies. library analysis support does not establish that the
+CLI/server supports the same datasource initialization path; see the [analysis
+overview](../../sql-analysis.md).
 
 ## Diagnostics
 

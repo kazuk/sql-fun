@@ -2,10 +2,9 @@
 
 ## Overview
 
-PostgreSQL domain analysis resolves the base type, retains the domain's nominal
-identity and category, and preserves the requested declaration modifiers and
-explicit collation independently of the canonical base identity. A valid
-definition can be used by later type and member-access analysis.
+PostgreSQL domain analysis resolves the base type and explicit collation. The
+declared domain remains a distinct named type. A valid definition can be used by
+later type and member-access analysis.
 
 ```sql
 CREATE DOMAIN public.item_label AS text;
@@ -25,9 +24,9 @@ PostgreSQL 18 constraint features are version-gated and can reach explicit
 unimplemented boundaries. SQLite type-name syntax does not supply this
 PostgreSQL domain model.
 
-SQLite/Turso CREATE DOMAIN and DROP DOMAIN semantic entry points remain
-unimplemented; see the
-[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+SQLite/Turso CREATE DOMAIN and DROP DOMAIN analysis remains unimplemented; see
+the [statement support
+inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
 These paths do not acquire PostgreSQL semantics from similarly named commands.
 
 ## Diagnostics

@@ -3,23 +3,22 @@
 ## Overview
 
 LIMIT and OFFSET expressions are analyzed separately from the query's row-source
-scope. They retain their expressions and contribute to the statement's parameter
-constraints. PostgreSQL constrains row-count parameter inputs to bigint-
-compatible types. Compound queries own their trailing LIMIT/OFFSET;
-parenthesized operand-local clauses remain with that operand.
+scope. Their operands contribute to the statement's parameter type requirements.
+PostgreSQL constrains row-count parameter inputs to bigint- compatible types.
+Compound queries own their trailing LIMIT/OFFSET; parenthesized operand-local
+clauses remain with that operand.
 
 ```sql
 SELECT 1 LIMIT $1 OFFSET $2;
 ```
 
 The analyzer does not execute the query, count its rows, or guarantee how many
-rows it will return. It retains query limit modifiers, including WITH TIES where
-represented, without establishing complete runtime/legality checking for every
-modifier or bound value.
+rows it will return. Query limit modifiers, including WITH TIES, do not yet have
+complete legality checking for every modifier or bound value.
 
 ## Dialect and engine-specific behavior
 
-SQLite supported SELECT limit expressions retain their parameter occurrences
+Parameters in supported SQLite SELECT limit expressions are analyzed
 without PostgreSQL bigint coercion requirements. SQLite UPDATE/DELETE ORDER BY
 or LIMIT forms are rejected by the inherited parser even on a SQLite build with
 SQLITE_ENABLE_UPDATE_DELETE_LIMIT. There is no sql-fun parser setting or

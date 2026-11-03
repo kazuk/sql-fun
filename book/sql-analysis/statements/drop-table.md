@@ -2,10 +2,9 @@
 
 ## Overview
 
-DROP TABLE analysis retains the requested table names, IF EXISTS and dependency
-choice. The current schema catalog appends the drop as metadata on each found
-table; it does **not** remove a table definition or free its name for another
-CREATE.
+DROP TABLE analysis looks up the requested tables but does **not** remove their
+definitions or free their names for another CREATE during subsequent schema
+analysis.
 
 ```sql
 DROP TABLE public.items;
@@ -17,11 +16,10 @@ removed, and CASCADE does not execute dependency removal.
 
 ## Dialect and engine-specific behavior
 
-PostgreSQL and the feature-gated SQLite table paths retain DROP TABLE metadata.
-IF EXISTS is retained, but an absent table is still diagnosed by the current
-lookup/application path; do not infer database-style suppression from the syntax
-flag. Other DROP object types have separate support boundaries; rule and trigger
-drops are documented on their owning pages.
+For PostgreSQL and the feature-gated SQLite analysis, an absent table still
+produces a diagnostic even with IF EXISTS; do not infer database-style
+suppression from the syntax flag. Other DROP object types have separate support
+boundaries; rule and trigger drops are documented on their owning pages.
 
 ## Diagnostics
 

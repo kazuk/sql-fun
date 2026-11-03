@@ -94,15 +94,14 @@ metadata comes from the first row. For example, the output type of
 rows. This also affects VALUES used as a derived source, set-operation operand
 or INSERT source; traversing later rows does not make the result shape complete.
 
-### Projection metadata API limitations
+### Incomplete result-column descriptions
 
-Some resolved expressions can still panic when a SQLAST caller requests
-projection metadata ([#521](https://github.com/kazuk/sql-fun/issues/521)).
-`SemScalarExpr::get_column_name` remains unimplemented for SQL value expressions
-such as CURRENT_DATE; `get_column_def` has unfinished branches for other
-expression kinds. Successful expression resolution alone does not guarantee
-that these accessor calls succeed. This is an accessor limitation, not a claim
-that every CLI projection containing such an expression fails.
+Result-column name and type reporting is incomplete for some expressions,
+including SQL value expressions such as CURRENT_DATE
+([#521](https://github.com/kazuk/sql-fun/issues/521)). Requesting a
+result-column description through the analysis library can terminate analysis
+even after the expression itself was accepted. This does not mean every CLI
+projection containing such an expression fails.
 
 ## Diagnostics
 

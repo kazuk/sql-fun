@@ -2,8 +2,8 @@
 
 ## Overview
 
-PostgreSQL COMMENT analysis canonicalizes the supplied object target and records
-its comment text and object kind in the analysis catalog.
+PostgreSQL COMMENT analysis records the supplied object name, comment text and
+object kind in the analysis catalog.
 
 ```sql
 COMMENT ON TABLE public.items IS 'Application items';
@@ -12,12 +12,12 @@ COMMENT ON TABLE public.items IS 'Application items';
 The operation preserves annotation metadata for consumers; it does not change
 query result typing, execute a database command or establish that the target
 exists. Routine targets can include argument type spellings as part of their
-canonical identity.
+name.
 
 ## Dialect and engine-specific behavior
 
 This is the implemented PostgreSQL annotation path. Recording an object kind or
-canonical name does not constitute full object lookup, signature resolution,
+object name does not constitute full object lookup, signature resolution,
 permission validation or complete COMMENT syntax support. SQLite does not
 provide this PostgreSQL COMMENT operation.
 

@@ -7,6 +7,12 @@ use crate::{
 };
 
 /// Read named rules through context layers without falling through tombstones.
+///
+/// Rule names belong to their target relation. `RuleInfoRead::rule` retrieves an
+/// exact `RuleIdentity`; `CreateTable::rules`, `CreateView::rules` and
+/// `ViewLike::rules` expose target links whose `resolve` method yields the
+/// effective analyzed definitions.
+///
 pub trait RuleInfoRead {
     /// Read the current layer: missing entry, cancellation, or analyzed definition.
     fn local_rule(&self, _identity: &RuleIdentity) -> Option<Option<&CreateRule>> {
@@ -27,6 +33,13 @@ pub trait RuleInfoRead {
 }
 
 /// Explicit definition and target-link operations selected by rule DDL.
+///
+/// `RuleInfoWrite` provides explicit registration, cancellation and target-link
+/// updates, with shared defaults for layered lookup and association. Resolving
+/// alone has no catalog effects. Applying a valid statement registers its
+/// definition and target link in the current layer; replacement leaves frozen
+/// parents and siblings intact.
+///
 pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
     /// Store an analyzed definition or cancellation in this layer.
     fn store_rule(&mut self, identity: &RuleIdentity, definition: Option<&CreateRule>);

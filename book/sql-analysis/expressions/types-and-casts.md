@@ -22,17 +22,19 @@ casts retain array identity and can supply an element target to empty or nested
 [CASE, COALESCE, GREATEST and LEAST](conditional.md) and ARRAY list constructors
 select common types using PostgreSQL categories, preferred-type facts and
 implicit conversions. Unknown SQL literals and unresolved client inputs are
-different: all-unknown literals resolve to text in these common-type operations,
-while wholly unresolved input-dependent results can retain open domains.
+different: all-unknown literals select text as the common scalar or array
+element type in these operations, while results depending on unknown input types
+may remain undetermined.
 
 ### Declaration type modifiers
 
-Declaration modifiers are separate from nominal type identity. Record-returning
-[FROM function definitions](../clauses/from.md#record-returning-functions) own
-the builtin length, numeric precision/scale and time/interval rules, including
-invalid arguments, clamping and unvalidated extension modifiers. Declaration
-modifiers are not accepted in
-[client input hints](parameters.md#sqlast-api-callers).
+Declaration modifiers such as length and precision do not define distinct named
+types. Record-returning [FROM function
+definitions](../clauses/from.md#record-returning-functions) own the builtin
+length, numeric precision/scale and time/interval rules, including invalid
+arguments, clamping and unvalidated extension modifiers. Declaration modifiers
+are not accepted in [client input
+hints](parameters.md).
 
 ## Dialect and engine-specific behavior
 

@@ -2,13 +2,14 @@
 
 ## Overview
 
-A view retains its analyzed SELECT and ordered result columns. An explicit
-column-name list renames outputs by position; too many names or duplicate output
-names are rejected. The query uses the shared [SELECT](select.md),
-[clauses](../clauses.md) and [expressions](../expressions.md) rules. Catalog
-application publishes an applicable definition for later statements. A
-compatible PostgreSQL OR REPLACE preserves retained relation state and owner; an
-incompatible result-column replacement leaves the prior definition intact.
+View analysis checks the defining SELECT and reports its ordered result columns.
+An explicit column-name list renames outputs by position; too many names or
+duplicate output names are rejected. The query uses the shared
+[SELECT](select.md), [clauses](../clauses.md) and
+[expressions](../expressions.md) rules. Catalog application publishes an
+applicable definition for later statements. A compatible PostgreSQL OR REPLACE
+preserves retained relation state and owner; an incompatible result-column
+replacement leaves the prior definition intact.
 
 ```sql
 CREATE VIEW public.item_names AS SELECT id, label FROM public.items;
@@ -42,36 +43,17 @@ PostgreSQL views, ON CONFLICT inference maps aliases to real underlying
 arbiters. Trigger-backed views allow targetless DO NOTHING without exposing base
 indexes. Rule replacement and trigger paths with INSERT/UPDATE rules reject ON
 CONFLICT. SQLite views reject UPSERT. Modifier and partial-index inference
-retains the [INSERT catalog-service limitations](insert.md#overview).
+has the same [INSERT conflict-target limitations](insert.md#overview).
 
 Load trigger/rule declarations, replacements, drops, and view defaults after the
-view declaration, in schema order. Catalog changes in a later schema layer do
-not mutate a frozen parent. Invalid view declarations produce structured
+view declaration, in schema order. Invalid view declarations produce structured
 semantic diagnostics and leave the existing definition intact. If a catalog
 reports `view_missing_write_metadata`, rebuild it from complete schema
 declarations before analyzing writes. Analysis does not execute trigger
 functions, rule actions, CHECK OPTION checks, or runtime row constraints.
-Trigger/rule SQL cannot currently be rendered back through the common AST
-deparser. Broader rule and ALTER VIEW processing remains tracked separately.
-
-### SQLAST API: evaluating view writes
-
-API consumers construct `ViewWriteEvaluation::new(&mut context)` with the
-existing analysis context, then call `insert`, `update`, or `evaluate` with an
-already-bound View `FullName`. Evaluation follows the View's effective semantic
-Trigger/Rule references and does not register capabilities or resolve a new
-search path. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use
-this same service. The service reports semantic problems through that context
-and returns `Ok(None)` when evaluation cannot finish because of a semantic
-problem. A read-only view still yields `Ok(Some(support))`; a write to that view
-reports a problem. Invalid statements leave an explicitly unresolved result so
-later statements can still be analyzed. `AnalysisError` is reserved for
-unrecoverable failures, including internal parser/analysis contract violations
-and diagnostic delivery failures. Frozen contexts store analysis results;
-writable-view analysis requires an active `ParseContext`.
-
-The analyzer retains write capabilities in `InsertStatement::view_support` and
-`UpdateStatement::view_support` for SQLAST API callers.
+Generating SQL text for trigger/rule declarations from analysis results is not
+currently supported. Broader rule and ALTER VIEW processing remains tracked
+separately.
 
 ## Dialect and engine-specific behavior
 
@@ -82,9 +64,9 @@ definitions are handled through the table-as path described at [CREATE
 TABLE](create-table.md#create-table-as). Analysis does not enforce runtime CHECK
 OPTION checks or execute the defining query.
 
-SQLite/Turso CREATE MATERIALIZED VIEW and DROP VIEW semantic entry points remain
-unimplemented; see the
-[statement support inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
+SQLite/Turso CREATE MATERIALIZED VIEW and DROP VIEW analysis remains
+unimplemented; see the [statement support
+inventory](../statements.md#unimplemented-sqlite-and-turso-statement-analysis).
 These paths do not acquire PostgreSQL semantics from similarly named commands.
 
 ## Diagnostics

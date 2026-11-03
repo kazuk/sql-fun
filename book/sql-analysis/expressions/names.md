@@ -22,8 +22,8 @@ columns in order. PostgreSQL also expands `(composite_expression).*`, including
 named composite values, table rows, and `ROW(...)` values. A composite column
 can be expanded as `column.*` when no source uses that name. A row expansion
 outside a projection target, or on a scalar value, produces a diagnostic. When a
-composite input's type is still unresolved, the result retains an explicit
-pending expansion until parameter inference determines its fields.
+composite input's type is still unknown, analysis cannot report its expanded
+columns until the type and its fields are determined.
 
 ### Composite fields
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-PostgreSQL and SQLite INSERT analysis retains the destination column bindings,
+PostgreSQL and SQLite INSERT analysis checks destination columns and the
 VALUES or query source, conflict policy, and RETURNING result names, types, and
 nullability. Without RETURNING, the analyzed statement has no result columns.
 DEFAULT VALUES and PostgreSQL per-value DEFAULT remain distinct from explicit
@@ -24,43 +24,26 @@ PostgreSQL INSERT CTEs expose their RETURNING columns to subsequent queries; a
 CTE without RETURNING cannot be read as a relation. SQLite permits WITH before
 INSERT but does not permit INSERT inside a CTE body.
 
-DO NOTHING retains and checks conflict targets against catalog constraints and
+DO NOTHING checks conflict targets against catalog constraints and
 unique indexes, including matching expression keys and identical partial-index
 predicates. Named constraint targets require constraint names retained in the
 schema; automatically generated database names are not inferred.
 
-### SQLAST API: conflict catalog services
+Explicit conflict collations and operator classes are looked up by name, using
+qualification, the search path, database encoding and index access method where
+applicable. SQLite conflict collation names are compared without case
+sensitivity; BINARY, NOCASE and RTRIM are known, while custom names require
+explicit declaration. This does not install a runtime collation.
 
-Explicit conflict collation/operator-class references retain their completed
-catalog lookups, including missing and ambiguous outcomes. Custom analysis
-contexts provide these lookups and modifier-aware arbiter inference through
-`ConflictInfoRead`; SQL spellings are not treated as resolved identities.
-Production PostgreSQL catalogs load collation and operator-class definitions
-from `collations.json` and `operator_classes.json` in the explicitly selected
-catalog generation. Both files are required; incomplete or malformed generations
-fail to load. Name lookup honors qualification, the current search path,
-database encoding, and the requested access method. `ConflictInfoRead` provides
-purpose-specific `database_collation`, `collation_definition`, and
-`operator_class_definition` reads for database-default provenance and qualified
-definitions with operator-family/type relations. The provider selects
-encoding/access-method eligibility; backing master collections remain private.
-Frozen catalogs retain the same read services.
-
-SQLite lookup uses its connection-local, case-insensitive collation namespace.
-BINARY, NOCASE, and RTRIM are available. API consumers must explicitly declare
-custom names with `BaseContext::declare_sqlite_collation` before freezing the
-base; this declaration records availability for analysis and does not install a
-runtime collation or inspect a connection.
-
-Modifier-aware arbiter eligibility and general partial-index predicate
-implication still require additional catalog services and can terminate analysis
-at their catalog boundary. Their implementation and production INSERT end-to-end
-verification remain tracked in
-[#581](https://github.com/kazuk/sql-fun/issues/581). Master lookup support alone
-does not establish those INSERT capabilities. DO UPDATE remains explicitly
-unimplemented ([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not
-produce a successful INSERT analysis, including later actions in SQLite UPSERT
-chains.
+Matching conflict targets with collation/operator-class modifiers, and
+determining whether a general partial-index predicate is implied by the conflict
+predicate, remain incomplete and can terminate analysis. Their implementation
+and production INSERT end-to-end verification remain tracked in
+[#581](https://github.com/kazuk/sql-fun/issues/581). Successful
+collation/operator-class lookup alone does not establish those INSERT
+capabilities. DO UPDATE remains explicitly unimplemented
+([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
+successful INSERT analysis, including later actions in SQLite UPSERT chains.
 
 View-target eligibility and defaults are described once in [CREATE
 VIEW](create-view.md#writable-views). Shared [WITH](../clauses/with.md),

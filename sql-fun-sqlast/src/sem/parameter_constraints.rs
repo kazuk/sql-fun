@@ -197,6 +197,21 @@ impl ParameterConstraint {
 /// unhinted overloads. [`Self::allows`] checks explicitly supplied types against
 /// the complete SQL constraints. Analysis does not select the single parameter
 /// signature chosen by PostgreSQL's untyped `PREPARE`.
+///
+/// A result column can have several SQL types when its output depends on the
+/// explicit input types. For example, `ARRAY[$1,1]` admits an integer input with
+/// an integer-array result and a bigint input with a bigint-array result.
+/// Inspect [`Self::result_column`] rather than assuming one result type. A
+/// single result column type may be unavailable even when these alternatives are
+/// known.
+///
+/// [`Self::allows`] checks correlated assignments across parameter positions;
+/// checking each parameter's domain independently can admit an incompatible
+/// combination. Omitted positions remain unconstrained by the check, while
+/// unknown positions are rejected. Inspection does not install hints, choose an
+/// application binding, narrow the retained result domains or change executable
+/// SQL.
+///
 #[derive(Clone, Debug, Default)]
 pub struct ParameterConstraints {
     parameters: Vec<ParameterConstraint>,

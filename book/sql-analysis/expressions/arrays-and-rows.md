@@ -27,16 +27,15 @@ This support does not establish multi-column comparison operator support.
 
 ### ARRAY list constructors
 
-`ARRAY[...]` retains its ordered elements and selects a common type using
+`ARRAY[...]` considers elements in written order and selects a common type using
 PostgreSQL's type categories and implicit conversions. For example,
 `ARRAY[1,2.5]` has type `numeric[]`; all-unknown strings or NULLs produce
-`text[]`. When the element type is wholly unresolved, the result domain remains
-open and `ParameterConstraints::allows` checks each supplied input assignment;
-for example, `ARRAY[$1,NULL]` admits integer and text inputs with their
-corresponding array types. SQL NULL and string literals that have no parameter
-source still resolve to `text`. The constructed array is non-null even when its
-elements may be NULL. Its implicit output name is `array`; an explicit alias
-supplies the output name.
+`text[]`. When the element type is unknown, analysis may be unable to determine
+a result type. For example, `ARRAY[$1,NULL]` admits integer and text inputs with
+their corresponding array types. The all-unknown literal rule applies when
+every element is a bare NULL or untyped string. The constructed array is non-null
+even when its elements may be NULL. Its implicit output name is `array`; an explicit
+alias supplies the output name.
 
 An empty constructor requires an explicit array cast, such as
 `ARRAY[]::integer[]`. The cast also supplies the element type to nested
@@ -48,8 +47,8 @@ Arrays of anonymous records are supported. PostgreSQL subscripting yields a
 generic `record` without accessible field names; use a named composite element
 type when subsequent SQL needs field references.
 
-Numbered parameters participate in constructor analysis. The result retains
-admissible input and output types and their relationships; explicit casts
+Numbered parameters participate in constructor analysis. Admissible input types
+determine the corresponding array result types; explicit casts
 constrain the target type. `ARRAY(SELECT ...)` also analyzes its child query, as
 described below.
 
@@ -58,13 +57,14 @@ described below.
 `ARRAY(SELECT ...)` requires exactly one output column and constructs a non-null
 array, including for an empty query result or nullable scalar elements. For
 example, `ARRAY(SELECT 1 WHERE false)` has type `integer[]`. Unknown literal
-outputs resolve to `text`; unresolved parameters keep their input/result
-domains. Parameters and correlated references in the child query participate in
-analysis. A pending composite star expansion defers the width check until its
-fields are known. Array-valued source columns retain the same PostgreSQL array
-type identity; analysis does not reject their static types merely because
-runtime accumulation has additional shape restrictions. Analysis does not
-execute the child query or validate runtime dimensions.
+outputs resolve to `text`; parameters whose types are unknown can leave both
+input and result types undetermined. Parameters and correlated references in the
+child query participate in analysis. For a composite star projection, the width
+can be checked only after its fields are known. Array-valued source columns
+retain the same PostgreSQL array type identity; analysis does not reject their
+static types merely because runtime accumulation has additional shape
+restrictions. Analysis does not execute the child query or validate runtime
+dimensions.
 
 Array subscripting and slices retain their source and index constraints. A known
 non-array operand and a known invalid index type can produce distinct

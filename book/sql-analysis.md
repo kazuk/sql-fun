@@ -24,15 +24,15 @@ interpret its output.
 The reference distinguishes SQL legality, parser acceptance, semantic analysis,
 and schema application. Valid SQL may remain unsupported. Known names or result
 columns can remain available after a diagnostic; that does not establish that
-all analysis completed successfully. A schema statement can retain a failed
-semantic outcome without applying its proposed changes to the catalog.
+all analysis completed successfully. A rejected schema statement can report a
+problem without changing the schema used by subsequent analysis.
 
 PostgreSQL analysis uses the selected catalog and explicitly configured engine
 version. Parsing PostgreSQL 18 grammar does not establish PostgreSQL 18 semantic
 support: implemented version checks can report
 [incompatible_engine_version](diagnostics/incompatible_engine_version.md).
-Unimplemented conversions or analysis operations can still panic. Examples
-include utility statement conversion, renamed RETURNING row images,
+Unimplemented conversions or analysis operations can still terminate analysis.
+Examples include unsupported utility statements, renamed RETURNING row images,
 INSERT/UPDATE destination row images, temporal constraints and unfinished
 constraint enforcement/inheritance operations. See the applicable statement
 pages. Deferrable unique-key catalog definitions and recursive CTE binding
@@ -42,12 +42,12 @@ covers tables, ordinary views, derived queries, nonrecursive CTEs and joins; the
 [optional executable-SQL rewrite](sql-analysis/statements/select.md) has its own
 narrower expansion policy.
 
-SQLite SQLAST support requires the `sqlite` feature and is partial. Do not infer
-CLI/server availability from SQLAST support: the [schema initialization
-API](api/check-analysis-design.md) currently supports PostgreSQL. Each reference
-page identifies dialect differences and the relevant support boundary.
-Successful binding alone does not prove complete grouping, window or other
-runtime legality validation.
+SQLite library analysis support requires the `sqlite` feature and is partial. Do
+not infer CLI/server availability from library analysis support: the [schema
+initialization API](api/check-analysis-design.md) currently supports PostgreSQL.
+Each reference page identifies dialect differences and the relevant support
+boundary. Successful binding alone does not prove complete grouping, window or
+other runtime legality validation.
 
 ## Existing reference links
 
@@ -169,7 +169,7 @@ constructors, nesting, coercion and empty arrays.
 
 **Parameter analysis**.
 [Reference](sql-analysis/expressions/parameters.md). Explicit hints, admissible
-types, application binding finalization and SQLAST API usage.
+types and application input type requirements.
 
 <a id="null-safe-distinctness-predicates"></a>
 

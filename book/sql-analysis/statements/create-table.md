@@ -2,7 +2,7 @@
 
 ## Overview
 
-CREATE TABLE analysis retains ordered column declarations and analyzed
+CREATE TABLE analysis checks column declarations in written order and analyzes
 attributes, types, defaults, nullability, generated/identity settings and
 supported constraints. Applicable definitions enter the analysis catalog for
 later statements; no table is created in a database. [Shared creation
@@ -15,10 +15,10 @@ CREATE TABLE public.items (id integer PRIMARY KEY, label text);
 PostgreSQL primary-key columns receive non-null metadata. Named and unnamed
 table-level foreign keys, including composite keys, retain source columns,
 selected referenced relation and target columns. Omitting referenced columns
-uses the referenced primary key when available. Failed lookups retain their
-outcome; a rejected declaration is not published merely because an analyzed
-statement was produced. Original declaration type modifiers and explicit
-declaration collations are retained separately from canonical type identity; see
+uses the referenced primary key when available. Missing referenced objects
+produce diagnostics; rejected declarations do not become available to later
+schema analysis. Original declaration type modifiers and explicit
+declaration collations are checked separately from the column type; see
 [types and casts](../expressions/types-and-casts.md) and
 [COLLATE](../expressions/collate.md).
 
@@ -36,9 +36,9 @@ WITH NO DATA spelling does not turn static analysis into data loading.
 SQLite CREATE TABLE has a dedicated conversion and analysis path behind the
 sqlite feature, including declared types and retained foreign-key declarations.
 It does not use PostgreSQL assignment or implicit-cast rules. SQLite permits
-repeated constraint names, but that remains unsupported by the retained schema
-model. Automatically generated database index names are not inferred. SQLite
-CREATE TABLE AS currently reaches an unimplemented table-query analysis path;
+repeated constraint names, but that remains unsupported by schema analysis.
+Automatically generated database index names are not inferred. SQLite CREATE
+TABLE AS currently reaches an unimplemented table-query analysis path;
 PostgreSQL table-as support does not establish SQLite support.
 
 Inheritance/partition analysis remains incomplete
@@ -51,13 +51,13 @@ paths; grammar acceptance is not full constraint validation.
 ### Remaining declaration limitations
 
 Table-level CHECK constraint binding/validation remains unimplemented
-([#525](https://github.com/kazuk/sql-fun/issues/525)), as does PostgreSQL EXCLUDE
-constraint analysis
-([#526](https://github.com/kazuk/sql-fun/issues/526)). These paths can panic;
-column CHECK handling does not implement table CHECK, and lack of static
-constraint analysis is separate from not checking live database rows.
+([#525](https://github.com/kazuk/sql-fun/issues/525)), as does PostgreSQL
+EXCLUDE constraint analysis
+([#526](https://github.com/kazuk/sql-fun/issues/526)). These paths can terminate
+analysis; column CHECK handling does not implement table CHECK, and lack of
+static constraint analysis is separate from not checking live database rows.
 
-`CREATE TABLE name OF composite_type` retains its syntax but does not resolve
+`CREATE TABLE name OF composite_type` is recognized but does not resolve
 and apply the typed table's column structure and dependent type association
 ([#657](https://github.com/kazuk/sql-fun/issues/657)). Inheritance, partition
 bounds/keys and relation options such as ON COMMIT, access method and storage

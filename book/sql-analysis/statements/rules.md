@@ -2,22 +2,15 @@
 
 ## Overview
 
-PostgreSQL `CREATE RULE` analysis returns `SemAst::rule()`, retaining the rule's
-resolved relation/name identity, event, replacement and INSTEAD options, boolean
-condition, ordered analyzed actions, dependencies and available source location.
-DO NOTHING retains an empty action list. Table and ordinary-view targets are
+PostgreSQL `CREATE RULE` analysis checks the target relation, rule name, event,
+replacement and INSTEAD options, boolean condition, and actions in written
+order. DO NOTHING has no action statements. Table and ordinary-view targets are
 supported; materialized views are rejected. OLD/NEW bind to actual target
 columns and are checked against the event and their enclosing query scope. Bind
 parameters and unresolved definitions are rejected.
 
-Rule names belong to their target relation. `RuleInfoRead::rule` retrieves an
-exact `RuleIdentity`; `CreateTable::rules`, `CreateView::rules` and
-`ViewLike::rules` expose target links whose `resolve` method yields the
-effective analyzed definitions. `RuleInfoWrite` provides explicit registration,
-cancellation and target-link updates, with shared defaults for layered lookup
-and association. Resolving alone has no catalog effects. Applying a valid
-statement registers its definition and target link in the current layer;
-replacement leaves frozen parents and siblings intact.
+Rule names belong to their target relation. A valid definition becomes available
+for subsequent schema analysis. OR REPLACE replaces the rule for that relation.
 
 RETURNING requires an unconditional INSTEAD rule with one returning action and
 matching target column count, order and types. ON SELECT requires an ordinary
@@ -34,19 +27,18 @@ limitations apply, including ON CONFLICT DO UPDATE (#474). Within rules, EXISTS
 explicitly rejected pending their implementations. Scalar, correlated and ARRAY
 subqueries use the shared query-expression support rules. Exact result
 compatibility for known built-in modifier-capable types (such as varchar,
-numeric and timestamp, including arrays) is rejected pending type-modifier
-retention (#619), even when their base types match. NOTIFY is still blocked at
-common syntax conversion (#608). No rewrite expansion, action execution or SQL
-rendering is performed.
+numeric and timestamp, including arrays) is rejected because complete
+type-modifier checking is not implemented (#619), even when their base types
+match. NOTIFY actions remain unsupported (#608). No rewrite expansion, action
+execution or SQL rendering is performed.
 
-PostgreSQL `DROP RULE` resolves its ON relation first and retains the exact
-relation-scoped rule identity, IF EXISTS lookup outcome and dependency choice in
-`SemAst::rule_drop()`. Application masks the named definition and removes its
-target link in the current layer. Frozen parents and siblings remain unchanged;
-re-creation replaces the cancellation. IF EXISTS accepts a missing relation or
-rule as an explicit no-op. A View's required `_RETURN` SELECT rule cannot be
-dropped, including with CASCADE; drop the View instead. CASCADE/RESTRICT is
-retained for inspection, without executing database dependency removal.
+PostgreSQL `DROP RULE` resolves its ON relation first and retains the exact rule
+name within that relation. After a successful DROP, the rule is no longer
+available to subsequent statements in the same schema analysis. IF EXISTS
+accepts a missing relation or rule as an explicit no-op. A View's required
+`_RETURN` SELECT rule cannot be dropped, including with CASCADE; drop the View
+instead. CASCADE/RESTRICT does not cause sql-fun to remove database
+dependencies.
 
 ## Dialect and engine-specific behavior
 

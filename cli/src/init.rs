@@ -7,6 +7,8 @@ pub(crate) mod install;
 mod postgres;
 mod presentation;
 mod prompt;
+mod review;
+mod selection_presentation;
 mod sqlite;
 mod step;
 #[cfg(test)]
@@ -22,7 +24,10 @@ use self::{
     step::{PromptInput, TerminalInput},
 };
 
-use std::{path::Path, process::ExitCode};
+use std::{
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 use ::sql_fun_core::{InitializationDatasources, InitializeArgs, PostgresVersion, SqlFunArgs};
 
@@ -65,6 +70,10 @@ pub async fn initialize(
         plan.install(state.home.home()).await?;
     }
     theme::validate_installed(state.home.home())?;
+    println!(
+        "Initialization complete. Use {} as SQL_FUN_HOME or --sql-fun-home for subsequent commands.",
+        state.home.home().display()
+    );
     Ok(ExitCode::SUCCESS)
 }
 
@@ -133,14 +142,24 @@ impl InitializationState<'_> {
         }
     }
     fn choose_engines(&mut self) -> Result<(), InitError> {
+        let explanation = self
+            .selection
+            .as_ref()
+            .expect("loaded selection")
+            .engine_explanation(self.home.home());
         self.selection
             .as_mut()
             .expect("loaded selection")
-            .choose_engines(&self.args, self.input.as_mut())?;
+            .choose_engines(&self.args, &explanation, self.input.as_mut())?;
         self.discard_unselected_postgres();
         Ok(())
     }
     fn choose_datasources(&mut self) -> Result<(), anyhow::Error> {
+        let explanation = self
+            .selection
+            .as_ref()
+            .expect("loaded selection")
+            .datasource_explanation(self.common);
         let previous = self
             .selection
             .as_ref()
@@ -149,7 +168,7 @@ impl InitializationState<'_> {
         self.selection
             .as_mut()
             .expect("loaded selection")
-            .choose_datasources(&self.args, self.input.as_mut())?;
+            .choose_datasources(&self.args, &explanation, self.input.as_mut())?;
         self.discard_unselected_postgres();
         if self
             .selection
@@ -163,7 +182,12 @@ impl InitializationState<'_> {
         Ok(())
     }
     fn choose_postgres_source(&mut self) -> Result<(), InitError> {
-        let selected = PostgresSetup::choose_source(&self.args, self.source, self.input.as_mut())?;
+        let selected = PostgresSetup::choose_source(
+            &self.args,
+            self.home.home(),
+            self.source,
+            self.input.as_mut(),
+        )?;
         if self.source.is_some_and(|previous| previous != selected) {
             self.connection = None;
             self.versions = None;
@@ -205,6 +229,13 @@ impl InitializationState<'_> {
         self.versions = Some(
             PostgresSetup::choose_versions(
                 &self.effective_args(),
+                self.home.home(),
+                &self
+                    .selection
+                    .as_ref()
+                    .map_or_else(String::new, |selection| {
+                        selection.version_requirements(self.common)
+                    }),
                 self.versions.as_deref(),
                 self.input.as_mut(),
             )
@@ -275,6 +306,7 @@ struct SetupSelection {
     engines: Vec<String>,
     datasource_names: Vec<String>,
     metadata: Option<InitializationDatasources>,
+    metadata_source: Option<PathBuf>,
 }
 impl SetupSelection {
     fn load(
@@ -282,10 +314,13 @@ impl SetupSelection {
         args: &InitializeArgs,
         metadata_file_from_cli: bool,
     ) -> Result<Self, anyhow::Error> {
-        let metadata = if metadata_file_from_cli || args.datasources().is_some() {
-            Some(InitializationDatasources::load_from(
-                &common.metadata_file()?,
-            )?)
+        let metadata_source = if metadata_file_from_cli || args.datasources().is_some() {
+            Some(common.metadata_file()?)
+        } else {
+            None
+        };
+        let metadata = if let Some(path) = &metadata_source {
+            Some(InitializationDatasources::load_from(path)?)
         } else {
             None
         };
@@ -293,6 +328,7 @@ impl SetupSelection {
             engines: Vec::new(),
             datasource_names: Vec::new(),
             metadata,
+            metadata_source,
         })
     }
 
@@ -330,9 +366,16 @@ impl SetupSelection {
     fn choose_engines(
         &mut self,
         args: &InitializeArgs,
+        explanation: &str,
         input: &mut dyn PromptInput,
     ) -> Result<(), InitError> {
         if let Some(engines) = args.engines() {
+            if !args.assume_yes() {
+                println!(
+                    "Engines supplied by --engines: {}.\n{explanation}",
+                    engines.join(", ")
+                );
+            }
             for engine in engines {
                 self.add_engine(engine);
             }
@@ -341,7 +384,7 @@ impl SetupSelection {
                 "Choose engines for development support",
                 &["postgres".to_owned(), "sqlite".to_owned()],
                 &self.engines,
-                |request| input.answer(request),
+                |request| input.answer(&request.clone().with_explanation(explanation)),
             )?;
         }
         Ok(())
@@ -350,6 +393,7 @@ impl SetupSelection {
     fn choose_datasources(
         &mut self,
         args: &InitializeArgs,
+        explanation: &str,
         input: &mut dyn PromptInput,
     ) -> Result<(), anyhow::Error> {
         let metadata = self
@@ -357,13 +401,19 @@ impl SetupSelection {
             .as_ref()
             .expect("explicitly requested metadata");
         let names = if let Some(names) = args.datasources() {
+            if !args.assume_yes() {
+                println!(
+                    "Datasources supplied by --datasource: {}.\n{explanation}",
+                    names.join(", ")
+                );
+            }
             names.to_vec()
         } else {
             choice::select_retained(
                 "Choose datasources to initialize",
                 &metadata.names(),
                 &self.datasource_names,
-                |request| input.answer(request),
+                |request| input.answer(&request.clone().with_explanation(explanation)),
             )?
         };
         self.engines.clear();

@@ -25,6 +25,13 @@ async fn complete_interactive_flow_collects_mixed_engine_settings_without_creati
     assert!(state.effective_args().docker());
     assert_eq!(state.versions.as_ref().unwrap().len(), 2);
     assert_eq!(state.plans.len(), 2);
+    let review = state.review().unwrap();
+    assert!(review.contains("PostgreSQL source: Docker"));
+    for version in state.versions.as_ref().unwrap() {
+        assert!(review.contains(&version.definition_base_path(&home).display().to_string()));
+    }
+    assert!(review.contains("no SQLite engine data will be installed"));
+    assert!(review.contains(&home.join("highlighter/default.toml").display().to_string()));
     assert!(
         !home.join("postgres").exists(),
         "collection must not install catalogs"
@@ -276,6 +283,9 @@ async fn removing_postgres_discards_its_answers_and_stale_plans() {
     assert_eq!(state.plans.len(), 1);
     assert!(state.versions.is_none());
     assert!(state.source.is_none());
+    let review = state.review().unwrap();
+    assert!(!review.contains("PostgreSQL source:"));
+    assert!(review.contains("Engines (execution order): sqlite"));
     assert!(!home.exists());
     script.assert_finished();
 }

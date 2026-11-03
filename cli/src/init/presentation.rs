@@ -98,5 +98,6 @@ impl Notice {
 
     fn show_invalid_home(error: &HomePathError) {
         error.show();
+        eprintln!("Enter a directory path whose parent exists; no files have been changed.");
     }
 }

@@ -150,14 +150,27 @@ impl ThemePlan {
         input: &mut dyn PromptInput,
     ) -> Result<bool, anyhow::Error> {
         if self.valid_original() {
+            if !args.assume_yes() {
+                println!(
+                    "Diagnostic colors: {}. This existing theme is valid and will be kept unchanged, including customizations. No download or editor is needed.",
+                    self.home.join(THEME_PATH).display()
+                );
+            }
             return Ok(true);
         }
         if args.install_default_theme() {
             anyhow::ensure!(
                 self.original.is_none(),
-                "existing theme is invalid; correct it explicitly before downloading a default theme"
+                "existing theme is invalid at {}; correct it explicitly before downloading a default theme (--install-default-theme never authorizes replacement)",
+                self.home.join(THEME_PATH).display()
             );
             self.operation = Operation::download();
+            if !args.assume_yes() {
+                println!(
+                    "Download default theme was requested with --install-default-theme.\n{}",
+                    self.choice_explanation()
+                );
+            }
             return Ok(true);
         }
         anyhow::ensure!(
@@ -170,11 +183,12 @@ impl ThemePlan {
         }
         options.push(Operation::edit("").title().to_owned());
         let retained = retained.filter(|plan| plan.home == self.home);
+        let explanation = self.choice_explanation();
         let selected = choice::select_one_retained(
             "Choose highlighter theme operation",
             &options,
             &retained.map_or_else(Vec::new, |plan| vec![plan.operation.title().to_owned()]),
-            |request| input.answer(request),
+            |request| input.answer(&request.clone().with_explanation(&explanation)),
         )?;
         if selected == Operation::download().title() {
             self.operation = Operation::download();
@@ -195,32 +209,55 @@ impl ThemePlan {
         let Some(editor) = self.operation.editor() else {
             return Ok(true);
         };
-        let request = PromptRequest::text("Theme editor executable", "").with_initial_text(editor);
+        let request = PromptRequest::text("Theme editor executable", "")
+            .with_initial_text(editor)
+            .with_explanation(&format!("Theme destination: {}.\nAfter final Ok, this editor will open a temporary {}. Enter an executable name on PATH or an executable path, without shell arguments (for example vi or /usr/bin/vi). Save a valid theme and exit successfully to install it. The editor is not run now.\nTheme format: https://kazuk.github.io/sql-fun/cli/init.html#diagnostic-theme", self.home.join(THEME_PATH).display(), if self.original.is_some() { "copy of the existing file" } else { "new file" }));
         let answer = input.answer(&request)?;
         let editor = answer
             .text_input()
             .context("theme editor executable is required")?;
         anyhow::ensure!(
             !editor.trim().is_empty(),
-            "theme editor executable is required"
+            "A theme editor executable is required. Rerun and supply an executable name or path"
         );
         self.operation = Operation::edit(editor);
         Ok(false)
     }
-    pub(super) fn review(&self) -> Result<(), anyhow::Error> {
-        println!(
-            "{}: {}",
-            self.operation.title(),
+    fn choice_explanation(&self) -> String {
+        let mut lines = vec![format!(
+            "Diagnostics need a valid color theme at {}.",
             self.home.join(THEME_PATH).display()
-        );
+        )];
+        if let Some(bytes) = &self.original {
+            if let Err(error) = validate_bytes(bytes) {
+                lines.push(format!(
+                    "The existing theme is invalid: {error}. Downloading cannot overwrite it."
+                ));
+            }
+        } else {
+            lines.push(format!("No theme exists there. Download default theme: after final Ok, fetch {THEME_URL} using curl, or wget if curl is unavailable; requires HTTPS access and trusted certificates."));
+        }
+        lines.push("Create/Edit theme: after final Ok, run an editor you specify on a temporary file (a copy if a theme exists). Install it only if the editor succeeds and the result is valid. A valid theme is required; neither route skips this requirement.\nTheme format: https://kazuk.github.io/sql-fun/cli/init.html#diagnostic-theme".to_owned());
+        lines.join("\n")
+    }
+
+    pub(super) fn review(&self) -> Result<String, anyhow::Error> {
+        let mut lines = vec![
+            format!("Diagnostic theme: {}", self.operation.title()),
+            format!(
+                "Theme destination: {}",
+                self.home.join(THEME_PATH).display()
+            ),
+        ];
         if self.operation.downloads() {
-            println!("Theme source: {THEME_URL}");
+            lines.push(format!("Theme source: {THEME_URL}"));
+            lines.push("Download requires curl, or wget if curl is unavailable, HTTPS access and trusted certificates.".to_owned());
         }
         if let Some(editor) = self.operation.editor() {
             anyhow::ensure!(!editor.is_empty(), "theme editor executable is required");
-            println!("Theme editor: {editor}");
+            lines.push(format!("Theme editor: {editor}"));
         }
-        Ok(())
+        Ok(lines.join("\n"))
     }
     pub(super) async fn install(&self) -> Result<(), anyhow::Error> {
         self.apply().await.with_context(|| {

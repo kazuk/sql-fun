@@ -1,0 +1,7 @@
+PostgreSQL analysis needs descriptions of the server's own types, functions,
+operators, casts, and catalogs (builtin metadata), separate from application schema.
+Docker: after final Ok, use psql and Docker with an accessible daemon to start
+and remove temporary PostgreSQL containers. Images may need downloading.
+Existing PostgreSQL server: requires psql, a reachable server and catalog-read
+permissions. Validate its version during questions, then read builtin catalogs
+after final Ok. Docker is not required for this route.

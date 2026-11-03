@@ -31,7 +31,8 @@ async fn invalid_text_is_retained_without_changing_the_original_suggestion() {
     let request = PromptRequest::text(
         include_str!("../home_prompt.txt").trim_end(),
         home.to_str().unwrap(),
-    );
+    )
+    .with_explanation(&state.home.entry_explanation());
     let script = Script::install(
         &mut state,
         vec![

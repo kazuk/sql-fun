@@ -92,7 +92,8 @@ impl Initialization {
                 include_str!("home_prompt.txt").trim_end(),
                 &self.default_home,
             )
-            .with_initial_text(&self.home_input);
+            .with_initial_text(&self.home_input)
+            .with_explanation(&self.entry_explanation());
             let answer = input.answer(&request)?;
             let Some(text) = answer.text_input() else {
                 continue;
@@ -148,6 +149,10 @@ impl Initialization {
             let request = PromptRequest::confirm(
                 format!(include_str!("confirm_home.txt"), path = self.home.display()).trim_end(),
             )
+            .with_explanation(&format!(
+                "{}\nThis confirms the location; it does not start installation.",
+                self.review()
+            ))
             .with_initial_confirmation(self.confirmed)
             .with_automatic(automatic);
             if let Some(confirmed) = input.answer(&request)?.confirmation() {
@@ -155,6 +160,29 @@ impl Initialization {
                 return Ok(());
             }
         }
+    }
+
+    fn entry_explanation(&self) -> String {
+        let working_directory = std::env::current_dir().map_or_else(
+            |_| "unavailable".to_owned(),
+            |path| path.display().to_string(),
+        );
+        format!(
+            "Suggested location: {}. Accepting the suggestion selects it; you may enter another.\nPaths may be absolute, relative to this command's working directory ({}), or begin with ~/.\nNothing is created yet.",
+            self.default_home, working_directory,
+        )
+    }
+
+    pub(super) fn review(&self) -> String {
+        format!(
+            "Selected home: {}.\nThis directory will be {} after final Ok.",
+            self.home.display(),
+            if self.home.exists() {
+                "reused"
+            } else {
+                "created"
+            },
+        )
     }
 
     pub(super) fn set_home(&mut self, home: &std::path::Path) {

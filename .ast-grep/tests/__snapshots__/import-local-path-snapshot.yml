@@ -1,5 +1,19 @@
 id: import-local-path
 snapshots:
+  "fn f() { <FullName as crate::traits::Convert>::convert(); }":
+    labels:
+    - source: crate::traits::Convert
+      style: primary
+      start: 22
+      end: 44
+    - source: crate
+      style: secondary
+      start: 22
+      end: 27
+    - source: crate::traits
+      style: secondary
+      start: 22
+      end: 35
   "fn f() { <crate::names::FullName as crate::traits::Convert>::convert(); }":
     labels:
     - source: crate::names::FullName

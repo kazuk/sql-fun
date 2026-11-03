@@ -16,6 +16,7 @@ valid:
   - 'fn f() { let s = "crate::names::FullName"; /* crate::names::FullName */ }'
   - 'fn f() -> std::io::Result<()> { external::run(); Ok(()) }'
   - 'fn f(x: &Self::Item) { Type::associated(); }'
+  - 'fn f() { <FullName as Convert>::convert(); }'
 invalid:
   - 'struct Field { value: crate::names::FullName }'
   - 'type Nested = Option<Vec<crate::names::FullName>>;'
@@ -41,3 +42,4 @@ invalid:
   - 'impl crate::traits::Convert<FullName> for crate::names::TableName {}'
   - 'fn f() { let limit = crate::constants::LIMIT; }'
   - 'fn f() { crate::factory::make(); }'
+  - 'fn f() { <FullName as crate::traits::Convert>::convert(); }'

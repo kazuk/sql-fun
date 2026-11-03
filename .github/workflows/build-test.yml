@@ -48,7 +48,7 @@ jobs:
     needs: pr-freshness
     runs-on: ubuntu-24.04
     container: &ci-builder-container
-      image: ghcr.io/kazuk/ci-builder@sha256:c104ba0ed1720eec34f94daa2c67594b69884c87d67541c25ea2d943b04f1588
+      image: ghcr.io/kazuk/ci-builder@sha256:9d645aa36d9e5b91a6c488869f8c925efe1ac26ba42462aa130012d612200ca3
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

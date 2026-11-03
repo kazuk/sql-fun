@@ -166,8 +166,8 @@ The helper lists assets by Release ID, requires existing expected assets to be
 uploaded with the prepared size, and uploads only missing inventory names
 without `--clobber`. It re-reads state after upload responses and failed
 creation responses whose server-side effects may already have completed.
-Incomplete or conflicting assets fail without replacement; producer package validation is
-not repeated. A final inventory read confirms all required draft assets.
+Incomplete or conflicting assets fail without replacement; producer package
+validation is not repeated. A final inventory read confirms all required draft assets.
 
 Before each upload, the helper rechecks draft state and the remote tag. A
 published Release is left untouched when observed. These checks do not lock

@@ -1,5 +1,7 @@
 //! Lightweight, parameterized fixtures for connector tests.
 
+pub(crate) mod query_requirements;
+
 use crate::{
     QueryFunctionKind, QueryFunctionSpec, ResultType, connectors::ConnectorSpec,
     rust_syn::ItemFunction,

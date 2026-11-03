@@ -5,49 +5,49 @@ schema_dump_hash = "78c6ec82ebbecb407fb57914d95c4d896168c965c92ae9ef75c5fabc5cc1
 
 [[queries]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statements = 1
 
 [[queries]]
 function = "delete_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 34
 fingerprint = "3a0e7986123aa0a9fe97840a3ec4344d609add952bec3837ecf86914bbccf87f"
 statements = 1
 
 [[queries]]
 function = "find_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 41
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statements = 1
 
 [[queries]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statements = 1
 
 [[queries]]
 function = "joined_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 48
 fingerprint = "2f04ebc61c61c461be457e69053b1539c496c71206e8acbef9627687d1a9e9fc"
 statements = 1
 
 [[queries]]
 function = "nested_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 62
 fingerprint = "368f816b7ae7b35a605bc10a8da5e733030d0c3ab7495ca3e5b7eefa3bf84702"
 statements = 1
 
 [[queries]]
 function = "select_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 20
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statements = 1
@@ -56,7 +56,7 @@ statements = 1
 # ANCHOR: update-query
 [[queries]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statements = 1
@@ -65,7 +65,7 @@ statements = 1
 
 [[queries]]
 function = "view_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 69
 fingerprint = "8d3207508c0b564b65f93492a757762445df280c1f7360d8df4497dfd22e846d"
 statements = 1
@@ -78,7 +78,7 @@ name = "e2e_items"
 
 [[relations.accesses.DeleteRows]]
 function = "delete_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 34
 fingerprint = "3a0e7986123aa0a9fe97840a3ec4344d609add952bec3837ecf86914bbccf87f"
 statement = 1
@@ -87,70 +87,70 @@ statement = 1
 
 [[relations.accesses.InsertRows]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "delete_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 34
 fingerprint = "3a0e7986123aa0a9fe97840a3ec4344d609add952bec3837ecf86914bbccf87f"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "find_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 41
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "joined_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 48
 fingerprint = "2f04ebc61c61c461be457e69053b1539c496c71206e8acbef9627687d1a9e9fc"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "nested_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 62
 fingerprint = "368f816b7ae7b35a605bc10a8da5e733030d0c3ab7495ca3e5b7eefa3bf84702"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "select_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 20
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.accesses.ReadRows]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
 
 [[relations.accesses.UpdateRows]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
@@ -160,112 +160,112 @@ name = "id"
 
 [[relations.columns.accesses.DeleteFilter]]
 function = "delete_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 34
 fingerprint = "3a0e7986123aa0a9fe97840a3ec4344d609add952bec3837ecf86914bbccf87f"
 statement = 1
 
 [[relations.columns.accesses.DeleteReturning]]
 function = "delete_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 34
 fingerprint = "3a0e7986123aa0a9fe97840a3ec4344d609add952bec3837ecf86914bbccf87f"
 statement = 1
 
 [[relations.columns.accesses.InsertReturning]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statement = 1
 
 [[relations.columns.accesses.InsertTarget]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statement = 1
 
 [[relations.columns.accesses.SelectFilter]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statement = 1
 
 [[relations.columns.accesses.SelectFilter]]
 function = "find_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 41
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.columns.accesses.SelectFilter]]
 function = "joined_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 48
 fingerprint = "2f04ebc61c61c461be457e69053b1539c496c71206e8acbef9627687d1a9e9fc"
 statement = 1
 
 [[relations.columns.accesses.SelectFilter]]
 function = "nested_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 62
 fingerprint = "368f816b7ae7b35a605bc10a8da5e733030d0c3ab7495ca3e5b7eefa3bf84702"
 statement = 1
 
 [[relations.columns.accesses.SelectFilter]]
 function = "select_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 20
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.columns.accesses.SelectJoin]]
 function = "joined_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 48
 fingerprint = "2f04ebc61c61c461be457e69053b1539c496c71206e8acbef9627687d1a9e9fc"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "find_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 41
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "joined_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 48
 fingerprint = "2f04ebc61c61c461be457e69053b1539c496c71206e8acbef9627687d1a9e9fc"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "nested_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 62
 fingerprint = "368f816b7ae7b35a605bc10a8da5e733030d0c3ab7495ca3e5b7eefa3bf84702"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "select_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 20
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.columns.accesses.SelectSource]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statement = 1
@@ -273,28 +273,28 @@ statement = 1
 # ANCHOR: update-id-accesses
 [[relations.columns.accesses.UpdateFilter]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
 
 [[relations.columns.accesses.UpdateInput]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
 
 [[relations.columns.accesses.UpdateReturning]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
 
 [[relations.columns.accesses.UpdateTarget]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
@@ -306,77 +306,77 @@ name = "name"
 
 [[relations.columns.accesses.DeleteReturning]]
 function = "delete_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 34
 fingerprint = "3a0e7986123aa0a9fe97840a3ec4344d609add952bec3837ecf86914bbccf87f"
 statement = 1
 
 [[relations.columns.accesses.InsertReturning]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statement = 1
 
 [[relations.columns.accesses.InsertTarget]]
 function = "insert_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 13
 fingerprint = "da630597c282ad4bb9e6cd5d775af05ed93b9a52d80eb247cae33a8b68efccc6"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "find_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 41
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "joined_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 48
 fingerprint = "2f04ebc61c61c461be457e69053b1539c496c71206e8acbef9627687d1a9e9fc"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "nested_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 62
 fingerprint = "368f816b7ae7b35a605bc10a8da5e733030d0c3ab7495ca3e5b7eefa3bf84702"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "select_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 20
 fingerprint = "7593e6fd0f247a25dc8f467e2ef598c34aa5ba2aae31d50ee83a71a2c2a41af3"
 statement = 1
 
 [[relations.columns.accesses.SelectSource]]
 function = "cte_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 55
 fingerprint = "50ebf8cb9355f81fcfbb9413292709bae8267a5bbf2aa28f29f091ecf927cf6f"
 statement = 1
 
 [[relations.columns.accesses.UpdateReturning]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
 
 [[relations.columns.accesses.UpdateTarget]]
 function = "update_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 27
 fingerprint = "18555ab72f3ff5b6e0b3e0fcf04ecad18e0ff682551abb66f0501ccd990473fc"
 statement = 1
@@ -388,7 +388,7 @@ name = "e2e_item_view"
 
 [[relations.accesses.ReadRows]]
 function = "view_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 69
 fingerprint = "8d3207508c0b564b65f93492a757762445df280c1f7360d8df4497dfd22e846d"
 statement = 1
@@ -398,14 +398,14 @@ name = "id"
 
 [[relations.columns.accesses.SelectFilter]]
 function = "view_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 69
 fingerprint = "8d3207508c0b564b65f93492a757762445df280c1f7360d8df4497dfd22e846d"
 statement = 1
 
 [[relations.columns.accesses.SelectOutput]]
 function = "view_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 69
 fingerprint = "8d3207508c0b564b65f93492a757762445df280c1f7360d8df4497dfd22e846d"
 statement = 1
@@ -415,7 +415,7 @@ name = "name"
 
 [[relations.columns.accesses.SelectOutput]]
 function = "view_item"
-source_file = "<unknown>"
+source_file = "src/main.rs"
 source_line = 69
 fingerprint = "8d3207508c0b564b65f93492a757762445df280c1f7360d8df4497dfd22e846d"
 statement = 1

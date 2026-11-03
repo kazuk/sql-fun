@@ -1,13 +1,10 @@
 //! The private protocol shared by connector stubs and the expanded-source reader.
 
-#[cfg(test)]
-mod test_helpers;
-
 use crate::{QueryFunctionSpec, SqlFunCodegenError};
 
 use ::proc_macro2::{Span, TokenStream};
 use ::sql_fun_core::ResolvedCteCatalog;
-use ::syn::{Block, Ident, ItemConst, LitStr, Signature, visit::Visit};
+use ::syn::{Block, Ident, ItemConst, Signature, visit::Visit};
 
 const CODEGEN_VERSION: &str = env!("CARGO_PKG_VERSION");
 const VERSION: &str = "__SQL_FUN_CODEGEN_VERSION";
@@ -32,7 +29,7 @@ impl QueryRequirement {
     pub(crate) fn emit_stub_function(
         spec: &QueryFunctionSpec,
         sig: &Signature,
-        source_file: &LitStr,
+        source_file: &TokenStream,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let version_marker = Ident::new(VERSION, Span::call_site());
         let file_marker = Ident::new(SOURCE_FILE, Span::call_site());
@@ -107,7 +104,8 @@ impl QueryRequirement {
 
 #[cfg(test)]
 mod test_query_requirement {
-    use super::{QueryRequirements, test_helpers};
+    use super::QueryRequirements;
+    use crate::test_helpers::query_requirements as test_helpers;
 
     #[test]
     fn generator_round_trip_restores_typed_cte_and_source() {
@@ -138,7 +136,7 @@ mod test_query_requirement {
             spec.connector_spec.render_query_many(&spec),
             spec.connector_spec.render_execute(&spec),
         ] {
-            let function = test_helpers::expand_line(&generated.unwrap());
+            let function = test_helpers::expand_location(&generated.unwrap());
             let requirements = QueryRequirements::extract(&syn::parse_quote!(#function)).unwrap();
             assert_eq!(requirements.len(), 1);
         }
@@ -154,7 +152,7 @@ mod test_query_requirement {
             spec.connector_spec.render_query_many(&spec),
             spec.connector_spec.render_execute(&spec),
         ] {
-            let function = test_helpers::expand_line(&generated.unwrap());
+            let function = test_helpers::expand_location(&generated.unwrap());
             let requirements = QueryRequirements::extract(&syn::parse_quote!(#function)).unwrap();
             assert_eq!(requirements.len(), 1);
             let requirement = requirements.iter().next().unwrap();
@@ -220,7 +218,8 @@ impl IntoIterator for QueryRequirements {
 
 #[cfg(test)]
 mod test_query_requirements {
-    use super::{QueryRequirements, test_helpers};
+    use super::QueryRequirements;
+    use crate::test_helpers::query_requirements as test_helpers;
 
     #[test]
     fn separate_stubs_keep_their_own_fields() {
@@ -363,7 +362,8 @@ impl<'a> StubConstants<'a> {
 
 #[cfg(test)]
 mod test_stub_constants {
-    use super::{CODEGEN_VERSION, QueryRequirements, test_helpers};
+    use super::{CODEGEN_VERSION, QueryRequirements};
+    use crate::test_helpers::query_requirements as test_helpers;
 
     #[test]
     fn missing_and_duplicate_fields_are_errors_after_identification() {
@@ -534,7 +534,8 @@ impl<'ast> Visit<'ast> for RequirementVisitor {
 
 #[cfg(test)]
 mod test_requirement_visitor {
-    use super::{CODEGEN_VERSION, QueryRequirements, test_helpers};
+    use super::{CODEGEN_VERSION, QueryRequirements};
+    use crate::test_helpers::query_requirements as test_helpers;
 
     #[test]
     fn traverses_all_function_kinds_and_nested_blocks() {

@@ -80,11 +80,12 @@ impl super::ArithExpr {
 
 #[cfg(test)]
 mod test_build_op_all {
+    use crate::test_helpers::quantified;
+    use crate::test_helpers::quantified_all as test_helpers;
     use crate::{
         ast::Dialect, parse_statements, sem::InputTypeConstraint,
         test_helpers::create_cache_context,
     };
-
     use crate::{
         names::OperatorName,
         sem::{
@@ -294,7 +295,7 @@ mod test_build_op_all {
         #[values(false, true)] left_coercion: bool,
         #[values(false, true)] nonnull: bool,
     ) -> testresult::TestResult {
-        let mut context = test_helpers::domains();
+        let mut context = quantified::domains();
         let target = if domain == "amount[]" {
             "public.amount".parse::<TypeReference>()?
         } else if coercion {
@@ -464,78 +465,6 @@ mod test_build_op_all {
         Ok(())
     }
 
-    mod test_helpers {
-        use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
-
-        use crate::{
-            context::{BaseParseContext, SchemaFileContext},
-            names::SchemaName,
-            sem::{CreateDomain, ParseContext, PgBuiltInType, TypeDefinition, TypeReference},
-            test_helpers::TestParseContext,
-        };
-
-        pub(super) fn context() -> TestParseContext {
-            let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
-            context.set_get_search_path_result(&[
-                SchemaName::from("public"),
-                SchemaName::from("pg_catalog"),
-            ]);
-            for ty in [
-                PgBuiltInType::int4(),
-                PgBuiltInType::int4().array_type(),
-                PgBuiltInType::bool(),
-            ] {
-                context.setup_type(ty);
-            }
-            context.setup_binary("=", "int4", "int4", "bool", true);
-            context
-        }
-
-        pub(super) fn domains() -> TestParseContext {
-            let mut context = context();
-            let amount = "public.amount".parse::<TypeReference>().unwrap();
-            let array = "public.amount_array".parse::<TypeReference>().unwrap();
-            let chain = "public.amount_array_chain"
-                .parse::<TypeReference>()
-                .unwrap();
-            for (domain, base) in [
-                (&amount, PgBuiltInType::int4()),
-                (&array, PgBuiltInType::int4().array_type()),
-                (&chain, array.clone()),
-            ] {
-                context.set_get_type_impl_result(
-                    domain.full_name().expect("nominal type identity"),
-                    &TypeDefinition::from(&CreateDomain::new(domain, &Some(base))),
-                );
-            }
-            context
-        }
-
-        pub(super) fn schema() -> testresult::TestResult<SchemaFileContext> {
-            let mut cache_context = create_cache_context();
-            let base = context();
-            let args = base.get_args().clone();
-            let metadata = base.metadata().clone();
-            let mut context = SchemaFileContext::new(
-                std::path::Path::new("query.sql"),
-                &base.freeze(),
-                &args,
-                &metadata,
-            );
-            // Apply real DDL in the mutable schema catalog; no builtin metadata is loaded.
-            for statement in parse_statements(
-                "CREATE DOMAIN amount AS integer; CREATE DOMAIN amount_array AS integer[]; CREATE DOMAIN amount_array_chain AS amount_array; CREATE DOMAIN amount_array_deep AS amount_array_chain;",
-                Dialect::postgres(),
-            ) {
-                context = statement?
-                    .analyze(context, &mut cache_context)?
-                    .into_context();
-            }
-            assert!(context.problems().is_empty(), "{:?}", context.problems());
-            Ok(context)
-        }
-    }
-
     #[rstest::rstest]
     #[case::int2vector("int2vector", "int2")]
     #[case::oidvector("oidvector", "oid")]
@@ -573,7 +502,7 @@ mod test_build_op_all {
 
     #[test]
     fn dynamic_array_keeps_element_operator() -> testresult::TestResult {
-        let context = test_helpers::context();
+        let context = quantified::context();
         let element = PgBuiltInType::int4();
         let array = TypeReference::dynamic(&TypeDefinition::array(&element));
         let left = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));

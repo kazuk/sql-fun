@@ -1,4 +1,5 @@
-pub(crate) use crate::test_helpers::membership::{expression, query};
+pub(crate) use crate::test_helpers::query::expression;
+pub(crate) use crate::test_helpers::statements::query_in_context as query;
 
 use crate::{
     context::{BaseParseContext, ParseContext, SchemaFileContext},

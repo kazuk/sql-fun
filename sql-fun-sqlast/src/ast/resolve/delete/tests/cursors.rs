@@ -1,21 +1,14 @@
-use crate::{
-    ast::{Dialect, Expr, StatementNode, resolve::delete::tests::test_helpers::catalog},
-    context::ParseContext,
-    names::{FullName, TableName},
-    parse_statements,
-    sem::{CursorInfo, SemAst},
-    test_helpers::{TestParseContext, create_cache_context},
-};
-
-fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {
-    parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap()
-        .node
-        .resolve(context, &mut create_cache_context())
-        .unwrap()
-}
+use crate::ast::Dialect;
+use crate::ast::Expr;
+use crate::ast::StatementNode;
+use crate::context::ParseContext;
+use crate::names::FullName;
+use crate::names::TableName;
+use crate::parse_statements;
+use crate::sem::CursorInfo;
+use crate::test_helpers::create_cache_context;
+use crate::test_helpers::delete::catalog;
+use crate::test_helpers::statements::resolve_cursor as resolve;
 
 #[rstest::rstest]
 #[case::target(Some("items"), Some(true), false)]

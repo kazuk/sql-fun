@@ -22,14 +22,17 @@ use crate::{
     test_helpers::create_cache_context,
 };
 
-use crate::{
-    ast::{
-        Dialect,
-        resolve::query::test_helpers::{output_index, output_type, query, resolve},
-    },
-    context::ParseContext,
-    sem::{ColumnReferenceExpr, PgBuiltInType, QueryGrouping, QueryNameResolution, SemScalarExpr},
-};
+use crate::ast::Dialect;
+use crate::context::ParseContext;
+use crate::sem::ColumnReferenceExpr;
+use crate::sem::PgBuiltInType;
+use crate::sem::QueryGrouping;
+use crate::sem::QueryNameResolution;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::output_index;
+use crate::test_helpers::query::output_type;
+use crate::test_helpers::query::query;
+use crate::test_helpers::query::resolve;
 
 #[test]
 fn retains_query_and_select_structure() {

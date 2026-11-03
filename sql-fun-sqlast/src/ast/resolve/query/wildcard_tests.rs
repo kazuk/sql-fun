@@ -1,15 +1,17 @@
 //! Semantic wildcard groups use the same small relation fixtures as name resolution.
 
+use crate::ast::Dialect;
+use crate::parse_statements;
+use crate::sem::MergeRecordRole;
+use crate::sem::ResultColumn;
+use crate::sem::WildcardExpansion;
+use crate::test_helpers::create_cache_context;
 #[cfg(feature = "sqlite")]
-use crate::ast::resolve::query::test_helpers::resolve;
-use crate::{
-    ast::{Dialect, resolve::query::test_helpers::table_function_query},
-    parse_statements,
-    sem::{MergeRecordRole, ResultColumn, WildcardExpansion},
-    test_helpers::create_cache_context,
-};
+use crate::test_helpers::query::resolve;
+use crate::test_helpers::query::table_function_query;
 
-use crate::{ast::resolve::query::test_helpers::source_namespace_statement, context::ParseContext};
+use crate::context::ParseContext;
+use crate::test_helpers::query::source_namespace_statement;
 
 #[rstest::rstest]
 #[case::zero_width("SELECT * FROM a.zero_columns", &[7], &[true], &[""])]

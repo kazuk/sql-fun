@@ -1,8 +1,10 @@
-use crate::{
-    ast::resolve::query::test_helpers::{output_type, table_function_query},
-    context::ParseContext,
-    sem::{AnalysisError, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
-};
+use crate::context::ParseContext;
+use crate::sem::AnalysisError;
+use crate::sem::ColumnReferenceExpr;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::output_type;
+use crate::test_helpers::query::table_function_query;
 
 #[test]
 fn typed_record_parameter_is_warning_free_in_the_controlled_context() {

@@ -1,11 +1,9 @@
+pub(crate) use crate::test_helpers::query::expression;
 use crate::{
     ast::Dialect,
     names::FullName,
     parse_statements,
-    sem::{
-        AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, SemScalarExpr,
-        TypeDefinition,
-    },
+    sem::{AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, TypeDefinition},
     test_helpers::{TestParseContext, create_cache_context},
 };
 
@@ -53,13 +51,4 @@ pub(crate) fn query(
         .ok_or_else(|| AnalysisError::unexpected_input_error("expected SELECT"))?;
     *context = analyzed.into_context();
     Ok(query)
-}
-
-pub(crate) fn expression(query: &SelectStatement) -> &SemScalarExpr {
-    query
-        .result_columns()
-        .get_column_at(0)
-        .unwrap()
-        .expression()
-        .unwrap()
 }

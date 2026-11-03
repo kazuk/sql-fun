@@ -3,8 +3,6 @@ mod clauses;
 #[cfg(test)]
 mod grouping_tests;
 #[cfg(test)]
-mod test_helpers;
-#[cfg(test)]
 mod tests;
 
 use crate::{
@@ -36,6 +34,15 @@ use crate::{
 };
 
 impl Query {
+    #[cfg(test)]
+    pub(crate) fn resolve_test_in(
+        &self,
+        context: &mut impl ParseContext,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+    ) -> Result<SelectStatement, AnalysisError> {
+        self.resolve_in(context, outer)
+    }
+
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,

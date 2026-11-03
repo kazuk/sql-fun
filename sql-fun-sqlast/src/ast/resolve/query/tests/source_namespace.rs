@@ -1,14 +1,14 @@
 #[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
+use crate::names::FullName;
+use crate::sem::ColumnReferenceExpr;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::sem::TypeReference;
 #[cfg(feature = "sqlite")]
-use crate::ast::resolve::query::test_helpers::resolve;
-use crate::{
-    ast::resolve::query::test_helpers::{
-        source_namespace_statement, source_namespace_statement_at_version,
-    },
-    names::FullName,
-    sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr, TypeReference},
-};
+use crate::test_helpers::query::resolve;
+use crate::test_helpers::query::source_namespace_statement;
+use crate::test_helpers::query::source_namespace_statement_at_version;
 
 #[rstest::rstest]
 #[case::comma("SELECT a.t.id, b.t.id FROM a.t, b.t")]
@@ -639,62 +639,4 @@ fn an_unresolved_join_input_blocks_qualified_binding() {
     );
 }
 
-mod test_helpers {
-    use crate::sem::SemAst;
-
-    use crate::{
-        names::FullName,
-        sem::{
-            AnalysisError, ResultColumnCollection, SemScalarExpr, traversal::SemanticVisitorMut,
-        },
-    };
-
-    pub(super) fn result_columns(ast: &SemAst) -> ResultColumnCollection {
-        if let Some(statement) = ast.as_update() {
-            statement.result_columns().clone()
-        } else if let Some(statement) = ast.as_delete() {
-            statement.result_columns().clone()
-        } else {
-            ast.clone()
-                .into_select_statemtnt()
-                .unwrap()
-                .result_columns()
-                .clone()
-        }
-    }
-
-    #[derive(Default)]
-    pub(super) struct TableBindings {
-        relations: Vec<FullName>,
-    }
-    impl TableBindings {
-        pub(super) fn assert_only_relation(&self, relation: &FullName) {
-            assert_eq!(self.relations.as_slice(), std::slice::from_ref(relation));
-        }
-    }
-    impl SemanticVisitorMut for TableBindings {
-        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
-            if let Some(binding) = expression.table_column_reference() {
-                self.relations.push(binding.relation().clone());
-            }
-            Ok(())
-        }
-    }
-    #[derive(Default)]
-    pub(super) struct SourceFailures {
-        codes: Vec<&'static str>,
-    }
-    impl SourceFailures {
-        pub(super) fn assert_source_ambiguity(&self) {
-            assert_eq!(self.codes, ["column_source_ambiguous"]);
-        }
-    }
-    impl SemanticVisitorMut for SourceFailures {
-        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
-            if let Some(failure) = expression.qualification_failure() {
-                self.codes.push(failure.code());
-            }
-            Ok(())
-        }
-    }
-}
+use crate::test_helpers::query_source_namespace as test_helpers;

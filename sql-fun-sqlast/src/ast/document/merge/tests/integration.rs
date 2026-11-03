@@ -1,23 +1,14 @@
-use crate::{
-    ast::{
-        CteDefinition, Dialect, HaveWithClause, Statement, StatementKind,
-        document::merge::tests::test_helpers::catalog,
-    },
-    context::ParseContext,
-    names::ColumnName,
-    parse_statements,
-    sem::{
-        PgBuiltInType, parameter_resolution::inference_runs as parameter_resolution_inference_runs,
-    },
-    test_helpers::create_cache_context,
-};
-
-fn statement(sql: &str) -> Statement {
-    parse_statements(sql, Dialect::postgres())
-        .next()
-        .expect("one statement")
-        .expect(sql)
-}
+use crate::ast::CteDefinition;
+use crate::ast::Dialect;
+use crate::ast::HaveWithClause;
+use crate::ast::StatementKind;
+use crate::context::ParseContext;
+use crate::names::ColumnName;
+use crate::sem::PgBuiltInType;
+use crate::sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs;
+use crate::test_helpers::create_cache_context;
+use crate::test_helpers::document_merge::catalog;
+use crate::test_helpers::merge_statements::statement;
 
 #[test]
 fn public_statement_entry_point_analyzes_and_deparses_merge() {

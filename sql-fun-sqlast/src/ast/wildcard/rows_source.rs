@@ -138,8 +138,6 @@ impl<'a> RowsProjectionBuilder<'a> {
 }
 
 #[cfg(test)]
-mod test_helpers;
-#[cfg(test)]
 mod tests;
 
 fn reference(alias: &str, column: &str) -> Expr {

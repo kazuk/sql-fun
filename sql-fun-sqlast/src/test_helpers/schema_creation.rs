@@ -1,0 +1,71 @@
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+use crate::ast::StatementNode;
+use crate::context::MutSourcePathWithSpan as _;
+#[cfg(feature = "sqlite")]
+use crate::context::ParseContext as _;
+#[cfg(feature = "sqlite")]
+use crate::names::SchemaName;
+use crate::syn::Node;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::SqliteSynBuilder;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::TestParseContext;
+use crate::test_helpers::create_cache_context;
+use crate::test_helpers::ownership::ownership_context;
+use crate::test_helpers::source_span;
+
+use crate::context::{FrozenBaseContext, SchemaFileContext};
+use crate::sem::AnalysisError;
+pub(crate) fn child(parent: FrozenBaseContext) -> SchemaFileContext {
+    use crate::context::BaseParseContext;
+    let mut context = SchemaFileContext::new(
+        std::path::Path::new("creation.sql"),
+        &parent,
+        parent.get_args(),
+        parent.metadata(),
+    );
+    context.set_source_path_with_span(&source_span());
+    context
+}
+pub(crate) fn postgres(sql: &str) -> Result<SchemaFileContext, AnalysisError> {
+    apply(ownership_context(), sql)
+}
+pub(crate) fn apply(
+    mut context: SchemaFileContext,
+    sql: &str,
+) -> Result<SchemaFileContext, AnalysisError> {
+    use crate::ast::TryFromWithTokens;
+    let parsed = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
+        .expect("valid PostgreSQL fixture");
+    for raw in parsed.protobuf.stmts {
+        let node = Node::from(raw.stmt.expect("statement").as_ref().clone());
+        let syntax = StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
+        context = syntax
+            .resolve_and_apply(context, &mut create_cache_context())?
+            .into_context();
+    }
+    Ok(context)
+}
+#[cfg(feature = "sqlite")]
+pub(crate) fn sqlite_accepts(first: &str, second: &str) -> Result<bool, ::rusqlite::Error> {
+    let connection = ::rusqlite::Connection::open_in_memory()?;
+    connection.execute_batch(first)?;
+    Ok(connection.execute_batch(second).is_ok())
+}
+#[cfg(feature = "sqlite")]
+pub(crate) fn sqlite_context() -> SchemaFileContext {
+    let mut root = TestParseContext::default().with_dialect(Dialect::sqlite());
+    root.set_search_path(&[SchemaName::from("main")]);
+    child(root.freeze())
+}
+#[cfg(feature = "sqlite")]
+pub(crate) fn apply_sqlite(
+    context: SchemaFileContext,
+    sql: &str,
+) -> Result<SchemaFileContext, AnalysisError> {
+    let statement = SqliteSynBuilder.parse_as_stmt(sql);
+    Ok(StatementNode::try_from(&statement)?
+        .resolve_and_apply(context, &mut create_cache_context())?
+        .into_context())
+}

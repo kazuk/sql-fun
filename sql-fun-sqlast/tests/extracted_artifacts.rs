@@ -1,11 +1,11 @@
 //! Loader compatibility for the officially extracted `PostgreSQL` artifacts.
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
 // Removed installed-generation bootstrap cases here and builtin_bootstrap.rs; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 
-mod extracted_artifacts_helpers {
-    pub(crate) mod heavy;
-}
-
-use self::extracted_artifacts_helpers::heavy;
+use crate::test_helpers::heavy::extracted_artifacts as heavy;
 
 use ::sql_fun_sqlast::{context::ConflictInfoRead, names::FullName};
 use std::path::PathBuf;

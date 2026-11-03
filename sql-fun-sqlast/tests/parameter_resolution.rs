@@ -1,62 +1,16 @@
 //! SQL input constraints are independent of parameter hints and Rust code generation.
 
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
 use crate::test_helpers::create_cache_context;
+use crate::test_helpers::heavy;
 use ::sql_fun_sqlast::{ast::Dialect, context::ParseContext, parse_statements, sem::PgBuiltInType};
 use std::collections::BTreeMap;
 
 // Removed real_postgres_catalog_preserves_numeric_source_types after a standard timeout;
 // restore from 379f1ef4a1ac9b54a19263976d6b269a86d60709.
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use ::sql_fun_sqlast::{
-            SqlFunArgs,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-        };
-        use std::path::PathBuf;
-
-        /// Reloads selected test metadata on every call; no result is shared.
-        /// The real metadata selects the builtin catalog used by schema tests.
-        pub(crate) fn environment()
-        -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>>
-        {
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let mut collection = args.load_metadata()?;
-            Ok((
-                args,
-                collection
-                    .remove("default")
-                    .expect("selected test metadata"),
-            ))
-        }
-
-        /// Loads the full builtin function/operator/cast metadata once per call.
-        /// This is intentionally heavy to validate the real catalog contracts.
-        pub(crate) fn context() -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-            let (args, selected) = environment()?;
-            let base = BaseContext::new(&args, &selected)?;
-            Ok(SchemaFileContext::new(
-                std::path::Path::new("query.sql"),
-                &FrozenBaseContext::from(base),
-                &args,
-                &selected,
-            ))
-        }
-    }
-}
 
 #[rstest::rstest]
 #[case::function("select lower($1) as label")]
@@ -68,7 +22,8 @@ fn real_catalog_contexts_produce_constraints(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(heavy::context()?, &mut cache_context)?;
+    let analyzed =
+        statement.analyze(heavy::parameter_resolution::context()?, &mut cache_context)?;
     assert!(
         !analyzed
             .context()
@@ -98,9 +53,10 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
     )
     .next()
     .unwrap()?;
-    let defined = definition.analyze(heavy::context()?, &mut cache_context)?;
+    let defined =
+        definition.analyze(heavy::parameter_resolution::context()?, &mut cache_context)?;
     let context = {
-        let (args, selected) = heavy::environment()?;
+        let (args, selected) = heavy::environment("17")?;
         let analysis_base = &defined.into_context().freeze();
         SchemaFileContext::new(
             std::path::Path::new("query.sql"),
@@ -158,7 +114,7 @@ fn explicit_assignment_inspection_keeps_declared_cast_sources(
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?
-        .analyze(heavy::context()?, &mut cache_context)?;
+        .analyze(heavy::parameter_resolution::context()?, &mut cache_context)?;
     assert!(
         analyzed
             .context()

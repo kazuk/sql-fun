@@ -1,10 +1,12 @@
-use crate::{
-    ast::{Dialect, resolve::update::tests::test_helpers::catalog},
-    names::{ColumnName, FullName},
-    parse_statements,
-    sem::{CreateView, ViewLike, ViewUpdateSupport},
-    test_helpers::create_cache_context,
-};
+use crate::ast::Dialect;
+use crate::names::ColumnName;
+use crate::names::FullName;
+use crate::parse_statements;
+use crate::sem::CreateView;
+use crate::sem::ViewLike;
+use crate::sem::ViewUpdateSupport;
+use crate::test_helpers::create_cache_context;
+use crate::test_helpers::update::catalog;
 
 #[rstest::rstest]
 #[case::writable("UPDATE writable_items SET id=$1 RETURNING *", true, true, true)]

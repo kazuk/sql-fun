@@ -1,14 +1,11 @@
 //! Parser-to-owned-AST regression cases for the published 0.8.1 grammar.
 
+use crate::test_helpers::sqlite_names::assert_bracket_name;
+
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::{Expr, Name, Stmt};
+use crate::syn::sqlite::{Expr, Stmt};
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::{SqliteArrayTypeGate, SqliteSynBuilder};
-
-fn assert_bracket_name(name: &Name, expected: &str) {
-    assert_eq!(name.value(), expected);
-    assert_eq!(*name.quote(), Some('['));
-}
 
 #[rstest::rstest]
 #[case::alter("ALTER TABLE [main].[items] RENAME TO [renamed]")]

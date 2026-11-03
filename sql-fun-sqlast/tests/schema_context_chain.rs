@@ -1,10 +1,15 @@
 //! Semantic coverage for immutable schema layers and independent descendants.
 
-use self::test_helpers::{
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+use crate::test_helpers::heavy::schema_context_chain as heavy;
+use crate::test_helpers::schema_context_chain;
+
+use crate::test_helpers::schema_context_chain::{
     EXTENSION_A, EXTENSION_B, assert_missing_domain_base, assert_missing_relation,
-    assert_primary_key, assert_query_type, assert_table_exists, assert_type_exists, builtin_root,
-    chain_prefix, dependent_dump, extension_sources, heavy, load_layer, load_schema,
-    parent_with_same_named_tables, query,
+    assert_primary_key, assert_query_type, assert_table_exists, assert_type_exists, dependent_dump,
+    extension_sources, load_layer, load_schema, query,
 };
 
 use ::sql_fun_sqlast::{
@@ -20,9 +25,9 @@ use ::sql_fun_sqlast::{
 fn anonymous_registration_returns_an_error_and_preserves_the_parent_catalog()
 -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::sem::{AnalysisError, CompositeFieldCollection, CreateCompositeType};
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let before = root.type_references();
-    let builder = test_helpers::schema_builder(&root)?;
+    let builder = schema_context_chain::schema_builder(&root)?;
     let definition = CreateCompositeType::from_fields(&CompositeFieldCollection::default());
     let error = builder.apply_create_comp_type(&definition).unwrap_err();
     assert!(matches!(error, AnalysisError::UnexpectedInput(_)));
@@ -44,7 +49,7 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
     #[case] extension_count: usize,
     #[case] answer_type: TypeReference,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut prefix = chain_prefix()?;
+    let mut prefix = heavy::chain_prefix()?;
     for source in extension_sources(extension_count) {
         let loaded = load_schema(&prefix, source)?;
         assert!(loaded.problems().is_empty());
@@ -68,7 +73,7 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
 fn missing_from_relation_reports_a_recoverable_problem(
     #[case] query: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let parsed = load_schema(
         &root,
         &format!("CREATE VIEW public.missing_view AS {query};"),
@@ -81,7 +86,7 @@ fn missing_from_relation_reports_a_recoverable_problem(
 #[test]
 fn dependent_view_keeps_missing_relation_problem_after_provider_is_loaded()
 -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let dependent = load_schema(
         &root,
         "CREATE VIEW public.missing_view AS SELECT id FROM missing.items;",
@@ -101,7 +106,7 @@ fn dependent_view_keeps_missing_relation_problem_after_provider_is_loaded()
 #[test]
 fn dependent_file_reports_named_missing_domain_base_before_its_provider()
 -> Result<(), Box<dyn std::error::Error>> {
-    let prefix = builtin_root()?;
+    let prefix = heavy::builtin_root()?;
     let dependent = load_schema(
         &prefix,
         "CREATE SCHEMA b; CREATE DOMAIN b.state_alias AS a.state;",
@@ -124,7 +129,7 @@ fn dependent_file_reports_named_missing_domain_base_before_its_provider()
 #[test]
 fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_root()?;
+    let builtin = heavy::builtin_root()?;
     let first = load_schema(&builtin, EXTENSION_A)?;
     let second = load_schema(first.base_context(), EXTENSION_B)?;
     let dump = load_schema(second.base_context(), dependent_dump(2))?;
@@ -232,7 +237,7 @@ fn array_item_reads_agree_across_context_layers(
     #[case] is_array: bool,
     #[case] expected: Option<TypeReference>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = test_helpers::builtin_context()?;
+    let root = heavy::builtin_context()?;
     let reference =
         TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), is_array);
     assert_eq!(root.get_array_item_type(&reference), expected);
@@ -244,7 +249,7 @@ fn array_item_reads_agree_across_context_layers(
         dump.base_context().get_array_item_type(&reference),
         expected
     );
-    let builder = test_helpers::schema_builder(dump.base_context())?;
+    let builder = schema_context_chain::schema_builder(dump.base_context())?;
     assert_eq!(builder.get_array_item_type(&reference), expected);
     assert_eq!(builder.freeze().get_array_item_type(&reference), expected);
     Ok(())
@@ -257,7 +262,7 @@ fn array_item_reads_agree_across_context_layers(
 fn sql_array_declarations_survive_schema_layers(
     #[case] declaration: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let parsed = load_schema(
         &root,
         &format!(
@@ -308,7 +313,7 @@ fn sql_array_declarations_survive_schema_layers(
 
 #[test]
 fn sql_scalar_subscript_reports_array_required() -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let parsed = load_schema(
         &root,
         "CREATE TABLE public.scalar_items (value integer); \
@@ -369,7 +374,7 @@ fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
 #[test]
 fn cloned_prefix_outlives_its_parse_result_and_supports_shared_thread_reads()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_root()?;
+    let builtin = heavy::builtin_root()?;
     let parsed = load_schema(&builtin, EXTENSION_A)?;
     let prefix = parsed.base_context().clone();
     drop(parsed);
@@ -402,7 +407,7 @@ fn cloned_prefix_outlives_its_parse_result_and_supports_shared_thread_reads()
 #[test]
 fn forked_files_keep_definitions_search_paths_provenance_and_problems_local()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_root()?;
+    let builtin = heavy::builtin_root()?;
     let parent = load_schema(&builtin, EXTENSION_A)?;
     let left = load_layer(
         parent.base_context(),
@@ -463,7 +468,7 @@ fn inherited_alter_updates_only_the_resolved_child_table(
     #[case] other_schema: &str,
     #[case] unqualified_key: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let parent = parent_with_same_named_tables(false)?;
+    let parent = heavy::parent_with_same_named_tables(false)?;
     let alteration = format!(
         "ALTER TABLE {target} ADD CONSTRAINT items_pk PRIMARY KEY (other_id); \
          SELECT id, other_id FROM {target};"
@@ -507,7 +512,7 @@ fn inherited_unqualified_declarations_are_altered_under_the_resolved_key(
     #[case] selected_schema: &str,
     #[case] other_schema: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let first = load_layer(
         &root,
         &["a"],
@@ -541,7 +546,7 @@ fn inherited_unqualified_declarations_are_altered_under_the_resolved_key(
 fn local_unqualified_declaration_retains_its_catalog_key_after_alter(
     #[case] target: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
+    let root = heavy::builtin_root()?;
     let parsed = load_schema(
         &root,
         &format!(
@@ -565,7 +570,7 @@ fn inherited_drop_records_without_removing_tables_or_changing_other_layers(
     #[case] search_path: &[&str],
     #[case] selected_schema: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let parent = parent_with_same_named_tables(true)?;
+    let parent = heavy::parent_with_same_named_tables(true)?;
     let child = load_layer(
         parent.base_context(),
         search_path,
@@ -743,286 +748,4 @@ fn absent_index_traverses_schema_layers_to_builtin_root() -> Result<(), Box<dyn 
             .is_none()
     );
     Ok(())
-}
-
-mod test_helpers {
-    pub(super) mod heavy {
-        use crate::test_helpers::environment;
-
-        use crate::test_helpers::builtin_root;
-        use ::sql_fun_sqlast::{PostgresDialect, context::FrozenBaseContext};
-        use std::path::Path;
-
-        /// Load real builtin type/function metadata for index absence and DDL
-        /// resolution tests. Every call reloads metadata, without sharing across
-        /// calls or nextest processes; the full builtin schema is not parsed.
-        pub fn index_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            builtin_root()
-        }
-
-        /// Load builtin JSON metadata and the real tablefunc extension for
-        /// extension integration coverage. Every call repeats both loads;
-        /// results are not cached or shared between calls or test processes.
-        pub fn tablefunc_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            let prefix = builtin_root()?;
-            let file =
-                Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
-            Ok({
-                let (args, selected) = environment()?;
-                let analysis_base = &prefix;
-                PostgresDialect::parse_schema_file(
-                    &file,
-                    analysis_base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )
-            }?
-            .base_context()
-            .clone())
-        }
-    }
-
-    use ::clap::Parser;
-    use ::sql_fun_sqlast::{
-        ParsedSchemaDump, PostgresDialect, SqlFunArgs,
-        context::{
-            BaseContext, BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext,
-            ViewInfoRead,
-        },
-        names::{ColumnName, FullName, SchemaName, TableName},
-        sem::{AnalysisProblem, TypeReference, ViewLike, problem::NameResolution},
-    };
-    use std::path::Path;
-
-    pub(super) const EXTENSION_A: &str = "CREATE SCHEMA a; CREATE TYPE a.state AS ENUM ('ready'); CREATE DOMAIN a.label AS text; \
-         CREATE TYPE a.pair AS (key integer, value text); \
-         CREATE TABLE a.items (id integer, label a.label); \
-         CREATE FUNCTION a.choose(x integer) RETURNS integer LANGUAGE sql STRICT AS 'SELECT x'; \
-         CREATE VIEW a.answers AS SELECT a.choose(t.id) AS answer, t.label FROM a.items t; \
-         CREATE SEQUENCE a.item_seq; CREATE INDEX items_id_idx ON a.items (id);";
-
-    pub(super) const EXTENSION_B: &str = "CREATE SCHEMA b; CREATE DOMAIN b.state_alias AS a.state; CREATE DOMAIN b.label_alias AS a.label; \
-         CREATE TABLE b.items (id integer, label a.label, state b.state_alias); \
-         CREATE FUNCTION a.choose(x text) RETURNS text LANGUAGE sql STRICT AS 'SELECT x'; \
-         CREATE VIEW b.answers AS SELECT a.choose(t.id) AS answer, t.label FROM a.items t; \
-         CREATE MATERIALIZED VIEW b.cached_answers AS SELECT answer FROM b.answers; \
-         CREATE EXTENSION tablefunc;";
-
-    pub(super) fn extension_sources(count: usize) -> &'static [&'static str] {
-        &[EXTENSION_A, EXTENSION_B][..count]
-    }
-
-    pub(super) fn dependent_dump(count: usize) -> &'static str {
-        match count {
-            0 => {
-                "CREATE TABLE public.final_items (id integer); \
-                  CREATE VIEW public.final_answers AS SELECT abs(CAST(id AS double precision)) AS answer FROM public.final_items;"
-            }
-            1 => {
-                "CREATE DOMAIN public.final_label AS a.label; \
-                  CREATE VIEW public.final_answers AS SELECT answer, label FROM a.answers;"
-            }
-            2 => {
-                "CREATE DOMAIN public.final_state AS b.state_alias; \
-                  CREATE VIEW public.final_answers AS SELECT answer, label FROM b.answers;"
-            }
-            _ => panic!("unsupported fixture extension count"),
-        }
-    }
-
-    pub(super) fn parent_with_same_named_tables(
-        with_primary_keys: bool,
-    ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
-        let root = builtin_root()?;
-        let mut schema = String::from(
-            "CREATE SCHEMA a; CREATE SCHEMA b; \
-             CREATE TABLE a.items (id INTEGER, other_id INTEGER, sibling_id INTEGER); \
-             CREATE TABLE b.items (id INTEGER, other_id INTEGER, sibling_id INTEGER);",
-        );
-        if with_primary_keys {
-            schema.push_str(
-                "ALTER TABLE a.items ADD CONSTRAINT items_pk PRIMARY KEY (id); \
-                 ALTER TABLE b.items ADD CONSTRAINT items_pk PRIMARY KEY (id);",
-            );
-        }
-        load_layer(&root, &["a", "b"], &schema)
-    }
-
-    pub(super) fn environment()
-    -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>> {
-        let metadata = Path::new(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-        let args = SqlFunArgs::try_parse_from([
-            "sqlfun",
-            "--metadata-file",
-            metadata.to_str().expect("fixture metadata path"),
-            "--sql-fun-home",
-            env!("SQL_FUN_HOME"),
-            "--postgres-version",
-            "17",
-        ])?;
-        let metadata = args.load_metadata()?;
-        let selected = metadata
-            .get("default")
-            .expect("selected fixture metadata")
-            .clone();
-        Ok((args, selected))
-    }
-
-    pub(super) fn builtin_context() -> Result<BaseContext, Box<dyn std::error::Error>> {
-        // Real type/function/operator/cast metadata is sufficient for small fixtures;
-        // only catalog and full-extension tests need the entire builtin schema SQL.
-        let (args, selected) = environment()?;
-        Ok(BaseContext::new(&args, &selected)?)
-    }
-
-    pub(super) fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-        Ok(FrozenBaseContext::from(builtin_context()?))
-    }
-
-    pub(super) fn schema_builder(
-        base: &FrozenBaseContext,
-    ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-        let (args, selected) = environment()?;
-        Ok(SchemaFileContext::new(
-            std::path::Path::new("array.sql"),
-            base,
-            &args,
-            &selected,
-        ))
-    }
-
-    pub(super) fn chain_prefix() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-        let root = builtin_root()?;
-        let parsed = load_schema(&root, "CREATE TABLE public.base_items (id integer);")?;
-        assert!(parsed.problems().is_empty());
-        Ok(parsed.base_context().clone())
-    }
-
-    pub(super) fn load_schema(
-        base: &FrozenBaseContext,
-        sql: &str,
-    ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
-        let file = ::tempfile::NamedTempFile::new()?;
-        std::fs::write(file.path(), sql)?;
-        Ok({
-            let (args, selected) = environment()?;
-            let analysis_base = base;
-            PostgresDialect::parse_schema_file(
-                file.path(),
-                analysis_base,
-                &mut None,
-                &args,
-                &selected,
-            )
-        }?)
-    }
-
-    pub(super) fn query(
-        base: &FrozenBaseContext,
-        sql: &str,
-    ) -> Result<ViewLike, Box<dyn std::error::Error>> {
-        let parsed = load_schema(
-            base,
-            &format!("CREATE VIEW public.acceptance_query AS {sql};"),
-        )?;
-        assert!(parsed.problems().is_empty());
-        Ok(parsed
-            .get_view_impl(&FullName::with_schema("public", "acceptance_query"))
-            .expect("analyzed query view")
-            .clone())
-    }
-
-    pub(super) fn assert_query_type(query: &ViewLike, column: &str, expected: &TypeReference) {
-        assert_eq!(
-            query
-                .get_column_def(&ColumnName::from(column))
-                .expect("resolved query column")
-                .get_type(),
-            Some(expected)
-        );
-    }
-
-    pub(super) fn assert_type_exists(context: &impl BaseParseContext, name: &str) {
-        let full_name = name.parse::<FullName>().expect("fixture type name");
-        assert_eq!(
-            context
-                .get_type(&full_name)
-                .expect("visible named type")
-                .full_name(),
-            Some(&full_name)
-        );
-    }
-
-    pub(super) fn assert_table_exists(context: &impl BaseParseContext, name: &str) {
-        let table_name = TableName::from(name.parse::<FullName>().expect("fixture table name"));
-        assert!(context.get_table(&table_name).is_some());
-    }
-
-    pub(super) fn assert_missing_domain_base(
-        problems: &[AnalysisProblem],
-        domain: &str,
-        base: &str,
-    ) {
-        let domain_name = domain.parse::<FullName>().expect("fixture domain name");
-        assert!(problems.iter().any(|problem| match problem {
-            AnalysisProblem::NameResolution(NameResolution::DomainTypeNameNotFound(problem)) =>
-                problem.domain_type_name().as_str() == domain_name.to_string()
-                    && problem.base_type_name() == base,
-            _ => false,
-        }));
-    }
-
-    pub(super) fn assert_missing_relation(problems: &[AnalysisProblem], relation: &str) {
-        assert!(problems.iter().any(|problem| matches!(
-            problem,
-            AnalysisProblem::NameResolution(NameResolution::RelationNotFound(name))
-                if name == relation
-        )));
-    }
-
-    pub(super) fn load_layer(
-        base: &FrozenBaseContext,
-        search_path: &[&str],
-        sql: &str,
-    ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
-        let file = ::tempfile::NamedTempFile::new()?;
-        std::fs::write(file.path(), sql)?;
-        let mut context = {
-            let (args, selected) = environment()?;
-            let analysis_base = base;
-            SchemaFileContext::new(file.path(), analysis_base, &args, &selected)
-        };
-        let mut schemas = Vec::new();
-        for schema in search_path {
-            schemas.push(SchemaName::from(schema));
-        }
-        context.set_search_path(&schemas);
-        Ok({
-            let (args, selected) = environment()?;
-            let analysis_base = &context.freeze();
-            PostgresDialect::parse_schema_file(
-                file.path(),
-                analysis_base,
-                &mut None,
-                &args,
-                &selected,
-            )
-        }?)
-    }
-
-    pub(super) fn assert_primary_key(
-        context: &impl BaseParseContext,
-        table: &str,
-        key: Option<&str>,
-    ) {
-        let table_name = TableName::from(table.parse::<FullName>().expect("fixture table name"));
-        let table = context.get_table(&table_name).expect("resolved table");
-        if let Some(key) = key {
-            let expected = ColumnName::from(key);
-            assert_eq!(table.primary_key_columns(), vec![&expected]);
-        } else {
-            assert_eq!(table.primary_key_columns(), Vec::<&ColumnName>::new());
-        }
-    }
 }

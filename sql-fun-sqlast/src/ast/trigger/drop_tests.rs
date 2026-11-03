@@ -1,23 +1,7 @@
-use crate::ast::{Dialect, DropBehavior, DropTrigger, StatementKind, StatementNode};
-use crate::{parse_statements, syn};
-
-impl StatementNode {
-    fn into_test_drop_trigger(self) -> DropTrigger {
-        match self {
-            Self::DropTrigger(trigger) => trigger,
-            _ => panic!("DROP TRIGGER node"),
-        }
-    }
-}
-
-fn drop_trigger(sql: &str, dialect: Dialect) -> DropTrigger {
-    let statement = parse_statements(sql, dialect)
-        .next()
-        .expect("statement")
-        .expect("context-free DROP TRIGGER conversion");
-    assert_eq!(statement.kind(), StatementKind::drop_trigger());
-    statement.node.into_test_drop_trigger()
-}
+use crate::ast::{Dialect, DropBehavior, DropTrigger};
+use crate::syn;
+use crate::test_helpers::drop_syntax::postgres_drop_syntax;
+use crate::test_helpers::drop_trigger_syntax::drop_trigger;
 
 #[rstest::rstest]
 #[case::bare("DROP TRIGGER TriggerName ON Items", &["items"], "triggername")]
@@ -90,25 +74,6 @@ fn equivalent_concepts_use_common_shapes() {
     assert!(sqlite.relation.is_none());
     assert_eq!(postgres.behavior, Some(DropBehavior::restrict()));
     assert!(sqlite.behavior.is_none());
-}
-
-fn postgres_drop_syntax(sql: &str) -> ::pg_query::protobuf::DropStmt {
-    let result =
-        ::pg_query::parse(sql, ::pg_query::ParserOptions::default()).expect("DROP syntax fixture");
-    let node = result
-        .protobuf
-        .stmts
-        .into_iter()
-        .next()
-        .expect("statement")
-        .stmt
-        .expect("node")
-        .node
-        .expect("payload");
-    match node {
-        ::pg_query::protobuf::node::Node::DropStmt(value) => value,
-        _ => panic!("DROP statement fixture"),
-    }
 }
 
 #[test]

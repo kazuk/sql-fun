@@ -96,11 +96,13 @@ impl ArithExpr {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod tests {
-    use crate::{
-        ast::Dialect,
-        sem::{ParseContext, PgBuiltInType, SemScalarExpr},
-        test_helpers::membership::{context_for, expression, query},
-    };
+    use crate::ast::Dialect;
+    use crate::sem::ParseContext;
+    use crate::sem::PgBuiltInType;
+    use crate::sem::SemScalarExpr;
+    use crate::test_helpers::membership::context_for;
+    use crate::test_helpers::membership::expression;
+    use crate::test_helpers::statements::query_in_context as query;
     use std::collections::BTreeMap;
 
     #[rstest::rstest]

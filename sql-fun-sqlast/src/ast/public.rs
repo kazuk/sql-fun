@@ -21,6 +21,11 @@ pub struct Statement {
 }
 
 impl Statement {
+    #[cfg(test)]
+    pub(crate) fn into_test_node(self) -> StatementNode {
+        self.node
+    }
+
     pub(crate) const fn from_node(node: StatementNode, dialect: Dialect, span: StringSpan) -> Self {
         Self {
             node,
@@ -114,18 +119,15 @@ impl Statement {
 
 #[cfg(test)]
 mod test_statement_analyze {
+    use crate::test_helpers::public_analysis::statement;
+
     use crate::test_helpers::create_cache_context;
 
     use crate::{
-        ast::{CteDefinition, Dialect, HaveWithClause, Statement},
-        parse_statements,
+        ast::{CteDefinition, Dialect, HaveWithClause},
         sem::PgBuiltInType,
         test_helpers::TestParseContext,
     };
-
-    fn statement(sql: &str, dialect: Dialect) -> Statement {
-        parse_statements(sql, dialect).next().unwrap().unwrap()
-    }
 
     #[rstest::rstest]
     #[case::postgres(Dialect::postgres())]
@@ -606,13 +608,10 @@ impl CteBody {
 
 #[cfg(test)]
 mod test_parameter_analysis {
+    use crate::test_helpers::public_analysis::{analyze, context};
+
     use crate::{
-        AstAndContextPair,
-        names::FullName,
-        sem::{
-            AnalysisError,
-            parameter_resolution::inference_runs as parameter_resolution_inference_runs,
-        },
+        sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs,
         test_helpers::{create_cache_context, schema_layer, source_span},
     };
 
@@ -621,67 +620,9 @@ mod test_parameter_analysis {
         context::ParseContext,
         names::OperatorName,
         parse_statements,
-        sem::{
-            BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
-            FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType,
-        },
-        test_helpers::TestParseContext,
+        sem::{BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType},
     };
     use std::collections::BTreeMap;
-
-    fn context() -> TestParseContext {
-        let mut context = TestParseContext::default();
-        let int = PgBuiltInType::int4();
-        let small = PgBuiltInType::int2();
-        let text = PgBuiltInType::text();
-        context.setup_type(int.clone());
-        context.setup_type(small.clone());
-        context.setup_type(text.clone());
-        context.setup_type(PgBuiltInType::bool());
-        for ty in [&int, &small, &text] {
-            context.set_get_implicit_cast_result(
-                ty,
-                ty,
-                Some(CastDefinition::new(CastContext::no_conversion())),
-            );
-        }
-        context.set_get_implicit_cast_result(
-            &small,
-            &int,
-            Some(CastDefinition::new(CastContext::implicit())),
-        );
-        let add =
-            OperatorDefinition::binary(&[BinaryOperatorDefinition::new(&int, &int, &int, true)]);
-        context.set_get_operator_op_result(
-            &OperatorName::from_parts(None, "+"),
-            true,
-            true,
-            Some(&add),
-        );
-        let lower = OverloadVariant::new(
-            &Some(text.clone()),
-            &vec![FunctionParam::new_input_param(&None, &Some(text), &None)],
-            true,
-            false,
-        );
-        context.set_get_function_impl_result(
-            &FullName::with_schema("pg_catalog", "lower"),
-            &FunctionOverloadCollection::new(&[lower]),
-        );
-        context
-    }
-
-    fn analyze(
-        sql: &str,
-        dialect: Dialect,
-    ) -> Result<AstAndContextPair<TestParseContext>, AnalysisError> {
-        let mut cache_context = create_cache_context();
-        parse_statements(sql, dialect)
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(context().with_dialect(dialect), &mut cache_context)
-    }
 
     #[rstest::rstest]
     #[case::postgres("select $7 is null", Dialect::postgres())]

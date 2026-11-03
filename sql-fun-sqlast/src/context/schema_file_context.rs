@@ -285,7 +285,8 @@ impl IndexInfoRead for SchemaCatalog {
 mod test_index_lookup {
     use crate::{names::SchemaName as NamesSchemaName, test_helpers::schema_layer};
 
-    use self::test_helpers::{index, layer};
+    use crate::test_helpers::index_layers::index;
+    use crate::test_helpers::index_layers::layer;
     use crate::{
         context::{BaseParseContext, IndexInfoRead, ParseContext},
         names::FullName,
@@ -449,43 +450,6 @@ mod test_index_lookup {
         );
         Ok(())
     }
-
-    mod test_helpers {
-        use crate::{sem::AnalysisError, test_helpers::schema_layer};
-
-        use crate::{
-            context::{ParseContext, SchemaFileContext},
-            names::{FullName, SchemaName, TableName},
-            sem::{CreateIndex, IndexElementCollection},
-            test_helpers::TestParseContext,
-        };
-        use std::path::Path;
-
-        pub(super) fn index(schema: &str, table: &str, name: &str) -> CreateIndex {
-            CreateIndex::new(
-                &FullName::with_schema(schema, name),
-                &TableName::from(FullName::with_schema(schema, table)),
-                &IndexElementCollection::default(),
-            )
-        }
-
-        pub(super) fn layer(
-            path: &[&str],
-            indexes: &[CreateIndex],
-        ) -> Result<SchemaFileContext, AnalysisError> {
-            let base = TestParseContext::default().freeze();
-            let mut context = schema_layer(Path::new("indexes.sql"), &base);
-            let mut schemas = Vec::new();
-            for name in path {
-                schemas.push(SchemaName::from(name));
-            }
-            context.set_search_path(&schemas);
-            for index in indexes {
-                context = context.apply_create_index(index)?;
-            }
-            Ok(context)
-        }
-    }
 }
 
 impl OperatorInfoRead for SchemaCatalog {
@@ -522,6 +486,7 @@ impl OperatorInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_operator_layers {
+    use crate::test_helpers::operator_layers as test_helpers;
     use crate::{context::OperatorInfoRead, names::OperatorName, sem::PgBuiltInType};
 
     #[rstest::rstest]
@@ -541,85 +506,6 @@ mod test_operator_layers {
             .get_operator_op(&OperatorName::new("-"), has_left, has_right)
             .expect("inherited operator");
         test_helpers::assert_returns(inherited, &PgBuiltInType::int4());
-    }
-
-    mod test_helpers {
-        use crate::{context::FrozenBaseContext, test_helpers::schema_layer};
-
-        use crate::{
-            context::{ParseContext, SchemaFileContext},
-            sem::{
-                BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, TypeReference,
-                UnaryOperatorDefinition,
-            },
-            test_helpers::TestParseContext,
-        };
-        use std::path::Path;
-
-        pub(super) fn operator_layer(has_left: bool, has_right: bool) -> FrozenBaseContext {
-            let root = TestParseContext::default().freeze();
-            let mut parent = schema_layer(Path::new("parent.sql"), &root);
-            register(
-                &mut parent,
-                "+",
-                has_left,
-                has_right,
-                &PgBuiltInType::int4(),
-            );
-            register(
-                &mut parent,
-                "-",
-                has_left,
-                has_right,
-                &PgBuiltInType::int4(),
-            );
-            let mut child = schema_layer(Path::new("child.sql"), &parent.freeze());
-            register(&mut child, "+", has_left, has_right, &PgBuiltInType::int8());
-            child.freeze()
-        }
-
-        fn register(
-            context: &mut SchemaFileContext,
-            name: &str,
-            left: bool,
-            right: bool,
-            result: &TypeReference,
-        ) {
-            let argument = PgBuiltInType::int4();
-            if left && right {
-                let overload = BinaryOperatorDefinition::new(&argument, &argument, result, true);
-                context
-                    .catalog
-                    .binary_operators
-                    .insert(name, OperatorDefinition::binary(&[overload]));
-            } else if left {
-                let overload = UnaryOperatorDefinition::new(&argument, result, true);
-                context
-                    .catalog
-                    .left_unary_operators
-                    .insert(name, OperatorDefinition::left_unary(&[overload]));
-            } else {
-                let overload = UnaryOperatorDefinition::new(&argument, result, true);
-                context
-                    .catalog
-                    .right_unary_operators
-                    .insert(name, OperatorDefinition::right_unary(&[overload]));
-            }
-        }
-
-        pub(super) fn assert_returns(operator: &OperatorDefinition, expected: &TypeReference) {
-            match operator {
-                OperatorDefinition::Binary(overloads) => {
-                    assert_eq!(overloads.len(), 1);
-                    assert_eq!(overloads[0].get_return_type(), expected);
-                }
-                OperatorDefinition::LeftUnary(overloads)
-                | OperatorDefinition::RightUnary(overloads) => {
-                    assert_eq!(overloads.len(), 1);
-                    assert_eq!(overloads[0].get_return_type(), expected);
-                }
-            }
-        }
     }
 }
 
@@ -1025,8 +911,8 @@ mod test_extension_record {
 
 #[cfg(test)]
 mod test_freeze {
+    use crate::test_helpers::freeze as test_helpers;
     use crate::test_helpers::schema_layer;
-
     use crate::{
         StringSpan,
         context::{
@@ -1096,87 +982,12 @@ mod test_freeze {
         );
         Ok(())
     }
-
-    mod test_helpers {
-        use crate::{
-            context::{FrozenBaseContext, ParseContext, SchemaFileContext, SourceAccessService},
-            names::{ColumnName, FullName, SchemaName, TableName},
-            sem::{
-                AlterObjSubCommand, AlterTable, ColumnDefinition, Constraint, CreateTable,
-                CreateTableMode, PgBuiltInType, PrimaryKeyConstraint,
-            },
-            test_helpers::{TestParseContext, source_span},
-        };
-        use std::rc::{Rc, Weak};
-
-        pub(super) fn empty_base() -> FrozenBaseContext {
-            let mut context = TestParseContext::default();
-            context.set_search_path(&[SchemaName::from("public")]);
-            context.freeze()
-        }
-
-        fn column(name: &str) -> ColumnDefinition {
-            ColumnDefinition::new(
-                &Some(ColumnName::from(name)),
-                Some(&PgBuiltInType::int4()),
-                Some(true),
-                &[],
-            )
-        }
-
-        pub(super) fn table_with_id() -> CreateTable {
-            CreateTable::new(
-                &TableName::from(FullName::with_schema("public", "items")),
-                vec![column("id")],
-                CreateTableMode::from_if_not_exists(false),
-                false,
-                &source_span(),
-            )
-        }
-
-        pub(super) fn table_with_key_candidates() -> CreateTable {
-            CreateTable::new(
-                &TableName::from(FullName::with_schema("public", "items")),
-                vec![column("id"), column("other_id")],
-                CreateTableMode::from_if_not_exists(false),
-                false,
-                &source_span(),
-            )
-        }
-
-        pub(super) fn add_primary_key(table: &CreateTable, name: &str) -> AlterTable {
-            let primary_key =
-                PrimaryKeyConstraint::new("items_pk", table.name(), &[ColumnName::from(name)]);
-            let constraint = Constraint::primary_key(&primary_key);
-            AlterTable::new(
-                table.name(),
-                &[AlterObjSubCommand::add_constraint(&constraint)],
-                &source_span(),
-            )
-        }
-
-        #[derive(Debug)]
-        struct LocalSource {
-            _lifetime: Rc<()>,
-        }
-
-        impl SourceAccessService for LocalSource {}
-
-        pub(super) fn attach_local_source(context: &mut SchemaFileContext) -> Weak<()> {
-            let lifetime = Rc::new(());
-            let observer = Rc::downgrade(&lifetime);
-            context.set_source_file(Box::new(LocalSource {
-                _lifetime: lifetime,
-            }));
-            observer
-        }
-    }
 }
 
 #[cfg(test)]
 mod test_search_path {
     use crate::test_helpers::schema_layer;
-
+    use crate::test_helpers::search_path as test_helpers;
     use crate::{
         context::{BaseParseContext, ParseContext, SearchPathRead},
         names::{FullName, SchemaName},
@@ -1289,43 +1100,6 @@ mod test_search_path {
             Some(&FullName::with_schema("public", "item"))
         );
     }
-
-    mod test_helpers {
-        use crate::{
-            context::{FrozenBaseContext, ParseContext},
-            names::{FullName, SchemaName},
-            sem::{FunctionOverloadCollection, OverloadVariant, TypeDefinition, TypeReference},
-            test_helpers::TestParseContext,
-        };
-
-        pub(super) fn search_path(schemas: &[&str]) -> Vec<SchemaName> {
-            let mut names = Vec::new();
-            for schema in schemas {
-                names.push(SchemaName::from(schema));
-            }
-            names
-        }
-
-        pub(super) fn catalog_with_search_path(schemas: &[&str]) -> FrozenBaseContext {
-            let mut context = TestParseContext::default();
-            context.set_search_path(&search_path(schemas));
-            for schema in ["pg_catalog", "public", "app"] {
-                let name = FullName::with_schema(schema, "item");
-                context.set_get_type_impl_result(&name, &TypeDefinition::builtin(&name, None));
-                let overload = OverloadVariant::new(
-                    &Some(TypeReference::from_full_name(name.clone())),
-                    &Vec::new(),
-                    true,
-                    true,
-                );
-                context.set_get_function_impl_result(
-                    &name,
-                    &FunctionOverloadCollection::new(&[overload]),
-                );
-            }
-            context.freeze()
-        }
-    }
 }
 
 impl crate::context::ConflictInfoRead for SchemaCatalog {
@@ -1381,5 +1155,37 @@ impl crate::context::ViewDeleteInfoRead for SchemaCatalog {
 impl crate::context::ViewMergeInfoRead for SchemaCatalog {
     fn view_merge_support(&self, _view: &FullName) -> ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
+    }
+}
+
+#[cfg(test)]
+impl SchemaFileContext {
+    pub(crate) fn set_test_cast(
+        &mut self,
+        source: &TypeReference,
+        target: &TypeReference,
+        cast: CastDefinition,
+    ) {
+        if let Some(targets) = self.catalog.casts.get_mut(&source.to_string()) {
+            targets.insert(&target.to_string(), cast);
+        } else {
+            let mut targets = TrieMap::new();
+            targets.insert(&target.to_string(), cast);
+            self.catalog.casts.insert(&source.to_string(), targets);
+        }
+    }
+
+    pub(crate) fn set_test_operator(&mut self, name: &str, operator: OperatorDefinition) {
+        match operator {
+            OperatorDefinition::Binary(_) => {
+                self.catalog.binary_operators.insert(name, operator);
+            }
+            OperatorDefinition::LeftUnary(_) => {
+                self.catalog.left_unary_operators.insert(name, operator);
+            }
+            OperatorDefinition::RightUnary(_) => {
+                self.catalog.right_unary_operators.insert(name, operator);
+            }
+        }
     }
 }

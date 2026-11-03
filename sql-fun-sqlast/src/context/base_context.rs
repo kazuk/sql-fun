@@ -3,9 +3,6 @@ mod builtin_casts;
 mod builtin_fun;
 mod builtin_ope;
 
-#[cfg(test)]
-mod test_helpers;
-
 pub use self::{
     builtin_casts::PgBuiltinCasts, builtin_fun::PgBuiltInFunctions, builtin_ope::PgBuiltinOperators,
 };
@@ -298,12 +295,11 @@ impl BaseContext {
 
 #[cfg(test)]
 mod read_builtin_types_tests {
-    use crate::{
-        context::base_context::{BaseContext, test_helpers},
-        names::FullName,
-        sem::TypeReference,
-        test_helpers::TestParseContext,
-    };
+    use crate::context::base_context::BaseContext;
+    use crate::names::FullName;
+    use crate::sem::TypeReference;
+    use crate::test_helpers::TestParseContext;
+    use crate::test_helpers::type_catalog as test_helpers;
 
     #[rstest::rstest]
     #[case::empty_schema(r#"[{"schema":"","name":"text","collatable":true}]"#)]

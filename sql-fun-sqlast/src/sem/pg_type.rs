@@ -761,26 +761,9 @@ impl PgBuiltInType {
 
 #[cfg(test)]
 mod tests {
-    use crate::syn::{Node, NodeInner, String as SynString};
+    use crate::test_helpers::type_syntax::build_string_node_list_opt;
 
-    use crate::{names::FullName, syn::NodeListOpt};
-
-    fn build_string_node_list_opt(strings: &[&str]) -> NodeListOpt {
-        use crate::syn::StringBuilder;
-
-        let mut string_values = Vec::new();
-        for string in strings {
-            let string_value = StringBuilder::default()
-                .sval(String::from(*string))
-                .build()
-                .unwrap();
-            let string_value = SynString::from(string_value);
-            let string_node = NodeInner::from(string_value);
-            let string_node = Node::from(string_node);
-            string_values.push(string_node);
-        }
-        NodeListOpt::from(string_values)
-    }
+    use crate::names::FullName;
 
     #[test]
     fn test_try_from_nodelistopt_two_elements() {

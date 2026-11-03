@@ -1,4 +1,5 @@
 //! The caller's selected metadata survives context initialization and analysis.
+use crate::test_helpers::heavy::selected_metadata as heavy;
 
 #[cfg(feature = "sqlite")]
 use crate::SqliteDialect;
@@ -23,7 +24,7 @@ use crate::{
 fn retains_selected_postgres_metadata_without_reloading_default()
 -> Result<(), Box<dyn std::error::Error>> {
     let metadata = test_helpers::selected_metadata("selected-postgres.toml")?;
-    let context = test_helpers::context(&metadata)?;
+    let context = heavy::context(&metadata)?;
     let syntax = PostgresDialect::parse("select 42 as n")?;
     let select = syntax
         .get_stmts()
@@ -46,7 +47,7 @@ fn retains_selected_postgres_metadata_without_reloading_default()
 fn retains_selected_sqlite_metadata_through_group_resolution()
 -> Result<(), Box<dyn std::error::Error>> {
     let metadata = test_helpers::selected_metadata("selected-sqlite.toml")?;
-    let context = test_helpers::context(&metadata)?;
+    let context = heavy::context(&metadata)?;
     let statement = SqliteDialect::parse("select q.n as n from ((select 42 as n)) as q")?
         .expect("statement")
         .into_plain_statement()
@@ -136,90 +137,4 @@ fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
     Ok(())
 }
 
-mod test_helpers {
-    use crate::StringSpan;
-
-    use crate::{
-        context::{
-            BaseContext, BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan,
-            SchemaFileContext,
-        },
-        sem::SourcePathWithSpan,
-    };
-    use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
-    use std::path::Path;
-
-    #[cfg(feature = "sqlite")]
-    pub(super) fn sqlite_compatible_engine() -> Result<SqlFunMetadata, ::serde_json::Error> {
-        ::serde_json::from_value(::serde_json::json!({
-            "engine": "custom-sqlite-engine", "dialect": "SQLite", "version": "3"
-        }))
-    }
-
-    #[cfg(feature = "sqlite")]
-    pub(super) fn context_over_catalog(
-        base: &FrozenBaseContext,
-        metadata: &SqlFunMetadata,
-    ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-        let args = SqlFunArgs::builder(&std::collections::HashMap::new())?
-            .sql_dialect(::sql_fun_core::SqlDialect::PostgreSQL)
-            .build()?;
-        Ok(SchemaFileContext::new(
-            Path::new("query.sql"),
-            base,
-            &args,
-            metadata,
-        ))
-    }
-
-    pub(super) fn selected_metadata(
-        fixture: &str,
-    ) -> Result<SqlFunMetadata, Box<dyn std::error::Error>> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures")
-            .join(fixture);
-        let mut collection = SqlFunMetadataCollection::load_from(path)?;
-        Ok(collection.remove("analytics").expect("selected metadata"))
-    }
-
-    pub(super) fn context(
-        metadata: &SqlFunMetadata,
-    ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
-        let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-            "sqlfun",
-            "--metadata-file",
-            "this-metadata-file-does-not-exist.toml",
-            "--sql-fun-home",
-            env!("SQL_FUN_HOME"),
-            "--postgres-version",
-            "17",
-        ])?;
-        let base = BaseContext::new(&args, metadata)?;
-        assert_selected_metadata(&base, metadata);
-        let mut context = {
-            let analysis_base = &FrozenBaseContext::from(base);
-            SchemaFileContext::new(Path::new("query.sql"), analysis_base, &args, metadata)
-        };
-        context.set_source_path_with_span(&SourcePathWithSpan::new(
-            "query.sql",
-            &StringSpan::default(),
-        ));
-        Ok(context)
-    }
-
-    pub(super) fn assert_selected_metadata<C: BaseParseContext>(
-        context: &C,
-        selected: &SqlFunMetadata,
-    ) {
-        let metadata = context.metadata();
-        assert_eq!(metadata.name(), "analytics");
-        assert_eq!(metadata.sql_dialect(), selected.sql_dialect());
-        assert_eq!(metadata.engine_version(), selected.engine_version());
-        assert_eq!(metadata.search_path(), selected.search_path());
-        assert_eq!(metadata.connector(), selected.connector());
-        assert_eq!(
-            context.get_search_path()[0].as_str(),
-            selected.search_path().as_ref().expect("search path")[0]
-        );
-    }
-}
+use crate::test_helpers::selected_metadata as test_helpers;

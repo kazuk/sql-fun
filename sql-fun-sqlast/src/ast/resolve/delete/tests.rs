@@ -13,7 +13,8 @@ use crate::sem::{
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::SqliteSynBuilder;
 
-use self::test_helpers::{analyze, catalog};
+use crate::test_helpers::delete::analyze;
+use crate::test_helpers::delete::catalog;
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, ParseContext},
@@ -367,86 +368,7 @@ fn sqlite_public_adapter_analyzes_delete() {
     );
 }
 
-mod test_helpers {
-    use crate::{
-        parse_statements,
-        sem::{CastContext, CastDefinition},
-        test_helpers::create_cache_context,
-    };
-
-    use crate::{
-        ast::Dialect,
-        context::MutSourcePathWithSpan,
-        names::{ColumnName, SchemaName},
-        sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SemAst},
-        test_helpers::{TestParseContext, source_span},
-    };
-
-    pub(super) fn catalog_with_text_integer_cast() -> TestParseContext {
-        let mut context = catalog(Dialect::postgres());
-        context.set_get_implicit_cast_result(
-            &PgBuiltInType::text(),
-            &PgBuiltInType::int4(),
-            Some(CastDefinition::new(CastContext::explicit())),
-        );
-        context
-    }
-    pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(dialect);
-        context.set_source_path_with_span(&source_span());
-        context.set_get_search_path_result(&[
-            SchemaName::from("public"),
-            SchemaName::from("pg_catalog"),
-        ]);
-        context.setup_type(PgBuiltInType::int4());
-        context.setup_type(PgBuiltInType::text());
-        context.setup_type(PgBuiltInType::bool());
-        context.setup_table(
-            "items",
-            &[
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("id")),
-                    Some(&PgBuiltInType::int4()),
-                    Some(true),
-                    &[],
-                ),
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("label")),
-                    Some(&PgBuiltInType::text()),
-                    Some(false),
-                    &[],
-                ),
-            ],
-            &source_span(),
-        );
-        context
-    }
-    pub(super) fn resolve(
-        sql: &str,
-        context: &mut TestParseContext,
-        dialect: Dialect,
-    ) -> Result<SemAst, AnalysisError> {
-        parse_statements(sql, dialect)
-            .next()
-            .unwrap()
-            .unwrap()
-            .node
-            .resolve(context, &mut create_cache_context())
-    }
-    pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
-        let mut context = catalog(dialect);
-        let result = resolve(sql, &mut context, dialect).unwrap();
-        (result, context)
-    }
-    #[cfg(feature = "sqlite")]
-    pub(super) fn sqlite_accepts(sql: &str) {
-        let oracle = ::rusqlite::Connection::open_in_memory().unwrap();
-        oracle
-            .execute_batch("CREATE TABLE items(id INTEGER NOT NULL, label TEXT);")
-            .unwrap();
-        assert!(oracle.prepare(sql).is_ok(), "SQLite rejected {sql}");
-    }
-}
+use crate::test_helpers::delete as test_helpers;
 
 #[cfg(feature = "sqlite")]
 #[rstest::rstest]

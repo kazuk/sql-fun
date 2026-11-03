@@ -1,3 +1,4 @@
+use crate::test_helpers::statements;
 use crate::{
     context::{BaseParseContext, ParseContext, RuleInfoRead, RuleInfoWrite},
     names::{
@@ -109,7 +110,7 @@ fn resolves_complete_statement_without_applying(
     #[case] actions: usize,
 ) -> testresult::TestResult {
     let mut context = test_helpers::catalog();
-    let statement = test_helpers::resolve(sql, &mut context)?;
+    let statement = statements::resolve_postgres(sql, &mut context)?;
     let rule = statement.rule().unwrap();
     assert_eq!(rule.event(), event);
     assert_eq!(rule.actions().len(), actions);
@@ -186,7 +187,7 @@ fn resolves_complete_statement_without_applying(
 fn rejects_invalid_definition_without_registration(#[case] sql: &str) {
     let mut context = test_helpers::catalog();
     assert!(
-        test_helpers::resolve(sql, &mut context)
+        statements::resolve_postgres(sql, &mut context)
             .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement)),
         "{sql}"
     );
@@ -210,7 +211,7 @@ fn rejects_invalid_definition_without_registration(#[case] sql: &str) {
 #[test]
 fn retains_bound_actions_and_dependencies() -> testresult::TestResult {
     let mut context = test_helpers::catalog();
-    let statement = test_helpers::resolve(
+    let statement = statements::resolve_postgres(
         "CREATE RULE r AS ON UPDATE TO items DO (SELECT OLD.id; INSERT INTO sink VALUES(NEW.id))",
         &mut context,
     )?;
@@ -331,7 +332,7 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
     let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "r");
     let mut child = test_helpers::layer(&parent);
     assert!(
-        test_helpers::resolve(
+        statements::resolve_postgres(
             "CREATE OR REPLACE RULE r AS ON INSERT TO item_view DO SELECT OLD.id",
             &mut child
         )
@@ -427,7 +428,7 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
         assert_eq!(linked.len(), 1);
         assert!(std::ptr::eq(linked[0], registered));
     }
-    let unresolved = test_helpers::resolve(
+    let unresolved = statements::resolve_postgres(
         "CREATE RULE r AS ON INSERT TO items DO NOTHING",
         &mut context,
     )
@@ -450,7 +451,7 @@ fn insert_returning_does_not_bind_enclosing_rule_rows(
     #[values("15", "16", "17", "18")] version: &str,
 ) {
     let mut context = test_helpers::catalog_version(version);
-    test_helpers::resolve(
+    statements::resolve_postgres(
         "CREATE RULE r AS ON UPDATE TO items DO INSTEAD INSERT INTO sink VALUES(NEW.id) RETURNING OLD.id",
         &mut context,
     ).unwrap();
@@ -483,7 +484,7 @@ fn returning_distinguishes_rule_rows_from_action_destination(
         &FullName::with_schema("public", "sink"),
         "other",
     );
-    let result = test_helpers::resolve(
+    let result = statements::resolve_postgres(
         &format!("CREATE RULE r AS ON UPDATE TO items DO INSTEAD {action}"),
         &mut context,
     );
@@ -519,7 +520,7 @@ fn cte_delete_returning_uses_its_destination_row_image_on_postgres18() -> testre
         &FullName::with_schema("public", "sink"),
         "other",
     );
-    test_helpers::resolve(
+    statements::resolve_postgres(
         "CREATE RULE r AS ON UPDATE TO items DO WITH x AS (DELETE FROM sink RETURNING OLD.other) SELECT other FROM x",
         &mut context,
     )?;
@@ -547,13 +548,13 @@ fn modifier_capable_results_have_an_explicit_semantic_boundary() -> testresult::
         &source_span(),
     );
     context.set_get_table_impl_result(&name, &Some(table));
-    let query = test_helpers::resolve("SELECT id FROM sized", &mut context)?
+    let query = statements::resolve_postgres("SELECT id FROM sized", &mut context)?
         .into_select_statemtnt()
         .unwrap();
     let name = FullName::with_schema("public", "sized_view");
     let view = CreateView::new(&name, &query, &[], &None, false);
     context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
-    let unresolved = test_helpers::resolve(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO sized_view DO INSTEAD SELECT id FROM sized"#, &mut context).unwrap();
+    let unresolved = statements::resolve_postgres(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO sized_view DO INSTEAD SELECT id FROM sized"#, &mut context).unwrap();
     assert!(matches!(
         unresolved,
         crate::sem::SemAst::UnresolvedStatement
@@ -573,13 +574,13 @@ fn modifier_capable_results_have_an_explicit_semantic_boundary() -> testresult::
 #[test]
 fn action_lookup_retains_the_first_relation_on_the_search_path() -> testresult::TestResult {
     let mut context = test_helpers::catalog();
-    let query = test_helpers::resolve("SELECT id FROM public.sink", &mut context)?
+    let query = statements::resolve_postgres("SELECT id FROM public.sink", &mut context)?
         .into_select_statemtnt()
         .unwrap();
     let name = FullName::with_schema("pg_catalog", "items");
     let view = CreateView::new(&name, &query, &[], &None, false);
     context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
-    let statement = test_helpers::resolve(
+    let statement = statements::resolve_postgres(
         "CREATE RULE r AS ON UPDATE TO public.sink DO SELECT id FROM items",
         &mut context,
     )?;
@@ -597,7 +598,7 @@ fn action_lookup_retains_the_first_relation_on_the_search_path() -> testresult::
 #[test]
 fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
     let mut context = test_helpers::catalog();
-    let statement = test_helpers::resolve(
+    let statement = statements::resolve_postgres(
         "CREATE RULE r AS ON UPDATE TO items DO WITH x AS (INSERT INTO sink VALUES(1) RETURNING id) SELECT id FROM x",
         &mut context,
     )?;
@@ -612,116 +613,4 @@ fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
     Ok(())
 }
 
-mod test_helpers {
-    use crate::{
-        context::MutSourcePathWithSpan,
-        names::OperatorName,
-        parse_statements,
-        sem::{
-            BinaryOperatorDefinition, CastContext, CastDefinition, CreateView, OperatorDefinition,
-            ViewLike,
-        },
-        test_helpers::{create_cache_context, source_span},
-    };
-
-    use crate::{
-        ast::Dialect,
-        context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
-        names::{ColumnName, FullName, SchemaName, TableName},
-        sem::{
-            AnalysisError, ColumnDefinition, CreateTable, CreateTableMode, PgBuiltInType, SemAst,
-        },
-        test_helpers::TestParseContext,
-    };
-
-    pub(super) fn catalog_version(version: &str) -> TestParseContext {
-        let metadata = ::serde_json::from_value(::serde_json::json!({
-            "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
-        })).expect("explicit rule fixture version");
-        catalog().with_metadata(&metadata)
-    }
-    pub(super) fn catalog() -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
-        context.set_get_search_path_result(&[SchemaName::from("public")]);
-        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
-        let int = PgBuiltInType::int4();
-        context.set_get_implicit_cast_result(
-            &int,
-            &int,
-            Some(CastDefinition::new(CastContext::NoConversion)),
-        );
-        let equality = OperatorDefinition::binary(&[BinaryOperatorDefinition::new(
-            &int,
-            &int,
-            &PgBuiltInType::bool(),
-            true,
-        )]);
-        context.set_get_operator_op_result(
-            &OperatorName::from_parts(None, "="),
-            true,
-            true,
-            Some(&equality),
-        );
-        for name in ["items", "sink"] {
-            add_table(&mut context, &FullName::with_schema("public", name));
-        }
-        let query = resolve("SELECT id FROM items", &mut context)
-            .unwrap()
-            .into_select_statemtnt()
-            .unwrap();
-        let name = FullName::with_schema("public", "item_view");
-        let view = CreateView::new(&name, &query, &[], &None, false);
-        context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
-        context
-    }
-    pub(super) fn add_table(context: &mut TestParseContext, name: &FullName) {
-        add_table_column(context, name, "id");
-    }
-    pub(super) fn add_table_column(context: &mut TestParseContext, name: &FullName, column: &str) {
-        let column = ColumnDefinition::new(
-            &Some(ColumnName::from(column)),
-            Some(&PgBuiltInType::int4()),
-            Some(false),
-            &[],
-        );
-        let table = CreateTable::new(
-            &TableName::from(name.clone()),
-            vec![column],
-            CreateTableMode::from_if_not_exists(false),
-            false,
-            &source_span(),
-        );
-        context.set_get_table_impl_result(name, &Some(table));
-    }
-    pub(super) fn resolve(
-        sql: &str,
-        context: &mut impl ParseContext,
-    ) -> Result<SemAst, AnalysisError> {
-        parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .node
-            .resolve(context, &mut create_cache_context())
-    }
-    pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
-        SchemaFileContext::new(
-            std::path::Path::new("rule.sql"),
-            base,
-            base.get_args(),
-            base.metadata(),
-        )
-    }
-    pub(super) fn apply(
-        sql: &str,
-        context: SchemaFileContext,
-    ) -> Result<SchemaFileContext, AnalysisError> {
-        Ok(parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .node
-            .resolve_and_apply(context, &mut create_cache_context())?
-            .into_context())
-    }
-}
+use crate::test_helpers::rule as test_helpers;

@@ -12,7 +12,8 @@ use crate::{
     test_helpers::create_cache_context,
 };
 
-use self::test_helpers::{analyze, catalog};
+use crate::test_helpers::update::analyze;
+use crate::test_helpers::update::catalog;
 use crate::{ast::Dialect, context::ParseContext, sem::PgBuiltInType};
 
 #[rstest::rstest]
@@ -140,65 +141,7 @@ fn sqlite_invalid_returning(#[case] sql: &str) {
     assert!(context.reported_problem_count() > 0);
 }
 
-mod test_helpers {
-    use crate::{parse_statements, test_helpers::create_cache_context};
-
-    use crate::{
-        ast::Dialect,
-        context::MutSourcePathWithSpan,
-        names::{ColumnName, SchemaName},
-        sem::{ColumnDefinition, PgBuiltInType, SemAst},
-        test_helpers::{TestParseContext, source_span},
-    };
-
-    #[cfg(feature = "sqlite")]
-    pub(super) fn sqlite_accepts(sql: &str) {
-        let oracle = ::rusqlite::Connection::open_in_memory().unwrap();
-        oracle
-            .execute_batch("CREATE TABLE items(id INTEGER, label TEXT);")
-            .unwrap();
-        assert!(oracle.prepare(sql).is_ok(), "SQLite rejected {sql}");
-    }
-    pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(dialect);
-        context.set_source_path_with_span(&source_span());
-        context.set_get_search_path_result(&[
-            SchemaName::from("public"),
-            SchemaName::from("pg_catalog"),
-        ]);
-        context.setup_type(PgBuiltInType::int4());
-        context.setup_type(PgBuiltInType::text());
-        context.setup_type(PgBuiltInType::bool());
-        context.setup_table(
-            "items",
-            &[
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("id")),
-                    Some(&PgBuiltInType::int4()),
-                    Some(false),
-                    &[],
-                ),
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("label")),
-                    Some(&PgBuiltInType::text()),
-                    Some(false),
-                    &[],
-                ),
-            ],
-            &source_span(),
-        );
-        context
-    }
-    pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
-        let mut context = catalog(dialect);
-        let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
-        let result = statement
-            .node
-            .resolve(&mut context, &mut create_cache_context())
-            .unwrap();
-        (result, context)
-    }
-}
+use crate::test_helpers::update as test_helpers;
 
 #[test]
 fn public_postgres_entry_points_share_update_resolution() {

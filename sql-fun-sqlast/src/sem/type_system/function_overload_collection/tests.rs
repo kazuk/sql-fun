@@ -1,5 +1,5 @@
 //! Function selection through SQL analysis, with a small explicit catalog.
-mod test_helpers;
+use crate::test_helpers::function_overloads as test_helpers;
 
 use crate::sem::{ParseContext, PgBuiltInType, TypeReference};
 use std::collections::BTreeMap;

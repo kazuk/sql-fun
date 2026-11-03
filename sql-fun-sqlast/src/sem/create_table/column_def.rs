@@ -361,7 +361,8 @@ impl ColumnDefinition {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_sqlite_column_definition {
-    use crate::ast::Dialect;
+    use crate::test_helpers::column_definition::setup_context;
+
     #[cfg(feature = "sqlite")]
     use crate::syn::sqlite::CreateTableStatement;
 
@@ -370,14 +371,13 @@ mod test_sqlite_column_definition {
 
     use crate::{
         SqliteToken,
-        names::{FullName, SchemaName, TableName},
+        names::TableName,
         sem::{
-            SemScalarExpr, TypeReference,
+            SemScalarExpr,
             create_table::column_def::{ColumnConstraint, ColumnDefinition},
         },
         sqlite::SqliteDialect,
         syn::sqlite::CreateTableBody,
-        test_helpers::TestParseContext,
     };
 
     fn parse_create_table<'a>(sql: &'a str) -> (CreateTableStatement, IVec<SqliteToken<'a>>) {
@@ -390,20 +390,6 @@ mod test_sqlite_column_definition {
             panic!("expected create table statement")
         };
         (create_table, tokens)
-    }
-
-    fn setup_context() -> TestParseContext {
-        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-        context.set_get_search_path_result(&[SchemaName::from("public")]);
-        context.setup_type(TypeReference::concrete_type_ref(
-            &FullName::with_schema("public", "integer"),
-            false,
-        ));
-        context.setup_type(TypeReference::concrete_type_ref(
-            &FullName::with_schema("public", "text"),
-            false,
-        ));
-        context
     }
 
     #[rstest::fixture]

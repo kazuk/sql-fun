@@ -1,7 +1,7 @@
-use crate::ast::wildcard::rows_source::{
-    freeze,
-    test_helpers::{invocation, layout, rendered},
-};
+use crate::ast::wildcard::rows_source::freeze;
+use crate::test_helpers::wildcard_rows_source::invocation;
+use crate::test_helpers::wildcard_rows_source::layout;
+use crate::test_helpers::wildcard_rows_source::rendered;
 
 #[rstest::rstest]
 #[case::plain(false)]

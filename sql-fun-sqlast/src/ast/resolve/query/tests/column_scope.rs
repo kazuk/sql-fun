@@ -1,7 +1,9 @@
-use crate::{
-    ast::{Dialect, resolve::query::test_helpers::column_scope_query},
-    sem::{AnalysisError, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
-};
+use crate::ast::Dialect;
+use crate::sem::AnalysisError;
+use crate::sem::ColumnReferenceExpr;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::column_scope_query;
 
 #[rstest::rstest]
 #[case::original("SELECT (SELECT id FROM missing.items) FROM outer_items;")]

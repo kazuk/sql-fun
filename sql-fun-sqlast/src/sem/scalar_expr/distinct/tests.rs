@@ -1,4 +1,5 @@
-mod test_helpers;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::distinct as test_helpers;
 
 #[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
@@ -7,8 +8,11 @@ use crate::{
     test_helpers::TestParseContext,
 };
 
-use self::test_helpers::{context, expression, query, schema};
 use crate::sem::{ParseContext, PgBuiltInType, SemScalarExpr};
+use crate::test_helpers::distinct::context;
+use crate::test_helpers::distinct::schema;
+use crate::test_helpers::query::expression;
+use crate::test_helpers::statements::query_in_context as query;
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

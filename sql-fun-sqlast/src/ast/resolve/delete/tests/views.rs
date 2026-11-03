@@ -1,10 +1,11 @@
-use crate::{
-    ast::{Dialect, resolve::delete::tests::test_helpers::catalog},
-    names::FullName,
-    parse_statements,
-    sem::{CreateView, ViewDeleteSupport, ViewLike},
-    test_helpers::create_cache_context,
-};
+use crate::ast::Dialect;
+use crate::names::FullName;
+use crate::parse_statements;
+use crate::sem::CreateView;
+use crate::sem::ViewDeleteSupport;
+use crate::sem::ViewLike;
+use crate::test_helpers::create_cache_context;
+use crate::test_helpers::delete::catalog;
 
 #[rstest::rstest]
 #[case::writable("DELETE FROM writable_items WHERE $1 RETURNING *", true, true, true)]

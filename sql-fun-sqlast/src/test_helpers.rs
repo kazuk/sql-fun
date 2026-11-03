@@ -1,46 +1,125 @@
-#![cfg(test)]
 //! test helper types
+#![cfg(test)]
 
-mod name_builders;
-mod postgres_ast;
-pub(crate) mod query_access;
-
+pub(crate) mod alter_index;
+#[cfg(feature = "sqlite")]
+pub(crate) mod alter_table;
 pub(crate) mod analysis_cache;
+pub(crate) mod analysis_lifecycle;
+pub(crate) mod ast_query;
 pub(crate) mod between;
+pub(crate) mod builtin_functions;
+pub(crate) mod call_arguments;
+pub(crate) mod case_parameters;
+pub(crate) mod cast_catalog;
+pub(crate) mod cast_layers;
+pub(crate) mod coalesce;
 pub(crate) mod collate;
+pub(crate) mod column_attributes;
+#[cfg(feature = "sqlite")]
+pub(crate) mod column_definition;
 pub(crate) mod column_rename;
 pub(crate) mod common_types;
 pub(crate) mod composite_domains;
 pub(crate) mod conflict_masters;
+pub(crate) mod counted_root;
+pub(crate) mod data_source_table;
 pub(crate) mod declaration_collation;
+pub(crate) mod delete;
+pub(crate) mod delete_sql_driven;
+pub(crate) mod delete_versions;
+pub(crate) mod deparse;
+pub(crate) mod deparse_constraints;
+pub(crate) mod deparse_lexical;
+pub(crate) mod deparse_statements;
+pub(crate) mod distinct;
+pub(crate) mod document_merge;
 pub(crate) mod domain_casts;
+pub(crate) mod drop_rule;
+pub(crate) mod drop_rule_syntax;
+pub(crate) mod drop_syntax;
+pub(crate) mod drop_trigger;
+#[cfg(feature = "sqlite")]
+pub(crate) mod drop_trigger_sqlite;
+pub(crate) mod drop_trigger_syntax;
 pub(crate) mod dynamic_types;
 pub(crate) mod foreign_keys;
+pub(crate) mod freeze;
+pub(crate) mod function_overloads;
+pub(crate) mod function_syntax;
+pub(crate) mod grouping;
+pub(crate) mod heavy;
+pub(crate) mod index_layers;
+pub(crate) mod indirection;
+pub(crate) mod insert;
+pub(crate) mod insert_join_and_key_semantics;
+pub(crate) mod insert_views;
 pub(crate) mod membership;
+pub(crate) mod merge_assignments;
+pub(crate) mod merge_statements;
+pub(crate) mod merge_views;
+mod name_builders;
+pub(crate) mod name_identity;
+pub(crate) mod operator_layers;
 pub(crate) mod ownership;
 pub(crate) mod parameter_calls;
 pub(crate) mod pattern;
+mod postgres_ast;
+pub(crate) mod public_analysis;
+pub(crate) mod quantified;
+pub(crate) mod quantified_all;
+pub(crate) mod quantified_any;
+pub(crate) mod query;
+pub(crate) mod query_access;
+pub(crate) mod query_array_subquery;
+pub(crate) mod query_source_namespace;
+pub(crate) mod query_whole_rows;
 pub(crate) mod rows_from;
+pub(crate) mod rule;
 pub(crate) mod sampling;
+pub(crate) mod scalar_catalog;
+pub(crate) mod schema_content_hash;
+pub(crate) mod schema_creation;
+pub(crate) mod search_path;
+pub(crate) mod selected_metadata;
 pub(crate) mod set_operations;
+#[cfg(feature = "sqlite")]
+pub(crate) mod sqlite_from_groups;
+#[cfg(feature = "sqlite")]
+pub(crate) mod sqlite_names;
+#[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
+pub(crate) mod sqlite_retention;
+pub(crate) mod stack_regressions;
+pub(crate) mod statements;
+pub(crate) mod structural;
 mod syn_builder;
+pub(crate) mod table_clone;
+pub(crate) mod table_rename;
 mod test_parse_context;
+pub(crate) mod trigger;
+pub(crate) mod truth_test;
+pub(crate) mod type_catalog;
+pub(crate) mod type_hint;
+pub(crate) mod type_syntax;
+pub(crate) mod unqualified_tables;
+pub(crate) mod update;
+pub(crate) mod update_assignments;
+pub(crate) mod wildcard;
+pub(crate) mod wildcard_rows_source;
 
 pub(crate) use self::postgres_ast::{
     assert_postgres_structure, postgres_expression, postgres_node,
 };
+#[cfg(feature = "sqlite")]
+pub use self::sqlite_syn_builder::{SqliteArrayTypeGate, SqliteSynBuilder, sqlite_syn};
 pub use self::{
     syn_builder::SynBuilder,
     test_parse_context::{TestParseContext, test_context},
 };
-
 use crate::{
     CacheContext,
     context::{FrozenBaseContext, SchemaFileContext},
 };
-
-use std::path::PathBuf;
-
 use crate::{
     StringSpan,
     names::{ColumnName, FullName, TableName},
@@ -49,6 +128,7 @@ use crate::{
         TypeReference,
     },
 };
+use std::path::PathBuf;
 
 /// Create independent cache state for a test-owned analysis base.
 pub(crate) fn create_cache_context() -> CacheContext {
@@ -146,9 +226,6 @@ mod sqlite_syn_builder {
     }
 }
 
-#[cfg(feature = "sqlite")]
-pub use self::sqlite_syn_builder::{SqliteArrayTypeGate, SqliteSynBuilder, sqlite_syn};
-
 /// setup default function overload for test
 pub fn setup_function_overload() -> (TypeReference, OverloadVariant) {
     let int4 = TypeReference::from_master_type_name("int4");
@@ -240,4 +317,16 @@ pub(crate) fn schema_layer(path: &std::path::Path, base: &FrozenBaseContext) -> 
     use crate::context::BaseParseContext;
     let environment = TestParseContext::default();
     SchemaFileContext::new(path, base, environment.get_args(), environment.metadata())
+}
+
+#[rstest::fixture]
+pub(crate) fn context_args() -> ::sql_fun_core::SqlFunArgs {
+    <::sql_fun_core::SqlFunArgs as ::clap::Parser>::try_parse_from(vec![
+        "sqlfun",
+        "--metadata-file",
+        "sql_fun.metadata.toml",
+        "--sql-fun-home",
+        env!("SQL_FUN_HOME"),
+    ])
+    .unwrap()
 }

@@ -1,10 +1,10 @@
 //! Row structure and field bindings use the small query catalog, without builtin loading.
-use crate::{
-    ast::{Dialect, resolve::query::test_helpers::resolve},
-    context::ParseContext,
-    names::ColumnName,
-    sem::{PgBuiltInType, SemScalarExpr},
-};
+use crate::ast::Dialect;
+use crate::context::ParseContext;
+use crate::names::ColumnName;
+use crate::sem::PgBuiltInType;
+use crate::sem::SemScalarExpr;
+use crate::test_helpers::query::resolve;
 
 #[test]
 fn row_fields_preserve_order_types_nullability_and_nested_shape() {

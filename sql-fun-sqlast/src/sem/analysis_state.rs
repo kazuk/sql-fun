@@ -71,6 +71,7 @@ impl AnalysisState {
 
 #[cfg(test)]
 mod test_analysis_lifecycle {
+    use crate::test_helpers::analysis_lifecycle as test_helpers;
     use crate::{
         sem::{AnalysisError, ParseContext},
         test_helpers::TestParseContext,
@@ -112,33 +113,5 @@ mod test_analysis_lifecycle {
         assert_eq!(context.reported_problem_count(), 1);
         assert!(!context.parameter_inference_needed());
         Ok(())
-    }
-
-    mod test_helpers {
-        use crate::{
-            StringSpan,
-            names::FullName,
-            sem::{AnalysisError, AnalysisProblem, ParseContext},
-        };
-        pub(super) fn missing_functions() -> Vec<AnalysisProblem> {
-            vec![
-                AnalysisProblem::function_not_found(
-                    &FullName::from_local_name("first"),
-                    &StringSpan::new(3, 5),
-                ),
-                AnalysisProblem::function_not_found(
-                    &FullName::from_local_name("second"),
-                    &StringSpan::new(12, 6),
-                ),
-            ]
-        }
-        pub(super) fn report_missing_functions(
-            context: &mut impl ParseContext,
-        ) -> Result<(), AnalysisError> {
-            for problem in missing_functions() {
-                context.report_analysis_problem(problem)?;
-            }
-            Ok(())
-        }
     }
 }

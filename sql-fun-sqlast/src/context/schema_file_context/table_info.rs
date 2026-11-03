@@ -152,7 +152,7 @@ impl TableInfoWrite for SchemaFileContext {
 #[cfg(test)]
 mod test_drop_catalog_key {
     use crate::test_helpers::schema_layer;
-
+    use crate::test_helpers::unqualified_tables as test_helpers;
     use crate::{
         context::{BaseParseContext, ParseContext, TableInfoRead, TableInfoWrite},
         names::{FullName, TableName},
@@ -197,40 +197,5 @@ mod test_drop_catalog_key {
         );
         assert!(context.get_table(&TableName::from(key)).is_some());
         Ok(())
-    }
-
-    mod test_helpers {
-        use crate::test_helpers::{TestParseContext, schema_layer, source_span};
-
-        use crate::{
-            context::{ParseContext, SchemaFileContext},
-            names::{FullName, SchemaName, TableName},
-            sem::{AnalysisError, CreateTable, CreateTableMode},
-        };
-
-        pub(super) fn unqualified_tables() -> Result<SchemaFileContext, AnalysisError> {
-            let root = TestParseContext::default().freeze();
-            let mut context = schema_layer(std::path::Path::new("parent.sql"), &root);
-            let table = CreateTable::new(
-                &TableName::from("items".parse::<FullName>()?),
-                Vec::new(),
-                CreateTableMode::from_if_not_exists(false),
-                false,
-                &source_span(),
-            );
-            for schema in ["a", "b"] {
-                context.set_search_path(&[SchemaName::from(schema)]);
-                context = context.apply_create_table(&table)?;
-            }
-            Ok(context)
-        }
-
-        pub(super) fn set_search_path(context: &mut SchemaFileContext, path: &[&str]) {
-            let mut schemas = Vec::new();
-            for schema in path {
-                schemas.push(SchemaName::from(schema));
-            }
-            context.set_search_path(&schemas);
-        }
     }
 }

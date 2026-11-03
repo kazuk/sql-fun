@@ -80,7 +80,7 @@ impl DeparseError {
     }
 }
 
-pub(in crate::ast) trait SqlEmit {
+pub(crate) trait SqlEmit {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError>;
 }
 
@@ -90,16 +90,16 @@ impl<T: SqlEmit> SqlEmit for Box<T> {
     }
 }
 
-pub(in crate::ast) struct SqlWriter {
+pub(crate) struct SqlWriter {
     sql: String,
     dialect: Dialect,
 }
 
 impl SqlWriter {
-    pub(in crate::ast) fn into_sql(self) -> String {
+    pub(crate) fn into_sql(self) -> String {
         self.sql
     }
-    pub(in crate::ast) const fn new(dialect: Dialect) -> Self {
+    pub(crate) const fn new(dialect: Dialect) -> Self {
         Self {
             sql: String::new(),
             dialect,

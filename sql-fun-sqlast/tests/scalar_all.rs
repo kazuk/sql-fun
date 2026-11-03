@@ -1,4 +1,8 @@
 //! Scalar ALL through `PostgreSQL` 18's shipped operator and cast metadata.
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
 use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::PgBuiltInType;
 
@@ -19,7 +23,7 @@ use ::sql_fun_sqlast::sem::PgBuiltInType;
 #[case::records("pg_control_system() = ALL (ARRAY[pg_control_system()])")]
 fn typed_all_retains_boolean_and_binding(#[case] expression: &str) -> testresult::TestResult {
     // Actual builtin overload and cast families are the contract under test.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"))?;
+    let analyzed = heavy::analyze("18", &format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -58,7 +62,7 @@ fn invalid_all_keeps_operands_and_failure(
     #[case] expression: &str,
     #[case] code: &str,
 ) -> testresult::TestResult {
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"))?;
+    let analyzed = heavy::analyze("18", &format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed
             .context()
@@ -92,10 +96,3 @@ fn invalid_all_keeps_operands_and_failure(
 }
 
 // Removed shipped_catalog_all_clauses_resolve; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy;
-}

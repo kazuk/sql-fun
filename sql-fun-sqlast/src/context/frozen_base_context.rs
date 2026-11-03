@@ -87,6 +87,7 @@ impl From<BaseContext> for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_frozen_root {
+    use crate::test_helpers::heavy::selected_root as heavy;
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, GetSourcePathWithSpanOpt, SearchPathRead},
         names::FullName,
@@ -97,7 +98,7 @@ mod test_frozen_root {
         fn assert_shareable<T: Clone + Send + Sync>() {}
         assert_shareable::<FrozenBaseContext>();
 
-        let frozen = test_helpers::selected_root()?;
+        let frozen = heavy::selected_root()?;
         let clone = frozen.clone();
         drop(frozen);
 
@@ -119,29 +120,6 @@ mod test_frozen_root {
         assert!(clone.get_source_file_path().is_none());
         assert!(clone.get_source_path_with_span().is_none());
         Ok(())
-    }
-
-    mod test_helpers {
-        use crate::context::{BaseContext, FrozenBaseContext};
-        use ::sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
-        use std::path::Path;
-
-        pub(super) fn selected_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-            let fixture =
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/selected-postgres.toml");
-            let mut metadata = SqlFunMetadataCollection::load_from(fixture)?;
-            let selected = metadata.remove("analytics").expect("selected metadata");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                "this-metadata-file-does-not-exist.toml",
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            Ok(BaseContext::new(&args, &selected)?.into())
-        }
     }
 }
 
@@ -526,8 +504,8 @@ impl crate::context::TypeInfoRead for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_type_lookup_cost {
+    use crate::test_helpers::counted_root as test_helpers;
     use crate::test_helpers::schema_layer;
-
     use crate::{
         context::{BaseParseContext, ParseContext},
         names::FullName,
@@ -551,63 +529,7 @@ mod test_type_lookup_cost {
         );
         assert_eq!(probes.load(Ordering::Relaxed), 1);
     }
-
-    mod test_helpers {
-        use crate::{
-            context::{FrozenBaseContext, ParseContext, TypeInfoRead},
-            names::FullName,
-            sem::{TypeDefinition, TypeReference},
-            test_helpers::TestParseContext,
-        };
-        use std::sync::{
-            Arc,
-            atomic::{AtomicUsize, Ordering},
-        };
-
-        #[derive(Debug)]
-        struct CountingRoot {
-            base: FrozenBaseContext,
-            probes: Arc<AtomicUsize>,
-        }
-
-        impl CountingRoot {
-            fn base(&self) -> &FrozenBaseContext {
-                &self.base
-            }
-        }
-
-        forward_catalog_reads!(CountingRoot, base);
-
-        impl TypeInfoRead for CountingRoot {
-            fn type_references(&self) -> Vec<TypeReference> {
-                self.base.type_references()
-            }
-
-            fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
-                self.base.builtin_type_ordered(name)
-            }
-
-            fn get_type_impl(&self, name: &FullName) -> Option<&TypeDefinition> {
-                assert_eq!(
-                    self.probes.fetch_add(1, Ordering::Relaxed),
-                    0,
-                    "a qualified lookup must not probe the root twice"
-                );
-                self.base.get_type_impl(name)
-            }
-
-            fn get_array_item_type(&self, name: &TypeReference) -> Option<TypeReference> {
-                self.base.get_array_item_type(name)
-            }
-        }
-
-        pub(super) fn counted_root() -> (FrozenBaseContext, Arc<AtomicUsize>) {
-            let probes = Arc::new(AtomicUsize::new(0));
-            let root = CountingRoot {
-                base: TestParseContext::default().freeze(),
-                probes: Arc::clone(&probes),
-            };
-            (FrozenBaseContext::new(root), probes)
-        }
-    }
 }
+
+#[cfg(test)]
+pub(crate) use forward_catalog_reads;

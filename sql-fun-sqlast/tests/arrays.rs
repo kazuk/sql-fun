@@ -1,7 +1,11 @@
 //! ARRAY semantics through the maintained SQL analysis boundary.
 
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
 use crate::test_helpers::create_cache_context;
+use crate::test_helpers::heavy;
 use ::sql_fun_sqlast::{
     context::ParseContext,
     sem::{PgBuiltInType, TypeReference},
@@ -10,7 +14,7 @@ use std::collections::BTreeMap;
 
 #[test]
 fn ordered_elements_and_coercions_are_retained() -> testresult::TestResult {
-    let analyzed = heavy::analyze("SELECT ARRAY[1,2.5,NULL]", &[])?;
+    let analyzed = heavy::analyze("17", "SELECT ARRAY[1,2.5,NULL]", &[])?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = query.result_columns().get_column_at(0).unwrap();
     let array = column.expression().unwrap().as_array().unwrap();
@@ -42,7 +46,7 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
     let mut cache_context = create_cache_context();
     // The CLI regression asserts diagnostic identities and result metadata;
     // this integration test keeps rendered diagnostics, array shape, and recovery.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression}"), &[])?;
     let problem = analyzed
         .context()
         .problems()
@@ -115,6 +119,7 @@ fn schema_types_and_bindings_survive_frozen_contexts(
     #[case] expression: &str,
 ) -> testresult::TestResult {
     let analyzed = heavy::analyze(
+        "17",
         &format!("SELECT {expression}"),
         &[
             "CREATE DOMAIN amount AS integer",
@@ -147,6 +152,7 @@ fn schema_types_and_bindings_survive_frozen_contexts(
 #[test]
 fn operands_keep_successful_and_failed_column_bindings() -> testresult::TestResult {
     let analyzed = heavy::analyze(
+        "17",
         "SELECT ARRAY[1,t.n,missing.n] FROM t",
         &["CREATE TABLE t(n integer)"],
     )?;
@@ -178,7 +184,7 @@ fn anonymous_record_arrays_keep_their_element_fields(
     // The CLI contract records the absent public type; this checks the internal
     // dynamic array and retains the anonymous record's field definition.
     use ::sql_fun_sqlast::context::TypeInfoRead;
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression}"), &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -208,6 +214,7 @@ fn anonymous_record_arrays_keep_their_element_fields(
 #[test]
 fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::TestResult {
     let analyzed = heavy::analyze(
+        "17",
         "SELECT ARRAY[$1,pg_control_system(),pg_control_checkpoint()]",
         &[],
     )?;
@@ -249,7 +256,7 @@ fn late_constraints_reach_array_results(
     #[case] sql: &str,
     #[case] ty: &str,
 ) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
+    let analyzed = heavy::analyze("17", sql, &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -285,7 +292,7 @@ fn ordinary_array_equality_retains_binding_and_types(
 ) -> testresult::TestResult {
     // The CLI regression checks the result column; this keeps the resolved
     // operator binding and its argument, result, and strictness metadata.
-    let analyzed = heavy::analyze(sql, definitions)?;
+    let analyzed = heavy::analyze("17", sql, definitions)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -322,7 +329,7 @@ fn ordinary_array_equality_retains_binding_and_types(
 fn invalid_array_equality_retains_failure(#[case] expression: &str) -> testresult::TestResult {
     // The CLI regression checks the diagnostic set and unresolved result type;
     // this retains the unresolved operator node and its operand payloads.
-    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression}"), &[])?;
     let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = select.result_columns().get_column_at(0).unwrap();
     let expression = column.expression().unwrap();
@@ -338,60 +345,4 @@ fn invalid_array_equality_retains_failure(#[case] expression: &str) -> testresul
     assert!(!call["larg"].is_null());
     assert!(!call["rarg"].is_null());
     Ok(())
-}
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect, SqlFunArgs,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        /// Loads shipped builtin JSON metadata and optional SQL definitions per call.
-        /// Initialization repeats for each test process; no cache is shared.
-        pub(crate) fn analyze(
-            sql: &str,
-            definitions: &[&str],
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "17",
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            if !definitions.is_empty() {
-                let file = ::tempfile::NamedTempFile::new()?;
-                std::fs::write(file.path(), definitions.join(";"))?;
-                let schema = PostgresDialect::parse_schema_file(
-                    file.path(),
-                    &base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )?;
-                assert!(schema.problems().is_empty(), "{:?}", schema.problems());
-                base = schema.base_context().clone();
-            }
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
 }

@@ -181,9 +181,9 @@ impl PostgresDialect {
 
 #[cfg(test)]
 mod test_schema_content_hash {
-    use crate::{ast::Dialect, context::BaseParseContext, test_helpers::TestParseContext};
-
     use crate::PostgresDialect;
+    use crate::test_helpers::schema_content_hash as test_helpers;
+    use crate::{ast::Dialect, context::BaseParseContext, test_helpers::TestParseContext};
     use ::sql_fun_core::Hasher;
 
     #[rstest::rstest]
@@ -195,7 +195,7 @@ mod test_schema_content_hash {
     )]
     fn hashes_original_text_before_analysis(#[case] sql: &str, #[case] succeeds: bool) {
         let file = test_helpers::schema_file(sql);
-        let base = test_helpers::base_with_public_schema();
+        let base = test_helpers::base_with_public_schema(Dialect::postgres());
         let mut hash = Some("previous output".to_owned());
         let result = {
             let analysis_base = &base;
@@ -215,7 +215,7 @@ mod test_schema_content_hash {
     #[test]
     fn failed_read_clears_previous_hash() {
         let directory = ::tempfile::tempdir().unwrap();
-        let base = test_helpers::base_with_public_schema();
+        let base = test_helpers::base_with_public_schema(Dialect::postgres());
         let mut hash = Some("previous output".to_owned());
         let error = {
             let analysis_base = &base;
@@ -231,24 +231,6 @@ mod test_schema_content_hash {
         .unwrap_err();
         assert!(error.is_io());
         assert!(hash.is_none());
-    }
-
-    mod test_helpers {
-        use crate::{context::FrozenBaseContext, test_helpers::TestParseContext};
-
-        pub(super) fn base_with_public_schema() -> FrozenBaseContext {
-            use crate::{context::ParseContext, names::SchemaName};
-
-            let mut base = TestParseContext::default();
-            base.set_get_search_path_result(&[SchemaName::from("public")]);
-            base.freeze()
-        }
-
-        pub(super) fn schema_file(sql: &str) -> ::tempfile::NamedTempFile {
-            let file = ::tempfile::NamedTempFile::new().unwrap();
-            std::fs::write(file.path(), sql).unwrap();
-            file
-        }
     }
 }
 
@@ -351,21 +333,7 @@ mod tests {
         syn::{ListOpt, Opt},
     };
 
-    use clap::Parser;
-    use sql_fun_core::SqlFunArgs;
     use testresult::TestResult;
-
-    #[rstest::fixture]
-    pub fn context_args() -> SqlFunArgs {
-        SqlFunArgs::try_parse_from(vec![
-            "sqlfun",
-            "--metadata-file",
-            "sql_fun.metadata.toml",
-            "--sql-fun-home",
-            env!("SQL_FUN_HOME"),
-        ])
-        .unwrap()
-    }
 
     #[ctor::ctor(unsafe)]
     fn init_tracing() {

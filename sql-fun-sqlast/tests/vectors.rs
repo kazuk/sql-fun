@@ -1,5 +1,9 @@
 //! `PostgreSQL` vector coercion and builtin polymorphism through SQL analysis.
-use self::test_helpers::heavy;
+// Shared support lives below tests/ to avoid an extra Cargo test target.
+#[path = "test_helpers/shared.rs"]
+mod test_helpers;
+
+use crate::test_helpers::heavy;
 use ::sql_fun_sqlast::{
     context::{CastInfoRead, TypeInfoRead},
     sem::TypeReference,
@@ -22,7 +26,7 @@ fn builtin_vector_results(
     #[case] expected: &str,
 ) -> testresult::TestResult {
     // The shipped builtin signatures and casts are the contract under test.
-    let analyzed = heavy::analyze(&format!("SELECT {expression} AS result"), &[])?;
+    let analyzed = heavy::analyze("17", &format!("SELECT {expression} AS result"), &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -62,7 +66,7 @@ fn vector_catalog_reads_and_conversion_contexts(
     #[case] element: &str,
 ) -> testresult::TestResult {
     // Verify JSON catalog loading and frozen schema-layer delegation together.
-    let analyzed = heavy::analyze("SELECT 1", &[])?;
+    let analyzed = heavy::analyze("17", "SELECT 1", &[])?;
     let context = analyzed.context();
     let vector = TypeReference::from_master_type_name(vector);
     let element = TypeReference::from_master_type_name(element);
@@ -103,7 +107,7 @@ fn vector_element_cast_context_is_preserved(
     #[case] assignment: bool,
 ) -> testresult::TestResult {
     // Checks the actual builtin scalar casts from which vector conversions derive.
-    let analyzed = heavy::analyze("SELECT 1", &[])?;
+    let analyzed = heavy::analyze("17", "SELECT 1", &[])?;
     let context = analyzed.context();
     let source = TypeReference::from_master_type_name(source);
     let target = TypeReference::from_master_type_name(target);
@@ -132,6 +136,7 @@ fn vector_from_functions_retain_output_bindings() -> testresult::TestResult {
     let definition = "CREATE FUNCTION information_schema._pg_expandarray(anyarray, OUT x anyelement, OUT n integer) RETURNS SETOF record LANGUAGE sql AS ''";
     // Uses the exact shipped SQL declaration plus builtin unnest metadata.
     let analyzed = heavy::analyze(
+        "17",
         "SELECT u.v, e.x, e.n FROM unnest('1 2'::int2vector) AS u(v), information_schema._pg_expandarray('1 2'::int2vector) AS e",
         &[definition],
     )?;
@@ -161,7 +166,11 @@ fn vector_from_functions_retain_output_bindings() -> testresult::TestResult {
 #[case::oid("oidvector")]
 fn vector_operator_binding_keeps_named_inputs(#[case] vector: &str) -> testresult::TestResult {
     // The ordinary-array operator fix also consumes shared simple inference.
-    let analyzed = heavy::analyze(&format!("SELECT '1 2'::{vector} = '1 2'::{vector}"), &[])?;
+    let analyzed = heavy::analyze(
+        "17",
+        &format!("SELECT '1 2'::{vector} = '1 2'::{vector}"),
+        &[],
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -187,60 +196,4 @@ fn vector_operator_binding_keeps_named_inputs(#[case] vector: &str) -> testresul
     assert_eq!(call["left_arg_type"], expected);
     assert_eq!(call["right_arg_type"], expected);
     Ok(())
-}
-
-mod test_helpers {
-    mod cache_context;
-    pub(crate) use self::cache_context::create_cache_context;
-
-    pub(super) mod heavy {
-        use crate::test_helpers::create_cache_context;
-
-        use ::sql_fun_sqlast::{
-            AstAndContextPair, PostgresDialect, SqlFunArgs,
-            ast::Dialect,
-            context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-            parse_statements,
-        };
-        use std::path::{Path, PathBuf};
-
-        /// Loads shipped builtin JSON metadata and optional SQL definitions per call.
-        /// Initialization repeats for each test process; no cache is shared.
-        pub(crate) fn analyze(
-            sql: &str,
-            definitions: &[&str],
-        ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = create_cache_context();
-            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-            let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
-                "sqlfun",
-                "--metadata-file",
-                metadata.to_str().unwrap(),
-                "--sql-fun-home",
-                env!("SQL_FUN_HOME"),
-                "--postgres-version",
-                "18",
-            ])?;
-            let selected = args.load_metadata()?.remove("default").unwrap();
-            let mut base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            if !definitions.is_empty() {
-                let file = ::tempfile::NamedTempFile::new()?;
-                std::fs::write(file.path(), definitions.join(";"))?;
-                let schema = PostgresDialect::parse_schema_file(
-                    file.path(),
-                    &base,
-                    &mut None,
-                    &args,
-                    &selected,
-                )?;
-                assert!(schema.problems().is_empty(), "{:?}", schema.problems());
-                base = schema.base_context().clone();
-            }
-            let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-            Ok(parse_statements(sql, Dialect::postgres())
-                .next()
-                .unwrap()?
-                .analyze(context, &mut cache_context)?)
-        }
-    }
 }

@@ -15,6 +15,14 @@ use crate::ast::{
 pub struct AstMutationError(MutationProblem);
 
 impl AstMutationError {
+    pub(in crate::ast) fn check_identifier(name: &str, dialect: Dialect) -> Result<(), Self> {
+        if (name.is_empty() && dialect == Dialect::postgres()) || name.contains('\0') {
+            Err(MutationProblem::invalid_name())
+        } else {
+            Ok(())
+        }
+    }
+
     /// Whether the destination statement cannot carry a WITH clause.
     pub const fn is_unsupported_carrier(&self) -> bool {
         self.0.is_unsupported_carrier()
@@ -35,7 +43,7 @@ impl AstMutationError {
         self.0.is_dialect_mismatch()
     }
 
-    /// Whether a CTE name or column alias violates the dialect's identifier rules.
+    /// Whether a SQL identifier violates the dialect's identifier rules.
     pub const fn is_invalid_identifier(&self) -> bool {
         self.0.is_invalid_identifier()
     }
@@ -71,7 +79,7 @@ enum MutationProblem {
     NestedModification,
     #[error("CTE definitions must use the destination statement's dialect")]
     DifferentDialect,
-    #[error("CTE identifier is not permitted by the selected dialect")]
+    #[error("SQL identifier is not permitted by the selected dialect")]
     InvalidName,
     #[error("a CTE named {0:?} already exists in this WITH clause")]
     DuplicateName(String),
@@ -232,11 +240,7 @@ impl CteDefinition {
     }
 
     fn validate_name(name: &str, dialect: Dialect) -> Result<(), AstMutationError> {
-        if (name.is_empty() && dialect == Dialect::postgres()) || name.contains('\0') {
-            Err(MutationProblem::invalid_name())
-        } else {
-            Ok(())
-        }
+        AstMutationError::check_identifier(name, dialect)
     }
 
     fn validate(&self) -> Result<(), AstMutationError> {

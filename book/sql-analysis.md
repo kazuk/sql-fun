@@ -475,10 +475,16 @@ supports tables, ordinary views, derived queries, nonrecursive CTEs, and joins.
 The PostgreSQL parser accepts PostgreSQL 18 grammar. Implemented conversion paths
 check new syntax against the explicitly configured engine version: a PostgreSQL
 17 target reports `incompatible_engine_version`. Missing conversion or analysis
-is marked with `todo!()` and panics, including utility statement conversion,
+is marked with `todo!()` and panics, including utility statement interpretation,
 renamed RETURNING row images, INSERT/UPDATE destination row images, temporal
 constraints, and new constraint enforcement/inheritance transitions. Parsing a
-statement does not establish that its semantics are implemented.
+statement does not establish that its semantics are implemented. ALTER DEFAULT
+PRIVILEGES and CREATE FOREIGN TABLE support structured syntax conversion,
+inspection, editing and deparsing, including LARGE OBJECTS and foreign-table LIKE.
+Their names remain unresolved; privilege validation, catalog changes and LIKE
+column expansion are not implemented. Compatible semantic-analysis inputs still
+reach an explicit `todo!()`; PostgreSQL 17 rejects the two new forms with the
+existing version diagnostic.
 
 ## PostgreSQL truth predicates
 

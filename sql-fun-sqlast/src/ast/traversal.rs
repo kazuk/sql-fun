@@ -2,12 +2,14 @@
 
 use crate::{
     ast::{
-        Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte,
-        CteBody, Cycle, Delete, DerivedTable, Expr, Frame, FrameBound, FromGroup, FromItem,
-        Grouping, InTable, IndexExpression, Indirection, Insert, Into, Join, NamedArgument,
-        NullTest, OperatorExpr, Order, Query, QueryBody, Raise, Select, SetQuery, Slice, Subquery,
-        SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target, TruthTest,
-        TypeName, TypedColumn, Update, Window, With, projection::ProjectionScope,
+        Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Column,
+        ColumnConstraint, Conflict, ConstraintExtras, Cte, CteBody, Cycle, Delete, DerivedTable,
+        ExclusionElement, Expr, Frame, FrameBound, FromGroup, FromItem, Grouping, InTable,
+        IndexExpression, Indirection, Insert, Into, Join, NamedArgument, NullTest, OperatorExpr,
+        Order, PartitionBound, PartitionDatum, Query, QueryBody, Raise, Select, SetQuery, Slice,
+        Subquery, SyntaxOption, SyntaxValue, TableConstraint, TableFunction, TableFunctions,
+        TableSample, Target, TruthTest, TypeName, TypedColumn, Update, Window, With,
+        projection::ProjectionScope,
     },
     stack::with_stack as stack_with_stack,
 };
@@ -58,6 +60,11 @@ macro_rules! walk_fields {
 walk_fields! {
 
 
+    Column => type_name, constraints;
+    TableConstraint => extras, constraint, order;
+    ConstraintExtras => options, predicate, exclusions;
+    ExclusionElement => expression;
+    PartitionBound => list, lower, upper;
     SetQuery => left, right;
 
     Order => expression;
@@ -187,8 +194,37 @@ impl WalkSqlMut for StatementNode {
             Self::Update(node) => node.walk_sql_mut(visitor),
             Self::Delete(node) => node.walk_sql_mut(visitor),
             Self::Merge(node) => node.walk_sql_mut(visitor),
+            Self::ForeignTable(node) => node.walk_sql_mut(visitor),
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod foreign_table_traversal_tests {
+    use crate::{
+        ast::{
+            Dialect, Query,
+            traversal::{AstVisitorMut, WalkSqlMut},
+        },
+        parse_statements,
+    };
+
+    #[derive(Default)]
+    struct QueryCounter(usize);
+    impl AstVisitorMut for QueryCounter {
+        fn enter_query(&mut self, _query: &mut Query) {
+            self.0 += 1;
+        }
+    }
+    #[test]
+    fn visits_query_edges_in_foreign_column_and_table_constraints() {
+        let mut statement = parse_statements("CREATE FOREIGN TABLE f (LIKE missing, x int DEFAULT (SELECT 1), CHECK ((SELECT true)), y int GENERATED ALWAYS AS ((SELECT 2)) STORED) SERVER absent", Dialect::postgres()).next().unwrap().unwrap();
+        let before = statement.deparse_sql(Dialect::postgres()).unwrap();
+        let mut counter = QueryCounter::default();
+        statement.node.walk_sql_mut(&mut counter);
+        assert_eq!(counter.0, 3);
+        assert_eq!(statement.deparse_sql(Dialect::postgres()).unwrap(), before);
     }
 }
 
@@ -344,6 +380,24 @@ impl<T: WalkSqlMut> WalkSqlMut for [T] {
     fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
         for item in self {
             item.walk_sql_mut(visitor);
+        }
+    }
+}
+
+impl WalkSqlMut for ColumnConstraint {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        match self {
+            Self::Default(value) | Self::Check(value) | Self::Generated(value, _) => {
+                value.walk_sql_mut(visitor)
+            }
+            _ => {}
+        }
+    }
+}
+impl WalkSqlMut for PartitionDatum {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        if let Self::Value(value) = self {
+            value.walk_sql_mut(visitor);
         }
     }
 }

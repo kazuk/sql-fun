@@ -1,6 +1,6 @@
 use crate::{
     ast::{
-        Column, ColumnConstraint, ConstraintExtras, ExclusionElement, Expr as AstExpr,
+        Column, ColumnConstraint, ConstraintExtras, ExclusionElement, Expr as AstExpr, FdwOption,
         ForeignReference, Literal as AstLiteral, SyntaxOption, SyntaxValue, TableConstraint,
         deparse::{DeparseError, SqlEmit, SqlWriter},
     },
@@ -12,6 +12,16 @@ use crate::{
 
 impl SqlEmit for Column {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.emit_with_fdw_options(writer, &[])
+    }
+}
+
+impl Column {
+    pub(in crate::ast) fn emit_with_fdw_options(
+        &self,
+        writer: &mut SqlWriter,
+        options: &[FdwOption],
+    ) -> Result<(), DeparseError> {
         writer.ident(&self.name)?;
         if let Some(type_name) = &self.type_name {
             writer.sql(" ");
@@ -19,6 +29,7 @@ impl SqlEmit for Column {
         } else if writer.is_postgres() {
             writer.sql(" WITH OPTIONS");
         }
+        FdwOption::emit_options(options, writer)?;
         if let Some(storage) = &self.storage {
             writer.postgres_only("column storage")?;
             let storage = match storage.to_ascii_uppercase().as_str() {

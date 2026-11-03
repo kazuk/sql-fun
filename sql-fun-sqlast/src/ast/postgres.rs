@@ -3,8 +3,9 @@ mod query;
 
 use crate::{
     ast::{
-        AlterRelation, CompositeType, CreateRule, CreateTrigger, CurrentOf, DropRule, DropTrigger,
-        Table, TableConstraint, VariableSetKind as AstVariableSetKind,
+        AlterRelation, CompositeType, CreateRule, CreateTrigger, CurrentOf, DefaultPrivileges,
+        DropRule, DropTrigger, ForeignTable, Table, TableConstraint,
+        VariableSetKind as AstVariableSetKind,
         ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
@@ -627,15 +628,13 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         value: &syn::Node,
         tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        if value
-            .as_alter_default_privileges_stmt()
-            .as_inner()
-            .is_some()
-        {
-            todo!("common-AST conversion for ALTER DEFAULT PRIVILEGES (#891)");
+        if let Some(value) = value.as_alter_default_privileges_stmt().as_inner() {
+            let value = DefaultPrivileges::try_from_with_tokens(&value, tokens)?;
+            return Ok(Self::default_privileges(value));
         }
-        if value.as_create_foreign_table_stmt().as_inner().is_some() {
-            todo!("common-AST conversion for CREATE FOREIGN TABLE (#891)");
+        if let Some(value) = value.as_create_foreign_table_stmt().as_inner() {
+            let value = ForeignTable::try_from_with_tokens(&value, tokens)?;
+            return Ok(Self::foreign_table(value));
         }
         if let Some(query) = value.as_select_stmt().as_inner() {
             return Ok(Self::query(Query::try_from_with_tokens(&query, tokens)?));
@@ -781,19 +780,6 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
-    }
-}
-
-#[cfg(test)]
-mod unimplemented_utility_conversion_tests {
-    use crate::{ast::Dialect, parse_statements};
-
-    #[rstest::rstest]
-    #[case::large_objects("ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC")]
-    #[case::foreign_like("CREATE FOREIGN TABLE f (LIKE t) SERVER s")]
-    #[should_panic(expected = "common-AST conversion")]
-    fn retains_explicit_todo(#[case] sql: &str) {
-        let _ = parse_statements(sql, Dialect::postgres()).next();
     }
 }
 

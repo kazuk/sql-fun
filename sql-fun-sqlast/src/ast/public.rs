@@ -86,6 +86,8 @@ impl Statement {
     /// # Panics
     ///
     /// CREATE TRIGGER analysis is not implemented yet (#602 / #555).
+    /// ALTER DEFAULT PRIVILEGES and CREATE FOREIGN TABLE interpretation remains
+    /// unimplemented (#955 / #956), after syntax-version checks succeed.
     ///
     /// # Errors
     ///
@@ -208,6 +210,10 @@ pub enum StatementKind {
     TableAs,
     /// A table definition.
     Table,
+    /// ALTER DEFAULT PRIVILEGES syntax; interpretation is separate.
+    DefaultPrivileges,
+    /// CREATE FOREIGN TABLE syntax; interpretation is separate.
+    ForeignTable,
     /// ALTER TABLE or a related relation change.
     AlterRelation,
 }
@@ -241,12 +247,23 @@ impl std::fmt::Display for StatementKind {
             Self::Index => "CREATE INDEX",
             Self::TableAs => "query-backed relation definition",
             Self::Table => "CREATE TABLE",
+            Self::DefaultPrivileges => "ALTER DEFAULT PRIVILEGES",
+            Self::ForeignTable => "CREATE FOREIGN TABLE",
             Self::AlterRelation => "relation alteration",
         })
     }
 }
 
 impl StatementKind {
+    /// The ALTER DEFAULT PRIVILEGES category.
+    pub const fn default_privileges() -> Self {
+        Self::DefaultPrivileges
+    }
+    /// The CREATE FOREIGN TABLE category.
+    pub const fn foreign_table() -> Self {
+        Self::ForeignTable
+    }
+
     /// The TRUNCATE category, independently of common-AST conversion support.
     pub const fn truncate() -> Self {
         Self::Truncate
@@ -410,6 +427,8 @@ impl StatementNode {
             Self::Index(_) => StatementKind::index(),
             Self::TableAs(_) => StatementKind::table_as(),
             Self::Table(_) => StatementKind::table(),
+            Self::DefaultPrivileges(_) => StatementKind::default_privileges(),
+            Self::ForeignTable(_) => StatementKind::foreign_table(),
             Self::AlterRelation(_) => StatementKind::alter_relation(),
         }
     }

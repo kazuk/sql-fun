@@ -183,7 +183,7 @@ not be combined because their slots can collide.
 Hints apply only to the current query's semantic construction and do not insert
 SQL casts. Unhinted inputs use SQLAST inference. Hints use the existing type-name
 resolver, including its documented syntax and type-modifier limitations; see
-[parameter analysis](../sql-analysis.md#parameter-analysis). No Rust type
+[parameter analysis](../sql-analysis/expressions/parameters.md). No Rust type
 inference is performed by this API.
 
 Set `analyze_access: true` on an `analyze_query` request to collect SQL-visible
@@ -277,7 +277,7 @@ contract cannot be finalized. This does not imply the SQL is intrinsically
 invalid or that PostgreSQL cannot prepare it. A known result-column type can
 still be returned independently of the missing input type. Explicit input hints
 such as `${src:text}` can finalize a binding where `${src}::text` only constrains
-the result of a cast. See [parameter analysis](../sql-analysis.md#parameter-analysis).
+the result of a cast. See [parameter analysis](../sql-analysis/expressions/parameters.md).
 Contradictory constraints retain their SQLAST diagnostics.
 A result-column `column_type: null` is preserved without inventing a type or
 adding an error solely for its absence. Anonymous dynamic types currently have
@@ -288,7 +288,8 @@ The CLI/lockfile consumer decides whether these results suffice for its task;
 For PostgreSQL datasources with `rewrite_options.expand_asterisk = true`,
 `execute_sql` contains explicit projections for table-dependent wildcards. This
 preserves the analyzed column names and order; unrelated stars remain unchanged.
-See [wildcard projection expansion](../sql-analysis.md#wildcard-projection-expansion)
+See
+[wildcard projection expansion](../sql-analysis/statements/select.md#wildcard-projection-expansion)
 for configuration scope and schema limitations.
 
 SQLAST diagnostics retain their original structured problem. Direct-input

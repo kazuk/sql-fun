@@ -1,0 +1,68 @@
+# CREATE RULE / DROP RULE
+
+## Overview
+
+PostgreSQL `CREATE RULE` analysis returns `SemAst::rule()`, retaining the rule's
+resolved relation/name identity, event, replacement and INSTEAD options, boolean
+condition, ordered analyzed actions, dependencies and available source location.
+DO NOTHING retains an empty action list. Table and ordinary-view targets are
+supported; materialized views are rejected. OLD/NEW bind to actual target
+columns and are checked against the event and their enclosing query scope. Bind
+parameters and unresolved definitions are rejected.
+
+Rule names belong to their target relation. `RuleInfoRead::rule` retrieves an
+exact `RuleIdentity`; `CreateTable::rules`, `CreateView::rules` and
+`ViewLike::rules` expose target links whose `resolve` method yields the
+effective analyzed definitions. `RuleInfoWrite` provides explicit registration,
+cancellation and target-link updates, with shared defaults for layered lookup
+and association. Resolving alone has no catalog effects. Applying a valid
+statement registers its definition and target link in the current layer;
+replacement leaves frozen parents and siblings intact.
+
+RETURNING requires an unconditional INSTEAD rule with one returning action and
+matching target column count, order and types. ON SELECT requires an ordinary
+view, `CREATE OR REPLACE RULE "_RETURN"`, an unconditional INSTEAD single
+SELECT, and matching result names as well as types. It replaces the view query
+and its resolved output-column lineage. UPDATE/DELETE action RETURNING binds
+visible rule rows; PostgreSQL 18 destination row images in INSERT RETURNING
+remain a separately tracked semantic boundary (#621), rather than binding the
+enclosing rule row.
+
+Actions use the common query/INSERT/UPDATE/DELETE analyzers. Their ordinary
+limitations apply, including ON CONFLICT DO UPDATE (#474). Within rules, EXISTS
+(#570), quantified/row (#571) and multi-expression (#573) subquery semantics are
+explicitly rejected pending their implementations. Scalar, correlated and ARRAY
+subqueries use the shared query-expression support rules. Exact result
+compatibility for known built-in modifier-capable types (such as varchar,
+numeric and timestamp, including arrays) is rejected pending type-modifier
+retention (#619), even when their base types match. NOTIFY is still blocked at
+common syntax conversion (#608). No rewrite expansion, action execution or SQL
+rendering is performed.
+
+PostgreSQL `DROP RULE` resolves its ON relation first and retains the exact
+relation-scoped rule identity, IF EXISTS lookup outcome and dependency choice in
+`SemAst::rule_drop()`. Application masks the named definition and removes its
+target link in the current layer. Frozen parents and siblings remain unchanged;
+re-creation replaces the cancellation. IF EXISTS accepts a missing relation or
+rule as an explicit no-op. A View's required `_RETURN` SELECT rule cannot be
+dropped, including with CASCADE; drop the View instead. CASCADE/RESTRICT is
+retained for inspection, without executing database dependency removal.
+
+## Dialect and engine-specific behavior
+
+Rules are PostgreSQL-specific. They are analyzed definitions, not an
+implementation of PostgreSQL's runtime rule rewriter. Actions share the
+[statement](../statements.md), [clause](../clauses.md) and
+[expression](../expressions.md) support boundaries. See [CREATE
+VIEW](create-view.md#writable-views) for how retained rules affect writable-view
+analysis.
+
+## Diagnostics
+
+- [rule_invalid_definition](../../diagnostics/rule_invalid_definition.md): the
+  target, duplicate definition, event scope, condition, action, result
+  compatibility or protected _RETURN rule does not satisfy the implemented rule
+  requirements.
+
+Action analyzers can also emit their own diagnostics; resolving a rule does not
+suppress those findings.

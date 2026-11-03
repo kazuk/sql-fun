@@ -65,7 +65,7 @@ connector = "tokio-postgres"
 
 For PostgreSQL queries using `database.schema.table.column`, configure
 `database-name` explicitly as described in
-[qualified column references](sql-analysis.md#qualified-column-references).
+[qualified column references](sql-analysis/expressions/names.md).
 The datasource selection name does not supply the database identity.
 
 - `default`: default database for this application
@@ -89,7 +89,7 @@ expand_asterisk = true
 
 Omitting this option, using an empty `rewrite_options` table, or setting
 `expand_asterisk = false` preserves existing SQL output. See
-[wildcard projection expansion](sql-analysis.md#wildcard-projection-expansion)
+[wildcard projection expansion](sql-analysis/statements/select.md#wildcard-projection-expansion)
 for its scope and schema requirements. SQLite expansion is not available.
 
 You can use multiple database in application like a bellow.
@@ -175,7 +175,7 @@ behavior. `roles = []` explicitly supplies no roles. Both report unavailable nam
 owners when an ALTER OWNER statement needs a role that was not supplied.
 Configuration supplies role identities for analysis; it does not create roles,
 connect to PostgreSQL, or validate membership and permissions. See
-[ownership analysis](sql-analysis.md#project-role-inventory).
+[ownership analysis](sql-analysis/statements/alter-owner.md).
 
 ## Initialize PostgreSQL builtin metadata
 

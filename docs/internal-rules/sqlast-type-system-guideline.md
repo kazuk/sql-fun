@@ -235,7 +235,7 @@ owns domains, correlated alternatives, and the common propagation graph.
   `col_type()` may remain absent when multiple result types survive. An explicit
   SQL cast can narrow the result. See the public-boundary tests in
   [`tests/arrays.rs`](../../sql-fun-sqlast/tests/arrays.rs) and the
-  [parameter analysis documentation](../../book/sql-analysis.md#parameter-analysis).
+  [parameter analysis documentation](../../book/sql-analysis/expressions/parameters.md).
 - Preserve structure for unresolved expressions in the semantic tree and graph.
   Array indexing, slices, and member access use relationships in
   [`parameter_constraints/structural.rs`](../../sql-fun-sqlast/src/sem/parameter_constraints/structural.rs)

@@ -89,5 +89,5 @@ with its resolved target, event, condition, ordered actions and dependencies.
 resolve the effective definitions in a schema layer. Rule names are local to
 their owning relation. `OR REPLACE` updates that identity without duplicating
 its link. Analysis binds OLD/NEW to target columns and never executes actions.
-See [CREATE RULE definitions](../book/sql-analysis.md#create-rule-definitions)
+See [CREATE RULE definitions](../book/sql-analysis/statements/rules.md)
 for validation and current boundaries.

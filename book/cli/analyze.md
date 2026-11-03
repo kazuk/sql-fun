@@ -102,7 +102,7 @@ SELECT a,b FROM record_fun(${src:text}::text) AS r(a int,b text);
 
 Hints must be compatible with every use of the parameter. Use either named
 placeholders or native numbered parameters in one input, never both. See
-[parameter analysis](../sql-analysis.md#parameter-analysis) for the distinction
+[parameter analysis](../sql-analysis/expressions/parameters.md) for the distinction
 between admissible type domains and the public binding contract.
 
 ## Schema loading

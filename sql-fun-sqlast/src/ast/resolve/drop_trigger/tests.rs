@@ -1,7 +1,8 @@
 use crate::{
     context::{ParseContext, TriggerInfoRead},
-    names::FullName,
+    names::{FullName, SchemaName},
     sem::TriggerIdentity,
+    test_helpers::create_cache_context as test_helpers_create_cache_context,
 };
 
 #[rstest::rstest]
@@ -15,7 +16,7 @@ fn resolved_drop_does_not_apply_until_requested(
     let mut child = test_helpers::layer(&parent);
     let statement = test_helpers::statement(sql)
         .node
-        .resolve(&mut child, &mut crate::test_helpers::create_cache_context())?;
+        .resolve(&mut child, &mut test_helpers_create_cache_context())?;
     let drop = statement.trigger_drop().unwrap();
     assert!(drop.found());
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
@@ -132,10 +133,7 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
         "CREATE TABLE earlier.item_view(id integer)",
     )?
     .into_context();
-    context.set_search_path(&[
-        crate::names::SchemaName::from("earlier"),
-        crate::names::SchemaName::from("public"),
-    ]);
+    context.set_search_path(&[SchemaName::from("earlier"), SchemaName::from("public")]);
     let pair = test_helpers::apply(context, "DROP TRIGGER IF EXISTS audit ON item_view")?;
     let drop = pair.ast().trigger_drop().unwrap();
     assert!(!drop.found());
@@ -152,6 +150,15 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
 }
 
 mod test_helpers {
+    use crate::{
+        AstAndContextPair,
+        ast::{Dialect, Statement},
+        context::MutSourcePathWithSpan,
+        parse_statements,
+        sem::AnalysisError,
+        test_helpers::{create_cache_context, source_span},
+    };
+
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, SchemaFileContext},
         names::{FullName, TableName, ViewName},
@@ -173,8 +180,8 @@ mod test_helpers {
             base.metadata(),
         )
     }
-    pub(super) fn statement(sql: &str) -> crate::ast::Statement {
-        crate::parse_statements(sql, crate::ast::Dialect::postgres())
+    pub(super) fn statement(sql: &str) -> Statement {
+        parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .expect("valid test SQL")
@@ -182,12 +189,9 @@ mod test_helpers {
     pub(super) fn apply(
         mut context: SchemaFileContext,
         sql: &str,
-    ) -> Result<crate::AstAndContextPair<SchemaFileContext>, crate::sem::AnalysisError> {
-        let mut cache_context = crate::test_helpers::create_cache_context();
-        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
-            &mut context,
-            &crate::test_helpers::source_span(),
-        );
+    ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
+        let mut cache_context = create_cache_context();
+        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
         statement(sql).analyze(context, &mut cache_context)
     }
     pub(super) fn table_trigger_count(context: &FrozenBaseContext) -> usize {
@@ -210,8 +214,13 @@ mod test_helpers {
             .len()
     }
     pub(super) mod heavy {
-        use super::{CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply};
-        use crate::{ParseContext, context::BaseContext};
+        use crate::{
+            ParseContext,
+            ast::resolve::drop_trigger::tests::test_helpers::{
+                CREATE_AUDIT, FrozenBaseContext, SchemaFileContext, apply,
+            },
+            context::BaseContext,
+        };
         /// Reload the maintained catalog and analyze the test schema on each call.
         /// Catalog state is not shared across independent test processes.
         pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {

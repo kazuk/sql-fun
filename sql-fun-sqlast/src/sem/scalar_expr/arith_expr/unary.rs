@@ -1,9 +1,12 @@
-use crate::sem::overload_rank::OverloadRank;
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, CastContext, OperatorDefinition, SemScalarExpr,
-        TypeReference, UnaryOperatorDefinition,
+        AnalysisError, AnalysisProblem, CastContext, OperatorDefinition, ParseContext,
+        SemScalarExpr, TypeReference, UnaryOperatorDefinition,
+        overload_rank::OverloadRank,
+        scalar_expr::arith_expr::{
+            LeftUnaryCallSite, RightUnaryCallSite, UndefinedOperatorCallSite,
+        },
     },
 };
 
@@ -32,7 +35,7 @@ impl UnaryCastCandidate {
         arg_type: &TypeReference,
     ) -> Vec<Self>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let mut candidates = Vec::new();
         for overload in overloads {
@@ -69,9 +72,13 @@ impl UnaryCastCandidate {
 
 #[cfg(test)]
 mod test_domain_unary {
-    use super::UnaryCastCandidate;
-    use crate::sem::{PgBuiltInType, UnaryOperatorDefinition};
-    use crate::test_helpers::domain_casts;
+    use crate::{
+        sem::{
+            PgBuiltInType, UnaryOperatorDefinition,
+            scalar_expr::arith_expr::unary::UnaryCastCandidate,
+        },
+        test_helpers::domain_casts,
+    };
 
     #[rstest::rstest]
     fn domain_unary_operator_uses_shared_ranking(#[values(false, true)] exact_domain: bool) {
@@ -121,12 +128,12 @@ impl ResolvedUnaryOperator {
         name: &OperatorName,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(operator) = self.operator_def {
-            super::LeftUnaryCallSite::op_left_unary_resolved(context, name, operator, self.arg_expr)
+            LeftUnaryCallSite::op_left_unary_resolved(context, name, operator, self.arg_expr)
         } else {
-            super::UndefinedOperatorCallSite::undefined_operator_resolved(
+            UndefinedOperatorCallSite::undefined_operator_resolved(
                 context,
                 name,
                 None,
@@ -141,17 +148,12 @@ impl ResolvedUnaryOperator {
         name: &OperatorName,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(operator) = self.operator_def {
-            super::RightUnaryCallSite::op_right_unary_resolved(
-                context,
-                name,
-                operator,
-                self.arg_expr,
-            )
+            RightUnaryCallSite::op_right_unary_resolved(context, name, operator, self.arg_expr)
         } else {
-            super::UndefinedOperatorCallSite::undefined_operator_resolved(
+            UndefinedOperatorCallSite::undefined_operator_resolved(
                 context,
                 name,
                 None,
@@ -169,7 +171,7 @@ impl super::ArithExpr {
         input: SemScalarExpr,
     ) -> Result<ResolvedUnaryOperator, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let overloads = match &operator_def {
             OperatorDefinition::LeftUnary(u) => u,

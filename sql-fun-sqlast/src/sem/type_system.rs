@@ -3,6 +3,21 @@ mod func_params;
 mod function_overload_collection;
 mod infer;
 
+pub use self::{
+    err::TypeError,
+    func_params::FunctionParam,
+    function_overload_collection::FunctionOverloadCollection,
+    infer::{CommonInferContext, SimpleInferContext, SimpleInferResult},
+};
+
+use crate::{
+    names::TableName,
+    sem::{
+        pg_type::TypeReference as PgTypeTypeReference,
+        scalar_expr::SemScalarExpr as ScalarExprSemScalarExpr,
+    },
+};
+
 use std::collections::VecDeque;
 
 use crate::{
@@ -15,12 +30,6 @@ use crate::{
 };
 
 use self::func_params::ParameterBindResult;
-pub use self::{
-    err::TypeError,
-    func_params::FunctionParam,
-    function_overload_collection::FunctionOverloadCollection,
-    infer::{CommonInferContext, SimpleInferContext, SimpleInferResult},
-};
 
 #[derive(Clone, Debug, Default)]
 pub struct ArgumentBindingCollection(VecDeque<Option<TypeReference>>);
@@ -34,7 +43,7 @@ impl ArgumentBindingCollection {
         Self(
             expr_list
                 .iter()
-                .map(super::scalar_expr::SemScalarExpr::get_type)
+                .map(ScalarExprSemScalarExpr::get_type)
                 .collect(),
         )
     }
@@ -59,11 +68,7 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(ty) = &mut self.ret_type {
             ty.rename_relation(old, new);
         }
@@ -188,8 +193,8 @@ impl OverloadVariant {
     pub(crate) fn table_function_output_columns(
         &self,
         context: &impl ParseContext,
-        scalar_name: &crate::names::ColumnName,
-    ) -> crate::sem::ColumnCollection {
+        scalar_name: &ColumnName,
+    ) -> ColumnCollection {
         let declared = self.returning_table();
         if !declared.is_empty() {
             return declared;
@@ -202,7 +207,7 @@ impl OverloadVariant {
         {
             return columns;
         }
-        crate::sem::ColumnCollection::scalar_function_output(scalar_name, ty)
+        ColumnCollection::scalar_function_output(scalar_name, ty)
     }
 
     pub(crate) fn requires_record_definition(&self) -> bool {
@@ -212,7 +217,7 @@ impl OverloadVariant {
     fn returns_record(&self) -> bool {
         self.ret_type()
             .as_ref()
-            .is_some_and(super::pg_type::TypeReference::is_record)
+            .is_some_and(PgTypeTypeReference::is_record)
     }
 
     /// get argument by zero based index
@@ -282,10 +287,10 @@ impl OverloadVariant {
 
 #[cfg(test)]
 mod test_output_return_shape {
-    use crate::test_helpers::TestParseContext;
     use crate::{
         names::ColumnName,
         sem::{FunctionParam, OverloadVariant, TypeReference},
+        test_helpers::TestParseContext,
     };
 
     #[rstest::rstest]

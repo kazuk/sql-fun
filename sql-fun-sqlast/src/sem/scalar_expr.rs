@@ -61,6 +61,22 @@ pub use self::{
 pub(crate) use self::{case_expr::SqliteCaseBuilder, whole_row::WholeRowFields};
 
 use crate::{
+    StringSpan,
+    ast::Dialect,
+    context::{BaseParseContext, ParseContext as ContextParseContext},
+    names::{AliasName as NamesAliasName, FullName as NamesFullName, TableName as NamesTableName},
+    sem::{
+        BinaryOperatorDefinition, ColumnCollection as SemColumnCollection, ColumnRename,
+        DeleteRowColumn, DeleteRowVersion, FunctionModifiers, InputTypeConstraint, MergeRecordRole,
+        MinMaxExpr as SemMinMaxExpr, OverloadVariant, ParameterConstraints, QueryNameResolution,
+        QueryProblem, ResolvedOperator, TypeDefinition as SemTypeDefinition,
+        parameter_resolution::ParameterResolution,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+        with_stack,
+    },
+};
+
+use crate::{
     names::ColumnName,
     sem::{
         AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
@@ -135,24 +151,18 @@ impl RowExpr {
                 )
             })
             .collect();
-        TypeReference::dynamic(&crate::sem::TypeDefinition::ImplicitComposite(
-            crate::sem::ColumnCollection::new(columns),
+        TypeReference::dynamic(&SemTypeDefinition::ImplicitComposite(
+            SemColumnCollection::new(columns),
         ))
     }
 
-    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for field in &mut self.0 {
             field.walk(visitor)?;
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for field in &self.0 {
             field.visit(visitor)?;
         }
@@ -162,12 +172,14 @@ impl RowExpr {
 
 #[cfg(test)]
 mod row_cast_tests {
-    use super::{ScalarConstExpr, SemScalarExpr};
-    use crate::sem::{
-        CastContext, CastDefinition, ColumnCollection, ColumnDefinition, PgBuiltInType,
-        TypeDefinition, TypeReference,
+    use crate::{
+        sem::{
+            CastContext, CastDefinition, ColumnCollection, ColumnDefinition, PgBuiltInType,
+            TypeDefinition, TypeReference,
+            scalar_expr::{ScalarConstExpr, SemScalarExpr},
+        },
+        test_helpers::TestParseContext,
     };
-    use crate::test_helpers::TestParseContext;
 
     #[test]
     fn field_casts_retain_target_types_and_nullability() {
@@ -230,7 +242,7 @@ impl ListExpr {
 
 #[cfg(test)]
 mod list_contract_tests {
-    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
 
     #[test]
     fn internal_lists_have_no_scalar_metadata_and_retain_their_arguments() {
@@ -370,7 +382,7 @@ impl SemScalarExpr {
             Self::Unexpected(_) => "unrecognized expression",
         }
     }
-    pub(crate) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
+    pub(crate) fn matches_column(&self, rename: &ColumnRename) -> bool {
         if let Self::ColumnRef(value) = self {
             value.matches_column(rename)
         } else {
@@ -378,9 +390,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) const fn namespace_reference(
-        &self,
-    ) -> Option<(&str, &crate::names::ColumnName, bool)> {
+    pub(crate) const fn namespace_reference(&self) -> Option<(&str, &ColumnName, bool)> {
         if let Self::ColumnRef(value) = self {
             value.namespace_reference()
         } else {
@@ -394,10 +404,7 @@ impl SemScalarExpr {
         }
         self
     }
-    pub(crate) fn renamed_column_output(
-        &self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Option<&crate::names::ColumnName> {
+    pub(crate) fn renamed_column_output(&self, rename: &ColumnRename) -> Option<&ColumnName> {
         if let Self::ColumnRef(value) = self {
             value.renamed_output(rename)
         } else {
@@ -405,12 +412,12 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn set_projection_name(&mut self, name: &crate::names::ColumnName) {
+    pub(crate) fn set_projection_name(&mut self, name: &ColumnName) {
         if let Self::ColumnRef(value) = self {
             value.set_projection_name(name);
         }
     }
-    pub(crate) fn rename_bound_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(crate) fn rename_bound_column(&mut self, rename: &ColumnRename) {
         match self {
             Self::ColumnRef(value) => value.rename_column(rename),
             Self::WholeRow(value) => value.rename_column(rename),
@@ -419,11 +426,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn rename_bound_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_bound_relation(&mut self, old: &NamesTableName, new: &NamesTableName) {
         match self {
             Self::ColumnRef(value) => value.rename_relation(old, new),
             Self::WholeRow(value) => value.rename_relation(old, new),
@@ -477,7 +480,7 @@ impl SemScalarExpr {
         }
     }
     /// Completed qualification failure for a direct column reference.
-    pub const fn qualification_failure(&self) -> Option<&self::column_ref::QualifiedColumnFailure> {
+    pub const fn qualification_failure(&self) -> Option<&QualifiedColumnFailure> {
         if let Self::ColumnRef(reference) = self {
             reference.qualification_failure()
         } else {
@@ -500,7 +503,7 @@ impl SemScalarExpr {
             None
         }
     }
-    pub(crate) const fn function_dependency(&self) -> Option<&crate::names::FullName> {
+    pub(crate) const fn function_dependency(&self) -> Option<&NamesFullName> {
         if let Self::FuncCall(call) = self {
             call.name_resolution().function_identity()
         } else {
@@ -509,7 +512,7 @@ impl SemScalarExpr {
     }
 
     /// MERGE record binding, when this is a direct column reference.
-    pub const fn merge_record_reference(&self) -> Option<&self::column_ref::MergeRecordColumnRef> {
+    pub const fn merge_record_reference(&self) -> Option<&MergeRecordColumnRef> {
         match self {
             Self::ColumnRef(reference) => reference.merge_record_reference(),
             _ => None,
@@ -518,7 +521,7 @@ impl SemScalarExpr {
 
     pub(crate) fn coerce_row_cast(
         &mut self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         target: &TypeReference,
     ) -> bool {
         let Self::Row(row) = self else {
@@ -567,17 +570,13 @@ impl SemScalarExpr {
         Self::MergeAction
     }
     /// PostgreSQL DELETE RETURNING row-image binding, when this is a direct column.
-    pub const fn delete_row_reference(&self) -> Option<&crate::sem::DeleteRowColumn> {
+    pub const fn delete_row_reference(&self) -> Option<&DeleteRowColumn> {
         match self {
             Self::ColumnRef(reference) => reference.delete_row_reference(),
             _ => None,
         }
     }
-    pub(crate) fn merge_record_column(
-        self,
-        role: crate::sem::MergeRecordRole,
-        nullable: bool,
-    ) -> Self {
+    pub(crate) fn merge_record_column(self, role: MergeRecordRole, nullable: bool) -> Self {
         match self {
             Self::ColumnRef(reference) => Self::column_reference(
                 ColumnReferenceExpr::merge_record(role, &reference, nullable),
@@ -585,7 +584,7 @@ impl SemScalarExpr {
             _ => unreachable!("MERGE record lookup must produce a column reference"),
         }
     }
-    pub(crate) fn delete_row_column(self, version: crate::sem::DeleteRowVersion) -> Self {
+    pub(crate) fn delete_row_column(self, version: DeleteRowVersion) -> Self {
         match self {
             Self::ColumnRef(reference) => {
                 Self::column_reference(ColumnReferenceExpr::delete_row(version, &reference))
@@ -593,7 +592,7 @@ impl SemScalarExpr {
             _ => unreachable!("row-image lookup must produce a column reference"),
         }
     }
-    pub(crate) fn bound_view_column(&self, view: &crate::names::FullName) -> Option<&ColumnName> {
+    pub(crate) fn bound_view_column(&self, view: &NamesFullName) -> Option<&ColumnName> {
         if let Self::ColumnRef(column) = self {
             column.bound_view_column(view)
         } else {
@@ -601,10 +600,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn is_invalid_sampling_function(
-        &self,
-        context: &impl crate::context::BaseParseContext,
-    ) -> bool {
+    pub(crate) fn is_invalid_sampling_function(&self, context: &impl BaseParseContext) -> bool {
         if let Self::FuncCall(call) = self {
             call.modifiers().over().is_some() || call.returns_set(context) == Some(true)
         } else if let Self::Constrained(value) = self {
@@ -616,10 +612,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn preserves_view_rows(
-        &self,
-        context: &impl crate::context::BaseParseContext,
-    ) -> bool {
+    pub(crate) fn preserves_view_rows(&self, context: &impl BaseParseContext) -> bool {
         if let Self::FuncCall(call) = self {
             if call.signature_is_deferred() || call.modifiers().over().is_some() {
                 return false;
@@ -643,8 +636,8 @@ impl SemScalarExpr {
 
     pub(crate) fn with_source_reference_name(
         self,
-        alias: &crate::names::AliasName,
-        column: &crate::names::ColumnName,
+        alias: &NamesAliasName,
+        column: &ColumnName,
     ) -> Self {
         match self {
             Self::SourceColumn(value) => {
@@ -660,17 +653,17 @@ impl SemScalarExpr {
     pub(crate) const fn column_reference(reference: ColumnReferenceExpr) -> Self {
         Self::ColumnRef(reference)
     }
-    pub(crate) fn set_cast_resolution(&mut self, resolution: crate::sem::QueryNameResolution) {
+    pub(crate) fn set_cast_resolution(&mut self, resolution: QueryNameResolution) {
         if let Self::TypeCast(cast) = self {
             cast.set_resolution(resolution);
         }
     }
-    fn retain_cast_binding(&mut self, binding: &crate::sem::QueryNameResolution) {
+    fn retain_cast_binding(&mut self, binding: &QueryNameResolution) {
         if let Self::Constrained(value) = self {
             value.retain_cast_binding(binding);
         }
     }
-    fn retain_operator_binding(&mut self, binding: &crate::sem::ResolvedOperator) {
+    fn retain_operator_binding(&mut self, binding: &ResolvedOperator) {
         if let Self::Constrained(value) = self {
             value.retain_operator_binding(binding);
         }
@@ -681,35 +674,29 @@ impl SemScalarExpr {
         }
     }
     /// Completed operator-name binding retained before and after parameter inference.
-    pub fn operator_binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+    pub fn operator_binding(&self) -> Option<&ResolvedOperator> {
         match self {
             Self::Arith(value) => value.binding(),
             Self::Constrained(value) => value.operator_binding(),
             _ => None,
         }
     }
-    pub(crate) fn set_operator_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+    pub(crate) fn set_operator_binding(&mut self, binding: ResolvedOperator) {
         if let Self::Arith(call) = self {
             call.set_binding(binding);
         }
     }
-    pub(crate) fn set_function_candidates(
-        &mut self,
-        candidates: Option<Vec<crate::sem::OverloadVariant>>,
-    ) {
+    pub(crate) fn set_function_candidates(&mut self, candidates: Option<Vec<OverloadVariant>>) {
         if let Self::FuncCall(call) = self {
             call.set_candidates(candidates);
         }
     }
-    pub(crate) fn set_function_name_resolution(
-        &mut self,
-        outcome: crate::sem::QueryNameResolution,
-    ) {
+    pub(crate) fn set_function_name_resolution(&mut self, outcome: QueryNameResolution) {
         if let Self::FuncCall(call) = self {
             call.set_name_resolution(outcome);
         }
     }
-    pub(crate) fn set_function_modifiers(&mut self, modifiers: crate::sem::FunctionModifiers) {
+    pub(crate) fn set_function_modifiers(&mut self, modifiers: FunctionModifiers) {
         if let Self::FuncCall(call) = self {
             call.set_modifiers(modifiers);
         }
@@ -744,11 +731,7 @@ impl SemScalarExpr {
             _ => None,
         }
     }
-    pub(crate) fn parameter(
-        position: u32,
-        node: usize,
-        constraint: &crate::sem::InputTypeConstraint,
-    ) -> Self {
+    pub(crate) fn parameter(position: u32, node: usize, constraint: &InputTypeConstraint) -> Self {
         Self::Param(ParamRef::new(position, node, constraint))
     }
     /// Retained explicit collation reference and its analyzed operand.
@@ -766,7 +749,7 @@ impl SemScalarExpr {
 
     pub(crate) fn validate_collation(
         &mut self,
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if let Self::Collate(value) = self {
             value.validate_type(context)?;
@@ -926,8 +909,10 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_get_type_and_is_not_null {
-    use crate::sem::PgBuiltInType;
-    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::{
+        PgBuiltInType,
+        scalar_expr::{ScalarConstExpr, SemScalarExpr},
+    };
 
     #[test]
     fn get_type_and_is_not_null_for_const() {
@@ -1016,12 +1001,13 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_get_column_def_and_name {
-    use crate::sem::scalar_expr::{
-        ColumnReferenceExpr, SemScalarExpr, TableColumnRef, TypeReference,
-    };
     use crate::{
         names::{AliasName, ColumnName, FullName, TableName},
-        sem::{PgBuiltInType, create_table::ColumnDefinition},
+        sem::{
+            PgBuiltInType,
+            create_table::ColumnDefinition,
+            scalar_expr::{ColumnReferenceExpr, SemScalarExpr, TableColumnRef, TypeReference},
+        },
     };
 
     fn make_table_column_expr(
@@ -1059,8 +1045,10 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_wrap_implicit_cast {
-    use crate::sem::PgBuiltInType;
-    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::{
+        PgBuiltInType,
+        scalar_expr::{ScalarConstExpr, SemScalarExpr},
+    };
 
     #[test]
     fn wrap_implicit_cast_sets_type() {
@@ -1090,7 +1078,7 @@ impl SemScalarExpr {
         Self::implicit_cast_resolved(context, result_type, expr)
     }
 
-    pub(crate) fn implicit_cast_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn implicit_cast_resolved<TContext: ParseContext>(
         context: &mut TContext,
         result_type: &TypeReference,
         expr: &mut Self,
@@ -1118,9 +1106,13 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_implicit_cast_if_require {
-    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
-    use crate::sem::{CastContext, CastDefinition, PgBuiltInType};
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        sem::{
+            CastContext, CastDefinition, PgBuiltInType,
+            scalar_expr::{ScalarConstExpr, SemScalarExpr},
+        },
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn implicit_cast_if_require_no_change_when_same_type() {
@@ -1181,7 +1173,7 @@ impl SemScalarExpr {
         self.require_array_resolved(context)
     }
 
-    pub(crate) fn require_array_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn require_array_resolved<TContext: ParseContext>(
         &self,
         context: &mut TContext,
     ) -> Result<(), AnalysisError> {
@@ -1197,9 +1189,13 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_require_array {
-    use crate::sem::PgBuiltInType;
-    use crate::sem::scalar_expr::{ImplicitCastExpr, ScalarConstExpr, SemScalarExpr};
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        sem::{
+            PgBuiltInType,
+            scalar_expr::{ImplicitCastExpr, ScalarConstExpr, SemScalarExpr},
+        },
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn require_array_reports_for_non_array() {
@@ -1234,7 +1230,7 @@ impl SemScalarExpr {
         self.fits_array_index_resolved(context)
     }
 
-    pub(crate) fn fits_array_index_resolved<TContext: crate::sem::ParseContext>(
+    pub(crate) fn fits_array_index_resolved<TContext: ParseContext>(
         &self,
         context: &mut TContext,
     ) -> Result<(), AnalysisError> {
@@ -1253,9 +1249,13 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_fits_array_index {
-    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
-    use crate::sem::{CastContext, CastDefinition, PgBuiltInType};
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        sem::{
+            CastContext, CastDefinition, PgBuiltInType,
+            scalar_expr::{ScalarConstExpr, SemScalarExpr},
+        },
+        test_helpers::TestParseContext,
+    };
 
     #[test]
     fn fits_array_index_reports_when_not_castable() {
@@ -1285,19 +1285,16 @@ mod test_fits_array_index {
 }
 
 impl ListExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         for expression in &mut self.0 {
             expression.walk(visitor)?;
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for expression in &self.0 {
             expression.visit(visitor)?;
         }
@@ -1306,27 +1303,21 @@ impl ListExpr {
 }
 
 impl SemScalarExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        crate::sem::with_stack(|| self.walk_body(visitor))?;
+    ) -> Result<(), AnalysisError> {
+        with_stack(|| self.walk_body(visitor))?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        crate::sem::with_stack(|| self.visit_body(visitor))?;
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        with_stack(|| self.visit_body(visitor))?;
         Ok(())
     }
 }
 
 impl SemScalarExpr {
-    fn walk_body<V: crate::sem::traversal::SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn walk_body<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_expression(self)?;
         match self {
             Self::SourceColumn(value) => value.walk(visitor)?,
@@ -1363,10 +1354,7 @@ impl SemScalarExpr {
         }
         visitor.expression(self)
     }
-    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_expression(self)?;
         match self {
             Self::SourceColumn(value) => value.visit(visitor)?,
@@ -1407,7 +1395,7 @@ impl SemScalarExpr {
 
 impl SemScalarExpr {
     /// Preserve a supplied argument name without resolving a formal parameter.
-    pub fn named_argument(name: &str, value: &Self, span: &Option<crate::StringSpan>) -> Self {
+    pub fn named_argument(name: &str, value: &Self, span: &Option<StringSpan>) -> Self {
         Self::NamedArg(NamedArgExpr::new(name, value, span))
     }
     /// Array/composite access, including a parameter-dependent analyzed binding.
@@ -1448,7 +1436,7 @@ impl SemScalarExpr {
             _ => false,
         }
     }
-    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+    pub(crate) fn apply_constraints(&mut self, constraints: &ParameterConstraints) {
         match self {
             Self::Param(value) => value.apply_constraints(constraints),
             Self::Constrained(value) => value.apply_constraints(constraints),
@@ -1465,8 +1453,8 @@ impl SemScalarExpr {
     }
     pub(crate) fn collect_constraints(
         &mut self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         let replacement = match self {
             Self::Param(value) => Some(parameters.parameter(value.position(), value.constraint())),
@@ -1554,10 +1542,10 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
         if matches!(self, Self::List(_))
-            || (context.dialect() == crate::ast::Dialect::sqlite() && self.as_row().is_some())
+            || (context.dialect() == Dialect::sqlite() && self.as_row().is_some())
         {
             context.report_analysis_problem(AnalysisProblem::query(
-                crate::sem::QueryProblem::scalar_value_required(),
+                QueryProblem::scalar_value_required(),
             ))?;
         }
         Ok(())
@@ -1613,7 +1601,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk_assignment_target<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -1623,7 +1611,7 @@ impl SemScalarExpr {
         visitor.assignment_target(self);
         Ok(())
     }
-    pub(crate) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assignment_target<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -1654,21 +1642,19 @@ impl SemScalarExpr {
     // peer supplies the comparison target; two literals use string comparison.
     pub(crate) fn comparison_literal_operands(
         context: &impl ParseContext,
-        overloads: Option<&[crate::sem::BinaryOperatorDefinition]>,
+        overloads: Option<&[BinaryOperatorDefinition]>,
         left: Self,
         right: Self,
     ) -> (Self, Self) {
-        let left_unknown =
-            crate::sem::MinMaxExpr::input_type(&left) == Some(crate::sem::MinMaxExpr::unknown());
-        let right_unknown =
-            crate::sem::MinMaxExpr::input_type(&right) == Some(crate::sem::MinMaxExpr::unknown());
+        let left_unknown = SemMinMaxExpr::input_type(&left) == Some(SemMinMaxExpr::unknown());
+        let right_unknown = SemMinMaxExpr::input_type(&right) == Some(SemMinMaxExpr::unknown());
         let left_target = if right_unknown {
-            Some(crate::sem::PgBuiltInType::text())
+            Some(PgBuiltInType::text())
         } else {
             right.get_type()
         };
         let right_target = if left_unknown {
-            Some(crate::sem::PgBuiltInType::text())
+            Some(PgBuiltInType::text())
         } else {
             left.get_type()
         };
@@ -1693,7 +1679,7 @@ impl SemScalarExpr {
 
     fn comparison_literal_target(
         context: &impl ParseContext,
-        overloads: Option<&[crate::sem::BinaryOperatorDefinition]>,
+        overloads: Option<&[BinaryOperatorDefinition]>,
         known: &TypeReference,
     ) -> TypeReference {
         // PostgreSQL tries (domain, domain) before reducing a domain paired
@@ -1705,15 +1691,17 @@ impl SemScalarExpr {
         }) {
             known.clone()
         } else {
-            crate::sem::MinMaxExpr::base_type(context, known)
+            SemMinMaxExpr::base_type(context, known)
         }
     }
 }
 
 #[cfg(test)]
 mod test_domain_comparison_literals {
-    use crate::sem::{PgBuiltInType, ScalarConstExpr, SemScalarExpr};
-    use crate::test_helpers::domain_casts;
+    use crate::{
+        sem::{PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+        test_helpers::domain_casts,
+    };
 
     #[rstest::rstest]
     fn unknown_literal_checks_domain_exact_signature_before_base(
@@ -1753,7 +1741,7 @@ mod test_domain_comparison_literals {
 impl SemScalarExpr {
     pub(crate) fn invalid_from_scalar(
         &self,
-        context: &impl crate::context::ParseContext,
+        context: &impl ContextParseContext,
         allow_set: bool,
     ) -> bool {
         if let Self::FuncCall(call) = self {

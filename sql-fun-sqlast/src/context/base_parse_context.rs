@@ -1,3 +1,7 @@
+use crate::context::{
+    ExtensionInfoRead, ObjectInfoRead, OwnershipInfoRead, RoleInfoRead, ViewDeleteInfoRead,
+    ViewInsertInfoRead, ViewMergeInfoRead, ViewUpdateInfoRead,
+};
 use std::path::Path;
 
 use ::sql_fun_core::SqlFunArgs;
@@ -25,13 +29,13 @@ use crate::{
 /// [`crate::context::ParseContext`] presents mutate functions.
 ///
 pub trait BaseParseContext:
-    crate::context::RoleInfoRead
-    + crate::context::OwnershipInfoRead
+    RoleInfoRead
+    + OwnershipInfoRead
     + CastInfoRead
     + ConflictInfoRead
     + FunctionInfoRead
-    + crate::context::ExtensionInfoRead
-    + crate::context::ObjectInfoRead
+    + ExtensionInfoRead
+    + ObjectInfoRead
     + IndexInfoRead
     + OperatorInfoRead
     + RuleInfoRead
@@ -39,10 +43,10 @@ pub trait BaseParseContext:
     + SequenceInfoRead
     + TypeInfoRead
     + TableInfoRead
-    + crate::context::ViewInsertInfoRead
-    + crate::context::ViewUpdateInfoRead
-    + crate::context::ViewDeleteInfoRead
-    + crate::context::ViewMergeInfoRead
+    + ViewInsertInfoRead
+    + ViewUpdateInfoRead
+    + ViewDeleteInfoRead
+    + ViewMergeInfoRead
     + ViewInfoRead
     + SearchPathRead
     + GetSourcePathWithSpanOpt
@@ -140,11 +144,13 @@ pub trait BaseParseContext:
 
 #[cfg(test)]
 mod canonicalization_tests {
-    use crate::context::{BaseParseContext, ParseContext};
-    use crate::test_helpers::TestParseContext;
+    use crate::{sem::PgBuiltInType, test_helpers::dynamic_types::record};
+
     use crate::{
+        context::{BaseParseContext, ParseContext},
         names::{FullName, SchemaName},
         sem::{TypeDefinition, TypeReference},
+        test_helpers::TestParseContext,
     };
 
     #[rstest::rstest]
@@ -185,7 +191,7 @@ mod canonicalization_tests {
     #[test]
     fn canonicalization_preserves_owned_anonymous_identity() {
         let context = TestParseContext::default();
-        let row = crate::test_helpers::dynamic_types::record(&crate::sem::PgBuiltInType::int4());
+        let row = record(&PgBuiltInType::int4());
         assert_eq!(context.canonicalize_type_ref(&row), Some(row.clone()));
         let array = row.array_type();
         assert_eq!(context.canonicalize_type_ref(&array), Some(array));

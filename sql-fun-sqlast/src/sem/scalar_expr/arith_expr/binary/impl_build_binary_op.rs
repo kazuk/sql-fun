@@ -28,7 +28,7 @@ impl super::ArithExpr {
         operator_def: OperatorDefinition,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         // Ordinary operators need the domain/unknown exact-match phase too.
         // Other literal policies remain with their existing semantic consumers.

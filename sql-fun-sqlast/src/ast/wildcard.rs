@@ -2,13 +2,29 @@
 
 mod rows_source;
 mod source;
-use self::source::SourcePlans;
 
-use crate::ast::projection::{
-    ProjectionError, ProjectionLocations, ProjectionReplacements, ProjectionScopes,
+use self::source::SourcePlans;
+use crate::{
+    ast::{
+        Dialect,
+        wildcard::source::{ordinal_reference, typed_record_reference},
+    },
+    names::FullName,
+    sem::{
+        CoalesceExpr, ColumnReferenceExpr, ImplicitCastExpr, TypeCastExpr, TypeReference,
+        WildcardQualifiers, with_stack,
+    },
 };
-use crate::ast::{Call, Expr, Name, Statement, Target, TypeName};
-use crate::sem::{SemScalarExpr, WildcardExpansion};
+
+use crate::{
+    ast::{
+        Call, Expr, Name, Statement, Target, TypeName,
+        projection::{
+            ProjectionError, ProjectionLocations, ProjectionReplacements, ProjectionScopes,
+        },
+    },
+    sem::{SemScalarExpr, WildcardExpansion},
+};
 
 /// A rejected wildcard rewrite. The statement remains unchanged on failure.
 #[derive(Debug, thiserror::Error)]
@@ -145,7 +161,7 @@ impl Statement {
         &mut self,
         mut reparsed: Self,
     ) -> Result<(), WildcardRewriteError> {
-        if self.dialect != crate::ast::Dialect::postgres() || self.dialect != reparsed.dialect {
+        if self.dialect != Dialect::postgres() || self.dialect != reparsed.dialect {
             return Err(WildcardRewriteError::invalid(
                 "target location synchronization requires the same PostgreSQL dialect",
             ));
@@ -244,9 +260,9 @@ mod tests;
 impl SemScalarExpr {
     fn projection_expression(
         &self,
-        bindings: &crate::sem::WildcardQualifiers,
+        bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
-        crate::sem::with_stack(|| match self {
+        with_stack(|| match self {
             Self::ColumnRef(value) => value.projection_expression(bindings),
             Self::Coalesce(value) => value.projection_expression(bindings),
             Self::ImplicitCast(value) => value.projection_expression(bindings),
@@ -258,8 +274,8 @@ impl SemScalarExpr {
     }
     fn projection_cast(
         &self,
-        target: &crate::sem::TypeReference,
-        bindings: &crate::sem::WildcardQualifiers,
+        target: &TypeReference,
+        bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         if target.type_definition().is_some() {
             return Err(WildcardRewriteError::invalid(
@@ -277,10 +293,10 @@ impl SemScalarExpr {
         Ok(Expr::projection_cast(&expression, &target))
     }
 }
-impl crate::sem::ColumnReferenceExpr {
+impl ColumnReferenceExpr {
     fn projection_expression(
         &self,
-        bindings: &crate::sem::WildcardQualifiers,
+        bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         if let Some(table) = self.table_column_reference()
             && let Some(qualifier) = bindings.reference_for(table.relation(), table.alias())
@@ -302,10 +318,10 @@ impl crate::sem::ColumnReferenceExpr {
         Ok(Expr::projection_column(&Name::from_parts(&parts)))
     }
 }
-impl crate::sem::CoalesceExpr {
+impl CoalesceExpr {
     fn projection_expression(
         &self,
-        bindings: &crate::sem::WildcardQualifiers,
+        bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         let mut arguments = Vec::new();
         for argument in self.arguments() {
@@ -316,19 +332,19 @@ impl crate::sem::CoalesceExpr {
         )))
     }
 }
-impl crate::sem::ImplicitCastExpr {
+impl ImplicitCastExpr {
     fn projection_expression(
         &self,
-        bindings: &crate::sem::WildcardQualifiers,
+        bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         let (argument, target) = self.projection_operand();
         argument.projection_cast(target, bindings)
     }
 }
-impl crate::sem::TypeCastExpr {
+impl TypeCastExpr {
     fn projection_expression(
         &self,
-        bindings: &crate::sem::WildcardQualifiers,
+        bindings: &WildcardQualifiers,
     ) -> Result<Expr, WildcardRewriteError> {
         let (argument, target) = self.projection_operand();
         argument.projection_cast(target, bindings)
@@ -341,9 +357,9 @@ impl WildcardExpansion {
         let mut targets = Vec::new();
         for (index, column) in self.columns().iter().enumerate() {
             let expression = if let Some(record) = self.typed_record_at(index) {
-                self::source::typed_record_reference(record)
+                typed_record_reference(record)
             } else if let Some((alias, ordinal)) = self.source_ordinal_at(index) {
-                self::source::ordinal_reference(alias, ordinal)
+                ordinal_reference(alias, ordinal)
             } else if let Some(parts) = self.reference_at(index) {
                 Expr::projection_column(&Name::from_parts(parts))
             } else {
@@ -365,7 +381,7 @@ impl WildcardExpansion {
     }
 }
 
-impl crate::names::FullName {
+impl FullName {
     pub(super) fn projection_name(&self) -> Name {
         let mut parts = Vec::new();
         if let Some(catalog) = self.catalog() {

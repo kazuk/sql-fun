@@ -25,6 +25,14 @@ pub use self::{
 };
 
 use crate::{
+    names::{AliasName, CteName, FullName, TableName},
+    sem::{
+        ColumnRename, DeleteRowColumn, DeleteRowVersion, data_source::MergeRecordRole,
+        query_access::AccessColumn as QueryAccessAccessColumn,
+    },
+};
+
+use crate::{
     context::ParseContext,
     names::ColumnName,
     sem::{
@@ -46,7 +54,7 @@ pub enum ColumnReferenceExpr {
     /// Failed qualified lookup with its requested identity and reason.
     QualifiedFailure(QualifiedColumnFailure),
     /// PostgreSQL DELETE RETURNING OLD/NEW target-column binding.
-    DeleteRow(crate::sem::DeleteRowColumn),
+    DeleteRow(DeleteRowColumn),
     /// MERGE target, source, or row-image column binding.
     MergeRecord(MergeRecordColumnRef),
     /// Reference to a resolved projection position (alias or ordinal).
@@ -87,7 +95,7 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn matches_column(&self, rename: &crate::sem::ColumnRename) -> bool {
+    pub(crate) fn matches_column(&self, rename: &ColumnRename) -> bool {
         if let Self::TableColumn(value) = self {
             value.matches_column(rename)
         } else {
@@ -114,7 +122,7 @@ impl ColumnReferenceExpr {
             _ => {}
         }
     }
-    pub(crate) fn renamed_output(&self, rename: &crate::sem::ColumnRename) -> Option<&ColumnName> {
+    pub(crate) fn renamed_output(&self, rename: &ColumnRename) -> Option<&ColumnName> {
         if let Self::TableColumn(value) = self {
             value.renamed_output(rename)
         } else {
@@ -139,17 +147,13 @@ impl ColumnReferenceExpr {
             _ => {}
         }
     }
-    pub(in crate::sem) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(in crate::sem) fn rename_column(&mut self, rename: &ColumnRename) {
         if let Self::TableColumn(value) = self {
             value.rename_column(rename);
         }
     }
 
-    pub(in crate::sem) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(in crate::sem) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
             Self::TableColumn(value) => value.rename_relation(old, new),
             Self::SystemColumn(value) => value.rename_relation(old, new),
@@ -172,11 +176,7 @@ impl ColumnReferenceExpr {
         }
     }
 
-    pub(super) fn with_reference_name(
-        self,
-        alias: &crate::names::AliasName,
-        column: &ColumnName,
-    ) -> Self {
+    pub(super) fn with_reference_name(self, alias: &AliasName, column: &ColumnName) -> Self {
         match self {
             Self::MergeRecord(value) => Self::MergeRecord(value.with_reference_name(alias, column)),
             Self::TableColumn(value) => Self::TableColumn(value.with_reference_name(alias, column)),
@@ -246,9 +246,9 @@ impl ColumnReferenceExpr {
     }
 
     pub(crate) fn system_column(
-        alias: &crate::names::AliasName,
+        alias: &AliasName,
         column: &ColumnName,
-        table: &crate::names::TableName,
+        table: &TableName,
         column_type: &TypeReference,
         nullable: bool,
     ) -> Self {
@@ -272,17 +272,13 @@ impl ColumnReferenceExpr {
 
     pub(crate) fn undefined_alias_resolved<C: ParseContext>(
         context: &mut C,
-        alias: &crate::names::AliasName,
+        alias: &AliasName,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
         UndefinedAliasColumnRef::new_with_report(context, alias, column)
     }
 
-    pub(crate) fn merge_record(
-        role: crate::sem::data_source::MergeRecordRole,
-        source: &Self,
-        nullable: bool,
-    ) -> Self {
+    pub(crate) fn merge_record(role: MergeRecordRole, source: &Self, nullable: bool) -> Self {
         let source = match source {
             Self::MergeRecord(reference) => reference.source(),
             _ => source,
@@ -290,14 +286,14 @@ impl ColumnReferenceExpr {
         Self::MergeRecord(MergeRecordColumnRef::new(role, source, nullable))
     }
 
-    pub(crate) const fn delete_row_reference(&self) -> Option<&crate::sem::DeleteRowColumn> {
+    pub(crate) const fn delete_row_reference(&self) -> Option<&DeleteRowColumn> {
         match self {
             Self::DeleteRow(column) => Some(column),
             _ => None,
         }
     }
 
-    pub(crate) fn bound_view_column(&self, view: &crate::names::FullName) -> Option<&ColumnName> {
+    pub(crate) fn bound_view_column(&self, view: &FullName) -> Option<&ColumnName> {
         match self {
             Self::TableColumn(column) if column.belongs_to(view) => Some(column.get_column_name()),
             Self::ViewColumn(column) if column.belongs_to(view) => Some(column.get_column_name()),
@@ -305,8 +301,8 @@ impl ColumnReferenceExpr {
         }
     }
 
-    pub(crate) fn delete_row(version: crate::sem::DeleteRowVersion, source: &Self) -> Self {
-        Self::DeleteRow(crate::sem::DeleteRowColumn::new(version, source))
+    pub(crate) fn delete_row(version: DeleteRowVersion, source: &Self) -> Self {
+        Self::DeleteRow(DeleteRowColumn::new(version, source))
     }
 
     pub(crate) fn view_source_column(&self) -> Option<&ColumnName> {
@@ -318,9 +314,9 @@ impl ColumnReferenceExpr {
     }
 
     pub(crate) fn table_column(
-        alias: &crate::names::AliasName,
+        alias: &AliasName,
         column: &ColumnName,
-        table: &crate::names::TableName,
+        table: &TableName,
         definition: Option<&ColumnDefinition>,
         nullable: bool,
     ) -> Self {
@@ -366,8 +362,8 @@ impl ColumnReferenceExpr {
     }
 
     pub(crate) fn cte_column(
-        alias: &crate::names::AliasName,
-        cte_name: &crate::names::CteName,
+        alias: &AliasName,
+        cte_name: &CteName,
         column_name: &ColumnName,
         column_def: Option<&ColumnDefinition>,
         source_nullable: bool,
@@ -510,7 +506,7 @@ impl ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn access_column(&self) -> Option<crate::sem::query_access::AccessColumn> {
+    pub(crate) fn access_column(&self) -> Option<QueryAccessAccessColumn> {
         use crate::sem::query_access::{AccessColumn, AccessObjectKind};
         match self {
             Self::TableColumn(value) => {

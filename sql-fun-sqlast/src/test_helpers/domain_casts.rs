@@ -1,9 +1,13 @@
 //! Lightweight domain catalog and operator fixtures; no builtin loading.
+
 use crate::{
     context::{ParseContext, SchemaFileContext, TypeInfoWrite},
     names::FullName,
-    sem::{CastContext, CastDefinition, CreateDomain, PgBuiltInType, TypeReference},
-    test_helpers::TestParseContext,
+    sem::{
+        BinaryOperatorDefinition as SemBinaryOperatorDefinition, CastContext, CastDefinition,
+        CreateDomain, PgBuiltInType, TypeReference,
+    },
+    test_helpers::{TestParseContext, schema_layer},
 };
 
 pub(crate) fn reference(name: &str) -> TypeReference {
@@ -40,7 +44,7 @@ pub(crate) fn context() -> SchemaFileContext {
         &PgBuiltInType::int4(),
         &std::collections::HashSet::from([PgBuiltInType::int4(), PgBuiltInType::int8()]),
     );
-    crate::test_helpers::schema_layer(std::path::Path::new("domains.sql"), &base.freeze())
+    schema_layer(std::path::Path::new("domains.sql"), &base.freeze())
 }
 
 pub(crate) fn domain(
@@ -57,7 +61,7 @@ pub(crate) fn domain(
     reference
 }
 
-pub(crate) fn operators(domain: &TypeReference) -> Vec<crate::sem::BinaryOperatorDefinition> {
+pub(crate) fn operators(domain: &TypeReference) -> Vec<SemBinaryOperatorDefinition> {
     use crate::sem::BinaryOperatorDefinition;
     vec![
         BinaryOperatorDefinition::new(domain, domain, &PgBuiltInType::text(), true),

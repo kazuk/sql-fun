@@ -1,10 +1,14 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{AliasName, ColumnName, FullName},
     sem::{
         AnalysisError, DataSource, SemScalarExpr, TypeReference, WholeRowExpr, WholeRowFields,
         WildcardQualifier, WildcardQualifiers, WildcardTypedRecord, WithClause,
-        data_source::MergeRecordRole,
+        data_source::{
+            AliasSpec, ColumnCandidates, MergeRecordRole, ProjectionColumn, WildcardProjection,
+            projection::ProjectionColumns,
+        },
     },
 };
 
@@ -101,8 +105,8 @@ impl<'a> QualifiedSource<'a> {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<super::WildcardProjection<'a>, AnalysisError> {
-        Ok(super::WildcardProjection::new(
+    ) -> Result<WildcardProjection<'a>, AnalysisError> {
+        Ok(WildcardProjection::new(
             &self.projection_columns(context, with)?,
             self.projection_shape_is_resolved(),
             self.is_table_dependent(context),
@@ -113,8 +117,8 @@ impl<'a> QualifiedSource<'a> {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<super::ProjectionColumn<'a>>, AnalysisError> {
-        let columns = super::projection::ProjectionColumns::from(self.source.projection_names(
+    ) -> Result<Vec<ProjectionColumn<'a>>, AnalysisError> {
+        let columns = ProjectionColumns::from(self.source.projection_names(
             context,
             with,
             Some(&self.alias),
@@ -129,7 +133,7 @@ impl<'a> QualifiedSource<'a> {
         context: &impl ParseContext,
         with: &WithClause,
         column: &ColumnName,
-    ) -> Result<super::ColumnCandidates, AnalysisError> {
+    ) -> Result<ColumnCandidates, AnalysisError> {
         self.source
             .column_occurrence_candidates(context, with, column, &self.alias)
     }
@@ -141,7 +145,7 @@ impl<'a> QualifiedSource<'a> {
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let canonical;
-        let column = if context.dialect() == crate::ast::Dialect::sqlite() {
+        let column = if context.dialect() == Dialect::sqlite() {
             canonical = self.source.canonical_relation_column(context, column);
             canonical.as_ref().unwrap_or(column)
         } else {
@@ -170,18 +174,18 @@ impl DataSource {
         with: &WithClause,
         column: &ColumnName,
         alias: &AliasName,
-    ) -> Result<super::ColumnCandidates, AnalysisError> {
+    ) -> Result<ColumnCandidates, AnalysisError> {
         if let Self::JoinExpr(join) = self {
             if join.column_candidates(column, context, with).is_unknown() {
-                return Ok(super::ColumnCandidates::unknown());
+                return Ok(ColumnCandidates::unknown());
             }
             let mut aliases = Vec::new();
             for projected in join.project(context, with, None)? {
                 if projected.name() == column {
-                    aliases.push(super::AliasSpec::from_local_name(alias.as_str()));
+                    aliases.push(AliasSpec::from_local_name(alias.as_str()));
                 }
             }
-            return Ok(super::ColumnCandidates::from(aliases));
+            return Ok(ColumnCandidates::from(aliases));
         }
         Ok(self.aliases_for_column_resolved(column, context, with))
     }
@@ -190,7 +194,7 @@ impl DataSource {
         &'a self,
         context: &impl ParseContext,
         name: &FullName,
-        alias: &'a super::AliasSpec,
+        alias: &'a AliasSpec,
     ) -> Option<QualifiedSource<'a>> {
         match self {
             Self::Table(table) => table.qualified_source(self, context, name, Some(alias)),
@@ -221,9 +225,9 @@ pub(super) fn relation_matches(
     context: &impl ParseContext,
     name: &FullName,
     relation: &FullName,
-    alias: &super::AliasSpec,
+    alias: &AliasSpec,
 ) -> bool {
-    if context.dialect() == crate::ast::Dialect::sqlite() {
+    if context.dialect() == Dialect::sqlite() {
         name.schema()
             .zip(relation.schema())
             .is_some_and(|(requested, actual)| {

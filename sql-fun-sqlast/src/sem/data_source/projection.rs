@@ -2,10 +2,12 @@ use crate::{
     context::ParseContext,
     names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasSpec, AnalysisError, ColumnDefinition, ColumnReferenceExpr, DataSource, PgBuiltInType,
-        QualifiedColumnFailure, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
-        WildcardExpansion, WildcardQualifiers, WildcardRowsSource, WildcardRowsSources,
-        WildcardTypedRecord, WithClause, data_source::QualifiedSource,
+        AliasSpec, AnalysisError, CoalesceExpr, ColumnDefinition, ColumnReferenceExpr, DataSource,
+        PgBuiltInType, QualifiedColumnFailure, ResultColumnCollection, ScalarAnalysisContext,
+        SemScalarExpr, WildcardExpansion, WildcardQualifiers, WildcardRowsSource,
+        WildcardRowsSources, WildcardSourceProjection, WildcardTypedRecord, WithClause,
+        data_source::{MergeRecordRole, QualifiedSource, function_columns::OutputColumnNames},
+        with_stack,
     },
 };
 
@@ -19,7 +21,7 @@ pub(crate) struct ProjectionColumn<'a> {
     origin: Option<ProjectionOrigin<'a>>,
     typed_record: Option<WildcardTypedRecord>,
     rows_origin: Option<(std::sync::Arc<WildcardRowsSource>, usize)>,
-    merge_record: Option<(super::MergeRecordRole, bool)>,
+    merge_record: Option<(MergeRecordRole, bool)>,
 }
 
 #[derive(Clone, Debug)]
@@ -68,9 +70,9 @@ impl<'a> ProjectionSource<'a> {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::WildcardSourceProjection, AnalysisError> {
-        crate::sem::with_stack(|| {
-            let mut projection = crate::sem::WildcardSourceProjection::new(&self.alias);
+    ) -> Result<WildcardSourceProjection, AnalysisError> {
+        with_stack(|| {
+            let mut projection = WildcardSourceProjection::new(&self.alias);
             let mut sources = ProjectionSources::default();
             for column in &self.columns {
                 let expression = column.bind(context, scope)?;
@@ -95,7 +97,7 @@ impl<'a, 'b> ProjectionSources<'a, 'b> {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<crate::sem::WildcardSourceProjection>, AnalysisError> {
+    ) -> Result<Vec<WildcardSourceProjection>, AnalysisError> {
         let mut projections = Vec::new();
         for source in &self.0 {
             projections.push(source.resolve_wildcard(context, scope)?);
@@ -163,7 +165,7 @@ impl<'a> MergedProjection<'a> {
             .clone()
             .with_nullability(true)
             .bind_direct(context, with)?;
-        crate::sem::CoalesceExpr::resolve_join_key(
+        CoalesceExpr::resolve_join_key(
             context,
             &[left, right],
             self.left.name(),
@@ -258,7 +260,7 @@ impl<'a> ProjectionColumn<'a> {
         self.rows_origin = Some((std::sync::Arc::clone(source), index));
     }
 
-    fn with_occurrence(self, role: Option<super::MergeRecordRole>, nullable: bool) -> Self {
+    fn with_occurrence(self, role: Option<MergeRecordRole>, nullable: bool) -> Self {
         if let Some(role) = role {
             self.with_merge(role, nullable)
         } else {
@@ -299,7 +301,7 @@ impl<'a> ProjectionColumn<'a> {
     }
 
     pub(crate) fn collect_rows_sources(&self, sources: &mut WildcardRowsSources) {
-        crate::sem::with_stack(|| {
+        with_stack(|| {
             if let Some((source, _)) = &self.rows_origin
                 && self
                     .alias
@@ -320,7 +322,7 @@ impl<'a> ProjectionColumn<'a> {
     }
 
     pub(crate) fn collect_qualifiers(&self, qualifiers: &mut WildcardQualifiers) {
-        crate::sem::with_stack(|| {
+        with_stack(|| {
             self.binding.collect_qualifiers(qualifiers);
         });
     }
@@ -365,7 +367,7 @@ impl<'a> ProjectionColumn<'a> {
         None
     }
     fn collect_projection_sources<'b>(&'b self, sources: &mut ProjectionSources<'a, 'b>) {
-        crate::sem::with_stack(|| {
+        with_stack(|| {
             if let Some(origin) = &self.origin {
                 sources.include(origin.source());
             }
@@ -488,7 +490,7 @@ impl<'a> ProjectionColumn<'a> {
         self.binding = self.binding.with_nullability(nullable);
         self
     }
-    pub(super) fn with_merge(mut self, role: super::MergeRecordRole, nullable: bool) -> Self {
+    pub(super) fn with_merge(mut self, role: MergeRecordRole, nullable: bool) -> Self {
         self.binding = self.binding.with_nullability(nullable);
         self.merge_record = Some((role, nullable));
         self
@@ -533,9 +535,7 @@ impl DataSource {
             let Some((source, nullable)) = self.resolve_alias(alias.name()) else {
                 continue;
             };
-            let names = super::function_columns::OutputColumnNames::from(
-                source.column_names(context, with)?,
-            );
+            let names = OutputColumnNames::from(source.column_names(context, with)?);
             columns.extend(names.project(source, &alias, nullable, context));
         }
         Ok(columns)
@@ -616,11 +616,7 @@ impl<'a> ProjectionColumns<'a> {
         })
     }
 
-    pub(super) fn with_occurrence(
-        self,
-        role: Option<super::MergeRecordRole>,
-        nullable: bool,
-    ) -> Self {
+    pub(super) fn with_occurrence(self, role: Option<MergeRecordRole>, nullable: bool) -> Self {
         Self(
             self.0
                 .into_iter()

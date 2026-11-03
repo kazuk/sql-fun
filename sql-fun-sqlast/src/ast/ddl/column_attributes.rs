@@ -1,13 +1,17 @@
 //! ALTER COLUMN attribute resolution. Unimplemented dependent operations remain leaves.
-use super::{AlterDefinition, AlterOperation};
+
 use crate::{
-    ast::{AlterCommand, AlterRelation, Expr, Literal, SyntaxOption, SyntaxValue},
+    ast::{
+        AlterCommand, AlterRelation, AlterRelationKind, Expr, Literal, SyntaxOption, SyntaxValue,
+        ddl::{AlterDefinition, AlterOperation},
+    },
     context::ParseContext,
     names::{ColumnName, TableName},
     sem::{
         AlterColumnAttributes, AlterObjSubCommand, AlterTable, AnalysisError, AnalysisProblem,
-        ColumnAttributeAction, ColumnAttributeBinding, ColumnAttributeOption, CreateTable, SemAst,
-        SourcePathWithSpan, problem::AlterColumnProblem,
+        ColumnAttributeAction, ColumnAttributeBinding, ColumnAttributeOption, CreateTable, Kind,
+        SemAst, SourcePathWithSpan, problem::AlterColumnProblem,
+        search_path::expand_relation_search_path,
     },
 };
 
@@ -48,13 +52,12 @@ impl AlterRelation {
         // PostgreSQL AT_PASS_DROP, AT_PASS_COL_ATTRS, AT_PASS_MISC. Stable sort
         // preserves the supplied order within a pass, including repeated changes.
         ordered.sort_by_key(|command| command.column_attribute_phase());
-        let existing_relation = crate::sem::search_path::expand_relation_search_path(
-            context,
-            requested.full_name(),
-            |name| context.object_kind(name),
-        );
-        if existing_relation == Some(crate::sem::Kind::materialized_view())
-            || existing_relation == Some(crate::sem::Kind::index())
+        let existing_relation =
+            expand_relation_search_path(context, requested.full_name(), |name| {
+                context.object_kind(name)
+            });
+        if existing_relation == Some(Kind::materialized_view())
+            || existing_relation == Some(Kind::index())
         {
             todo!("column attributes on materialized views and indexes");
         }
@@ -79,27 +82,29 @@ impl AlterRelation {
 
 #[cfg(test)]
 mod test_applicability {
-    use crate::ParseContext;
-    use crate::context::BaseParseContext;
+    use crate::{
+        ast::StatementNode,
+        names::{ColumnName, FullName, TableName},
+        test_helpers::{
+            ownership::{apply_ownership_sql, ownership_context, ownership_statement},
+            source_span,
+        },
+    };
+
+    use crate::{ParseContext, context::BaseParseContext};
 
     #[test]
     fn discarded_diagnostics_cannot_make_rejected_ddl_applicable() -> testresult::TestResult {
-        let context = crate::test_helpers::ownership::ownership_context();
-        let context = crate::test_helpers::ownership::apply_ownership_sql(
-            context,
-            "CREATE TABLE t(a integer)",
-        )?
-        .into_context();
-        let syntax = crate::test_helpers::ownership::ownership_statement(
-            "ALTER TABLE t ALTER a SET NOT NULL, ALTER a SET STATISTICS -2",
-        )?;
-        let crate::ast::StatementNode::AlterRelation(relation) = syntax else {
+        let context = ownership_context();
+        let context = apply_ownership_sql(context, "CREATE TABLE t(a integer)")?.into_context();
+        let syntax =
+            ownership_statement("ALTER TABLE t ALTER a SET NOT NULL, ALTER a SET STATISTICS -2")?;
+        let StatementNode::AlterRelation(relation) = syntax else {
             panic!("ALTER TABLE syntax");
         };
         let mut context = context;
         context.begin_parameter_type_analysis();
-        let statement = relation
-            .resolve_column_attributes(&mut context, Some(&crate::test_helpers::source_span()))?;
+        let statement = relation.resolve_column_attributes(&mut context, Some(&source_span()))?;
         // Simulate a diagnostic policy that suppresses delivery after analysis.
         let problems = context.analysis_state_mut().take_problems();
         assert_eq!(problems.len(), 1);
@@ -113,17 +118,12 @@ mod test_applicability {
         assert!(!statement.alter_table_statement().unwrap().can_apply());
         let context = statement.apply_relation_alter(context)?;
         let table = context
-            .get_table(&crate::names::TableName::from(
-                crate::names::FullName::with_schema("public", "t"),
-            ))
+            .get_table(&TableName::from(FullName::with_schema("public", "t")))
             .unwrap();
-        let column = table
-            .get_column_def(&crate::names::ColumnName::from("a"))
-            .unwrap();
+        let column = table.get_column_def(&ColumnName::from("a")).unwrap();
         assert_eq!(column.is_not_null(), Some(false));
         assert_eq!(column.statistics_target(), None);
-        let result =
-            crate::test_helpers::ownership::apply_ownership_sql(context, "SELECT a FROM t")?;
+        let result = apply_ownership_sql(context, "SELECT a FROM t")?;
         assert!(result.ast().select_statement().is_some());
         Ok(())
     }
@@ -150,7 +150,7 @@ impl AlterCommand {
         command.resolve_column_attribute(context, table, staged, if_exists)
     }
 }
-impl crate::ast::AlterRelationKind {
+impl AlterRelationKind {
     pub(super) const fn supports_table_column_attributes(self) -> bool {
         matches!(self, Self::Table)
     }

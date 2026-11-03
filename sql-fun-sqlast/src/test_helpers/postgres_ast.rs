@@ -1,4 +1,8 @@
-use crate::ast::Dialect;
+use crate::{
+    ast::Dialect,
+    parse_statements,
+    syn::{Node, ParseResult},
+};
 
 fn normalize_locations(value: &mut ::serde_json::Value) {
     match value {
@@ -35,7 +39,7 @@ fn normalize_locations(value: &mut ::serde_json::Value) {
 }
 
 pub(crate) fn assert_postgres_structure(sql: &str) {
-    let rendered = crate::parse_statements(sql, Dialect::postgres())
+    let rendered = parse_statements(sql, Dialect::postgres())
         .next()
         .expect("statement")
         .expect(sql)
@@ -59,9 +63,9 @@ pub(crate) fn assert_postgres_structure(sql: &str) {
 }
 
 /// Parse one PostgreSQL syntax node without initializing a semantic catalog.
-pub(crate) fn postgres_node(sql: &str) -> crate::syn::Node {
+pub(crate) fn postgres_node(sql: &str) -> Node {
     use crate::syn::{ListOpt, Opt};
-    let parsed = crate::syn::ParseResult::from(
+    let parsed = ParseResult::from(
         ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
             .expect("valid PostgreSQL syntax")
             .protobuf,
@@ -75,7 +79,7 @@ pub(crate) fn postgres_node(sql: &str) -> crate::syn::Node {
 }
 
 /// Parse a SELECT's first expression without analyzing names or types.
-pub(crate) fn postgres_expression(sql: &str) -> crate::syn::Node {
+pub(crate) fn postgres_expression(sql: &str) -> Node {
     use crate::syn::{ListOpt, Opt};
     postgres_node(&format!("SELECT {sql}"))
         .as_select_stmt()

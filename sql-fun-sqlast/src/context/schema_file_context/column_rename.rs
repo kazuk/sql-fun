@@ -1,6 +1,7 @@
 //! Prepare every dependent edit before publishing any catalog changes.
+
 use crate::{
-    context::{SchemaFileContext, TableInfoRead},
+    context::{SchemaFileContext, TableInfoRead, schema_file_context::table_rename::RenameUpdates},
     sem::{AlterTable, AnalysisError, ColumnRename},
 };
 impl SchemaFileContext {
@@ -17,7 +18,7 @@ impl SchemaFileContext {
         };
         table.apply_alter(alteration)?;
         table.rename_column_dependencies(rename, true)?;
-        let updates = super::table_rename::RenameUpdates::prepare_column(&self, rename)?;
+        let updates = RenameUpdates::prepare_column(&self, rename)?;
         self.catalog.store_table(target.full_name(), &table);
         updates.commit(&mut self.catalog, target);
         Ok(self)

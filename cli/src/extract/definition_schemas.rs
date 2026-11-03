@@ -38,7 +38,7 @@ impl DefinitionSchemas {
 
 #[cfg(test)]
 mod tests {
-    use super::DefinitionSchemas;
+    use crate::extract::definition_schemas::DefinitionSchemas;
 
     #[test]
     fn scope_is_explicit_sorted_and_deduplicated() {

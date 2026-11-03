@@ -1,7 +1,12 @@
 use crate::{
     context::ParseContext,
-    names::AliasName,
-    sem::{AliasSpec, AnalysisError, DataSource, FuncCallExpr, Nullable},
+    names::{AliasName, ColumnName},
+    sem::{
+        AliasSpec, AnalysisError, ColumnCollection, ColumnReferenceExpr, DataSource, FuncCallExpr,
+        Nullable, SemScalarExpr, TableFunctionProblem, TypeReference, WithTypmod,
+        data_source::{ColumnCandidates, TableFunctionOutput},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
 };
 
 /// A table invocation with completed name lookup and deferred signature/columns.
@@ -9,7 +14,7 @@ use crate::{
 pub struct DeferredTableFunction {
     call: FuncCallExpr,
     alias: AliasSpec,
-    output: super::TableFunctionOutput,
+    output: TableFunctionOutput,
 }
 impl DeferredTableFunction {
     pub(super) fn retain_invalid_expression(&mut self) {
@@ -19,7 +24,7 @@ impl DeferredTableFunction {
         Self {
             call: call.clone(),
             alias: alias.clone(),
-            output: super::TableFunctionOutput::default(),
+            output: TableFunctionOutput::default(),
         }
     }
     /// Preserved invocation, including name lookup, supplied arguments and modifiers.
@@ -44,16 +49,13 @@ impl DeferredTableFunction {
             None
         }
     }
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.call.walk(visitor)
     }
-    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let Some(name) = self.call.name_resolution().function_identity() {
             visitor.function_binding(name, &self.alias, &self.output.names());
         }
@@ -77,7 +79,7 @@ impl DeferredTableFunction {
     pub(super) fn apply_output(
         &mut self,
         context: &mut impl ParseContext,
-        output: &super::TableFunctionOutput,
+        output: &TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
         self.output.replace_definition(output);
         if let Some(overload) = self.call.overload() {
@@ -89,29 +91,27 @@ impl DeferredTableFunction {
         }
         Ok(())
     }
-    pub(super) fn column_names(&self) -> Vec<crate::names::ColumnName> {
+    pub(super) fn column_names(&self) -> Vec<ColumnName> {
         self.output.names()
     }
-    pub(super) fn candidates(&self, column: &crate::names::ColumnName) -> super::ColumnCandidates {
+    pub(super) fn candidates(&self, column: &ColumnName) -> ColumnCandidates {
         if self.output.has_declarations() {
-            super::ColumnCandidates::from(self.output.candidates(column, &self.alias))
+            ColumnCandidates::from(self.output.candidates(column, &self.alias))
         } else {
-            super::ColumnCandidates::from(vec![self.alias.clone()])
+            ColumnCandidates::from(vec![self.alias.clone()])
         }
     }
     pub(super) fn bind_column<'a, C: ParseContext>(
         &self,
         context: &'a mut C,
         alias: &AliasName,
-        column: &crate::names::ColumnName,
+        column: &ColumnName,
         nullable: bool,
-    ) -> Result<(crate::sem::SemScalarExpr, &'a mut C), AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'a mut C), AnalysisError> {
         if !self.output.has_declarations() {
-            return crate::sem::ColumnReferenceExpr::unknown_function_source_ref(
-                context, alias, column,
-            );
+            return ColumnReferenceExpr::unknown_function_source_ref(context, alias, column);
         }
-        let (expression, context) = crate::sem::ColumnReferenceExpr::function_source_ref(
+        let (expression, context) = ColumnReferenceExpr::function_source_ref(
             context,
             alias,
             column,
@@ -134,7 +134,7 @@ impl DeferredTableFunction {
     pub(super) fn validate_aliases(
         &mut self,
         context: &mut impl ParseContext,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         if self.output.has_declarations() {
             self.output.validate_aliases(context, &self.alias)
         } else {
@@ -147,22 +147,22 @@ impl DeferredTableFunction {
     /// Caller-supplied type and modifiers for an effective output column.
     pub fn output_type_declaration(
         &self,
-        column: &crate::names::ColumnName,
-    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+        column: &ColumnName,
+    ) -> Option<&WithTypmod<TypeReference>> {
         self.output.declaration(column, &self.alias)
     }
     /// Effective invocation columns, independently of the catalog return declaration.
-    pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
+    pub const fn output_columns(&self) -> &ColumnCollection {
         self.output.columns()
     }
     /// Retained invalid-definition outcomes, independently of diagnostic delivery.
-    pub fn output_problems(&self) -> &[crate::sem::TableFunctionProblem] {
+    pub fn output_problems(&self) -> &[TableFunctionProblem] {
         self.output.problems()
     }
 }
 
 impl DeferredTableFunction {
-    pub(super) fn known_column_names(&self) -> Option<Vec<crate::names::ColumnName>> {
+    pub(super) fn known_column_names(&self) -> Option<Vec<ColumnName>> {
         if self.output.has_declarations() {
             Some(self.output.names())
         } else {

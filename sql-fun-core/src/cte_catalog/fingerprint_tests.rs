@@ -1,9 +1,5 @@
-use super::{CteAlias, CteName, CteParameterCollection, ResolvedCteCatalog};
-use crate::PlaceholderedSql;
-use ::indexmap::IndexMap;
-
 mod test_helpers {
-    use super::{
+    use crate::cte_catalog::fingerprint_tests::{
         CteAlias, CteName, CteParameterCollection, IndexMap, PlaceholderedSql, ResolvedCteCatalog,
     };
 
@@ -20,6 +16,12 @@ mod test_helpers {
         ResolvedCteCatalog::new(&parameters, &queries)
     }
 }
+
+use crate::{
+    PlaceholderedSql,
+    cte_catalog::{CteAlias, CteName, CteParameterCollection, ResolvedCteCatalog},
+};
+use ::indexmap::IndexMap;
 
 #[rstest::rstest]
 #[case::plain(&[])]

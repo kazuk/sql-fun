@@ -1,7 +1,6 @@
-use crate::ast::Dialect;
-use crate::context::BaseParseContext;
-use crate::context::ParseContext;
 use crate::{
+    ast::Dialect,
+    context::{BaseParseContext, ParseContext},
     names::{ColumnName, FullName},
     sem::{PgBuiltInType, SemAst, ViewInsertSupport, ViewLike},
 };
@@ -175,9 +174,17 @@ fn rejects_sqlite_view_upsert() {
 }
 
 mod test_helpers {
-    use super::*;
-    use crate::sem::AnalysisError;
-    use crate::test_helpers::TestParseContext;
+    use crate::{
+        ast::resolve::insert::tests::test_helpers::catalog,
+        names::{SchemaName, TableName},
+        parse_statements,
+        sem::{CreateView, InsertArbiter, InsertInferenceModifiers},
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        ast::resolve::insert::tests::views::*, sem::AnalysisError, test_helpers::TestParseContext,
+    };
 
     #[cfg(feature = "sqlite")]
     pub(super) fn sqlite_oracle() -> ::rusqlite::Connection {
@@ -192,20 +199,17 @@ mod test_helpers {
         writable: bool,
         all_columns: bool,
     ) -> (Result<SemAst, AnalysisError>, TestParseContext) {
-        let mut context = super::super::test_helpers::catalog(dialect);
-        let view = crate::parse_statements("SELECT id, label FROM items", dialect)
+        let mut context = catalog(dialect);
+        let view = parse_statements("SELECT id, label FROM items", dialect)
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .unwrap();
         let query = view.into_select_statemtnt().unwrap();
         let name = FullName::with_schema("public", "writable_items");
-        let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
+        let view = CreateView::new(&name, &query, &[], &None, false);
         context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
         let columns = if all_columns {
             vec![ColumnName::from("id"), ColumnName::from("label")]
@@ -214,7 +218,7 @@ mod test_helpers {
         };
         let support = if sql.contains("/* identity */") {
             let definition = context
-                .get_table(&crate::names::TableName::from(FullName::with_schema(
+                .get_table(&TableName::from(FullName::with_schema(
                     "public",
                     "identity_items",
                 )))
@@ -247,40 +251,31 @@ mod test_helpers {
         context.set_view_insert_support(&name, &support);
         // A later same-named table must not hide the earlier view.
         let later_table = context
-            .get_table(&crate::names::TableName::from(FullName::with_schema(
-                "public", "items",
-            )))
+            .get_table(&TableName::from(FullName::with_schema("public", "items")))
             .unwrap()
             .clone();
         context.set_get_table_impl_result(
             &FullName::with_schema("later", "writable_items"),
             &Some(later_table),
         );
-        context.set_search_path(&[
-            crate::names::SchemaName::from("public"),
-            crate::names::SchemaName::from("later"),
-        ]);
+        context.set_search_path(&[SchemaName::from("public"), SchemaName::from("later")]);
         if sql.contains("ON CONFLICT(id)") && dialect == Dialect::postgres() {
-            context.expect_conflict_target(&crate::names::TableName::from(FullName::with_schema(
-                "public", "items",
-            )));
+            context
+                .expect_conflict_target(&TableName::from(FullName::with_schema("public", "items")));
             context.expect_conflict_modifiers(
-                &[crate::sem::InsertInferenceModifiers::new(None, None)],
-                &[crate::sem::InsertArbiter::index(&FullName::with_schema(
+                &[InsertInferenceModifiers::new(None, None)],
+                &[InsertArbiter::index(&FullName::with_schema(
                     "public",
                     "items_id_key",
                 ))],
             );
         }
-        let result = crate::parse_statements(sql, dialect)
+        let result = parse_statements(sql, dialect)
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            );
+            .resolve(&mut context, &mut create_cache_context());
         (result, context)
     }
 }

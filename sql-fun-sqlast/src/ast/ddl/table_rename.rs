@@ -1,6 +1,7 @@
 //! Table renames resolve both identities before catalog application.
+
 use crate::{
-    ast::{AlterCommand, AlterRelation},
+    ast::{AlterCommand, AlterRelation, Dialect},
     context::ParseContext,
     names::{FullName, TableName},
     sem::{AlterTable, AnalysisError, AnalysisProblem, Kind, SemAst, SourcePathWithSpan},
@@ -24,7 +25,7 @@ impl AlterRelation {
         };
         let requested = TableName::from(self.name.full_name()?);
         let target = context.resolve_table_name(&requested).map(|target| {
-            if context.dialect() == crate::ast::Dialect::sqlite() {
+            if context.dialect() == Dialect::sqlite() {
                 TableName::from(target.full_name().sqlite_identity())
             } else {
                 target
@@ -38,7 +39,7 @@ impl AlterRelation {
         }
         let original = target.as_ref().unwrap_or(&requested).full_name();
         let destination = command.table_rename_destination(original)?;
-        let destination = if context.dialect() == crate::ast::Dialect::sqlite() {
+        let destination = if context.dialect() == Dialect::sqlite() {
             TableName::from(destination.full_name().sqlite_identity())
         } else {
             destination
@@ -82,11 +83,17 @@ impl AlterCommand {
 
 #[cfg(test)]
 mod test_applicability {
-    use crate::ParseContext;
-    use crate::test_helpers::ownership::{
-        apply_ownership_sql, ownership_context, ownership_statement,
+    use crate::{
+        ast::StatementNode,
+        test_helpers::{schema_layer, source_span},
     };
-    use crate::{context::TableInfoRead, names::FullName};
+
+    use crate::{
+        ParseContext,
+        context::TableInfoRead,
+        names::FullName,
+        test_helpers::ownership::{apply_ownership_sql, ownership_context, ownership_statement},
+    };
 
     #[test]
     fn suppressed_diagnostics_cannot_authorize_a_conflicting_rename() -> testresult::TestResult {
@@ -96,18 +103,14 @@ mod test_applicability {
         let mut context =
             apply_ownership_sql(context, "CREATE TABLE occupied(id integer)")?.into_context();
         let syntax = ownership_statement("ALTER TABLE before_name RENAME TO occupied")?;
-        let crate::ast::StatementNode::AlterRelation(relation) = syntax else {
+        let StatementNode::AlterRelation(relation) = syntax else {
             panic!("ALTER TABLE syntax");
         };
         context.begin_parameter_type_analysis();
-        let ast = relation
-            .resolve_table_rename(&mut context, Some(&crate::test_helpers::source_span()))?;
+        let ast = relation.resolve_table_rename(&mut context, Some(&source_span()))?;
         assert_eq!(context.problems().len(), 1);
         // Diagnostic delivery is independent of the retained applicability decision.
-        let context = crate::test_helpers::schema_layer(
-            std::path::Path::new("rename.sql"),
-            &context.freeze(),
-        );
+        let context = schema_layer(std::path::Path::new("rename.sql"), &context.freeze());
         assert!(context.problems().is_empty());
         assert!(!ast.alter_table_statement().unwrap().can_apply());
         let context = ast.apply_relation_alter(context)?;

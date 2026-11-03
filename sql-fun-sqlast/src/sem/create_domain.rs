@@ -1,3 +1,9 @@
+use crate::{
+    ast::Domain,
+    names::TableName,
+    sem::{CatalogNameLookup, DeclarationCollation, OwnerSpecification, TypeCategory, WithTypmod},
+    syn::CreateDomainStmt,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -7,45 +13,45 @@ use crate::{
     syn::ScanToken,
 };
 
-use {super::AnalysisError, crate::names::FullName};
+use crate::{names::FullName, sem::AnalysisError};
 
 /// analyzed [`crate::syn::CreateDomainStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateDomain {
     #[serde(skip)]
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     type_ref: TypeReference,
     base_type: Option<TypeReference>,
     #[serde(default)]
-    declaration_collation: crate::sem::DeclarationCollation,
+    declaration_collation: DeclarationCollation,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    requested_base: Option<Box<crate::sem::WithTypmod<TypeReference>>>,
+    requested_base: Option<Box<WithTypmod<TypeReference>>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    category: Option<crate::sem::TypeCategory>,
+    category: Option<TypeCategory>,
 }
 
 impl CreateDomain {
     /// Requested declaration type and modifiers, separate from canonical identity.
-    pub fn requested_base(&self) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+    pub fn requested_base(&self) -> Option<&WithTypmod<TypeReference>> {
         self.requested_base.as_deref()
     }
 
-    pub(crate) fn retain_requested_type(&mut self, value: &crate::sem::WithTypmod<TypeReference>) {
+    pub(crate) fn retain_requested_type(&mut self, value: &WithTypmod<TypeReference>) {
         self.requested_base = Some(Box::new(value.clone()));
     }
 
     /// Completed explicit base-type collation validation.
-    pub const fn declaration_collation(&self) -> &crate::sem::DeclarationCollation {
+    pub const fn declaration_collation(&self) -> &DeclarationCollation {
         &self.declaration_collation
     }
 
     pub(crate) fn validate_collation(
         &mut self,
         context: &mut impl ParseContext,
-        lookup: Option<&crate::sem::CatalogNameLookup>,
+        lookup: Option<&CatalogNameLookup>,
     ) -> Result<(), AnalysisError> {
         self.declaration_collation =
-            crate::sem::DeclarationCollation::validate(context, self.base_type.as_ref(), lookup);
+            DeclarationCollation::validate(context, self.base_type.as_ref(), lookup);
         self.declaration_collation
             .report(context, self.base_type.as_ref())
     }
@@ -54,11 +60,7 @@ impl CreateDomain {
         self.base_type.is_some() && self.declaration_collation.can_apply()
     }
 
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(base) = &mut self.base_type {
             base.rename_relation(old, new);
         }
@@ -67,11 +69,11 @@ impl CreateDomain {
     /// Retained ownership; None means no ownership information was supplied.
     /// Ownership is catalog state: it is omitted from the existing serialized
     /// type format and does not affect SQL type equality or hashing.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -81,15 +83,15 @@ impl CreateDomain {
             category: None,
             type_ref: type_ref.clone(),
             base_type: base_type.clone(),
-            declaration_collation: crate::sem::DeclarationCollation::default(),
+            declaration_collation: DeclarationCollation::default(),
             requested_base: None,
         }
     }
-    pub(crate) const fn category(&self) -> Option<crate::sem::TypeCategory> {
+    pub(crate) const fn category(&self) -> Option<TypeCategory> {
         self.category
     }
 
-    pub(crate) const fn set_category(&mut self, category: Option<crate::sem::TypeCategory>) {
+    pub(crate) const fn set_category(&mut self, category: Option<TypeCategory>) {
         self.category = category;
     }
 
@@ -115,20 +117,22 @@ impl CreateDomain {
     /// analyze [`crate::syn::CreateDomainStmt`]
     pub fn analyze_create_domain<TParseContext>(
         context: TParseContext,
-        syn: crate::syn::CreateDomainStmt,
+        syn: CreateDomainStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+        Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::CreateDomain;
-    use crate::{names::FullName, sem::TypeReference};
+    use crate::{
+        names::FullName,
+        sem::{TypeReference, create_domain::CreateDomain},
+    };
 
     #[rstest::rstest]
     #[case::unresolved(None)]
@@ -167,10 +171,7 @@ impl std::hash::Hash for CreateDomain {
 }
 
 impl CreateDomain {
-    pub(crate) fn row_table_name(
-        &self,
-        context: &impl ParseContext,
-    ) -> Option<crate::names::TableName> {
+    pub(crate) fn row_table_name(&self, context: &impl ParseContext) -> Option<TableName> {
         self.base_type()?
             .definition_from_catalog(context)?
             .row_table_name(context)

@@ -72,8 +72,7 @@ pub(super) fn builtin_aggregate(name: &FullName) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::builtin_aggregate;
-    use crate::names::FullName;
+    use crate::{context::base_context::aggregate_info::builtin_aggregate, names::FullName};
 
     #[rstest::rstest]
     #[case::aggregate("pg_catalog", "sum", true)]

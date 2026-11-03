@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use super::{DiagnosticMetadata, DiagnosticSeverity, FullName};
+use crate::analysis_problem::{DiagnosticMetadata, DiagnosticSeverity, FullName};
 
 /// Classification of a rejected index alteration or a statistics warning.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]

@@ -13,17 +13,22 @@ pub(crate) fn with_stack<T>(operation: impl FnOnce() -> T) -> T {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        stack::{RED_ZONE as StackRED_ZONE, with_stack},
+        test_helpers::on_small_stack,
+    };
+
     #[rstest::rstest]
     #[case::returns(false)]
     #[case::unwinds(true)]
     fn grown_stack_preserves_thread_and_unwinding(#[case] panic: bool) {
-        crate::test_helpers::on_small_stack(|| {
+        on_small_stack(|| {
             let thread = std::thread::current().id();
             let dropped = std::cell::Cell::new(false);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 // Force the production checkpoint to allocate a segment.
-                ::stacker::grow(super::RED_ZONE / 2, || {
-                    super::with_stack(|| {
+                ::stacker::grow(StackRED_ZONE / 2, || {
+                    with_stack(|| {
                         let _guard = DropMarker(&dropped);
                         assert!(
                             ::stacker::remaining_stack().expect("supported stack backend")

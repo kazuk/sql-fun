@@ -1,4 +1,4 @@
-use super::super::CollectionRegistry;
+use crate::session::collection_registry::CollectionRegistry;
 use std::{
     num::NonZeroUsize,
     sync::{

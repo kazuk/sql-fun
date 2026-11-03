@@ -1,3 +1,11 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::GeneratedColumnConstraint as SqliteGeneratedColumnConstraint;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::GeneratedColumnType;
+use crate::{
+    sem::{ColumnRename, traversal::SemanticVisitorMut},
+    syn::Constraint,
+};
 use sql_fun_core::IVec;
 
 #[cfg(feature = "sqlite")]
@@ -48,11 +56,11 @@ impl GeneratedColumnMode {
 }
 
 #[cfg(feature = "sqlite")]
-impl From<&crate::syn::sqlite::GeneratedColumnType> for GeneratedColumnMode {
-    fn from(value: &crate::syn::sqlite::GeneratedColumnType) -> Self {
+impl From<&GeneratedColumnType> for GeneratedColumnMode {
+    fn from(value: &GeneratedColumnType) -> Self {
         match value {
-            crate::syn::sqlite::GeneratedColumnType::Stored => Self::Stored,
-            crate::syn::sqlite::GeneratedColumnType::Virtual => Self::Virtual,
+            GeneratedColumnType::Stored => Self::Stored,
+            GeneratedColumnType::Virtual => Self::Virtual,
         }
     }
 }
@@ -92,7 +100,7 @@ pub struct GeneratedColumnConstraint {
 }
 
 impl GeneratedColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -100,7 +108,7 @@ impl GeneratedColumnConstraint {
 
     pub(super) fn rename_expression(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.expr.walk(visitor)
     }
@@ -151,7 +159,7 @@ impl GeneratedColumnConstraint {
         mut context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
@@ -194,7 +202,7 @@ impl GeneratedColumnConstraint {
         mut context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::GeneratedColumnConstraint,
+        syn: &SqliteGeneratedColumnConstraint,
         tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where

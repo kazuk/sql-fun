@@ -1,10 +1,19 @@
 mod result_column;
 mod set_operation;
 
-pub use self::set_operation::{SetOperationKind, SetOperationQuery};
-
 pub(crate) use self::result_column::ResultColumn;
 pub use self::result_column::ResultColumnCollection;
+pub use self::set_operation::{SetOperationKind, SetOperationQuery};
+
+use crate::{
+    CacheContext,
+    ast::Query as AstQuery,
+    sem::{
+        AccessKind, InsertTarget, SelectClauses, SemanticQuery, SemanticValues,
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
+    },
+    syn::SelectStmt,
+};
 
 use crate::{
     ast::TryFromWithTokens,
@@ -23,9 +32,9 @@ use ::sql_fun_core::IVec;
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SelectStatement {
     /// Query boundary with local CTEs and trailing clauses.
-    Query(Box<crate::sem::SemanticQuery>),
+    Query(Box<SemanticQuery>),
     /// VALUES rows.
-    Values(crate::sem::SemanticValues),
+    Values(SemanticValues),
     /// simple query
     Simple(SelectStatementNode),
     /// Binary set operation with analyzed output semantics.
@@ -60,7 +69,7 @@ impl SelectStatement {
         }
     }
 
-    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn assign_update_output<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
         index: usize,
@@ -167,14 +176,14 @@ impl SelectStatement {
     /// analyze [`crate::syn::SelectStmt`]
     pub fn analyze_select<TParseContext>(
         mut context: TParseContext,
-        syn: crate::syn::SelectStmt,
+        syn: SelectStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&mut context, &mut crate::CacheContext::new());
+        let syntax = AstQuery::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&mut context, &mut CacheContext::new());
         let query = outcome?;
         Ok(AstAndContextPair::new(SemAst::select(&query), context))
     }
@@ -202,7 +211,7 @@ pub struct SelectStatementNode {
     // Keep clause payloads indirect: SelectStatement also determines the size
     // of every SemAst retained while loading a schema dump.
     #[serde(default)]
-    clauses: Box<crate::sem::SelectClauses>,
+    clauses: Box<SelectClauses>,
 }
 
 impl SelectStatementNode {
@@ -248,14 +257,14 @@ impl SelectStatementNode {
     /// analyze [`crate::syn::SelectStmt`]
     pub fn analyze_select_node<TParseContext>(
         mut context: TParseContext,
-        syn: crate::syn::SelectStmt,
+        syn: SelectStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SelectStatement, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&mut context, &mut crate::CacheContext::new());
+        let syntax = AstQuery::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&mut context, &mut CacheContext::new());
         let query = outcome?;
         Ok((query, context))
     }
@@ -263,6 +272,8 @@ impl SelectStatementNode {
 
 #[cfg(test)]
 mod test_scalar_scope {
+    use crate::sem::select_statement::SelectStatementNode;
+
     use crate::{
         context::MutSourcePathWithSpan,
         names::ColumnName,
@@ -285,7 +296,7 @@ mod test_scalar_scope {
             "select case when true then coalesce(s.n) else n end as result \
              from (select 42 as n) s where s.n is not null",
         );
-        let (select, context) = super::SelectStatementNode::analyze_select_node(
+        let (select, context) = SelectStatementNode::analyze_select_node(
             context,
             syn.as_select_stmt().as_inner().expect("select statement"),
             &IVec::default(),
@@ -312,7 +323,7 @@ mod test_scalar_scope {
         let syn = SynBuilder::new().parse(&format!(
             "select {expression} as result from (select 42 as n) a, (select 43 as n) b"
         ));
-        let (select, context) = super::SelectStatementNode::analyze_select_node(
+        let (select, context) = SelectStatementNode::analyze_select_node(
             context,
             syn.as_select_stmt().as_inner().expect("select statement"),
             &IVec::default(),
@@ -327,20 +338,17 @@ mod test_scalar_scope {
 }
 
 impl SelectStatement {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         visitor.enter_query();
         let result = self.walk_body(visitor);
         visitor.leave_query();
         result?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_query();
         let result = self.visit_body(visitor);
         visitor.leave_query();
@@ -350,42 +358,42 @@ impl SelectStatement {
 }
 
 impl SelectStatement {
-    pub(super) fn walk_body<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk_body<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.walk_body_assigned(visitor, &[])
     }
-    pub(super) fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_body<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.visit_body_assigned(visitor, &[])
     }
-    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         visitor.enter_query();
         let result = self.walk_body_assigned(visitor, targets);
         visitor.leave_query();
         result
     }
-    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         visitor.enter_query();
         let result = self.visit_body_assigned(visitor, targets);
         visitor.leave_query();
         result
     }
-    pub(super) fn walk_body_assigned<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk_body_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Simple(query) => query.walk_assigned(visitor, targets),
@@ -394,10 +402,10 @@ impl SelectStatement {
             Self::Set(query) => query.walk_assigned(visitor, targets),
         }
     }
-    pub(super) fn visit_body_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn visit_body_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Simple(query) => query.visit_assigned(visitor, targets),
@@ -409,14 +417,14 @@ impl SelectStatement {
 }
 
 impl SelectStatementNode {
-    fn walk_assigned<V: crate::sem::traversal::SemanticVisitorMut>(
+    fn walk_assigned<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
         self.with_clause.walk(visitor)?;
         self.from_clause.walk(visitor)?;
-        crate::sem::traversal::optional(&mut self.where_clause, visitor)?;
+        optional(&mut self.where_clause, visitor)?;
         if let Some(predicate) = &self.where_clause {
             visitor.predicate(predicate);
         }
@@ -425,21 +433,21 @@ impl SelectStatementNode {
         self.clauses.walk(visitor)?;
         Ok(())
     }
-    fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
-        targets: &[crate::sem::InsertTarget],
+        targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::select_source());
+        visitor.access_purpose(AccessKind::select_source());
         self.with_clause.visit(visitor)?;
         self.from_clause.visit(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::select_filter());
-        crate::sem::traversal::visit_optional(&self.where_clause, visitor)?;
+        visitor.access_purpose(AccessKind::select_filter());
+        visit_optional(&self.where_clause, visitor)?;
         if let Some(predicate) = &self.where_clause {
             visitor.predicate(predicate);
         }
         self.clauses.visit_windows(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::select_output());
+        visitor.access_purpose(AccessKind::select_output());
         self.result_columns.visit_assigned(visitor, targets)?;
         self.clauses.visit(visitor)?;
         Ok(())
@@ -457,7 +465,7 @@ impl SelectStatementNode {
         with_clause: &WithClause,
         from_clause: FromClause,
         where_clause: Option<SemScalarExpr>,
-        clauses: crate::sem::SelectClauses,
+        clauses: SelectClauses,
     ) -> Self {
         Self {
             result_columns,
@@ -470,21 +478,21 @@ impl SelectStatementNode {
 }
 
 impl SelectStatement {
-    pub(crate) fn query(query: crate::sem::SemanticQuery) -> Self {
+    pub(crate) fn query(query: SemanticQuery) -> Self {
         Self::Query(Box::new(query))
     }
     pub(crate) fn values(rows: Vec<Vec<SemScalarExpr>>) -> Self {
-        Self::Values(crate::sem::SemanticValues::new(rows))
+        Self::Values(SemanticValues::new(rows))
     }
     /// Query-wide clauses, if this value owns a query boundary.
-    pub const fn query_clauses(&self) -> Option<&crate::sem::SemanticQuery> {
+    pub const fn query_clauses(&self) -> Option<&SemanticQuery> {
         match self {
             Self::Query(query) => Some(query),
             _ => None,
         }
     }
     /// SELECT-specific clauses, if this is a simple SELECT body.
-    pub fn select_clauses(&self) -> Option<&crate::sem::SelectClauses> {
+    pub fn select_clauses(&self) -> Option<&SelectClauses> {
         match self {
             Self::Simple(node) => Some(&node.clauses),
             _ => None,

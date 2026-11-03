@@ -1,5 +1,6 @@
 //! Catalog identity across quoted component boundaries and frozen layers.
-use crate::{context::ParseContext, names::FullName};
+
+use crate::{context::ParseContext, names::FullName, test_helpers::schema_layer};
 
 #[rstest::rstest]
 #[case::tables("table")]
@@ -16,8 +17,7 @@ fn distinct_names_survive_exact_lookup_and_layering(
     let mut context = test_helpers::context();
     context = test_helpers::declare(context, kind, &left, "left_marker")?;
     if inherited {
-        context =
-            crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &context.freeze());
+        context = schema_layer(std::path::Path::new("child.sql"), &context.freeze());
     }
     context = test_helpers::declare(context, kind, &right, "right_marker")?;
     test_helpers::assert_definition(&context, kind, &left, "left_marker");
@@ -36,7 +36,7 @@ fn duplicate_child_preserves_both_qualified_parent_tables() -> testresult::TestR
     context = test_helpers::declare(context, "table", &left, "parent_marker")?;
     context = test_helpers::declare(context, "table", &right, "other_marker")?;
     let parent = context.freeze();
-    let child = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &parent);
+    let child = schema_layer(std::path::Path::new("child.sql"), &parent);
     let child = test_helpers::declare(child, "table", &left, "child_marker")?;
     assert_eq!(child.problems().len(), 1);
     let child = child.freeze();
@@ -80,6 +80,8 @@ fn comment_targets_preserve_quoted_names_and_function_signatures() -> testresult
 }
 
 mod test_helpers {
+    use crate::test_helpers::{create_cache_context, schema_layer, source_span};
+
     use crate::{
         ast::{Dialect, StatementNode, TryFromWithTokens},
         context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
@@ -92,9 +94,8 @@ mod test_helpers {
         let mut base = TestParseContext::default();
         base.set_search_path(&[SchemaName::from("public")]);
         base.setup_type(PgBuiltInType::int4());
-        let mut context =
-            crate::test_helpers::schema_layer(std::path::Path::new("names.sql"), &base.freeze());
-        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        let mut context = schema_layer(std::path::Path::new("names.sql"), &base.freeze());
+        context.set_source_path_with_span(&source_span());
         context
     }
 
@@ -124,13 +125,13 @@ mod test_helpers {
         mut context: SchemaFileContext,
         sql: &str,
     ) -> Result<SchemaFileContext, AnalysisError> {
-        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        context.set_source_path_with_span(&source_span());
         let statement = StatementNode::try_from_with_tokens(
             &SynBuilder::new().parse(sql),
             &::sql_fun_core::IVec::default(),
         )?;
         Ok(statement
-            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
+            .resolve_and_apply(context, &mut create_cache_context())?
             .into_context())
     }
 

@@ -1,5 +1,8 @@
-use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, SelectStatement, TypeReference};
+use crate::sem::{
+    AnalysisError, SelectStatement, TypeReference,
+    scalar_expr::SemScalarExprNode,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
 
 /// Sub-query expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -39,18 +42,15 @@ impl SemScalarExprNode for SubLinkExpr {
 }
 
 impl SubLinkExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.subselect.walk(visitor)?;
         self.type_ref = self.subselect.returning_composite_type()?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.subselect.visit(visitor)?;
         Ok(())
     }

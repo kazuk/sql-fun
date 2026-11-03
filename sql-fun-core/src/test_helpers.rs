@@ -1,3 +1,4 @@
+use crate::SqlFunMetadataCollection;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -172,7 +173,7 @@ pub fn parse_metadata<P: AsRef<Path> + std::fmt::Debug>(
     source: &str,
     path_hint: P,
 ) -> Result<SqlFunMetadata, MetadataError> {
-    let mut metadata = crate::SqlFunMetadataCollection::from_str(source, &path_hint)?;
+    let mut metadata = SqlFunMetadataCollection::from_str(source, &path_hint)?;
     if let Some(metadata) = metadata.remove("default") {
         Ok(metadata)
     } else {
@@ -350,8 +351,8 @@ pub fn write_test_manifest(
 
 pub(crate) fn metadata_with_codegen_options(
     options: &str,
-) -> Result<crate::SqlFunMetadataCollection, crate::MetadataError> {
-    crate::SqlFunMetadataCollection::from_str(
+) -> Result<SqlFunMetadataCollection, MetadataError> {
+    SqlFunMetadataCollection::from_str(
         &format!(
             "[package.metadata.database.default]\nengine = \"PostgreSQL\"\ndialect = \"postgres\"\n{options}"
         ),

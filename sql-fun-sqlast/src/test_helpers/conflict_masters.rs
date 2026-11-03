@@ -1,9 +1,15 @@
-use crate::{context::ConflictMasters, test_helpers::TestParseContext};
+use crate::{
+    ast::Dialect,
+    context::{BaseContext, BaseParseContext, ConflictMasters, ParseContext},
+    names::SchemaName,
+    sem::AnalysisError,
+    test_helpers::TestParseContext,
+};
 use ::serde_json::Value;
 
 pub(crate) fn base_without_masters(
-    dialect: crate::ast::Dialect,
-) -> Result<crate::context::BaseContext, Box<dyn std::error::Error>> {
+    dialect: Dialect,
+) -> Result<BaseContext, Box<dyn std::error::Error>> {
     let directory = ::tempfile::tempdir()?;
     for file in ["pg_type.json", "functions.json", "func_detail.json"] {
         std::fs::write(directory.path().join(file), "[]")?;
@@ -24,9 +30,9 @@ pub(crate) fn base_without_masters(
         .builtin_schema_dir(directory.path())
         .build()?;
     let metadata = TestParseContext::default().with_dialect(dialect);
-    Ok(crate::context::BaseContext::new(
+    Ok(BaseContext::new(
         &args,
-        crate::context::BaseParseContext::metadata(&metadata),
+        BaseParseContext::metadata(&metadata),
     )?)
 }
 
@@ -101,7 +107,7 @@ impl Masters {
             _ => panic!("unknown fixture defect"),
         }
     }
-    pub(crate) fn load(&self) -> Result<ConflictMasters, crate::sem::AnalysisError> {
+    pub(crate) fn load(&self) -> Result<ConflictMasters, AnalysisError> {
         let collations = self.directory.path().join("collations.json");
         let classes = self.directory.path().join("operator_classes.json");
         std::fs::write(&collations, self.collations.to_string()).unwrap();
@@ -117,10 +123,7 @@ impl Masters {
     pub(crate) fn context(&self) -> TestParseContext {
         let mut context = TestParseContext::default();
         context.set_conflict_masters(&self.load().unwrap());
-        crate::context::ParseContext::set_search_path(
-            &mut context,
-            &[crate::names::SchemaName::from("public")],
-        );
+        ParseContext::set_search_path(&mut context, &[SchemaName::from("public")]);
         context
     }
 }

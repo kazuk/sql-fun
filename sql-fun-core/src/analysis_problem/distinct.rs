@@ -1,4 +1,4 @@
-use super::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
+use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata, TypeReference};
 
 /// Invalid operands or equality result for a null-safe distinctness predicate.
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]

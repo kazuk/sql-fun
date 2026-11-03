@@ -95,9 +95,13 @@ impl Dialect {
 
 #[cfg(test)]
 mod tests {
+    use crate::PostgresDialect;
+    #[cfg(feature = "sqlite")]
+    use crate::SqliteDialect;
+
     use ::sql_fun_core::PlaceholderedSql;
 
-    use super::Dialect;
+    use crate::placeholdered_sql::Dialect;
 
     #[rstest::rstest]
     #[case::zero_parameters("select 42", &[], "select 42")]
@@ -146,7 +150,7 @@ mod tests {
             .render_placeholdered_sql(&sql, parameter_order)
             .expect("rendered PostgreSQL SQL");
         assert_eq!(actual, expected);
-        crate::PostgresDialect::parse(&actual).expect("valid PostgreSQL SQL");
+        PostgresDialect::parse(&actual).expect("valid PostgreSQL SQL");
     }
 
     #[test]
@@ -223,6 +227,6 @@ mod tests {
             .render_placeholdered_sql(&sql, parameter_order)
             .expect("rendered SQLite SQL");
         assert_eq!(actual, expected);
-        crate::SqliteDialect::parse(&actual).expect("valid SQLite SQL");
+        SqliteDialect::parse(&actual).expect("valid SQLite SQL");
     }
 }

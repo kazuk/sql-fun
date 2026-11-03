@@ -1,6 +1,6 @@
 use crate::{
     names::{AliasName, ColumnName},
-    sem::{ColumnDefinition, Nullable, TypeReference},
+    sem::{ColumnDefinition, Nullable, TypeReference, source_flag::SourceFlag},
 };
 
 /// column reference for sub-query
@@ -8,7 +8,7 @@ use crate::{
 pub struct SubQueryColumnRef {
     alias: AliasName,
     #[serde(skip)]
-    unqualified: crate::sem::source_flag::SourceFlag,
+    unqualified: SourceFlag,
     column: ColumnName,
     column_def: Option<ColumnDefinition>,
     datasource_nullable: Nullable,
@@ -51,7 +51,7 @@ impl SubQueryColumnRef {
     }
 
     pub(super) const fn mark_unqualified(&mut self) {
-        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+        self.unqualified = SourceFlag::new(true);
     }
     pub(super) const fn namespace_reference(&self) -> (&str, &ColumnName, bool) {
         (self.alias.as_str(), &self.column, self.unqualified.get())
@@ -80,7 +80,7 @@ impl SubQueryColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
-            unqualified: crate::sem::source_flag::SourceFlag::new(false),
+            unqualified: SourceFlag::new(false),
             column: column.clone(),
             column_def: column_def.cloned(),
             datasource_nullable,
@@ -89,7 +89,7 @@ impl SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

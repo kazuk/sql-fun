@@ -1,8 +1,7 @@
 //! Row structure and field bindings use the small query catalog, without builtin loading.
-use super::super::test_helpers::resolve;
-use crate::ast::Dialect;
-use crate::context::ParseContext;
 use crate::{
+    ast::{Dialect, resolve::query::test_helpers::resolve},
+    context::ParseContext,
     names::ColumnName,
     sem::{PgBuiltInType, SemScalarExpr},
 };

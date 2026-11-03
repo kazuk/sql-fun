@@ -1,9 +1,15 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
-    names::{AliasName, ColumnName},
+    names::{AliasName, ColumnName, FullName},
     sem::{
         AliasSpec, AnalysisError, DataSource, Nullable, SemScalarExpr, WithClause,
+        data_source::{
+            ColumnCandidates, ProjectionColumn, QualifiedSource, SourceNamespace,
+            projection::ProjectionColumns,
+        },
         scalar_expr::ColumnReferenceExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -26,9 +32,9 @@ impl GroupedDataSource {
     pub(super) fn sqlite_qualified_group_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::names::FullName,
+        name: &FullName,
         alias: &'a AliasSpec,
-    ) -> Option<super::QualifiedSource<'a>> {
+    ) -> Option<QualifiedSource<'a>> {
         self.source
             .sqlite_qualified_group_source(context, name, alias)
     }
@@ -36,9 +42,9 @@ impl GroupedDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::names::FullName,
-    ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
-        if context.dialect() != crate::ast::Dialect::sqlite() {
+        name: &FullName,
+    ) -> Result<Option<QualifiedSource<'a>>, ()> {
+        if context.dialect() != Dialect::sqlite() {
             return Ok(None);
         }
         if self.is_joined() {
@@ -50,8 +56,8 @@ impl GroupedDataSource {
         }
     }
 
-    pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> super::SourceNamespace<'a> {
-        let mut namespace = super::SourceNamespace::default();
+    pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> SourceNamespace<'a> {
+        let mut namespace = SourceNamespace::default();
         namespace.push(source, &self.alias);
         if self.is_joined() {
             namespace.hide_group_columns();
@@ -72,7 +78,7 @@ impl GroupedDataSource {
         source: &'a DataSource,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<super::ProjectionColumn<'a>>, AnalysisError> {
+    ) -> Result<Vec<ProjectionColumn<'a>>, AnalysisError> {
         Ok(self
             .source
             .projection_names(context, with, None)?
@@ -111,7 +117,7 @@ impl GroupedDataSource {
         column: &ColumnName,
         context: &C,
         with: &WithClause,
-    ) -> super::ColumnCandidates {
+    ) -> ColumnCandidates {
         let candidates = self
             .source
             .aliases_for_column_resolved(column, context, with);
@@ -153,17 +159,14 @@ impl GroupedDataSource {
 }
 
 impl GroupedDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.source.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.source.visit(visitor)?;
         Ok(())
     }
@@ -177,6 +180,6 @@ impl GroupedDataSource {
         with: &WithClause,
     ) -> Result<Vec<ColumnName>, AnalysisError> {
         let columns = self.projection_names(source, context, with)?;
-        Ok(super::projection::ProjectionColumns::from(columns).names())
+        Ok(ProjectionColumns::from(columns).names())
     }
 }

@@ -1,9 +1,11 @@
-use super::ArithExpr;
 use crate::{
     names::OperatorName,
     sem::{
         AnalysisError, InputTypeConstraint, MinMaxExpr, ParseContext, ResolvedOperator,
         SemScalarExpr,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::arith_expr::ArithExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -15,7 +17,7 @@ pub struct PatternExpr {
 }
 
 impl PatternExpr {
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -24,10 +26,7 @@ impl PatternExpr {
         }
         Ok(())
     }
-    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for operand in &self.operands {
             operand.visit(visitor)?;
         }
@@ -35,7 +34,7 @@ impl PatternExpr {
     }
     pub(super) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
+        parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         let mut operands = self.operands.clone();

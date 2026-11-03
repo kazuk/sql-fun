@@ -1,9 +1,11 @@
 //! Query-local GROUPING bindings. The shared environment remains ParseContext.
+
 use crate::{
     context::ParseContext,
     sem::{
         AnalysisError, AnalysisProblem, QueryGrouping, QueryProblem, ResultColumnCollection,
-        SelectStatement, SemScalarExpr, traversal::SemanticVisitorMut,
+        SelectStatement, SemScalarExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -84,10 +86,7 @@ impl GroupingExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for argument in &self.arguments {
             argument.expression.visit(visitor)?;
         }

@@ -1,6 +1,8 @@
-use super::super::test_helpers::{output_type, table_function_query};
-use crate::context::ParseContext;
-use crate::sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr};
+use crate::{
+    ast::resolve::query::test_helpers::{output_type, table_function_query},
+    context::ParseContext,
+    sem::{AnalysisError, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
+};
 
 #[test]
 fn typed_record_parameter_is_warning_free_in_the_controlled_context() {
@@ -249,10 +251,7 @@ fn retains_failed_or_ambiguous_binding(#[case] sql: &str, #[case] ambiguous: boo
         found: bool,
     }
     impl crate::sem::traversal::SemanticVisitorMut for BindingFailure {
-        fn expression(
-            &mut self,
-            value: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::ColumnRef(reference) = value {
                 if self.ambiguous {
                     self.found |= matches!(reference, ColumnReferenceExpr::AmbiguousColumnRef(_));
@@ -314,8 +313,8 @@ fn keeps_schema_qualified_and_array_field_types() {
 
 #[test]
 fn keeps_selected_overload_separate_from_output_definitions() {
-    use crate::context::BaseParseContext;
     use crate::{
+        context::BaseParseContext,
         names::{AliasName, ColumnName, FullName},
         sem::DataSource,
     };
@@ -440,8 +439,10 @@ fn qualified_star_expands_only_its_selected_source(#[case] sql: &str) {
 
 #[test]
 fn table_row_returns_do_not_inherit_storage_constraints() {
-    use crate::context::BaseParseContext;
-    use crate::names::{ColumnName, FullName, TableName};
+    use crate::{
+        context::BaseParseContext,
+        names::{ColumnName, FullName, TableName},
+    };
     let (query, context) = table_function_query("SELECT r.a FROM row_fun() r", false);
     assert_eq!(
         context.reported_problem_count(),
@@ -519,10 +520,7 @@ fn retains_and_interprets_record_typmods(
         found: bool,
     }
     impl crate::sem::traversal::SemanticVisitorMut for Modifiers {
-        fn expression(
-            &mut self,
-            value: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::ColumnRef(ColumnReferenceExpr::TableFuncColumn(column)) = value {
                 let declaration = column.type_declaration().unwrap();
                 assert_eq!(declaration.typmod(), Some(self.expected));

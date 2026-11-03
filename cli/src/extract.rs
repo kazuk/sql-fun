@@ -4,8 +4,11 @@ mod container;
 mod definition_schemas;
 mod publication;
 mod render;
+
 #[cfg(test)]
 mod test_helpers;
+
+use crate::extract::definition_schemas::DefinitionSchemas;
 
 use self::publication::Publication;
 use std::{path::PathBuf, process::ExitCode, time::Duration};
@@ -143,7 +146,7 @@ pub(crate) async fn initialize_catalog(
 
 impl CatalogArgs {
     async fn execute(&self) -> Result<(), anyhow::Error> {
-        let schemas = self::definition_schemas::DefinitionSchemas::new(&self.definition_schemas)?;
+        let schemas = DefinitionSchemas::new(&self.definition_schemas)?;
         which::which("psql").map_err(|_| {
             anyhow::anyhow!(
                 "psql is required for catalog extraction; install the PostgreSQL client tools"

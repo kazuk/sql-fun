@@ -1,4 +1,4 @@
-use super::{KeyFragment, TrieNode, TrieNodeIter};
+use crate::trie_map::{KeyFragment, TrieNode, TrieNodeIter};
 
 #[derive(Debug)]
 pub(super) struct TrieLeaves<TValue>(Vec<TrieNode<TValue>>);

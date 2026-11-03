@@ -1,7 +1,8 @@
-use super::{
+use crate::init::{
     error::InitError,
     presentation::{HomePathError, Notice},
     prompt::{PromptRequest, PromptResponse},
+    step::PromptInput,
 };
 
 use std::path::PathBuf;
@@ -85,10 +86,7 @@ impl Initialization {
         Ok(!self.supplied_home)
     }
 
-    pub(super) fn edit_directory(
-        &mut self,
-        input: &mut dyn super::step::PromptInput,
-    ) -> Result<(), InitError> {
+    pub(super) fn edit_directory(&mut self, input: &mut dyn PromptInput) -> Result<(), InitError> {
         loop {
             let request = PromptRequest::text(
                 include_str!("home_prompt.txt").trim_end(),
@@ -139,7 +137,7 @@ impl Initialization {
 
     pub(super) fn confirm_directory(
         &mut self,
-        input: &mut dyn super::step::PromptInput,
+        input: &mut dyn PromptInput,
     ) -> Result<(), InitError> {
         loop {
             let automatic = if self.yes {

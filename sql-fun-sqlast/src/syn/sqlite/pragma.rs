@@ -1,3 +1,4 @@
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::{Expr, QualifiedName};
 use crate::{
     engine_specific::{
@@ -99,10 +100,11 @@ impl From<PragmaBodyIn> for PragmaBody {
 
 #[cfg(test)]
 mod test_new_pragmas {
-    use super::{
+    use crate::syn::sqlite::pragma::{
         AnalysisError, PragmaStatement, TursoFtsMergeThresholdFeature, TursoMvccGcFeature,
         TursoMvccGroupCommitFeature,
     };
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     #[derive(Default)]

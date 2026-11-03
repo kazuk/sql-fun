@@ -2,6 +2,11 @@ mod ddl;
 mod dml;
 mod query;
 
+use crate::{
+    ast::{AlterRelation, CreateTrigger, DropTrigger, RaiseAction, Table},
+    sem::with_stack,
+};
+
 use crate::ast::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
     DropTable, Expr, InTable, Indirection, Insert, Literal, Name, NullTest, OperatorExpr,
@@ -10,7 +15,9 @@ use crate::ast::{
     Update, View, ViewCheckOption, Window,
 };
 #[cfg(feature = "workaround_turso_9791")]
+#[cfg(feature = "sqlite")]
 use crate::ast::{SqliteTypeModifier, SqliteTypeModifiers};
+#[cfg(feature = "sqlite")]
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
 impl From<&syn::QualifiedName> for Name {
@@ -33,16 +40,16 @@ impl TryFrom<&syn::Stmt> for StatementNode {
             syn::Stmt::Insert(insert) => Ok(Self::insert(Insert::try_from(insert)?)),
             syn::Stmt::Update(update) => Ok(Self::update(Update::try_from(update)?)),
             syn::Stmt::Delete(delete) => Ok(Self::delete(Delete::try_from(delete)?)),
-            syn::Stmt::CreateTable(table) => Ok(Self::table(super::Table::try_from(table)?)),
+            syn::Stmt::CreateTable(table) => Ok(Self::table(Table::try_from(table)?)),
             syn::Stmt::AlterTable(table) => {
-                Ok(Self::alter_relation(super::AlterRelation::try_from(table)?))
+                Ok(Self::alter_relation(AlterRelation::try_from(table)?))
             }
             syn::Stmt::DropTrigger(trigger) => {
-                Ok(Self::drop_trigger(super::DropTrigger::try_from(trigger)?))
+                Ok(Self::drop_trigger(DropTrigger::try_from(trigger)?))
             }
-            syn::Stmt::CreateTrigger(trigger) => Ok(Self::create_trigger(
-                super::CreateTrigger::try_from(trigger)?,
-            )),
+            syn::Stmt::CreateTrigger(trigger) => {
+                Ok(Self::create_trigger(CreateTrigger::try_from(trigger)?))
+            }
             syn::Stmt::CreateView(view) => Ok(Self::view(View::try_from(view)?)),
             syn::Stmt::DropTable(drop_table) => Ok(Self::drop_table(DropTable::from(drop_table))),
             _ => AnalysisError::raise_unexpected_input("top-level SQLite statement"),
@@ -86,7 +93,7 @@ impl TryFrom<&syn::Expr> for Expr {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Expr) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::convert_sqlite(value))
+        with_stack(|| Self::convert_sqlite(value))
     }
 }
 
@@ -393,7 +400,8 @@ impl TryFrom<&syn::ExprLike> for OperatorExpr {
 
 #[cfg(test)]
 mod test_pattern_classification {
-    use super::{OperatorExpr, OperatorKind, syn};
+    #[cfg(feature = "sqlite")]
+    use crate::ast::sqlite::{OperatorExpr, OperatorKind, syn};
 
     #[rstest::rstest]
     #[case(syn::LikeOperator::Like, "like")]
@@ -439,7 +447,7 @@ impl TryFrom<&syn::ExprRaise> for Raise {
 
     fn try_from(value: &syn::ExprRaise) -> Result<Self, Self::Error> {
         Ok(Self {
-            action: super::RaiseAction::from(value.resolve_type()),
+            action: RaiseAction::from(value.resolve_type()),
             message: Expr::try_from_opt(value.expr().as_deref())?,
         })
     }
@@ -579,7 +587,7 @@ impl Literal {
     }
 }
 
-impl From<&syn::ResolveType> for super::RaiseAction {
+impl From<&syn::ResolveType> for RaiseAction {
     fn from(value: &syn::ResolveType) -> Self {
         match value {
             syn::ResolveType::Rollback => Self::Rollback,

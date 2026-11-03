@@ -1,3 +1,4 @@
+use crate::init::step::StepCompletion;
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
     #[error("{0}")]
@@ -9,13 +10,11 @@ pub enum InitError {
 }
 
 impl InitError {
-    pub(super) const fn navigation(&self) -> Option<super::step::StepCompletion> {
+    pub(super) const fn navigation(&self) -> Option<StepCompletion> {
         match self {
-            Self::Prompt(inquire::InquireError::OperationCanceled) => {
-                Some(super::step::StepCompletion::back())
-            }
+            Self::Prompt(inquire::InquireError::OperationCanceled) => Some(StepCompletion::back()),
             Self::Prompt(inquire::InquireError::OperationInterrupted) => {
-                Some(super::step::StepCompletion::cancelled())
+                Some(StepCompletion::cancelled())
             }
             _ => None,
         }
@@ -28,9 +27,8 @@ impl InitError {
 
 #[cfg(test)]
 mod test_io {
-    use super::InitError;
-    use std::error::Error as StdError;
-    use std::io::ErrorKind;
+    use crate::init::error::InitError;
+    use std::{error::Error as StdError, io::ErrorKind};
 
     #[rstest::rstest]
     #[case::permission_denied(ErrorKind::PermissionDenied)]
@@ -56,7 +54,7 @@ impl InitError {
 
 #[cfg(test)]
 mod test_prompt {
-    use super::InitError;
+    use crate::init::error::InitError;
     use std::error::Error as StdError;
 
     #[rstest::rstest]

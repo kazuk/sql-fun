@@ -1,9 +1,9 @@
-use crate::sem::scalar_expr::column_ref::ColumnReference;
 use crate::{
     names::{AliasName, ColumnName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, SemScalarExpr, TypeReference,
-        scalar_expr::ColumnReferenceExpr,
+        AnalysisError, AnalysisProblem, ColumnDefinition, ParseContext, SemScalarExpr,
+        TypeReference,
+        scalar_expr::{ColumnReferenceExpr, column_ref::ColumnReference},
     },
 };
 
@@ -45,7 +45,7 @@ impl UndefinedAliasColumnRef {
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         context.report_analysis_problem(AnalysisProblem::undefined_alias(alias.as_str()))?;
 

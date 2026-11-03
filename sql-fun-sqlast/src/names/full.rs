@@ -1,5 +1,7 @@
 mod parse;
 
+use crate::ast::{DeparseError, Dialect as AstDialect, render_full_name};
+
 use std::fmt::Display;
 
 use crate::names::{CatalogName, LocalName, SchemaName};
@@ -120,8 +122,8 @@ impl FullName {
     ///
     /// # Errors
     /// Returns an error if the name cannot be emitted for the selected dialect.
-    pub fn to_sql(&self, dialect: crate::ast::Dialect) -> Result<String, crate::ast::DeparseError> {
-        crate::ast::render_full_name(self, dialect)
+    pub fn to_sql(&self, dialect: AstDialect) -> Result<String, DeparseError> {
+        render_full_name(self, dialect)
     }
 
     /// create with schema
@@ -174,8 +176,7 @@ mod construction_tests {
 
 #[cfg(test)]
 mod render_tests {
-    use crate::ast::Dialect;
-    use crate::names::FullName;
+    use crate::{ast::Dialect, names::FullName};
     #[rstest::rstest]
     #[case::empty(FullName::from_local_name(""))]
     #[case::empty_schema(FullName::with_schema("", "x"))]

@@ -1,7 +1,11 @@
 mod resolve;
 
-use crate::context::ParseContext;
-use crate::sem::{AnalysisError, TypeReference};
+use crate::context::type_hint::resolve::resolve_parameter_hint;
+
+use crate::{
+    context::ParseContext,
+    sem::{AnalysisError, TypeReference},
+};
 
 /// Read the explicit SQL input types installed for this query.
 pub trait ParameterTypeHintRead {
@@ -47,7 +51,7 @@ impl ParameterTypeHints {
         let mut resolved = Vec::with_capacity(hints.len());
         for (slot, hint) in hints.iter().enumerate() {
             let ty = if let Some(hint) = hint {
-                self::resolve::resolve_parameter_hint(slot, hint, context)?
+                resolve_parameter_hint(slot, hint, context)?
             } else {
                 None
             };

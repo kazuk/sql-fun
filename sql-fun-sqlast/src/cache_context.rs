@@ -2,11 +2,14 @@
 
 mod argument_rank;
 
+use crate::sem::{ConstraintMemo, array_cast_ranks as sem_array_cast_ranks};
+
 use self::argument_rank::{ArgumentRankInput, ArgumentRanks};
 
-use crate::context::BaseParseContext;
-use crate::sem::parameter_resolution::Signature;
-use crate::sem::{OverloadRank, TypeReference};
+use crate::{
+    context::BaseParseContext,
+    sem::{OverloadRank, TypeReference, parameter_resolution::Signature},
+};
 use std::collections::{HashMap, HashSet};
 
 /// Cache state owned by an analysis caller and reused across its requests.
@@ -18,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 /// configuration, or diagnostic services. Query-derived operation results are
 /// cleared when their inference pass ends.
 pub struct CacheContext {
-    constraint_memo: crate::sem::ConstraintMemo,
+    constraint_memo: ConstraintMemo,
     declared_implicit_cast_sources: HashMap<TypeReference, HashSet<TypeReference>>,
     array_cast_ranks: HashMap<TypeReference, HashMap<TypeReference, OverloadRank>>,
     assignment_sources: HashMap<TypeReference, HashSet<TypeReference>>,
@@ -44,7 +47,7 @@ impl CacheContext {
     )]
     pub fn new() -> Self {
         Self {
-            constraint_memo: crate::sem::ConstraintMemo::default(),
+            constraint_memo: ConstraintMemo::default(),
             declared_implicit_cast_sources: HashMap::new(),
             array_cast_ranks: HashMap::new(),
             assignment_sources: HashMap::new(),
@@ -64,13 +67,13 @@ impl CacheContext {
     }
 
     /// Share operation results across branches of the current inference pass.
-    pub(crate) const fn constraint_memo(&mut self) -> &mut crate::sem::ConstraintMemo {
+    pub(crate) const fn constraint_memo(&mut self) -> &mut ConstraintMemo {
         &mut self.constraint_memo
     }
 
     /// Query-derived combinations must not accumulate across requests.
     pub(crate) fn clear_constraint_memo(&mut self) {
-        self.constraint_memo = crate::sem::ConstraintMemo::default();
+        self.constraint_memo = ConstraintMemo::default();
     }
 
     /// Memoize declared sources without broadening the finite candidate domain.
@@ -104,7 +107,7 @@ impl CacheContext {
                 {
                     self.array_rank_computations += 1;
                 }
-                crate::sem::array_cast_ranks(context, source)
+                sem_array_cast_ranks(context, source)
             })
             .clone()
     }
@@ -165,10 +168,17 @@ impl CacheContext {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::{CastInfoRead, ParseContext};
-    use crate::sem::parameter_resolution::Signature;
-    use crate::sem::{PgBuiltInType, TypeReference};
-    use crate::test_helpers::{analysis_cache, domain_casts};
+    use crate::{
+        names::{CatalogName, FullName, LocalName, SchemaName},
+        sem::array_cast_ranks as sem_array_cast_ranks,
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        context::{CastInfoRead, ParseContext},
+        sem::{PgBuiltInType, TypeReference, parameter_resolution::Signature},
+        test_helpers::{analysis_cache, domain_casts},
+    };
 
     #[rstest::rstest]
     #[case::scalar(PgBuiltInType::int4())]
@@ -178,7 +188,7 @@ mod tests {
     fn declared_sources_reuse_complete_results_independently(#[case] target: TypeReference) {
         let mut context = domain_casts::context();
         domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let expected = context.declared_implicit_cast_sources(&target);
         let mut first = cache.declared_implicit_cast_sources(&context, &target);
         assert_eq!(first, expected);
@@ -207,8 +217,8 @@ mod tests {
     fn array_ranks_reuse_complete_results_independently(#[case] source: TypeReference) {
         let mut context = domain_casts::context();
         domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
-        let mut cache = crate::test_helpers::create_cache_context();
-        let expected = crate::sem::array_cast_ranks(&context, &source);
+        let mut cache = create_cache_context();
+        let expected = sem_array_cast_ranks(&context, &source);
         let mut first = cache.array_cast_ranks(&context, &source);
         assert_eq!(first, expected);
         first.clear();
@@ -223,12 +233,11 @@ mod tests {
     fn comparison_cache_keys_preserve_complete_type_identities() {
         let mut context = domain_casts::context();
         let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
-        let other_schema =
-            TypeReference::from_full_name(crate::names::FullName::with_schema("other", "amount"));
-        let other_catalog = TypeReference::from_full_name(crate::names::FullName::new(
-            &Some(crate::names::CatalogName::from("other")),
-            &Some(crate::names::SchemaName::from("public")),
-            &crate::names::LocalName::from("amount"),
+        let other_schema = TypeReference::from_full_name(FullName::with_schema("other", "amount"));
+        let other_catalog = TypeReference::from_full_name(FullName::new(
+            &Some(CatalogName::from("other")),
+            &Some(SchemaName::from("public")),
+            &LocalName::from("amount"),
         ));
         let types = [
             domain.clone(),
@@ -236,7 +245,7 @@ mod tests {
             other_schema,
             other_catalog,
         ];
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         for _ in 0..2 {
             for ty in &types {
                 assert_eq!(
@@ -259,8 +268,8 @@ mod tests {
         let mut second = domain_casts::context();
         let domain = domain_casts::domain(&mut first, "amount", Some(&PgBuiltInType::int4()));
         domain_casts::domain(&mut second, "amount", Some(&PgBuiltInType::bool()));
-        let mut first_cache = crate::test_helpers::create_cache_context();
-        let mut second_cache = crate::test_helpers::create_cache_context();
+        let mut first_cache = create_cache_context();
+        let mut second_cache = create_cache_context();
         let source = domain.array_type();
         let first_ranks = first_cache.array_cast_ranks(&first, &source);
         let second_ranks = second_cache.array_cast_ranks(&second, &source);
@@ -287,7 +296,7 @@ mod tests {
     fn assignment_sources_reuse_complete_results_independently(#[case] target: TypeReference) {
         let mut context = domain_casts::context();
         domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let expected = context.assignment_sources(&target);
         assert!(expected.contains(&target));
         let mut first = cache.assignment_sources(&context, &target);
@@ -300,7 +309,7 @@ mod tests {
     #[test]
     fn assignment_sources_preserve_assignment_eligibility() {
         let context = domain_casts::context();
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let target = PgBuiltInType::int4();
         let assignment = cache.assignment_sources(&context, &target);
         let explicit = cache.cast_sources(&context, &target, true);
@@ -318,9 +327,8 @@ mod tests {
     fn assignment_source_keys_separate_full_target_identities() {
         let mut context = domain_casts::context();
         let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
-        let other_schema =
-            TypeReference::from_full_name(crate::names::FullName::with_schema("other", "amount"));
-        let mut cache = crate::test_helpers::create_cache_context();
+        let other_schema = TypeReference::from_full_name(FullName::with_schema("other", "amount"));
+        let mut cache = create_cache_context();
         // Each target, including same-local-name and array-qualified references,
         // must have its own result even when conversions overlap.
         let targets = [
@@ -351,7 +359,7 @@ mod tests {
     #[case::implicit(false)]
     #[case::explicit(true)]
     fn source_sets_are_reused_and_returned_independently(#[case] explicit: bool) {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let context = domain_casts::context();
         let target = PgBuiltInType::int4();
         let expected = context.cast_sources(&target, explicit);
@@ -364,7 +372,7 @@ mod tests {
 
     #[test]
     fn source_keys_separate_targets_and_cast_selectors() {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let context = domain_casts::context();
         let target = PgBuiltInType::int4();
         let implicit = cache.cast_sources(&context, &target, false);
@@ -381,7 +389,7 @@ mod tests {
 
     #[test]
     fn empty_source_sets_are_cached() {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let mut context = domain_casts::context();
         let broken = domain_casts::domain(&mut context, "broken", None);
         assert!(cache.cast_sources(&context, &broken, true).is_empty());
@@ -393,7 +401,7 @@ mod tests {
     #[case::identity(PgBuiltInType::int4())]
     #[case::rejected(PgBuiltInType::bool())]
     fn argument_ranks_cache_success_and_rejection(#[case] source: TypeReference) {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let context = domain_casts::context();
         let signature = Signature::new(&[PgBuiltInType::int4()], &PgBuiltInType::bool());
         let expected = signature.cast_score(&context, &source, 0);
@@ -410,7 +418,7 @@ mod tests {
 
     #[test]
     fn rank_keys_preserve_function_declarations_and_unrestricted_inputs() {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let context = domain_casts::context();
         let target = PgBuiltInType::int4();
         let concrete = Signature::new_function(
@@ -453,7 +461,7 @@ mod tests {
 
     #[test]
     fn rank_keys_separate_argument_positions_and_sources() {
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let context = domain_casts::context();
         let signature = Signature::new(
             &[PgBuiltInType::int4(), PgBuiltInType::bool()],
@@ -497,7 +505,7 @@ mod tests {
         #[case] assignment_computations: usize,
     ) -> testresult::TestResult {
         let base = analysis_cache::base();
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let first = analysis_cache::analyze(sql, &base, &mut cache)?;
         assert_eq!(
             cache.assignment_source_computations,
@@ -522,8 +530,7 @@ mod tests {
             ),
             computations
         );
-        let independent =
-            analysis_cache::analyze(sql, &base, &mut crate::test_helpers::create_cache_context())?;
+        let independent = analysis_cache::analyze(sql, &base, &mut create_cache_context())?;
         analysis_cache::assert_equivalent(&first, &repeated);
         analysis_cache::assert_equivalent(&first, &independent);
         Ok(())
@@ -532,7 +539,7 @@ mod tests {
     #[test]
     fn failed_analysis_does_not_replay_diagnostics_or_constraints() -> testresult::TestResult {
         let base = analysis_cache::base();
-        let mut cache = crate::test_helpers::create_cache_context();
+        let mut cache = create_cache_context();
         let rejected = analysis_cache::analyze(
             "SELECT missing, ($1::int4[])[1] AS result",
             &base,
@@ -550,11 +557,8 @@ mod tests {
                 .parameter(1)
                 .is_none()
         );
-        let independent = analysis_cache::analyze(
-            "SELECT 1 AS result",
-            &base,
-            &mut crate::test_helpers::create_cache_context(),
-        )?;
+        let independent =
+            analysis_cache::analyze("SELECT 1 AS result", &base, &mut create_cache_context())?;
         analysis_cache::assert_equivalent(&valid, &independent);
         Ok(())
     }

@@ -1,8 +1,15 @@
 //! Stage resolved source transformations and commit them in lexical scope order.
-use crate::ast::projection::{ProjectionScope, ProjectionScopes, ScopedSource, ScopedSourceEdit};
-use crate::ast::wildcard::WildcardRewriteError;
-use crate::ast::{DerivedTable, Expr, FromItem, Query, Target, TypeName};
-use crate::sem::{WildcardExpansion, WildcardRowsSource, WildcardSourceProjection};
+
+use crate::{
+    ast::{
+        DerivedTable, Expr, FromGroup, FromItem, Join, Name, Query, StatementNode, Target,
+        TypeName,
+        projection::{ProjectionScope, ProjectionScopes, ScopedSource, ScopedSourceEdit},
+        wildcard::{WildcardRewriteError, rows_source::freeze},
+    },
+    sem::{WildcardExpansion, WildcardRowsSource, WildcardSourceProjection, WildcardTypedRecord},
+    stack::with_stack,
+};
 pub(super) struct SourcePlans {
     edits: Vec<SourceEdit>,
     failure: Option<WildcardRewriteError>,
@@ -27,7 +34,7 @@ impl SourcePlans {
     }
     pub(super) fn stage(
         &mut self,
-        statement: &mut crate::ast::StatementNode,
+        statement: &mut StatementNode,
     ) -> Result<(), WildcardRewriteError> {
         statement.apply_source_edits(self);
         if let Some(error) = self.failure.take() {
@@ -124,7 +131,7 @@ impl WildcardExpansion {
 }
 impl WildcardSourceProjection {
     fn freeze_source(&self, source: &FromItem) -> Result<FromItem, WildcardRewriteError> {
-        crate::stack::with_stack(|| {
+        with_stack(|| {
             let mut from = source.clone();
             from.clear_projection_alias();
             for rows in self.rows_sources() {
@@ -158,7 +165,7 @@ impl WildcardSourceProjection {
             } else if let Some((alias, ordinal)) = self.source_ordinal_at(index) {
                 ordinal_reference(alias, ordinal)
             } else if let Some(parts) = self.reference_at(index) {
-                Expr::projection_column(&crate::ast::Name::from_parts(parts))
+                Expr::projection_column(&Name::from_parts(parts))
             } else {
                 let Some(expression) = column.expression() else {
                     return Err(WildcardRewriteError::invalid(
@@ -177,7 +184,7 @@ impl WildcardSourceProjection {
         Ok(targets)
     }
 }
-pub(super) fn typed_record_reference(record: &crate::sem::WildcardTypedRecord) -> Expr {
+pub(super) fn typed_record_reference(record: &WildcardTypedRecord) -> Expr {
     let target = TypeName::projection(&record.relation().projection_name(), false);
     let row = Expr::projection_source_row(record.alias());
     let cast = Expr::projection_cast(&row, &target);
@@ -195,7 +202,7 @@ impl FromItem {
         resolved: &WildcardRowsSource,
     ) -> Result<Self, WildcardRewriteError> {
         match self {
-            Self::Functions(functions) => super::rows_source::freeze(resolved, functions.clone()),
+            Self::Functions(functions) => freeze(resolved, functions.clone()),
             _ => Err(WildcardRewriteError::invalid(
                 "ROWS FROM origin is not a function source",
             )),
@@ -209,12 +216,12 @@ impl FromItem {
         }
     }
 }
-impl crate::ast::Join {
+impl Join {
     fn clear_projection_alias(&mut self) {
         self.alias = None;
     }
 }
-impl crate::ast::FromGroup {
+impl FromGroup {
     fn clear_projection_alias(&mut self) {
         self.alias = None;
     }

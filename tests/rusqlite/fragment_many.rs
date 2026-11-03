@@ -1,4 +1,4 @@
-use super::User;
+use crate::User;
 
 #[sql_fun::sql_query_many(datasource = "sqlite", sql = "#[choice]")]
 #[sql_fragment(choice, choice, (choice), {

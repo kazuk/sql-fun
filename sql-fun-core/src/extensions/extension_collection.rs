@@ -160,8 +160,9 @@ impl PostgresExtensionsCollection {
 
 #[cfg(test)]
 mod test_uuid_ossp_resolution {
-    use super::PostgresExtensionsCollection;
-    use crate::extensions::test_helpers::ExtensionFixture;
+    use crate::extensions::{
+        extension_collection::PostgresExtensionsCollection, test_helpers::ExtensionFixture,
+    };
 
     #[test]
     fn resolves_versions_from_controls_with_non_utf8_comments_and_values()

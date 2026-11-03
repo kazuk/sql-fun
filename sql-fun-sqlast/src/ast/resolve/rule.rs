@@ -1,13 +1,17 @@
 //! PostgreSQL rule analysis over common syntax only.
+
 use crate::{
-    ast::{CreateRule, Dialect, Expr, RuleEvent, StatementNode, SubqueryKind},
+    AstAndContextPair,
+    ast::{
+        CreateRule, CteBody, Dialect, Expr, Literal, Query, RuleEvent, StatementNode, SubqueryKind,
+    },
     context::ParseContext,
     names::{TableName, ViewName},
     sem::{
-        AliasSpec, AnalysisError, DataSource, FromClause, PgBuiltInType, ResolutionFailure,
-        ResultColumn, ResultColumnCollection, RuleIdentity, ScalarAnalysisContext, SemAst,
-        SemScalarExpr, TypeReference, ViewLike, WithClause, problem::RuleProblem,
-        traversal::SemanticVisitorMut,
+        AliasSpec, AnalysisError, CreateRule as SemCreateRule, DataSource, FromClause,
+        PgBuiltInType, ResolutionFailure, ResultColumn, ResultColumnCollection,
+        RuleEvent as SemRuleEvent, RuleIdentity, ScalarAnalysisContext, SemAst, SemScalarExpr,
+        TypeReference, ViewLike, WithClause, problem::RuleProblem, traversal::SemanticVisitorMut,
     },
 };
 
@@ -15,7 +19,7 @@ impl CreateRule {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::CreateRule>, AnalysisError> {
+    ) -> Result<Option<SemCreateRule>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self
             .resolve_definition(context)
@@ -25,8 +29,8 @@ impl CreateRule {
     }
     fn validate_resolved(
         context: &impl ParseContext,
-        definition: crate::sem::CreateRule,
-    ) -> Result<crate::sem::CreateRule, ResolutionFailure> {
+        definition: SemCreateRule,
+    ) -> Result<SemCreateRule, ResolutionFailure> {
         if context.parameter_inference_needed() {
             return Self::invalid(
                 definition.identity(),
@@ -44,15 +48,15 @@ impl CreateRule {
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,
         mut context: C,
-    ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
+    ) -> Result<AstAndContextPair<C>, AnalysisError> {
         let Some(definition) = self.resolve(&mut context)? else {
-            return Ok(crate::AstAndContextPair::new(
+            return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         };
         let context = definition.apply(context)?;
-        Ok(crate::AstAndContextPair::new(
+        Ok(AstAndContextPair::new(
             SemAst::create_rule(&definition),
             context,
         ))
@@ -60,7 +64,7 @@ impl CreateRule {
     fn resolve_definition(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<crate::sem::CreateRule, ResolutionFailure> {
+    ) -> Result<SemCreateRule, ResolutionFailure> {
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let requested = self.relation.name.full_name()?;
         let target = context
@@ -98,7 +102,7 @@ impl CreateRule {
         for action in &self.actions {
             actions.push(action.resolve_rule_action(context, &scope, &identity)?);
         }
-        let mut definition = crate::sem::CreateRule::new(
+        let mut definition = SemCreateRule::new(
             &identity,
             event,
             self.replace,
@@ -189,7 +193,7 @@ impl CreateRule {
     fn validate_results(
         &self,
         context: &impl ParseContext,
-        definition: &crate::sem::CreateRule,
+        definition: &SemCreateRule,
     ) -> Result<(), ResolutionFailure> {
         let mut returning = false;
         for action in definition.actions() {
@@ -270,19 +274,19 @@ impl CreateRule {
 }
 
 impl RuleEvent {
-    const fn semantic(self) -> crate::sem::RuleEvent {
+    const fn semantic(self) -> SemRuleEvent {
         match self {
-            Self::Select => crate::sem::RuleEvent::select(),
-            Self::Insert => crate::sem::RuleEvent::insert(),
-            Self::Update => crate::sem::RuleEvent::update(),
-            Self::Delete => crate::sem::RuleEvent::delete(),
+            Self::Select => SemRuleEvent::select(),
+            Self::Insert => SemRuleEvent::insert(),
+            Self::Update => SemRuleEvent::update(),
+            Self::Delete => SemRuleEvent::delete(),
         }
     }
 }
 #[cfg(test)]
 mod tests;
 
-impl crate::ast::CteBody {
+impl CteBody {
     fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), ResolutionFailure> {
         match self {
             Self::Query(query) => query.validate_select_rule_ctes(identity),
@@ -293,7 +297,7 @@ impl crate::ast::CteBody {
         }
     }
 }
-impl crate::ast::Query {
+impl Query {
     fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), ResolutionFailure> {
         for entry in &self.with.entries {
             entry.body.validate_select_rule_ctes(identity)?;
@@ -302,7 +306,7 @@ impl crate::ast::Query {
     }
 }
 impl StatementNode {
-    const fn rule_query(&self) -> Option<&crate::ast::Query> {
+    const fn rule_query(&self) -> Option<&Query> {
         if let Self::Query(query) = self {
             Some(query)
         } else {
@@ -430,7 +434,7 @@ impl Expr {
         }
     }
 }
-impl crate::ast::Literal {
+impl Literal {
     const fn is_rule_boolean_literal(&self) -> bool {
         matches!(self, Self::Null | Self::String(_))
     }

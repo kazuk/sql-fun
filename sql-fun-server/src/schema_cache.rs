@@ -1,6 +1,8 @@
 #[cfg(test)]
 pub(crate) mod test_helpers;
 
+use crate::file_hash_cache::ReadToken;
+
 use crate::{cache::Cache, file_hash_cache::FileHashCache};
 use ::sql_fun_core::{Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
 use ::sql_fun_sqlast::{
@@ -582,7 +584,7 @@ impl SchemaCacheService {
         &self,
         parent: &LoadedLayer,
         snapshot: SqlFileSnapshot,
-        token: crate::file_hash_cache::ReadToken,
+        token: ReadToken,
         args: &SqlFunArgs,
         metadata: &SqlFunMetadata,
     ) -> Result<LoadedLayer, SchemaLoadError> {

@@ -1,7 +1,6 @@
 //! Regression fixtures for generated local identifier hygiene.
 
-use super::IdWithName;
-use super::builders::BonRow;
+use crate::{IdWithName, builders::BonRow};
 use std::future::Future;
 
 use ::tokio_postgres::Client;

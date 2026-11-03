@@ -1,3 +1,4 @@
+use crate::test_helpers::api::executable::cli_executable;
 use std::process::Output;
 
 use ::serde_json::Value;
@@ -13,7 +14,7 @@ pub(crate) async fn run(options: &[&str]) -> ::testresult::TestResult<(Output, V
     let directory = prepare_inputs(listener.local_addr()?.port())?;
     let root = directory.path();
     let peer = ::tokio::spawn(capture_requests(listener));
-    let output = ::tokio::process::Command::new(super::api::executable::cli_executable())
+    let output = ::tokio::process::Command::new(cli_executable())
         .current_dir(root)
         .env("USER", root.file_name().unwrap())
         .env("SQL_FUN_SERVER", root.join("unused-server"))

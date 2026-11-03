@@ -1,5 +1,7 @@
-use crate::context::BaseParseContext;
-use crate::sem::{CastContext, TypeReference};
+use crate::{
+    context::BaseParseContext,
+    sem::{CastContext, TypeReference},
+};
 
 /// Compare exact-match counts before considering preferred conversions.
 /// This uses existing cast preferences; category/unknown resolution is separate.
@@ -110,8 +112,7 @@ impl std::ops::Add for OverloadRank {
 
 #[cfg(test)]
 mod test_overload_rank {
-    use super::OverloadRank;
-    use crate::sem::CastContext;
+    use crate::sem::{CastContext, overload_rank::OverloadRank};
 
     #[rstest::rstest]
     #[case::exact_over_preferred(

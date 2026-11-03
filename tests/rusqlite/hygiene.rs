@@ -1,7 +1,8 @@
 //! Regression fixtures for generated local identifier hygiene.
 
-use super::User;
-use super::common_builders::BonRow;
+use crate::UserBuilderError;
+
+use crate::{User, common_builders::BonRow};
 use std::{
     cell::{Cell, RefCell},
     sync::{Arc, Mutex, mpsc},
@@ -19,8 +20,8 @@ impl From<rusqlite::Error> for HygieneError {
     }
 }
 
-impl From<super::UserBuilderError> for HygieneError {
-    fn from(error: super::UserBuilderError) -> Self {
+impl From<UserBuilderError> for HygieneError {
+    fn from(error: UserBuilderError) -> Self {
         Self(error.into())
     }
 }

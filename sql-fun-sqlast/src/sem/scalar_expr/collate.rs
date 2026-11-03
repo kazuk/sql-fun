@@ -1,11 +1,13 @@
-use crate::StringSpan;
-use crate::ast::Dialect;
-use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::{
+    StringSpan,
+    ast::Dialect,
     names::FullName,
     sem::{
         AnalysisError, AnalysisProblem, CatalogNameLookup, MinMaxExpr, ParseContext, SemScalarExpr,
-        TypeReference, problem::CollateProblem,
+        TypeReference,
+        problem::CollateProblem,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -111,27 +113,24 @@ impl CollateExpr {
         }
     }
 
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.argument.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.argument.visit(visitor)
     }
 }
 
 #[cfg(test)]
 mod test_collate_resolution {
-    use crate::ast::Dialect;
-    use crate::test_helpers::collate::{context, expression, query};
     use crate::{
+        ast::Dialect,
         names::FullName,
         sem::{CatalogNameLookup, ParseContext, PgBuiltInType, SemScalarExpr},
+        test_helpers::collate::{context, expression, query},
     };
     use std::collections::BTreeMap;
 
@@ -320,8 +319,10 @@ impl SemScalarExprNode for CollateExpr {
 
 #[cfg(test)]
 mod test_collate_operand_metadata {
-    use crate::ast::Dialect;
-    use crate::test_helpers::collate::{context, expression, query};
+    use crate::{
+        ast::Dialect,
+        test_helpers::collate::{context, expression, query},
+    };
 
     #[rstest::rstest]
     #[case::literal(r#"SELECT 'x' COLLATE "C""#)]

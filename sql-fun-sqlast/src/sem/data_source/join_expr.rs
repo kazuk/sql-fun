@@ -1,7 +1,16 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{AliasName, ColumnName, FullName},
-    sem::{AliasSpec, DataSource, JoinKind, Nullable, SemScalarExpr, WithClause},
+    sem::{
+        AliasSpec, AnalysisError, ColumnReferenceExpr, DataSource, JoinKind, Nullable,
+        SemScalarExpr, WithClause,
+        data_source::{
+            ColumnCandidates, ProjectionColumn, QualifiedSource, SourceNamespace,
+            projection::ProjectionColumns,
+        },
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -44,9 +53,9 @@ impl JoinExprDataSource {
             || self.right.projection_is_table_dependent(context)
     }
 
-    pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> super::SourceNamespace<'a> {
+    pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> SourceNamespace<'a> {
         if let Some(alias) = &self.alias {
-            let mut namespace = super::SourceNamespace::default();
+            let mut namespace = SourceNamespace::default();
             namespace.push(source, alias);
             return namespace;
         }
@@ -66,7 +75,7 @@ impl JoinExprDataSource {
         &'a self,
         context: &impl ParseContext,
         name: &FullName,
-    ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
+    ) -> Result<Option<QualifiedSource<'a>>, ()> {
         if self.alias.is_some() {
             return Ok(None);
         }
@@ -138,7 +147,7 @@ impl JoinExprDataSource {
         column: &ColumnName,
         context: &TParseContext,
         with_clause: &WithClause,
-    ) -> super::ColumnCandidates {
+    ) -> ColumnCandidates {
         let mut candidates = self
             .left
             .aliases_for_column_resolved(column, context, with_clause);
@@ -157,10 +166,9 @@ impl JoinExprDataSource {
         with: &WithClause,
         column: &ColumnName,
         nullable: bool,
-    ) -> Result<(SemScalarExpr, &'context mut C), crate::sem::AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'context mut C), AnalysisError> {
         if self.column_candidates(column, context, with).is_unknown() {
-            let expression =
-                crate::sem::ColumnReferenceExpr::undefined_column_resolved(context, column)?;
+            let expression = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
             return Ok((expression, context));
         }
         let columns = self.project(context, with, None)?;
@@ -169,9 +177,7 @@ impl JoinExprDataSource {
             if candidate.name() == column {
                 if selected.is_some() {
                     return Ok((
-                        crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(
-                            context, column,
-                        )?,
+                        ColumnReferenceExpr::ambiguous_column_resolved(context, column)?,
                         context,
                     ));
                 }
@@ -183,7 +189,7 @@ impl JoinExprDataSource {
                 .with_nullability(nullable)
                 .bind_direct(context, with)?
         } else {
-            crate::sem::ColumnReferenceExpr::undefined_column_resolved(context, column)?
+            ColumnReferenceExpr::undefined_column_resolved(context, column)?
         };
         Ok((value, context))
     }
@@ -218,10 +224,10 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         visitor.enter_join();
         self.left.walk(visitor)?;
         visitor.join_right();
@@ -233,16 +239,13 @@ impl JoinExprDataSource {
             self.natural,
             self.alias.as_ref(),
         );
-        crate::sem::traversal::optional(&mut self.qualifications, visitor)?;
+        optional(&mut self.qualifications, visitor)?;
         if let Some(value) = &self.qualifications {
             visitor.predicate(value);
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_join();
         self.left.visit(visitor)?;
         visitor.join_right();
@@ -255,7 +258,7 @@ impl JoinExprDataSource {
             self.natural,
             self.alias.as_ref(),
         );
-        crate::sem::traversal::visit_optional(&self.qualifications, visitor)?;
+        visit_optional(&self.qualifications, visitor)?;
         if let Some(value) = &self.qualifications {
             visitor.predicate(value);
         }
@@ -270,11 +273,11 @@ impl JoinExprDataSource {
         context: &impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
-    ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
+    ) -> Result<Vec<ProjectionColumn<'_>>, AnalysisError> {
         if self.matches_projection_qualifier(qualifier) {
             let columns = self.projection_names(context, with)?;
             return Ok(if let Some(alias) = &self.alias {
-                super::projection::ProjectionColumns::from(columns)
+                ProjectionColumns::from(columns)
                     .with_join_alias(alias)
                     .into_columns()
             } else {
@@ -312,7 +315,7 @@ impl JoinExprDataSource {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
+    ) -> Result<Vec<ProjectionColumn<'_>>, AnalysisError> {
         let original_left = self.left.projection_names(context, with, None)?;
         let original_right = self.right.projection_names(context, with, None)?;
         let layout = self.projection_layout(
@@ -337,7 +340,7 @@ impl JoinExprDataSource {
             .map(|column| column.with_nullability(self.kind.right_nullable(false)))
             .collect::<Vec<_>>();
         Ok(layout.project(&left, &right, |left, right| {
-            super::ProjectionColumn::merged(&original_left[left], &original_right[right])
+            ProjectionColumn::merged(&original_left[left], &original_right[right])
         }))
     }
 
@@ -349,7 +352,7 @@ impl JoinExprDataSource {
     // No catalog lookup, type solving or expression interpretation occurs here.
     pub(crate) fn projection_layout(
         &self,
-        dialect: crate::ast::Dialect,
+        dialect: Dialect,
         left: &[ColumnName],
         right: &[ColumnName],
     ) -> JoinProjection {
@@ -364,7 +367,7 @@ impl JoinExprDataSource {
             Vec::new()
         };
         let mut output = Vec::new();
-        if dialect == crate::ast::Dialect::postgres() {
+        if dialect == Dialect::postgres() {
             for name in &keys {
                 let left_index = left.iter().position(|column| column == name);
                 let right_index = right.iter().position(|column| column == name);
@@ -415,9 +418,9 @@ impl JoinExprDataSource {
         &self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<ColumnName>, crate::sem::AnalysisError> {
+    ) -> Result<Vec<ColumnName>, AnalysisError> {
         let columns = self.project(context, with, None)?;
-        Ok(super::projection::ProjectionColumns::from(columns).names())
+        Ok(ProjectionColumns::from(columns).names())
     }
 }
 

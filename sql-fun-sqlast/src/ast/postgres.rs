@@ -1,18 +1,33 @@
 mod ddl;
 mod query;
 
-use crate::ast::{
-    Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm,
-    Cast, CastTarget, Collate, Comment, Delete, DomainConstraintTarget, DropTable, EnumType, Expr,
-    Extension, FromOpt, Indirection, Insert, Literal, Merge, Name, NamedArgument, NullTest,
-    ObjectArgument, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role,
-    Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption,
-    TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
-    TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+use crate::{
+    ast::{
+        AlterRelation, CompositeType, CreateRule, CreateTrigger, CurrentOf, DropRule, DropTrigger,
+        Table, TableConstraint, VariableSetKind as AstVariableSetKind,
+        ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
+        document::DocumentExpr,
+    },
+    names::FullName as NamesFullName,
+    sem::{CreateCompositeType, ObjectKind, with_stack},
+    syn::{FunctionParameterMode as SynFunctionParameterMode, ScanToken, String as SynString},
 };
-use crate::sem::{CompositeFieldCollection, CompositeFieldDefinition};
-use crate::syn::{ListOpt, Opt};
-use crate::{StringSpan, sem::AnalysisError, syn};
+
+use crate::{
+    StringSpan,
+    ast::{
+        Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
+        CaseArm, Cast, CastTarget, Collate, Comment, Delete, DomainConstraintTarget, DropTable,
+        EnumType, Expr, Extension, FromOpt, Indirection, Insert, Literal, Merge, Name,
+        NamedArgument, NullTest, ObjectArgument, ObjectTarget, OperatorExpr, OperatorKind, Order,
+        Parameter, Query, Role, Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind,
+        SyntaxOption, TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+        TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+    },
+    sem::{AnalysisError, CompositeFieldCollection, CompositeFieldDefinition},
+    syn,
+    syn::{ListOpt, Opt},
+};
 
 use ::sql_fun_core::IVec;
 
@@ -55,11 +70,13 @@ impl TryFrom<syn::NodeListOpt> for Name {
 
 #[cfg(test)]
 mod test_name_from_nodes {
+    use crate::syn::Node;
+
     use crate::{ast::Name, syn::NodeListOpt, test_helpers::SynBuilder};
 
     #[test]
     fn rejects_non_string_name_components() {
-        let nodes = SynBuilder::new().as_node_list(&[crate::syn::Node::none()]);
+        let nodes = SynBuilder::new().as_node_list(&[Node::none()]);
         assert!(Name::try_from(NodeListOpt::from(&nodes)).is_err());
     }
 
@@ -111,10 +128,7 @@ mod test_name_from_range_var {
 }
 
 impl ObjectTarget {
-    fn try_from_node(
-        object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+    fn try_from_node(object: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
         if let Some(object) = object.as_object_with_args().as_inner() {
             let name = Name::try_from(object.get_objname())?.0;
             let argument_types = if object.get_args_unspecified() {
@@ -141,7 +155,7 @@ impl ObjectTarget {
             };
             Ok(Self::new(&name, argument_types.as_deref()))
         } else if let Some(items) = object.as_list().get_items().map(|items| items.as_string()) {
-            let name: Vec<_> = items.iter().map(crate::syn::String::get_sval).collect();
+            let name: Vec<_> = items.iter().map(SynString::get_sval).collect();
             Ok(Self::new(&name, None))
         } else if let Some(item) = object.as_string().get_sval() {
             Ok(Self::new(std::slice::from_ref(&item), None))
@@ -190,7 +204,7 @@ mod test_object_target {
 impl ObjectTarget {
     fn try_from_cast_node(
         object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         let cast = CastTarget::try_from_node(object, tokens)?;
         Ok(Self::with_cast(&cast))
@@ -200,7 +214,7 @@ impl ObjectTarget {
 impl ObjectTarget {
     fn try_from_domain_constraint_node(
         object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         let target = DomainConstraintTarget::try_from_node(object, tokens)?;
         Ok(Self::with_domain_constraint(&target))
@@ -210,7 +224,7 @@ impl ObjectTarget {
 impl ObjectTarget {
     fn try_from_transform_node(
         object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         let target = TransformTarget::try_from_node(object, tokens)?;
         Ok(Self::with_transform(&target))
@@ -285,7 +299,7 @@ impl ObjectTarget {
 impl ObjectArgument {
     fn try_from_node(
         argument: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         let type_name = if argument.as_inner().is_none() {
             None
@@ -349,17 +363,17 @@ mod test_object_argument {
 impl ObjectArgument {
     fn try_from_function_parameter(
         argument: &syn::FunctionParameter,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, AnalysisError> {
         let type_name = required(
             argument.get_arg_type().as_inner(),
             "object_with_args.objfuncargs.arg_type",
         )?;
         let mode = match argument.get_mode().as_inner() {
-            Some(crate::syn::FunctionParameterMode::FuncParamIn) => Some("IN"),
-            Some(crate::syn::FunctionParameterMode::FuncParamOut) => Some("OUT"),
-            Some(crate::syn::FunctionParameterMode::FuncParamInout) => Some("INOUT"),
-            Some(crate::syn::FunctionParameterMode::FuncParamVariadic) => Some("VARIADIC"),
+            Some(SynFunctionParameterMode::FuncParamIn) => Some("IN"),
+            Some(SynFunctionParameterMode::FuncParamOut) => Some("OUT"),
+            Some(SynFunctionParameterMode::FuncParamInout) => Some("INOUT"),
+            Some(SynFunctionParameterMode::FuncParamVariadic) => Some("VARIADIC"),
             _ => None,
         }
         .map(str::to_owned);
@@ -427,10 +441,7 @@ impl ObjectArgument {
 }
 
 impl CastTarget {
-    fn try_from_node(
-        object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+    fn try_from_node(object: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
         let Some(items) = object.as_list().get_items().as_inner() else {
             return AnalysisError::raise_unexpected_input("COMMENT ON CAST target");
         };
@@ -492,10 +503,7 @@ impl CastTarget {
 }
 
 impl DomainConstraintTarget {
-    fn try_from_node(
-        object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+    fn try_from_node(object: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
         let Some(items) = object.as_list().get_items().as_inner() else {
             return AnalysisError::raise_unexpected_input("COMMENT ON DOMAIN CONSTRAINT target");
         };
@@ -554,10 +562,7 @@ impl DomainConstraintTarget {
 }
 
 impl TransformTarget {
-    fn try_from_node(
-        object: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+    fn try_from_node(object: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
         let Some(items) = object.as_list().get_items().as_inner() else {
             return AnalysisError::raise_unexpected_input("COMMENT ON TRANSFORM target");
         };
@@ -620,7 +625,7 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
 
     fn try_from_with_tokens(
         value: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         if value
             .as_alter_default_privileges_stmt()
@@ -648,12 +653,12 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::merge(Merge::try_from_with_tokens(&merge, tokens)?));
         }
         if let Some(trigger) = value.as_create_trig_stmt().as_inner() {
-            return Ok(Self::create_trigger(
-                super::CreateTrigger::try_from_with_tokens(&trigger, tokens)?,
-            ));
+            return Ok(Self::create_trigger(CreateTrigger::try_from_with_tokens(
+                &trigger, tokens,
+            )?));
         }
         if let Some(rule) = value.as_rule_stmt().as_inner() {
-            return Ok(Self::create_rule(super::CreateRule::try_from_with_tokens(
+            return Ok(Self::create_rule(CreateRule::try_from_with_tokens(
                 &rule, tokens,
             )?));
         }
@@ -684,15 +689,13 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 drop_table.get_remove_type().as_inner(),
                 Some(syn::ObjectType::ObjectTrigger)
             ) {
-                return Ok(Self::drop_trigger(super::DropTrigger::try_from(
-                    &drop_table,
-                )?));
+                return Ok(Self::drop_trigger(DropTrigger::try_from(&drop_table)?));
             }
             if matches!(
                 drop_table.get_remove_type().as_inner(),
                 Some(syn::ObjectType::ObjectRule)
             ) {
-                return Ok(Self::drop_rule(super::DropRule::try_from(&drop_table)?));
+                return Ok(Self::drop_rule(DropRule::try_from(&drop_table)?));
             }
             return Ok(Self::drop_table(DropTable::try_from(&drop_table)?));
         }
@@ -714,30 +717,31 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(composite_type) = value.as_composite_type_stmt().as_inner() {
-            return Ok(Self::composite_type(
-                crate::ast::CompositeType::try_from_with_tokens(&composite_type, tokens)?,
-            ));
+            return Ok(Self::composite_type(CompositeType::try_from_with_tokens(
+                &composite_type,
+                tokens,
+            )?));
         }
         if let Some(create_table) = value.as_create_stmt().as_inner() {
-            return Ok(Self::table(super::Table::try_from_with_tokens(
+            return Ok(Self::table(Table::try_from_with_tokens(
                 &create_table,
                 tokens,
             )?));
         }
         if let Some(create_function) = value.as_create_function_stmt().as_inner() {
-            return Ok(Self::function(super::ddl::Function::try_from_with_tokens(
+            return Ok(Self::function(Function::try_from_with_tokens(
                 &create_function,
                 tokens,
             )?));
         }
         if let Some(create_schema) = value.as_create_schema_stmt().as_inner() {
-            return Ok(Self::schema(super::ddl::Schema::try_from_with_tokens(
+            return Ok(Self::schema(Schema::try_from_with_tokens(
                 &create_schema,
                 tokens,
             )?));
         }
         if let Some(create_domain) = value.as_create_domain_stmt().as_inner() {
-            return Ok(Self::domain(super::ddl::Domain::try_from_with_tokens(
+            return Ok(Self::domain(Domain::try_from_with_tokens(
                 &create_domain,
                 tokens,
             )?));
@@ -754,23 +758,24 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 Some(syn::ObjectType::ObjectTable)
             )))
         {
-            return Ok(Self::alter_relation(
-                super::AlterRelation::try_from_with_tokens(&rename, tokens)?,
-            ));
+            return Ok(Self::alter_relation(AlterRelation::try_from_with_tokens(
+                &rename, tokens,
+            )?));
         }
         if let Some(alter_table) = value.as_alter_table_stmt().as_inner() {
-            return Ok(Self::alter_relation(
-                super::AlterRelation::try_from_with_tokens(&alter_table, tokens)?,
-            ));
+            return Ok(Self::alter_relation(AlterRelation::try_from_with_tokens(
+                &alter_table,
+                tokens,
+            )?));
         }
         if let Some(create_table_as) = value.as_create_table_as_stmt().as_inner() {
-            return Ok(Self::table_as(super::ddl::TableAs::try_from_with_tokens(
+            return Ok(Self::table_as(TableAs::try_from_with_tokens(
                 &create_table_as,
                 tokens,
             )?));
         }
         if let Some(create_index) = value.as_index_stmt().as_inner() {
-            return Ok(Self::index(super::ddl::Index::try_from_with_tokens(
+            return Ok(Self::index(DdlIndex::try_from_with_tokens(
                 &create_index,
                 tokens,
             )?));
@@ -781,16 +786,18 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
 
 #[cfg(test)]
 mod unimplemented_utility_conversion_tests {
+    use crate::{ast::Dialect, parse_statements};
+
     #[rstest::rstest]
     #[case::large_objects("ALTER DEFAULT PRIVILEGES GRANT SELECT ON LARGE OBJECTS TO PUBLIC")]
     #[case::foreign_like("CREATE FOREIGN TABLE f (LIKE t) SERVER s")]
     #[should_panic(expected = "common-AST conversion")]
     fn retains_explicit_todo(#[case] sql: &str) {
-        let _ = crate::parse_statements(sql, crate::ast::Dialect::postgres()).next();
+        let _ = parse_statements(sql, Dialect::postgres()).next();
     }
 }
 
-impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
+impl TryFromWithTokens<&syn::CreateDomainStmt> for Domain {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
@@ -804,10 +811,7 @@ impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
             .map(|constraints| constraints.as_constraint())
             .unwrap_or_default()
         {
-            constraints.push(super::TableConstraint::from_postgres_inline(
-                &constraint,
-                tokens,
-            )?);
+            constraints.push(TableConstraint::from_postgres_inline(&constraint, tokens)?);
         }
         Ok(Self::new(
             Name::try_from(value.get_domainname())?,
@@ -819,7 +823,7 @@ impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
     }
 }
 
-impl TryFrom<&syn::CompositeTypeStmt> for crate::sem::CreateCompositeType {
+impl TryFrom<&syn::CompositeTypeStmt> for CreateCompositeType {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::CompositeTypeStmt) -> Result<Self, Self::Error> {
@@ -836,7 +840,7 @@ impl TryFrom<&syn::CompositeTypeStmt> for crate::sem::CreateCompositeType {
             composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
         }
         Ok(Self::new(
-            &crate::names::FullName::try_from(typevar)?,
+            &NamesFullName::try_from(typevar)?,
             &composite_fields,
         ))
     }
@@ -847,7 +851,7 @@ impl TryFromWithTokens<&syn::AlterOwnerStmt> for AlterOwner {
 
     fn try_from_with_tokens(
         value: &syn::AlterOwnerStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let relation = Name::from_opt(value.get_relation().as_inner().as_ref());
         let object = value
@@ -860,7 +864,7 @@ impl TryFromWithTokens<&syn::AlterOwnerStmt> for AlterOwner {
             value
                 .get_object_type()
                 .as_inner()
-                .map(|object_kind| crate::sem::ObjectKind::from(object_kind as u32)),
+                .map(|object_kind| ObjectKind::from(object_kind as u32)),
             relation,
             object,
             Role::new(
@@ -879,7 +883,7 @@ impl TryFromWithTokens<&syn::CommentStmt> for Comment {
 
     fn try_from_with_tokens(
         value: &syn::CommentStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let object_kind = required(value.get_objtype().as_inner(), "comment_stmt.objtype")?;
         let object = required(value.get_object().as_inner(), "comment_stmt.object")?;
@@ -894,7 +898,7 @@ impl TryFromWithTokens<&syn::CommentStmt> for Comment {
         };
         Ok(Self::new(
             target,
-            crate::sem::ObjectKind::from(object_kind as u32),
+            ObjectKind::from(object_kind as u32),
             &value.get_comment(),
         ))
     }
@@ -952,7 +956,7 @@ impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
 
     fn try_from_with_tokens(
         value: &syn::AlterSeqStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let sequence = required(value.get_sequence().as_inner(), "alter_seq.sequence")?;
         Ok(Self::new(
@@ -996,7 +1000,7 @@ impl TryFromWithTokens<&syn::CreateSeqStmt> for Sequence {
 
     fn try_from_with_tokens(
         value: &syn::CreateSeqStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let sequence = required(value.get_sequence().as_inner(), "create_seq.sequence")?;
         Ok(Self::new(
@@ -1029,11 +1033,11 @@ impl TryFromWithTokens<&syn::VariableSetStmt> for VariableSet {
 
     fn try_from_with_tokens(
         value: &syn::VariableSetStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let name = value.get_name();
         let kind =
-            super::VariableSetKind::try_from(required(value.get_kind().as_inner(), "SET kind")?)?;
+            AstVariableSetKind::try_from(required(value.get_kind().as_inner(), "SET kind")?)?;
         let transaction_modes = matches!(kind, super::VariableSetKind::Multi)
             && (name.eq_ignore_ascii_case("transaction")
                 || name.eq_ignore_ascii_case("session characteristics"));
@@ -1068,7 +1072,7 @@ impl TryFromWithTokens<&syn::CreateExtensionStmt> for Extension {
         Ok(statement)
     }
 }
-impl TryFrom<syn::VariableSetKind> for super::VariableSetKind {
+impl TryFrom<syn::VariableSetKind> for AstVariableSetKind {
     type Error = AnalysisError;
     fn try_from(value: syn::VariableSetKind) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -1088,7 +1092,7 @@ impl TryFromWithTokens<&syn::ViewStmt> for View {
 
     fn try_from_with_tokens(
         value: &syn::ViewStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let view = required(value.get_view().as_inner(), "view_stmt.view")?;
         let query = required(
@@ -1131,7 +1135,7 @@ impl TryFromWithTokens<&syn::ColumnRef> for Expr {
 
     fn try_from_with_tokens(
         column: &syn::ColumnRef,
-        _tokens: &IVec<crate::syn::ScanToken>,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let mut parts = Vec::new();
         let mut star = false;
@@ -1156,7 +1160,7 @@ impl TryFromWithTokens<&syn::AExpr> for OperatorExpr {
 
     fn try_from_with_tokens(
         value: &syn::AExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: Name::try_from(value.get_name())?,
@@ -1173,7 +1177,7 @@ impl TryFromWithTokens<&syn::AExpr> for Expr {
 
     fn try_from_with_tokens(
         value: &syn::AExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Operator(Box::new(
             OperatorExpr::try_from_with_tokens(value, tokens)?,
@@ -1186,7 +1190,7 @@ impl TryFromWithTokens<&syn::BoolExpr> for BooleanExpr {
 
     fn try_from_with_tokens(
         value: &syn::BoolExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             operator: BooleanOperator::try_from(required(
@@ -1203,7 +1207,7 @@ impl TryFromWithTokens<&syn::BoolExpr> for Expr {
 
     fn try_from_with_tokens(
         value: &syn::BoolExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Boolean(Box::new(BooleanExpr::try_from_with_tokens(
             value, tokens,
@@ -1216,7 +1220,7 @@ impl TryFromWithTokens<&syn::NullTest> for NullTest {
 
     fn try_from_with_tokens(
         test: &syn::NullTest,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             argument: Expr::try_from_with_tokens(&test.get_arg(), tokens)?,
@@ -1234,7 +1238,7 @@ impl TryFromWithTokens<&syn::NullTest> for Expr {
 
     fn try_from_with_tokens(
         test: &syn::NullTest,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::NullTest(Box::new(NullTest::try_from_with_tokens(
             test, tokens,
@@ -1247,7 +1251,7 @@ impl TryFromWithTokens<&syn::BooleanTest> for TruthTest {
 
     fn try_from_with_tokens(
         test: &syn::BooleanTest,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let (value, negated) = match required(test.get_booltesttype().as_inner(), "truth test")? {
             syn::BoolTestType::IsTrue => (Some(true), false),
@@ -1271,7 +1275,7 @@ impl TryFromWithTokens<&syn::BooleanTest> for Expr {
 
     fn try_from_with_tokens(
         test: &syn::BooleanTest,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::TruthTest(Box::new(TruthTest::try_from_with_tokens(
             test, tokens,
@@ -1284,7 +1288,7 @@ impl TryFromWithTokens<&syn::TypeCast> for Cast {
 
     fn try_from_with_tokens(
         cast: &syn::TypeCast,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             argument: Expr::try_from_with_tokens(&cast.get_arg(), tokens)?,
@@ -1301,7 +1305,7 @@ impl TryFromWithTokens<&syn::TypeCast> for Expr {
 
     fn try_from_with_tokens(
         cast: &syn::TypeCast,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Cast(Box::new(Cast::try_from_with_tokens(
             cast, tokens,
@@ -1314,7 +1318,7 @@ impl TryFromWithTokens<&syn::CollateClause> for Collate {
 
     fn try_from_with_tokens(
         collate: &syn::CollateClause,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             argument: Expr::try_from_with_tokens(&collate.get_arg(), tokens)?,
@@ -1333,7 +1337,7 @@ impl TryFromWithTokens<&syn::CollateClause> for Expr {
 
     fn try_from_with_tokens(
         collate: &syn::CollateClause,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Collate(Box::new(Collate::try_from_with_tokens(
             collate, tokens,
@@ -1346,7 +1350,7 @@ impl TryFromWithTokens<&syn::SubLink> for Subquery {
 
     fn try_from_with_tokens(
         link: &syn::SubLink,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             query: Query::try_from_with_tokens(
@@ -1368,7 +1372,7 @@ impl TryFromWithTokens<&syn::SubLink> for Expr {
 
     fn try_from_with_tokens(
         link: &syn::SubLink,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Subquery(Box::new(Subquery::try_from_with_tokens(
             link, tokens,
@@ -1381,7 +1385,7 @@ impl TryFromWithTokens<&syn::AArrayExpr> for Vec<Expr> {
 
     fn try_from_with_tokens(
         value: &syn::AArrayExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Expr::try_collect_from_with_tokens(value.get_elements(), tokens)
     }
@@ -1392,7 +1396,7 @@ impl TryFromWithTokens<&syn::AArrayExpr> for Expr {
 
     fn try_from_with_tokens(
         array: &syn::AArrayExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Array(Vec::<Self>::try_from_with_tokens(
             array, tokens,
@@ -1405,7 +1409,7 @@ impl TryFromWithTokens<&syn::AIndirection> for Indirection {
 
     fn try_from_with_tokens(
         indirection: &syn::AIndirection,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             argument: Expr::try_from_with_tokens(&indirection.get_arg(), tokens)?,
@@ -1419,7 +1423,7 @@ impl TryFromWithTokens<&syn::AIndirection> for Expr {
 
     fn try_from_with_tokens(
         indirection: &syn::AIndirection,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Indirection(Box::new(
             Indirection::try_from_with_tokens(indirection, tokens)?,
@@ -1432,7 +1436,7 @@ impl TryFromWithTokens<&syn::NamedArgExpr> for NamedArgument {
 
     fn try_from_with_tokens(
         argument: &syn::NamedArgExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: argument.get_name(),
@@ -1447,7 +1451,7 @@ impl TryFromWithTokens<&syn::NamedArgExpr> for Expr {
 
     fn try_from_with_tokens(
         argument: &syn::NamedArgExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::NamedArgument(Box::new(
             NamedArgument::try_from_with_tokens(argument, tokens)?,
@@ -1460,7 +1464,7 @@ impl TryFromWithTokens<&syn::ParamRef> for Parameter {
 
     fn try_from_with_tokens(
         value: &syn::ParamRef,
-        _tokens: &IVec<crate::syn::ScanToken>,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             position: value.get_number() as u32,
@@ -1475,7 +1479,7 @@ impl TryFromWithTokens<&syn::ParamRef> for Expr {
 
     fn try_from_with_tokens(
         value: &syn::ParamRef,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Parameter(Parameter::try_from_with_tokens(
             value, tokens,
@@ -1488,7 +1492,7 @@ impl TryFromWithTokens<&syn::SqlValueFunction> for Expr {
 
     fn try_from_with_tokens(
         value: &syn::SqlValueFunction,
-        _tokens: &IVec<crate::syn::ScanToken>,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::SqlValue(SqlValue::try_from(value)?))
     }
@@ -1499,7 +1503,7 @@ impl TryFromWithTokens<&syn::MinMaxExpr> for Expr {
 
     fn try_from_with_tokens(
         minmax: &syn::MinMaxExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let name = match minmax.get_op().as_inner() {
             Some(syn::MinMaxOp::IsGreatest) => "greatest",
@@ -1518,7 +1522,7 @@ impl TryFromWithTokens<&syn::GroupingFunc> for Expr {
 
     fn try_from_with_tokens(
         grouping: &syn::GroupingFunc,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Grouping(Self::try_collect_from_with_tokens(
             grouping.get_args(),
@@ -1532,7 +1536,7 @@ impl TryFromWithTokens<&syn::FuncCall> for Expr {
 
     fn try_from_with_tokens(
         value: &syn::FuncCall,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Call(Box::new(Call::try_from_with_tokens(
             value, tokens,
@@ -1545,18 +1549,15 @@ impl TryFromWithTokens<&syn::Node> for Expr {
 
     fn try_from_with_tokens(
         node: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
-        crate::sem::with_stack(|| Self::convert_postgres(node, tokens))
+        with_stack(|| Self::convert_postgres(node, tokens))
     }
 }
 
 impl Expr {
     #[inline(never)]
-    fn convert_postgres(
-        node: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+    fn convert_postgres(node: &syn::Node, tokens: &IVec<ScanToken>) -> Result<Self, AnalysisError> {
         if node.is_a_const() {
             return Ok(Self::Literal(Literal::from(&node.as_a_const())));
         }
@@ -1629,7 +1630,7 @@ impl Expr {
             return Ok(Self::Default);
         }
         if let Some(cursor) = node.as_current_of_expr().as_inner() {
-            return Ok(Self::CurrentOf(super::CurrentOf {
+            return Ok(Self::CurrentOf(CurrentOf {
                 name: cursor.get_cursor_name(),
                 parameter: cursor.get_cursor_param(),
             }));
@@ -1637,9 +1638,7 @@ impl Expr {
         if node.is_merge_support_func() {
             return Ok(Self::MergeAction);
         }
-        if let Some(document) =
-            super::document::DocumentExpr::try_from_with_tokens_opt(node, tokens)?
-        {
+        if let Some(document) = DocumentExpr::try_from_with_tokens_opt(node, tokens)? {
             return Ok(Self::Document(document));
         }
         if let Some(grouping) = node.as_grouping_func().as_inner() {
@@ -1657,7 +1656,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Expr {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         nodes
             .as_inner()
@@ -1673,7 +1672,7 @@ impl TryFromWithTokensOpt<syn::Node> for Expr {
 
     fn try_from_with_tokens_opt(
         node: syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         node.as_inner()
             .map(|node| Self::try_from_with_tokens(&node, tokens))
@@ -1758,7 +1757,7 @@ impl TryFromWithTokens<&syn::TypeName> for TypeName {
 
     fn try_from_with_tokens(
         value: &syn::TypeName,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let mut bounds = Vec::new();
         for bound in value.get_array_bounds().as_inner().unwrap_or_default() {
@@ -1839,8 +1838,7 @@ fn source_span(location: i32, tokens: &IVec<syn::ScanToken>) -> Option<StringSpa
 
 #[cfg(test)]
 mod test_source_span {
-    use crate::PostgresDialect;
-    use crate::ast::postgres::source_span;
+    use crate::{PostgresDialect, ast::postgres::source_span};
 
     #[test]
     fn preserves_quoted_qualified_name_and_intervening_comment() -> testresult::TestResult {
@@ -1905,6 +1903,8 @@ fn call_argument_span(node: &syn::Node, tokens: &IVec<syn::ScanToken>) -> Option
 
 #[cfg(test)]
 mod test_call_argument_span {
+    use crate::ast::postgres::call_argument_span;
+
     use crate::{PostgresDialect, test_helpers::postgres_expression};
 
     #[rstest::rstest]
@@ -1921,7 +1921,7 @@ mod test_call_argument_span {
         let sql = format!("SELECT {expression}");
         let tokens = PostgresDialect::scan(&sql).unwrap();
         let node = postgres_expression(expression);
-        let span = super::call_argument_span(&node, &tokens);
+        let span = call_argument_span(&node, &tokens);
         let text = if let Some(span) = span {
             span.get_from(&sql)
         } else {
@@ -1938,7 +1938,7 @@ impl TryFromWithTokens<&syn::FuncCall> for Call {
 
     fn try_from_with_tokens(
         value: &syn::FuncCall,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             sql_syntax: matches!(
@@ -1997,7 +1997,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Access {
     type Error = AnalysisError;
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         nodes
             .as_inner()
@@ -2206,7 +2206,7 @@ impl TryFromWithTokens<&syn::CaseExpr> for Expr {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         case: &syn::CaseExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         let mut arms = Vec::new();
         for arm in case.get_args().as_inner().unwrap_or_default() {
@@ -2229,7 +2229,7 @@ impl TryFromWithTokens<&syn::CoalesceExpr> for Expr {
 
     fn try_from_with_tokens(
         value: &syn::CoalesceExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Call(Box::new(Call::special(
             "coalesce",

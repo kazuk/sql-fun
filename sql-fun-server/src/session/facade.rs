@@ -1,7 +1,12 @@
-use super::{
-    SessionState, context_handle_registry::ContextHandleRegistry, initialization::Initialization,
+use crate::{
+    Api, InitializedSchema, JsonRpcError, LayerDiagnostics,
+    json_rpc::JsonRpcRequest,
+    process_request as local_process_request,
+    session::{
+        SessionState, context_handle_registry::ContextHandleRegistry,
+        initialization::Initialization,
+    },
 };
-use crate::{Api, InitializedSchema, JsonRpcError, json_rpc::JsonRpcRequest};
 use std::sync::Arc;
 
 use sql_fun_server_api::{
@@ -188,7 +193,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
                 self.release_collection(&Self::arguments(request)?)?;
                 Ok(::serde_json::Value::Null)
             }
-            _ => crate::process_request(request),
+            _ => local_process_request(request),
         }
     }
 
@@ -207,7 +212,7 @@ mod tests;
 
 /// This source borrows cached diagnostics and maps only the requested items.
 struct Diagnostics<'ctx> {
-    layers: &'ctx [Arc<crate::LayerDiagnostics>],
+    layers: &'ctx [Arc<LayerDiagnostics>],
 }
 
 impl<'ctx> From<&'ctx InitializedSchema> for Diagnostics<'ctx> {
@@ -263,7 +268,7 @@ struct LayerProblems<'ctx> {
 }
 
 impl<'ctx> LayerProblems<'ctx> {
-    fn items(layer: &'ctx Arc<crate::LayerDiagnostics>) -> impl Iterator<Item = Diagnostic<'ctx>> {
+    fn items(layer: &'ctx Arc<LayerDiagnostics>) -> impl Iterator<Item = Diagnostic<'ctx>> {
         Self {
             path: layer.path(),
             problems: layer.problems(),

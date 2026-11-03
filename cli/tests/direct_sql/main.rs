@@ -1,6 +1,8 @@
 //! Direct SQL CLI request contracts and real-server integration tests.
 mod test_helpers;
 
+use self::test_helpers::api as api_helpers;
+
 use self::test_helpers::{
     Suite,
     api::{heavy, schema::SchemaFixture},

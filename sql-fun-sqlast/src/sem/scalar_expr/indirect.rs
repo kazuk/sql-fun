@@ -5,6 +5,13 @@ mod member_ref;
 
 pub use self::array_subscripts::{ArraySubscript, ArraySubscripts};
 
+use crate::sem::{
+    ColumnDefinition, ColumnRename, ParseContext as SemParseContext,
+    parameter_resolution::ParameterResolution,
+    scalar_expr::RowExpr,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
+
 use self::{array_index::ArrayIndex, array_slice::ArraySlice, member_ref::MemberRef};
 
 use crate::{
@@ -28,7 +35,7 @@ pub enum IndirectionExpr {
 impl IndirectionExpr {
     pub(crate) fn projected_member(
         base: &SemScalarExpr,
-        field: &crate::sem::ColumnDefinition,
+        field: &ColumnDefinition,
     ) -> SemScalarExpr {
         let name = field.name().as_ref().expect("composite field name");
         SemScalarExpr::indirection(&Self::MemberRef(Box::new(MemberRef::new(
@@ -39,7 +46,7 @@ impl IndirectionExpr {
         ))))
     }
 
-    pub(super) fn row_constructor(&self) -> Option<&super::RowExpr> {
+    pub(super) fn row_constructor(&self) -> Option<&RowExpr> {
         if let Self::MemberRef(value) = self {
             value.row_constructor()
         } else {
@@ -55,7 +62,7 @@ impl IndirectionExpr {
         }
     }
 
-    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(super) fn rename_column(&mut self, rename: &ColumnRename) {
         if let Self::MemberRef(value) = self {
             value.rename_column(rename);
         }
@@ -157,10 +164,10 @@ impl SemScalarExprNode for IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         match self {
             Self::ArrayIndex(v) => v.walk(visitor)?,
             Self::ArraySlice(v) => v.walk(visitor)?,
@@ -169,10 +176,7 @@ impl IndirectionExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::ArrayIndex(v) => v.visit(visitor)?,
             Self::ArraySlice(v) => v.visit(visitor)?,
@@ -186,8 +190,8 @@ impl IndirectionExpr {
 impl IndirectionExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl SemParseContext,
     ) -> Option<SemScalarExpr> {
         match self {
             Self::ArrayIndex(value) => Some(value.collect_constraints(parameters, context)),
@@ -199,7 +203,7 @@ impl IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk_assignment_target<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
@@ -210,7 +214,7 @@ impl IndirectionExpr {
             Self::MemberRef(target) => target.walk_assignment_target(visitor),
         }
     }
-    pub(crate) fn visit_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assignment_target<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {

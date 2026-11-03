@@ -1,6 +1,8 @@
 use crate::{
-    ast::TryFromWithTokens,
+    ast::{AlterOwner as AstAlterOwner, TryFromWithTokens},
+    names::FullName as NamesFullName,
     sem::{AnalysisError, AstAndContextPair, OwnerSpecification, OwnershipIdentity, ParseContext},
+    syn::AlterOwnerStmt,
 };
 
 /// Completed target lookup for an ALTER OWNER statement.
@@ -32,7 +34,7 @@ impl OwnershipLookup {
     }
     pub(crate) fn argument_type_not_found(
         identity: &OwnershipIdentity,
-        names: &[crate::names::FullName],
+        names: &[NamesFullName],
     ) -> Self {
         Self::ArgumentTypeNotFound(OwnershipArgumentFailure {
             identity: identity.clone(),
@@ -40,7 +42,7 @@ impl OwnershipLookup {
         })
     }
     /// Type references whose lookup failed; NONE operator operands are not failures.
-    pub fn unresolved_argument_types(&self) -> &[crate::names::FullName] {
+    pub fn unresolved_argument_types(&self) -> &[NamesFullName] {
         if let Self::ArgumentTypeNotFound(failure) = self {
             &failure.names
         } else {
@@ -165,9 +167,9 @@ impl AlterOwner {
     /// Analyze and apply a PostgreSQL ALTER OWNER through the common AST.
     pub fn analyze_alter_owner<C: ParseContext>(
         context: C,
-        syntax: crate::syn::AlterOwnerStmt,
+        syntax: AlterOwnerStmt,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        crate::ast::AlterOwner::try_from_with_tokens(&syntax, &::sql_fun_core::IVec::default())?
+        AstAlterOwner::try_from_with_tokens(&syntax, &::sql_fun_core::IVec::default())?
             .resolve_and_apply(context)
     }
 }
@@ -176,7 +178,7 @@ impl AlterOwner {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipArgumentFailure {
     identity: OwnershipIdentity,
-    names: Vec<crate::names::FullName>,
+    names: Vec<NamesFullName>,
 }
 impl OwnershipArgumentFailure {
     /// Requested object identity with successful type bindings retained.
@@ -184,7 +186,7 @@ impl OwnershipArgumentFailure {
         &self.identity
     }
     /// Every missing argument type name in source order.
-    pub fn names(&self) -> &[crate::names::FullName] {
+    pub fn names(&self) -> &[NamesFullName] {
         &self.names
     }
 }

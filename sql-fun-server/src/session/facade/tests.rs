@@ -1,11 +1,10 @@
 mod test_helpers;
 
 use self::test_helpers::SchemaColumns;
-use super::Session;
 use crate::{
     Api,
     schema_cache::test_helpers::SchemaProject,
-    session::{SessionState, SessionWrapper},
+    session::{SessionState, SessionWrapper, facade::Session},
 };
 use std::{
     num::NonZeroUsize,

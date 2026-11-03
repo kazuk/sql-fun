@@ -1,17 +1,21 @@
-use crate::ast::document::DocumentExpr;
-use crate::ast::postgres::required;
-use crate::ast::{
-    Alias, Assignment, CmdType, Expr, FromItem, JsonAggregate, JsonArgument, JsonArray,
-    JsonArrayAggregate, JsonArrayQuery, JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding,
-    JsonExprOp, JsonFormat, JsonFormatType, JsonFunction, JsonKeyValue, JsonObject,
-    JsonObjectAggregate, JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonQuotes, JsonReturning,
-    JsonScalar, JsonSerialize, JsonTable, JsonTableColumnType, JsonValue, JsonValueType,
-    JsonWrapper, Merge, MergeMatchKind, MergeWhen, MultiAssignment, Name, Order, OverridingKind,
-    Query, Relation, Target, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
-    TypeName, Window, With, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize, XmlTable,
+use crate::{
+    StringSpan,
+    ast::{
+        Alias, Assignment, CmdType, Expr, FromItem, JsonAggregate, JsonArgument, JsonArray,
+        JsonArrayAggregate, JsonArrayQuery, JsonBehavior, JsonBehaviorType, JsonColumn,
+        JsonEncoding, JsonExprOp, JsonFormat, JsonFormatType, JsonFunction, JsonKeyValue,
+        JsonObject, JsonObjectAggregate, JsonOutput, JsonParse, JsonPath, JsonPredicate,
+        JsonQuotes, JsonReturning, JsonScalar, JsonSerialize, JsonTable, JsonTableColumnType,
+        JsonValue, JsonValueType, JsonWrapper, Merge, MergeMatchKind, MergeWhen, MultiAssignment,
+        Name, Order, OverridingKind, Query, Relation, ReturningOption, Target,
+        TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Window, With,
+        Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize, XmlTable, document::DocumentExpr,
+        postgres::required,
+    },
+    sem::AnalysisError,
+    syn,
+    syn::{ListOpt, Opt, ScanToken},
 };
-use crate::syn::{ListOpt, Opt};
-use crate::{StringSpan, sem::AnalysisError, syn};
 
 use ::sql_fun_core::IVec;
 
@@ -209,7 +213,7 @@ impl TryFromWithTokensOpt<syn::JsonFormatOpt> for JsonFormat {
 
     fn try_from_with_tokens_opt(
         value: syn::JsonFormatOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         value
             .as_inner()
@@ -223,7 +227,7 @@ impl TryFromWithTokens<&syn::JsonFormat> for JsonFormat {
 
     fn try_from_with_tokens(
         value: &syn::JsonFormat,
-        _tokens: &IVec<crate::syn::ScanToken>,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             format_type: JsonFormatType::try_from(required(
@@ -244,7 +248,7 @@ impl TryFromWithTokensOpt<syn::JsonOutputOpt> for JsonOutput {
 
     fn try_from_with_tokens_opt(
         value: syn::JsonOutputOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         value
             .as_inner()
@@ -258,7 +262,7 @@ impl TryFromWithTokens<&syn::JsonOutput> for JsonOutput {
 
     fn try_from_with_tokens(
         value: &syn::JsonOutput,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             type_name: value
@@ -276,7 +280,7 @@ impl TryFromWithTokensOpt<syn::JsonReturningOpt> for JsonReturning {
 
     fn try_from_with_tokens_opt(
         value: syn::JsonReturningOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         value
             .as_inner()
@@ -290,7 +294,7 @@ impl TryFromWithTokens<&syn::JsonReturning> for JsonReturning {
 
     fn try_from_with_tokens(
         value: &syn::JsonReturning,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             format: JsonFormat::try_from_with_tokens_opt(value.get_format(), tokens)?,
@@ -303,7 +307,7 @@ impl TryFromWithTokens<&syn::JsonValueExpr> for JsonValue {
 
     fn try_from_with_tokens(
         value: &syn::JsonValueExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             raw_expr: Expr::try_from_with_tokens(&value.get_raw_expr(), tokens)?,
@@ -317,7 +321,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for JsonValue {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -335,7 +339,7 @@ impl TryFromWithTokens<&syn::JsonArgument> for JsonArgument {
 
     fn try_from_with_tokens(
         value: &syn::JsonArgument,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             val: JsonValue::try_from_with_tokens(
@@ -352,7 +356,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for JsonArgument {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -370,7 +374,7 @@ impl TryFromWithTokensOpt<syn::JsonBehaviorOpt> for JsonBehavior {
 
     fn try_from_with_tokens_opt(
         value: syn::JsonBehaviorOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         value
             .as_inner()
@@ -384,7 +388,7 @@ impl TryFromWithTokens<&syn::JsonBehavior> for JsonBehavior {
 
     fn try_from_with_tokens(
         value: &syn::JsonBehavior,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             btype: JsonBehaviorType::try_from(required(
@@ -402,7 +406,7 @@ impl TryFromWithTokens<&syn::JsonTablePathSpec> for JsonPath {
 
     fn try_from_with_tokens(
         value: &syn::JsonTablePathSpec,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             string: Expr::try_from_with_tokens(&value.get_string(), tokens)?,
@@ -418,7 +422,7 @@ impl TryFromWithTokens<&syn::JsonKeyValue> for JsonKeyValue {
 
     fn try_from_with_tokens(
         value: &syn::JsonKeyValue,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             key: Expr::try_from_with_tokens(&value.get_key(), tokens)?,
@@ -435,7 +439,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for JsonKeyValue {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -452,7 +456,7 @@ impl TryFromWithTokens<&syn::JsonFuncExpr> for JsonFunction {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::JsonFuncExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             op: JsonExprOp::try_from(required(value.get_op().as_inner(), "JsonExprOp")?)?,
@@ -481,7 +485,7 @@ impl TryFromWithTokens<&syn::JsonIsPredicate> for JsonPredicate {
 
     fn try_from_with_tokens(
         value: &syn::JsonIsPredicate,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             expr: Expr::try_from_with_tokens(&value.get_expr(), tokens)?,
@@ -501,7 +505,7 @@ impl TryFromWithTokens<&syn::JsonParseExpr> for JsonParse {
 
     fn try_from_with_tokens(
         value: &syn::JsonParseExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             expr: JsonValue::try_from_with_tokens(
@@ -520,7 +524,7 @@ impl TryFromWithTokens<&syn::JsonScalarExpr> for JsonScalar {
 
     fn try_from_with_tokens(
         value: &syn::JsonScalarExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             expr: Expr::try_from_with_tokens(&value.get_expr(), tokens)?,
@@ -535,7 +539,7 @@ impl TryFromWithTokens<&syn::JsonSerializeExpr> for JsonSerialize {
 
     fn try_from_with_tokens(
         value: &syn::JsonSerializeExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             expr: JsonValue::try_from_with_tokens(
@@ -553,7 +557,7 @@ impl TryFromWithTokens<&syn::JsonObjectConstructor> for JsonObject {
 
     fn try_from_with_tokens(
         value: &syn::JsonObjectConstructor,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             exprs: JsonKeyValue::try_collect_from_with_tokens(value.get_exprs(), tokens)?,
@@ -570,7 +574,7 @@ impl TryFromWithTokens<&syn::JsonArrayConstructor> for JsonArray {
 
     fn try_from_with_tokens(
         value: &syn::JsonArrayConstructor,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             exprs: JsonValue::try_collect_from_with_tokens(value.get_exprs(), tokens)?,
@@ -586,7 +590,7 @@ impl TryFromWithTokens<&syn::JsonArrayQueryConstructor> for JsonArrayQuery {
 
     fn try_from_with_tokens(
         value: &syn::JsonArrayQueryConstructor,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             query: Query::try_from_with_tokens(
@@ -606,7 +610,7 @@ impl TryFromWithTokens<&syn::JsonAggConstructor> for JsonAggregate {
 
     fn try_from_with_tokens(
         value: &syn::JsonAggConstructor,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             output: JsonOutput::try_from_with_tokens_opt(value.get_output(), tokens)?,
@@ -627,7 +631,7 @@ impl TryFromWithTokens<&syn::JsonObjectAgg> for JsonObjectAggregate {
 
     fn try_from_with_tokens(
         value: &syn::JsonObjectAgg,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             constructor: JsonAggregate::try_from_with_tokens(
@@ -649,7 +653,7 @@ impl TryFromWithTokens<&syn::JsonArrayAgg> for JsonArrayAggregate {
 
     fn try_from_with_tokens(
         value: &syn::JsonArrayAgg,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             constructor: JsonAggregate::try_from_with_tokens(
@@ -670,7 +674,7 @@ impl TryFromWithTokens<&syn::JsonTable> for JsonTable {
 
     fn try_from_with_tokens(
         value: &syn::JsonTable,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             context_item: JsonValue::try_from_with_tokens(
@@ -696,7 +700,7 @@ impl TryFromWithTokens<&syn::JsonTableColumn> for JsonColumn {
 
     fn try_from_with_tokens(
         value: &syn::JsonTableColumn,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             coltype: JsonTableColumnType::try_from(required(
@@ -733,7 +737,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for JsonColumn {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -751,7 +755,7 @@ impl TryFromWithTokens<&syn::XmlExpr> for Xml {
 
     fn try_from_with_tokens(
         value: &syn::XmlExpr,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             op: XmlExprOp::try_from(required(value.get_op().as_inner(), "XmlExprOp")?)?,
@@ -774,7 +778,7 @@ impl TryFromWithTokens<&syn::XmlSerialize> for XmlSerialize {
 
     fn try_from_with_tokens(
         value: &syn::XmlSerialize,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             xmloption: XmlOptionType::try_from(required(
@@ -797,7 +801,7 @@ impl TryFromWithTokens<&syn::RangeTableFunc> for XmlTable {
 
     fn try_from_with_tokens(
         value: &syn::RangeTableFunc,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             lateral: value.get_lateral(),
@@ -816,7 +820,7 @@ impl TryFromWithTokens<&syn::RangeTableFuncCol> for XmlColumn {
 
     fn try_from_with_tokens(
         value: &syn::RangeTableFuncCol,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             colname: value.get_colname(),
@@ -839,7 +843,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for XmlColumn {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -860,7 +864,7 @@ impl TryFromWithTokens<&syn::MultiAssignRef> for MultiAssignment {
 
     fn try_from_with_tokens(
         value: &syn::MultiAssignRef,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             source: Expr::try_from_with_tokens(&value.get_source(), tokens)?,
@@ -875,7 +879,7 @@ impl TryFromWithTokens<&syn::MergeStmt> for Merge {
 
     fn try_from_with_tokens(
         value: &syn::MergeStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             relation: Relation::try_from(&required(value.get_relation().as_inner(), "relation")?)?,
@@ -885,9 +889,7 @@ impl TryFromWithTokens<&syn::MergeStmt> for Merge {
                 value.get_merge_when_clauses(),
                 tokens,
             )?,
-            returning_options: crate::ast::ReturningOption::from_postgres(
-                &value.get_returning_clause(),
-            )?,
+            returning_options: ReturningOption::from_postgres(&value.get_returning_clause())?,
             returning_list: Target::try_collect_from_with_tokens(
                 value.get_returning_clause().get_exprs(),
                 tokens,
@@ -902,7 +904,7 @@ impl TryFromWithTokens<&syn::MergeWhenClause> for MergeWhen {
 
     fn try_from_with_tokens(
         value: &syn::MergeWhenClause,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             match_kind: MergeMatchKind::try_from(required(
@@ -929,7 +931,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for MergeWhen {
 
     fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Vec<Self>, Self::Error> {
         let mut values = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
@@ -953,7 +955,7 @@ impl TryFromWithTokensOpt<&syn::Node> for DocumentExpr {
 
     fn try_from_with_tokens_opt(
         node: &syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<Option<Self>, Self::Error> {
         if let Some(value) = node.as_json_func_expr().as_inner() {
             return Ok(Some(Self::JsonFunction(Box::new(

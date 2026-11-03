@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests;
 
+use crate::{CacheContext, ast::Access};
+
 use crate::{
     ast::{Alias, Assignment, CurrentOf, Dialect, Expr, FromItem, Name, Subquery, Update},
     context::ParseContext,
@@ -18,7 +20,7 @@ impl Update {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<Option<UpdateStatement>, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|value| {
@@ -332,12 +334,8 @@ impl UpdateAssignmentCollection {
             let destination =
                 Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
                     .resolve_column(context, target_scope)?;
-            let destination = crate::ast::Access::resolve_sequence(
-                &assignment.indirection,
-                context,
-                rhs_scope,
-                destination,
-            )?;
+            let destination =
+                Access::resolve_sequence(&assignment.indirection, context, rhs_scope, destination)?;
             let value = assignment.resolve_update_value(context, rhs_scope)?;
             if value.is_default()
                 && table

@@ -1,6 +1,6 @@
 use crate::{
     names::{AliasName, ColumnName, CteName},
-    sem::{ColumnDefinition, Nullable, TypeReference},
+    sem::{ColumnDefinition, Nullable, TypeReference, source_flag::SourceFlag},
 };
 
 /// Column reference for CTE source
@@ -8,7 +8,7 @@ use crate::{
 pub struct CteColumnRef {
     alias: AliasName,
     #[serde(skip)]
-    unqualified: crate::sem::source_flag::SourceFlag,
+    unqualified: SourceFlag,
     cte_name: CteName,
     column_name: ColumnName,
     column_def: Option<ColumnDefinition>,
@@ -54,7 +54,7 @@ impl CteColumnRef {
     }
 
     pub(super) const fn mark_unqualified(&mut self) {
-        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+        self.unqualified = SourceFlag::new(true);
     }
     pub(super) const fn namespace_reference(&self) -> (&str, &ColumnName, bool) {
         (
@@ -88,7 +88,7 @@ impl CteColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
-            unqualified: crate::sem::source_flag::SourceFlag::new(false),
+            unqualified: SourceFlag::new(false),
             cte_name: cte_name.clone(),
             column_name: column_name.clone(),
             column_def: column_def.cloned(),
@@ -98,7 +98,7 @@ impl CteColumnRef {
 }
 
 impl CteColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         Some((self.alias.as_str(), &self.column_name))
     }
 }

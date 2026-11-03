@@ -1,8 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, SchemaFileContext},
-    names::SchemaName,
-    sem::{ParseContext, PgBuiltInType},
+    names::{FullName, SchemaName},
+    sem::{CreateDomain, ParseContext, PgBuiltInType, TypeCategory, TypeDefinition, TypeReference},
     test_helpers::TestParseContext,
 };
 
@@ -35,9 +35,9 @@ fn context_for(dialect: Dialect) -> SchemaFileContext {
         };
         base.set_get_type_impl_result(
             ty.full_name().expect("nominal type identity"),
-            &crate::sem::TypeDefinition::builtin_with_category(
+            &TypeDefinition::builtin_with_category(
                 ty.full_name().expect("nominal type identity"),
-                Some(crate::sem::TypeCategory::try_from(category).unwrap()),
+                Some(TypeCategory::try_from(category).unwrap()),
                 None,
             ),
         );
@@ -46,11 +46,8 @@ fn context_for(dialect: Dialect) -> SchemaFileContext {
         ("amount", PgBuiltInType::int4()),
         ("amount_array", PgBuiltInType::int4().array_type()),
     ] {
-        let ty = crate::sem::TypeReference::from_full_name(crate::names::FullName::with_schema(
-            "public", name,
-        ));
-        let definition =
-            crate::sem::TypeDefinition::from(&crate::sem::CreateDomain::new(&ty, &Some(target)));
+        let ty = TypeReference::from_full_name(FullName::with_schema("public", name));
+        let definition = TypeDefinition::from(&CreateDomain::new(&ty, &Some(target)));
         base.set_get_type_impl_result(ty.full_name().expect("nominal type identity"), &definition);
     }
     base.setup_binary("+", "int4", "int4", "int4", true);

@@ -107,7 +107,7 @@ fn parse_prerelease(number: &str, text: &str) -> Result<u32, String> {
 
 #[cfg(test)]
 mod test_parse {
-    use super::PostgresVersion;
+    use crate::postgres_version::PostgresVersion;
     #[rstest::rstest]
     #[case::stable("19", 19, true)]
     #[case::future("123", 123, true)]
@@ -282,7 +282,7 @@ impl PostgresVersionInventory<'_> {
 
 #[cfg(test)]
 mod test_inventory {
-    use super::{PostgresVersion, PostgresVersionInventory, Support, VERSIONS};
+    use crate::postgres_version::{PostgresVersion, PostgresVersionInventory, Support, VERSIONS};
     #[rstest::rstest]
     #[case::seventeen(&["17"], &["17"])]
     #[case::eighteen(&["18"], &["18"])]

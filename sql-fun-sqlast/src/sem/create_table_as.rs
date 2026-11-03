@@ -1,3 +1,13 @@
+use crate::{
+    CacheContext,
+    ast::TableAs,
+    names::{ColumnName, TableName},
+    sem::{
+        ColumnRename, OwnerSpecification, ResultColumnCollection,
+        traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
+    },
+    syn::CreateTableAsStmt,
+};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -9,9 +19,9 @@ use crate::{
     syn::{ObjectType, ScanToken},
 };
 
-use {
-    super::{AlterView, AnalysisError, ParseContext, SemAst},
-    crate::names::FullName,
+use crate::{
+    names::FullName,
+    sem::{AlterView, AnalysisError, ParseContext, SemAst},
 };
 
 /// analyzed [`crate::syn::CreateTableAsStmt`]
@@ -22,7 +32,7 @@ pub struct CreateTableAs {
     name: FullName,
     query: Box<SemAst>,
     obj_type: ObjectType,
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     alter_statements: Vec<AlterView>,
 }
 
@@ -36,29 +46,26 @@ impl CreateTableAs {
 
     pub(crate) fn walk_column_dependencies(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.query.walk_nested_command(visitor)
     }
 
-    pub(crate) fn rename_column(
-        &mut self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         self.query
-            .walk_nested_command(&mut crate::sem::traversal::ColumnRenamer::new(rename))
+            .walk_nested_command(&mut ColumnRenamer::new(rename))
     }
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
+        old: &TableName,
+        new: &TableName,
     ) -> Result<(), AnalysisError> {
         self.query
-            .walk_nested_command(&mut crate::sem::traversal::RelationRenamer::new(old, new))
+            .walk_nested_command(&mut RelationRenamer::new(old, new))
     }
 
-    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+    pub(crate) fn result_columns(&self) -> &ResultColumnCollection {
         self.query
             .select_statement()
             .expect("CREATE AS query is a SELECT")
@@ -74,11 +81,11 @@ impl CreateTableAs {
     }
 
     /// Retained ownership; None means no ownership information was supplied.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -125,13 +132,10 @@ impl CreateTableAs {
         Ok(())
     }
 
-    pub(crate) fn get_column_def(
-        &self,
-        column: &crate::names::ColumnName,
-    ) -> Option<ColumnDefinition> {
+    pub(crate) fn get_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
         self.result_columns().get_result_column_def(column)
     }
-    pub(crate) fn has_column(&self, column: &crate::names::ColumnName) -> bool {
+    pub(crate) fn has_column(&self, column: &ColumnName) -> bool {
         self.result_columns().has_column(column)
     }
 
@@ -140,16 +144,16 @@ impl CreateTableAs {
     pub fn analyze_create_table_as<TParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        syn: crate::syn::CreateTableAsStmt,
+        syn: CreateTableAsStmt,
         tokens: &IVec<ScanToken>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::TableAs::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
+        TableAs::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
             context,
-            &mut crate::CacheContext::new(),
+            &mut CacheContext::new(),
             source_span,
         )
     }

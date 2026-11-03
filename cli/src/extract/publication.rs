@@ -94,7 +94,7 @@ impl Publication {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_helpers::PublicationFixture;
+    use crate::extract::test_helpers::PublicationFixture;
 
     #[test]
     fn refuses_nonempty_output_without_replacing_content() {

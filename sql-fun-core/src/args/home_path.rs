@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::SqlFunArgsError;
+use crate::args::SqlFunArgsError;
 
 /// Resolve an explicitly supplied sql-fun home path to an absolute path.
 ///
@@ -40,8 +40,12 @@ fn resolve_with(
 
 #[cfg(test)]
 mod test_resolve_sql_fun_home_path {
-    use super::{resolve_sql_fun_home_path, resolve_with};
-    use crate::SqlFunArgsBuilder;
+    use crate::args::home_path::SqlFunArgsError;
+
+    use crate::{
+        SqlFunArgsBuilder,
+        args::home_path::{resolve_sql_fun_home_path, resolve_with},
+    };
     use std::path::Path;
 
     #[rstest::rstest]
@@ -78,11 +82,7 @@ mod test_resolve_sql_fun_home_path {
         let unavailable = std::io::Error::new(std::io::ErrorKind::NotFound, "cwd unavailable");
         let error = resolve_with(
             Path::new("./work"),
-            || {
-                Err(super::SqlFunArgsError::current_directory_unavailable(
-                    unavailable,
-                ))
-            },
+            || Err(SqlFunArgsError::current_directory_unavailable(unavailable)),
             || unreachable!(),
         )
         .unwrap_err();

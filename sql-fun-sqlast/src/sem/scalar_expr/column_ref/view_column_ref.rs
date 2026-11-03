@@ -1,14 +1,17 @@
-use crate::sem::scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr};
 use crate::{
-    names::{AliasName, ColumnName, ViewName},
-    sem::{ColumnDefinition, Nullable, TypeReference},
+    names::{AliasName, ColumnName, FullName, ViewName},
+    sem::{
+        ColumnDefinition, Nullable, TypeReference,
+        scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr},
+        source_flag::SourceFlag,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewColumnRef {
     alias: AliasName,
     #[serde(skip)]
-    unqualified: crate::sem::source_flag::SourceFlag,
+    unqualified: SourceFlag,
     column: ColumnName,
     view_name: ViewName,
     column_def: Option<ColumnDefinition>,
@@ -46,7 +49,7 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
-    pub(super) const fn access_relation(&self) -> &crate::names::FullName {
+    pub(super) const fn access_relation(&self) -> &FullName {
         self.view_name.full_name()
     }
 
@@ -58,7 +61,7 @@ impl ViewColumnRef {
     }
 
     pub(super) const fn mark_unqualified(&mut self) {
-        self.unqualified = crate::sem::source_flag::SourceFlag::new(true);
+        self.unqualified = SourceFlag::new(true);
     }
     pub(super) const fn namespace_reference(&self) -> (&str, &ColumnName, bool) {
         (self.alias.as_str(), &self.column, self.unqualified.get())
@@ -73,7 +76,7 @@ impl ViewColumnRef {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
-    pub(super) fn belongs_to(&self, relation: &crate::names::FullName) -> bool {
+    pub(super) fn belongs_to(&self, relation: &FullName) -> bool {
         self.view_name.full_name() == relation
     }
 
@@ -86,7 +89,7 @@ impl ViewColumnRef {
     ) -> Self {
         Self {
             alias: alias.clone(),
-            unqualified: crate::sem::source_flag::SourceFlag::new(false),
+            unqualified: SourceFlag::new(false),
             column: column.clone(),
             view_name: view_name.clone(),
             column_def: column_def.clone(),
@@ -114,7 +117,7 @@ impl ColumnReferenceExpr {
 }
 
 impl ViewColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

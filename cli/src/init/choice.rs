@@ -1,4 +1,4 @@
-use super::{
+use crate::init::{
     error::InitError,
     prompt::{PromptRequest, PromptResponse},
 };
@@ -37,7 +37,7 @@ pub(super) fn select_retained(
 
 #[cfg(test)]
 mod test_select {
-    use super::{PromptResponse, select_retained};
+    use crate::init::choice::{PromptResponse, select_retained};
 
     #[test]
     fn empty_answer_reprompts_even_for_a_single_candidate() {

@@ -62,11 +62,16 @@ pub(super) fn write_response(
 
 #[cfg(test)]
 mod test_response_display {
+    use crate::{
+        direct_sql::results::write_response,
+        test_helpers::direct_sql::results::column_access_response,
+    };
+
     #[test]
     fn displays_returned_column_access_and_unresolved_columns() -> ::testresult::TestResult {
-        let response = crate::test_helpers::direct_sql::results::column_access_response();
+        let response = column_access_response();
         let mut output = Vec::new();
-        super::write_response(&mut output, "queries.yaml#$.queries[2]", &response, true)?;
+        write_response(&mut output, "queries.yaml#$.queries[2]", &response, true)?;
         let output = String::from_utf8(output)?;
         assert!(output.contains("queries.yaml#$.queries[2] (statement 0)"));
         assert!(output.contains("Column access (4):"));
@@ -83,7 +88,7 @@ mod test_response_display {
         );
         assert!(output.contains(expected_accesses), "{output}");
         let mut disabled = Vec::new();
-        super::write_response(&mut disabled, "queries.yaml#$.queries[2]", &response, false)?;
+        write_response(&mut disabled, "queries.yaml#$.queries[2]", &response, false)?;
         let disabled = String::from_utf8(disabled)?;
         assert!(!disabled.contains("Column access"));
         assert!(!disabled.contains("SelectOutput"));
@@ -152,7 +157,7 @@ fn type_name(reference: Option<&TypeReference>) -> String {
 
 #[cfg(test)]
 mod test_type_display {
-    use super::{TypeReference, type_name};
+    use crate::direct_sql::results::{TypeReference, type_name};
 
     #[rstest::rstest]
     #[case::scalar(Some(false), "pg_catalog.int4")]

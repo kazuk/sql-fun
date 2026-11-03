@@ -1,3 +1,4 @@
+use crate::{names::TableName, sem::type_system::SimpleInferResult, syn::FunctionParameter};
 use sql_fun_core::IVec;
 
 use crate::{
@@ -10,7 +11,9 @@ use crate::{
     syn::{Opt, ScanToken},
 };
 
-use super::{FunctionParam, FunctionParameterTrait, ParameterBindResult};
+use crate::sem::type_system::func_params::{
+    FunctionParam, FunctionParameterTrait, ParameterBindResult,
+};
 
 impl FunctionParam {
     /// create new input parameter instance
@@ -56,11 +59,7 @@ pub struct FunctionParamIn {
 }
 
 impl FunctionParamIn {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Some(ty) = &mut self.param_type {
             ty.rename_relation(old, new);
         }
@@ -105,7 +104,7 @@ impl FunctionParameterTrait for FunctionParamIn {
 
     fn from_syn<TParseContext>(
         mut context: TParseContext,
-        param: crate::syn::FunctionParameter,
+        param: FunctionParameter,
         tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
@@ -166,10 +165,7 @@ impl FunctionParameterTrait for FunctionParamIn {
         true
     }
 
-    fn apply_simple_infer_result(
-        &mut self,
-        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
-    ) {
+    fn apply_simple_infer_result(&mut self, simple_infer_result: &SimpleInferResult) {
         if let Some(ty) = self.param_type.as_mut() {
             simple_infer_result.apply(ty);
         }

@@ -1,15 +1,16 @@
+use crate::{CacheContext, ast::Schema, sem::OwnerSpecification, syn::CreateSchemaStmt};
 use sql_fun_core::IVec;
 
 use crate::{ast::TryFromWithTokens, sem::AstAndContextPair, syn::ScanToken};
 
-use super::{AnalysisError, ParseContext, SemAst};
+use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::CreateSchemaStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateSchema {
     if_not_exists: bool,
 
-    owner: Option<crate::sem::OwnerSpecification>,
+    owner: Option<OwnerSpecification>,
     name: String,
     #[expect(dead_code)]
     elements: Vec<SemAst>,
@@ -25,11 +26,11 @@ impl CreateSchema {
     }
 
     /// Retained ownership; None means no ownership information was supplied.
-    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+    pub const fn owner(&self) -> Option<&OwnerSpecification> {
         self.owner.as_ref()
     }
     /// Commit an ownership change, leaving the rest of the definition intact.
-    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+    pub(crate) fn change_owner(&mut self, owner: &OwnerSpecification) {
         self.owner = Some(owner.clone());
     }
 
@@ -50,13 +51,13 @@ impl CreateSchema {
     /// analyze [`crate::syn::CreateSchemaStmt`]
     pub fn analyze_create_schema<TParseContext>(
         context: TParseContext,
-        syn: crate::syn::CreateSchemaStmt,
+        syn: CreateSchemaStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Schema::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, &mut crate::CacheContext::new())
+        Schema::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply(context, &mut CacheContext::new())
     }
 }

@@ -1,3 +1,4 @@
+use crate::{ast::Dialect, sem::CreateCompositeType};
 use std::{
     convert::Infallible,
     io::ErrorKind,
@@ -55,17 +56,14 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
-    pub(crate) fn check_dialect(
-        parsed: crate::ast::Dialect,
-        configured: crate::ast::Dialect,
-    ) -> Result<(), Self> {
+    pub(crate) fn check_dialect(parsed: Dialect, configured: Dialect) -> Result<(), Self> {
         if parsed != configured {
             return Err(Self::dialect_mismatch(parsed, configured));
         }
         Ok(())
     }
 
-    fn dialect_mismatch(parsed: crate::ast::Dialect, configured: crate::ast::Dialect) -> Self {
+    fn dialect_mismatch(parsed: Dialect, configured: Dialect) -> Self {
         Self::UnexpectedInput(format!(
             "statement dialect {parsed} does not match analysis metadata dialect {configured}"
         ))
@@ -115,7 +113,7 @@ impl AnalysisError {
 
     /// registering dynamic type to context
     pub fn raise_register_dynamic_type(
-        _create_comp_type: &super::CreateCompositeType,
+        _create_comp_type: &CreateCompositeType,
     ) -> Result<Infallible, Self> {
         Self::raise_unexpected_input("anonymous composite cannot be registered in the catalog")
     }

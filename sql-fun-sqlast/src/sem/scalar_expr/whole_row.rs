@@ -1,9 +1,10 @@
 use crate::{
     context::ParseContext,
-    names::{AliasName, ColumnName, FullName},
+    names::{AliasName, ColumnName, FullName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, QueryProblem,
-        SemScalarExpr, TypeDefinition, TypeReference,
+        AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, ColumnRename,
+        QueryProblem, SemScalarExpr, TypeDefinition, TypeReference,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -31,14 +32,14 @@ struct RowSource {
 }
 
 impl WholeRowExpr {
-    pub(super) fn has_renamed_field(&self, rename: &crate::sem::ColumnRename) -> bool {
+    pub(super) fn has_renamed_field(&self, rename: &ColumnRename) -> bool {
         self.fields
             .0
             .iter()
             .any(|field| field.value.renamed_column_output(rename).is_some())
     }
 
-    pub(super) fn rename_column(&mut self, rename: &crate::sem::ColumnRename) {
+    pub(super) fn rename_column(&mut self, rename: &ColumnRename) {
         if let RowLookup::Source(source) = &self.lookup
             && source.relation.as_ref() == Some(rename.table().full_name())
         {
@@ -50,11 +51,7 @@ impl WholeRowExpr {
         }
     }
 
-    pub(super) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(super) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let RowLookup::Source(source) = &mut self.lookup {
             if source.relation.as_ref() == Some(old.full_name()) {
                 source.relation = Some(new.full_name().clone());
@@ -133,17 +130,14 @@ impl WholeRowExpr {
             None
         }
     }
-    pub(super) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(super) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.fields.walk(visitor)?;
         Ok(())
     }
-    pub(super) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.fields.visit(visitor)?;
         Ok(())
     }
@@ -324,19 +318,13 @@ impl WholeRowFields {
     fn get_type(&self) -> TypeReference {
         TypeReference::dynamic(&TypeDefinition::implicit_composite(&self.columns()))
     }
-    fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
         for field in &mut self.0 {
             field.value.walk(visitor)?;
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for field in &self.0 {
             field.value.visit(visitor)?;
         }

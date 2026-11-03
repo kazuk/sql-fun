@@ -1,12 +1,13 @@
 use crate::{
     ast::Dialect,
-    context::ParseContext,
+    context::{ParseContext, SchemaFileContext},
     names::{ColumnName, FullName, SchemaName},
     sem::{
-        CastContext, CastDefinition, ColumnDefinition, PgBuiltInType, SamplingMethod,
-        SamplingMethodLookup, SelectStatement, TableSampleSource,
+        AnalysisError, CastContext, CastDefinition, ColumnDefinition, CreateTableAs, CreateView,
+        OverloadVariant, PgBuiltInType, SamplingMethod, SamplingMethodLookup, SelectStatement,
+        SemAst, TableSampleSource, TypeReference, ViewLike,
     },
-    test_helpers::{TestParseContext, source_span},
+    test_helpers::{TestParseContext, schema_layer, source_span},
 };
 
 /// Small explicit offline catalog. No real builtin schema is loaded.
@@ -15,16 +16,16 @@ pub(crate) fn context() -> TestParseContext {
     context.set_get_search_path_result(&[SchemaName::from("public")]);
     for ty in [
         PgBuiltInType::int4(),
-        crate::sem::TypeReference::from_master_type_name("float4"),
-        crate::sem::TypeReference::from_master_type_name("float8"),
+        TypeReference::from_master_type_name("float4"),
+        TypeReference::from_master_type_name("float8"),
         PgBuiltInType::bool(),
         PgBuiltInType::text(),
     ] {
         context.setup_type(ty);
     }
     for target in [
-        crate::sem::TypeReference::from_master_type_name("float4"),
-        crate::sem::TypeReference::from_master_type_name("float8"),
+        TypeReference::from_master_type_name("float4"),
+        TypeReference::from_master_type_name("float8"),
     ] {
         context.set_get_implicit_cast_result(
             &PgBuiltInType::int4(),
@@ -57,7 +58,7 @@ pub(crate) fn context() -> TestParseContext {
             &name,
             &SamplingMethodLookup::found(&SamplingMethod::new(
                 &name,
-                &[crate::sem::TypeReference::from_master_type_name("float4")],
+                &[TypeReference::from_master_type_name("float4")],
                 true,
             )),
         );
@@ -76,7 +77,7 @@ pub(crate) fn context() -> TestParseContext {
         ("aggregate507", false),
         ("set507", false),
     ] {
-        let overload = crate::sem::OverloadVariant::new(
+        let overload = OverloadVariant::new(
             &Some(PgBuiltInType::int4()),
             &vec![crate::sem::FunctionParam::new_input_param(
                 &None,
@@ -108,10 +109,7 @@ pub(crate) fn sources(query: &SelectStatement) -> Vec<TableSampleSource> {
 #[derive(Default)]
 struct Samples(Vec<TableSampleSource>);
 impl crate::sem::traversal::SemanticVisitorMut for Samples {
-    fn table_sample(
-        &mut self,
-        value: &mut TableSampleSource,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    fn table_sample(&mut self, value: &mut TableSampleSource) -> Result<(), AnalysisError> {
         self.0.push(value.clone());
         Ok(())
     }
@@ -121,20 +119,16 @@ impl crate::sem::traversal::SemanticVisitorMut for Samples {
 pub(crate) fn with_views(mut context: TestParseContext) -> TestParseContext {
     let query = query("SELECT id,label FROM sampled", &mut context).unwrap();
     let ordinary = FullName::with_schema("public", "ordinary507");
-    let view = crate::sem::CreateView::new(&ordinary, &query, &[], &None, false);
-    context.set_get_view_impl_result(&ordinary, &Some(crate::sem::ViewLike::from(&view)));
+    let view = CreateView::new(&ordinary, &query, &[], &None, false);
+    context.set_get_view_impl_result(&ordinary, &Some(ViewLike::from(&view)));
     let materialized = FullName::with_schema("public", "materialized507");
-    let definition =
-        crate::sem::CreateTableAs::new(&materialized, &crate::sem::SemAst::select(&query), true);
-    context.set_get_view_impl_result(
-        &materialized,
-        &Some(crate::sem::ViewLike::from(&definition)),
-    );
+    let definition = CreateTableAs::new(&materialized, &SemAst::select(&query), true);
+    context.set_get_view_impl_result(&materialized, &Some(ViewLike::from(&definition)));
     context
 }
 
 /// Explicit schema layer for function-property tests; no builtin initialization.
-pub(crate) fn schema_context() -> crate::context::SchemaFileContext {
+pub(crate) fn schema_context() -> SchemaFileContext {
     let base = context().freeze();
-    crate::test_helpers::schema_layer(std::path::Path::new("sampling-properties.sql"), &base)
+    schema_layer(std::path::Path::new("sampling-properties.sql"), &base)
 }

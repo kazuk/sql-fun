@@ -14,7 +14,7 @@
 //! order and side-effect timing when updating lists, and adjust the affected
 //! semantic tests.
 
-use super::{
+use crate::init::{
     InitializationState,
     conversation::Conversation,
     step::{

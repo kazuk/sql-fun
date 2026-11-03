@@ -2,20 +2,44 @@ mod aggregate_info;
 mod builtin_casts;
 mod builtin_fun;
 mod builtin_ope;
+
 #[cfg(test)]
 mod test_helpers;
+
 pub use self::{
     builtin_casts::PgBuiltinCasts, builtin_fun::PgBuiltInFunctions, builtin_ope::PgBuiltinOperators,
 };
 
+use crate::{
+    ast::Dialect,
+    context::{
+        ConflictMasters, base_context::aggregate_info::builtin_aggregate,
+        ownership::ConfiguredRoles,
+    },
+    names::TableName,
+    sem::{
+        CatalogNameLookup, CollationDefinition, ConflictArbiterInference, CreateFunction,
+        CreateTrigger, DatabaseCollation, InsertConflict, Kind, ObjectKind,
+        OperatorClassDefinition, OverloadVariant, OwnedObjectDefinition, Role, TriggerIdentity,
+        TypeCategory as SemTypeCategory, ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport,
+        ViewUpdateSupport,
+        conflict_info::infer_from_catalog,
+        conflict_masters::{
+            lookup_collation as conflict_masters_lookup_collation,
+            lookup_operator_class as conflict_masters_lookup_operator_class,
+        },
+        ownership::model_definitions,
+    },
+};
+
 use std::{fs::File, io::BufReader, path::Path};
 
-use crate::context::BaseParseContext;
 use crate::{
     TrieMap,
     context::{
-        FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead,
-        SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
+        BaseParseContext, FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead,
+        OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
+        ViewInfoRead,
     },
     names::{FullName, OperatorName, SchemaName},
     sem::{
@@ -30,7 +54,7 @@ use serde::de::DeserializeOwned;
 /// Builtin schema information initialized from the selected metadata.
 #[derive(Debug)]
 pub struct BaseContext {
-    configured_roles: crate::context::ownership::ConfiguredRoles,
+    configured_roles: ConfiguredRoles,
     context_args: SqlFunArgs,
     metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
@@ -41,7 +65,7 @@ pub struct BaseContext {
     right_unary_operators: TrieMap<OperatorDefinition>,
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
-    masters: crate::context::ConflictMasters,
+    masters: ConflictMasters,
 }
 
 #[derive(serde::Deserialize)]
@@ -49,14 +73,14 @@ struct BuiltinTypeInfo {
     schema: String,
     name: String,
     #[serde(default)]
-    category: Option<crate::sem::TypeCategory>,
+    category: Option<SemTypeCategory>,
     #[serde(deserialize_with = "crate::sem::pg_type::deserialize_collatable")]
     collatable: Option<bool>,
 }
 
 #[cfg(test)]
 mod builtin_type_info_tests {
-    use super::BuiltinTypeInfo;
+    use crate::context::base_context::BuiltinTypeInfo;
 
     #[rstest::rstest]
     #[case::missing_schema(r#"{"name":"text","collatable":true}"#)]
@@ -77,9 +101,8 @@ impl From<&BuiltinTypeInfo> for TypeDefinition {
 
 #[cfg(test)]
 mod builtin_type_conversion_tests {
-    use super::BuiltinTypeInfo;
     use crate::{
-        context::BaseParseContext,
+        context::{BaseParseContext, base_context::BuiltinTypeInfo},
         names::FullName,
         sem::{TypeDefinition, TypeReference},
         test_helpers::TestParseContext,
@@ -198,10 +221,10 @@ impl BaseContext {
             PgBuiltinOperators::load_left_unary(paths.left_unary_operators()?)?;
         let right_unary_operators =
             PgBuiltinOperators::load_right_unary(paths.right_unary_operators()?)?;
-        let masters = if crate::ast::Dialect::from(metadata) == crate::ast::Dialect::sqlite() {
-            crate::context::ConflictMasters::sqlite()
+        let masters = if Dialect::from(metadata) == Dialect::sqlite() {
+            ConflictMasters::sqlite()
         } else {
-            crate::context::ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
+            ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
         };
 
         let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
@@ -275,8 +298,12 @@ impl BaseContext {
 
 #[cfg(test)]
 mod read_builtin_types_tests {
-    use super::{BaseContext, test_helpers};
-    use crate::{names::FullName, sem::TypeReference, test_helpers::TestParseContext};
+    use crate::{
+        context::base_context::{BaseContext, test_helpers},
+        names::FullName,
+        sem::TypeReference,
+        test_helpers::TestParseContext,
+    };
 
     #[rstest::rstest]
     #[case::empty_schema(r#"[{"schema":"","name":"text","collatable":true}]"#)]
@@ -340,7 +367,7 @@ impl TypeInfoRead for BaseContext {
     }
 
     fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
-        if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres() {
+        if Dialect::from(&self.metadata) != Dialect::postgres() {
             return None;
         }
         self.types.get(&name.to_string())?;
@@ -355,7 +382,7 @@ impl TypeInfoRead for BaseContext {
         if type_name.is_array() == Some(true) {
             Some(type_name.element_type())
         } else {
-            if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres() {
+            if Dialect::from(&self.metadata) != Dialect::postgres() {
                 return None;
             }
             let (name, _) = self.builtin_cast_type(type_name)?;
@@ -383,7 +410,7 @@ impl ViewInfoRead for BaseContext {
 }
 
 impl IndexInfoRead for BaseContext {
-    fn indexes_for_table(&self, _table: &crate::names::TableName) -> Vec<&CreateIndex> {
+    fn indexes_for_table(&self, _table: &TableName) -> Vec<&CreateIndex> {
         Vec::new()
     }
     fn get_index_impl(&self, _index_name: &FullName) -> Option<&CreateIndex> {
@@ -400,21 +427,13 @@ impl SequenceInfoRead for BaseContext {
 
 impl FunctionInfoRead for BaseContext {
     fn is_aggregate_impl(&self, name: &FullName) -> bool {
-        self::aggregate_info::builtin_aggregate(name)
+        builtin_aggregate(name)
     }
-    fn function_preserves_view_rows(
-        &self,
-        name: &FullName,
-        overload: &crate::sem::OverloadVariant,
-    ) -> bool {
+    fn function_preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         self.functions.preserves_view_rows(name, overload)
     }
 
-    fn function_returns_set(
-        &self,
-        name: &FullName,
-        overload: &crate::sem::OverloadVariant,
-    ) -> bool {
+    fn function_returns_set(&self, name: &FullName, overload: &OverloadVariant) -> bool {
         self.functions.returns_set(name, overload)
     }
 
@@ -478,10 +497,7 @@ impl GetSourcePathWithSpanOpt for BaseContext {
 }
 
 impl crate::context::TriggerInfoRead for BaseContext {
-    fn trigger(
-        &self,
-        _identity: &crate::sem::TriggerIdentity,
-    ) -> Option<&crate::sem::CreateTrigger> {
+    fn trigger(&self, _identity: &TriggerIdentity) -> Option<&CreateTrigger> {
         None
     }
 }
@@ -513,95 +529,88 @@ where
 }
 
 impl crate::context::ConflictInfoRead for BaseContext {
-    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+    fn database_collation(&self) -> Option<&DatabaseCollation> {
         self.masters.database()
     }
-    fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition> {
+    fn collation_definition(&self, name: &FullName) -> Option<&CollationDefinition> {
         self.masters.qualified_collation(name)
     }
     fn operator_class_definition(
         &self,
         name: &FullName,
         method: &str,
-    ) -> Option<&crate::sem::OperatorClassDefinition> {
+    ) -> Option<&OperatorClassDefinition> {
         self.masters.operator_class(name, method)
     }
-    fn lookup_sqlite_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
+    fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.masters.sqlite_lookup(name)
     }
-    fn lookup_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
-        crate::sem::conflict_masters::lookup_collation(self, name)
+    fn lookup_collation(&self, name: &FullName) -> CatalogNameLookup {
+        conflict_masters_lookup_collation(self, name)
     }
-    fn lookup_operator_class(
-        &self,
-        name: &FullName,
-        access_method: &str,
-    ) -> crate::sem::CatalogNameLookup {
-        crate::sem::conflict_masters::lookup_operator_class(self, name, access_method)
+    fn lookup_operator_class(&self, name: &FullName, access_method: &str) -> CatalogNameLookup {
+        conflict_masters_lookup_operator_class(self, name, access_method)
     }
     fn infer_conflict_arbiters(
         &self,
-        table: &crate::names::TableName,
-        conflict: &crate::sem::InsertConflict,
-    ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-        crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
+        table: &TableName,
+        conflict: &InsertConflict,
+    ) -> Result<ConflictArbiterInference, AnalysisError> {
+        infer_from_catalog(self, table, conflict)
     }
 }
 
 impl crate::context::ViewInsertInfoRead for BaseContext {
-    fn view_insert_support(&self, _view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
+    fn view_insert_support(&self, _view: &FullName) -> Option<&ViewInsertSupport> {
         None
     }
 }
 
 impl crate::context::ViewUpdateInfoRead for BaseContext {
-    fn view_update_support(
-        &self,
-        _view: &crate::names::FullName,
-    ) -> Option<&crate::sem::ViewUpdateSupport> {
+    fn view_update_support(&self, _view: &FullName) -> Option<&ViewUpdateSupport> {
         None
     }
 }
 
 impl crate::context::ViewDeleteInfoRead for BaseContext {
-    fn view_delete_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewDeleteSupport {
+    fn view_delete_support(&self, _view: &FullName) -> ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
 impl crate::context::ViewMergeInfoRead for BaseContext {
-    fn view_merge_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewMergeSupport {
+    fn view_merge_support(&self, _view: &FullName) -> ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }
 }
 
 impl crate::context::RoleInfoRead for BaseContext {
-    fn registered_role_by_name(&self, _name: &str) -> Option<&crate::sem::Role> {
+    fn registered_role_by_name(&self, _name: &str) -> Option<&Role> {
         None
     }
 
-    fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
+    fn role_by_name(&self, name: &str) -> Option<&Role> {
         self.configured_roles.role(name)
     }
 }
 impl crate::context::OwnershipInfoRead for BaseContext {
-    fn routine_definitions(&self, name: &FullName) -> Vec<crate::sem::CreateFunction> {
+    fn routine_definitions(&self, name: &FullName) -> Vec<CreateFunction> {
         self.get_function_impl(name)
             .map_or_else(Vec::new, |overloads| {
-                crate::sem::CreateFunction::new(name, &overloads, &None).split_definitions()
+                CreateFunction::new(name, &overloads, &None).split_definitions()
             })
     }
     fn ownership_definitions(
         &self,
-        kind: crate::sem::ObjectKind,
+        kind: ObjectKind,
         name: &FullName,
-    ) -> Vec<crate::sem::OwnedObjectDefinition> {
-        crate::sem::ownership::model_definitions(self, kind, name)
+    ) -> Vec<OwnedObjectDefinition> {
+        model_definitions(self, kind, name)
     }
 }
 
 impl crate::context::ObjectInfoRead for BaseContext {
-    fn object_kind(&self, _: &FullName) -> Option<crate::sem::Kind> {
+    fn object_kind(&self, _: &FullName) -> Option<Kind> {
         None
     }
 }

@@ -1,10 +1,19 @@
-use super::test_helpers::catalog;
-use crate::ast::{CteDefinition, Dialect, HaveWithClause, Statement, StatementKind};
-use crate::context::ParseContext;
-use crate::{names::ColumnName, sem::PgBuiltInType};
+use crate::{
+    ast::{
+        CteDefinition, Dialect, HaveWithClause, Statement, StatementKind,
+        document::merge::tests::test_helpers::catalog,
+    },
+    context::ParseContext,
+    names::ColumnName,
+    parse_statements,
+    sem::{
+        PgBuiltInType, parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+    },
+    test_helpers::create_cache_context,
+};
 
 fn statement(sql: &str) -> Statement {
-    crate::parse_statements(sql, Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .expect("one statement")
         .expect(sql)
@@ -12,7 +21,7 @@ fn statement(sql: &str) -> Statement {
 
 #[test]
 fn public_statement_entry_point_analyzes_and_deparses_merge() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let source = statement(
         "MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel RETURNING t.id",
     );
@@ -35,7 +44,7 @@ fn public_statement_entry_point_analyzes_and_deparses_merge() {
 
 #[test]
 fn merge_cte_alias_is_visible_to_the_outer_query() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let source = statement(
         "WITH changed(renamed_id) AS (MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel RETURNING t.id) SELECT renamed_id FROM changed",
     );
@@ -85,7 +94,7 @@ fn merge_cte_body_can_be_inserted_and_roundtripped() {
 
 #[test]
 fn merge_statement_with_clause_can_be_mutated_and_deparsed() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut merge = statement(
         "MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel",
     );
@@ -112,7 +121,7 @@ fn merge_statement_with_clause_can_be_mutated_and_deparsed() {
 
 #[test]
 fn nested_merge_cte_placement_is_rejected() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let source = statement(
         "SELECT * FROM (WITH changed AS (MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel RETURNING t.id) SELECT id FROM changed) AS nested",
     );
@@ -125,7 +134,7 @@ fn nested_merge_cte_placement_is_rejected() {
 
 #[test]
 fn returning_parameter_defaults_to_text_before_merge_action_assignment() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let source = statement(
         "MERGE INTO items AS t USING incoming AS s ON t.id = $2 WHEN MATCHED AND $3 THEN UPDATE SET id = $1 WHEN NOT MATCHED THEN INSERT (id) VALUES ($1) RETURNING $1 AS value",
     );
@@ -138,7 +147,7 @@ fn returning_parameter_defaults_to_text_before_merge_action_assignment() {
 
 #[test]
 fn postgres_18_merge_row_image_stars_expand_the_target_columns() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let source = statement(
         "MERGE INTO items AS t USING incoming AS s ON true WHEN MATCHED THEN UPDATE SET label = s.slabel WHEN NOT MATCHED BY SOURCE THEN DELETE WHEN NOT MATCHED BY TARGET THEN INSERT (id, label) VALUES (s.sid, s.slabel) RETURNING old.*, new.*",
     );
@@ -150,11 +159,11 @@ fn postgres_18_merge_row_image_stars_expand_the_target_columns() {
 
 #[test]
 fn cte_source_and_merge_actions_share_parameter_analysis() {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let source = statement(
         "WITH input AS (SELECT $1::integer AS sid) MERGE INTO items t USING input s ON true WHEN MATCHED THEN UPDATE SET id=s.sid WHEN NOT MATCHED THEN INSERT(id) VALUES(s.sid) RETURNING t.id",
     );
-    let before = crate::sem::parameter_resolution::inference_runs();
+    let before = parameter_resolution_inference_runs();
     let analyzed = source.analyze(catalog(17), &mut cache_context).unwrap();
     assert_eq!(analyzed.context().reported_problem_count(), 0);
     assert_eq!(

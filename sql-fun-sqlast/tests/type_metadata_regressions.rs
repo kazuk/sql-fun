@@ -248,6 +248,8 @@ mod test_helpers {
     pub(crate) use self::cache_context::create_cache_context;
 
     pub(super) mod heavy {
+        use crate::test_helpers::create_cache_context;
+
         use ::sql_fun_sqlast::{
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
@@ -294,7 +296,7 @@ mod test_helpers {
             schema: &str,
             sql: &str,
         ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
-            let mut cache_context = crate::test_helpers::create_cache_context();
+            let mut cache_context = create_cache_context();
             let base = catalog(schema)?;
             let (args, selected) = environment()?;
             let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);

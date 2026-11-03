@@ -1,13 +1,13 @@
-use crate::ast::{
-    Dialect, FromItem, Query, QueryBody, Select, Statement, StatementNode, TableFunctions,
-};
 use crate::{
+    StringSpan,
+    ast::{Dialect, FromItem, Query, QueryBody, Select, Statement, StatementNode, TableFunctions},
     names::{AliasName, ColumnName},
+    parse_statements,
     sem::{WildcardRowsFunction, WildcardRowsSource},
 };
 
 pub(super) fn invocation(sql: &str) -> TableFunctions {
-    crate::parse_statements(sql, Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
@@ -90,7 +90,7 @@ pub(super) fn rendered(source: FromItem) -> String {
     Statement::from_node(
         StatementNode::query(Query::projection(&[], &[source])),
         Dialect::postgres(),
-        crate::StringSpan::default(),
+        StringSpan::default(),
     )
     .deparse_sql(Dialect::postgres())
     .unwrap()

@@ -1,4 +1,4 @@
-use super::{BoxedKeyFragment, KeyFragment, TrieLeafIter, TrieLeaves};
+use crate::trie_map::{BoxedKeyFragment, KeyFragment, TrieLeafIter, TrieLeaves};
 
 #[derive(Debug)]
 pub(super) struct TrieNode<TValue> {

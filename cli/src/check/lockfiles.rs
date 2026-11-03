@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test_helpers;
 
-use super::submission::QueryAnalysis;
+use crate::check::submission::QueryAnalysis;
 use ::anyhow::Context;
 use ::sql_fun_client::payloads::{AnalyzeQueryItem, TypeReference};
 use ::sql_fun_codegen::QueryRequirement;
@@ -192,7 +192,7 @@ impl From<&TypeReference> for SqlTypeName {
 
 #[cfg(test)]
 mod test_statement {
-    use super::{SqlTypeName, statement_from_item, test_helpers::statement};
+    use crate::check::lockfiles::{SqlTypeName, statement_from_item, test_helpers::statement};
     use ::sql_fun_client::payloads::TypeReference;
 
     #[test]

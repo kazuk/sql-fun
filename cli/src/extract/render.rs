@@ -64,7 +64,7 @@ impl Renderer {
 
 #[cfg(test)]
 mod tests {
-    use super::{Renderer, fragment, identifier};
+    use crate::extract::render::{Renderer, fragment, identifier};
 
     #[test]
     fn renders_legal_quoted_names_signatures_and_expressions() {

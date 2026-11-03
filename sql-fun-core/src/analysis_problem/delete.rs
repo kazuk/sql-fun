@@ -1,4 +1,4 @@
-use super::{DiagnosticMetadata, TableName};
+use crate::analysis_problem::{DiagnosticMetadata, TableName};
 
 /// A normalized portal name retained by a cursor diagnostic.
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
@@ -174,7 +174,7 @@ impl DeleteProblemKind {
 
 #[cfg(test)]
 mod cursor_message_tests {
-    use super::DeleteProblemKind;
+    use crate::analysis_problem::delete::DeleteProblemKind;
 
     #[rstest::rstest]
     #[case::missing(

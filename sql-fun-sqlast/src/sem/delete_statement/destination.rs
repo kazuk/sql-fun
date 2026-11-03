@@ -1,4 +1,5 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::{FullName, TableName, ViewName},
     sem::{ViewDeleteSupport, ViewLike, search_path::expand_relation_search_path},
@@ -34,7 +35,7 @@ impl DeleteDestination {
     }
     fn resolve_at(context: &impl ParseContext, key: &FullName) -> Option<Self> {
         let canonical;
-        let key = if context.dialect() == crate::ast::Dialect::sqlite() {
+        let key = if context.dialect() == Dialect::sqlite() {
             canonical = context.sqlite_relation_identity(key)?;
             &canonical
         } else {

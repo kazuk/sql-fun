@@ -1,5 +1,18 @@
 //! The caller's selected metadata survives context initialization and analysis.
 
+#[cfg(feature = "sqlite")]
+use crate::SqliteDialect;
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect as AstDialect;
+#[cfg(feature = "sqlite")]
+use crate::parse_statements;
+#[cfg(feature = "sqlite")]
+use crate::sem::SemAst;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::TestParseContext;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::create_cache_context;
+
 use crate::{
     AstAndContextPair, PostgresDialect,
     sem::SelectStatement,
@@ -34,12 +47,12 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
 -> Result<(), Box<dyn std::error::Error>> {
     let metadata = test_helpers::selected_metadata("selected-sqlite.toml")?;
     let context = test_helpers::context(&metadata)?;
-    let statement = crate::SqliteDialect::parse("select q.n as n from ((select 42 as n)) as q")?
+    let statement = SqliteDialect::parse("select q.n as n from ((select 42 as n)) as q")?
         .expect("statement")
         .into_plain_statement()
         .expect("plain SELECT");
     test_helpers::assert_selected_metadata(&context, &metadata);
-    let AstAndContextPair(ast, context) = crate::sem::SemAst::semantic_analysis_sqlite_stmt(
+    let AstAndContextPair(ast, context) = SemAst::semantic_analysis_sqlite_stmt(
         context,
         statement,
         &::sql_fun_core::IVec::default(),
@@ -61,8 +74,8 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
 fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
 -> testresult::TestResult {
     use crate::context::{BaseParseContext, ParseContext};
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let base = crate::test_helpers::TestParseContext::default().freeze();
+    let mut cache_context = create_cache_context();
+    let base = TestParseContext::default().freeze();
     let selected = test_helpers::selected_metadata("selected-sqlite.toml")?;
     let context = test_helpers::context_over_catalog(&base, &selected)?;
     assert_eq!(
@@ -77,13 +90,10 @@ fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
         ::sql_fun_core::SqlDialect::PostgreSQL
     );
     assert_eq!(context.metadata().name(), selected.name());
-    let analyzed = crate::parse_statements(
-        "select cast(?1 as integer) as n",
-        crate::ast::Dialect::sqlite(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(context, &mut cache_context)?;
+    let analyzed = parse_statements("select cast(?1 as integer) as n", AstDialect::sqlite())
+        .next()
+        .unwrap()?
+        .analyze(context, &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -100,7 +110,7 @@ fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
 fn selected_dialect_does_not_depend_on_the_engine_name() -> testresult::TestResult {
     use crate::context::{BaseParseContext, ParseContext};
     let metadata = test_helpers::sqlite_compatible_engine()?;
-    let context = crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
+    let context = TestParseContext::default().with_metadata(&metadata);
     assert_eq!(context.dialect(), crate::ast::Dialect::sqlite());
     assert_eq!(
         context.metadata().engine().as_custom().map(String::as_str),
@@ -112,9 +122,9 @@ fn selected_dialect_does_not_depend_on_the_engine_name() -> testresult::TestResu
 #[cfg(feature = "sqlite")]
 #[test]
 fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    let context = crate::test_helpers::TestParseContext::default();
-    let statement = crate::parse_statements("select 1", crate::ast::Dialect::sqlite())
+    let mut cache_context = create_cache_context();
+    let context = TestParseContext::default();
+    let statement = parse_statements("select 1", AstDialect::sqlite())
         .next()
         .unwrap()?;
     let error = statement
@@ -127,6 +137,8 @@ fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
 }
 
 mod test_helpers {
+    use crate::StringSpan;
+
     use crate::{
         context::{
             BaseContext, BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan,
@@ -190,7 +202,7 @@ mod test_helpers {
         };
         context.set_source_path_with_span(&SourcePathWithSpan::new(
             "query.sql",
-            &crate::StringSpan::default(),
+            &StringSpan::default(),
         ));
         Ok(context)
     }

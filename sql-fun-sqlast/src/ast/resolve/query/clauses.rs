@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         Dialect, Expr, Frame, FrameBound, FrameExclusion, FrameMode, Grouping, Literal, Lock,
-        LockStrength, LockWait, Name, Order, Window,
+        LockStrength, LockWait, Name, Order, QueryBody, Select, Window,
     },
     context::ParseContext,
     names::ColumnName,
@@ -105,7 +105,7 @@ impl Name {
 impl Order {
     pub(super) fn resolve_for_query(
         values: &[Self],
-        body: &crate::ast::QueryBody,
+        body: &QueryBody,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
@@ -439,7 +439,7 @@ impl Expr {
         Some(writer.into_sql())
     }
 }
-impl crate::ast::QueryBody {
+impl QueryBody {
     fn match_sqlite_order(&self, expression: &Expr) -> Option<usize> {
         match self {
             Self::Select(select) => select.match_sqlite_order(expression),
@@ -459,7 +459,7 @@ impl crate::ast::QueryBody {
         }
     }
 }
-impl crate::ast::Select {
+impl Select {
     fn match_sqlite_order(&self, expression: &Expr) -> Option<usize> {
         let key = expression.sqlite_comparison_sql()?;
         self.targets.iter().position(|target| {

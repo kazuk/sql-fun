@@ -1,4 +1,4 @@
-use crate::ast::Dialect;
+use crate::ast::{Dialect, resolve::delete::tests::test_helpers::resolve};
 
 #[rstest::rstest]
 #[case::postgres17("17", true)]
@@ -9,7 +9,7 @@ fn returning_row_images_use_configured_engine_version(
     #[case] missing: bool,
 ) {
     let mut context = test_helpers::catalog_for_version(version);
-    let statement = super::test_helpers::resolve(
+    let statement = resolve(
         "DELETE FROM items RETURNING old.id,new.id",
         &mut context,
         Dialect::postgres(),
@@ -32,7 +32,7 @@ fn returning_row_images_use_configured_engine_version(
 #[case::nested("DELETE FROM items RETURNING (SELECT old.id)", 1)]
 fn row_images_preserve_typed_catalog_bindings(#[case] sql: &str, #[case] width: usize) {
     let mut context = test_helpers::catalog_for_version("18");
-    let result = super::test_helpers::resolve(sql, &mut context, Dialect::postgres()).unwrap();
+    let result = resolve(sql, &mut context, Dialect::postgres()).unwrap();
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -63,7 +63,7 @@ fn row_images_preserve_typed_catalog_bindings(#[case] sql: &str, #[case] width: 
 #[rstest::rstest]
 fn explicit_old_alias_is_ordinary_source(#[values("17", "18")] version: &str) {
     let mut context = test_helpers::catalog_for_version(version);
-    let result = super::test_helpers::resolve(
+    let result = resolve(
         "DELETE FROM items AS old RETURNING old.id",
         &mut context,
         Dialect::postgres(),
@@ -85,11 +85,15 @@ fn explicit_old_alias_is_ordinary_source(#[values("17", "18")] version: &str) {
 }
 
 mod test_helpers {
-    pub(super) fn catalog_for_version(version: &str) -> crate::test_helpers::TestParseContext {
+    use crate::{
+        ast::{Dialect, resolve::delete::tests::test_helpers::catalog},
+        test_helpers::TestParseContext,
+    };
+
+    pub(super) fn catalog_for_version(version: &str) -> TestParseContext {
         let metadata = ::serde_json::from_value(::serde_json::json!({
             "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
         })).unwrap();
-        super::super::test_helpers::catalog(crate::ast::Dialect::postgres())
-            .with_metadata(&metadata)
+        catalog(Dialect::postgres()).with_metadata(&metadata)
     }
 }

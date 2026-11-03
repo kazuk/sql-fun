@@ -1,9 +1,14 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
-    context::{ParseContext, ViewInfoRead, ViewInfoWrite},
+    context::{
+        ParseContext, ViewInfoRead, ViewInfoWrite,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
+    },
     names::FullName,
-    sem::{AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, ViewLike},
+    sem::{
+        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, Kind, ViewLike,
+        problem::CreationProblem, search_path::expand_relation_search_path,
+    },
     syn::ObjectType,
 };
 
@@ -57,15 +62,13 @@ impl ViewInfoWrite for SchemaFileContext {
         Self: Sized,
     {
         let view_name = alter_view.view();
-        let Some((key, mut view)) = crate::sem::search_path::expand_relation_search_path(
-            &self,
-            view_name.full_name(),
-            |key| {
+        let Some((key, mut view)) =
+            expand_relation_search_path(&self, view_name.full_name(), |key| {
                 self.get_view_impl(key)
                     .cloned()
                     .map(|view| (key.clone(), view))
-            },
-        ) else {
+            })
+        else {
             self.report_analysis_problem(AnalysisProblem::view_not_found(view_name))?;
             return Ok(self);
         };
@@ -88,7 +91,7 @@ impl ViewInfoWrite for SchemaFileContext {
             ObjectType::ObjectMatview => {
                 if !self.permits_relation_creation(
                     &name,
-                    crate::sem::Kind::materialized_view(),
+                    Kind::materialized_view(),
                     create_table_as.if_not_exists(),
                     false,
                 )? {
@@ -111,9 +114,9 @@ impl ViewInfoWrite for SchemaFileContext {
         }
         let name = self.creation_name(create_view.name(), create_view.temporary())?;
         let kind = if create_view.is_materialized() {
-            crate::sem::Kind::materialized_view()
+            Kind::materialized_view()
         } else {
-            crate::sem::Kind::view()
+            Kind::view()
         };
         if !self.permits_relation_creation(
             &name,
@@ -131,13 +134,11 @@ impl ViewInfoWrite for SchemaFileContext {
                 .result_columns()
                 .can_replace_view_columns(previous.result_columns())
             {
-                self.report_analysis_problem(AnalysisProblem::creation(
-                    crate::sem::problem::CreationProblem::named(
-                        &name,
-                        "view replacement",
-                        &self.creation_span(),
-                    ),
-                ))?;
+                self.report_analysis_problem(AnalysisProblem::creation(CreationProblem::named(
+                    &name,
+                    "view replacement",
+                    &self.creation_span(),
+                )))?;
                 return Ok(self);
             }
             if let Some(previous) = previous.ordinary_definition()

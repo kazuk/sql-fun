@@ -1,6 +1,8 @@
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::TableInternalId;
 
-use super::Expr;
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::expr::Expr;
 
 /// column expression
 #[derive(Clone, Debug, derive_getters::Getters)]

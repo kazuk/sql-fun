@@ -1,4 +1,5 @@
 //! Semantic behavior at the query-analysis boundary. All fixtures use a small catalog.
+
 mod array_subquery;
 mod call_arguments;
 mod column_scope;
@@ -9,11 +10,25 @@ mod source_namespace;
 mod table_functions;
 mod whole_rows;
 
-use super::test_helpers::{output_index, output_type, query, resolve};
-use crate::ast::Dialect;
-use crate::context::ParseContext;
-use crate::sem::{
-    ColumnReferenceExpr, PgBuiltInType, QueryGrouping, QueryNameResolution, SemScalarExpr,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, QueryProblem as SemQueryProblem, SelectStatement,
+        TypeReference as SemTypeReference,
+        parameter_resolution::{
+            ParameterResolution, inference_runs as parameter_resolution_inference_runs,
+        },
+    },
+    test_helpers::create_cache_context,
+};
+
+use crate::{
+    ast::{
+        Dialect,
+        resolve::query::test_helpers::{output_index, output_type, query, resolve},
+    },
+    context::ParseContext,
+    sem::{ColumnReferenceExpr, PgBuiltInType, QueryGrouping, QueryNameResolution, SemScalarExpr},
 };
 
 #[test]
@@ -67,7 +82,7 @@ fn retains_query_and_select_structure() {
 fn infers_parameters_outside_projection(
     #[case] sql: &str,
     #[case] position: u32,
-    #[case] ty: crate::sem::TypeReference,
+    #[case] ty: SemTypeReference,
 ) {
     let (_, context) = resolve(sql, Dialect::postgres(), true).unwrap();
     assert_eq!(
@@ -119,10 +134,7 @@ fn preserves_failed_column_resolution(#[case] sql: &str, #[case] ambiguous: bool
         ambiguous: usize,
     }
     impl crate::sem::traversal::SemanticVisitorMut for Failures {
-        fn expression(
-            &mut self,
-            expression: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             match expression {
                 SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedColumn(_)) => {
                     self.missing += 1
@@ -168,10 +180,7 @@ fn records_window_resolution(
     assert_eq!(context.reported_problem_count(), problems);
     struct Windows(Vec<QueryNameResolution>);
     impl crate::sem::traversal::SemanticVisitorMut for Windows {
-        fn expression(
-            &mut self,
-            expression: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::FuncCall(call) = expression {
                 self.0.push(
                     call.modifiers()
@@ -204,7 +213,7 @@ fn compound_boundary_owns_its_trailing_clauses() {
     assert_eq!(boundary.order().len(), 1);
     assert!(boundary.limit().is_some());
     assert!(boundary.offset().is_some());
-    let crate::sem::SelectStatement::Set(set) = boundary.body() else {
+    let SelectStatement::Set(set) = boundary.body() else {
         panic!("compound body");
     };
     assert!(set.left().query_clauses().unwrap().order().is_empty());
@@ -227,10 +236,7 @@ fn ctes_are_owned_once_in_declaration_order() {
     assert_eq!(second.name(), "b");
     struct Parameters(usize);
     impl crate::sem::traversal::SemanticVisitorMut for Parameters {
-        fn expression(
-            &mut self,
-            expression: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if matches!(expression, SemScalarExpr::Param(_)) {
                 self.0 += 1;
             }
@@ -248,7 +254,7 @@ fn ctes_are_owned_once_in_declaration_order() {
 #[case::nested("WITH a AS (SELECT 1 AS n ORDER BY n) SELECT n FROM a ORDER BY (SELECT 1)")]
 #[case::compound("SELECT 1 UNION ALL SELECT 2 ORDER BY 1 LIMIT 1")]
 fn parameter_free_queries_skip_inference(#[case] sql: &str) {
-    let before = crate::sem::parameter_resolution::inference_runs();
+    let before = parameter_resolution_inference_runs();
     let (_, context) = resolve(sql, Dialect::postgres(), true).unwrap();
     assert_eq!(context.reported_problem_count(), 0);
     assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
@@ -279,7 +285,7 @@ fn sqlite_retains_clause_parameters(#[case] sql: &str) {
     crate::sem::TypeReference::from_master_type_name("interval")
 )]
 #[case::using("SELECT 1 ORDER BY $7 USING <", PgBuiltInType::int4())]
-fn uses_clause_specific_constraints(#[case] sql: &str, #[case] ty: crate::sem::TypeReference) {
+fn uses_clause_specific_constraints(#[case] sql: &str, #[case] ty: SemTypeReference) {
     let (_, context) = resolve(sql, Dialect::postgres(), true).unwrap();
     assert_eq!(
         context.reported_problem_count(),
@@ -311,10 +317,7 @@ fn retains_function_modifiers_after_inference_without_duplicate_operands() {
         parameters: Vec<u32>,
     }
     impl crate::sem::traversal::SemanticVisitorMut for Calls {
-        fn expression(
-            &mut self,
-            expression: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::Param(parameter) = expression {
                 self.parameters.push(parameter.position());
             }
@@ -421,19 +424,11 @@ fn inference_uses_captured_function_and_operator_bindings() {
     )
     .unwrap();
     catalog.setup_function("sum", &[]);
-    catalog.set_get_operator_op_result(
-        &crate::names::OperatorName::from_parts(None, "+"),
-        true,
-        true,
-        None,
-    );
+    catalog.set_get_operator_op_result(&OperatorName::from_parts(None, "+"), true, true, None);
     catalog.begin_parameter_type_analysis();
-    let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
-        &mut query,
-        &mut catalog,
-        &mut crate::test_helpers::create_cache_context(),
-    )
-    .unwrap();
+    let constraints =
+        ParameterResolution::infer_query(&mut query, &mut catalog, &mut create_cache_context())
+            .unwrap();
     catalog.finish_analysis(Ok(())).unwrap();
     assert_eq!(catalog.reported_problem_count(), 0);
     assert!(
@@ -526,10 +521,7 @@ fn failed_function_name_lookup_survives_inference() {
     assert_eq!(context.reported_problem_count(), 1);
     struct Bindings(usize);
     impl crate::sem::traversal::SemanticVisitorMut for Bindings {
-        fn expression(
-            &mut self,
-            expression: &mut SemScalarExpr,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
             if let SemScalarExpr::Constrained(value) = expression
                 && let Some(binding) = value.function_binding()
             {
@@ -603,10 +595,7 @@ fn sqlite_window_definitions_do_not_bind_projection_aliases() {
     "SELECT 1 UNION SELECT 2 ORDER BY 1 + 1",
     vec![crate::sem::QueryProblem::invalid_compound_order()]
 )]
-fn reports_structured_query_problems(
-    #[case] sql: &str,
-    #[case] expected: Vec<crate::sem::QueryProblem>,
-) {
+fn reports_structured_query_problems(#[case] sql: &str, #[case] expected: Vec<SemQueryProblem>) {
     let (_, context) = resolve(sql, Dialect::postgres(), false).unwrap();
     let mut actual = Vec::new();
     for problem in context.reported_problems() {

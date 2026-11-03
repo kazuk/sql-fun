@@ -1,7 +1,7 @@
-use crate::context::BaseParseContext;
 use crate::{
+    context::BaseParseContext,
     names::{FullName, TableName},
-    sem::{AnalysisError, InsertArbiter, InsertConflict},
+    sem::{AnalysisError, AnalysisProblem, InsertArbiter, InsertConflict},
 };
 
 /// A completed catalog name lookup, retaining the requested spelling separately
@@ -90,17 +90,17 @@ impl LookupOutcome {
 /// A completed arbiter lookup or an explicit catalog diagnostic.
 /// Missing view metadata must not masquerade as a completed empty inference.
 #[derive(Debug, Clone)]
-pub struct ConflictArbiterInference(Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>>);
+pub struct ConflictArbiterInference(Result<Vec<InsertArbiter>, Box<AnalysisProblem>>);
 impl ConflictArbiterInference {
     /// Record completed inference, including a genuine no-match result.
     pub fn complete(arbiters: &[InsertArbiter]) -> Self {
         Self(Ok(arbiters.to_vec()))
     }
-    pub(crate) fn problem(problem: &crate::sem::AnalysisProblem) -> Self {
+    pub(crate) fn problem(problem: &AnalysisProblem) -> Self {
         Self(Err(Box::new(problem.clone())))
     }
     /// Consume the lookup while preserving an incomplete catalog diagnostic.
-    pub fn into_result(self) -> Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>> {
+    pub fn into_result(self) -> Result<Vec<InsertArbiter>, Box<AnalysisProblem>> {
         self.0
     }
 }

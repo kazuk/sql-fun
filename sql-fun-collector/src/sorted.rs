@@ -186,7 +186,7 @@ where
 
 #[cfg(test)]
 mod test_view_head {
-    use super::{ExtractKey, Sorted, SortedSlice, SortedSliceView, SortedVec};
+    use crate::sorted::{ExtractKey, Sorted, SortedSlice, SortedSliceView, SortedVec};
 
     struct Row(i32, i32, i32);
 

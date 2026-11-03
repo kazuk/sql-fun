@@ -1,5 +1,13 @@
 //! Enduring SQL-to-catalog rename contracts with explicit metadata.
+
 mod test_helpers;
+
+#[cfg(feature = "sqlite")]
+use crate::names::FullName as NamesFullName;
+use crate::{
+    names::SchemaName,
+    sem::{ColumnConstraint, QueryMetadata, SemAst},
+};
 
 #[cfg(feature = "sqlite")]
 use crate::context::ViewInfoRead;
@@ -148,10 +156,7 @@ fn destination_stays_in_the_bound_schema_and_preserves_quoted_names() -> testres
         apply_ownership_sql(context, r#"CREATE TABLE other."After.Name"(other integer)"#)?
             .into_context();
     let mut context = context;
-    context.set_search_path(&[
-        crate::names::SchemaName::from("other"),
-        crate::names::SchemaName::from("public"),
-    ]);
+    context.set_search_path(&[SchemaName::from("other"), SchemaName::from("public")]);
     let context =
         apply_ownership_sql(context, r#"ALTER TABLE before_name RENAME TO "After.Name""#)?
             .into_context();
@@ -218,8 +223,7 @@ fn indexes_sequences_and_view_sources_follow_the_renamed_table() -> testresult::
         .unwrap()
         .ordinary_definition()
         .unwrap();
-    let metadata =
-        crate::sem::QueryMetadata::from_statement(&crate::sem::SemAst::select(view.query()))?;
+    let metadata = QueryMetadata::from_statement(&SemAst::select(view.query()))?;
     assert_eq!(metadata.relations(), &[test_helpers::name("after_name")]);
     test_helpers::assert_select(context, "SELECT id FROM preserved")?;
     Ok(())
@@ -245,8 +249,8 @@ fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> test
         "ALTER TABLE BEFORE_NAME RENAME TO After_Name",
     )?
     .into_context();
-    let old = crate::names::FullName::with_schema("main", "before_name");
-    let new = crate::names::FullName::with_schema("main", "after_name");
+    let old = NamesFullName::with_schema("main", "before_name");
+    let new = NamesFullName::with_schema("main", "after_name");
     assert!(context.get_table_impl(&old).is_none());
     assert!(context.get_table_impl(&new).is_some());
     let result = apply_sqlite(context, "SELECT id FROM AFTER_NAME")?;
@@ -266,12 +270,11 @@ fn sqlite_case_insensitive_rename_survives_layers_and_repeated_renames() -> test
     assert!(result.context().problems().is_empty());
     let view = result
         .context()
-        .get_view_impl(&crate::names::FullName::with_schema("main", "preserved"))
+        .get_view_impl(&NamesFullName::with_schema("main", "preserved"))
         .unwrap()
         .ordinary_definition()
         .unwrap();
-    let metadata =
-        crate::sem::QueryMetadata::from_statement(&crate::sem::SemAst::select(view.query()))?;
+    let metadata = QueryMetadata::from_statement(&SemAst::select(view.query()))?;
     assert_eq!(
         metadata.relations(),
         &[crate::names::FullName::with_schema("main", "final_name")]
@@ -343,7 +346,7 @@ fn qualified_foreign_key_and_row_type_consumers_follow_the_target() -> testresul
     let fk = column
         .constraints()
         .iter()
-        .find_map(crate::sem::ColumnConstraint::as_foreign_key)
+        .find_map(ColumnConstraint::as_foreign_key)
         .unwrap();
     assert_eq!(
         fk.primary_key_table().unwrap().full_name(),

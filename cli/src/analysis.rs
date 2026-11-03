@@ -1,3 +1,4 @@
+use crate::diagnostic::DiagnosticRenderer;
 use ::sql_fun_client::{
     TcpJsonRpcClientAsync,
     payloads::{AnalysisProbrem, AnalyzeQueryResponse, InitializeSchemaArgs},
@@ -29,7 +30,7 @@ impl PreparedDiagnostics {
     pub(crate) fn render(
         &self,
         diagnostic: &AnalysisProbrem,
-        renderer: &crate::diagnostic::DiagnosticRenderer,
+        renderer: &DiagnosticRenderer,
     ) -> Result<String, ::anyhow::Error> {
         if let Some(presentation) = diagnostic.presentation() {
             renderer.render_problem(

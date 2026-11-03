@@ -1,4 +1,4 @@
-use super::{
+use crate::init::{
     flow::collect,
     test_helpers::{Answer, HomeFixture, MetadataProject, Script, common_args, state},
 };

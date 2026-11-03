@@ -1,10 +1,9 @@
-use crate::sem::overload_rank::OverloadRank;
-use crate::sem::type_system::SimpleInferContext;
 use crate::{
     names::OperatorName,
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition, CastContext, OperatorDefinition,
-        ParseContext, SemScalarExpr, TypeReference,
+        ParseContext, SemScalarExpr, TypeReference, overload_rank::OverloadRank,
+        type_system::SimpleInferContext,
     },
 };
 
@@ -37,7 +36,7 @@ impl BinaryCastCandidate {
         right_type: &TypeReference,
     ) -> Vec<Self>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let mut candidates = Vec::new();
         for overload in overloads {
@@ -226,12 +225,16 @@ impl BinaryCastCandidate {
 
 #[cfg(test)]
 mod tests {
-    use super::BinaryCastCandidate;
-    use crate::sem::{
-        BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition, PgBuiltInType,
-        TypeReference,
+    use crate::names::OperatorName;
+
+    use crate::{
+        sem::{
+            BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
+            PgBuiltInType, TypeReference,
+            scalar_expr::arith_expr::binary::bin_cast_candidate::BinaryCastCandidate,
+        },
+        test_helpers::{TestParseContext, domain_casts},
     };
-    use crate::test_helpers::{TestParseContext, domain_casts};
 
     #[rstest::rstest]
     #[case::same_array("_oid", "_oid", true)]
@@ -311,7 +314,7 @@ mod tests {
         let operator = OperatorDefinition::binary(&[first, second]);
         let best = BinaryCastCandidate::resolve(
             &mut context,
-            &crate::names::OperatorName::new("="),
+            &OperatorName::new("="),
             &operator,
             &array,
             &array,
@@ -346,10 +349,9 @@ mod tests {
         let mut context = domain_casts::context();
         let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
         let array = domain.array_type();
-        let anyarray = crate::sem::TypeReference::from_master_type_name("anyarray");
-        let element = crate::sem::TypeReference::from_master_type_name("anyelement");
-        let overload =
-            crate::sem::BinaryOperatorDefinition::new(&anyarray, &element, &element, true);
+        let anyarray = TypeReference::from_master_type_name("anyarray");
+        let element = TypeReference::from_master_type_name("anyelement");
+        let overload = BinaryOperatorDefinition::new(&anyarray, &element, &element, true);
         let instantiated =
             BinaryCastCandidate::instantiate_array_overload(&context, &overload, &array, &domain)
                 .unwrap();
@@ -363,13 +365,13 @@ mod tests {
         let mut context = domain_casts::context();
         let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
         let overloads = [
-            crate::sem::BinaryOperatorDefinition::new(
+            BinaryOperatorDefinition::new(
                 &domain,
                 &PgBuiltInType::int8(),
                 &PgBuiltInType::text(),
                 true,
             ),
-            crate::sem::BinaryOperatorDefinition::new(
+            BinaryOperatorDefinition::new(
                 &PgBuiltInType::int8(),
                 &PgBuiltInType::int4(),
                 &PgBuiltInType::bool(),
@@ -378,7 +380,7 @@ mod tests {
         ];
         let best = BinaryCastCandidate::resolve(
             &mut context,
-            &crate::names::OperatorName::new("="),
+            &OperatorName::new("="),
             &OperatorDefinition::binary(&overloads),
             &domain,
             &PgBuiltInType::int4(),
@@ -409,7 +411,7 @@ mod tests {
         };
         let best = BinaryCastCandidate::resolve(
             &mut context,
-            &crate::names::OperatorName::new("="),
+            &OperatorName::new("="),
             &OperatorDefinition::binary(&overloads),
             &domain,
             &right,

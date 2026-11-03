@@ -1,5 +1,7 @@
-use super::{Direction, InitStep, StepCompletion, StepFuture};
-use crate::init::InitializationState;
+use crate::init::{
+    InitializationState,
+    step::{Direction, InitStep, StepCompletion, StepFuture},
+};
 
 pub(in crate::init) struct EditHomeStep;
 impl InitStep for EditHomeStep {

@@ -1,6 +1,6 @@
 use convert_case::{Case, Casing};
 
-use super::MessageTypeField;
+use crate::protobuf_prost::MessageTypeField;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

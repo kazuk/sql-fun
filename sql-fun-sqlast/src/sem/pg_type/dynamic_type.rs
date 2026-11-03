@@ -1,15 +1,11 @@
-use crate::sem::TypeDefinition;
+use crate::{names::TableName, sem::TypeDefinition};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DynamicTypeReference {
     type_def: Box<TypeDefinition>,
 }
 impl DynamicTypeReference {
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         self.type_def.rename_relation(old, new);
     }
 

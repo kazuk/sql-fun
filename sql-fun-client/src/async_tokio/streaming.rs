@@ -1,5 +1,7 @@
 mod coordination;
 
+use crate::TypedResponseError;
+
 use self::coordination::{
     AcceptedRequests, CallbackDeliveries, ConnectionReporter, ConnectionStatus, ConnectionTask,
     IncomingResponses, OutgoingRequests, RequestAdmission, Submission, SubmissionQueue,
@@ -17,8 +19,7 @@ use std::{
     },
 };
 
-use ::tokio::io::BufReader;
-use ::tokio::net::TcpStream;
+use ::tokio::{io::BufReader, net::TcpStream};
 
 pub(super) struct Streaming {
     sender: RequestSender,
@@ -292,7 +293,7 @@ impl RequestSender {
         &self,
         method: &str,
         params: &::serde_json::Value,
-    ) -> Result<::serde_json::Value, crate::TypedResponseError> {
+    ) -> Result<::serde_json::Value, TypedResponseError> {
         let (sent, received) = ::tokio::sync::oneshot::channel();
         self.submit(
             method,
@@ -306,14 +307,12 @@ impl RequestSender {
             }),
         )
         .await
-        .map_err(crate::TypedResponseError::from)?;
+        .map_err(TypedResponseError::from)?;
         let response = received
             .await
-            .map_err(|_| crate::TypedResponseError::message("internal response delivery closed"))?
-            .map_err(|message| crate::TypedResponseError::message(&message))?;
-        response
-            .into_result()
-            .map_err(crate::TypedResponseError::from)
+            .map_err(|_| TypedResponseError::message("internal response delivery closed"))?
+            .map_err(|message| TypedResponseError::message(&message))?;
+        response.into_result().map_err(TypedResponseError::from)
     }
 
     pub(crate) fn is_open(&self) -> bool {

@@ -1,9 +1,10 @@
 use crate::{
     context::ParseContext,
-    names::{ColumnName, FullName},
+    names::{ColumnName, FullName, TableName},
     sem::{
-        AlterView, AnalysisError, ColumnDefinition, CreateTableAs, CreateView, OwnerSpecification,
-        ResultColumnCollection, RuleIdentity, RuleReferences, SelectStatement, TriggerReferences,
+        AlterView, AnalysisError, ColumnDefinition, ColumnRename, CreateTableAs, CreateView,
+        OwnerSpecification, ResultColumnCollection, RuleIdentity, RuleReferences, SelectStatement,
+        TriggerReferences, traversal::SemanticVisitorMut,
     },
 };
 
@@ -17,10 +18,7 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
-    pub(crate) fn rename_column(
-        &mut self,
-        rename: &crate::sem::ColumnRename,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename) -> Result<(), AnalysisError> {
         match self {
             Self::View(value) => value.rename_column(rename),
             Self::MaterializedView(value) => value.rename_column(rename),
@@ -29,8 +27,8 @@ impl ViewLike {
 
     pub(crate) fn rename_column_with(
         &mut self,
-        rename: &crate::sem::ColumnRename,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        rename: &ColumnRename,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::View(view) => view.rename_column_with(rename, visitor),
@@ -39,8 +37,8 @@ impl ViewLike {
     }
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
+        old: &TableName,
+        new: &TableName,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::View(value) => value.rename_relation(old, new),

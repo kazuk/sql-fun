@@ -1,8 +1,13 @@
-use super::token::{TypeToken, TypeTokens};
-use super::{invalid, typmod};
 use crate::{
     names::FullName,
-    sem::{AnalysisError, TypeReference},
+    sem::{
+        AnalysisError, TypeReference,
+        client_type::{
+            invalid,
+            token::{TypeToken, TypeTokens},
+            typmod,
+        },
+    },
 };
 use ::combine::{Parser, attempt, choice, many, optional};
 

@@ -1,8 +1,15 @@
-use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
-    context::{BaseParseContext, ExtensionInfoRead, ObjectInfoRead},
+    StringSpan,
+    ast::Dialect,
+    context::{
+        BaseParseContext, ExtensionInfoRead, ObjectInfoRead,
+        schema_file_context::{SchemaCatalog, SchemaFileContext},
+    },
     names::FullName,
-    sem::Kind,
+    sem::{
+        AnalysisError, CreateCompositeType, CreateIndex, CreateSequence, CreateTable, Kind,
+        ViewLike,
+    },
 };
 
 impl ObjectInfoRead for SchemaCatalog {
@@ -36,13 +43,13 @@ impl SchemaCatalog {
     // SQLite folds ASCII identifiers even when quoted. Canonical Display still
     // encodes component boundaries after dialect-specific identity normalization.
     pub(super) fn relation_identity(&self, name: &FullName) -> FullName {
-        if crate::ast::Dialect::from(self.metadata()) == crate::ast::Dialect::sqlite() {
+        if Dialect::from(self.metadata()) == Dialect::sqlite() {
             name.sqlite_identity()
         } else {
             name.clone()
         }
     }
-    pub(super) fn store_table(&mut self, name: &FullName, definition: &crate::sem::CreateTable) {
+    pub(super) fn store_table(&mut self, name: &FullName, definition: &CreateTable) {
         let name = self.relation_identity(name);
         self.renamed_relations.remove(&name);
         self.renamed_tables.remove(&name);
@@ -53,18 +60,17 @@ impl SchemaCatalog {
     pub(super) fn store_view(
         &mut self,
         name: &FullName,
-        definition: &crate::sem::ViewLike,
-    ) -> Result<(), crate::sem::AnalysisError> {
+        definition: &ViewLike,
+    ) -> Result<(), AnalysisError> {
         let name = self.relation_identity(name);
-        let row_type =
-            if crate::ast::Dialect::from(self.metadata()) == crate::ast::Dialect::postgres() {
-                Some(crate::sem::CreateCompositeType::new(
-                    &name,
-                    &definition.result_columns().composite_field_collection()?,
-                ))
-            } else {
-                None
-            };
+        let row_type = if Dialect::from(self.metadata()) == Dialect::postgres() {
+            Some(CreateCompositeType::new(
+                &name,
+                &definition.result_columns().composite_field_collection()?,
+            ))
+        } else {
+            None
+        };
         self.renamed_relations.remove(&name);
         self.renamed_types.remove(&name);
         self.views.insert(&name, definition);
@@ -79,16 +85,12 @@ impl SchemaCatalog {
         self.objects.insert(&name.to_string(), kind);
         Ok(())
     }
-    pub(super) fn store_sequence(
-        &mut self,
-        name: &FullName,
-        definition: &crate::sem::CreateSequence,
-    ) {
+    pub(super) fn store_sequence(&mut self, name: &FullName, definition: &CreateSequence) {
         self.renamed_relations.remove(name);
         self.sequences.insert(name, definition);
         self.objects.insert(&name.to_string(), Kind::sequence());
     }
-    pub(super) fn store_index(&mut self, definition: &crate::sem::CreateIndex) {
+    pub(super) fn store_index(&mut self, definition: &CreateIndex) {
         self.renamed_relations.remove(definition.name());
         self.indexes
             .insert(&definition.name().to_string(), definition.clone());
@@ -97,7 +99,7 @@ impl SchemaCatalog {
     }
 }
 impl SchemaFileContext {
-    pub(super) const fn creation_span(&self) -> crate::StringSpan {
+    pub(super) const fn creation_span(&self) -> StringSpan {
         self.statement_span
     }
 }

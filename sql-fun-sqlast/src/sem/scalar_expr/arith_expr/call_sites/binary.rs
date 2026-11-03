@@ -1,8 +1,11 @@
 use crate::{
     names::OperatorName,
     sem::{
-        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ParseContext, SemScalarExpr,
-        TypeReference, scalar_expr::arith_expr::ArithExpr,
+        AnalysisError, AnalysisProblem, BinaryOperatorDefinition, ParseContext, ResolvedOperator,
+        SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::arith_expr::{ArithExpr, call_sites::binary_is_not_null},
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
     },
     syn::AExprKind,
 };
@@ -11,7 +14,7 @@ use crate::{
 pub struct BinaryOpCallSite {
     operator_name: OperatorName,
     #[serde(default)]
-    binding: Option<Box<crate::sem::ResolvedOperator>>,
+    binding: Option<Box<ResolvedOperator>>,
     left_arg: SemScalarExpr,
     left_arg_type: Option<TypeReference>,
     right_arg: SemScalarExpr,
@@ -30,7 +33,7 @@ impl BinaryOpCallSite {
     }
 
     pub fn is_not_null(&self) -> Option<bool> {
-        super::binary_is_not_null(&self.left_arg, &self.right_arg)
+        binary_is_not_null(&self.left_arg, &self.right_arg)
     }
 
     pub const fn get_return_type(&self) -> &TypeReference {
@@ -69,7 +72,7 @@ impl BinaryOpCallSite {
         rexpr: SemScalarExpr,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let call_site = Self {
             operator_name: name.clone(),
@@ -91,12 +94,13 @@ impl BinaryOpCallSite {
 
 #[cfg(test)]
 mod test_binary_op_call_site {
-    use crate::sem::scalar_expr::arith_expr::call_sites::binary::BinaryOpCallSite;
     use crate::{
         names::{OperatorName, ValidOperatorName},
         sem::{
             BinaryOperatorDefinition, SemScalarExpr, TypeReference,
-            scalar_expr::const_expr::ScalarConstExpr,
+            scalar_expr::{
+                arith_expr::call_sites::binary::BinaryOpCallSite, const_expr::ScalarConstExpr,
+            },
         },
         test_helpers::{TestParseContext, test_context},
     };
@@ -123,7 +127,7 @@ mod test_binary_op_call_site {
 pub struct UndefinedOperatorCallSite {
     operator_name: OperatorName,
     #[serde(default)]
-    binding: Option<Box<crate::sem::ResolvedOperator>>,
+    binding: Option<Box<ResolvedOperator>>,
     larg: Option<SemScalarExpr>,
     rarg: Option<SemScalarExpr>,
 }
@@ -197,7 +201,7 @@ impl UndefinedOperatorCallSite {
         rexpr: Option<SemScalarExpr>,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         context.report_analysis_problem(AnalysisProblem::undefined_operator(
             AExprKind::AexprOp,
@@ -220,18 +224,15 @@ impl UndefinedOperatorCallSite {
 }
 
 impl BinaryOpCallSite {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.left_arg.walk(visitor)?;
         self.right_arg.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.left_arg.visit(visitor)?;
         self.right_arg.visit(visitor)?;
         Ok(())
@@ -239,20 +240,17 @@ impl BinaryOpCallSite {
 }
 
 impl UndefinedOperatorCallSite {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        crate::sem::traversal::optional(&mut self.larg, visitor)?;
-        crate::sem::traversal::optional(&mut self.rarg, visitor)?;
+    ) -> Result<(), AnalysisError> {
+        optional(&mut self.larg, visitor)?;
+        optional(&mut self.rarg, visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
-        crate::sem::traversal::visit_optional(&self.larg, visitor)?;
-        crate::sem::traversal::visit_optional(&self.rarg, visitor)?;
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visit_optional(&self.larg, visitor)?;
+        visit_optional(&self.rarg, visitor)?;
         Ok(())
     }
 }
@@ -260,8 +258,8 @@ impl UndefinedOperatorCallSite {
 impl BinaryOpCallSite {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if let Some(binding) = &self.binding {
             binding.infer(
@@ -284,8 +282,8 @@ impl BinaryOpCallSite {
 impl UndefinedOperatorCallSite {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if let Some(binding) = &self.binding {
             binding.infer(parameters, context, self.larg.as_ref(), self.rarg.as_ref())
@@ -316,19 +314,19 @@ impl UndefinedOperatorCallSite {
 }
 
 impl BinaryOpCallSite {
-    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+    pub(crate) fn set_binding(&mut self, binding: ResolvedOperator) {
         self.binding = Some(Box::new(binding));
     }
-    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+    pub(crate) fn binding(&self) -> Option<&ResolvedOperator> {
         self.binding.as_deref()
     }
 }
 
 impl UndefinedOperatorCallSite {
-    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+    pub(crate) fn set_binding(&mut self, binding: ResolvedOperator) {
         self.binding = Some(Box::new(binding));
     }
-    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+    pub(crate) fn binding(&self) -> Option<&ResolvedOperator> {
         self.binding.as_deref()
     }
 }

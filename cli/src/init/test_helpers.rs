@@ -1,4 +1,4 @@
-use super::{
+use crate::init::{
     InitializationState,
     error::InitError,
     prompt::{PromptRequest, PromptResponse},

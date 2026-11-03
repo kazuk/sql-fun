@@ -1,8 +1,13 @@
 //! Enduring parser-to-semantics and schema-chain coverage without database dependencies.
+
 use crate::{
     context::IndexInfoRead,
     names::{FullName, SchemaName, TableName},
-    sem::{Kind, ParseContext, problem::IndexProblemKind},
+    sem::{
+        Kind, ParseContext,
+        alter_index::{AlterIndex, IndexAlteration, IndexStorageParameter},
+        problem::IndexProblemKind,
+    },
 };
 
 #[rstest::rstest]
@@ -448,6 +453,15 @@ fn statistics_preserve_a_non_btree_access_method() -> testresult::TestResult {
 
 mod test_helpers {
     use crate::{
+        syn::Node,
+        test_helpers::{
+            create_cache_context,
+            ownership::{apply_ownership_sql, ownership_context},
+            source_span,
+        },
+    };
+
+    use crate::{
         AstAndContextPair,
         ast::{StatementNode, TryFromWithTokens},
         context::{
@@ -494,15 +508,15 @@ mod test_helpers {
         )
     }
     pub(super) fn seed(sql: &str) -> Result<SchemaFileContext, AnalysisError> {
-        let mut context = crate::test_helpers::ownership::ownership_context();
+        let mut context = ownership_context();
         let parsed =
             ::pg_query::parse(sql, ::pg_query::ParserOptions::default()).expect("valid fixture");
         for raw in parsed.protobuf.stmts {
-            let node = crate::syn::Node::from(raw.stmt.expect("statement").as_ref().clone());
+            let node = Node::from(raw.stmt.expect("statement").as_ref().clone());
             let syntax =
                 StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
             context = syntax
-                .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
+                .resolve_and_apply(context, &mut create_cache_context())?
                 .into_context();
         }
         assert!(context.problems().is_empty(), "{:?}", context.problems());
@@ -515,14 +529,14 @@ mod test_helpers {
             parent.get_args(),
             parent.metadata(),
         );
-        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        context.set_source_path_with_span(&source_span());
         context
     }
     pub(super) fn statement(
         context: SchemaFileContext,
         sql: &str,
     ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-        crate::test_helpers::ownership::apply_ownership_sql(context, sql)
+        apply_ownership_sql(context, sql)
     }
     pub(super) fn alter(
         context: SchemaFileContext,
@@ -544,17 +558,13 @@ fn rejected_alteration_is_inapplicable_even_when_diagnostics_are_suppressed()
 -> testresult::TestResult {
     let mut context = test_helpers::catalog()?;
     context.begin_parameter_type_analysis();
-    let statement = super::AlterIndex::resolve(
+    let statement = AlterIndex::resolve(
         &mut context,
         &test_helpers::index_name(),
         false,
-        &[super::IndexAlteration::storage(
+        &[IndexAlteration::storage(
             false,
-            &[super::IndexStorageParameter::new(
-                None,
-                "fillfactor",
-                Some("2"),
-            )],
+            &[IndexStorageParameter::new(None, "fillfactor", Some("2"))],
         )],
     )?;
     // Simulate a diagnostic policy discarding delivery, after semantic validation.

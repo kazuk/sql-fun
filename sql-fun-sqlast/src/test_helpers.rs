@@ -4,14 +4,11 @@
 mod name_builders;
 mod postgres_ast;
 pub(crate) mod query_access;
-pub(crate) use self::postgres_ast::{
-    assert_postgres_structure, postgres_expression, postgres_node,
-};
-pub(crate) mod analysis_cache;
-pub(crate) mod column_rename;
 
+pub(crate) mod analysis_cache;
 pub(crate) mod between;
 pub(crate) mod collate;
+pub(crate) mod column_rename;
 pub(crate) mod common_types;
 pub(crate) mod composite_domains;
 pub(crate) mod conflict_masters;
@@ -29,6 +26,19 @@ pub(crate) mod set_operations;
 mod syn_builder;
 mod test_parse_context;
 
+pub(crate) use self::postgres_ast::{
+    assert_postgres_structure, postgres_expression, postgres_node,
+};
+pub use self::{
+    syn_builder::SynBuilder,
+    test_parse_context::{TestParseContext, test_context},
+};
+
+use crate::{
+    CacheContext,
+    context::{FrozenBaseContext, SchemaFileContext},
+};
+
 use std::path::PathBuf;
 
 use crate::{
@@ -40,21 +50,25 @@ use crate::{
     },
 };
 
-pub use self::{
-    syn_builder::SynBuilder,
-    test_parse_context::{TestParseContext, test_context},
-};
-
 /// Create independent cache state for a test-owned analysis base.
-pub(crate) fn create_cache_context() -> crate::CacheContext {
-    crate::CacheContext::new()
+pub(crate) fn create_cache_context() -> CacheContext {
+    CacheContext::new()
 }
 
 #[cfg(feature = "sqlite")]
 #[expect(missing_docs)]
 mod sqlite_syn_builder {
+    #[cfg(feature = "sqlite")]
+    use crate::SqliteDialect;
+    use crate::sem::AnalysisError;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::Expr;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::Type;
+
     use turso_parser::parser::Parser as TursoParser;
 
+    #[cfg(feature = "sqlite")]
     use crate::syn::sqlite::{Cmd, Name, QualifiedName, Stmt};
 
     #[derive(Default)]
@@ -67,10 +81,7 @@ mod sqlite_syn_builder {
     }
 
     impl crate::engine_specific::TursoArrayTypeFeature for SqliteArrayTypeGate {
-        fn array_type_used(
-            &mut self,
-            _: &crate::syn::sqlite::Type,
-        ) -> Result<(), crate::sem::AnalysisError> {
+        fn array_type_used(&mut self, _: &Type) -> Result<(), AnalysisError> {
             self.0 += 1;
             Ok(())
         }
@@ -85,7 +96,7 @@ mod sqlite_syn_builder {
     }
 
     impl SqliteSynBuilder {
-        pub fn parse_expression(&self, sql: &str) -> crate::syn::sqlite::Expr {
+        pub fn parse_expression(&self, sql: &str) -> Expr {
             let mut parser = TursoParser::new(sql.as_bytes());
             let Some(Ok(turso_parser::ast::Cmd::Stmt(turso_parser::ast::Stmt::Select(select)))) =
                 parser.next()
@@ -99,11 +110,11 @@ mod sqlite_syn_builder {
             let turso_parser::ast::ResultColumn::Expr(expr, _) = columns.remove(0) else {
                 panic!("expected expression column");
             };
-            crate::syn::sqlite::Expr::from(*expr)
+            Expr::from(*expr)
         }
 
         pub fn parse_command(&self, sql: &str) -> Cmd {
-            crate::SqliteDialect::parse(sql)
+            SqliteDialect::parse(sql)
                 .expect("valid SQLite command")
                 .expect("command exists")
         }
@@ -115,6 +126,7 @@ mod sqlite_syn_builder {
         }
 
         pub fn name(&self, value: &str) -> Name {
+            #[cfg(feature = "sqlite")]
             use crate::syn::sqlite::NameBuilder;
             NameBuilder::default()
                 .value(String::from(value))
@@ -123,6 +135,7 @@ mod sqlite_syn_builder {
         }
 
         pub fn qualified_name(&self, name: &str) -> QualifiedName {
+            #[cfg(feature = "sqlite")]
             use crate::syn::sqlite::QualifiedNameBuilder;
 
             QualifiedNameBuilder::default()
@@ -223,16 +236,8 @@ pub fn small_stack_regression(stack_size: usize, operation: impl FnOnce() + Send
 
 /// Create a lightweight schema layer with the explicitly selected PostgreSQL test environment.
 /// The supplied base contributes catalog data only.
-pub(crate) fn schema_layer(
-    path: &std::path::Path,
-    base: &crate::context::FrozenBaseContext,
-) -> crate::context::SchemaFileContext {
+pub(crate) fn schema_layer(path: &std::path::Path, base: &FrozenBaseContext) -> SchemaFileContext {
     use crate::context::BaseParseContext;
     let environment = TestParseContext::default();
-    crate::context::SchemaFileContext::new(
-        path,
-        base,
-        environment.get_args(),
-        environment.metadata(),
-    )
+    SchemaFileContext::new(path, base, environment.get_args(), environment.metadata())
 }

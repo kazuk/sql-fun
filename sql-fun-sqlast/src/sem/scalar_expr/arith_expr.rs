@@ -18,6 +18,16 @@ pub use self::{
     sqlite_like::SqliteLikeExpr,
 };
 
+use crate::{
+    ast::Dialect,
+    names::OperatorName,
+    sem::{
+        AnalysisError, ParseContext, PgBuiltInType, ResolvedOperator,
+        parameter_resolution::ParameterResolution,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
+};
+
 use crate::sem::{SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
 
 /// arith expression
@@ -134,7 +144,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => None,
-            Self::Between(_) => Some(crate::sem::PgBuiltInType::bool()),
+            Self::Between(_) => Some(PgBuiltInType::bool()),
             Self::Pattern(_) => None,
             Self::SqliteLike(value) => value.get_type(),
         }
@@ -174,19 +184,16 @@ impl SemScalarExprNode for ArithExpr {
 }
 
 impl BetweenExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         self.left.walk(visitor)?;
         self.start.walk(visitor)?;
         self.end.walk(visitor)?;
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.left.visit(visitor)?;
         self.start.visit(visitor)?;
         self.end.visit(visitor)?;
@@ -195,10 +202,10 @@ impl BetweenExpr {
 }
 
 impl ArithExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         match self {
             Self::OpBinary(v) => v.walk(visitor)?,
             Self::OpLeftUnary(v) => v.walk(visitor)?,
@@ -215,10 +222,7 @@ impl ArithExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::OpBinary(v) => v.visit(visitor)?,
             Self::OpLeftUnary(v) => v.visit(visitor)?,
@@ -238,10 +242,7 @@ impl ArithExpr {
 }
 
 impl BetweenExpr {
-    fn collect_constraints(
-        &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-    ) {
+    fn collect_constraints(&self, parameters: &mut ParameterResolution<'_>) {
         if self.left.constraint_node().is_some()
             || self.start.constraint_node().is_some()
             || self.end.constraint_node().is_some()
@@ -253,9 +254,9 @@ impl BetweenExpr {
 impl ArithExpr {
     pub(crate) fn collect_constraints(
         &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        parameters: &mut ParameterResolution<'_>,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         match self {
             Self::Pattern(value) => value.collect_constraints(parameters, context),
             Self::OpBinary(v) => v.collect_constraints(parameters, context),
@@ -295,7 +296,7 @@ impl ArithExpr {
 
 impl ArithExpr {
     pub(crate) fn deferred_operator(
-        name: &crate::names::OperatorName,
+        name: &OperatorName,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
     ) -> SemScalarExpr {
@@ -306,7 +307,7 @@ impl ArithExpr {
 
 impl ArithExpr {
     pub(crate) fn deferred_any_operator(
-        name: &crate::names::OperatorName,
+        name: &OperatorName,
         left: SemScalarExpr,
         right: SemScalarExpr,
     ) -> SemScalarExpr {
@@ -317,7 +318,7 @@ impl ArithExpr {
 
 impl ArithExpr {
     pub(crate) fn deferred_all_operator(
-        name: &crate::names::OperatorName,
+        name: &OperatorName,
         left: SemScalarExpr,
         right: SemScalarExpr,
     ) -> SemScalarExpr {
@@ -334,7 +335,7 @@ impl ArithExpr {
             _ => None,
         }
     }
-    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+    pub(crate) fn set_binding(&mut self, binding: ResolvedOperator) {
         match self {
             Self::Pattern(value) => value.set_binding(binding),
             Self::OpBinary(call) => call.set_binding(binding),
@@ -349,7 +350,7 @@ impl ArithExpr {
         }
     }
     /// Operator-name resolution, retained separately from overload/type selection.
-    pub fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+    pub fn binding(&self) -> Option<&ResolvedOperator> {
         match self {
             Self::Pattern(value) => Some(value.binding()),
             Self::OpBinary(call) => call.binding(),
@@ -368,9 +369,9 @@ impl ArithExpr {
 impl ArithExpr {
     pub(crate) fn resolve_between(
         &self,
-        context: &mut impl crate::sem::ParseContext,
-    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
-        if context.dialect() == crate::ast::Dialect::postgres()
+        context: &mut impl ParseContext,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if context.dialect() == Dialect::postgres()
             && let Self::Between(value) = self
         {
             return Ok(Some(value.resolve(context)?));

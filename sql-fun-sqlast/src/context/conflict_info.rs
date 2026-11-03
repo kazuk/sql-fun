@@ -1,6 +1,9 @@
 use crate::{
     names::{FullName, TableName},
-    sem::{AnalysisError, CatalogNameLookup, ConflictArbiterInference, InsertConflict},
+    sem::{
+        AnalysisError, CatalogNameLookup, CollationDefinition, ConflictArbiterInference,
+        DatabaseCollation, InsertConflict, OperatorClassDefinition,
+    },
 };
 
 /// Catalog services required by conflict-target name resolution and inference.
@@ -10,12 +13,12 @@ use crate::{
 /// unimplemented at its implementation boundary.
 pub trait ConflictInfoRead {
     /// Source database encoding and default-collation provenance, absent for SQLite.
-    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation>;
+    fn database_collation(&self) -> Option<&DatabaseCollation>;
 
     /// Read one PostgreSQL collation at an exact schema-qualified name.
     /// The provider selects the variant eligible for its database encoding.
     /// Unqualified/catalog-qualified names and SQLite namespaces return `None`.
-    fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition>;
+    fn collation_definition(&self, name: &FullName) -> Option<&CollationDefinition>;
 
     /// Read one PostgreSQL operator class at an exact schema-qualified name for
     /// the explicitly supplied access method. Does not select a default class.
@@ -23,7 +26,7 @@ pub trait ConflictInfoRead {
         &self,
         name: &FullName,
         access_method: &str,
-    ) -> Option<&crate::sem::OperatorClassDefinition>;
+    ) -> Option<&OperatorClassDefinition>;
 
     /// Resolve a name in the explicit SQLite connection-local namespace.
     /// Available independently of the context's historical analysis dialect;

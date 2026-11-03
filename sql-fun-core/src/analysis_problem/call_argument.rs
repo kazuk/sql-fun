@@ -1,4 +1,4 @@
-use super::{DiagnosticMetadata, StringSpan};
+use crate::analysis_problem::{DiagnosticMetadata, StringSpan};
 
 /// Invocation-shape violations decidable without a function signature.
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
@@ -52,7 +52,7 @@ impl CallArgumentProblem {
 
 #[cfg(test)]
 mod test_diagnostics {
-    use super::{CallArgumentProblem, StringSpan};
+    use crate::analysis_problem::call_argument::{CallArgumentProblem, StringSpan};
 
     #[test]
     fn retains_argument_location_and_label() {

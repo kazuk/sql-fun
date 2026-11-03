@@ -1,5 +1,7 @@
-use super::{Direction, InitStep, StepFuture};
-use crate::init::InitializationState;
+use crate::init::{
+    InitializationState,
+    step::{Direction, InitStep, StepFuture},
+};
 
 pub(in crate::init) struct EngineSelectionStep;
 impl InitStep for EngineSelectionStep {

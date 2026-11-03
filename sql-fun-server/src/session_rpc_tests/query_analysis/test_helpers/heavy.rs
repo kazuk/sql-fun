@@ -1,5 +1,7 @@
-use super::{query_project, rewrite_request};
-use crate::test_helpers::heavy::Connection;
+use crate::{
+    session_rpc_tests::query_analysis::test_helpers::{query_project, rewrite_request},
+    test_helpers::heavy,
+};
 use ::serde_json::Value;
 
 /// Analyze one immutable schema snapshot through a fresh RPC connection.
@@ -12,7 +14,7 @@ pub(crate) async fn analyze_schema_snapshot(
     expand: Option<bool>,
 ) -> Value {
     let project = query_project();
-    let mut connection = Connection::start(16384, 2).await;
+    let mut connection = heavy::Connection::start(16384, 2).await;
     connection.authenticate().await;
     let initialized = connection
         .rpc(

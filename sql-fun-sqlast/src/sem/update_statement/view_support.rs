@@ -1,6 +1,8 @@
 use crate::{
     names::{ColumnName, FullName},
-    sem::ColumnDefinition,
+    sem::{
+        AnalysisError, ColumnDefinition, ParseContext, ViewAssignmentColumn, ViewWriteEvaluation,
+    },
 };
 
 /// Analyzed capability for UPDATE into an ordinary view.
@@ -12,7 +14,7 @@ pub struct ViewUpdateSupport {
     #[serde(default)]
     unassignable_defaults: Vec<ColumnName>,
     #[serde(default)]
-    assignment_columns: Vec<crate::sem::ViewAssignmentColumn>,
+    assignment_columns: Vec<ViewAssignmentColumn>,
     #[serde(default)]
     required_trigger_columns: Option<Vec<ColumnName>>,
 }
@@ -24,15 +26,15 @@ impl ViewUpdateSupport {
     /// # Errors
     /// Returns only unrecoverable analysis or diagnostic delivery failures.
     pub fn analyze(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl ParseContext,
         view: &FullName,
-    ) -> Result<Option<Self>, crate::sem::AnalysisError> {
-        crate::sem::ViewWriteEvaluation::new(context).update(view)
+    ) -> Result<Option<Self>, AnalysisError> {
+        ViewWriteEvaluation::new(context).update(view)
     }
 
     /// Record alias equivalence for automatic-view assignment targets.
     /// Trigger/rule-backed NEW-row fields have independent identities instead.
-    pub fn set_assignment_columns(&mut self, columns: &[crate::sem::ViewAssignmentColumn]) {
+    pub fn set_assignment_columns(&mut self, columns: &[ViewAssignmentColumn]) {
         self.assignment_columns = columns.to_vec();
     }
     /// The underlying assignment-column key, or the supplied view name when
@@ -41,7 +43,7 @@ impl ViewUpdateSupport {
         self.assignment_columns
             .iter()
             .find(|column| column.name() == name)
-            .map_or(name, crate::sem::ViewAssignmentColumn::source_column)
+            .map_or(name, ViewAssignmentColumn::source_column)
     }
 
     /// Record a column whose DEFAULT is expanded by view rewriting before

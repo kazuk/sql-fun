@@ -1,8 +1,15 @@
-use crate::context::BaseParseContext;
 use crate::{
-    context::{ParseContext, RuleInfoRead, RuleInfoWrite},
-    names::FullName,
-    sem::{RuleEvent, RuleIdentity},
+    context::{BaseParseContext, ParseContext, RuleInfoRead, RuleInfoWrite},
+    names::{
+        ColumnName as NamesColumnName, FullName, TableName as NamesTableName,
+        ViewName as NamesViewName,
+    },
+    sem::{
+        ColumnDefinition as SemColumnDefinition, CreateTable as SemCreateTable,
+        CreateTableMode as SemCreateTableMode, CreateView, RuleEvent, RuleIdentity, TypeReference,
+        ViewLike,
+    },
+    test_helpers::source_span,
 };
 
 #[rstest::rstest]
@@ -343,7 +350,7 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
         test_helpers::layer(&parent),
     )?;
     let view = child
-        .get_view(&crate::names::ViewName::from_full_name(identity.target()))
+        .get_view(&NamesViewName::from_full_name(identity.target()))
         .unwrap();
     let active = view.rules().unwrap().resolve(&child);
     assert_eq!(active.len(), 1);
@@ -413,7 +420,7 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
         let registered = context.rule(&identity).unwrap();
         assert_eq!(registered.target(), &target);
         let linked = context
-            .get_table(&crate::names::TableName::from(target.clone()))
+            .get_table(&NamesTableName::from(target.clone()))
             .unwrap()
             .rules()
             .resolve(&context);
@@ -523,29 +530,29 @@ fn cte_delete_returning_uses_its_destination_row_image_on_postgres18() -> testre
 fn modifier_capable_results_have_an_explicit_semantic_boundary() -> testresult::TestResult {
     let mut context = test_helpers::catalog();
     let name = FullName::with_schema("public", "sized");
-    let column = crate::sem::ColumnDefinition::new(
-        &Some(crate::names::ColumnName::from("id")),
-        Some(&crate::sem::TypeReference::concrete_type_ref(
+    let column = SemColumnDefinition::new(
+        &Some(NamesColumnName::from("id")),
+        Some(&TypeReference::concrete_type_ref(
             &FullName::with_schema("pg_catalog", "varchar"),
             false,
         )),
         Some(false),
         &[],
     );
-    let table = crate::sem::CreateTable::new(
-        &crate::names::TableName::from(name.clone()),
+    let table = SemCreateTable::new(
+        &NamesTableName::from(name.clone()),
         vec![column],
-        crate::sem::CreateTableMode::from_if_not_exists(false),
+        SemCreateTableMode::from_if_not_exists(false),
         false,
-        &crate::test_helpers::source_span(),
+        &source_span(),
     );
     context.set_get_table_impl_result(&name, &Some(table));
     let query = test_helpers::resolve("SELECT id FROM sized", &mut context)?
         .into_select_statemtnt()
         .unwrap();
     let name = FullName::with_schema("public", "sized_view");
-    let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
-    context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
+    let view = CreateView::new(&name, &query, &[], &None, false);
+    context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
     let unresolved = test_helpers::resolve(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO sized_view DO INSTEAD SELECT id FROM sized"#, &mut context).unwrap();
     assert!(matches!(
         unresolved,
@@ -570,8 +577,8 @@ fn action_lookup_retains_the_first_relation_on_the_search_path() -> testresult::
         .into_select_statemtnt()
         .unwrap();
     let name = FullName::with_schema("pg_catalog", "items");
-    let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
-    context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
+    let view = CreateView::new(&name, &query, &[], &None, false);
+    context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
     let statement = test_helpers::resolve(
         "CREATE RULE r AS ON UPDATE TO public.sink DO SELECT id FROM items",
         &mut context,
@@ -607,6 +614,17 @@ fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
 
 mod test_helpers {
     use crate::{
+        context::MutSourcePathWithSpan,
+        names::OperatorName,
+        parse_statements,
+        sem::{
+            BinaryOperatorDefinition, CastContext, CastDefinition, CreateView, OperatorDefinition,
+            ViewLike,
+        },
+        test_helpers::{create_cache_context, source_span},
+    };
+
+    use crate::{
         ast::Dialect,
         context::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
         names::{ColumnName, FullName, SchemaName, TableName},
@@ -625,27 +643,21 @@ mod test_helpers {
     pub(super) fn catalog() -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
-        crate::context::MutSourcePathWithSpan::set_source_path_with_span(
-            &mut context,
-            &crate::test_helpers::source_span(),
-        );
+        MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
         let int = PgBuiltInType::int4();
         context.set_get_implicit_cast_result(
             &int,
             &int,
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::NoConversion,
-            )),
+            Some(CastDefinition::new(CastContext::NoConversion)),
         );
-        let equality =
-            crate::sem::OperatorDefinition::binary(&[crate::sem::BinaryOperatorDefinition::new(
-                &int,
-                &int,
-                &PgBuiltInType::bool(),
-                true,
-            )]);
+        let equality = OperatorDefinition::binary(&[BinaryOperatorDefinition::new(
+            &int,
+            &int,
+            &PgBuiltInType::bool(),
+            true,
+        )]);
         context.set_get_operator_op_result(
-            &crate::names::OperatorName::from_parts(None, "="),
+            &OperatorName::from_parts(None, "="),
             true,
             true,
             Some(&equality),
@@ -658,8 +670,8 @@ mod test_helpers {
             .into_select_statemtnt()
             .unwrap();
         let name = FullName::with_schema("public", "item_view");
-        let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
-        context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
+        let view = CreateView::new(&name, &query, &[], &None, false);
+        context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
         context
     }
     pub(super) fn add_table(context: &mut TestParseContext, name: &FullName) {
@@ -677,7 +689,7 @@ mod test_helpers {
             vec![column],
             CreateTableMode::from_if_not_exists(false),
             false,
-            &crate::test_helpers::source_span(),
+            &source_span(),
         );
         context.set_get_table_impl_result(name, &Some(table));
     }
@@ -685,12 +697,12 @@ mod test_helpers {
         sql: &str,
         context: &mut impl ParseContext,
     ) -> Result<SemAst, AnalysisError> {
-        crate::parse_statements(sql, Dialect::postgres())
+        parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(context, &mut crate::test_helpers::create_cache_context())
+            .resolve(context, &mut create_cache_context())
     }
     pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
         SchemaFileContext::new(
@@ -704,12 +716,12 @@ mod test_helpers {
         sql: &str,
         context: SchemaFileContext,
     ) -> Result<SchemaFileContext, AnalysisError> {
-        Ok(crate::parse_statements(sql, Dialect::postgres())
+        Ok(parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())?
+            .resolve_and_apply(context, &mut create_cache_context())?
             .into_context())
     }
 }

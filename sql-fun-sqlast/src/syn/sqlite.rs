@@ -57,8 +57,10 @@ mod view_management_statements;
 mod window;
 mod with;
 
-use crate::syn::sqlite::{domain::DomainConstraint, pragma::PragmaBody};
-
+#[cfg(test)]
+pub use self::names::{
+    NameBuilder, NameBuilderError, QualifiedNameBuilder, QualifiedNameBuilderError,
+};
 pub use self::{
     analyze_statement::AnalyzeStatement,
     column_definition::ColumnDefinition,
@@ -130,10 +132,8 @@ pub use self::{
     with::{CommonTableExpr, Materialized, With},
 };
 
-#[cfg(test)]
-pub use self::names::{
-    NameBuilder, NameBuilderError, QualifiedNameBuilder, QualifiedNameBuilderError,
-};
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::{domain::DomainConstraint, pragma::PragmaBody};
 
 use turso_parser::ast::As as AsIn;
 
@@ -534,6 +534,9 @@ impl From<StmtIn> for Stmt {
 
 #[cfg(test)]
 mod test_stmt_from {
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::Stmt;
+
     use testresult::TestResult;
     use turso_parser::{ast::Cmd, parser::Parser};
 
@@ -588,7 +591,7 @@ mod test_stmt_from {
         let Cmd::Stmt(stmt) = cmd else {
             panic!("cmd is not stmt")
         };
-        let _stmt = super::Stmt::from(stmt);
+        let _stmt = Stmt::from(stmt);
         Ok(())
     }
 }

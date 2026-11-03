@@ -1,6 +1,6 @@
-use crate::engine_specific::TursoEqpFeature;
-use crate::sem::AnalysisError;
+#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::Stmt;
+use crate::{engine_specific::TursoEqpFeature, sem::AnalysisError};
 
 use ::turso_parser::ast::{Cmd as CmdIn, EqpFormat as EqpFormatIn};
 
@@ -154,10 +154,11 @@ impl From<EqpFormatIn> for EqpFormat {
 
 #[cfg(test)]
 mod test_command_conversion {
-    use super::{EqpFormat, ExplainQueryPlan};
-    use crate::engine_specific::TursoEqpFeature;
-    use crate::sem::AnalysisError;
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::command::{EqpFormat, ExplainQueryPlan};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
+    use crate::{engine_specific::TursoEqpFeature, sem::AnalysisError};
 
     #[derive(Default)]
     struct Gate(usize);

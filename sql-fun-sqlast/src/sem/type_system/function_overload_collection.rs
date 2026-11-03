@@ -1,9 +1,8 @@
-use crate::context::BaseParseContext;
 use crate::{
-    context::ParseContext,
-    names::FullName,
+    context::{BaseParseContext, ParseContext},
+    names::{FullName, TableName},
     sem::{
-        OverloadVariant, SemScalarExpr,
+        OverloadVariant, SemScalarExpr, TypeReference,
         overload_rank::OverloadRank,
         parameter_resolution::Signature,
         type_system::{
@@ -30,7 +29,7 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 
 impl FunctionOverloadCollection {
     // Shared declaration result, without binding or selecting an overload.
-    pub(crate) fn common_scalar_result(&self) -> Option<crate::sem::TypeReference> {
+    pub(crate) fn common_scalar_result(&self) -> Option<TypeReference> {
         let result = self.overloads.first()?.scaler_ret_type()?;
         if result.is_simple_infer_arg() || result.is_common_infer_arg() {
             return None;
@@ -70,8 +69,8 @@ impl FunctionOverloadCollection {
         &self,
         context: &impl BaseParseContext,
         name: &FullName,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
+        old: &TableName,
+        new: &TableName,
     ) -> Vec<((FullName, OverloadVariant), bool)> {
         self.overloads
             .iter()
@@ -84,11 +83,7 @@ impl FunctionOverloadCollection {
             .collect()
     }
 
-    pub(crate) fn rename_relation(
-        &mut self,
-        old: &crate::names::TableName,
-        new: &crate::names::TableName,
-    ) {
+    pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         for overload in &mut self.overloads {
             overload.rename_relation(old, new);
         }

@@ -144,7 +144,7 @@ impl super::CollectionTraversal for SqlToken {}
 
 #[cfg(test)]
 mod tests {
-    use super::{SqlToken, TokenizeSqlArgs};
+    use crate::payloads::tokenize_sql::{SqlToken, TokenizeSqlArgs};
     use ::sql_fun_core::{SqlDialect, SqlToken as CoreToken, TokenKind};
 
     #[rstest::rstest]

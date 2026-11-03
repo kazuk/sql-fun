@@ -1,3 +1,4 @@
+use crate::payloads::CollectionReference;
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
@@ -125,10 +126,10 @@ impl SchemaContext {
 }
 
 impl super::CollectionTraversal for SchemaContext {
-    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+    fn collections(&self) -> Vec<&dyn CollectionReference> {
         vec![&self.problems]
     }
-    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+    fn collections_mut(&mut self) -> Vec<&mut dyn CollectionReference> {
         vec![&mut self.problems]
     }
 }

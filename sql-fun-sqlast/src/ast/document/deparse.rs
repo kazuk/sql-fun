@@ -1,13 +1,19 @@
-use super::{
-    CmdType, DocumentExpr, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate,
-    JsonArrayQuery, JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp,
-    JsonFormat, JsonFormatType, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate,
-    JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonQuotes, JsonReturning, JsonScalar,
-    JsonSerialize, JsonTable, JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, Merge,
-    MergeMatchKind, MergeWhen, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize, XmlTable,
+use crate::{
+    ast::{
+        Assignment, ReturningOption, Target,
+        deparse::{DeparseError, SqlEmit, SqlWriter},
+        document::{
+            CmdType, DocumentExpr, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate,
+            JsonArrayQuery, JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp,
+            JsonFormat, JsonFormatType, JsonFunction, JsonKeyValue, JsonObject,
+            JsonObjectAggregate, JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonQuotes,
+            JsonReturning, JsonScalar, JsonSerialize, JsonTable, JsonTableColumnType, JsonValue,
+            JsonValueType, JsonWrapper, Merge, MergeMatchKind, MergeWhen, Xml, XmlColumn,
+            XmlExprOp, XmlOptionType, XmlSerialize, XmlTable,
+        },
+    },
+    sem::with_stack,
 };
-use crate::ast::Assignment;
-use crate::ast::deparse::{DeparseError, SqlEmit, SqlWriter};
 
 impl SqlEmit for DocumentExpr {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
@@ -403,7 +409,7 @@ impl SqlEmit for JsonTable {
 }
 impl SqlEmit for JsonColumn {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
-        crate::sem::with_stack(|| self.coltype.emit_column(self, w))
+        with_stack(|| self.coltype.emit_column(self, w))
     }
 }
 impl JsonTableColumnType {
@@ -706,7 +712,7 @@ impl SqlEmit for Merge {
         }
         if !self.returning_list.is_empty() {
             w.sql(" RETURNING ");
-            crate::ast::ReturningOption::emit_options(&self.returning_options, w)?;
+            ReturningOption::emit_options(&self.returning_options, w)?;
             w.list(&self.returning_list, ", ")?;
         }
         Ok(())
@@ -778,7 +784,7 @@ impl MergeWhen {
     }
 }
 
-impl crate::ast::Target {
+impl Target {
     fn emit_namespace(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         if let Some(alias) = &self.alias {
             self.expression.emit(w)?;

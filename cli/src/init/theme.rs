@@ -2,8 +2,10 @@
 mod download;
 
 use self::download::Downloader;
-use super::{choice, prompt::PromptRequest, step::PromptInput};
-use crate::highlighter_theme::HighlighterTheme;
+use crate::{
+    highlighter_theme::HighlighterTheme,
+    init::{choice, prompt::PromptRequest, step::PromptInput},
+};
 use ::anyhow::Context;
 use ::sql_fun_core::InitializeArgs;
 use std::{
@@ -53,8 +55,7 @@ pub(super) fn validate_installed(home: &Path) -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod test_installed_validation {
-    use super::validate_installed;
-    use crate::test_helpers::theme::ThemeFixture;
+    use crate::{init::theme::validate_installed, test_helpers::theme::ThemeFixture};
     #[rstest::rstest]
     #[case::toml("[[broken")]
     #[case::foreground("keyword = { foreground = 'invalid-color' }")]
@@ -285,8 +286,12 @@ impl ThemePlan {
 
 #[cfg(test)]
 mod test_theme_plan {
-    use super::{Operation, ThemePlan};
-    use crate::test_helpers::theme::ThemeFixture;
+    use crate::init::step::TerminalInput as StepTerminalInput;
+
+    use crate::{
+        init::theme::{Operation, ThemePlan},
+        test_helpers::theme::ThemeFixture,
+    };
     use ::clap::Parser;
     use ::sql_fun_core::InitializeArgs;
 
@@ -352,7 +357,7 @@ mod test_theme_plan {
         let fixture = ThemeFixture::new();
         let args = InitializeArgs::try_parse_from(["init", "--yes"]).unwrap();
         let mut plan = ThemePlan::inspect(fixture.home()).unwrap();
-        let mut input = crate::init::step::TerminalInput;
+        let mut input = StepTerminalInput;
         assert!(
             plan.choose(&args, None, &mut input)
                 .unwrap_err()

@@ -1,3 +1,9 @@
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint;
+use crate::{
+    sem::{ColumnRename, traversal::SemanticVisitorMut},
+    syn::Constraint,
+};
 use sql_fun_core::IVec;
 
 #[cfg(feature = "sqlite")]
@@ -20,7 +26,7 @@ pub struct CheckColumnConstraint {
 }
 
 impl CheckColumnConstraint {
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         if owned {
             rename.rename_name(&mut self.column_name);
         }
@@ -28,7 +34,7 @@ impl CheckColumnConstraint {
 
     pub(super) fn rename_expression(
         &mut self,
-        visitor: &mut impl crate::sem::traversal::SemanticVisitorMut,
+        visitor: &mut impl SemanticVisitorMut,
     ) -> Result<(), AnalysisError> {
         self.expr.walk(visitor)
     }
@@ -72,7 +78,7 @@ impl CheckColumnConstraint {
         context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::Constraint,
+        syn: &Constraint,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
@@ -106,7 +112,7 @@ impl CheckColumnConstraint {
         mut context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
-        syn: &crate::syn::sqlite::CheckColumnConstraint,
+        syn: &SqliteCheckColumnConstraint,
         tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where

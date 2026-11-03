@@ -1,6 +1,6 @@
 use crate::{
     names::FullName,
-    sem::{ObjectKind, OwnedObjectDefinition, Role},
+    sem::{CreateFunction, CreateSchema, ObjectKind, OwnedObjectDefinition, Role},
 };
 
 /// Exact-name role lookup supplied by the explicitly selected analysis environment.
@@ -23,12 +23,12 @@ pub trait RoleInfoRead {
 /// Exact catalog reads used for ownership analysis (no search-path expansion here).
 pub trait OwnershipInfoRead {
     /// Retained schema DDL by exact global schema name.
-    fn schema_definition(&self, _name: &str) -> Option<&crate::sem::CreateSchema> {
+    fn schema_definition(&self, _name: &str) -> Option<&CreateSchema> {
         None
     }
 
     /// Retained routine DDL, one definition per exact input signature.
-    fn routine_definitions(&self, _name: &FullName) -> Vec<crate::sem::CreateFunction> {
+    fn routine_definitions(&self, _name: &FullName) -> Vec<CreateFunction> {
         Vec::new()
     }
 

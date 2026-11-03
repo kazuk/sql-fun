@@ -1,5 +1,6 @@
 use crate::{
-    ast::{Alias, Delete, Dialect, Expr, FromItem},
+    CacheContext,
+    ast::{Alias, CurrentOf, Delete, Dialect, Expr, FromItem},
     context::ParseContext,
     names::{FullName, TableName},
     sem::{
@@ -14,7 +15,7 @@ impl Delete {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-        cache: &mut crate::CacheContext,
+        cache: &mut CacheContext,
     ) -> Result<DeleteStatement, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None).and_then(|mut delete| {
@@ -232,7 +233,7 @@ impl Expr {
         }
     }
 }
-impl crate::ast::CurrentOf {
+impl CurrentOf {
     fn resolve_delete(
         &self,
         context: &mut impl ParseContext,

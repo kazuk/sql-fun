@@ -1,10 +1,10 @@
-use super::{AlterOwner, Name, ObjectArgument, ObjectTarget, Role};
 use crate::{
+    ast::{AlterOwner, Name, ObjectArgument, ObjectTarget, Role, SyntaxValue},
     context::ParseContext,
-    names::{FullName, SchemaName},
+    names::{FullName, SchemaName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, AstAndContextPair, ObjectKind, OwnerSpecification,
-        OwnershipIdentity, OwnershipLookup, SemAst, TypeReference,
+        AlterOwner as SemAlterOwner, AnalysisError, AnalysisProblem, AstAndContextPair, ObjectKind,
+        OwnerSpecification, OwnershipIdentity, OwnershipLookup, SemAst, TypeReference,
     },
 };
 
@@ -12,7 +12,7 @@ impl AlterOwner {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<crate::sem::AlterOwner, AnalysisError> {
+    ) -> Result<SemAlterOwner, AnalysisError> {
         let requested = self.target_identity(context)?;
         let target = if !requested.missing_types.is_empty() {
             OwnershipLookup::argument_type_not_found(&requested.identity, &requested.missing_types)
@@ -23,7 +23,7 @@ impl AlterOwner {
             context.report_analysis_problem(AnalysisProblem::ownership_target(&target))?;
         }
         let owner = self.owner.resolve_owner(context)?;
-        Ok(crate::sem::AlterOwner::new(&target, &owner))
+        Ok(SemAlterOwner::new(&target, &owner))
     }
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,
@@ -290,20 +290,18 @@ impl OwnershipIdentity {
 mod tests;
 
 impl super::SyntaxOption {
-    pub(in crate::ast) fn owned_relation(
-        &self,
-    ) -> Result<Option<crate::names::TableName>, AnalysisError> {
+    pub(in crate::ast) fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
         if self.name != "owned_by" {
             return Ok(None);
         }
-        let Some(super::SyntaxValue::Expression(expression)) = &self.value else {
+        let Some(SyntaxValue::Expression(expression)) = &self.value else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY target");
         };
         expression.owned_relation()
     }
 }
 impl super::Expr {
-    fn owned_relation(&self) -> Result<Option<crate::names::TableName>, AnalysisError> {
+    fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
         match self {
             Self::List(parts) => Self::owned_relation_from_parts(parts),
             Self::Column(name) => name.owned_relation(),
@@ -311,9 +309,7 @@ impl super::Expr {
             _ => AnalysisError::raise_unexpected_input("sequence OWNED BY identity"),
         }
     }
-    fn owned_relation_from_parts(
-        parts: &[Self],
-    ) -> Result<Option<crate::names::TableName>, AnalysisError> {
+    fn owned_relation_from_parts(parts: &[Self]) -> Result<Option<TableName>, AnalysisError> {
         let mut names = Vec::new();
         for part in parts {
             names.push(part.owned_identifier()?);
@@ -328,20 +324,18 @@ impl super::Expr {
     }
 }
 impl Name {
-    fn owned_relation(&self) -> Result<Option<crate::names::TableName>, AnalysisError> {
+    fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
         if self.0.len() == 1 && self.0[0].eq_ignore_ascii_case("none") {
             return Ok(None);
         }
         let Some((_, table)) = self.0.split_last() else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY column");
         };
-        Ok(Some(crate::names::TableName::from(
-            Self(table.to_vec()).full_name()?,
-        )))
+        Ok(Some(TableName::from(Self(table.to_vec()).full_name()?)))
     }
 }
 impl super::Literal {
-    fn owned_relation(&self) -> Result<Option<crate::names::TableName>, AnalysisError> {
+    fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
         if let Self::Keyword(keyword) = self
             && keyword.eq_ignore_ascii_case("none")
         {

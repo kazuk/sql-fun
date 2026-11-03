@@ -1,13 +1,18 @@
 // Reuse the maintained real-server lifecycle and lightweight schema fixtures.
-use crate::test_helpers::heavy::lifecycle;
 #[allow(dead_code)]
 #[path = "../../../../../sql-fun-client/tests/test_helpers/schema.rs"]
 mod schema;
 
+use crate::check::submission::test_helpers::{
+    catalog as test_helpers_catalog, collect_submission, requirements,
+};
+
+use crate::test_helpers::heavy;
+
 /// Starts a real server and loads a synthetic builtin catalog per test process.
 /// Required to verify extracted requirements reach the actual realization service.
 pub(crate) async fn analyze_recovered_catalog() -> ::testresult::TestResult {
-    let server = lifecycle::ServerFixture::new()?;
+    let server = heavy::lifecycle::ServerFixture::new()?;
     let schema = schema::SchemaFixture::with_query_schema("CREATE TABLE entries(id int4);")?;
     let request = schema.request();
     let args = ::sql_fun_core::SqlFunArgs::builder(&std::collections::HashMap::new())?
@@ -19,12 +24,12 @@ pub(crate) async fn analyze_recovered_catalog() -> ::testresult::TestResult {
         .sql_fun_home(request["environments"]["SQL_FUN_HOME"].as_str().unwrap())
         .schema_file(request["schema_dump"].as_str().unwrap())
         .build()?;
-    let catalog = super::catalog();
+    let catalog = test_helpers_catalog();
     let mut client = ::sql_fun_client::connect(&server.options()).await?;
-    let results = super::collect_submission(
+    let results = collect_submission(
         &mut client,
         &args,
-        super::requirements(
+        requirements(
             &["products"],
             "SELECT ${shared:int4}, id FROM a_visible",
             &catalog,

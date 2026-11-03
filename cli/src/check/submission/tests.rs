@@ -1,4 +1,7 @@
-use super::{test_helpers, test_helpers::collect_submission};
+use crate::{
+    analysis::PreparedDiagnostics,
+    check::submission::{submit, test_helpers, test_helpers::collect_submission},
+};
 
 const QUERY: &str = "SELECT ${shared:int4}, id FROM a_visible";
 
@@ -162,7 +165,7 @@ async fn delivers_identity_before_completion_and_distinguishes_partial_failure()
     let (release, released) = ::tokio::sync::oneshot::channel();
     let (mut client, peer) = test_helpers::gated_second_failure(released).await;
     let (sender, mut receiver) = ::tokio::sync::mpsc::channel(1);
-    let producer = super::submit(&mut client, &args, requirements, sender);
+    let producer = submit(&mut client, &args, requirements, sender);
     let consumer = async {
         let first = receiver.recv().await.expect("first completed query");
         assert_eq!(first.function_name, "query_0");
@@ -192,7 +195,7 @@ async fn closed_consumer_is_a_delivery_failure() {
     let (mut client, peer) = test_helpers::peer(None).await;
     let (sender, receiver) = ::tokio::sync::mpsc::channel(1);
     drop(receiver);
-    let result = super::submit(
+    let result = submit(
         &mut client,
         &project.args(),
         test_helpers::requirements(&["first", "first"], QUERY, &test_helpers::catalog()),
@@ -436,7 +439,7 @@ async fn validate_only_compares_prospective_state_without_mutation(
             source_line: 1,
             datasource: "first".to_owned(),
             response,
-            tokenizations: crate::analysis::PreparedDiagnostics::default(),
+            tokenizations: PreparedDiagnostics::default(),
         };
         lockfiles.receive(&analysis).unwrap();
     }

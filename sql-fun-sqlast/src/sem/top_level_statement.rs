@@ -1,9 +1,9 @@
 use crate::{
-    AstAndContextPair,
-    ast::TryFromWithTokens,
+    AstAndContextPair, CacheContext,
+    ast::{Dialect, StatementNode, TryFromWithTokens},
     context::ParseContext,
     sem::{AlterOwner, AnalysisError, SemAst, create_table::DropTable},
-    syn::{ListOpt, Opt, ParseResult},
+    syn::{DropStmt, ListOpt, Node, ObjectType, Opt, ParseResult, ScanToken},
 };
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::Stmt};
@@ -28,7 +28,7 @@ impl SemAst {
     pub fn semantic_analysis<TParseContext>(
         context: TParseContext,
         syn: ParseResult,
-        tokens: &IVec<crate::syn::ScanToken>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -42,8 +42,8 @@ impl SemAst {
     /// analyze drop object statement
     pub fn analyze_drop_statement<TParseContext>(
         context: TParseContext,
-        statement: crate::syn::DropStmt,
-        tokens: &IVec<crate::syn::ScanToken>,
+        statement: DropStmt,
+        tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -54,9 +54,7 @@ impl SemAst {
         };
 
         match drop_type {
-            crate::syn::ObjectType::ObjectTable => {
-                DropTable::analyze_drop_stmt(context, statement, tokens)
-            }
+            ObjectType::ObjectTable => DropTable::analyze_drop_stmt(context, statement, tokens),
             _ => {
                 AnalysisError::raise_unexpected_input(
                     "DROP object type is not supported by this analyzer",
@@ -71,17 +69,17 @@ impl SemAst {
     pub fn analyze_node<TParseContext: ParseContext>(
         context: TParseContext,
         _parent_schema: &Option<String>,
-        statement: crate::syn::Node,
-        tokens: &IVec<crate::syn::ScanToken>,
+        statement: Node,
+        tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
-        AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
+        AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let Some(_) = context.get_source_path_with_span() else {
             AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
             AnalysisError::never();
         };
 
-        let syntax = crate::ast::StatementNode::try_from_with_tokens(&statement, tokens)?;
-        syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+        let syntax = StatementNode::try_from_with_tokens(&statement, tokens)?;
+        syntax.resolve_and_apply(context, &mut CacheContext::new())
     }
 
     /// analyze [`Stmt`]
@@ -99,22 +97,19 @@ impl SemAst {
             AnalysisError::never();
         };
 
-        AnalysisError::check_dialect(crate::ast::Dialect::sqlite(), context.dialect())?;
+        AnalysisError::check_dialect(Dialect::sqlite(), context.dialect())?;
         match syn {
             Stmt::AlterTable(alter_table) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::AlterTable(alter_table))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::AlterTable(alter_table))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::CreateTable(create_table_statement) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTable(
-                    create_table_statement,
-                ))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::CreateTable(create_table_statement))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::DropTable(drop_table_statement) => {
-                let syntax =
-                    crate::ast::StatementNode::try_from(&Stmt::DropTable(drop_table_statement))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::DropTable(drop_table_statement))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
@@ -131,16 +126,16 @@ impl SemAst {
             Stmt::Optimize(_optimize_statement) => todo!(),
             Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
             Stmt::CreateTrigger(trigger) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTrigger(trigger))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::CreateTrigger(trigger))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::DropTrigger(trigger) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::DropTrigger(trigger))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::DropTrigger(trigger))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::CreateView(view) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateView(view))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::CreateView(view))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
             Stmt::DropView(_drop_view) => todo!(),
@@ -149,20 +144,20 @@ impl SemAst {
             Stmt::CreateSequence(_create_sequence_statement) => todo!(),
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::Select(select))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::Select(select))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::Update(update) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::Update(update))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::Update(update))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::Delete(delete) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::Delete(delete))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::Delete(delete))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::Insert(insert) => {
-                let syntax = crate::ast::StatementNode::try_from(&Stmt::Insert(insert))?;
-                syntax.resolve_and_apply(context, &mut crate::CacheContext::new())
+                let syntax = StatementNode::try_from(&Stmt::Insert(insert))?;
+                syntax.resolve_and_apply(context, &mut CacheContext::new())
             }
             Stmt::Pragma(_pragma_statement) => todo!(),
             Stmt::CreateDomain(_create_domain_statement) => todo!(),

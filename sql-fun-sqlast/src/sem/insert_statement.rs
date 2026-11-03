@@ -2,20 +2,33 @@ mod arbiter;
 mod destination;
 mod view_support;
 
-pub use self::arbiter::{
-    InsertArbiter, InsertArbiterLookup, InsertConstraintKind, InsertConstraintLookup,
-    ViewSourceArbiter,
-};
 pub(crate) use self::destination::InsertDestination;
-pub use self::view_support::ViewInsertSupport;
+pub use self::{
+    arbiter::{
+        InsertArbiter, InsertArbiterLookup, InsertConstraintKind, InsertConstraintLookup,
+        ViewSourceArbiter,
+    },
+    view_support::ViewInsertSupport,
+};
 
-use crate::ast::TryFromWithTokens;
-use crate::sem::traversal::SemanticVisitorMut;
 use crate::{
+    CacheContext,
+    ast::{Dialect, Insert, StatementNode},
+    sem::{
+        AccessKind, CatalogNameLookup, ConflictClause,
+        problem::InsertProblemKind,
+        traversal::{SemanticVisitor, optional, visit_optional},
+    },
+    syn::InsertStmt,
+};
+
+use crate::{
+    ast::TryFromWithTokens,
     names::TableName,
     sem::{
         AnalysisError, AnalysisProblem, ColumnDefinition, ParseContext, QueryCte,
         ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
+        traversal::SemanticVisitorMut,
     },
 };
 
@@ -30,7 +43,7 @@ pub struct InsertStatement {
     returning: ResultColumnCollection,
     conflicts: Vec<InsertConflict>,
     overriding: Option<String>,
-    or_conflict: Option<crate::sem::ConflictClause>,
+    or_conflict: Option<ConflictClause>,
 }
 impl InsertStatement {
     pub(crate) fn new(
@@ -56,7 +69,7 @@ impl InsertStatement {
         &mut self,
         conflicts: Vec<InsertConflict>,
         overriding: Option<String>,
-        or_conflict: Option<crate::sem::ConflictClause>,
+        or_conflict: Option<ConflictClause>,
     ) {
         self.conflicts = conflicts;
         self.overriding = overriding;
@@ -98,7 +111,7 @@ impl InsertStatement {
         self.overriding.as_deref()
     }
     /// SQLite statement-level conflict policy, when specified.
-    pub const fn or_conflict(&self) -> Option<&crate::sem::ConflictClause> {
+    pub const fn or_conflict(&self) -> Option<&ConflictClause> {
         self.or_conflict.as_ref()
     }
     pub(crate) fn rename_columns(&mut self, columns: &[String]) {
@@ -137,10 +150,7 @@ impl InsertStatement {
         visitor.leave_query();
         result
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.relation_identity(self.target().full_name());
         visitor.enter_query();
         let result = self.visit_body(visitor);
@@ -158,25 +168,19 @@ impl InsertStatement {
         }
         self.returning.walk(visitor)
     }
-    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_action(
-            self.target.full_name(),
-            crate::sem::AccessKind::insert_rows(),
-        );
-        visitor.access_purpose(crate::sem::AccessKind::insert_input());
+    fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_action(self.target.full_name(), AccessKind::insert_rows());
+        visitor.access_purpose(AccessKind::insert_input());
         visitor.table_binding(&self.target);
         for entry in &self.with {
             entry.visit(visitor)?;
         }
         self.source.visit(visitor, self.columns.as_slice())?;
-        visitor.access_purpose(crate::sem::AccessKind::insert_conflict());
+        visitor.access_purpose(AccessKind::insert_conflict());
         for conflict in &self.conflicts {
             conflict.visit(visitor)?;
         }
-        visitor.access_purpose(crate::sem::AccessKind::insert_returning());
+        visitor.access_purpose(AccessKind::insert_returning());
         self.returning.visit(visitor)
     }
 }
@@ -208,10 +212,7 @@ impl InsertTargetCollection {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for target in &self.0 {
             target.destination.visit_assignment_target(visitor)?;
             visitor.bound_definition(&target.column, &target.destination);
@@ -248,7 +249,7 @@ impl InsertValueCollection {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         targets: &InsertTargetCollection,
@@ -323,13 +324,10 @@ impl InsertClauseSemantics {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::insert_target());
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_purpose(AccessKind::insert_target());
         self.targets.visit(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::insert_input());
+        visitor.access_purpose(AccessKind::insert_input());
         if let Some(values) = self.values.values() {
             values.visit(visitor, &self.targets)?;
         }
@@ -438,17 +436,17 @@ impl InsertSource {
             Self::Query(query) => Self::walk_query(query, visitor, targets),
         }
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         targets: &[InsertTarget],
     ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::insert_target());
+        visitor.access_purpose(AccessKind::insert_target());
         for target in targets.iter() {
             target.destination.visit_assignment_target(visitor)?;
             visitor.bound_definition(&target.column, &target.destination);
         }
-        visitor.access_purpose(crate::sem::AccessKind::insert_input());
+        visitor.access_purpose(AccessKind::insert_input());
         match self {
             Self::DefaultValues => Ok(()),
             Self::Values(rows) => {
@@ -478,7 +476,7 @@ impl InsertSource {
         };
         query.walk_assigned(visitor, targets)
     }
-    fn visit_query<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit_query<V: SemanticVisitor>(
         query: &SelectStatement,
         visitor: &mut V,
         targets: &[InsertTarget],
@@ -535,7 +533,7 @@ impl InsertValue {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
+    fn visit<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         target: &InsertTarget,
@@ -613,20 +611,17 @@ impl InsertConflict {
         for expression in &mut self.inference {
             expression.walk(visitor)?;
         }
-        crate::sem::traversal::optional(&mut self.predicate, visitor)?;
+        optional(&mut self.predicate, visitor)?;
         if let Some(predicate) = &self.predicate {
             visitor.predicate(predicate);
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for expression in &self.inference {
             expression.visit(visitor)?;
         }
-        crate::sem::traversal::visit_optional(&self.predicate, visitor)?;
+        visit_optional(&self.predicate, visitor)?;
         if let Some(predicate) = &self.predicate {
             visitor.predicate(predicate);
         }
@@ -637,20 +632,20 @@ impl InsertConflict {
 /// Completed collation and operator-class lookups for one inference expression.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertInferenceModifiers {
-    collations: Vec<crate::sem::CatalogNameLookup>,
-    operator_class: Option<crate::sem::CatalogNameLookup>,
+    collations: Vec<CatalogNameLookup>,
+    operator_class: Option<CatalogNameLookup>,
 }
 impl InsertInferenceModifiers {
     #[cfg(test)]
     pub(crate) fn new(
-        collation: Option<crate::sem::CatalogNameLookup>,
-        operator_class: Option<crate::sem::CatalogNameLookup>,
+        collation: Option<CatalogNameLookup>,
+        operator_class: Option<CatalogNameLookup>,
     ) -> Self {
         Self::from_lookups(collation.into_iter().collect(), operator_class)
     }
     pub(crate) const fn from_lookups(
-        collations: Vec<crate::sem::CatalogNameLookup>,
-        operator_class: Option<crate::sem::CatalogNameLookup>,
+        collations: Vec<CatalogNameLookup>,
+        operator_class: Option<CatalogNameLookup>,
     ) -> Self {
         Self {
             collations,
@@ -658,16 +653,16 @@ impl InsertInferenceModifiers {
         }
     }
     /// Effective explicit collation lookup, absent when no COLLATE was supplied.
-    pub fn collation(&self) -> Option<&crate::sem::CatalogNameLookup> {
+    pub fn collation(&self) -> Option<&CatalogNameLookup> {
         self.collations.last()
     }
     /// All explicit COLLATE references, innermost to outermost, including names
     /// overridden by a later COLLATE. Every reference must be resolved.
-    pub fn collation_references(&self) -> &[crate::sem::CatalogNameLookup] {
+    pub fn collation_references(&self) -> &[CatalogNameLookup] {
         &self.collations
     }
     /// Explicit operator-class lookup, absent if SQL did not specify one.
-    pub const fn operator_class(&self) -> Option<&crate::sem::CatalogNameLookup> {
+    pub const fn operator_class(&self) -> Option<&CatalogNameLookup> {
         self.operator_class.as_ref()
     }
     const fn is_explicit(&self) -> bool {
@@ -691,7 +686,7 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
         value: &mut SemScalarExpr,
         target: &InsertTarget,
     ) -> Result<(), AnalysisError> {
-        if self.context.dialect() == crate::ast::Dialect::sqlite() {
+        if self.context.dialect() == Dialect::sqlite() {
             return Ok(());
         }
         let Some(ty) = target.assignment_type() else {
@@ -707,7 +702,7 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
         {
             self.context
                 .report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::assignment_type(),
+                    InsertProblemKind::assignment_type(),
                     &format!("cannot assign {source} to {ty}"),
                 ))?;
         }
@@ -725,14 +720,14 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
 pub fn analyze_insert_statement<TParseContext>(
     mut context: TParseContext,
     _parent_schema: &Option<String>,
-    syn: crate::syn::InsertStmt,
+    syn: InsertStmt,
 ) -> Result<(SemAst, TParseContext), AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
-    let syntax = crate::ast::Insert::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = crate::ast::StatementNode::Insert(syntax)
-        .resolve(&mut context, &mut crate::CacheContext::new())?;
+    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+    let syntax = Insert::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
+    let statement =
+        StatementNode::Insert(syntax).resolve(&mut context, &mut CacheContext::new())?;
     Ok((statement, context))
 }

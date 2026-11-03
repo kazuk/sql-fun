@@ -1,5 +1,4 @@
-use super::invalid;
-use crate::sem::AnalysisError;
+use crate::sem::{AnalysisError, client_type::invalid};
 use ::combine::{Parser, satisfy};
 
 /// Local lexical representation; existing dialect scanners own keyword policy.

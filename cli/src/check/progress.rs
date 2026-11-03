@@ -115,7 +115,7 @@ impl<W: Write> Progress<W> {
 
 #[cfg(test)]
 mod test_progress {
-    use super::{Progress, ProgressMode};
+    use crate::check::progress::{Progress, ProgressMode};
 
     #[rstest::rstest]
     #[case::silent(ProgressMode::silent(), "")]

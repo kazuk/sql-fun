@@ -1,5 +1,5 @@
 use crate::{
-    names::ColumnName,
+    names::{ColumnName, TableName},
     sem::{ColumnDefinition, CreateTable, problem::AlterColumnProblem},
 };
 
@@ -208,7 +208,7 @@ impl ColumnAttributeAction {
         }
         problems
     }
-    pub(crate) fn apply(&self, table: &crate::names::TableName, column: &mut ColumnDefinition) {
+    pub(crate) fn apply(&self, table: &TableName, column: &mut ColumnDefinition) {
         match self {
             Self::NotNull(value) => column.apply_attribute_nullability(table, *value),
             Self::Statistics(value) => column.apply_statistics_target(value.effective()),

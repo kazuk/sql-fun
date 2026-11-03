@@ -2,8 +2,11 @@ use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     names::SchemaName,
+    parse_statements,
     sem::{AnalysisError, AstAndContextPair},
-    test_helpers::common_types,
+    test_helpers::{
+        common_types, create_cache_context, ownership::apply_ownership_sql, source_span,
+    },
 };
 
 /// Minimal common-type catalog, retaining its real definitions for later assignments.
@@ -18,29 +21,26 @@ pub(crate) fn context(dialect: Dialect) -> SchemaFileContext {
         &args,
         &metadata,
     );
-    context.set_source_path_with_span(&crate::test_helpers::source_span());
+    context.set_source_path_with_span(&source_span());
     context
 }
 
 /// Analyze through the public statement boundary without loading builtin catalogs.
 pub(crate) fn analyze(sql: &str) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-    crate::parse_statements(sql, Dialect::postgres())
+    parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
-        .analyze(
-            context(Dialect::postgres()),
-            &mut crate::test_helpers::create_cache_context(),
-        )
+        .analyze(context(Dialect::postgres()), &mut create_cache_context())
 }
 
 /// A local two-column record for deferred projection/width contracts.
 pub(crate) fn composite_context() -> Result<SchemaFileContext, AnalysisError> {
-    let record = crate::test_helpers::ownership::apply_ownership_sql(
+    let record = apply_ownership_sql(
         context(Dialect::postgres()),
         "CREATE TYPE pair AS (n integer, m integer)",
     )?;
-    Ok(crate::test_helpers::ownership::apply_ownership_sql(
+    Ok(apply_ownership_sql(
         record.into_context(),
         "CREATE FUNCTION take_pair(pair) RETURNS integer LANGUAGE SQL AS 'SELECT 1'",
     )?

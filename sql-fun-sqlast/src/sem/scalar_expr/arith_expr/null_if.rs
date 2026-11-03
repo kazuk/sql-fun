@@ -1,6 +1,11 @@
-use crate::sem::{AnalysisError, SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
+use crate::sem::{
+    AnalysisError, SemScalarExpr, TypeReference,
+    parameter_resolution::ParameterResolution,
+    scalar_expr::SemScalarExprNode,
+    traversal::{SemanticVisitor, SemanticVisitorMut},
+};
 
-use super::ArithExpr;
+use crate::sem::scalar_expr::arith_expr::ArithExpr;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NullIfExpr {
@@ -51,27 +56,21 @@ impl ArithExpr {
 }
 
 impl NullIfExpr {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitorMut>(
+    pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         self.return_value.walk(visitor)?;
         self.comparison_value.walk(visitor)
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.return_value.visit(visitor)?;
         self.comparison_value.visit(visitor)
     }
 }
 
 impl NullIfExpr {
-    pub(crate) fn collect_constraints(
-        &self,
-        parameters: &mut crate::sem::parameter_resolution::ParameterResolution<'_>,
-    ) {
+    pub(crate) fn collect_constraints(&self, parameters: &mut ParameterResolution<'_>) {
         if self.return_value.constraint_node().is_some()
             || self.comparison_value.constraint_node().is_some()
         {

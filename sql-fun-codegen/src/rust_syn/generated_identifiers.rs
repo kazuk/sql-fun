@@ -42,7 +42,7 @@ impl GeneratedIdentifiers {
 
 #[cfg(test)]
 mod test_generated_identifiers {
-    use super::GeneratedIdentifiers;
+    use crate::rust_syn::generated_identifiers::GeneratedIdentifiers;
 
     #[test]
     fn reserves_generated_names_and_skips_occupied_suffixes() {

@@ -1,6 +1,7 @@
-use super::Conversation;
 use crate::init::{
     InitializationState,
+    conversation::Conversation,
+    prompt::PromptRequest,
     step::{Direction, InitStep, StepCompletion, StepFuture},
     test_helpers::{common_args, state},
 };
@@ -258,7 +259,7 @@ impl InitStep for QuestionStep {
             state
                 .input
                 .as_mut()
-                .answer(&crate::init::prompt::PromptRequest::confirm(self.0))?;
+                .answer(&PromptRequest::confirm(self.0))?;
             Ok(StepCompletion::next())
         })
     }

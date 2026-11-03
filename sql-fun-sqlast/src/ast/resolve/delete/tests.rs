@@ -3,11 +3,23 @@ mod sql_driven;
 mod versions;
 mod views;
 
+#[cfg(feature = "sqlite")]
+use crate::parse_statements;
+#[cfg(feature = "sqlite")]
+use crate::sem::SemAst as SemSemAst;
+use crate::sem::{
+    DeleteStatement, parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+};
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::SqliteSynBuilder;
+
 use self::test_helpers::{analyze, catalog};
-use crate::ast::Dialect;
-use crate::context::BaseParseContext;
-use crate::context::ParseContext;
-use crate::{names::ColumnName, sem::PgBuiltInType};
+use crate::{
+    ast::Dialect,
+    context::{BaseParseContext, ParseContext},
+    names::ColumnName,
+    sem::PgBuiltInType,
+};
 
 #[rstest::rstest]
 #[case::plain("DELETE FROM items")]
@@ -190,7 +202,7 @@ fn retains_invalid_structure_as_diagnostics(#[case] sql: &str) {
 #[test]
 fn cte_aliases_and_parameters_survive_a_single_outer_inference_pass() {
     let mut context = catalog(Dialect::postgres());
-    let before = crate::sem::parameter_resolution::inference_runs();
+    let before = parameter_resolution_inference_runs();
     let result = test_helpers::resolve("WITH s AS (SELECT $1::integer n), d(removed) AS (DELETE FROM items USING s WHERE $2 RETURNING s.n) SELECT removed FROM d", &mut context, Dialect::postgres()).unwrap();
     assert_eq!(
         crate::sem::parameter_resolution::inference_runs(),
@@ -253,7 +265,7 @@ fn analyzes_unused_cte_and_resets_statement_parameter_state() {
     // Result metadata serialization follows the existing ResultColumn contract:
     // expressions are skipped, while target, scopes and column metadata persist.
     let serialized = ::serde_json::to_value(result.as_delete().unwrap()).unwrap();
-    let restored: crate::sem::DeleteStatement = ::serde_json::from_value(serialized).unwrap();
+    let restored: DeleteStatement = ::serde_json::from_value(serialized).unwrap();
     assert_eq!(restored.target(), result.as_delete().unwrap().target());
     assert_eq!(
         restored
@@ -335,9 +347,9 @@ fn postgres_public_entry_points_agree() {
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_public_adapter_analyzes_delete() {
-    let syntax = crate::test_helpers::SqliteSynBuilder
-        .parse_as_stmt("DELETE FROM items NOT INDEXED WHERE ?1 RETURNING id");
-    let result = crate::sem::SemAst::semantic_analysis_sqlite_stmt(
+    let syntax =
+        SqliteSynBuilder.parse_as_stmt("DELETE FROM items NOT INDEXED WHERE ?1 RETURNING id");
+    let result = SemSemAst::semantic_analysis_sqlite_stmt(
         catalog(Dialect::sqlite()),
         syntax,
         &::sql_fun_core::IVec::default(),
@@ -356,12 +368,18 @@ fn sqlite_public_adapter_analyzes_delete() {
 }
 
 mod test_helpers {
-    use crate::ast::Dialect;
-    use crate::test_helpers::{TestParseContext, source_span};
     use crate::{
+        parse_statements,
+        sem::{CastContext, CastDefinition},
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        ast::Dialect,
         context::MutSourcePathWithSpan,
         names::{ColumnName, SchemaName},
         sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SemAst},
+        test_helpers::{TestParseContext, source_span},
     };
 
     pub(super) fn catalog_with_text_integer_cast() -> TestParseContext {
@@ -369,9 +387,7 @@ mod test_helpers {
         context.set_get_implicit_cast_result(
             &PgBuiltInType::text(),
             &PgBuiltInType::int4(),
-            Some(crate::sem::CastDefinition::new(
-                crate::sem::CastContext::explicit(),
-            )),
+            Some(CastDefinition::new(CastContext::explicit())),
         );
         context
     }
@@ -410,12 +426,12 @@ mod test_helpers {
         context: &mut TestParseContext,
         dialect: Dialect,
     ) -> Result<SemAst, AnalysisError> {
-        crate::parse_statements(sql, dialect)
+        parse_statements(sql, dialect)
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(context, &mut crate::test_helpers::create_cache_context())
+            .resolve(context, &mut create_cache_context())
     }
     pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
         let mut context = catalog(dialect);
@@ -499,7 +515,7 @@ fn retains_destination_lookup_outcome(#[case] sql: &str, #[case] found: bool) {
 fn sqlite_delete_cte_reports_an_unsupported_operation() {
     let mut context = catalog(Dialect::sqlite());
     // The common AST can carry a DELETE CTE even though SQLite's parser rejects it.
-    let statement = crate::parse_statements(
+    let statement = parse_statements(
         "WITH d AS (DELETE FROM items RETURNING id) SELECT id FROM d",
         Dialect::postgres(),
     )

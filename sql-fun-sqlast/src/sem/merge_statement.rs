@@ -4,13 +4,21 @@ mod view_support;
 pub(crate) use self::destination::MergeDestination;
 pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
-use crate::sem::traversal::SemanticVisitorMut;
+use crate::{
+    CacheContext,
+    ast::{Dialect, Merge, StatementNode},
+    sem::{
+        AccessKind, SemAst, ViewMergeSupport as SemViewMergeSupport, traversal::SemanticVisitor,
+    },
+    syn::MergeStmt,
+};
+
 use crate::{
     names::TableName,
     sem::{
         AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue, ParseContext,
         QueryCte, ResultColumnCollection, SemScalarExpr, UpdateAssignment,
-        UpdateAssignmentCollection,
+        UpdateAssignmentCollection, traversal::SemanticVisitorMut,
     },
 };
 
@@ -131,11 +139,11 @@ impl MergeAction {
     pub const fn is_nothing(&self) -> bool {
         matches!(self, Self::Nothing)
     }
-    const fn access_action(&self) -> Option<crate::sem::AccessKind> {
+    const fn access_action(&self) -> Option<AccessKind> {
         match self {
-            Self::Update(_) => Some(crate::sem::AccessKind::update_rows()),
-            Self::Insert(_) => Some(crate::sem::AccessKind::insert_rows()),
-            Self::Delete => Some(crate::sem::AccessKind::delete_rows()),
+            Self::Update(_) => Some(AccessKind::update_rows()),
+            Self::Insert(_) => Some(AccessKind::insert_rows()),
+            Self::Delete => Some(AccessKind::delete_rows()),
             Self::Nothing | Self::Unresolved => None,
         }
     }
@@ -146,10 +154,7 @@ impl MergeAction {
             Self::Unresolved | Self::Delete | Self::Nothing => Ok(()),
         }
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Update(value) => value.0.visit(visitor),
             Self::Insert(value) => value.clause.visit(visitor),
@@ -228,12 +233,9 @@ impl MergeWhenCollection {
         }
         Ok(())
     }
-    fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for clause in &self.0 {
-            visitor.access_purpose(crate::sem::AccessKind::merge_condition());
+            visitor.access_purpose(AccessKind::merge_condition());
             if let Some(condition) = &clause.condition {
                 condition.visit(visitor)?;
                 visitor.predicate(condition);
@@ -259,14 +261,14 @@ pub struct MergeStatement {
     clauses: MergeWhenCollection,
     returning: ResultColumnCollection,
     inherit: bool,
-    view_support: Option<crate::sem::ViewMergeSupport>,
+    view_support: Option<SemViewMergeSupport>,
 }
 impl MergeStatement {
     pub(crate) fn require_version(
         context: &impl ParseContext,
         minimum: u32,
     ) -> Result<(), AnalysisError> {
-        AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
+        AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let version = if let Some(version) = context.metadata().engine_version() {
             version
                 .to_string()
@@ -303,11 +305,11 @@ impl MergeStatement {
             view_support: None,
         }
     }
-    pub(crate) fn set_view_support(&mut self, support: Option<&crate::sem::ViewMergeSupport>) {
+    pub(crate) fn set_view_support(&mut self, support: Option<&SemViewMergeSupport>) {
         self.view_support = support.cloned();
     }
     /// MERGE-specific view capability decision, when targeting an ordinary view.
-    pub const fn view_support(&self) -> Option<&crate::sem::ViewMergeSupport> {
+    pub const fn view_support(&self) -> Option<&SemViewMergeSupport> {
         self.view_support.as_ref()
     }
     /// Resolved catalog target.
@@ -358,10 +360,7 @@ impl MergeStatement {
         visitor.leave_dml();
         result
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_dml();
         visitor.enter_query();
         let result = self.visit_body(visitor);
@@ -380,11 +379,8 @@ impl MergeStatement {
         visitor.dml_returning(&mut self.returning)?;
         self.clauses.walk(visitor)
     }
-    fn visit_body<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        visitor.access_purpose(crate::sem::AccessKind::merge_source());
+    fn visit_body<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        visitor.access_purpose(AccessKind::merge_source());
         for cte in &self.with {
             cte.visit(visitor)?;
         }
@@ -395,11 +391,11 @@ impl MergeStatement {
             }
         }
         self.from.visit(visitor)?;
-        visitor.access_purpose(crate::sem::AccessKind::merge_join());
+        visitor.access_purpose(AccessKind::merge_join());
         self.on.visit(visitor)?;
         visitor.predicate(&self.on);
         // PostgreSQL transforms RETURNING before WHEN action expressions.
-        visitor.access_purpose(crate::sem::AccessKind::merge_returning());
+        visitor.access_purpose(AccessKind::merge_returning());
         visitor.dml_returning(&self.returning)?;
         self.clauses.visit(visitor)
     }
@@ -412,12 +408,11 @@ impl MergeStatement {
 pub fn analyze_merge_statement<T: ParseContext>(
     mut context: T,
     _parent_schema: &Option<String>,
-    syn: crate::syn::MergeStmt,
-) -> Result<(crate::sem::SemAst, T), AnalysisError> {
+    syn: MergeStmt,
+) -> Result<(SemAst, T), AnalysisError> {
     use crate::ast::TryFromWithTokens;
-    AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
-    let syntax = crate::ast::Merge::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement = crate::ast::StatementNode::Merge(syntax)
-        .resolve(&mut context, &mut crate::CacheContext::new())?;
+    AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+    let syntax = Merge::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
+    let statement = StatementNode::Merge(syntax).resolve(&mut context, &mut CacheContext::new())?;
     Ok((statement, context))
 }

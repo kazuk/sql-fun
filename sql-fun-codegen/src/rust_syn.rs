@@ -1,8 +1,9 @@
 mod generated_identifiers;
 mod parameter_bindings;
 
-pub(crate) use self::generated_identifiers::GeneratedIdentifiers;
-pub(crate) use self::parameter_bindings::ParameterBindings;
+pub(crate) use self::{
+    generated_identifiers::GeneratedIdentifiers, parameter_bindings::ParameterBindings,
+};
 
 use proc_macro2::Span;
 use quote::ToTokens;
@@ -247,7 +248,7 @@ impl ItemFunction {
 
 #[cfg(test)]
 mod test_parameter_sources {
-    use super::ItemFunction;
+    use crate::rust_syn::ItemFunction;
 
     #[test]
     fn retains_attributes_until_emission_and_resolves_final_arguments() {
@@ -650,6 +651,8 @@ impl CteReferenceAttr {
 
 #[cfg(test)]
 mod test_cte_reference {
+    use crate::rust_syn::CteReferenceAttr;
+
     use crate::rust_syn::ItemFunction;
 
     #[rstest::rstest]
@@ -671,7 +674,7 @@ mod test_cte_reference {
     ) -> testresult::TestResult {
         let item: syn::ItemFn = syn::parse_str(attr)?;
         let item = ItemFunction::new(item);
-        let cte_reference = super::CteReferenceAttr::from_item_fn(&item)?;
+        let cte_reference = CteReferenceAttr::from_item_fn(&item)?;
         assert_eq!(cte_reference[0].cte_name(), cte_name);
         assert_eq!(cte_reference[0].alias(), alias);
         Ok(())

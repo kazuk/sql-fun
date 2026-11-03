@@ -5,13 +5,26 @@ mod sqlite_from_groups;
 mod stack_regressions;
 mod test_helpers;
 
+#[cfg(feature = "sqlite")]
+use crate::AstAndContextPair;
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
+#[cfg(feature = "sqlite")]
+use crate::names::SchemaName;
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::SqliteSynBuilder as TestHelpersSqliteSynBuilder;
+use crate::{sem::SourcePathWithSpan, test_helpers::create_cache_context};
+
 use self::test_helpers::postgres;
 
-use crate::ast::{StatementNode, TryFromWithTokens};
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::TestParseContext;
-use crate::test_helpers::{SynBuilder, source_span};
-use crate::{names::ColumnName, sem::PgBuiltInType};
+use crate::{
+    ast::{StatementNode, TryFromWithTokens},
+    names::ColumnName,
+    sem::PgBuiltInType,
+    test_helpers::{SynBuilder, source_span},
+};
 
 use ::sql_fun_core::IVec;
 
@@ -75,9 +88,7 @@ fn ddl_construction_does_not_require_referenced_objects(
 }
 
 #[rstest::rstest]
-fn table_resolution_uses_common_context(
-    source_span: crate::sem::SourcePathWithSpan,
-) -> testresult::TestResult {
+fn table_resolution_uses_common_context(source_span: SourcePathWithSpan) -> testresult::TestResult {
     let syntax = StatementNode::try_from_with_tokens(
         &SynBuilder::new().parse("create table items (id integer default 1)"),
         &IVec::default(),
@@ -104,10 +115,7 @@ fn ddl_resolution_uses_common_context(#[case] sql: &str) -> testresult::TestResu
     let syntax =
         StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
     let mut catalog = test_helpers::AnalysisFixture::with_index_table();
-    syntax.resolve(
-        &mut catalog,
-        &mut crate::test_helpers::create_cache_context(),
-    )?;
+    syntax.resolve(&mut catalog, &mut create_cache_context())?;
     assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
@@ -124,7 +132,7 @@ fn sqlite_ddl_owns_syntax_after_parser_input_is_dropped(
     #[case] is_create: bool,
 ) -> testresult::TestResult {
     let syntax = {
-        let parsed = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(sql);
+        let parsed = TestHelpersSqliteSynBuilder.parse_as_stmt(sql);
         StatementNode::try_from(&parsed)?
     };
     assert_eq!(matches!(syntax, StatementNode::Table(_)), is_create);
@@ -138,7 +146,7 @@ fn sqlite_ddl_owns_syntax_after_parser_input_is_dropped(
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_table_retains_named_constraints_order_and_options() -> testresult::TestResult {
-    let parsed = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(
+    let parsed = TestHelpersSqliteSynBuilder.parse_as_stmt(
         "create table items (id integer, label text, constraint pk primary key (id desc)) without rowid, strict",
     );
     let StatementNode::Table(table) = StatementNode::try_from(&parsed)? else {
@@ -153,19 +161,17 @@ fn sqlite_table_retains_named_constraints_order_and_options() -> testresult::Tes
 #[cfg(feature = "sqlite")]
 #[rstest::rstest]
 fn public_sqlite_table_dispatch_preserves_column_semantics(
-    source_span: crate::sem::SourcePathWithSpan,
+    source_span: SourcePathWithSpan,
 ) -> testresult::TestResult {
     use crate::{context::MutSourcePathWithSpan, sem::SemAst};
-    let parsed = crate::test_helpers::SqliteSynBuilder
+    let parsed = TestHelpersSqliteSynBuilder
         .parse_as_stmt("create table items (label text not null default 'one')");
-    let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
-    context.set_get_search_path_result(&[
-        crate::names::SchemaName::from("public"),
-        crate::names::SchemaName::from("pg_catalog"),
-    ]);
-    context.setup_type(crate::sem::PgBuiltInType::text());
+    let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
+    context
+        .set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
+    context.setup_type(PgBuiltInType::text());
     context.set_source_path_with_span(&source_span);
-    let crate::AstAndContextPair(statement, context) =
+    let AstAndContextPair(statement, context) =
         SemAst::semantic_analysis_sqlite_stmt(context, parsed, &IVec::default())?;
     let SemAst::CreateTable(table) = statement else {
         panic!("semantic table");
@@ -319,10 +325,7 @@ fn shared_resolution_preserves_result_metadata(
     #[case] not_null: bool,
 ) -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    let query = postgres(sql)?.resolve(
-        &mut catalog,
-        &mut crate::test_helpers::create_cache_context(),
-    )?;
+    let query = postgres(sql)?.resolve(&mut catalog, &mut create_cache_context())?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -338,10 +341,7 @@ fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
     let query =
         postgres("select (select outer_query.n) as result from (select 42 as n) outer_query")?
-            .resolve(
-                &mut catalog,
-                &mut crate::test_helpers::create_cache_context(),
-            )?;
+            .resolve(&mut catalog, &mut create_cache_context())?;
     assert!(
         query
             .result_columns()
@@ -357,10 +357,8 @@ fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
 #[test]
 fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::with_qualified_addition();
-    let query = postgres("select 1 operator(pg_catalog.+) 2 as n")?.resolve(
-        &mut catalog,
-        &mut crate::test_helpers::create_cache_context(),
-    )?;
+    let query = postgres("select 1 operator(pg_catalog.+) 2 as n")?
+        .resolve(&mut catalog, &mut create_cache_context())?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -375,10 +373,8 @@ fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult 
 #[test]
 fn non_lateral_query_does_not_see_sibling_from_item() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    postgres("select q.n as result from (select 42 as n) a, (select a.n) q")?.resolve(
-        &mut catalog,
-        &mut crate::test_helpers::create_cache_context(),
-    )?;
+    postgres("select q.n as result from (select 42 as n) a, (select a.n) q")?
+        .resolve(&mut catalog, &mut create_cache_context())?;
     assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }
@@ -395,10 +391,17 @@ fn context_free_dml_expression_syntax(#[case] sql: &str) -> testresult::TestResu
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    use crate::ast::Expr;
+    use crate::{
+        AstAndContextPair, ast::Dialect, sem::ScalarAnalysisContext,
+        test_helpers::create_cache_context,
+    };
+
+    #[cfg(feature = "sqlite")]
     use crate::ast::tests::test_helpers::{AnalysisFixture, postgres, sqlite};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
     use crate::{
+        ast::Expr,
         context::MutSourcePathWithSpan,
         names::ColumnName,
         sem::{PgBuiltInType, SemAst},
@@ -410,15 +413,9 @@ mod sqlite {
     fn sqlite_case_does_not_use_postgres_implicit_casts() -> testresult::TestResult {
         let sql = "select case when true then 1 else '2' end as n";
         let mut catalog = AnalysisFixture::with_integer_to_text_cast();
-        let pg = postgres(sql)?.resolve(
-            &mut catalog,
-            &mut crate::test_helpers::create_cache_context(),
-        )?;
-        catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
-        let sqlite = sqlite(sql)?.resolve(
-            &mut catalog,
-            &mut crate::test_helpers::create_cache_context(),
-        )?;
+        let pg = postgres(sql)?.resolve(&mut catalog, &mut create_cache_context())?;
+        catalog = catalog.with_dialect(Dialect::sqlite());
+        let sqlite = sqlite(sql)?.resolve(&mut catalog, &mut create_cache_context())?;
         let name = ColumnName::from("n");
         assert_eq!(
             pg.result_columns()
@@ -448,15 +445,9 @@ mod sqlite {
     #[case("select 1 as n union all select 2 as n union select 3 as n")]
     fn both_frontends_use_the_same_resolver(#[case] sql: &str) -> testresult::TestResult {
         let mut catalog = AnalysisFixture::context();
-        let pg = postgres(sql)?.resolve(
-            &mut catalog,
-            &mut crate::test_helpers::create_cache_context(),
-        )?;
-        catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
-        let sqlite = sqlite(sql)?.resolve(
-            &mut catalog,
-            &mut crate::test_helpers::create_cache_context(),
-        )?;
+        let pg = postgres(sql)?.resolve(&mut catalog, &mut create_cache_context())?;
+        catalog = catalog.with_dialect(Dialect::sqlite());
+        let sqlite = sqlite(sql)?.resolve(&mut catalog, &mut create_cache_context())?;
         assert_eq!(pg, sqlite);
         assert_eq!(catalog.reported_problem_count(), 0);
         Ok(())
@@ -492,11 +483,11 @@ mod sqlite {
 
     #[test]
     fn public_sqlite_select_dispatch_resolves_cte_columns() -> testresult::TestResult {
-        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.set_source_path_with_span(&source_span());
         let statement =
             SqliteSynBuilder.parse_as_stmt("with c(x) as (select 42) select x as n from c");
-        let crate::AstAndContextPair(ast, context) =
+        let AstAndContextPair(ast, context) =
             SemAst::semantic_analysis_sqlite_stmt(context, statement, &IVec::default())?;
         let query = ast.into_select_statemtnt().expect("SELECT result");
         let column = query
@@ -511,8 +502,8 @@ mod sqlite {
     #[test]
     fn sqlite_unary_literal_does_not_use_postgres_operator_catalog() -> testresult::TestResult {
         let syntax = Expr::try_from(&SqliteSynBuilder.parse_expression("select -42"))?;
-        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
-        let result = syntax.resolve(&mut context, &crate::sem::ScalarAnalysisContext::default())?;
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
+        let result = syntax.resolve(&mut context, &ScalarAnalysisContext::default())?;
         assert_eq!(result.get_type(), Some(PgBuiltInType::int4()));
         assert_eq!(context.reported_problem_count(), 0);
         Ok(())
@@ -528,6 +519,7 @@ mod sqlite {
 #[case::at("@name")]
 fn sqlite_upgrade_preserves_complete_parameter_names(#[case] name: &str) -> testresult::TestResult {
     use crate::ast::Expr;
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT {name}"));
@@ -544,6 +536,7 @@ fn sqlite_upgrade_preserves_complete_parameter_names(#[case] name: &str) -> test
 #[test]
 fn sqlite_upgrade_preserves_parameter_reuse() -> testresult::TestResult {
     use crate::ast::Expr;
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed =
@@ -570,6 +563,7 @@ fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
     #[values("(SELECT 2)", "((SELECT 2))", "(((SELECT 2)))")] rhs: &str,
 ) -> testresult::TestResult {
     use crate::ast::{BooleanOperator, Expr, Literal, SubqueryKind};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 IN {rhs}"));
@@ -603,6 +597,7 @@ fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
 #[test]
 fn sqlite_scalar_subquery_keeps_scalar_semantics() -> testresult::TestResult {
     use crate::ast::{Expr, SubqueryKind};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression("SELECT (SELECT 2)");
@@ -625,6 +620,7 @@ fn sqlite_blob_semantics_keep_hex_payload_after_spelling_upgrade(
     #[case] payload: &str,
 ) -> testresult::TestResult {
     use crate::ast::{Expr, Literal};
+    #[cfg(feature = "sqlite")]
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression(sql);
@@ -642,10 +638,7 @@ fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
         &IVec::default(),
     )?;
     let mut catalog = test_helpers::AnalysisFixture::context();
-    syntax.resolve(
-        &mut catalog,
-        &mut crate::test_helpers::create_cache_context(),
-    )?;
+    syntax.resolve(&mut catalog, &mut create_cache_context())?;
     assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }

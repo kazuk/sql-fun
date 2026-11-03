@@ -1,8 +1,12 @@
-use crate::ast::{
-    CreateTrigger, Dialect, Expr, StatementKind, StatementNode, TriggerBody, TriggerEvent,
-    TriggerGranularity, TriggerTiming,
+#[cfg(feature = "sqlite")]
+use crate::ast::QueryBody;
+use crate::{
+    ast::{
+        CreateTrigger, Dialect, Expr, StatementKind, StatementNode, TriggerBody, TriggerEvent,
+        TriggerGranularity, TriggerTiming,
+    },
+    parse_statements,
 };
-use crate::parse_statements;
 
 impl StatementNode {
     fn into_test_trigger(self) -> CreateTrigger {
@@ -289,7 +293,7 @@ fn sqlite_preserves_ordered_common_command_payloads() {
     let StatementNode::Query(query) = &commands[3] else {
         panic!("query")
     };
-    let crate::ast::QueryBody::Select(select) = &query.body else {
+    let QueryBody::Select(select) = &query.body else {
         panic!("SELECT")
     };
     let Expr::Case(case) = &select.targets[0].expression else {

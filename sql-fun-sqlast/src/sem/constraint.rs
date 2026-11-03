@@ -2,17 +2,23 @@ mod foreign;
 mod primary;
 mod unique;
 
+pub use self::{
+    foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint, unique::UniqueConstraint,
+};
+
+use crate::{
+    names::ColumnName,
+    sem::ColumnRename,
+    syn::{AlterTableCmd, Constraint as SynConstraint},
+};
+
 use crate::{
     names::TableName,
     sem::{AnalysisError, ParseContext, alter_table::AlterObjSubCommand},
     syn::{ConstrType, Opt},
 };
 
-use super::ImplicitChange;
-
-pub use self::{
-    foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint, unique::UniqueConstraint,
-};
+use crate::sem::ImplicitChange;
 
 /// analyze [`crate::syn::Constraint`] variants
 pub trait AnalyzeConstraint<TParseContext>
@@ -23,7 +29,7 @@ where
     fn analyze(
         context: &mut TParseContext,
         target_table: Option<&TableName>,
-        constraint: crate::syn::Constraint,
+        constraint: SynConstraint,
     ) -> Result<Constraint, AnalysisError>;
 }
 
@@ -53,13 +59,13 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn set_foreign_key_delete_columns(&mut self, columns: &[crate::names::ColumnName]) {
+    pub(crate) fn set_foreign_key_delete_columns(&mut self, columns: &[ColumnName]) {
         if let Self::Foreign(value) = self {
             value.set_delete_columns(columns);
         }
     }
 
-    pub(crate) fn rename_column(&mut self, rename: &crate::sem::ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
         match self {
             Self::PrimaryKey(value) => value.rename_column(rename, owned),
             Self::Unique(value) => value.rename_column(rename, owned),
@@ -75,7 +81,7 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn unique_key_columns(&self) -> Vec<crate::names::ColumnName> {
+    pub(crate) fn unique_key_columns(&self) -> Vec<ColumnName> {
         match self {
             Self::PrimaryKey(key) => key.keys().to_vec(),
             Self::Unique(key) => key.key_columns(),
@@ -83,7 +89,7 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn matches_unique_columns(&self, columns: &[crate::names::ColumnName]) -> bool {
+    pub(crate) fn matches_unique_columns(&self, columns: &[ColumnName]) -> bool {
         match self {
             Self::PrimaryKey(key) => {
                 key.keys().len() == columns.len()
@@ -152,7 +158,7 @@ impl Constraint {
     pub fn analyze_alter_obj_add_constraint<TParseContext>(
         context: &mut TParseContext,
         target_table: &TableName,
-        cmd: crate::syn::AlterTableCmd,
+        cmd: AlterTableCmd,
     ) -> Result<AlterObjSubCommand, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -168,6 +174,8 @@ impl Constraint {
 
 #[cfg(test)]
 mod test_analyze_alter_obj_add_constraint {
+    use crate::sem::CreateTableMode;
+
     use testresult::TestResult;
 
     use crate::{
@@ -188,7 +196,7 @@ mod test_analyze_alter_obj_add_constraint {
         let create_table = CreateTable::new(
             &table_name,
             vec![],
-            crate::sem::CreateTableMode::Default,
+            CreateTableMode::Default,
             false,
             &source_span,
         );
@@ -209,7 +217,7 @@ where
     fn analyze(
         context: &mut TParseContext,
         target_table: Option<&TableName>,
-        constraint: crate::syn::Constraint,
+        constraint: SynConstraint,
     ) -> Result<Constraint, AnalysisError> {
         let Some(constraint_type) = constraint.get_contype().as_inner() else {
             AnalysisError::raise_unexpected_none("constraint.contype")?

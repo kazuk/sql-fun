@@ -1,5 +1,5 @@
-use super::Initialization;
 use crate::init::{
+    home::Initialization,
     prompt::PromptRequest,
     step::{Direction, HomeStep, InitStep},
     test_helpers::{Answer, HomeFixture, Script, common_args, state},

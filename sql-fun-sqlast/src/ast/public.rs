@@ -1,5 +1,7 @@
 //! Supported inspection of the owned common AST.
 
+use crate::{AstAndContextPair, CacheContext};
+
 use crate::{
     StringSpan,
     ast::{Cte, CteBody, Dialect, StatementNode, With},
@@ -92,8 +94,8 @@ impl Statement {
     pub fn analyze<TContext: ParseContext>(
         &self,
         context: TContext,
-        cache_context: &mut crate::CacheContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, AnalysisError> {
+        cache_context: &mut CacheContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         AnalysisError::check_dialect(self.dialect, context.dialect())?;
         self.node.resolve_and_apply(context, cache_context)
     }
@@ -110,10 +112,14 @@ impl Statement {
 
 #[cfg(test)]
 mod test_statement_analyze {
-    use crate::ast::{CteDefinition, Dialect, HaveWithClause, Statement};
-    use crate::parse_statements;
-    use crate::sem::PgBuiltInType;
-    use crate::test_helpers::TestParseContext;
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        ast::{CteDefinition, Dialect, HaveWithClause, Statement},
+        parse_statements,
+        sem::PgBuiltInType,
+        test_helpers::TestParseContext,
+    };
 
     fn statement(sql: &str, dialect: Dialect) -> Statement {
         parse_statements(sql, dialect).next().unwrap().unwrap()
@@ -123,7 +129,7 @@ mod test_statement_analyze {
     #[case::postgres(Dialect::postgres())]
     #[cfg_attr(feature = "sqlite", case::sqlite(Dialect::sqlite()))]
     fn analyzes_structurally_inserted_dependencies(#[case] dialect: Dialect) {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let mut base = statement(
             "with existing as (select id from leaf) select id from existing",
             dialect,
@@ -581,16 +587,26 @@ impl CteBody {
 
 #[cfg(test)]
 mod test_parameter_analysis {
-    use crate::ast::Dialect;
-    use crate::context::ParseContext;
-    use crate::parse_statements;
-    use crate::test_helpers::TestParseContext;
     use crate::{
+        AstAndContextPair,
+        names::FullName,
+        sem::{
+            AnalysisError,
+            parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+        },
+        test_helpers::{create_cache_context, schema_layer, source_span},
+    };
+
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
         names::OperatorName,
+        parse_statements,
         sem::{
             BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
             FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType,
         },
+        test_helpers::TestParseContext,
     };
     use std::collections::BTreeMap;
 
@@ -630,7 +646,7 @@ mod test_parameter_analysis {
             false,
         );
         context.set_get_function_impl_result(
-            &crate::names::FullName::with_schema("pg_catalog", "lower"),
+            &FullName::with_schema("pg_catalog", "lower"),
             &FunctionOverloadCollection::new(&[lower]),
         );
         context
@@ -639,8 +655,8 @@ mod test_parameter_analysis {
     fn analyze(
         sql: &str,
         dialect: Dialect,
-    ) -> Result<crate::AstAndContextPair<TestParseContext>, crate::sem::AnalysisError> {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+    ) -> Result<AstAndContextPair<TestParseContext>, AnalysisError> {
+        let mut cache_context = create_cache_context();
         parse_statements(sql, dialect)
             .next()
             .unwrap()
@@ -714,7 +730,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn tied_best_overloads_are_not_accepted_as_a_type_range() {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let mut context = context();
         let int = PgBuiltInType::int4();
         let overloads = OperatorDefinition::binary(&[
@@ -791,7 +807,7 @@ mod test_parameter_analysis {
     }
     #[test]
     fn subsequent_analysis_replaces_context_constraints() {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let first = analyze("select $7 + 1 as n", Dialect::postgres()).unwrap();
         assert!(
             first
@@ -824,7 +840,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn parameter_state_restarts_after_parameter_free_analysis() {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let first = analyze("select $7 + 1", Dialect::postgres()).unwrap();
         let plain = parse_statements("select 1", Dialect::postgres())
             .next()
@@ -858,7 +874,7 @@ mod test_parameter_analysis {
     #[case::query("with x as (select 1 as n) select n + 1 from x")]
     #[case::subquery("select (select 1) + 1 as n")]
     fn parameter_free_analysis_skips_inference(#[case] sql: &str) {
-        let before = crate::sem::parameter_resolution::inference_runs();
+        let before = parameter_resolution_inference_runs();
         let result = analyze(sql, Dialect::postgres()).unwrap();
         assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
         assert!(
@@ -879,7 +895,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn parameter_free_function_keeps_null_argument_resolution() {
-        let before = crate::sem::parameter_resolution::inference_runs();
+        let before = parameter_resolution_inference_runs();
         let result = analyze("select lower(null) as s", Dialect::postgres()).unwrap();
         assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
         assert_eq!(result.context().reported_problem_count(), 0);
@@ -893,13 +909,10 @@ mod test_parameter_analysis {
     #[test]
     fn schema_loading_skips_parameter_inference() {
         use crate::{context::MutSourcePathWithSpan, names::SchemaName};
-        let mut cache_context = crate::test_helpers::create_cache_context();
-        let before = crate::sem::parameter_resolution::inference_runs();
-        let mut context = crate::test_helpers::schema_layer(
-            std::path::Path::new("schema.sql"),
-            &context().freeze(),
-        );
-        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        let mut cache_context = create_cache_context();
+        let before = parameter_resolution_inference_runs();
+        let mut context = schema_layer(std::path::Path::new("schema.sql"), &context().freeze());
+        context.set_source_path_with_span(&source_span());
         context.set_search_path(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
         let statements = parse_statements(
             "create table t (n int4 default 1); create view v as select n from t group by n having true window w as (order by n) order by n limit 1 offset 0;",
@@ -922,7 +935,7 @@ mod test_parameter_analysis {
         let baseline = analyze("select missing_column as absent", Dialect::postgres()).unwrap();
         let expected = baseline.context().reported_problems();
         assert!(!expected.is_empty());
-        let before = crate::sem::parameter_resolution::inference_runs();
+        let before = parameter_resolution_inference_runs();
         let result = analyze(
             "select $1 + 1 as n, missing_column as absent",
             Dialect::postgres(),
@@ -958,7 +971,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn diagnostic_sink_failure_still_aborts_parameter_analysis() {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let mut context = context();
         context.reject_diagnostics_after(0);
         let error = parse_statements("select $1 + 1, lower($1)", Dialect::postgres())
@@ -991,17 +1004,22 @@ mod test_parameter_analysis {
 
 #[cfg(test)]
 mod test_parameter_casts {
-    use crate::ast::Dialect;
-    use crate::context::ParseContext;
-    use crate::parse_statements;
-    use crate::sem::PgBuiltInType;
-    use crate::test_helpers::TestParseContext;
+    #[cfg(feature = "sqlite")]
+    use crate::names::FullName;
+    #[cfg(feature = "sqlite")]
+    use crate::sem::TypeReference;
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        ast::Dialect, context::ParseContext, parse_statements, sem::PgBuiltInType,
+        test_helpers::TestParseContext,
+    };
 
     #[rstest::rstest]
     #[case::boolean("select $1 as flag where $1")]
     #[case::not("select not $1 as flag")]
     fn boolean_context_constrains_input(#[case] sql: &str) {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let result = parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
@@ -1023,11 +1041,11 @@ mod test_parameter_casts {
     #[case::projection("select cast(?1 as integer) as n")]
     #[case::cte("with x as (select cast(?1 as integer) as n) select n from x")]
     fn sqlite_casts_do_not_require_postgres_casts(#[case] sql: &str) {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-        context.setup_type(crate::sem::TypeReference::from_full_name(
-            crate::names::FullName::from_local_name("integer"),
-        ));
+        context.setup_type(TypeReference::from_full_name(FullName::from_local_name(
+            "integer",
+        )));
         let result = parse_statements(sql, Dialect::sqlite())
             .next()
             .unwrap()

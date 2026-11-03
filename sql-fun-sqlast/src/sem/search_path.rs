@@ -1,5 +1,8 @@
-use crate::context::BaseParseContext;
-use crate::names::{FullName, SchemaName};
+use crate::{
+    ast::Dialect,
+    context::BaseParseContext,
+    names::{FullName, SchemaName},
+};
 
 pub fn expand_search_path_inst<TBaseParseContext, TResult, F>(
     context: &TBaseParseContext,
@@ -64,7 +67,7 @@ where
 }
 
 fn search_schemas(context: &(impl BaseParseContext + ?Sized), temporary: bool) -> Vec<SchemaName> {
-    let postgres = crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::postgres();
+    let postgres = Dialect::from(context.metadata()) == Dialect::postgres();
     let temp = SchemaName::from(if postgres { "pg_temp" } else { "temp" });
     let catalog = SchemaName::from("pg_catalog");
     let path = context.get_search_path();

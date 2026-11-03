@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::ExtensionVersion;
+use crate::extensions::ExtensionVersion;
 
 /// error in extension configurations
 #[derive(thiserror::Error, Debug)]
@@ -114,11 +114,13 @@ impl ExtensionConfigError {
 
 #[cfg(test)]
 mod test_extension_config_error {
+    use crate::extensions::config_error::ExtensionVersion;
+
     use std::path::PathBuf;
 
     use testresult::TestResult;
 
-    use super::ExtensionConfigError;
+    use crate::extensions::config_error::ExtensionConfigError;
 
     #[test]
     fn test_invalid_extension_name() {
@@ -169,7 +171,7 @@ mod test_extension_config_error {
     fn test_extension_sql_not_exist() -> TestResult {
         let err: Result<(), _> = ExtensionConfigError::extension_sql_not_exist(
             "extension_name",
-            &super::ExtensionVersion::try_from("0.1")?,
+            &ExtensionVersion::try_from("0.1")?,
             PathBuf::from("aaa"),
         );
         assert!(err.is_err());

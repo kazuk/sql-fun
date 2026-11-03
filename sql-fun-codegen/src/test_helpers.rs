@@ -2,6 +2,8 @@
 
 pub(crate) mod query_requirements;
 
+use crate::SqlFunCodegenError;
+
 use crate::{
     QueryFunctionKind, QueryFunctionSpec, ResultType, connectors::ConnectorSpec,
     rust_syn::ItemFunction,
@@ -138,11 +140,10 @@ impl<'ast> Visit<'ast> for GeneratedFunction {
 }
 
 /// One of the four connector rendering entry points.
-pub(crate) type RenderFunction =
-    fn(
-        &ConnectorSpec,
-        &QueryFunctionSpec,
-    ) -> Result<::proc_macro2::TokenStream, crate::SqlFunCodegenError>;
+pub(crate) type RenderFunction = fn(
+    &ConnectorSpec,
+    &QueryFunctionSpec,
+) -> Result<::proc_macro2::TokenStream, SqlFunCodegenError>;
 
 pub(crate) fn assert_stub(render: RenderFunction, spec: &QueryFunctionSpec) {
     let function: syn::ItemFn = syn::parse2(render(&spec.connector_spec, spec).unwrap()).unwrap();

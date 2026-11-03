@@ -1,7 +1,9 @@
-use crate::sem::scalar_expr::arith_expr::ArithExpr;
 use crate::{
     names::OperatorName,
-    sem::{AnalysisError, SemScalarExpr, scalar_expr::arith_expr::UndefinedOperatorCallSite},
+    sem::{
+        AnalysisError, ParseContext, SemScalarExpr,
+        scalar_expr::arith_expr::{ArithExpr, UndefinedOperatorCallSite},
+    },
 };
 
 impl ArithExpr {
@@ -12,7 +14,7 @@ impl ArithExpr {
         rexpr: Option<SemScalarExpr>,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         if let Some(operator_def) = context.get_operator_op(name, lexpr.is_some(), rexpr.is_some())
         {

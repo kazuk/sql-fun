@@ -120,7 +120,7 @@ impl HandleIdAllocator {
 
 #[cfg(test)]
 mod test_handle_id_allocator {
-    use super::HandleIdAllocator;
+    use crate::session::context_handle_registry::HandleIdAllocator;
     use std::{collections::HashSet, sync::atomic::AtomicU64};
 
     #[test]

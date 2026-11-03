@@ -1,10 +1,11 @@
 //! Explicit catalog fixtures for ownership semantics.
+
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
     context::{MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     names::SchemaName,
-    sem::{AnalysisError, AstAndContextPair, Role},
-    test_helpers::{SynBuilder, TestParseContext, schema_layer, source_span},
+    sem::{AnalysisError, AstAndContextPair, OwnedObjectDefinition, PgBuiltInType, Role},
+    test_helpers::{SynBuilder, TestParseContext, create_cache_context, schema_layer, source_span},
 };
 
 pub(crate) fn ownership_context() -> SchemaFileContext {
@@ -14,9 +15,9 @@ pub(crate) fn ownership_context() -> SchemaFileContext {
         inventory.insert_role(&Role::from(role));
     }
     for reference in [
-        crate::sem::PgBuiltInType::int4(),
-        crate::sem::PgBuiltInType::int8(),
-        crate::sem::PgBuiltInType::text(),
+        PgBuiltInType::int4(),
+        PgBuiltInType::int8(),
+        PgBuiltInType::text(),
     ] {
         inventory.setup_type(reference);
     }
@@ -35,11 +36,10 @@ pub(crate) fn apply_ownership_sql<C: ParseContext>(
     context: C,
     sql: &str,
 ) -> Result<AstAndContextPair<C>, AnalysisError> {
-    ownership_statement(sql)?
-        .resolve_and_apply(context, &mut crate::test_helpers::create_cache_context())
+    ownership_statement(sql)?.resolve_and_apply(context, &mut create_cache_context())
 }
 
-pub(crate) fn known_owner_count(definitions: &[crate::sem::OwnedObjectDefinition]) -> usize {
+pub(crate) fn known_owner_count(definitions: &[OwnedObjectDefinition]) -> usize {
     let mut count = 0;
     for definition in definitions {
         if definition.owner().is_some() {

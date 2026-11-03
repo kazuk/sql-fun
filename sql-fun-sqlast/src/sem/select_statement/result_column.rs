@@ -1,12 +1,15 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::ColumnName,
     sem::{
         AnalysisError, AnalysisProblem, ColumnDefinition, ColumnReferenceExpr, IndirectionExpr,
-        InsertTarget, QueryProblem, SemScalarExpr, TypeReference,
+        InputTypeConstraint, InsertTarget, ParameterConstraints, QueryProblem, SemScalarExpr,
+        TypeReference,
         create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
         parameter_resolution::ParameterResolution,
-        traversal::SemanticVisitorMut,
+        source_flag::SourceFlag,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -19,11 +22,11 @@ pub struct ResultColumn {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     star_expansion: Option<StarExpansion>,
     #[serde(skip)]
-    explicit_name: crate::sem::source_flag::SourceFlag,
+    explicit_name: SourceFlag,
     #[serde(skip)]
-    expanded: crate::sem::source_flag::SourceFlag,
+    expanded: SourceFlag,
     #[serde(skip)]
-    join_sensitive_star: crate::sem::source_flag::SourceFlag,
+    join_sensitive_star: SourceFlag,
     col_name: Option<ColumnName>,
     col_type: Option<TypeReference>,
     is_not_null: Option<bool>,
@@ -62,9 +65,9 @@ impl ResultColumn {
         is_not_null: &Option<bool>,
     ) -> Self {
         Self {
-            explicit_name: crate::sem::source_flag::SourceFlag::new(false),
-            expanded: crate::sem::source_flag::SourceFlag::new(false),
-            join_sensitive_star: crate::sem::source_flag::SourceFlag::new(false),
+            explicit_name: SourceFlag::new(false),
+            expanded: SourceFlag::new(false),
+            join_sensitive_star: SourceFlag::new(false),
             expression: None,
             star_expansion: None,
             col_name: col_name.clone(),
@@ -158,8 +161,10 @@ impl ResultColumn {
 
 #[cfg(test)]
 mod test_result_column_composite_field_definition {
-    use crate::sem::select_statement::result_column::ResultColumn;
-    use crate::{names::ColumnName, sem::TypeReference};
+    use crate::{
+        names::ColumnName,
+        sem::{TypeReference, select_statement::result_column::ResultColumn},
+    };
 
     use ::testresult::TestResult;
 
@@ -198,7 +203,7 @@ impl ResultColumnCollection {
         self.0
             .last_mut()
             .expect("inserted projection")
-            .explicit_name = crate::sem::source_flag::SourceFlag::new(explicit);
+            .explicit_name = SourceFlag::new(explicit);
     }
 
     pub(crate) fn membership_operands(&self) -> Vec<SemScalarExpr> {
@@ -378,7 +383,7 @@ impl ResultColumnCollection {
         let mut found: Option<usize> = None;
         for (index, column) in self.0.iter().enumerate() {
             if column.col_name.as_ref() == Some(name) {
-                if context.dialect() == crate::ast::Dialect::sqlite() {
+                if context.dialect() == Dialect::sqlite() {
                     return Ok(Some(index));
                 }
                 if let Some(previous) = found {
@@ -402,7 +407,7 @@ impl ResultColumnCollection {
     pub(crate) fn rename(&mut self, names: &[String]) {
         for (column, name) in self.0.iter_mut().zip(names) {
             column.col_name = Some(ColumnName::from(name.as_str()));
-            column.explicit_name = crate::sem::source_flag::SourceFlag::new(true);
+            column.explicit_name = SourceFlag::new(true);
         }
     }
 
@@ -487,10 +492,7 @@ impl ResultColumnCollection {
     ) -> Result<(), AnalysisError> {
         self.walk_assigned(visitor, &[])
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         self.visit_assigned(visitor, &[])
     }
     pub(crate) fn walk_assigned<V: SemanticVisitorMut>(
@@ -532,7 +534,7 @@ impl ResultColumnCollection {
         }
         Ok(())
     }
-    pub(crate) fn visit_assigned<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_assigned<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         targets: &[InsertTarget],
@@ -573,13 +575,12 @@ impl ResultColumnCollection {
 impl ResultColumnCollection {
     pub(crate) fn mark_join_sensitive_star_since(&mut self, start: usize) {
         for column in &mut self.0[start..] {
-            column.join_sensitive_star = crate::sem::source_flag::SourceFlag::new(true);
+            column.join_sensitive_star = SourceFlag::new(true);
         }
     }
     pub(crate) fn push_expanded(&mut self, name: &ColumnName, expression: SemScalarExpr) {
         self.push_expression(name, expression);
-        self.0.last_mut().expect("inserted expansion").expanded =
-            crate::sem::source_flag::SourceFlag::new(true);
+        self.0.last_mut().expect("inserted expansion").expanded = SourceFlag::new(true);
     }
     pub(crate) fn push_expression(&mut self, name: &ColumnName, expression: SemScalarExpr) {
         let mut column = ResultColumn::new(
@@ -594,10 +595,12 @@ impl ResultColumnCollection {
 
 #[cfg(test)]
 mod test_projection_metadata_contract {
-    use super::{ResultColumn, ResultColumnCollection};
     use crate::{
         names::ColumnName,
-        sem::{PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+        sem::{
+            PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+            select_statement::result_column::{ResultColumn, ResultColumnCollection},
+        },
     };
 
     #[test]
@@ -654,7 +657,7 @@ impl ResultColumnCollection {
     pub(crate) fn set_output(
         &mut self,
         index: usize,
-        types: &crate::sem::InputTypeConstraint,
+        types: &InputTypeConstraint,
         not_null: Option<bool>,
         expression: Option<SemScalarExpr>,
     ) {
@@ -675,7 +678,7 @@ impl ResultColumnCollection {
     pub(crate) fn finalize_set_output(
         &mut self,
         index: usize,
-        constraints: &crate::sem::ParameterConstraints,
+        constraints: &ParameterConstraints,
         not_null: Option<bool>,
     ) {
         if let Some(column) = self.0.get_mut(index) {
@@ -706,7 +709,7 @@ impl ResultColumnCollection {
         }
         Ok(())
     }
-    pub(crate) fn visit_set_outputs<V: crate::sem::traversal::SemanticVisitor>(
+    pub(crate) fn visit_set_outputs<V: SemanticVisitor>(
         &self,
         visitor: &mut V,
         targets: &[InsertTarget],

@@ -9,9 +9,14 @@ mod resolve;
 #[path = "document_validation.rs"]
 mod validation;
 
-use crate::StringSpan;
-use crate::ast::{
-    Alias, Assignment, Expr, FromItem, Name, Order, Query, Relation, Target, TypeName, Window, With,
+use crate::ast::ReturningOption;
+
+use crate::{
+    StringSpan,
+    ast::{
+        Alias, Assignment, Expr, FromItem, Name, Order, Query, Relation, Target, TypeName, Window,
+        With,
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -396,7 +401,7 @@ pub(crate) struct Merge {
     join_condition: Expr,
     merge_when_clauses: Vec<MergeWhen>,
     returning_list: Vec<Target>,
-    pub(super) returning_options: Vec<super::ReturningOption>,
+    pub(super) returning_options: Vec<ReturningOption>,
     pub(super) with_clause: With,
 }
 

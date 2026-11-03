@@ -3,6 +3,11 @@ mod test_helpers;
 #[cfg(test)]
 mod tests;
 
+use crate::{
+    DiagnosticRenderer,
+    analysis::{PreparedDiagnostics, initialization},
+};
+
 use std::collections::{HashMap, hash_map::Entry};
 
 use crate::analysis::{prepare_tokens, request_typed};
@@ -25,7 +30,7 @@ pub(super) struct QueryAnalysis {
     source_line: u32,
     datasource: String,
     response: AnalyzeQueryResponse,
-    tokenizations: crate::analysis::PreparedDiagnostics,
+    tokenizations: PreparedDiagnostics,
 }
 
 impl QueryAnalysis {
@@ -54,7 +59,7 @@ impl QueryAnalysis {
     pub(super) fn render(
         &self,
         diagnostic: &::sql_fun_client::payloads::AnalysisProbrem,
-        renderer: &crate::DiagnosticRenderer,
+        renderer: &DiagnosticRenderer,
     ) -> Result<String, ::anyhow::Error> {
         self.tokenizations.render(diagnostic, renderer)
     }
@@ -99,11 +104,8 @@ pub(super) async fn submit(
             .cte_catalog()
             .finger_print(&PlaceholderedSql::from_query(requirement.query()))?;
         if let Entry::Vacant(entry) = contexts.entry(datasource.clone()) {
-            let request = crate::analysis::initialization(
-                args,
-                &datasource,
-                ::sql_fun_core::SchemaLevel::project(),
-            )?;
+            let request =
+                initialization(args, &datasource, ::sql_fun_core::SchemaLevel::project())?;
             let initialized: SchemaContext =
                 request_typed(client, "initialize_schema_context", &request)
                     .await

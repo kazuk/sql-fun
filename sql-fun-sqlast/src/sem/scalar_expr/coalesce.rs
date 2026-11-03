@@ -1,10 +1,13 @@
 use crate::{
+    ast::Dialect,
     context::ParseContext,
     names::ColumnName,
     sem::{
         AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
-        SemScalarExpr, TypeReference, parameter_resolution::ParameterResolution,
-        scalar_expr::SemScalarExprNode, traversal::SemanticVisitorMut,
+        SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::SemScalarExprNode,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
 
@@ -61,7 +64,7 @@ impl CoalesceExpr {
                 first_non_null = Some(argument);
             }
         }
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             if arguments.len() < 2 {
                 context.report_analysis_problem(AnalysisProblem::parameter_constraint(
                     "SQLite COALESCE requires at least two arguments",
@@ -103,7 +106,7 @@ impl CoalesceExpr {
         name: &ColumnName,
         not_null: bool,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let sqlite_type = if context.dialect() == crate::ast::Dialect::sqlite() {
+        let sqlite_type = if context.dialect() == Dialect::sqlite() {
             if let Some(first) = arguments.first() {
                 first.get_type()
             } else {
@@ -164,10 +167,7 @@ impl CoalesceExpr {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for value in &self.arg_exprs {
             value.visit(visitor)?;
         }
@@ -179,7 +179,7 @@ impl CoalesceExpr {
         parameters: &mut ParameterResolution<'_>,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             return Ok(());
         }
         if self

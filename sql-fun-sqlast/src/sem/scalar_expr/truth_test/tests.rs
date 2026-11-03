@@ -1,5 +1,7 @@
 mod test_helpers;
 
+use crate::sem::SemScalarExpr;
+
 use self::test_helpers::{context, expression, query, schema};
 use crate::sem::{CastContext, ParseContext, PgBuiltInType};
 use std::collections::BTreeMap;
@@ -24,7 +26,7 @@ fn retains_all_six_kinds_and_operand_coercions(
     assert_eq!(test.negated(), negated);
     assert_eq!(test.argument().get_type(), Some(PgBuiltInType::bool()));
     let encoded = ::serde_json::to_string(expr)?;
-    let decoded: crate::sem::SemScalarExpr = ::serde_json::from_str(&encoded)?;
+    let decoded: SemScalarExpr = ::serde_json::from_str(&encoded)?;
     assert_eq!(decoded.as_truth_test().unwrap().value(), value);
     assert_eq!(decoded.as_truth_test().unwrap().negated(), negated);
     Ok(())

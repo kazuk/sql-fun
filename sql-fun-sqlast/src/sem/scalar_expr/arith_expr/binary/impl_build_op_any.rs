@@ -1,4 +1,4 @@
-use super::BinaryCastCandidate;
+use crate::sem::scalar_expr::arith_expr::binary::BinaryCastCandidate;
 
 use crate::{
     names::OperatorName,
@@ -30,7 +30,7 @@ impl super::ArithExpr {
         rexpr: Option<SemScalarExpr>,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::ParseContext,
+        TParseContext: ParseContext,
     {
         let Some(lexpr) = lexpr else {
             AnalysisError::raise_unexpected_none("a_expr.lexpr")?
@@ -85,14 +85,16 @@ impl super::ArithExpr {
 
 #[cfg(test)]
 mod test_build_op_any {
-    use crate::sem::scalar_expr::{ArrayExpr, ScalarConstExpr};
-    use crate::test_helpers::TestParseContext;
+    use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
+
     use crate::{
         names::OperatorName,
         sem::{
             ArithExpr, BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
             PgBuiltInType, SemScalarExpr, TypeDefinition, TypeReference,
+            scalar_expr::{ArrayExpr, ScalarConstExpr},
         },
+        test_helpers::TestParseContext,
     };
 
     #[rstest::rstest]
@@ -274,15 +276,12 @@ mod test_build_op_any {
         #[case] right_type: &str,
         #[case] failure: Option<&str>,
     ) -> testresult::TestResult {
-        let mut cache_context = crate::test_helpers::create_cache_context();
+        let mut cache_context = create_cache_context();
         let context = test_helpers::schema()?;
-        let analyzed = crate::parse_statements(
-            &format!("SELECT {expression}"),
-            crate::ast::Dialect::postgres(),
-        )
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+        let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+            .next()
+            .unwrap()?
+            .analyze(context, &mut cache_context)?;
         let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
         let column = select.result_columns().get_column_at(0).unwrap();
         let value = column.expression().unwrap();
@@ -343,6 +342,8 @@ mod test_build_op_any {
     }
 
     mod test_helpers {
+        use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
+
         use crate::{
             context::{BaseParseContext, SchemaFileContext},
             names::SchemaName,
@@ -351,8 +352,7 @@ mod test_build_op_any {
         };
 
         pub(super) fn context() -> TestParseContext {
-            let mut context =
-                TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());
+            let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
             context.set_get_search_path_result(&[
                 SchemaName::from("public"),
                 SchemaName::from("pg_catalog"),
@@ -389,7 +389,7 @@ mod test_build_op_any {
         }
 
         pub(super) fn schema() -> testresult::TestResult<SchemaFileContext> {
-            let mut cache_context = crate::test_helpers::create_cache_context();
+            let mut cache_context = create_cache_context();
             let base = context();
             let args = base.get_args().clone();
             let metadata = base.metadata().clone();
@@ -400,9 +400,9 @@ mod test_build_op_any {
                 &metadata,
             );
             // Apply real DDL in the mutable schema catalog; no builtin metadata is loaded.
-            for statement in crate::parse_statements(
+            for statement in parse_statements(
                 "CREATE DOMAIN amount AS integer; CREATE DOMAIN amount_array AS integer[]; CREATE DOMAIN amount_array_chain AS amount_array;",
-                crate::ast::Dialect::postgres(),
+                Dialect::postgres(),
             ) {
                 context = statement?
                     .analyze(context, &mut cache_context)?

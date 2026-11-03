@@ -1,6 +1,9 @@
 //! Resolved View projection lineage retained independently of DML capabilities.
+
 use crate::{
-    ast::{Expr, FromItem, Query, QueryBody, View},
+    ast::{
+        Expr, FromItem, Query, QueryBody, SyntaxValue, View, ViewCheckOption as AstViewCheckOption,
+    },
     context::ParseContext,
     names::{ColumnName, FullName, TableName, ViewName},
     sem::{
@@ -181,14 +184,14 @@ impl View {
         for option in &self.options {
             let value = match &option.value {
                 None => None,
-                Some(crate::ast::SyntaxValue::Expression(Expr::Column(name))) => Some(
-                    SemScalarExpr::literal(&ScalarConstExpr::string(&name.0.join("."))),
-                ),
-                Some(crate::ast::SyntaxValue::Expression(expression)) => Some(expression.resolve(
+                Some(SyntaxValue::Expression(Expr::Column(name))) => Some(SemScalarExpr::literal(
+                    &ScalarConstExpr::string(&name.0.join(".")),
+                )),
+                Some(SyntaxValue::Expression(expression)) => Some(expression.resolve(
                     context,
                     &ScalarAnalysisContext::new(&WithClause::default(), &FromClause::default()),
                 )?),
-                Some(crate::ast::SyntaxValue::Type(_)) => {
+                Some(SyntaxValue::Type(_)) => {
                     return AnalysisError::raise_unexpected_input("View option type");
                 }
             };
@@ -201,7 +204,7 @@ impl View {
         Ok(options)
     }
 }
-impl crate::ast::ViewCheckOption {
+impl AstViewCheckOption {
     pub(super) const fn semantic(self) -> ViewCheckOption {
         match self {
             Self::None => ViewCheckOption::none(),

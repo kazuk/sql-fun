@@ -1,7 +1,11 @@
 //! Read-only facts derived from the existing completed semantic traversal.
+
 use crate::{
     names::FullName,
-    sem::{AnalysisError, SemAst},
+    sem::{
+        AnalysisError, AnalysisProblem, ParameterConstraint, ParseContext as SemParseContext,
+        SemAst,
+    },
 };
 
 /// Relation identities already established by semantic analysis.
@@ -41,7 +45,7 @@ impl QueryMetadata {
     /// This inspects existing inference results and does not solve constraints again.
     /// Contradictory (empty) domains retain their existing conflict diagnostics.
     pub fn report_unresolved_parameters(
-        context: &mut impl crate::sem::ParseContext,
+        context: &mut impl SemParseContext,
     ) -> Result<(), AnalysisError> {
         let unresolved: Vec<_> = context
             .parameter_constraints()
@@ -53,12 +57,10 @@ impl QueryMetadata {
                         .admissible_types()
                         .is_none_or(|types| !types.is_empty())
             })
-            .map(crate::sem::ParameterConstraint::position)
+            .map(ParameterConstraint::position)
             .collect();
         for index in unresolved {
-            context.report_problem(crate::sem::AnalysisProblem::parameter_type_unresolved(
-                index,
-            ))?;
+            context.report_problem(AnalysisProblem::parameter_type_unresolved(index))?;
         }
         Ok(())
     }
@@ -66,11 +68,12 @@ impl QueryMetadata {
 
 #[cfg(test)]
 mod unresolved_parameter_tests {
-    use super::QueryMetadata;
+    use crate::sem::AnalysisError;
+
     use crate::{
         sem::{
             InputTypeConstraint, ParameterConstraints, ParseContext, PgBuiltInType, TypeReference,
-            parameter_constraints::ConstraintGraph,
+            parameter_constraints::ConstraintGraph, query_metadata::QueryMetadata,
         },
         test_helpers::TestParseContext,
     };
@@ -83,7 +86,7 @@ mod unresolved_parameter_tests {
     fn finalization_preserves_domains_and_reports_only_missing_bindings(
         #[case] candidate_count: Option<usize>,
         #[case] unresolved: bool,
-    ) -> Result<(), crate::sem::AnalysisError> {
+    ) -> Result<(), AnalysisError> {
         let types = [PgBuiltInType::int4(), PgBuiltInType::text()].map(|ty| {
             TypeReference::concrete_type_ref(ty.full_name().expect("nominal type identity"), false)
         });

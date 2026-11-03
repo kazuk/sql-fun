@@ -1,14 +1,16 @@
-use crate::AstAndContextPair;
-use crate::ast::{Dialect, StatementNode};
-use crate::context::ParseContext;
-use crate::test_helpers::{TestParseContext, source_span};
 use crate::{
-    context::MutSourcePathWithSpan,
-    names::{ColumnName, OperatorName, SchemaName},
+    AstAndContextPair,
+    ast::{Dialect, StatementNode},
+    context::{MutSourcePathWithSpan, ParseContext},
+    names::{ColumnName, FullName, OperatorName, SchemaName, TableName},
+    parse_statements,
     sem::{
-        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, FunctionParam,
-        OperatorDefinition, OverloadVariant, PgBuiltInType, SelectStatement, TypeReference,
+        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, CatalogNameLookup,
+        CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, CreateView,
+        FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType, SelectStatement,
+        SemScalarExpr, TypeCategory, TypeDefinition, TypeReference, ViewLike,
     },
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
 
 pub(super) fn catalog() -> TestParseContext {
@@ -84,10 +86,7 @@ pub(super) fn resolve(
     dialect: Dialect,
     infer: bool,
 ) -> Result<(SelectStatement, TestParseContext), AnalysisError> {
-    let statement = crate::parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap();
+    let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
     let StatementNode::Query(query) = statement.node else {
         panic!("query fixture expected");
     };
@@ -95,7 +94,7 @@ pub(super) fn resolve(
     catalog.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut catalog, None);
     let query = if infer {
-        catalog.infer_query_parameter_types(query, &mut crate::test_helpers::create_cache_context())
+        catalog.infer_query_parameter_types(query, &mut create_cache_context())
     } else {
         query
     };
@@ -107,7 +106,7 @@ pub(super) fn query(sql: &str) -> SelectStatement {
     resolve(sql, Dialect::postgres(), false).unwrap().0
 }
 
-pub(super) fn output_index(expression: &crate::sem::SemScalarExpr) -> Option<usize> {
+pub(super) fn output_index(expression: &SemScalarExpr) -> Option<usize> {
     expression.output_index()
 }
 
@@ -120,8 +119,8 @@ pub(super) fn output_type(query: &SelectStatement, name: &str) -> Option<TypeRef
 
 /// Small explicitly selected table for grouping placement checks in DML.
 pub(super) fn grouping_table_context() -> TestParseContext {
-    let mut cache_context = crate::test_helpers::create_cache_context();
-    crate::parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
+    let mut cache_context = create_cache_context();
+    parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
         .next()
         .unwrap()
         .unwrap()
@@ -138,14 +137,14 @@ pub(super) fn column_scope_query(
     sql: &str,
     dialect: Dialect,
 ) -> (SelectStatement, TestParseContext) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let mut context = catalog().with_dialect(dialect);
     for ddl in [
         "CREATE TABLE outer_items(id integer)",
         "CREATE TABLE local_items(other integer)",
         "CREATE TABLE known_items(id integer)",
     ] {
-        context = crate::parse_statements(ddl, dialect)
+        context = parse_statements(ddl, dialect)
             .next()
             .unwrap()
             .unwrap()
@@ -153,10 +152,7 @@ pub(super) fn column_scope_query(
             .unwrap()
             .into_context();
     }
-    let statement = crate::parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap();
+    let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
     let StatementNode::Query(query) = statement.node else {
         panic!("query fixture");
     };
@@ -173,7 +169,7 @@ pub(super) fn source_namespace_statement_at_version(
     sql: &str,
     version: &str,
 ) -> AstAndContextPair<TestParseContext> {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let dialect = Dialect::postgres();
     let metadata = ::serde_json::from_value(::serde_json::json!({
         "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["a", "public"]
@@ -183,9 +179,9 @@ pub(super) fn source_namespace_statement_at_version(
     for ty in [PgBuiltInType::int4(), PgBuiltInType::int8()] {
         context.set_get_type_impl_result(
             ty.full_name().expect("nominal type identity"),
-            &crate::sem::TypeDefinition::builtin_with_category(
+            &TypeDefinition::builtin_with_category(
                 ty.full_name().expect("nominal type identity"),
-                Some(crate::sem::TypeCategory::try_from('N').unwrap()),
+                Some(TypeCategory::try_from('N').unwrap()),
                 None,
             ),
         );
@@ -201,17 +197,17 @@ CREATE TABLE b.u(bid bigint NOT NULL);
 CREATE TABLE "a.b"."t.x"(id integer NOT NULL);
 CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
 "#;
-    for statement in crate::parse_statements(schema, dialect) {
+    for statement in parse_statements(schema, dialect) {
         context = statement
             .unwrap()
             .analyze(context, &mut cache_context)
             .unwrap()
             .into_context();
     }
-    let mixed = crate::names::FullName::with_schema("a", "mixed");
+    let mixed = FullName::with_schema("a", "mixed");
     context.set_get_type_impl_result(
         &mixed,
-        &crate::sem::TypeDefinition::table_ref(&crate::names::TableName::from(mixed.clone())),
+        &TypeDefinition::table_ref(&TableName::from(mixed.clone())),
     );
     context.setup_function(
         "mixed_fun",
@@ -229,28 +225,25 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
         ("a", "mixed_v", "a.mixed", "id, other"),
     ] {
         let sql = format!("SELECT {projection} FROM {source}");
-        let query = crate::parse_statements(&sql, dialect)
+        let query = parse_statements(&sql, dialect)
             .next()
             .unwrap()
             .unwrap()
             .node
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context(),
-            )
+            .resolve(&mut context, &mut create_cache_context())
             .unwrap()
             .into_select_statemtnt()
             .unwrap();
-        let name = crate::names::FullName::with_schema(schema, name);
-        let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
-        context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
+        let name = FullName::with_schema(schema, name);
+        let view = CreateView::new(&name, &query, &[], &None, false);
+        context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
     }
     assert!(
         context.reported_problems().is_empty(),
         "{:?}",
         context.reported_problems()
     );
-    crate::parse_statements(sql, dialect)
+    parse_statements(sql, dialect)
         .next()
         .unwrap()
         .unwrap()
@@ -260,7 +253,7 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
 
 /// Analyze using only the signatures/types needed by record-output tests.
 pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, TestParseContext) {
-    let mut cache_context = crate::test_helpers::create_cache_context();
+    let mut cache_context = create_cache_context();
     let dialect = Dialect::postgres();
     let mut context = catalog();
     for name in [
@@ -277,7 +270,7 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         context.setup_type(TypeReference::from_master_type_name(name).array_type());
     }
     context.setup_type(TypeReference::concrete_type_ref(
-        &crate::names::FullName::with_schema("public", "custom_type"),
+        &FullName::with_schema("public", "custom_type"),
         false,
     ));
     let record = TypeReference::from_master_type_name("record");
@@ -301,13 +294,10 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         false,
     );
     context.setup_function("overloaded_record", &[overload, integer_overload]);
-    let collation_name = crate::names::FullName::from_local_name("C");
+    let collation_name = FullName::from_local_name("C");
     context.set_collation_lookup(
         &collation_name,
-        &crate::sem::CatalogNameLookup::found(
-            &collation_name,
-            &crate::names::FullName::with_schema("pg_catalog", "C"),
-        ),
+        &CatalogNameLookup::found(&collation_name, &FullName::with_schema("pg_catalog", "C")),
     );
     context.setup_function(
         "out_fun",
@@ -321,36 +311,36 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
             false,
         )],
     );
-    let name = crate::names::FullName::with_schema("public", "pair");
-    let mut fields = crate::sem::CompositeFieldCollection::default();
-    fields.push(crate::sem::CompositeFieldDefinition::new(
+    let name = FullName::with_schema("public", "pair");
+    let mut fields = CompositeFieldCollection::default();
+    fields.push(CompositeFieldDefinition::new(
         "a",
         &Some(PgBuiltInType::int4()),
         &None,
     ));
-    fields.push(crate::sem::CompositeFieldDefinition::new(
+    fields.push(CompositeFieldDefinition::new(
         "b",
         &Some(PgBuiltInType::text()),
         &None,
     ));
-    let definition = crate::sem::CreateCompositeType::new(&name, &fields);
-    context.set_get_type_impl_result(&name, &crate::sem::TypeDefinition::from(&definition));
+    let definition = CreateCompositeType::new(&name, &fields);
+    context.set_get_type_impl_result(&name, &TypeDefinition::from(&definition));
     let pair = TypeReference::concrete_type_ref(&name, false);
     context.setup_function(
         "pair_fun",
         &[OverloadVariant::new(&Some(pair), &vec![], false, false)],
     );
-    context = crate::parse_statements("CREATE TABLE public.row_item(a integer NOT NULL)", dialect)
+    context = parse_statements("CREATE TABLE public.row_item(a integer NOT NULL)", dialect)
         .next()
         .unwrap()
         .unwrap()
         .analyze(context, &mut cache_context)
         .unwrap()
         .into_context();
-    let row_name = crate::names::FullName::with_schema("public", "row_item");
+    let row_name = FullName::with_schema("public", "row_item");
     context.set_get_type_impl_result(
         &row_name,
-        &crate::sem::TypeDefinition::table_ref(&crate::names::TableName::from(row_name.clone())),
+        &TypeDefinition::table_ref(&TableName::from(row_name.clone())),
     );
     context.setup_function(
         "row_fun",
@@ -361,17 +351,14 @@ pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
             false,
         )],
     );
-    let statement = crate::parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap();
+    let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
     let StatementNode::Query(query) = statement.node else {
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut context, None);
     let query = if infer {
-        context.infer_query_parameter_types(query, &mut crate::test_helpers::create_cache_context())
+        context.infer_query_parameter_types(query, &mut create_cache_context())
     } else {
         query
     };

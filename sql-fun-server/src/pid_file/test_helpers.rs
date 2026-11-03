@@ -1,8 +1,6 @@
-use super::PidFile;
-use crate::ServerError;
+use crate::{ServerError, pid_file::PidFile};
 
-use std::fs::File;
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 
 pub(super) struct PidFileFixture {
     _directory: ::tempfile::TempDir,

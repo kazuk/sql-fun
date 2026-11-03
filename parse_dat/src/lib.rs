@@ -1,12 +1,9 @@
 //! postgres internal .dat file parser
 
-use chumsky::error::Rich;
-use chumsky::prelude::*;
+use chumsky::{error::Rich, prelude::*};
 use clap::Parser as ClapParser;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+use std::{collections::HashMap, fs, path::PathBuf};
 use thiserror::Error;
 
 /// Convert byte offset in source to (line, column).
@@ -176,7 +173,7 @@ fn dat_parser<'a>() -> impl Parser<'a, &'a str, serde_json::Value, extra::Err<Ri
 
 #[cfg(test)]
 mod tests {
-    use super::{dat_parser, parse_pair, parse_record, parse_value};
+    use crate::{dat_parser, parse_pair, parse_record, parse_value};
     use ::chumsky::Parser;
     use ::serde_json::Value;
 

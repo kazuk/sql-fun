@@ -1,13 +1,14 @@
 use crate::{
-    ast::TryFromWithTokens,
+    ast::{Dialect, TryFromWithTokens, With},
     context::ParseContext,
     names::{ColumnName, CteName, FullName},
     sem::{
         AnalysisError, DeleteStatement, InsertStatement, MergeStatement, ResultColumnCollection,
-        SelectStatement, UpdateStatement, create_table::ColumnDefinition,
-        traversal::SemanticVisitorMut,
+        SelectStatement, UpdateStatement,
+        create_table::ColumnDefinition,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
-    syn::ScanToken,
+    syn::{ScanToken, WithClauseOpt},
 };
 
 use std::collections::HashMap;
@@ -269,7 +270,7 @@ impl WithClause {
             return None;
         }
         self.0.keys().find(|candidate| {
-            if context.dialect() == crate::ast::Dialect::sqlite() {
+            if context.dialect() == Dialect::sqlite() {
                 candidate.eq_ignore_ascii_case(name.name().as_str())
             } else {
                 candidate.as_str() == name.name().as_str()
@@ -282,7 +283,7 @@ impl WithClause {
         name: &CteName,
         statement: CteStatement,
     ) {
-        if context.dialect() == crate::ast::Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             self.0
                 .retain(|candidate, _| !candidate.eq_ignore_ascii_case(name));
         }
@@ -305,13 +306,13 @@ impl WithClause {
     /// analyze [`crate::syn::WithClauseOpt`]
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
-        syn: crate::syn::WithClauseOpt,
+        syn: WithClauseOpt,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::ast::With::try_from_with_tokens(syn, tokens)?;
+        let syntax = With::try_from_with_tokens(syn, tokens)?;
         let result = syntax.resolve_with(&mut context);
         Ok((result?, context))
     }
@@ -332,10 +333,7 @@ impl CteStatement {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         match self {
             Self::Unresolved => {}
             Self::Select(query) => query.visit(visitor)?,
@@ -365,10 +363,7 @@ impl WithClause {
         }
         Ok(())
     }
-    pub(crate) fn visit<V: crate::sem::traversal::SemanticVisitor>(
-        &self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         for (name, query) in &self.0 {
             if let Some(columns) = query.result_columns() {
                 visitor.source_outputs(&columns.names());

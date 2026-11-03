@@ -335,7 +335,7 @@ Choose the environment from the behavior under test:
 - For a small set of types, casts, and operators, use the existing unit-test
   `TestParseContext` and explicit definitions. Where real DDL application and
   freeze behavior matter, use that small base with `SchemaFileContext`. See
-  [`indirection_tests/test_helpers.rs`](../../sql-fun-sqlast/src/sem/parameter_resolution/indirection_tests/test_helpers.rs).
+  [`test_helpers/indirection.rs`](../../sql-fun-sqlast/src/test_helpers/indirection.rs).
 - Use `test_helpers::heavy` when real builtin catalog loading or catalog-wide
   interactions are themselves needed for the assertion. State that reason and
   preserve the visible heavy call path. A query using an integer cast and a

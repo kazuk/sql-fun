@@ -35,7 +35,7 @@ for binary in sql-fun sql-fun-server; do
     install -m 0755 "$release_dir/$binary" "$staging/tar/$binary"
 done
 install -m 0644 LICENSE "$staging/tar/LICENSE"
-deb_name="sql-fun_${deb_version}_${deb_arch}.deb"
+deb_name="sql-fun_${package_version}_${deb_arch}.deb"
 tar_name="sql-fun-${package_version}-${package_target}.tar.gz"
 cargo deb --locked -p sql-fun-cli --target "$package_target" \
     --no-build --no-strip --deb-version "$deb_version" --output "$staging/$deb_name"

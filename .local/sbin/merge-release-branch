@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Workflow-only consumer of the immutable release source handoff.
+[[ $# == 2 && "$2" =~ ^[0-9a-f]{40}$ ]] || {
+  echo 'usage: merge-release-branch PROJECT_TAG SOURCE_SHA' >&2
+  exit 1
+}
+scripts="$(cd "$(dirname "$0")" && pwd)"
+tag="$1"
+revision="$2"
+identity="$("$scripts/../bin/parse-release-version" "$tag")"
+[[ "${identity##*$'\t'}" == stable ]] || {
+  echo 'only stable releases may merge into main' >&2
+  exit 1
+}
+branch="refs/heads/release/$tag"
+[[ -z "$(git status --porcelain)" ]] || {
+  echo 'release merge requires a clean checkout' >&2
+  exit 1
+}
+
+# FETCH_HEAD preserves the remote object identities, including annotated tags.
+git fetch --no-tags origin refs/heads/main "$branch" "refs/tags/$tag"
+mapfile -t fetched < <(cut -f1 "$(git rev-parse --git-path FETCH_HEAD)")
+# Linked worktrees store FETCH_HEAD in their own Git directory.
+if [[ ${#fetched[@]} != 3 ]]; then
+  echo 'expected exactly main, release branch, and tag from origin' >&2
+  exit 1
+fi
+base="${fetched[0]}"
+source="${fetched[1]}"
+tag_object="${fetched[2]}"
+[[ "$source" == "$revision" && "$(git rev-parse "$tag_object^{commit}")" == "$revision" ]] || {
+  echo 'remote release branch and immutable tag must both identify the recorded source' >&2
+  exit 1
+}
+
+record() {
+  local result="$1" head="$2"
+  printf 'Release merge: %s; tag=%s branch=%s source=%s base=%s result=%s\n' \
+    "$result" "$tag" "$branch" "$revision" "$base" "$head" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+}
+
+if git merge-base --is-ancestor "$revision" "$base"; then
+  record already-incorporated "$base"
+  exit 0
+fi
+mapfile -t ancestors < <(git merge-base --all "$base" "$revision")
+[[ ${#ancestors[@]} == 1 ]] || {
+  echo 'release and main must have one unambiguous common ancestor' >&2
+  exit 1
+}
+git switch --detach "$base"
+git -c user.name=sql-fun-release-bot \
+  -c user.email=sql-fun-release-bot@users.noreply.github.com \
+  merge --no-ff --no-edit -m "chore(release): merge $tag into main" "$revision"
+
+# Pin what was validated; never silently adopt a moving release branch/tag.
+remote="$(git ls-remote --refs origin "$branch" "refs/tags/$tag" refs/heads/main)"
+remote_sha() { awk -v ref="$1" '$2 == ref { print $1 }' <<<"$remote"; }
+[[ "$(remote_sha "$branch")" == "$revision" && \
+   "$(remote_sha "refs/tags/$tag")" == "$tag_object" && \
+   "$(remote_sha refs/heads/main)" == "$base" ]] || {
+  echo 'remote refs changed during merge; operator must inspect and rerun' >&2
+  exit 1
+}
+# A normal push rejects a racing incompatible main update and branch-rule failures.
+git push origin HEAD:refs/heads/main
+git fetch --no-tags origin refs/heads/main
+result="$(git rev-parse FETCH_HEAD)"
+git merge-base --is-ancestor "$revision" "$result" || {
+  echo 'remote main does not contain the released history after push' >&2
+  exit 1
+}
+record merged "$result"

@@ -73,8 +73,57 @@ jobs:
           .local/bin/publish-crates --manifest="$RUNNER_TEMP/crates.tsv"
           echo 'crates.io distribution completed; existing exact versions were skipped.' >> "$GITHUB_STEP_SUMMARY"
 
-  pages:
+  merge:
     needs: [identity, crates]
+    if: ${{ needs.identity.outputs.classification == 'stable' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Create release merge token
+        id: bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.MAINTENANCE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.MAINTENANCE_BOT_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          # Complete release history can include workflow changes.
+          permission-workflows: write
+      - name: Verify existing ruleset authorization
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          APP_SLUG: ${{ steps.bot.outputs.app-slug }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          app_id="$(gh api "apps/$APP_SLUG" --jq '.id')"
+          [[ "$app_id" == 5016922 ]] || {
+            echo 'Maintenance App does not match the authorized release actor' >&2
+            exit 1
+          }
+          authorized="$(gh api "repos/$GH_REPO/rulesets/11504670" --jq '
+            .enforcement == "active" and any(.bypass_actors[];
+              .actor_type == "Integration" and .actor_id == 5016922
+              and .bypass_mode == "always")
+          ')"
+          [[ "$authorized" == true ]] || {
+            echo 'Existing main ruleset does not authorize the release App' >&2
+            exit 1
+          }
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.revision }}
+          fetch-depth: 0
+          token: ${{ steps.bot.outputs.token }}
+      - name: Merge the complete stable release history
+        env:
+          RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+          RELEASE_REVISION: ${{ needs.identity.outputs.revision }}
+        run: .local/sbin/merge-release-branch "$RELEASE_TAG" "$RELEASE_REVISION"
+
+  pages:
+    needs: [identity, crates, merge]
     if: ${{ needs.identity.outputs.classification == 'stable' }}
     runs-on: ubuntu-24.04
     concurrency:

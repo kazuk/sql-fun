@@ -7,7 +7,9 @@ and its assets. A maintainer publishes the draft as the final approval gate.
 
 1. Validate the product release tag and resolve its immutable source commit.
 2. Publish all publishable workspace crates to crates.io.
-3. Deploy the existing manual to Pages for the latest stable release only.
+3. For stable releases, merge the entire originating release branch into `main`.
+4. Deploy the existing manual to Pages for the latest stable release only, after
+   that merge succeeds.
 
 Announcements, when configured separately, must follow successful distribution.
 The GitHub Release can be visible before crates.io or Pages completes.
@@ -19,11 +21,12 @@ The GitHub Release can be visible before crates.io or Pages completes.
 `vX.Y.Z-snapshot`, and `vX.Y.Z-snapshotN` (where N is a sequence of digits).
 Numeric version components must not have leading zeros. Other prerelease names,
 build metadata, and invalid tags fail before distribution. The upstream release
-branch suffix must equal this product tag; future branch consumers can use the
-same parser on that suffix.
+branch suffix must equal this product tag. The merge job derives
+`refs/heads/release/<tag>` from that validated identity.
 
 Classification does not use `release.target_commitish`, `release.prerelease`,
-or a workflow input. Snapshot releases never enter the Pages job.
+or a workflow input. Snapshot releases never enter the merge or Pages jobs and
+never obtain a repository-write credential.
 
 The tag identifies the product release, independently of individual crate
 versions. Every publication job checks out the commit resolved from that tag.
@@ -64,6 +67,57 @@ there is no propagation retry loop. Cargo packages and verifies source during
 `cargo publish`; normal-CI `.crate` files are not inputs. No release binary,
 Debian package, or manual is rebuilt by this workflow.
 
+## Stable release merge and repository authorization
+
+After crates.io succeeds, the stable-only merge job checks the remote tag and
+`release/<tag>` branch against the recorded immutable source `R`. The branch tip
+must equal `R`; missing, advanced, rewound, or mismatched branches fail. A tag
+that no longer resolves to `R` also fails. Keep the release branch available and
+unchanged for this handoff and subsequent reruns.
+
+The job uses the existing maintenance App through
+`actions/create-github-app-token@v3`, with `MAINTENANCE_BOT_CLIENT_ID` and
+`MAINTENANCE_BOT_PRIVATE_KEY`. Its installation token is restricted to this
+repository, with contents write and workflows write: the complete release
+history may include workflow changes. It receives no crates.io/OIDC, Pages,
+Actions, or pull-request permission. The job's separate `GITHUB_TOKEN` remains
+contents read.
+
+The existing active `main` ruleset (`11504670`) authorizes Integration `5016922`
+with an always exception. The job verifies the token action's App identity and
+that existing exception before checkout with write credentials. This is an
+explicit reliance on existing repository policy, including its exception to
+PR/check requirements; granting contents write to `GITHUB_TOKEN` alone does not
+provide that authorization. Legacy branch protection must also permit the
+update. The workflow does not change protections or add exceptions. If App
+identity, installation permissions, or repository policy differs, stop and
+resolve that configuration explicitly; do not substitute another credential.
+
+`.local/sbin/merge-release-branch` checks ancestry before writing. When `main`
+already contains `R`, the job succeeds without creating a commit or pushing.
+Otherwise it requires one unambiguous common ancestor and makes a normal merge
+commit retaining the complete release history, even when a fast-forward would
+be possible. Independent changes on `main` are allowed when the merge is clean.
+It never cherry-picks, squashes, rebases, force-pushes, resets shared history,
+or moves/deletes release tags or branches.
+
+Immediately before a normal push, the helper rechecks the release branch, tag
+object, and `main` against the fetched state. Ref movement, merge conflicts,
+racing incompatible pushes, and branch-protection rejection fail the job and
+prevent Pages deployment in that run. Remote source-ref rechecks and the push
+are separate Git operations; the merge always uses pinned `R`, never a later
+branch tip. The producer/operator must preserve the immutable release handoff.
+An external update to `main` racing after the recheck is still subject to Git's
+normal non-fast-forward rejection. The job records source/base/result revisions
+and its merge outcome in the Actions summary.
+
+Inspect conflicts or ref movement before rerunning the original run. Do not
+rewrite release history to make a failed attempt disappear. If a push succeeded
+but its response or a later step failed, the rerun recognizes remote ancestry
+and makes no duplicate merge commit. A failed push is not automatically retried
+against a newly selected base. A rejected or ambiguous attempt remains visible
+for explicit operator action.
+
 ## Pages setup and manual input
 
 Select GitHub Actions as the repository's Pages publishing source. Configure
@@ -71,7 +125,8 @@ Select GitHub Actions as the repository's Pages publishing source. Configure
 by the workflow, rather than allowing only `main`. If environment approvals are
 configured, maintainers must satisfy them for deployment.
 
-The Pages job runs after successful crates.io distribution. It downloads
+The Pages job runs after successful crates.io distribution and stable-branch
+merge. A failed merge blocks Pages; snapshots run neither job. It downloads
 `sql-fun_vX.Y.Z_user-manual.tar.gz` from the triggering Release and extracts the
 mdBook output. The archive must contain the built site's `index.html` at its
 root, alongside its normal assets; #328 is the producer of this layout.
@@ -97,10 +152,11 @@ manual; historical and snapshot manuals remain versioned Release assets.
 Rerun the original Actions run after resolving a failure. Release-specific
 concurrency prevents simultaneous runs for the same tag. Already-present exact
 crate/version pairs are skipped and missing pairs continue in dependency order.
-If Pages failed after crates.io succeeded, rerunning completes deployment
-without republishing existing crate versions. Pages upload/deployment uses an
-attempt-specific Actions artifact name so reruns cannot collide with a previous
-attempt's immutable upload. Recovery is forward-only: no tags,
+If the merge or Pages failed after crates.io succeeded, rerunning skips existing
+crate versions, validates the same branch/tag handoff, and skips the merge when
+its history is already incorporated before resuming Pages. Pages upload/deployment
+uses an attempt-specific Actions artifact name so reruns cannot collide with a
+previous attempt's immutable upload. Recovery is forward-only: no tags,
 Releases, or published crate versions are rolled back.
 
 Offline release publication and preparation fixtures are excluded from standard

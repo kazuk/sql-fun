@@ -548,38 +548,38 @@ mod test_cast_layers {
 
     #[rstest::rstest]
     #[case::dot_scalar(
-        crate::sem::FullName::with_schema("a.b", "c"),
-        crate::sem::FullName::with_schema("a", "b.c"),
+        crate::names::FullName::with_schema("a.b", "c"),
+        crate::names::FullName::with_schema("a", "b.c"),
         false,
         false
     )]
     #[case::dot_arrays(
-        crate::sem::FullName::with_schema("a.b", "c"),
-        crate::sem::FullName::with_schema("a", "b.c"),
+        crate::names::FullName::with_schema("a.b", "c"),
+        crate::names::FullName::with_schema("a", "b.c"),
         true,
         true
     )]
     #[case::quotes(
-        crate::sem::FullName::with_schema("a\"b", "c"),
-        crate::sem::FullName::with_schema("a", "b\"c"),
+        crate::names::FullName::with_schema("a\"b", "c"),
+        crate::names::FullName::with_schema("a", "b\"c"),
         false,
         false
     )]
     #[case::array_suffix(
-        crate::sem::FullName::with_schema("a", "item[]"),
-        crate::sem::FullName::with_schema("a", "item"),
+        crate::names::FullName::with_schema("a", "item[]"),
+        crate::names::FullName::with_schema("a", "item"),
         false,
         true
     )]
     #[case::array_flag(
-        crate::sem::FullName::with_schema("a", "item"),
-        crate::sem::FullName::with_schema("a", "item"),
+        crate::names::FullName::with_schema("a", "item"),
+        crate::names::FullName::with_schema("a", "item"),
         false,
         true
     )]
     fn preserves_cast_keys_and_enumerated_types(
-        #[case] left: crate::sem::FullName,
-        #[case] right: crate::sem::FullName,
+        #[case] left: crate::names::FullName,
+        #[case] right: crate::names::FullName,
         #[case] source_array: bool,
         #[case] other_array: bool,
     ) {
@@ -612,7 +612,8 @@ mod test_cast_layers {
         use crate::{
             TrieMap,
             context::{ParseContext, SchemaFileContext},
-            sem::{CastContext, CastDefinition, FullName, TypeReference},
+            names::FullName,
+            sem::{CastContext, CastDefinition, TypeReference},
             test_helpers::TestParseContext,
         };
         use std::path::Path;

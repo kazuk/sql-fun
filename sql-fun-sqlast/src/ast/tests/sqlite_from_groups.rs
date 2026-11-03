@@ -1,5 +1,5 @@
 use crate::context::BaseParseContext;
-use crate::sem::{ColumnName, PgBuiltInType};
+use crate::{names::ColumnName, sem::PgBuiltInType};
 
 #[rstest::rstest]
 #[case("select q.ax as n from (a) as q", false, true)]
@@ -99,10 +99,8 @@ mod test_helpers {
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{
-            AnalysisError, ColumnDefinition, ColumnName, PgBuiltInType, SchemaName,
-            SelectStatement, SemAst,
-        },
+        names::{ColumnName, SchemaName},
+        sem::{AnalysisError, ColumnDefinition, PgBuiltInType, SelectStatement, SemAst},
     };
 
     fn selected_context() -> TestParseContext {

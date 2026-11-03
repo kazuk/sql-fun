@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! test helper types
 
+mod name_builders;
 mod postgres_ast;
 pub(crate) mod query_access;
 pub(crate) use self::postgres_ast::{
@@ -32,9 +33,10 @@ use std::path::PathBuf;
 
 use crate::{
     StringSpan,
+    names::{ColumnName, FullName, TableName},
     sem::{
-        ColumnName, FullName, FunctionParam, OverloadVariant, ScalarConstExpr, SemScalarExpr,
-        SourcePathWithSpan, TableName, TypeReference,
+        FunctionParam, OverloadVariant, ScalarConstExpr, SemScalarExpr, SourcePathWithSpan,
+        TypeReference,
     },
 };
 

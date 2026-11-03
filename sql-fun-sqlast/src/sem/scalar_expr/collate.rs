@@ -1,9 +1,12 @@
 use crate::StringSpan;
 use crate::ast::Dialect;
 use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, CatalogNameLookup, FullName, MinMaxExpr, ParseContext,
-    SemScalarExpr, TypeReference, problem::CollateProblem,
+use crate::{
+    names::FullName,
+    sem::{
+        AnalysisError, AnalysisProblem, CatalogNameLookup, MinMaxExpr, ParseContext, SemScalarExpr,
+        TypeReference, problem::CollateProblem,
+    },
 };
 
 /// An explicit COLLATE annotation with its completed name lookup and operand.
@@ -125,8 +128,11 @@ impl CollateExpr {
 #[cfg(test)]
 mod test_collate_resolution {
     use crate::ast::Dialect;
-    use crate::sem::{CatalogNameLookup, FullName, ParseContext, PgBuiltInType, SemScalarExpr};
     use crate::test_helpers::collate::{context, expression, query};
+    use crate::{
+        names::FullName,
+        sem::{CatalogNameLookup, ParseContext, PgBuiltInType, SemScalarExpr},
+    };
     use std::collections::BTreeMap;
 
     #[rstest::rstest]

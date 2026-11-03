@@ -1,4 +1,7 @@
-use crate::sem::{ColumnDefinition, ColumnName, FullName};
+use crate::{
+    names::{ColumnName, FullName},
+    sem::ColumnDefinition,
+};
 
 /// Analyzed capability for UPDATE into an ordinary view.
 /// Capabilities are independent of INSERT permissions.

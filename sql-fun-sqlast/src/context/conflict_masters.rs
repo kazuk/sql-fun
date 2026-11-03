@@ -1,8 +1,11 @@
 //! Loaded collation and operator-class master catalogs.
 
-use crate::sem::{
-    AnalysisError, CatalogNameLookup, CollationDefinition, DatabaseCollation, FullName,
-    OperatorClassDefinition,
+use crate::{
+    names::FullName,
+    sem::{
+        AnalysisError, CatalogNameLookup, CollationDefinition, DatabaseCollation,
+        OperatorClassDefinition,
+    },
 };
 use std::{collections::HashSet, fs::File, io::BufReader, path::Path};
 

@@ -1,7 +1,10 @@
 use super::ArithExpr;
-use crate::sem::{
-    AnalysisError, InputTypeConstraint, MinMaxExpr, OperatorName, ParseContext, ResolvedOperator,
-    SemScalarExpr,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, InputTypeConstraint, MinMaxExpr, ParseContext, ResolvedOperator,
+        SemScalarExpr,
+    },
 };
 
 /// A parameter-dependent pattern call whose unknown literals still need SQL context.

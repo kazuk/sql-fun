@@ -584,11 +584,14 @@ mod test_parameter_analysis {
     use crate::ast::Dialect;
     use crate::context::ParseContext;
     use crate::parse_statements;
-    use crate::sem::{
-        BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
-        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType,
-    };
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::OperatorName,
+        sem::{
+            BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
+            FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType,
+        },
+    };
     use std::collections::BTreeMap;
 
     fn context() -> TestParseContext {
@@ -627,7 +630,7 @@ mod test_parameter_analysis {
             false,
         );
         context.set_get_function_impl_result(
-            &crate::sem::FullName::with_schema("pg_catalog", "lower"),
+            &crate::names::FullName::with_schema("pg_catalog", "lower"),
             &FunctionOverloadCollection::new(&[lower]),
         );
         context
@@ -889,7 +892,7 @@ mod test_parameter_analysis {
 
     #[test]
     fn schema_loading_skips_parameter_inference() {
-        use crate::{context::MutSourcePathWithSpan, sem::SchemaName};
+        use crate::{context::MutSourcePathWithSpan, names::SchemaName};
         let mut cache_context = crate::test_helpers::create_cache_context();
         let before = crate::sem::parameter_resolution::inference_runs();
         let mut context = crate::test_helpers::schema_layer(
@@ -1023,7 +1026,7 @@ mod test_parameter_casts {
         let mut cache_context = crate::test_helpers::create_cache_context();
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.setup_type(crate::sem::TypeReference::from_full_name(
-            crate::sem::FullName::from_local_name("integer"),
+            crate::names::FullName::from_local_name("integer"),
         ));
         let result = parse_statements(sql, Dialect::sqlite())
             .next()

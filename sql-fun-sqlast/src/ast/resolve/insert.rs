@@ -4,13 +4,14 @@ use crate::{
         OverridingKind, Query, QueryBody,
     },
     context::ParseContext,
+    names::{ColumnName, TableName, ViewName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnName, DataSource,
-        FromClause, InsertArbiterLookup, InsertClauseSemantics, InsertClauseValues, InsertConflict,
+        AliasSpec, AnalysisError, AnalysisProblem, CatalogNameLookup, DataSource, FromClause,
+        InsertArbiterLookup, InsertClauseSemantics, InsertClauseValues, InsertConflict,
         InsertConstraintLookup, InsertDestination, InsertInferenceModifiers, InsertSource,
         InsertStatement, InsertTarget, InsertTargetCollection, InsertValue, InsertValueCollection,
         PgBuiltInType, ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext,
-        SelectStatement, SemScalarExpr, TableName, ViewName, ViewWriteEvaluation, WithClause,
+        SelectStatement, SemScalarExpr, ViewWriteEvaluation, WithClause,
         parameter_resolution::ParameterResolution, problem::InsertProblemKind,
     },
 };

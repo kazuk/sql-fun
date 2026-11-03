@@ -1,10 +1,10 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasSpec, AnalysisError, ColumnCollection, ColumnName, ColumnReferenceExpr, DataSource,
-        FullName, Nullable, OverloadVariant, QueryName, QueryNameResolution, SemScalarExpr,
-        TableFunctionProblem, TypeReference, WildcardTypedRecord, WithClause, WithTypmod,
-        data_source::AliasName, traversal::SemanticVisitorMut,
+        AliasSpec, AnalysisError, ColumnCollection, ColumnReferenceExpr, DataSource, Nullable,
+        OverloadVariant, QueryName, QueryNameResolution, SemScalarExpr, TableFunctionProblem,
+        TypeReference, WildcardTypedRecord, WithClause, WithTypmod, traversal::SemanticVisitorMut,
     },
 };
 

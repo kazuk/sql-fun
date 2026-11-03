@@ -1,4 +1,7 @@
-use crate::sem::{ColumnDefinition, ColumnName, FullName};
+use crate::{
+    names::{ColumnName, FullName},
+    sem::ColumnDefinition,
+};
 
 /// Analyzed capability for INSERT into an ordinary view.
 /// An empty writable-column list still permits DEFAULT VALUES.

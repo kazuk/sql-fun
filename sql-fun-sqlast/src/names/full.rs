@@ -1,11 +1,8 @@
-mod impl_conversion_traits;
 mod parse;
 
 use std::fmt::Display;
 
-#[cfg(feature = "sqlite")]
-use crate::sem::AnalysisError;
-use crate::sem::{CatalogName, LocalName, SchemaName};
+use crate::names::{CatalogName, LocalName, SchemaName};
 
 /// A logical SQL name with one, two, or three components.
 ///
@@ -25,19 +22,6 @@ pub struct FullName {
     catalog: Option<CatalogName>,
     schema: Option<SchemaName>,
     name: LocalName,
-}
-
-#[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::QualifiedName> for FullName {
-    type Error = AnalysisError;
-
-    fn try_from(value: &crate::syn::sqlite::QualifiedName) -> Result<Self, Self::Error> {
-        Ok(Self {
-            catalog: None,
-            schema: value.db_name().map(SchemaName::try_from).transpose()?,
-            name: LocalName::try_from(value.name())?,
-        })
-    }
 }
 
 impl FullName {
@@ -172,124 +156,45 @@ impl FullName {
             name: LocalName::from(local_name),
         }
     }
+}
 
-    /// builtin record type
-    #[must_use]
-    pub fn is_record(&self) -> bool {
-        self.schema
-            .as_ref()
-            .is_some_and(super::schema::SchemaName::is_pg_catalog)
-            && self.name.is_record()
+#[cfg(test)]
+mod construction_tests {
+    use crate::names::{CatalogName, FullName, LocalName};
+    #[test]
+    #[should_panic(expected = "a catalog requires a schema")]
+    fn constructor_prevents_catalog_only_names() {
+        let _ = FullName::new(
+            &Some(CatalogName::from("db")),
+            &None,
+            &LocalName::from("items"),
+        );
+    }
+}
+
+#[cfg(test)]
+mod render_tests {
+    use crate::ast::Dialect;
+    use crate::names::FullName;
+    #[rstest::rstest]
+    #[case::empty(FullName::from_local_name(""))]
+    #[case::empty_schema(FullName::with_schema("", "x"))]
+    #[case::nul(FullName::from_local_name("a\0b"))]
+    fn checked_postgres_emission_rejects_invalid_sql(#[case] name: FullName) {
+        assert!(
+            name.to_sql(Dialect::postgres())
+                .unwrap_err()
+                .is_invalid_syntax()
+        );
     }
 
-    /// is range type?
-    #[must_use]
-    pub fn is_range(&self) -> bool {
-        !self.is_multi_range() && self.local_name().as_str().ends_with("range")
-    }
-
-    /// get subtype from range type
-    #[must_use]
-    pub fn range_subtype(&self) -> Self {
-        todo!()
-    }
-
-    /// is multi range type?
-    #[must_use]
-    pub fn is_multi_range(&self) -> bool {
-        self.local_name().as_str().ends_with("multirange")
-    }
-
-    /// get base element type from multi range type
-    #[must_use]
-    pub fn multi_range_base_element(&self) -> Self {
-        todo!()
-    }
-
-    /// is simple infrence types
-    #[must_use]
-    pub fn is_simple_infer_arg(&self) -> bool {
-        self.is_any_array()
-            || self.is_any_element()
-            || self.is_any_range()
-            || self.is_any_multi_range()
-            || self.is_any_non_array()
-    }
-
-    /// is common inference types
-    #[must_use]
-    pub fn is_common_infer_arg(&self) -> bool {
-        self.is_any_compatible()
-            || self.is_any_compatible_array()
-            || self.is_any_compatible_non_array()
-            || self.is_any_compatible_range()
-            || self.is_any_compatible_multi_range()
-    }
-
-    fn schema_is_pg_catalog(&self) -> bool {
-        self.schema
-            .as_ref()
-            .is_some_and(super::schema::SchemaName::is_pg_catalog)
-    }
-
-    /// just anyarray type
-    #[must_use]
-    pub fn is_any_array(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anyarray")
-    }
-
-    /// just anyelement type
-    #[must_use]
-    pub fn is_any_element(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anyelement")
-    }
-
-    /// just anyrange type
-    #[must_use]
-    pub fn is_any_range(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anyrange")
-    }
-
-    /// just anymultirange
-    #[must_use]
-    pub fn is_any_multi_range(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anymultirange")
-    }
-
-    /// just anynonarray
-    #[must_use]
-    pub fn is_any_non_array(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anynonarray")
-    }
-
-    /// just anycompatible
-    #[must_use]
-    pub fn is_any_compatible(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anycompatible")
-    }
-
-    /// just anycompatiblearray
-    #[must_use]
-    pub fn is_any_compatible_array(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anycompatiblearray")
-    }
-
-    /// just anycompatiblenonarray
-    #[must_use]
-    pub fn is_any_compatible_non_array(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anycompatiblenonarray")
-    }
-
-    /// just anycompatiblerange
-    #[must_use]
-    pub fn is_any_compatible_range(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anycompatiblerange")
-    }
-
-    /// just anycompatiblemultirange
-    #[must_use]
-    pub fn is_any_compatible_multi_range(&self) -> bool {
-        self.schema_is_pg_catalog() && self.name == LocalName::from("anycompatiblemultirange")
+    #[test]
+    fn checked_sqlite_emission_rejects_catalog() {
+        assert!(
+            FullName::with_catalog("db", "main", "x")
+                .to_sql(Dialect::sqlite())
+                .is_err()
+        );
     }
 }
 
@@ -323,7 +228,31 @@ impl Display for FullName {
 }
 
 #[cfg(test)]
-mod tests;
+mod display_tests {
+    use crate::names::FullName;
+    #[rstest::rstest]
+    #[case::plain("simple_name", "simple_name")]
+    #[case::dot("a.b", r#""a.b""#)]
+    #[case::quote("a\"b", r#""a""b""#)]
+    #[case::mixed("Mixed", r#""Mixed""#)]
+    #[case::space("odd name", r#""odd name""#)]
+    #[case::reserved("select", r#""select""#)]
+    #[case::unicode("éclair", r#""éclair""#)]
+    #[case::empty("", r#""""#)]
+    #[case::numeric("12abc", r#""12abc""#)]
+    #[case::array_spelling("item[]", r#""item[]""#)]
+    fn formats_each_component_identically(#[case] component: &str, #[case] expected: &str) {
+        assert_eq!(FullName::from_local_name(component).to_string(), expected);
+        assert_eq!(
+            FullName::with_schema(component, component).to_string(),
+            format!("{expected}.{expected}")
+        );
+        assert_eq!(
+            FullName::with_catalog(component, component, component).to_string(),
+            format!("{expected}.{expected}.{expected}")
+        );
+    }
+}
 
 impl<'de> serde::Deserialize<'de> for FullName {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -344,7 +273,7 @@ impl<'de> serde::Deserialize<'de> for FullName {
 
 #[cfg(test)]
 mod deserialize_tests {
-    use super::FullName;
+    use crate::names::FullName;
 
     #[test]
     fn rejects_catalog_without_schema() {

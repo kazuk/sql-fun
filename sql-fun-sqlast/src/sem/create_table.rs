@@ -1,21 +1,17 @@
 mod column_def;
-mod column_name;
-mod table_name;
-mod view_name;
 
-pub use self::{
-    column_def::ColumnDefinition, column_name::ColumnName, table_name::TableName,
-    view_name::ViewName,
-};
+pub use self::column_def::ColumnDefinition;
+use crate::names::{ColumnName, TableName};
 use sql_fun_core::IVec;
 use std::collections::HashMap;
 
 use crate::{
     ast::TryFromWithTokens,
     context::{GetSourcePathWithSpan, ParseContext},
+    names::FullName,
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
-        ImplicitChange, InsertArbiter, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
+        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, ImplicitChange,
+        InsertArbiter, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
         SourcePathWithSpan, TriggerReferences, alter_table::AlterObjSubCommand,
     },
     syn::{ListOpt, Opt, ScanToken},
@@ -232,7 +228,10 @@ impl ColumnCollection {
 
 #[cfg(test)]
 mod column_collection_tests {
-    use super::{ColumnCollection, ColumnDefinition, ColumnName};
+    use {
+        super::{ColumnCollection, ColumnDefinition},
+        crate::names::ColumnName,
+    };
 
     #[test]
     fn names_keep_order_and_duplicates_without_unnamed_columns() {
@@ -299,10 +298,7 @@ pub struct CreateTable {
 mod test_create_table_clone {
     use crate::context::BaseParseContext;
     use crate::test_helpers::TestParseContext;
-    use crate::{
-        context::TableInfoWrite,
-        sem::{ColumnName, ParseContext},
-    };
+    use crate::{context::TableInfoWrite, names::ColumnName, sem::ParseContext};
     use std::path::Path;
 
     #[test]
@@ -325,10 +321,12 @@ mod test_create_table_clone {
     }
 
     mod test_helpers {
-        use crate::sem::{
-            AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, ColumnName,
-            Constraint, CreateTable, CreateTableMode, FullName, PgBuiltInType,
-            PrimaryKeyConstraint, TableName,
+        use crate::{
+            names::{ColumnName, FullName, TableName},
+            sem::{
+                AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, Constraint,
+                CreateTable, CreateTableMode, PgBuiltInType, PrimaryKeyConstraint,
+            },
         };
 
         pub(super) fn table_with_primary_key() -> Result<CreateTable, AnalysisError> {
@@ -710,7 +708,7 @@ impl CreateTable {
 
 #[cfg(test)]
 mod test_primary_key_columns {
-    use crate::{context::TableInfoRead, sem::ColumnName, test_helpers::foreign_keys as fk};
+    use crate::{context::TableInfoRead, names::ColumnName, test_helpers::foreign_keys as fk};
 
     #[rstest::rstest]
     #[case::unnamed_inline("id integer PRIMARY KEY", vec![ColumnName::from("id")])]
@@ -785,7 +783,8 @@ impl CreateTable {
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_columns_and_constraint {
     use crate::{
-        sem::{CreateTableMode, SchemaName, SourcePathWithSpan},
+        names::SchemaName,
+        sem::{CreateTableMode, SourcePathWithSpan},
         syn::sqlite::{CreateTableBody, Stmt},
         test_helpers::{
             SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
@@ -879,7 +878,8 @@ mod test_analyze_create_table {
     use crate::context::BaseParseContext;
     use crate::{
         AstAndContextPair,
-        sem::{CreateTableMode, FullName, SchemaName, SemAst, SourcePathWithSpan, TableName},
+        names::{FullName, SchemaName, TableName},
+        sem::{CreateTableMode, SemAst, SourcePathWithSpan},
         syn::sqlite::Stmt,
         test_helpers::{
             SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,

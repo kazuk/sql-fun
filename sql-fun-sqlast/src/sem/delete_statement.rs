@@ -11,9 +11,12 @@ pub use self::view_support::ViewDeleteSupport;
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection, SemAst,
-    SemScalarExpr, TableName,
+use crate::{
+    names::TableName,
+    sem::{
+        AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection, SemAst,
+        SemScalarExpr,
+    },
 };
 
 /// An analyzed DELETE, including its destination, sources and RETURNING outputs.

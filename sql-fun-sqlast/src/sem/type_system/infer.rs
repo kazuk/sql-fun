@@ -168,7 +168,10 @@ impl SimpleInferContext {
 #[cfg(test)]
 mod test_simple_infer_context {
     use crate::sem::type_system::infer::SimpleInferContext;
-    use crate::sem::{FullName, TypeReference, type_system::TypeError};
+    use crate::{
+        names::FullName,
+        sem::{TypeReference, type_system::TypeError},
+    };
 
     use ::testresult::TestResult;
 
@@ -415,10 +418,11 @@ impl CommonInferContext {
 #[cfg(test)]
 mod test_common_infer_context {
     use crate::sem::type_system::infer::CommonInferContext;
-    use crate::sem::{
-        CastContext, CastDefinition, FullName, TypeReference, type_system::TypeError,
-    };
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::FullName,
+        sem::{CastContext, CastDefinition, TypeReference, type_system::TypeError},
+    };
 
     use std::collections::HashSet;
 

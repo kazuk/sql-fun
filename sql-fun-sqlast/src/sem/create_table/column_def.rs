@@ -2,10 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     ast::TryFromWithTokens,
-    sem::{
-        AnalysisError, ColumnConstraint, ColumnName, ParseContext, SemScalarExpr, TableName,
-        TypeReference,
-    },
+    names::{ColumnName, TableName},
+    sem::{AnalysisError, ColumnConstraint, ParseContext, SemScalarExpr, TypeReference},
     syn::ScanToken,
 };
 
@@ -225,7 +223,7 @@ impl Clone for ColumnDefinition {
 impl ColumnDefinition {
     pub(crate) fn replace_view_default(
         &mut self,
-        view: &crate::sem::FullName,
+        view: &crate::names::FullName,
         value: &SemScalarExpr,
     ) {
         self.constraints
@@ -363,7 +361,8 @@ mod test_sqlite_column_definition {
     use super::{ColumnConstraint, ColumnDefinition};
     use crate::{
         SqliteToken,
-        sem::{FullName, SchemaName, SemScalarExpr, TableName, TypeReference},
+        names::{FullName, SchemaName, TableName},
+        sem::{SemScalarExpr, TypeReference},
         sqlite::SqliteDialect,
         syn::sqlite::CreateTableBody,
         test_helpers::TestParseContext,

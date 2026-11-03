@@ -2,14 +2,15 @@ use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
     context::{ParseContext, SequenceInfoRead, SequenceInfoWrite},
-    sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence, FullName},
+    names::FullName,
+    sem::{AlterSequence, AnalysisError, AnalysisProblem, CreateSequence},
 };
 
 #[derive(Clone, Debug, Default)]
 pub struct SequenceInfoCollection(TrieMap<CreateSequence>);
 
 impl SequenceInfoCollection {
-    fn owned_by(&self, table: &crate::sem::TableName) -> Vec<CreateSequence> {
+    fn owned_by(&self, table: &crate::names::TableName) -> Vec<CreateSequence> {
         self.0
             .iter()
             .filter(|(_, definition)| definition.owned_by() == Some(table))
@@ -27,7 +28,7 @@ impl SequenceInfoCollection {
 }
 
 impl SequenceInfoRead for SchemaCatalog {
-    fn sequences_owned_by(&self, table: &crate::sem::TableName) -> Vec<CreateSequence> {
+    fn sequences_owned_by(&self, table: &crate::names::TableName) -> Vec<CreateSequence> {
         let mut sequences = self.sequences.owned_by(table);
         for inherited in self.base.sequences_owned_by(table) {
             if self.sequences.get(inherited.name()).is_none() {

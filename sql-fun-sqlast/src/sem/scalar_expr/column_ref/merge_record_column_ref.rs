@@ -1,7 +1,10 @@
-use crate::sem::{
-    ColumnDefinition, ColumnName, TypeReference,
-    data_source::MergeRecordRole,
-    scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr},
+use crate::{
+    names::ColumnName,
+    sem::{
+        ColumnDefinition, TypeReference,
+        data_source::MergeRecordRole,
+        scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr},
+    },
 };
 
 /// A MERGE record column that retains its resolved relation binding.
@@ -15,7 +18,7 @@ pub struct MergeRecordColumnRef {
 impl MergeRecordColumnRef {
     pub(super) fn with_reference_name(
         mut self,
-        alias: &crate::sem::AliasName,
+        alias: &crate::names::AliasName,
         column: &ColumnName,
     ) -> Self {
         self.source = Box::new((*self.source).with_reference_name(alias, column));

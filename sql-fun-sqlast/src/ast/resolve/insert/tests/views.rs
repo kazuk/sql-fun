@@ -1,7 +1,10 @@
 use crate::ast::Dialect;
 use crate::context::BaseParseContext;
 use crate::context::ParseContext;
-use crate::sem::{ColumnName, FullName, PgBuiltInType, SemAst, ViewInsertSupport, ViewLike};
+use crate::{
+    names::{ColumnName, FullName},
+    sem::{PgBuiltInType, SemAst, ViewInsertSupport, ViewLike},
+};
 
 #[rstest::rstest]
 #[case::values("INSERT INTO writable_items(id) VALUES (1) RETURNING *", 2)]
@@ -211,7 +214,7 @@ mod test_helpers {
         };
         let support = if sql.contains("/* identity */") {
             let definition = context
-                .get_table(&crate::sem::TableName::from(FullName::with_schema(
+                .get_table(&crate::names::TableName::from(FullName::with_schema(
                     "public",
                     "identity_items",
                 )))
@@ -244,7 +247,7 @@ mod test_helpers {
         context.set_view_insert_support(&name, &support);
         // A later same-named table must not hide the earlier view.
         let later_table = context
-            .get_table(&crate::sem::TableName::from(FullName::with_schema(
+            .get_table(&crate::names::TableName::from(FullName::with_schema(
                 "public", "items",
             )))
             .unwrap()
@@ -254,11 +257,11 @@ mod test_helpers {
             &Some(later_table),
         );
         context.set_search_path(&[
-            crate::sem::SchemaName::from("public"),
-            crate::sem::SchemaName::from("later"),
+            crate::names::SchemaName::from("public"),
+            crate::names::SchemaName::from("later"),
         ]);
         if sql.contains("ON CONFLICT(id)") && dialect == Dialect::postgres() {
-            context.expect_conflict_target(&crate::sem::TableName::from(FullName::with_schema(
+            context.expect_conflict_target(&crate::names::TableName::from(FullName::with_schema(
                 "public", "items",
             )));
             context.expect_conflict_modifiers(

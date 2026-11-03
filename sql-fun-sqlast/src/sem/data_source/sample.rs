@@ -1,6 +1,9 @@
-use crate::sem::{
-    AnalysisError, AnalysisProblem, DataSource, FullName, ParseContext, SamplingMethodLookup,
-    SemScalarExpr, TypeReference, problem::TableSampleProblem, traversal::SemanticVisitorMut,
+use crate::{
+    names::FullName,
+    sem::{
+        AnalysisError, AnalysisProblem, DataSource, ParseContext, SamplingMethodLookup,
+        SemScalarExpr, TypeReference, problem::TableSampleProblem, traversal::SemanticVisitorMut,
+    },
 };
 
 /// A sampled relation with its completed method lookup and analyzed inputs.
@@ -108,8 +111,11 @@ impl TableSampleSource {
 
 #[cfg(test)]
 mod test_sampling_semantics {
-    use crate::sem::{FullName, ParseContext, PgBuiltInType, SamplingMethodLookup};
     use crate::test_helpers::sampling::{context, query, sources};
+    use crate::{
+        names::FullName,
+        sem::{ParseContext, PgBuiltInType, SamplingMethodLookup},
+    };
     use std::collections::BTreeMap;
 
     #[rstest::rstest]
@@ -399,8 +405,8 @@ mod test_sampling_semantics {
             &FullName::with_schema("pg_catalog", "system")
         );
         context.set_get_search_path_result(&[
-            crate::sem::SchemaName::from("public"),
-            crate::sem::SchemaName::from("pg_catalog"),
+            crate::names::SchemaName::from("public"),
+            crate::names::SchemaName::from("pg_catalog"),
         ]);
         let selected = query(
             "SELECT * FROM sampled TABLESAMPLE system('x')",

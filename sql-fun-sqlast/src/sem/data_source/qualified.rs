@@ -1,9 +1,10 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasName, AnalysisError, ColumnName, DataSource, FullName, SemScalarExpr, TypeReference,
-        WholeRowExpr, WholeRowFields, WildcardQualifier, WildcardQualifiers, WildcardTypedRecord,
-        WithClause, data_source::MergeRecordRole,
+        AnalysisError, DataSource, SemScalarExpr, TypeReference, WholeRowExpr, WholeRowFields,
+        WildcardQualifier, WildcardQualifiers, WildcardTypedRecord, WithClause,
+        data_source::MergeRecordRole,
     },
 };
 

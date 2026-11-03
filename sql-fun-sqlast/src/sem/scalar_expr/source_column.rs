@@ -1,4 +1,7 @@
-use crate::sem::{AliasName, AnalysisError, ColumnName, SemScalarExpr};
+use crate::{
+    names::{AliasName, ColumnName},
+    sem::{AnalysisError, SemScalarExpr},
+};
 
 /// A completed FROM-column binding backed by an analyzed expression.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

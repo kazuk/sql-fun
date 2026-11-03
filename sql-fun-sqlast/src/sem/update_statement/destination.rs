@@ -1,7 +1,10 @@
 use crate::sem::search_path::expand_relation_search_path;
-use crate::sem::{
-    AnalysisError, ColumnDefinition, ColumnName, ParseContext, TableName, ViewLike,
-    ViewMergeSupport, ViewUpdateSupport,
+use crate::{
+    names::{ColumnName, TableName},
+    sem::{
+        AnalysisError, ColumnDefinition, ParseContext, ViewLike, ViewMergeSupport,
+        ViewUpdateSupport,
+    },
 };
 
 /// UPDATE-owned projection of existing relation definitions.
@@ -25,7 +28,7 @@ impl UpdateDestination {
             return Self::resolve(context, &name);
         }
         let view = context
-            .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+            .get_view(&crate::names::ViewName::from_full_name(name.full_name()))
             .expect("resolved view");
         Self::from_rule_view(&name, view).map(Some)
     }
@@ -55,7 +58,7 @@ impl UpdateDestination {
     }
     fn resolve_at(
         context: &mut impl ParseContext,
-        key: &crate::sem::FullName,
+        key: &crate::names::FullName,
     ) -> Result<Option<Self>, AnalysisError> {
         let canonical;
         let key = if context.dialect() == crate::ast::Dialect::sqlite() {
@@ -80,7 +83,7 @@ impl UpdateDestination {
             }));
         }
         if context
-            .get_view(&crate::sem::ViewName::from_full_name(key))
+            .get_view(&crate::names::ViewName::from_full_name(key))
             .is_some()
         {
             return Self::from_view(context, key);
@@ -89,10 +92,10 @@ impl UpdateDestination {
     }
     fn from_view(
         context: &mut impl ParseContext,
-        key: &crate::sem::FullName,
+        key: &crate::names::FullName,
     ) -> Result<Option<Self>, AnalysisError> {
         let view = context
-            .get_view(&crate::sem::ViewName::from_full_name(key))
+            .get_view(&crate::names::ViewName::from_full_name(key))
             .expect("resolved view");
         let (columns, support) = if view.is_materialized() {
             (Vec::new(), ViewUpdateSupport::read_only())

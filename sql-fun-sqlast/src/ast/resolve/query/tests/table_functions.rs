@@ -315,7 +315,10 @@ fn keeps_schema_qualified_and_array_field_types() {
 #[test]
 fn keeps_selected_overload_separate_from_output_definitions() {
     use crate::context::BaseParseContext;
-    use crate::sem::{AliasName, ColumnName, DataSource, FullName};
+    use crate::{
+        names::{AliasName, ColumnName, FullName},
+        sem::DataSource,
+    };
     let (query, context) =
         table_function_query("SELECT r.a FROM overloaded_record(1) AS r(a text)", false);
     assert_eq!(
@@ -382,7 +385,7 @@ fn preserves_ordinality_and_join_nullability(#[case] sql: &str, #[case] not_null
     assert_eq!(output_type(&query, "n"), Some(PgBuiltInType::int8()));
     assert_eq!(
         query
-            .get_result_column_def(&crate::sem::ColumnName::from("n"))
+            .get_result_column_def(&crate::names::ColumnName::from("n"))
             .unwrap()
             .is_not_null(),
         not_null
@@ -395,7 +398,7 @@ fn preserves_ordinality_and_join_nullability(#[case] sql: &str, #[case] not_null
 #[case::unknown_type("SELECT 1 FROM record_fun('') r(a missing)")]
 #[case::deferred_missing("SELECT 1 FROM record_fun(src => '') r")]
 fn retains_invalid_definition_state_after_serialization(#[case] sql: &str) {
-    use crate::sem::{AliasName, DataSource};
+    use crate::{names::AliasName, sem::DataSource};
     let (query, context) = table_function_query(sql, false);
     assert!(context.reported_problem_count() > 0);
     let source = query
@@ -438,7 +441,7 @@ fn qualified_star_expands_only_its_selected_source(#[case] sql: &str) {
 #[test]
 fn table_row_returns_do_not_inherit_storage_constraints() {
     use crate::context::BaseParseContext;
-    use crate::sem::{ColumnName, FullName, TableName};
+    use crate::names::{ColumnName, FullName, TableName};
     let (query, context) = table_function_query("SELECT r.a FROM row_fun() r", false);
     assert_eq!(
         context.reported_problem_count(),
@@ -486,7 +489,7 @@ fn retains_and_interprets_record_typmods(
     #[case] expected: i32,
     #[values(false, true)] rows: bool,
 ) {
-    use crate::sem::{AliasName, DataSource};
+    use crate::{names::AliasName, sem::DataSource};
     let sql = if rows {
         format!("SELECT r.* FROM ROWS FROM(record_fun('') AS(a {declared})) r")
     } else {
@@ -561,7 +564,10 @@ fn diagnoses_invalid_record_typmods(#[case] declared: &str) {
 
 #[test]
 fn retains_extension_typmods_without_applying_builtin_rules() {
-    use crate::sem::{AliasName, ColumnName, DataSource};
+    use crate::{
+        names::{AliasName, ColumnName},
+        sem::DataSource,
+    };
     let (query, context) = table_function_query(
         "SELECT r.a FROM record_fun(src => '') r(a public.custom_type(Point,4326))",
         false,
@@ -594,7 +600,10 @@ fn retains_extension_typmods_without_applying_builtin_rules() {
 
 #[test]
 fn preserves_distinct_rows_function_names_with_equal_signatures() {
-    use crate::sem::{AliasName, DataSource, FullName, QueryNameResolution};
+    use crate::{
+        names::{AliasName, FullName},
+        sem::{DataSource, QueryNameResolution},
+    };
     let (query, context) = table_function_query(
         "SELECT r.* FROM ROWS FROM(record_fun('') AS(a int),overloaded_record('') AS(b int)) r",
         false,

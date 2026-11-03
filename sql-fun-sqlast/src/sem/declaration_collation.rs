@@ -136,7 +136,8 @@ mod tests {
     use super::DeclarationCollation;
     use crate::{
         context::{BaseParseContext, TypeInfoRead},
-        sem::{CatalogNameLookup, FullName, TableName, TypeDefinition, TypeReference},
+        names::{FullName, TableName},
+        sem::{CatalogNameLookup, TypeDefinition, TypeReference},
         test_helpers::{
             TestParseContext, collate, declaration_collation::context,
             ownership::apply_ownership_sql,

@@ -60,12 +60,12 @@ use sql_fun_core::{IVec, analysis_problem::AnalysisProblem};
 
 use crate::{
     StringSpan,
+    names::{FullName, SchemaName, TableName},
     sem::{
         AliasSpec, AlterIndex, AlterOwner, AnalysisError, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, DataSource, FullName, Kind, OwnedObjectDefinition, Role,
-        SchemaName, SemScalarExpr, TableName, VariableSet, problem::CreationProblem,
-        type_system::ArgumentBindingCollection,
+        CreateTable, CursorInfo, DataSource, Kind, OwnedObjectDefinition, Role, SemScalarExpr,
+        VariableSet, problem::CreationProblem, type_system::ArgumentBindingCollection,
     },
 };
 

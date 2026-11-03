@@ -1,8 +1,5 @@
 use std::{fmt::Display, ops::Deref};
 
-#[cfg(feature = "sqlite")]
-use crate::sem::AnalysisError;
-
 /// part of name for schema specific local name
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -38,14 +35,5 @@ impl Deref for LocalName {
 
     fn deref(&self) -> &Self::Target {
         self.0.as_ref()
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::Name> for LocalName {
-    type Error = AnalysisError;
-
-    fn try_from(value: &crate::syn::sqlite::Name) -> Result<Self, Self::Error> {
-        Ok(Self::from(value.value()))
     }
 }

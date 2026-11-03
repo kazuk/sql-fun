@@ -2,10 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     ast::TryFromWithTokens,
-    sem::{
-        AnalysisError, ColumnDefinition, ColumnName, FullName, FunctionParam, ParseContext,
-        TypeReference,
-    },
+    names::{ColumnName, FullName},
+    sem::{AnalysisError, ColumnDefinition, FunctionParam, ParseContext, TypeReference},
     syn::{FunctionParameterMode, Opt, ScanToken},
 };
 
@@ -34,7 +32,8 @@ mod test_function_param_analyze {
     use testresult::TestResult;
 
     use crate::{
-        sem::{FullName, FunctionParam, LocalName, SchemaName, TypeDefinition},
+        names::{FullName, LocalName, SchemaName},
+        sem::{FunctionParam, TypeDefinition},
         syn::FunctionParameterMode,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
@@ -111,7 +110,8 @@ mod test_function_param_analyze_as_column_definition {
     use testresult::TestResult;
 
     use crate::{
-        sem::{FullName, FunctionParam, LocalName, SchemaName, TypeDefinition},
+        names::{FullName, LocalName, SchemaName},
+        sem::{FunctionParam, TypeDefinition},
         syn::FunctionParameterMode,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };

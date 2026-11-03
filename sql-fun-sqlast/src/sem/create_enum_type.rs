@@ -1,6 +1,9 @@
 use crate::{sem::AstAndContextPair, syn::ListOpt};
 
-use super::{AnalysisError, FullName, ParseContext, SemAst, TypeReference};
+use {
+    super::{AnalysisError, ParseContext, SemAst, TypeReference},
+    crate::names::FullName,
+};
 
 /// analyzed [`crate::syn::CreateEnumStmt`]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -1,7 +1,7 @@
 //! Maintained SQL-to-catalog column-rename transitions.
 use crate::{
     context::{GetSourcePathWithSpan, ParseContext, TableInfoRead, ViewInfoRead},
-    sem::{ColumnName, SchemaName},
+    names::{ColumnName, SchemaName},
     test_helpers::{
         column_rename::{name, schema},
         ownership::apply_ownership_sql,
@@ -238,7 +238,7 @@ fn sqlite_view_outputs_follow_unaliased_names(
     assert!(result.context().problems().is_empty());
     let view = result
         .context()
-        .get_view_impl(&crate::sem::FullName::with_schema("main", "v"))
+        .get_view_impl(&crate::names::FullName::with_schema("main", "v"))
         .unwrap();
     assert_eq!(
         view.result_columns().names(),
@@ -305,7 +305,7 @@ fn sqlite_checks_rewritten_namespaces_before_publication(
     );
     let table = result
         .context()
-        .get_table_impl(&crate::sem::FullName::with_schema("main", "t"))
+        .get_table_impl(&crate::names::FullName::with_schema("main", "t"))
         .unwrap();
     assert_eq!(table.has_column(&ColumnName::from("a")), rejected);
     Ok(())
@@ -331,7 +331,7 @@ fn table_keys_indexes_and_fk_source_columns_follow_the_rename() -> testresult::T
         fk.target_columns(),
         Some([ColumnName::from("id")].as_slice())
     );
-    let indexes = context.indexes_for_table(&crate::sem::TableName::from(name("t")));
+    let indexes = context.indexes_for_table(&crate::names::TableName::from(name("t")));
     assert_eq!(indexes.len(), 2);
     assert!(
         indexes
@@ -415,7 +415,7 @@ fn sqlite_rejects_a_broken_dependent_view_atomically() -> testresult::TestResult
     assert!(!result.ast().alter_table_statement().unwrap().can_apply());
     let view = result
         .context()
-        .get_view_impl(&crate::sem::FullName::with_schema("main", "v1"))
+        .get_view_impl(&crate::names::FullName::with_schema("main", "v1"))
         .unwrap();
     assert_eq!(view.result_columns().names(), vec![ColumnName::from("a")]);
     Ok(())
@@ -466,7 +466,8 @@ fn triggers_and_rules_follow_bindings_without_changing_names_or_parent() -> test
 fn sqlite_trigger_event_and_body_bindings_follow_rename() -> testresult::TestResult {
     use crate::{
         context::TriggerInfoRead,
-        sem::{FullName, SemAst, TriggerIdentity},
+        names::FullName,
+        sem::{SemAst, TriggerIdentity},
         test_helpers::column_rename::{bound_columns, sqlite, sqlite_schema},
     };
     let statements = [
@@ -542,7 +543,7 @@ fn an_unresolved_foreign_key_is_not_bound_by_a_later_rename() -> testresult::Tes
 #[case::cte("CREATE VIEW v2 AS WITH q AS (SELECT a FROM t) SELECT * FROM q")]
 fn sqlite_expanded_outputs_follow_their_source(#[case] view: &str) -> testresult::TestResult {
     use crate::{
-        sem::FullName,
+        names::FullName,
         test_helpers::column_rename::{sqlite, sqlite_schema},
     };
     let statements = [

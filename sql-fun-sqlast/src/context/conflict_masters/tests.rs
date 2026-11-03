@@ -3,8 +3,7 @@ use crate::context::ConflictMasters;
 #[cfg(feature = "sqlite")]
 use crate::context::{BaseParseContext, ParseContext, SchemaFileContext};
 use crate::{
-    context::ConflictInfoRead,
-    sem::{CollationIdentity, FullName},
+    context::ConflictInfoRead, names::FullName, sem::CollationIdentity,
     test_helpers::conflict_masters as test_helpers,
 };
 

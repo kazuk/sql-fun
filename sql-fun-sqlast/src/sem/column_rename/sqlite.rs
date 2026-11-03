@@ -1,9 +1,10 @@
 //! SQLite validates the rewritten namespaces before committing a schema rename.
 use crate::{
     context::ParseContext,
+    names::{ColumnName, FullName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, ColumnRename, FullName,
-        QueryProblem, SemScalarExpr, ViewLike, traversal::SemanticVisitorMut,
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnRename, QueryProblem, SemScalarExpr,
+        ViewLike, traversal::SemanticVisitorMut,
     },
 };
 use std::collections::HashMap;

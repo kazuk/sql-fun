@@ -8,10 +8,10 @@ mod test_helpers;
 use self::test_helpers::postgres;
 
 use crate::ast::{StatementNode, TryFromWithTokens};
-use crate::sem::{ColumnName, PgBuiltInType};
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::TestParseContext;
 use crate::test_helpers::{SynBuilder, source_span};
+use crate::{names::ColumnName, sem::PgBuiltInType};
 
 use ::sql_fun_core::IVec;
 
@@ -160,8 +160,8 @@ fn public_sqlite_table_dispatch_preserves_column_semantics(
         .parse_as_stmt("create table items (label text not null default 'one')");
     let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
     context.set_get_search_path_result(&[
-        crate::sem::SchemaName::from("public"),
-        crate::sem::SchemaName::from("pg_catalog"),
+        crate::names::SchemaName::from("public"),
+        crate::names::SchemaName::from("pg_catalog"),
     ]);
     context.setup_type(crate::sem::PgBuiltInType::text());
     context.set_source_path_with_span(&source_span);
@@ -400,7 +400,8 @@ mod sqlite {
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::{ColumnName, PgBuiltInType, SemAst},
+        names::ColumnName,
+        sem::{PgBuiltInType, SemAst},
     };
 
     use ::sql_fun_core::IVec;

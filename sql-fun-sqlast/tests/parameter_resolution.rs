@@ -86,7 +86,8 @@ fn real_catalog_contexts_produce_constraints(
 fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::{
         context::{CastInfoRead, SchemaFileContext},
-        sem::{FullName, TypeReference},
+        names::FullName,
+        sem::TypeReference,
     };
     let mut cache_context = crate::test_helpers::create_cache_context();
     let definition = parse_statements(

@@ -1,4 +1,7 @@
-use crate::sem::{ColumnDefinition, ColumnName, Nullable, TypeReference, data_source::AliasName};
+use crate::{
+    names::{AliasName, ColumnName},
+    sem::{ColumnDefinition, Nullable, TypeReference},
+};
 
 /// column reference for sub-query
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -86,7 +89,7 @@ impl SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

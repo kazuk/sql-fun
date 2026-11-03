@@ -1,30 +1,10 @@
 use crate::{
-    sem::{AnalysisError, ColumnName, FullName, ParseContext},
+    names::{AliasName, ColumnName, FullName},
+    sem::{AnalysisError, ParseContext},
     syn::ListOpt,
 };
 
 use ::itertools::Itertools;
-
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct AliasName(String);
-
-impl std::fmt::Display for AliasName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<&str> for AliasName {
-    fn from(value: &str) -> Self {
-        Self(String::from(value))
-    }
-}
-
-impl AliasName {
-    pub const fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
 
 /// alias name in from clause
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -38,8 +18,8 @@ pub struct AliasSpec {
 impl AliasSpec {
     pub(crate) fn visible_column_names(
         &self,
-        columns: &[crate::sem::ColumnName],
-    ) -> Vec<crate::sem::ColumnName> {
+        columns: &[crate::names::ColumnName],
+    ) -> Vec<crate::names::ColumnName> {
         columns
             .iter()
             .enumerate()
@@ -50,8 +30,8 @@ impl AliasSpec {
     pub(super) fn projection_name(
         &self,
         index: usize,
-        original: &crate::sem::ColumnName,
-    ) -> crate::sem::ColumnName {
+        original: &crate::names::ColumnName,
+    ) -> crate::names::ColumnName {
         self.derived_column_at(index).unwrap_or(original).clone()
     }
 
@@ -85,7 +65,7 @@ impl AliasSpec {
     #[must_use]
     pub fn from_local_name(local_name: &str) -> Self {
         Self {
-            alias_name: AliasName(String::from(local_name)),
+            alias_name: AliasName::from(local_name),
             derived_column_names: Vec::new(),
             explicit: false,
         }
@@ -116,7 +96,7 @@ impl AliasSpec {
         };
         Ok((
             Self {
-                alias_name: AliasName(alias_name),
+                alias_name: AliasName::from(alias_name.as_str()),
                 derived_column_names: col_names,
                 explicit: !alias.get_aliasname().is_empty(),
             },
@@ -146,7 +126,7 @@ impl AliasSpec {
         };
         Ok((
             Self {
-                alias_name: AliasName(alias_name),
+                alias_name: AliasName::from(alias_name.as_str()),
                 derived_column_names: col_names,
                 explicit: !alias.get_aliasname().is_empty(),
             },

@@ -411,7 +411,7 @@ impl CaseExpr {
             return Ok(());
         };
         for arm in &mut self.when_exprs {
-            let name = crate::sem::OperatorName::from_parts(None, "=");
+            let name = crate::names::OperatorName::from_parts(None, "=");
             let binding = crate::sem::ResolvedOperator::resolve(context, &name, true, true);
             let (mut comparison, _) = crate::sem::ArithExpr::build_op(
                 context,

@@ -1,9 +1,10 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
+    names::SchemaName,
     sem::{
-        CastContext, CastDefinition, ParseContext, PgBuiltInType, SchemaName, SourcePathWithSpan,
-        TypeCategory, TypeDefinition, TypeReference,
+        CastContext, CastDefinition, ParseContext, PgBuiltInType, SourcePathWithSpan, TypeCategory,
+        TypeDefinition, TypeReference,
     },
     test_helpers::TestParseContext,
 };
@@ -85,5 +86,5 @@ pub(super) fn expression(query: &crate::sem::SelectStatement) -> &crate::sem::Se
 }
 
 pub(super) fn bool_domain() -> TypeReference {
-    TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "flag"))
+    TypeReference::from_full_name(crate::names::FullName::with_schema("public", "flag"))
 }

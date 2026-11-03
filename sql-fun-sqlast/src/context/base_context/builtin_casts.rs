@@ -6,7 +6,8 @@ use std::{
 use crate::{
     TrieMap,
     context::{CastInfoRead, TypeInfoRead},
-    sem::{AnalysisError, CastContext, CastDefinition, FullName, TypeReference},
+    names::FullName,
+    sem::{AnalysisError, CastContext, CastDefinition, TypeReference},
 };
 
 /// Loads builtin cast definitions from the selected master file.
@@ -269,7 +270,8 @@ impl super::BaseContext {
 mod test_builtin_cast_identity {
     use crate::{
         context::{BaseContext, CastInfoRead, FrozenBaseContext, SchemaFileContext},
-        sem::{FullName, TypeReference},
+        names::FullName,
+        sem::TypeReference,
     };
     use ::clap::Parser;
     use ::sql_fun_core::SqlFunArgs;

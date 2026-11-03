@@ -3,9 +3,10 @@ use crate::context::ParseContext;
 use crate::syn::Opt;
 use crate::{
     context::{OwnershipInfoRead, RoleInfoRead, TableInfoRead, TypeInfoRead},
+    names::{FullName, SchemaName, TableName},
     sem::{
-        AlterOwner, FullName, ObjectKind, OwnedObjectDefinition, OwnerSpecification,
-        OwnershipIdentity, Role, SchemaName, TableName, TypeReference,
+        AlterOwner, ObjectKind, OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, Role,
+        TypeReference,
     },
     test_helpers::{
         SynBuilder,

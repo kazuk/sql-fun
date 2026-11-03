@@ -1,4 +1,7 @@
-use crate::sem::{FullName, ObjectKind, OwnedObjectDefinition, Role};
+use crate::{
+    names::FullName,
+    sem::{ObjectKind, OwnedObjectDefinition, Role},
+};
 
 /// Exact-name role lookup supplied by the explicitly selected analysis environment.
 pub trait RoleInfoRead {

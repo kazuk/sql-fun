@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use ::sql_fun_server_api::payloads::ContextHandle;
 use ::sql_fun_sqlast::context::BaseParseContext;
-use ::sql_fun_sqlast::sem::{FullName, TableName};
+use ::sql_fun_sqlast::names::{FullName, TableName};
 
 #[tokio::test]
 async fn registration_resolves_original_schema_and_rejects_unknown_handles() {

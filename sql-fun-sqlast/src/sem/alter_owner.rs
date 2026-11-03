@@ -32,7 +32,7 @@ impl OwnershipLookup {
     }
     pub(crate) fn argument_type_not_found(
         identity: &OwnershipIdentity,
-        names: &[crate::sem::FullName],
+        names: &[crate::names::FullName],
     ) -> Self {
         Self::ArgumentTypeNotFound(OwnershipArgumentFailure {
             identity: identity.clone(),
@@ -40,7 +40,7 @@ impl OwnershipLookup {
         })
     }
     /// Type references whose lookup failed; NONE operator operands are not failures.
-    pub fn unresolved_argument_types(&self) -> &[crate::sem::FullName] {
+    pub fn unresolved_argument_types(&self) -> &[crate::names::FullName] {
         if let Self::ArgumentTypeNotFound(failure) = self {
             &failure.names
         } else {
@@ -102,7 +102,10 @@ impl OwnershipLookup {
 
 #[cfg(test)]
 mod lookup_message_tests {
-    use crate::sem::{FullName, ObjectKind, OwnershipIdentity, OwnershipLookup, PgBuiltInType};
+    use crate::{
+        names::FullName,
+        sem::{ObjectKind, OwnershipIdentity, OwnershipLookup, PgBuiltInType},
+    };
 
     #[test]
     fn failed_lookup_keeps_the_requested_signature() {
@@ -173,7 +176,7 @@ impl AlterOwner {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipArgumentFailure {
     identity: OwnershipIdentity,
-    names: Vec<crate::sem::FullName>,
+    names: Vec<crate::names::FullName>,
 }
 impl OwnershipArgumentFailure {
     /// Requested object identity with successful type bindings retained.
@@ -181,7 +184,7 @@ impl OwnershipArgumentFailure {
         &self.identity
     }
     /// Every missing argument type name in source order.
-    pub fn names(&self) -> &[crate::sem::FullName] {
+    pub fn names(&self) -> &[crate::names::FullName] {
         &self.names
     }
 }

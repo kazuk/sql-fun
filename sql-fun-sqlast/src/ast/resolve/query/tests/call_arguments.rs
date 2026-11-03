@@ -2,9 +2,12 @@
 use super::super::test_helpers::{catalog, resolve};
 use crate::ast::{Dialect, StatementNode};
 use crate::context::ParseContext;
-use crate::sem::{
-    AliasName, AnalysisError, DataSource, FuncCallExpr, FunctionParam, OverloadVariant,
-    PgBuiltInType, QueryNameResolution, SelectStatement, SemScalarExpr,
+use crate::{
+    names::AliasName,
+    sem::{
+        AnalysisError, DataSource, FuncCallExpr, FunctionParam, OverloadVariant, PgBuiltInType,
+        QueryNameResolution, SelectStatement, SemScalarExpr,
+    },
 };
 
 fn projection(query: &SelectStatement) -> &SemScalarExpr {
@@ -42,7 +45,7 @@ fn retains_actuals_in_written_order(#[case] sql: &str, #[case] names: &[Option<&
     assert_eq!(call.args().len(), names.len());
     assert_eq!(
         call.name_resolution(),
-        &QueryNameResolution::function(&crate::sem::FullName::with_schema("public", "identity"))
+        &QueryNameResolution::function(&crate::names::FullName::with_schema("public", "identity"))
     );
     for (index, expected) in (0..names.len()).zip(names) {
         let argument = &call.args()[index];

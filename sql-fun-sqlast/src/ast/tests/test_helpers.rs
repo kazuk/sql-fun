@@ -1,7 +1,10 @@
 use crate::ast::{Query, TryFromWithTokens};
-use crate::sem::{AnalysisError, OperatorDefinition, OperatorName, PgBuiltInType};
 use crate::syn::Opt;
 use crate::test_helpers::{SynBuilder, TestParseContext};
+use crate::{
+    names::OperatorName,
+    sem::{AnalysisError, OperatorDefinition, PgBuiltInType},
+};
 
 use ::sql_fun_core::IVec;
 
@@ -56,7 +59,7 @@ impl AnalysisFixture {
     }
     pub(super) fn with_index_table() -> TestParseContext {
         let mut catalog = Self::context();
-        catalog.set_get_search_path_result(&[crate::sem::SchemaName::from("public")]);
+        catalog.set_get_search_path_result(&[crate::names::SchemaName::from("public")]);
         catalog.setup_table("items", &[], &crate::test_helpers::source_span());
         catalog
     }

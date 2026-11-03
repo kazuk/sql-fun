@@ -1,9 +1,10 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    names::{ColumnName, FullName},
     sem::{
-        AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, FullName, ParseContext,
-        SemScalarExpr, TypeReference,
+        AnalysisError, ColumnCollection, ColumnDefinition, ParseContext, SemScalarExpr,
+        TypeReference,
         create_comp_type::CompositeFieldDefinition,
         type_system::{ArgumentBindingCollection, TypeError},
     },
@@ -48,8 +49,8 @@ pub struct FunctionParamOut {
 impl FunctionParamOut {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let Some(ty) = &mut self.param_type {
             ty.rename_relation(old, new);

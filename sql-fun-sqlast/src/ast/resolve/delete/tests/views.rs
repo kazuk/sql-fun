@@ -1,5 +1,8 @@
 use crate::ast::Dialect;
-use crate::sem::{FullName, ViewDeleteSupport, ViewLike};
+use crate::{
+    names::FullName,
+    sem::{ViewDeleteSupport, ViewLike},
+};
 
 #[rstest::rstest]
 #[case::writable("DELETE FROM writable_items WHERE $1 RETURNING *", true, true, true)]

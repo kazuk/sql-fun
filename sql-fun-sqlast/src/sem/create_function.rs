@@ -2,8 +2,9 @@ use sql_fun_core::IVec;
 
 use crate::{
     ast::TryFromWithTokens,
+    names::FullName,
     sem::{
-        AnalysisError, AstAndContextPair, ColumnCollection, FullName, FunctionOverloadCollection,
+        AnalysisError, AstAndContextPair, ColumnCollection, FunctionOverloadCollection,
         OverloadVariant, ParseContext, type_system::ArgumentBindingCollection,
     },
     syn::ScanToken,
@@ -24,8 +25,8 @@ pub struct CreateFunction {
 impl CreateFunction {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> bool {
         let previous = self.clone();
         self.overloads.rename_relation(old, new);

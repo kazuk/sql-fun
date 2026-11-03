@@ -120,7 +120,7 @@ pub(crate) struct WildcardSourceProjection {
 }
 
 impl WildcardSourceProjection {
-    pub(crate) fn new(alias: &crate::sem::AliasName) -> Self {
+    pub(crate) fn new(alias: &crate::names::AliasName) -> Self {
         Self {
             alias: alias.as_str().to_owned(),
             columns: Vec::new(),
@@ -197,8 +197,8 @@ impl WildcardQualifiers {
     }
     pub(crate) fn reference_for(
         &self,
-        relation: &crate::sem::FullName,
-        alias: &crate::sem::AliasName,
+        relation: &crate::names::FullName,
+        alias: &crate::names::AliasName,
     ) -> Option<&[String]> {
         self.0
             .iter()
@@ -228,19 +228,19 @@ impl WildcardRowsSources {
 /// An already resolved relation occurrence's legal SQL qualifier.
 #[derive(Clone, Debug)]
 pub(crate) struct WildcardQualifier {
-    relation: crate::sem::FullName,
-    alias: crate::sem::AliasName,
+    relation: crate::names::FullName,
+    alias: crate::names::AliasName,
     parts: Vec<String>,
 }
 
 impl WildcardQualifier {
-    fn is_for(&self, relation: &crate::sem::FullName, alias: &crate::sem::AliasName) -> bool {
+    fn is_for(&self, relation: &crate::names::FullName, alias: &crate::names::AliasName) -> bool {
         &self.relation == relation && &self.alias == alias
     }
 
     pub(crate) fn new(
-        relation: &crate::sem::FullName,
-        alias: &crate::sem::AliasName,
+        relation: &crate::names::FullName,
+        alias: &crate::names::AliasName,
         parts: &[String],
     ) -> Self {
         Self {
@@ -249,10 +249,10 @@ impl WildcardQualifier {
             parts: parts.to_vec(),
         }
     }
-    pub(crate) const fn relation(&self) -> &crate::sem::FullName {
+    pub(crate) const fn relation(&self) -> &crate::names::FullName {
         &self.relation
     }
-    pub(crate) const fn alias(&self) -> &crate::sem::AliasName {
+    pub(crate) const fn alias(&self) -> &crate::names::AliasName {
         &self.alias
     }
     pub(crate) fn parts(&self) -> &[String] {
@@ -264,14 +264,14 @@ impl WildcardQualifier {
 #[derive(Clone, Debug)]
 pub(crate) struct WildcardTypedRecord {
     alias: String,
-    relation: crate::sem::FullName,
+    relation: crate::names::FullName,
     column: String,
 }
 
 impl WildcardTypedRecord {
     pub(crate) fn from_table(
-        alias: &crate::sem::AliasName,
-        table: &crate::sem::TableName,
+        alias: &crate::names::AliasName,
+        table: &crate::names::TableName,
         context: &impl crate::sem::ParseContext,
         index: usize,
     ) -> Option<Self> {
@@ -284,8 +284,8 @@ impl WildcardTypedRecord {
     }
 
     pub(crate) fn from_view(
-        alias: &crate::sem::AliasName,
-        view: &crate::sem::ViewName,
+        alias: &crate::names::AliasName,
+        view: &crate::names::ViewName,
         context: &impl crate::sem::ParseContext,
         index: usize,
     ) -> Option<Self> {
@@ -299,7 +299,7 @@ impl WildcardTypedRecord {
     }
 
     pub(crate) fn from_function(
-        alias: &crate::sem::AliasName,
+        alias: &crate::names::AliasName,
         function: &crate::sem::OverloadVariant,
         context: &impl crate::sem::ParseContext,
         index: usize,
@@ -313,9 +313,9 @@ impl WildcardTypedRecord {
     }
 
     pub(crate) fn new(
-        alias: &crate::sem::AliasName,
-        relation: &crate::sem::FullName,
-        column: &crate::sem::ColumnName,
+        alias: &crate::names::AliasName,
+        relation: &crate::names::FullName,
+        column: &crate::names::ColumnName,
     ) -> Self {
         Self {
             alias: alias.as_str().to_owned(),
@@ -326,7 +326,7 @@ impl WildcardTypedRecord {
     pub(crate) fn alias(&self) -> &str {
         &self.alias
     }
-    pub(crate) const fn relation(&self) -> &crate::sem::FullName {
+    pub(crate) const fn relation(&self) -> &crate::names::FullName {
         &self.relation
     }
     pub(crate) fn column(&self) -> &str {
@@ -392,9 +392,9 @@ impl WildcardRowsSource {
     }
 
     pub(crate) fn new(
-        alias: &crate::sem::AliasName,
+        alias: &crate::names::AliasName,
         functions: &[WildcardRowsFunction],
-        output_names: &[crate::sem::ColumnName],
+        output_names: &[crate::names::ColumnName],
         ordinality: bool,
     ) -> Self {
         Self {
@@ -432,7 +432,7 @@ impl WildcardRowsFunction {
         }
     }
 
-    pub(crate) fn from_columns(columns: &[crate::sem::ColumnName]) -> Self {
+    pub(crate) fn from_columns(columns: &[crate::names::ColumnName]) -> Self {
         Self {
             columns: columns.iter().map(ToString::to_string).collect(),
         }

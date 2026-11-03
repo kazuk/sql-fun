@@ -1,6 +1,9 @@
-use crate::sem::{
-    AnalysisError, OperatorName, ParseContext, SemScalarExpr, TypeReference,
-    UnaryOperatorDefinition, scalar_expr::arith_expr::ArithExpr,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, ParseContext, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
+        scalar_expr::arith_expr::ArithExpr,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -37,7 +37,10 @@ use crate::{ast::TryFromWithTokens, syn::ScanToken};
 
 #[cfg(any(test, feature = "sqlite"))]
 use crate::sem::ParseContext;
-use crate::sem::{AnalysisError, ColumnName, TableName};
+use crate::{
+    names::{ColumnName, TableName},
+    sem::AnalysisError,
+};
 
 /// common behavior for column constraints
 pub trait ColumnConstraintTrait {
@@ -575,8 +578,9 @@ impl ColumnConstraint {
 #[cfg(test)]
 mod column_constraint_analyze_constraint_tests {
     use crate::{
+        names::{ColumnName, FullName, TableName},
         sem::{
-            ColumnConstraint, ColumnName, FullName, TableName,
+            ColumnConstraint,
             column_constraints::{ColumnConstraintKind, ColumnConstraintTrait},
         },
         syn::Constraint,

@@ -641,8 +641,9 @@ impl QueryResult {
             let name = access.relation();
             let relation = RelationName::new(
                 name.catalog()
-                    .map(::sql_fun_sqlast::sem::CatalogName::as_str),
-                name.schema().map(::sql_fun_sqlast::sem::SchemaName::as_str),
+                    .map(::sql_fun_sqlast::names::CatalogName::as_str),
+                name.schema()
+                    .map(::sql_fun_sqlast::names::SchemaName::as_str),
                 name.name().as_str(),
             );
             self.accesses.push(ColumnAccess::new(
@@ -652,7 +653,7 @@ impl QueryResult {
                 access
                     .column_name()
                     .as_ref()
-                    .map(::sql_fun_sqlast::sem::ColumnName::as_str),
+                    .map(::sql_fun_sqlast::names::ColumnName::as_str),
             ));
         }
     }

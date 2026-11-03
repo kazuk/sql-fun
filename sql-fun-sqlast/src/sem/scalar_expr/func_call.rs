@@ -1,13 +1,19 @@
 use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, FullName, OverloadVariant, SemScalarExpr, TypeReference,
-    type_system::ArgumentBindingCollection,
+use crate::{
+    names::FullName,
+    sem::{
+        AnalysisError, AnalysisProblem, OverloadVariant, SemScalarExpr, TypeReference,
+        type_system::ArgumentBindingCollection,
+    },
 };
 
 use ::sql_fun_core::IVec;
 
 mod implementation {
-    use crate::sem::{FullName, FunctionParam, OverloadVariant, SemScalarExpr};
+    use crate::{
+        names::FullName,
+        sem::{FunctionParam, OverloadVariant, SemScalarExpr},
+    };
 
     use ::sql_fun_core::IVec;
 
@@ -85,8 +91,8 @@ mod implementation {
     impl FuncCallExpr {
         pub(crate) fn rename_relation(
             &mut self,
-            old: &crate::sem::TableName,
-            new: &crate::sem::TableName,
+            old: &crate::names::TableName,
+            new: &crate::names::TableName,
         ) {
             self.name_resolution.rename_relation(old, new);
             if let Some(overload) = &mut self.overload {
@@ -151,7 +157,10 @@ mod implementation {
     #[cfg(test)]
     mod test_supplied_arguments {
         use super::{FuncCallArgs, FuncCallExpr};
-        use crate::sem::{FullName, FunctionParam, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+        use crate::{
+            names::FullName,
+            sem::{FunctionParam, PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+        };
 
         #[test]
         fn owning_call_assigns_positions_without_losing_known_associations() {
@@ -539,9 +548,9 @@ impl SemScalarExprNode for FuncCallExpr {
 mod test_func_call_expr_analyze_scalar_expr {
     use crate::sem::ScalarAnalysisContext;
     use crate::{
+        names::SchemaName,
         sem::{
-            FromClause, FunctionParam, OverloadVariant, PgBuiltInType, SchemaName, SemScalarExpr,
-            WithClause,
+            FromClause, FunctionParam, OverloadVariant, PgBuiltInType, SemScalarExpr, WithClause,
         },
         syn::{
             KeywordKindOpt, Node, NodeInner, NodeList, ScanToken, ScanTokenBuilder, Token, TokenOpt,
@@ -650,8 +659,9 @@ mod test_func_call_expr_analyze_scalar_expr {
 #[cfg(test)]
 mod test_func_call_expr_cast_operand_expression {
     use crate::{
+        names::FullName,
         sem::{
-            CastContext, CastDefinition, FullName, FunctionParam, OverloadVariant, PgBuiltInType,
+            CastContext, CastDefinition, FunctionParam, OverloadVariant, PgBuiltInType,
             ScalarConstExpr, SemScalarExpr,
         },
         test_helpers::{TestParseContext, test_context},
@@ -731,7 +741,10 @@ mod test_func_call_expr_cast_operand_expression {
 mod test_func_call_expr_is_not_null {
     use crate::sem::scalar_expr::SemScalarExprNode;
     use crate::sem::scalar_expr::func_call::{FuncCallArgs, FuncCallExpr};
-    use crate::sem::{FullName, OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+    use crate::{
+        names::FullName,
+        sem::{OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+    };
 
     use ::sql_fun_core::IVec;
 

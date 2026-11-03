@@ -1,6 +1,7 @@
 use crate::{
     ast::TryFromWithTokens,
-    sem::{AstAndContextPair, FullName, alter_table::AlterObjSubCommand},
+    names::FullName,
+    sem::{AstAndContextPair, alter_table::AlterObjSubCommand},
     syn::Opt,
 };
 
@@ -16,7 +17,7 @@ pub struct AlterSequence {
 }
 
 impl AlterSequence {
-    pub(crate) fn with_owned_by(mut self, relation: Option<&crate::sem::TableName>) -> Self {
+    pub(crate) fn with_owned_by(mut self, relation: Option<&crate::names::TableName>) -> Self {
         self.owned_by = Some(SequenceDependency::from(relation));
         self
     }
@@ -73,15 +74,15 @@ impl AlterSequence {
 
 /// An explicit sequence dependency, distinguishing OWNED BY NONE from an omitted edit.
 #[derive(Clone, Debug)]
-pub struct SequenceDependency(Option<crate::sem::TableName>);
-impl From<Option<&crate::sem::TableName>> for SequenceDependency {
-    fn from(relation: Option<&crate::sem::TableName>) -> Self {
+pub struct SequenceDependency(Option<crate::names::TableName>);
+impl From<Option<&crate::names::TableName>> for SequenceDependency {
+    fn from(relation: Option<&crate::names::TableName>) -> Self {
         Self(relation.cloned())
     }
 }
 impl SequenceDependency {
     /// Bound owning relation; None is the explicit OWNED BY NONE choice.
-    pub const fn relation(&self) -> Option<&crate::sem::TableName> {
+    pub const fn relation(&self) -> Option<&crate::names::TableName> {
         self.0.as_ref()
     }
 }

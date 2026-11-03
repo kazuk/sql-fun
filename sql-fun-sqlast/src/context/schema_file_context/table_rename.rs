@@ -5,10 +5,11 @@ use crate::{
         FunctionInfoRead, IndexInfoRead, ObjectInfoRead, OwnershipInfoRead, ParseContext,
         SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
+    names::{FullName, TableName},
     sem::{
         AlterTable, AnalysisError, CreateFunction, CreateIndex, CreateRule, CreateSequence,
-        CreateTable, CreateTrigger, FullName, OverloadVariant, RuleIdentity, RuleReferences,
-        TableName, TriggerIdentity, TriggerReferences, TypeDefinition, ViewLike,
+        CreateTable, CreateTrigger, OverloadVariant, RuleIdentity, RuleReferences, TriggerIdentity,
+        TriggerReferences, TypeDefinition, ViewLike,
     },
 };
 

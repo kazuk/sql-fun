@@ -1,4 +1,4 @@
-use crate::sem::{FullName, TypeReference};
+use crate::{names::FullName, sem::TypeReference};
 
 /// concrete type with array qualifies
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]

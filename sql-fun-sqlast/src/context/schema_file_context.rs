@@ -31,10 +31,11 @@ use crate::{
         IndexInfoRead, MutSourcePathWithSpan, OperatorInfoRead, ParseContext, SearchPathRead,
         SourceAccessService, TableInfoRead, ViewInfoRead,
     },
+    names::{FullName, OperatorName, SchemaName},
     sem::{
         AnalysisError, AnalysisProblem, CastDefinition, Comment, CreateExtension, CreateIndex,
-        CreateSchema, FullName, ImplicitChange, ObjectKind, OperatorDefinition, OperatorName,
-        SchemaName, SemScalarExpr, SourcePathWithSpan, TypeReference,
+        CreateSchema, ImplicitChange, ObjectKind, OperatorDefinition, SemScalarExpr,
+        SourcePathWithSpan, TypeReference,
     },
 };
 use ::sql_fun_core::SqlFunArgs;
@@ -238,7 +239,7 @@ mod test_schema_file_context {
 }
 
 impl IndexInfoRead for SchemaCatalog {
-    fn indexes_for_table(&self, table: &crate::sem::TableName) -> Vec<&CreateIndex> {
+    fn indexes_for_table(&self, table: &crate::names::TableName) -> Vec<&CreateIndex> {
         let mut indexes = self.base.indexes_for_table(table);
         indexes.retain(|index| !self.indexes.contains(&index.name().to_string()));
         indexes.extend(
@@ -264,7 +265,7 @@ mod test_index_lookup {
     use crate::context::BaseParseContext;
     use crate::{
         context::{IndexInfoRead, ParseContext},
-        sem::FullName,
+        names::FullName,
     };
 
     #[rstest::rstest]
@@ -329,8 +330,8 @@ mod test_index_lookup {
         let parent = layer(&["b", "a"], &[index("a", "parent", "idx")])?.freeze();
         let mut child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent);
         child.set_search_path(&[
-            crate::sem::SchemaName::from("a"),
-            crate::sem::SchemaName::from("b"),
+            crate::names::SchemaName::from("a"),
+            crate::names::SchemaName::from("b"),
         ]);
         child = child.apply_create_index(&index("b", "child", "idx"))?;
         assert_eq!(
@@ -379,7 +380,7 @@ mod test_index_lookup {
     fn quoted_names_do_not_alias_or_shadow_other_indexes() -> testresult::TestResult {
         use crate::{
             context::{IndexInfoRead, ParseContext},
-            sem::{FullName, TableName},
+            names::{FullName, TableName},
         };
         let left = index("a.b", "parent_table", "c");
         let right = index("a", "other_table", "b.c");
@@ -432,7 +433,8 @@ mod test_index_lookup {
     mod test_helpers {
         use crate::{
             context::{ParseContext, SchemaFileContext},
-            sem::{CreateIndex, FullName, IndexElementCollection, SchemaName, TableName},
+            names::{FullName, SchemaName, TableName},
+            sem::{CreateIndex, IndexElementCollection},
             test_helpers::TestParseContext,
         };
         use std::path::Path;
@@ -498,10 +500,7 @@ impl OperatorInfoRead for SchemaCatalog {
 
 #[cfg(test)]
 mod test_operator_layers {
-    use crate::{
-        context::OperatorInfoRead,
-        sem::{OperatorName, PgBuiltInType},
-    };
+    use crate::{context::OperatorInfoRead, names::OperatorName, sem::PgBuiltInType};
 
     #[rstest::rstest]
     #[case::binary(true, true)]
@@ -635,7 +634,8 @@ mod test_diagnostic_context {
     use crate::{
         StringSpan,
         context::{DiagnosticContext, ParseContext},
-        sem::{AnalysisProblem, FullName},
+        names::FullName,
+        sem::AnalysisProblem,
         test_helpers::TestParseContext,
     };
     use std::path::Path;
@@ -1031,7 +1031,7 @@ mod test_freeze {
             BaseParseContext, GetSourcePathWithSpanOpt, ParseContext, SearchPathRead,
             TableInfoWrite,
         },
-        sem::{ColumnName, SchemaName},
+        names::{ColumnName, SchemaName},
     };
     use std::path::Path;
 
@@ -1098,10 +1098,10 @@ mod test_freeze {
     mod test_helpers {
         use crate::{
             context::{FrozenBaseContext, ParseContext, SchemaFileContext, SourceAccessService},
+            names::{ColumnName, FullName, SchemaName, TableName},
             sem::{
-                AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint,
-                CreateTable, CreateTableMode, FullName, PgBuiltInType, PrimaryKeyConstraint,
-                SchemaName, TableName,
+                AlterObjSubCommand, AlterTable, ColumnDefinition, Constraint, CreateTable,
+                CreateTableMode, PgBuiltInType, PrimaryKeyConstraint,
             },
             test_helpers::{TestParseContext, source_span},
         };
@@ -1175,7 +1175,7 @@ mod test_freeze {
 mod test_search_path {
     use crate::{
         context::{BaseParseContext, ParseContext, SearchPathRead},
-        sem::{FullName, SchemaName},
+        names::{FullName, SchemaName},
     };
     use std::path::Path;
 
@@ -1289,10 +1289,8 @@ mod test_search_path {
     mod test_helpers {
         use crate::{
             context::{FrozenBaseContext, ParseContext},
-            sem::{
-                FullName, FunctionOverloadCollection, OverloadVariant, SchemaName, TypeDefinition,
-                TypeReference,
-            },
+            names::{FullName, SchemaName},
+            sem::{FunctionOverloadCollection, OverloadVariant, TypeDefinition, TypeReference},
             test_helpers::TestParseContext,
         };
 
@@ -1332,20 +1330,20 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
     }
     fn collation_definition(
         &self,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
     ) -> Option<&crate::sem::CollationDefinition> {
         self.base.collation_definition(name)
     }
     fn operator_class_definition(
         &self,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
         method: &str,
     ) -> Option<&crate::sem::OperatorClassDefinition> {
         self.base.operator_class_definition(name, method)
     }
     fn lookup_sqlite_collation(
         &self,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
     ) -> crate::sem::CatalogNameLookup {
         self.base.lookup_sqlite_collation(name)
     }
@@ -1361,7 +1359,7 @@ impl crate::context::ConflictInfoRead for SchemaCatalog {
     }
     fn infer_conflict_arbiters(
         &self,
-        table: &crate::sem::TableName,
+        table: &crate::names::TableName,
         conflict: &crate::sem::InsertConflict,
     ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
         crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
@@ -1377,20 +1375,20 @@ impl crate::context::ViewInsertInfoRead for SchemaCatalog {
 impl crate::context::ViewUpdateInfoRead for SchemaCatalog {
     fn view_update_support(
         &self,
-        view: &crate::sem::FullName,
+        view: &crate::names::FullName,
     ) -> Option<&crate::sem::ViewUpdateSupport> {
         self.base.view_update_support(view)
     }
 }
 
 impl crate::context::ViewDeleteInfoRead for SchemaCatalog {
-    fn view_delete_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewDeleteSupport {
+    fn view_delete_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
 impl crate::context::ViewMergeInfoRead for SchemaCatalog {
-    fn view_merge_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewMergeSupport {
+    fn view_merge_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }
 }

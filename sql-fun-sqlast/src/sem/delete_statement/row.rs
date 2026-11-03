@@ -1,4 +1,7 @@
-use crate::sem::{ColumnDefinition, ColumnName, ColumnReferenceExpr, TypeReference};
+use crate::{
+    names::ColumnName,
+    sem::{ColumnDefinition, ColumnReferenceExpr, TypeReference},
+};
 
 /// Row image bound by a PostgreSQL 18 DELETE RETURNING reference.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

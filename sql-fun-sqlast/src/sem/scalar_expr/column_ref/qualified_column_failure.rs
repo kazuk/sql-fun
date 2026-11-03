@@ -1,6 +1,7 @@
 use crate::{
     context::ParseContext,
-    sem::{AnalysisError, AnalysisProblem, ColumnName, FullName, QueryProblem, SemScalarExpr},
+    names::{ColumnName, FullName},
+    sem::{AnalysisError, AnalysisProblem, QueryProblem, SemScalarExpr},
 };
 
 /// A completed failed lookup retaining the logical relation qualifier and column.

@@ -2,8 +2,9 @@ use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
     context::{ParseContext, TableInfoRead, TableInfoWrite},
+    names::{FullName, TableName},
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, TableName,
+        AlterTable, AnalysisError, AnalysisProblem, CreateTable,
         search_path::expand_relation_search_path,
     },
 };
@@ -160,7 +161,8 @@ impl TableInfoWrite for SchemaFileContext {
 mod test_drop_catalog_key {
     use crate::{
         context::{BaseParseContext, ParseContext, TableInfoRead, TableInfoWrite},
-        sem::{DropTable, FullName, TableName},
+        names::{FullName, TableName},
+        sem::DropTable,
     };
 
     #[rstest::rstest]
@@ -206,7 +208,8 @@ mod test_drop_catalog_key {
     mod test_helpers {
         use crate::{
             context::{ParseContext, SchemaFileContext},
-            sem::{AnalysisError, CreateTable, CreateTableMode, FullName, SchemaName, TableName},
+            names::{FullName, SchemaName, TableName},
+            sem::{AnalysisError, CreateTable, CreateTableMode},
         };
 
         pub(super) fn unqualified_tables() -> Result<SchemaFileContext, AnalysisError> {

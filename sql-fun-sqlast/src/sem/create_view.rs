@@ -1,15 +1,18 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    names::ColumnName,
     sem::{
-        AlterView, AstAndContextPair,
-        alter_table::AlterObjSubCommand,
-        create_table::{ColumnDefinition, ColumnName},
+        AlterView, AstAndContextPair, alter_table::AlterObjSubCommand,
+        create_table::ColumnDefinition,
     },
     syn::{Opt, ScanToken},
 };
 
-use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst};
+use {
+    super::{AnalysisError, ParseContext, SelectStatement, SemAst},
+    crate::names::FullName,
+};
 
 /// analyzed [`crate::syn::ViewStmt`]
 #[derive(Debug, Clone)]
@@ -56,8 +59,8 @@ impl CreateView {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> Result<(), AnalysisError> {
         let mut visitor = crate::sem::traversal::RelationRenamer::new(old, new);
         self.query.walk(&mut visitor)?;
@@ -182,10 +185,10 @@ impl CreateView {
     pub const fn triggers(&self) -> &crate::sem::TriggerReferences {
         &self.triggers
     }
-    pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
+    pub(crate) fn associate_trigger(&mut self, name: &crate::names::FullName) {
         self.triggers.associate(name);
     }
-    pub(crate) fn dissociate_trigger(&mut self, name: &crate::sem::FullName) {
+    pub(crate) fn dissociate_trigger(&mut self, name: &crate::names::FullName) {
         self.triggers.dissociate(name);
     }
 

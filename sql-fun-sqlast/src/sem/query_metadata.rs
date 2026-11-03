@@ -1,5 +1,8 @@
 //! Read-only facts derived from the existing completed semantic traversal.
-use crate::sem::{AnalysisError, FullName, SemAst};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, SemAst},
+};
 
 /// Relation identities already established by semantic analysis.
 /// This does not add CRUD attribution or repeat name lookup.

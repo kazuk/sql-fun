@@ -1,6 +1,9 @@
 use crate::context::BaseParseContext;
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{AnalysisError, FullName, ParseContext, SemAst, SemScalarExpr};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, ParseContext, SemAst, SemScalarExpr},
+};
 
 /// PostgreSQL rule identity: a rule name in one resolved relation's namespace.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -11,8 +14,8 @@ pub struct RuleIdentity {
 impl RuleIdentity {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if &self.target == old.full_name() {
             self.target = new.full_name().clone();
@@ -26,7 +29,7 @@ impl RuleIdentity {
             name: FullName::new(
                 &target.catalog().cloned(),
                 &target.schema().cloned(),
-                &crate::sem::LocalName::from(name),
+                &crate::names::LocalName::from(name),
             ),
         }
     }
@@ -48,7 +51,7 @@ impl std::fmt::Display for RuleIdentity {
 
 #[cfg(test)]
 mod identity_display_tests {
-    use crate::sem::{FullName, RuleIdentity};
+    use crate::{names::FullName, sem::RuleIdentity};
 
     #[test]
     fn includes_relation_namespace_and_escaped_name() {
@@ -67,8 +70,8 @@ pub struct RuleReferences(Vec<RuleIdentity>);
 impl RuleReferences {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         for identity in &mut self.0 {
             identity.rename_relation(old, new);
@@ -173,8 +176,8 @@ impl CreateRule {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> Result<(), AnalysisError> {
         self.identity.rename_relation(old, new);
         self.walk(&mut crate::sem::traversal::RelationRenamer::new(old, new))?;
@@ -314,7 +317,8 @@ impl CreateRule {
         // DDL chooses both operations; storage does not interpret rule semantics.
         let mut context = context.associate_rule(self.identity.target(), &self.identity)?;
         let context = if self.event == RuleEvent::select() {
-            let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(self.target()))
+            let Some(view) =
+                context.get_view(&crate::names::ViewName::from_full_name(self.target()))
             else {
                 context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                     &crate::sem::problem::RuleProblem::target(self.target()),

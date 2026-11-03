@@ -1,8 +1,9 @@
 use crate::ast::Dialect;
-use crate::sem::{
-    AnalysisError, CatalogNameLookup, FullName, PgBuiltInType, SelectStatement, TypeDefinition,
-};
 use crate::test_helpers::TestParseContext;
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, CatalogNameLookup, PgBuiltInType, SelectStatement, TypeDefinition},
+};
 
 /// Explicit bindings and three type facts; no real catalog initialization.
 pub(crate) fn context(dialect: Dialect) -> TestParseContext {

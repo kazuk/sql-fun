@@ -1,12 +1,12 @@
 use crate::{
     ast::TryCollectFromWithTokens,
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasSpec, AnalysisError, DataSource, FullName, MergeMatchKind, Nullable, WithClause,
-        create_table::ColumnName,
+        AliasSpec, AnalysisError, DataSource, MergeMatchKind, Nullable, WithClause,
         data_source::{
-            AliasName, ColumnCandidates, MergeRecordRole, ProjectionColumn, QualifiedSource,
-            SourceNamespace, WildcardProjection,
+            ColumnCandidates, MergeRecordRole, ProjectionColumn, QualifiedSource, SourceNamespace,
+            WildcardProjection,
         },
         traversal::SemanticVisitorMut,
     },
@@ -309,8 +309,11 @@ impl FromClause {
 
 #[cfg(test)]
 mod test_find_alias_for_column {
-    use crate::sem::{AliasName, AliasSpec, ColumnName, WithClause};
     use crate::test_helpers::TestParseContext;
+    use crate::{
+        names::{AliasName, ColumnName},
+        sem::{AliasSpec, WithClause},
+    };
     use ::sql_fun_core::LookupResult;
 
     #[rstest::rstest]

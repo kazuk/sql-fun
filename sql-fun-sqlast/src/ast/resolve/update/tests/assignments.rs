@@ -18,8 +18,11 @@ fn synthetic_array_parameters_retain_assignment_compatibility() {
 
 mod test_helpers {
     use crate::ast::Dialect;
-    use crate::sem::{ColumnDefinition, ColumnName, PgBuiltInType};
     use crate::test_helpers::{TestParseContext, source_span};
+    use crate::{
+        names::ColumnName,
+        sem::{ColumnDefinition, PgBuiltInType},
+    };
 
     pub(super) fn catalog() -> TestParseContext {
         let mut context = super::super::test_helpers::catalog(Dialect::postgres());

@@ -1,7 +1,10 @@
 use crate::sem::search_path::expand_relation_search_path;
-use crate::sem::{
-    AnalysisError, ColumnDefinition, ColumnName, Constraint, CreateTable, ParseContext, TableName,
-    ViewInsertSupport, ViewLike, ViewMergeSupport,
+use crate::{
+    names::{ColumnName, TableName},
+    sem::{
+        AnalysisError, ColumnDefinition, Constraint, CreateTable, ParseContext, ViewInsertSupport,
+        ViewLike, ViewMergeSupport,
+    },
 };
 
 /// INSERT-owned projection of existing relation definitions.
@@ -30,7 +33,7 @@ impl InsertDestination {
             return Self::resolve(context, &name);
         }
         let view = context
-            .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+            .get_view(&crate::names::ViewName::from_full_name(name.full_name()))
             .expect("resolved view");
         Self::from_rule_view(&name, view).map(Some)
     }
@@ -61,7 +64,7 @@ impl InsertDestination {
     }
     fn resolve_at(
         context: &mut impl ParseContext,
-        key: &crate::sem::FullName,
+        key: &crate::names::FullName,
     ) -> Result<Option<Self>, AnalysisError> {
         let canonical;
         let key = if context.dialect() == crate::ast::Dialect::sqlite() {
@@ -87,7 +90,7 @@ impl InsertDestination {
             }));
         }
         if context
-            .get_view(&crate::sem::ViewName::from_full_name(key))
+            .get_view(&crate::names::ViewName::from_full_name(key))
             .is_some()
         {
             return Self::from_view(context, key);
@@ -96,10 +99,10 @@ impl InsertDestination {
     }
     fn from_view(
         context: &mut impl ParseContext,
-        key: &crate::sem::FullName,
+        key: &crate::names::FullName,
     ) -> Result<Option<Self>, AnalysisError> {
         let view = context
-            .get_view(&crate::sem::ViewName::from_full_name(key))
+            .get_view(&crate::names::ViewName::from_full_name(key))
             .expect("resolved view");
         let (columns, support) = if view.is_materialized() {
             (Vec::new(), ViewInsertSupport::read_only())

@@ -1,6 +1,9 @@
-use crate::sem::{
-    AnalysisError, InsertDestination, ParseContext, TableName, UpdateDestination, ViewLike,
-    ViewMergeSupport,
+use crate::{
+    names::TableName,
+    sem::{
+        AnalysisError, InsertDestination, ParseContext, UpdateDestination, ViewLike,
+        ViewMergeSupport,
+    },
 };
 
 /// MERGE-owned projection of a bound table or view target.
@@ -24,7 +27,7 @@ impl MergeDestination {
             return Self::resolve_table(context, &name).map(Some);
         }
         let view = context
-            .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+            .get_view(&crate::names::ViewName::from_full_name(name.full_name()))
             .expect("resolved view");
         if view.is_materialized() {
             Self::resolve_materialized_view(context, &name).map(Some)

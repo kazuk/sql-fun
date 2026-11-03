@@ -1,9 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable,
-        SelectStatement, WithClause,
-        data_source::AliasName,
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, SelectStatement,
+        WithClause,
         scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
     },
 };

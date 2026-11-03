@@ -22,7 +22,7 @@ impl MemberRef {
             .as_whole_row()
             .is_none_or(|row| row.has_renamed_field(rename))
         {
-            let mut name = crate::sem::ColumnName::from(self.member.as_str());
+            let mut name = crate::names::ColumnName::from(self.member.as_str());
             rename.rename_name(&mut name);
             self.member = name.as_str().to_owned();
         }
@@ -83,7 +83,7 @@ impl MemberRef {
         TParseContext: crate::sem::ParseContext,
     {
         if let Some(columns) = source.composite_columns(context)
-            && let Some(field) = columns.get_column_def(&crate::sem::ColumnName::from(member))
+            && let Some(field) = columns.get_column_def(&crate::names::ColumnName::from(member))
         {
             Ok((field.get_type_cloned(), field.is_not_null()))
         } else {
@@ -129,8 +129,9 @@ mod domain_member_tests {
     use crate::{
         ast::Dialect,
         context::ParseContext,
+        names::FullName,
         parse_statements,
-        sem::{AnalysisProblem, FullName, IndirectionExpr, PgBuiltInType, TypeReference},
+        sem::{AnalysisProblem, IndirectionExpr, PgBuiltInType, TypeReference},
         test_helpers::composite_domains,
     };
     use std::collections::BTreeMap;

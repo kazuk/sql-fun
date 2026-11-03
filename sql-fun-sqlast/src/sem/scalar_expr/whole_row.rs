@@ -1,8 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName},
     sem::{
-        AliasName, AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, ColumnName,
-        FullName, QueryProblem, SemScalarExpr, TypeDefinition, TypeReference,
+        AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, QueryProblem,
+        SemScalarExpr, TypeDefinition, TypeReference,
     },
 };
 
@@ -51,8 +52,8 @@ impl WholeRowExpr {
 
     pub(super) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         if let RowLookup::Source(source) = &mut self.lookup {
             if source.relation.as_ref() == Some(old.full_name()) {

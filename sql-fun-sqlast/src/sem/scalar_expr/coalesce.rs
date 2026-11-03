@@ -1,10 +1,10 @@
 use crate::{
     context::ParseContext,
+    names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnName, InputTypeConstraint, MinMaxExpr,
-        ParameterConstraints, SemScalarExpr, TypeReference,
-        parameter_resolution::ParameterResolution, scalar_expr::SemScalarExprNode,
-        traversal::SemanticVisitorMut,
+        AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
+        SemScalarExpr, TypeReference, parameter_resolution::ParameterResolution,
+        scalar_expr::SemScalarExprNode, traversal::SemanticVisitorMut,
     },
 };
 

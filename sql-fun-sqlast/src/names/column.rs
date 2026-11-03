@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use crate::{sem::AnalysisError, syn::Node};
-
 /// column name
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ColumnName(String);
@@ -41,24 +39,5 @@ impl From<&str> for ColumnName {
 impl Display for ColumnName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl TryFrom<&Node> for ColumnName {
-    type Error = AnalysisError;
-
-    fn try_from(value: &Node) -> Result<Self, Self::Error> {
-        let Some(name) = value.as_string().get_sval() else {
-            AnalysisError::raise_unexpected_none("(Node as String).sval")?;
-            AnalysisError::never();
-        };
-        Ok(Self::from(name))
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl From<&crate::syn::sqlite::Name> for ColumnName {
-    fn from(value: &crate::syn::sqlite::Name) -> Self {
-        Self::new(value.value())
     }
 }

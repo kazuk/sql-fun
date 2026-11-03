@@ -417,7 +417,8 @@ fn rejects_conflicting_explicit_hints(
 fn realized_bindings_accept_query_scoped_sql_type_hints() {
     use ::sql_fun_sqlast::{
         context::ParameterTypeHintWrite,
-        sem::{FullName, PgBuiltInType, TypeReference},
+        names::FullName,
+        sem::{PgBuiltInType, TypeReference},
     };
     let mut cache_context = crate::test_helpers::create_cache_context();
 

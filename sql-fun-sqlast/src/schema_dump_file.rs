@@ -1,6 +1,7 @@
 use crate::{
     context::{FrozenBaseContext, TypeInfoRead},
-    sem::{AnalysisError, AnalysisProblem, FullName, SemAst, TypeDefinition, TypeReference},
+    names::FullName,
+    sem::{AnalysisError, AnalysisProblem, SemAst, TypeDefinition, TypeReference},
 };
 
 /// Error for reading schema dump

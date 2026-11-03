@@ -4,11 +4,12 @@ mod tests;
 use crate::{
     ast::{Alias, Assignment, CurrentOf, Dialect, Expr, FromItem, Name, Subquery, Update},
     context::ParseContext,
+    names::{ColumnName, FullName, TableName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, DataSource,
-        FromClause, FullName, PgBuiltInType, ResolutionFailure, ResultColumnCollection,
-        ScalarAnalysisContext, TableName, UpdateAssignment, UpdateAssignmentCollection,
-        UpdateCursor, UpdateDestination, UpdatePredicate, UpdateStatement, UpdateValue, WithClause,
+        AliasSpec, AnalysisError, AnalysisProblem, ColumnDefinition, DataSource, FromClause,
+        PgBuiltInType, ResolutionFailure, ResultColumnCollection, ScalarAnalysisContext,
+        UpdateAssignment, UpdateAssignmentCollection, UpdateCursor, UpdateDestination,
+        UpdatePredicate, UpdateStatement, UpdateValue, WithClause,
         parameter_resolution::ParameterResolution, problem::UpdateProblemKind,
     },
 };

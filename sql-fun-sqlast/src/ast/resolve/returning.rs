@@ -1,10 +1,10 @@
 use crate::{
     ast::{Dialect, Name, Target},
     context::ParseContext,
+    names::{AliasName, ColumnName},
     sem::{
-        AliasName, AliasSpec, AnalysisError, AnalysisProblem, ColumnName, FromClause,
-        InsertDestination, ResultColumnCollection, ScalarAnalysisContext, WildcardExpansion,
-        WildcardProjection,
+        AliasSpec, AnalysisError, AnalysisProblem, FromClause, InsertDestination,
+        ResultColumnCollection, ScalarAnalysisContext, WildcardExpansion, WildcardProjection,
         problem::{DeleteProblemKind, InsertProblemKind, UpdateProblemKind},
     },
 };

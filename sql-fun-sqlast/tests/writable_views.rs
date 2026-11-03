@@ -4,7 +4,8 @@ use ::sql_fun_sqlast::context::RuleInfoRead;
 use sql_fun_core::analysis_problem::{InsertProblemKind, UpdateProblemKind};
 use sql_fun_sqlast::{
     context::{BaseParseContext, ParseContext},
-    sem::{RuleIdentity, ViewName, ViewWriteEvaluation},
+    names::ViewName,
+    sem::{RuleIdentity, ViewWriteEvaluation},
 };
 
 mod test_helpers {
@@ -184,14 +185,14 @@ mod test_helpers {
             }
             pub fn detached_view_catalog(
                 &self,
-                name: &::sql_fun_sqlast::sem::FullName,
+                name: &::sql_fun_sqlast::names::FullName,
             ) -> Result<FrozenBaseContext, String> {
                 use ::sql_fun_sqlast::context::BaseParseContext;
                 use sql_fun_sqlast::context::ViewInfoWrite;
 
                 let view = self
                     .context()
-                    .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(name))
+                    .get_view(&::sql_fun_sqlast::names::ViewName::from_full_name(name))
                     .unwrap()
                     .ordinary_definition()
                     .unwrap();
@@ -310,7 +311,7 @@ mod test_helpers {
             pub fn analyze_insert_at(
                 &self,
                 base: &FrozenBaseContext,
-                view: &::sql_fun_sqlast::sem::FullName,
+                view: &::sql_fun_sqlast::names::FullName,
             ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
                 ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
                     .insert(view)
@@ -320,7 +321,7 @@ mod test_helpers {
             pub fn analyze_update_at(
                 &self,
                 base: &FrozenBaseContext,
-                view: &::sql_fun_sqlast::sem::FullName,
+                view: &::sql_fun_sqlast::names::FullName,
             ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
                 ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
                     .update(view)
@@ -329,13 +330,13 @@ mod test_helpers {
             }
             pub fn analyze_insert(
                 &self,
-                view: &::sql_fun_sqlast::sem::FullName,
+                view: &::sql_fun_sqlast::names::FullName,
             ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
                 self.analyze_insert_at(self.context(), view)
             }
             pub fn analyze_update(
                 &self,
-                view: &::sql_fun_sqlast::sem::FullName,
+                view: &::sql_fun_sqlast::names::FullName,
             ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
                 self.analyze_update_at(self.context(), view)
             }
@@ -365,7 +366,7 @@ mod test_helpers {
 }
 
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::sem::FullName;
+use ::sql_fun_sqlast::names::FullName;
 
 const AUTOMATIC: &str = r"
 CREATE TABLE public.items (id integer PRIMARY KEY, value integer DEFAULT 7);
@@ -1226,7 +1227,7 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
     );
     assert_eq!(
         recreated
-            .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(&name))
+            .get_view(&::sql_fun_sqlast::names::ViewName::from_full_name(&name))
             .unwrap()
             .rules()
             .unwrap()

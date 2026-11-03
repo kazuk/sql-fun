@@ -3,8 +3,9 @@ use crate::context::BaseParseContext;
 use crate::context::ParseContext;
 use crate::{
     ast::Dialect,
+    names::{ColumnName, FullName, TableName},
     parse_statements,
-    sem::{ColumnName, FullName, PgBuiltInType, TableName},
+    sem::PgBuiltInType,
 };
 
 #[test]
@@ -53,7 +54,7 @@ fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
     for (alias, relation) in [("i", "items"), ("s", "sources")] {
         let source = delete
             .from()
-            .resolve_alias(&crate::sem::AliasName::from(alias))
+            .resolve_alias(&crate::names::AliasName::from(alias))
             .unwrap()
             .0;
         let crate::sem::DataSource::Table(table) = source else {
@@ -91,10 +92,7 @@ fn sql_driven_delete_cte_preserves_bindings_types_and_schema()
 
 mod test_helpers {
     use crate::test_helpers::{TestParseContext, source_span};
-    use crate::{
-        context::MutSourcePathWithSpan,
-        sem::{PgBuiltInType, SchemaName},
-    };
+    use crate::{context::MutSourcePathWithSpan, names::SchemaName, sem::PgBuiltInType};
 
     pub(super) fn context() -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());

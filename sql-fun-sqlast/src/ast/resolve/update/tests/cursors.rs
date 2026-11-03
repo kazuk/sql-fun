@@ -1,8 +1,11 @@
 use super::test_helpers::catalog;
 use crate::ast::Dialect;
 use crate::context::ParseContext;
-use crate::sem::{CursorInfo, FullName, SemAst, TableName};
 use crate::test_helpers::TestParseContext;
+use crate::{
+    names::{FullName, TableName},
+    sem::{CursorInfo, SemAst},
+};
 
 fn resolve(sql: &str, context: &mut TestParseContext) -> SemAst {
     crate::parse_statements(sql, Dialect::postgres())

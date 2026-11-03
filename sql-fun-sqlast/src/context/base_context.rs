@@ -17,10 +17,11 @@ use crate::{
         FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorInfoRead,
         SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
+    names::{FullName, OperatorName, SchemaName},
     sem::{
-        AnalysisError, CastDefinition, CreateIndex, CreateSequence, CreateTable, FullName,
-        FunctionOverloadCollection, OperatorDefinition, OperatorName, SchemaName,
-        SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
+        AnalysisError, CastDefinition, CreateIndex, CreateSequence, CreateTable,
+        FunctionOverloadCollection, OperatorDefinition, SourcePathWithSpan, TypeDefinition,
+        TypeReference, ViewLike,
     },
 };
 use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
@@ -79,7 +80,8 @@ mod builtin_type_conversion_tests {
     use super::BuiltinTypeInfo;
     use crate::{
         context::BaseParseContext,
-        sem::{FullName, TypeDefinition, TypeReference},
+        names::FullName,
+        sem::{TypeDefinition, TypeReference},
         test_helpers::TestParseContext,
     };
 
@@ -274,10 +276,7 @@ impl BaseContext {
 #[cfg(test)]
 mod read_builtin_types_tests {
     use super::{BaseContext, test_helpers};
-    use crate::{
-        sem::{FullName, TypeReference},
-        test_helpers::TestParseContext,
-    };
+    use crate::{names::FullName, sem::TypeReference, test_helpers::TestParseContext};
 
     #[rstest::rstest]
     #[case::empty_schema(r#"[{"schema":"","name":"text","collatable":true}]"#)]
@@ -384,7 +383,7 @@ impl ViewInfoRead for BaseContext {
 }
 
 impl IndexInfoRead for BaseContext {
-    fn indexes_for_table(&self, _table: &crate::sem::TableName) -> Vec<&CreateIndex> {
+    fn indexes_for_table(&self, _table: &crate::names::TableName) -> Vec<&CreateIndex> {
         Vec::new()
     }
     fn get_index_impl(&self, _index_name: &FullName) -> Option<&CreateIndex> {
@@ -542,7 +541,7 @@ impl crate::context::ConflictInfoRead for BaseContext {
     }
     fn infer_conflict_arbiters(
         &self,
-        table: &crate::sem::TableName,
+        table: &crate::names::TableName,
         conflict: &crate::sem::InsertConflict,
     ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
         crate::sem::conflict_info::infer_from_catalog(self, table, conflict)
@@ -558,20 +557,20 @@ impl crate::context::ViewInsertInfoRead for BaseContext {
 impl crate::context::ViewUpdateInfoRead for BaseContext {
     fn view_update_support(
         &self,
-        _view: &crate::sem::FullName,
+        _view: &crate::names::FullName,
     ) -> Option<&crate::sem::ViewUpdateSupport> {
         None
     }
 }
 
 impl crate::context::ViewDeleteInfoRead for BaseContext {
-    fn view_delete_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewDeleteSupport {
+    fn view_delete_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewDeleteSupport {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
 
 impl crate::context::ViewMergeInfoRead for BaseContext {
-    fn view_merge_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewMergeSupport {
+    fn view_merge_support(&self, _view: &crate::names::FullName) -> crate::sem::ViewMergeSupport {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }
 }

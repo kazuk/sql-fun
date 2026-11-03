@@ -4,10 +4,11 @@ use crate::{
         LockStrength, LockWait, Name, Order, Window,
     },
     context::ParseContext,
+    names::ColumnName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, QueryFrame,
-        QueryFrameBound, QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder,
-        QueryProblem, QueryWindow, ResolvedOperator, ResultColumnCollection, ScalarAnalysisContext,
+        AnalysisError, AnalysisProblem, ColumnReferenceExpr, QueryFrame, QueryFrameBound,
+        QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder, QueryProblem,
+        QueryWindow, ResolvedOperator, ResultColumnCollection, ScalarAnalysisContext,
         SemScalarExpr,
     },
 };

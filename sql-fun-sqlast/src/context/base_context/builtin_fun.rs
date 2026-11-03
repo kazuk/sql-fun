@@ -1,10 +1,13 @@
 mod parse_util;
 
 use self::parse_util::{deserialize_braced_list, deserialize_braced_list_opt};
-use crate::sem::{
-    AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, CompositeFieldCollection,
-    CreateCompositeType, CreateFunction, FullName, FunctionOverloadCollection, FunctionParam,
-    OverloadVariant, TypeDefinition, TypeReference,
+use crate::{
+    names::{ColumnName, FullName},
+    sem::{
+        AnalysisError, ColumnCollection, ColumnDefinition, CompositeFieldCollection,
+        CreateCompositeType, CreateFunction, FunctionOverloadCollection, FunctionParam,
+        OverloadVariant, TypeDefinition, TypeReference,
+    },
 };
 use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
@@ -360,8 +363,9 @@ impl PgBuiltInFunctions {
 #[cfg(test)]
 mod test_declared_builtin_results {
     use self::test_helpers::functions_with_scalar_and_output_overloads;
-    use crate::sem::{
-        ColumnCollection, ColumnDefinition, ColumnName, FullName, FunctionParam, TypeReference,
+    use crate::{
+        names::{ColumnName, FullName},
+        sem::{ColumnCollection, ColumnDefinition, FunctionParam, TypeReference},
     };
 
     #[rstest::rstest]
@@ -476,7 +480,7 @@ mod test_declared_builtin_results {
 mod test_builtin_function_details {
     use std::path::PathBuf;
 
-    use crate::sem::FullName;
+    use crate::names::FullName;
 
     use super::PgBuiltInFunctions;
 

@@ -3,10 +3,11 @@ use super::{AlterDefinition, AlterOperation};
 use crate::{
     ast::{AlterCommand, AlterRelation, Expr, Literal, SyntaxOption, SyntaxValue},
     context::ParseContext,
+    names::{ColumnName, TableName},
     sem::{
         AlterColumnAttributes, AlterObjSubCommand, AlterTable, AnalysisError, AnalysisProblem,
-        ColumnAttributeAction, ColumnAttributeBinding, ColumnAttributeOption, ColumnName,
-        CreateTable, SemAst, SourcePathWithSpan, TableName, problem::AlterColumnProblem,
+        ColumnAttributeAction, ColumnAttributeBinding, ColumnAttributeOption, CreateTable, SemAst,
+        SourcePathWithSpan, problem::AlterColumnProblem,
     },
 };
 
@@ -112,12 +113,12 @@ mod test_applicability {
         assert!(!statement.alter_table_statement().unwrap().can_apply());
         let context = statement.apply_relation_alter(context)?;
         let table = context
-            .get_table(&crate::sem::TableName::from(
-                crate::sem::FullName::with_schema("public", "t"),
+            .get_table(&crate::names::TableName::from(
+                crate::names::FullName::with_schema("public", "t"),
             ))
             .unwrap();
         let column = table
-            .get_column_def(&crate::sem::ColumnName::from("a"))
+            .get_column_def(&crate::names::ColumnName::from("a"))
             .unwrap();
         assert_eq!(column.is_not_null(), Some(false));
         assert_eq!(column.statistics_target(), None);

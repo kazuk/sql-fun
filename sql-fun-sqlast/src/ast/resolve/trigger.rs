@@ -7,10 +7,11 @@ use crate::{
         Update,
     },
     context::ParseContext,
+    names::{ColumnName, FullName, SchemaName},
     sem::{
-        AliasSpec, AnalysisError, ColumnName, DataSource, FromClause, FullName, PgBuiltInType,
-        ResolutionFailure, ScalarAnalysisContext, SchemaName, SemAst, SemScalarExpr, ViewLike,
-        WithClause, problem::TriggerProblem, traversal::SemanticVisitorMut,
+        AliasSpec, AnalysisError, DataSource, FromClause, PgBuiltInType, ResolutionFailure,
+        ScalarAnalysisContext, SemAst, SemScalarExpr, ViewLike, WithClause,
+        problem::TriggerProblem, traversal::SemanticVisitorMut,
     },
 };
 

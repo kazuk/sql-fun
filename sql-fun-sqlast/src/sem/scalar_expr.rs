@@ -60,9 +60,12 @@ pub use self::{
 };
 pub(crate) use self::{case_expr::SqliteCaseBuilder, whole_row::WholeRowFields};
 
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnName, ParseContext, PgBuiltInType, TypeReference,
-    create_table::ColumnDefinition,
+use crate::{
+    names::ColumnName,
+    sem::{
+        AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
+        create_table::ColumnDefinition,
+    },
 };
 
 trait SemScalarExprNode {
@@ -377,7 +380,7 @@ impl SemScalarExpr {
 
     pub(crate) const fn namespace_reference(
         &self,
-    ) -> Option<(&str, &crate::sem::ColumnName, bool)> {
+    ) -> Option<(&str, &crate::names::ColumnName, bool)> {
         if let Self::ColumnRef(value) = self {
             value.namespace_reference()
         } else {
@@ -394,7 +397,7 @@ impl SemScalarExpr {
     pub(crate) fn renamed_column_output(
         &self,
         rename: &crate::sem::ColumnRename,
-    ) -> Option<&crate::sem::ColumnName> {
+    ) -> Option<&crate::names::ColumnName> {
         if let Self::ColumnRef(value) = self {
             value.renamed_output(rename)
         } else {
@@ -402,7 +405,7 @@ impl SemScalarExpr {
         }
     }
 
-    pub(crate) fn set_projection_name(&mut self, name: &crate::sem::ColumnName) {
+    pub(crate) fn set_projection_name(&mut self, name: &crate::names::ColumnName) {
         if let Self::ColumnRef(value) = self {
             value.set_projection_name(name);
         }
@@ -418,8 +421,8 @@ impl SemScalarExpr {
 
     pub(crate) fn rename_bound_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         match self {
             Self::ColumnRef(value) => value.rename_relation(old, new),
@@ -497,7 +500,7 @@ impl SemScalarExpr {
             None
         }
     }
-    pub(crate) const fn function_dependency(&self) -> Option<&crate::sem::FullName> {
+    pub(crate) const fn function_dependency(&self) -> Option<&crate::names::FullName> {
         if let Self::FuncCall(call) = self {
             call.name_resolution().function_identity()
         } else {
@@ -590,7 +593,7 @@ impl SemScalarExpr {
             _ => unreachable!("row-image lookup must produce a column reference"),
         }
     }
-    pub(crate) fn bound_view_column(&self, view: &crate::sem::FullName) -> Option<&ColumnName> {
+    pub(crate) fn bound_view_column(&self, view: &crate::names::FullName) -> Option<&ColumnName> {
         if let Self::ColumnRef(column) = self {
             column.bound_view_column(view)
         } else {
@@ -640,8 +643,8 @@ impl SemScalarExpr {
 
     pub(crate) fn with_source_reference_name(
         self,
-        alias: &crate::sem::AliasName,
-        column: &crate::sem::ColumnName,
+        alias: &crate::names::AliasName,
+        column: &crate::names::ColumnName,
     ) -> Self {
         match self {
             Self::SourceColumn(value) => {
@@ -1016,10 +1019,9 @@ mod test_get_column_def_and_name {
     use crate::sem::scalar_expr::{
         ColumnReferenceExpr, SemScalarExpr, TableColumnRef, TypeReference,
     };
-    use crate::sem::{
-        FullName, PgBuiltInType,
-        create_table::{ColumnDefinition, ColumnName, TableName},
-        data_source::AliasName,
+    use crate::{
+        names::{AliasName, ColumnName, FullName, TableName},
+        sem::{PgBuiltInType, create_table::ColumnDefinition},
     };
 
     fn make_table_column_expr(

@@ -1,5 +1,6 @@
-use crate::sem::{
-    AliasSpec, AnalysisError, DataSource, FullName, Nullable, SemScalarExpr, data_source::AliasName,
+use crate::{
+    names::{AliasName, FullName},
+    sem::{AliasSpec, AnalysisError, DataSource, Nullable, SemScalarExpr},
 };
 
 use ::sql_fun_core::IVec;

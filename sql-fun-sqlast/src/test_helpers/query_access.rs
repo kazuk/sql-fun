@@ -1,13 +1,14 @@
 //! Small access-analysis fixture; no builtin loading or external services.
 use crate::{
     ast::Dialect,
-    sem::{ColumnDefinition, ColumnName, PgBuiltInType, QueryAccess},
+    names::ColumnName,
+    sem::{ColumnDefinition, PgBuiltInType, QueryAccess},
     test_helpers::{TestParseContext, create_cache_context, source_span},
 };
 
 pub(crate) fn context() -> TestParseContext {
     let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
-    context.set_get_search_path_result(&[crate::sem::SchemaName::from("public")]);
+    context.set_get_search_path_result(&[crate::names::SchemaName::from("public")]);
     context.setup_type(PgBuiltInType::int4());
     context.setup_type(PgBuiltInType::bool());
     for name in ["a", "b"] {
@@ -95,10 +96,10 @@ pub(crate) fn object_context() -> TestParseContext {
         .unwrap();
     let query = pair.ast().select_statement().unwrap().clone();
     context = pair.into_context();
-    let name = crate::sem::FullName::with_schema("public", "v");
+    let name = crate::names::FullName::with_schema("public", "v");
     let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
     context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
-    let name = crate::sem::FullName::with_schema("public", "m");
+    let name = crate::names::FullName::with_schema("public", "m");
     let materialized =
         crate::sem::CreateTableAs::new(&name, &crate::sem::SemAst::select(&query), true);
     context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&materialized)));

@@ -228,3 +228,11 @@ error text is diagnostic output; use the methods for programmatic decisions.
 Native build prerequisites are the same as for sql-fun: a C compiler, assembler,
 and clang. See the repository's
 [installation guide](https://github.com/kazuk/sql-fun/blob/main/book/installation.md).
+
+## SQL name identities
+
+Use [`names`] for logical SQL identities such as [`names::FullName`],
+[`names::TableName`] and [`names::ColumnName`]. These types are owned by `names`;
+the former `sem` reexports have been removed. Their logical spelling,
+qualification, formatting and serialization contracts are unchanged.
+Semantic type-hint parsing remains [`sem::parse_client_type`].

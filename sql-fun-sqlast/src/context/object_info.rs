@@ -1,4 +1,4 @@
-use crate::sem::{FullName, Kind};
+use crate::{names::FullName, sem::Kind};
 
 /// Read the kind at an exact qualified identity, without search-path expansion.
 /// Mutation belongs exclusively to definition write/update operations.

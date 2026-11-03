@@ -5,7 +5,10 @@ use std::sync::{
 };
 
 use ::sql_fun_sqlast::context::BaseParseContext;
-use ::sql_fun_sqlast::sem::{ColumnDefinition, CreateTable, FullName, TableName};
+use ::sql_fun_sqlast::{
+    names::{FullName, TableName},
+    sem::{ColumnDefinition, CreateTable},
+};
 
 /// Real schema borrow with a destructor that observes schema data on teardown.
 /// Uses the small synthetic `SchemaProject` fixture, not the full builtin catalog.

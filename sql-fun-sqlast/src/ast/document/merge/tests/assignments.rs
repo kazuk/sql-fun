@@ -1,7 +1,7 @@
 use super::test_helpers::{catalog, resolve};
-use crate::sem::{
-    ColumnDefinition, ColumnName, FullName, MergeRecordRole, MergeStatement, PgBuiltInType,
-    TableName,
+use crate::{
+    names::{ColumnName, FullName, TableName},
+    sem::{ColumnDefinition, MergeRecordRole, MergeStatement, PgBuiltInType},
 };
 
 #[rstest::rstest]

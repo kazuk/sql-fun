@@ -1,8 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName},
     sem::{
-        AliasSpec, AnalysisError, ColumnName, DataSource, Nullable, SemScalarExpr, WithClause,
-        data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+        AliasSpec, AnalysisError, DataSource, Nullable, SemScalarExpr, WithClause,
+        scalar_expr::ColumnReferenceExpr,
     },
 };
 
@@ -25,7 +26,7 @@ impl GroupedDataSource {
     pub(super) fn sqlite_qualified_group_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
         alias: &'a AliasSpec,
     ) -> Option<super::QualifiedSource<'a>> {
         self.source
@@ -35,7 +36,7 @@ impl GroupedDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
     ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
         if context.dialect() != crate::ast::Dialect::sqlite() {
             return Ok(None);

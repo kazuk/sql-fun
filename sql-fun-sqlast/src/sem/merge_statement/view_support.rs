@@ -1,4 +1,4 @@
-use crate::sem::{ColumnDefinition, ColumnName};
+use crate::{names::ColumnName, sem::ColumnDefinition};
 
 /// INSTEAD OF row-trigger events available on a MERGE view target.
 #[derive(
@@ -104,7 +104,10 @@ impl ViewMergeSupport {
 
 #[cfg(test)]
 mod tests {
-    use crate::sem::{ColumnDefinition, ColumnName, PgBuiltInType};
+    use crate::{
+        names::ColumnName,
+        sem::{ColumnDefinition, PgBuiltInType},
+    };
 
     use super::{ViewMergeSupport, ViewMergeTriggers};
 

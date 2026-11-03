@@ -1,4 +1,7 @@
-use crate::sem::{ColumnDefinition, ColumnName, TypeReference};
+use crate::{
+    names::ColumnName,
+    sem::{ColumnDefinition, TypeReference},
+};
 
 /// A name or ordinal bound to a projection position in the current query.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

@@ -1,5 +1,6 @@
-use crate::sem::{
-    AnalysisError, CatalogNameLookup, ConflictArbiterInference, FullName, InsertConflict, TableName,
+use crate::{
+    names::{FullName, TableName},
+    sem::{AnalysisError, CatalogNameLookup, ConflictArbiterInference, InsertConflict},
 };
 
 /// Catalog services required by conflict-target name resolution and inference.

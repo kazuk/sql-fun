@@ -1,4 +1,7 @@
-use crate::sem::{AnalysisError, OperatorDefinition, OperatorName, ParseContext, SemScalarExpr};
+use crate::{
+    names::OperatorName,
+    sem::{AnalysisError, OperatorDefinition, ParseContext, SemScalarExpr},
+};
 
 impl super::ArithExpr {
     /// create a instance
@@ -53,10 +56,10 @@ impl super::ArithExpr {
 #[cfg(test)]
 mod test_arith_expr_build_binary_op {
     use crate::{
+        names::{OperatorName, ValidOperatorName},
         sem::{
             BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
-            OperatorName, SemScalarExpr, TypeReference,
-            names::ValidOperatorName,
+            SemScalarExpr, TypeReference,
             scalar_expr::{arith_expr::ArithExpr, const_expr::ScalarConstExpr},
         },
         test_helpers::{TestParseContext, test_context},

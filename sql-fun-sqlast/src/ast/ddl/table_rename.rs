@@ -2,10 +2,8 @@
 use crate::{
     ast::{AlterCommand, AlterRelation},
     context::ParseContext,
-    sem::{
-        AlterTable, AnalysisError, AnalysisProblem, FullName, Kind, SemAst, SourcePathWithSpan,
-        TableName,
-    },
+    names::{FullName, TableName},
+    sem::{AlterTable, AnalysisError, AnalysisProblem, Kind, SemAst, SourcePathWithSpan},
 };
 
 impl AlterRelation {
@@ -88,7 +86,7 @@ mod test_applicability {
     use crate::test_helpers::ownership::{
         apply_ownership_sql, ownership_context, ownership_statement,
     };
-    use crate::{context::TableInfoRead, sem::FullName};
+    use crate::{context::TableInfoRead, names::FullName};
 
     #[test]
     fn suppressed_diagnostics_cannot_authorize_a_conflicting_rename() -> testresult::TestResult {

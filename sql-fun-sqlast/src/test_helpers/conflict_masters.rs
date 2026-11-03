@@ -119,7 +119,7 @@ impl Masters {
         context.set_conflict_masters(&self.load().unwrap());
         crate::context::ParseContext::set_search_path(
             &mut context,
-            &[crate::sem::SchemaName::from("public")],
+            &[crate::names::SchemaName::from("public")],
         );
         context
     }

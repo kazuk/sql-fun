@@ -3,7 +3,7 @@
 
 use super::test_helpers::{AnalysisFixture, postgres};
 use crate::ast::Dialect;
-use crate::sem::{ColumnName, PgBuiltInType};
+use crate::sem::PgBuiltInType;
 use crate::test_helpers::{on_small_stack, small_stack_regression};
 
 #[rstest::rstest]
@@ -49,8 +49,11 @@ fn sqlite_small_stack(
 }
 
 mod test_helpers {
-    use super::{AnalysisFixture, ColumnName, Dialect, PgBuiltInType};
     use crate::ast::Query;
+    use {
+        super::{AnalysisFixture, Dialect, PgBuiltInType},
+        crate::names::ColumnName,
+    };
 
     pub(super) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
         let mut catalog = AnalysisFixture::context().with_dialect(dialect);

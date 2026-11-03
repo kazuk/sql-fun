@@ -1,4 +1,7 @@
-use crate::sem::{AnalysisError, CreateTrigger, FullName, TriggerIdentity};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, CreateTrigger, TriggerIdentity},
+};
 
 /// Read analyzed triggers and effective cancellations through context layers.
 pub trait TriggerInfoRead {

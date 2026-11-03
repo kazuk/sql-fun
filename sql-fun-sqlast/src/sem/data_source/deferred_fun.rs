@@ -1,6 +1,7 @@
 use crate::{
     context::ParseContext,
-    sem::{AliasName, AliasSpec, AnalysisError, DataSource, FuncCallExpr, Nullable},
+    names::AliasName,
+    sem::{AliasSpec, AnalysisError, DataSource, FuncCallExpr, Nullable},
 };
 
 /// A table invocation with completed name lookup and deferred signature/columns.
@@ -88,10 +89,10 @@ impl DeferredTableFunction {
         }
         Ok(())
     }
-    pub(super) fn column_names(&self) -> Vec<crate::sem::ColumnName> {
+    pub(super) fn column_names(&self) -> Vec<crate::names::ColumnName> {
         self.output.names()
     }
-    pub(super) fn candidates(&self, column: &crate::sem::ColumnName) -> super::ColumnCandidates {
+    pub(super) fn candidates(&self, column: &crate::names::ColumnName) -> super::ColumnCandidates {
         if self.output.has_declarations() {
             super::ColumnCandidates::from(self.output.candidates(column, &self.alias))
         } else {
@@ -102,7 +103,7 @@ impl DeferredTableFunction {
         &self,
         context: &'a mut C,
         alias: &AliasName,
-        column: &crate::sem::ColumnName,
+        column: &crate::names::ColumnName,
         nullable: bool,
     ) -> Result<(crate::sem::SemScalarExpr, &'a mut C), AnalysisError> {
         if !self.output.has_declarations() {
@@ -146,7 +147,7 @@ impl DeferredTableFunction {
     /// Caller-supplied type and modifiers for an effective output column.
     pub fn output_type_declaration(
         &self,
-        column: &crate::sem::ColumnName,
+        column: &crate::names::ColumnName,
     ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
         self.output.declaration(column, &self.alias)
     }
@@ -161,7 +162,7 @@ impl DeferredTableFunction {
 }
 
 impl DeferredTableFunction {
-    pub(super) fn known_column_names(&self) -> Option<Vec<crate::sem::ColumnName>> {
+    pub(super) fn known_column_names(&self) -> Option<Vec<crate::names::ColumnName>> {
         if self.output.has_declarations() {
             Some(self.output.names())
         } else {

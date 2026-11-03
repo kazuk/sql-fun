@@ -1,4 +1,7 @@
-use crate::sem::{AlterTable, AnalysisError, CreateTable, DropTable, FullName};
+use crate::{
+    names::FullName,
+    sem::{AlterTable, AnalysisError, CreateTable, DropTable},
+};
 
 /// get table definition
 pub trait TableInfoRead {

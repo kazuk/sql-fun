@@ -3,7 +3,8 @@ use crate::{
     AstAndContextPair, CacheContext,
     ast::Dialect,
     context::{FrozenBaseContext, ParseContext, SchemaFileContext},
-    sem::{PgBuiltInType, SchemaName},
+    names::SchemaName,
+    sem::PgBuiltInType,
     test_helpers::{TestParseContext, domain_casts},
 };
 use std::collections::BTreeMap;

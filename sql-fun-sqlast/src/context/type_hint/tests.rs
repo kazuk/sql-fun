@@ -6,7 +6,8 @@ use crate::ast::Dialect;
 use crate::context::BaseParseContext;
 use crate::{
     context::{ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext},
-    sem::{PgBuiltInType, SchemaName, TypeReference},
+    names::SchemaName,
+    sem::{PgBuiltInType, TypeReference},
 };
 
 #[rstest::rstest]
@@ -200,14 +201,14 @@ fn resolves_custom_types_using_effective_search_path() {
     assert_eq!(
         context.get_parameter_typehint(1),
         Some(TypeReference::concrete_type_ref(
-            &crate::sem::FullName::with_schema("b", "kind"),
+            &crate::names::FullName::with_schema("b", "kind"),
             false
         ))
     );
     assert_eq!(
         context.get_parameter_typehint(2),
         Some(TypeReference::concrete_type_ref(
-            &crate::sem::FullName::with_schema("a", "kind"),
+            &crate::names::FullName::with_schema("a", "kind"),
             false
         ))
     );
@@ -235,7 +236,7 @@ fn sqlite_uses_its_type_spelling_and_catalog() {
     let mut base = crate::test_helpers::TestParseContext::default().with_dialect(Dialect::sqlite());
     base.set_get_search_path_result(&[SchemaName::from("main")]);
     let expected = TypeReference::concrete_type_ref(
-        &crate::sem::FullName::with_schema("main", "DOUBLE PRECISION"),
+        &crate::names::FullName::with_schema("main", "DOUBLE PRECISION"),
         false,
     );
     base.setup_type(expected.clone());
@@ -373,7 +374,7 @@ fn preserves_quoted_type_identity(#[case] hint: &str, #[case] logical: &str) {
     let mut context = crate::test_helpers::TestParseContext::default();
     context.set_get_search_path_result(&[SchemaName::from("public")]);
     let expected =
-        TypeReference::from_full_name(crate::sem::FullName::with_schema("public", logical));
+        TypeReference::from_full_name(crate::names::FullName::with_schema("public", logical));
     context.setup_type(expected.clone());
     context.setup_typehinting(&[Some(hint)]).unwrap();
     assert_eq!(context.get_parameter_typehint(1), Some(expected));
@@ -391,7 +392,8 @@ fn preserves_sqlite_type_identity(#[case] hint: &str, #[case] logical: &str, #[c
     let mut context =
         crate::test_helpers::TestParseContext::default().with_dialect(Dialect::sqlite());
     context.set_get_search_path_result(&[SchemaName::from("main")]);
-    let element = TypeReference::from_full_name(crate::sem::FullName::with_schema("main", logical));
+    let element =
+        TypeReference::from_full_name(crate::names::FullName::with_schema("main", logical));
     context.setup_type(element.clone());
     let expected = if array { element.array_type() } else { element };
     context.setup_typehinting(&[Some(hint)]).unwrap();

@@ -1,7 +1,10 @@
 use crate::sem::scalar_expr::column_ref::ColumnReference;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, SemScalarExpr, TypeReference,
-    data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+use crate::{
+    names::{AliasName, ColumnName},
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnDefinition, SemScalarExpr, TypeReference,
+        scalar_expr::ColumnReferenceExpr,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

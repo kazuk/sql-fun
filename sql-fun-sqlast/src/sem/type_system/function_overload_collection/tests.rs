@@ -436,7 +436,7 @@ fn variadic_any_parameter_domains(#[case] sql: &str) -> testresult::TestResult {
         assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4().array_type())])));
         assert!(constraints.allows(&BTreeMap::from([(
             1,
-            TypeReference::from_full_name(crate::sem::FullName::with_schema(
+            TypeReference::from_full_name(crate::names::FullName::with_schema(
                 "public",
                 "unlisted_type"
             ))

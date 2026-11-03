@@ -1,8 +1,8 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, TableName},
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, TableName,
-        data_source::AliasName,
+        AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable,
         scalar_expr::{ColumnReferenceExpr, SystemColumnRef},
     },
 };
@@ -18,7 +18,7 @@ impl TableDataSource {
         &'a self,
         source: &'a DataSource,
         context: &impl ParseContext,
-        name: &crate::sem::FullName,
+        name: &crate::names::FullName,
         alias: Option<&'a AliasSpec>,
     ) -> Option<super::QualifiedSource<'a>> {
         let alias = alias.unwrap_or(&self.alias);
@@ -166,14 +166,14 @@ impl TableDataSource {
         crate::sem::WildcardTypedRecord::from_table(alias, &self.name, context, index)
     }
 
-    pub(super) const fn wildcard_relation(&self) -> &crate::sem::FullName {
+    pub(super) const fn wildcard_relation(&self) -> &crate::names::FullName {
         self.name.full_name()
     }
 
     pub(super) fn unaliased_projection_relation(
         &self,
         alias: &AliasName,
-    ) -> Option<&crate::sem::FullName> {
+    ) -> Option<&crate::names::FullName> {
         if !self.alias.is_explicit() && self.alias.name() == alias {
             Some(self.name.full_name())
         } else {

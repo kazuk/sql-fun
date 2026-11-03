@@ -1,5 +1,8 @@
 use crate::ast::Dialect;
-use crate::sem::{ColumnName, FullName, ViewLike, ViewUpdateSupport};
+use crate::{
+    names::{ColumnName, FullName},
+    sem::{ViewLike, ViewUpdateSupport},
+};
 
 #[rstest::rstest]
 #[case::writable("UPDATE writable_items SET id=$1 RETURNING *", true, true, true)]

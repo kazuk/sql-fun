@@ -118,8 +118,8 @@ mod test_function_param_display {
 impl FunctionParam {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         match self {
             Self::In(value) => value.rename_relation(old, new),

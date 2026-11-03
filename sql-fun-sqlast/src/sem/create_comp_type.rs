@@ -1,10 +1,14 @@
 use crate::{
     context::ParseContext,
-    sem::{AstAndContextPair, ColumnDefinition, ColumnName, Nullable},
+    names::ColumnName,
+    sem::{AstAndContextPair, ColumnDefinition, Nullable},
     syn::{ColumnDef, Opt},
 };
 
-use super::{AnalysisError, ColumnCollection, FullName, TypeReference};
+use {
+    super::{AnalysisError, ColumnCollection, TypeReference},
+    crate::names::FullName,
+};
 
 /// collection for composite type field
 #[derive(Debug, Default, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -13,8 +17,8 @@ pub struct CompositeFieldCollection(Vec<CompositeFieldDefinition>);
 impl CompositeFieldCollection {
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         for field in &mut self.0 {
             if let Some(ty) = &mut field.field_type {
@@ -71,8 +75,8 @@ impl CreateCompositeType {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) {
         self.fields.rename_relation(old, new);
     }

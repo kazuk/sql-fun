@@ -1,11 +1,11 @@
 use crate::{
     context::ParseContext,
+    names::{AliasName, ColumnName, FullName, SchemaName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, DataSource,
-        DeleteRowVersion, FromClause, FullName, MergeMatchKind, QueryNameResolution, QueryProblem,
-        ResultColumnCollection, RuleEvent, RuleIdentity, SchemaName, SemScalarExpr, WholeRowExpr,
-        WithClause,
-        data_source::{AliasName, MergeRecordRole, QualifiedSource, WildcardProjection},
+        AnalysisError, AnalysisProblem, ColumnReferenceExpr, DataSource, DeleteRowVersion,
+        FromClause, MergeMatchKind, QueryNameResolution, QueryProblem, ResultColumnCollection,
+        RuleEvent, RuleIdentity, SemScalarExpr, WholeRowExpr, WithClause,
+        data_source::{MergeRecordRole, QualifiedSource, WildcardProjection},
         problem::{RuleProblem, TriggerProblem},
         scalar_expr::column_ref::UndefinedAliasColumnRef,
     },
@@ -75,7 +75,7 @@ mod unimplemented_returning_image_tests {
         let from_clause = crate::sem::FromClause::default();
         let mut scope = super::ScalarAnalysisContext::new(&with_clause, &from_clause);
         scope.set_postgres_returning(&context);
-        let _ = scope.notify_unbound_row_image(&mut context, &crate::sem::AliasName::from(name));
+        let _ = scope.notify_unbound_row_image(&mut context, &crate::names::AliasName::from(name));
     }
 }
 
@@ -852,9 +852,10 @@ impl ScalarAnalysisContext<'_> {
 mod test_resolve_column_ref {
     use crate::sem::scalar_expr::context::ScalarAnalysisContext;
     use crate::{
+        names::{AliasName, ColumnName},
         sem::{
-            ColumnDefinition, ColumnName, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr,
-            SubQueryColumnRef, WithClause, data_source::AliasName,
+            ColumnDefinition, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr, SubQueryColumnRef,
+            WithClause,
         },
         test_helpers::TestParseContext,
     };

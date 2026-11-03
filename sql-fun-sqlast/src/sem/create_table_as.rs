@@ -9,7 +9,10 @@ use crate::{
     syn::{ObjectType, ScanToken},
 };
 
-use super::{AlterView, AnalysisError, FullName, ParseContext, SemAst};
+use {
+    super::{AlterView, AnalysisError, ParseContext, SemAst},
+    crate::names::FullName,
+};
 
 /// analyzed [`crate::syn::CreateTableAsStmt`]
 #[derive(Debug, Clone)]
@@ -48,8 +51,8 @@ impl CreateTableAs {
 
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> Result<(), AnalysisError> {
         self.query
             .walk_nested_command(&mut crate::sem::traversal::RelationRenamer::new(old, new))
@@ -122,10 +125,13 @@ impl CreateTableAs {
         Ok(())
     }
 
-    pub(crate) fn get_column_def(&self, column: &super::ColumnName) -> Option<ColumnDefinition> {
+    pub(crate) fn get_column_def(
+        &self,
+        column: &crate::names::ColumnName,
+    ) -> Option<ColumnDefinition> {
         self.result_columns().get_result_column_def(column)
     }
-    pub(crate) fn has_column(&self, column: &super::ColumnName) -> bool {
+    pub(crate) fn has_column(&self, column: &crate::names::ColumnName) -> bool {
         self.result_columns().has_column(column)
     }
 

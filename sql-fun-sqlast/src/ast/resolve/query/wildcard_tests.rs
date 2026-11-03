@@ -256,8 +256,8 @@ fn unaliased_same_local_relations_retain_component_qualifiers() {
     assert_eq!(
         qualifiers
             .reference_for(
-                &crate::sem::FullName::with_schema("a", "t"),
-                &crate::sem::AliasName::from("t")
+                &crate::names::FullName::with_schema("a", "t"),
+                &crate::names::AliasName::from("t")
             )
             .unwrap(),
         ["a", "t"]
@@ -265,8 +265,8 @@ fn unaliased_same_local_relations_retain_component_qualifiers() {
     assert_eq!(
         qualifiers
             .reference_for(
-                &crate::sem::FullName::with_schema("b", "t"),
-                &crate::sem::AliasName::from("t")
+                &crate::names::FullName::with_schema("b", "t"),
+                &crate::names::AliasName::from("t")
             )
             .unwrap(),
         ["b", "t"]
@@ -521,7 +521,7 @@ impl WildcardGroupsAssertions for [crate::sem::WildcardExpansion] {
                 .unwrap();
             assert_eq!(
                 reference.relation(),
-                &crate::sem::FullName::with_schema(schemas[index], "t")
+                &crate::names::FullName::with_schema(schemas[index], "t")
             );
         }
     }

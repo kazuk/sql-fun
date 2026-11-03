@@ -1,7 +1,8 @@
 use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     context::{BaseParseContext, ExtensionInfoRead, ObjectInfoRead},
-    sem::{FullName, Kind},
+    names::FullName,
+    sem::Kind,
 };
 
 impl ObjectInfoRead for SchemaCatalog {

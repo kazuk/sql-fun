@@ -2,7 +2,8 @@
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
     context::{MutSourcePathWithSpan, ParseContext, SchemaFileContext},
-    sem::{AnalysisError, AstAndContextPair, Role, SchemaName},
+    names::SchemaName,
+    sem::{AnalysisError, AstAndContextPair, Role},
     test_helpers::{SynBuilder, TestParseContext, schema_layer, source_span},
 };
 

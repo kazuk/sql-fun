@@ -1,8 +1,11 @@
-use crate::sem::{
-    CastContext, CastDefinition, CreateDomain, FullName, PgBuiltInType, TypeCategory,
-    TypeDefinition, TypeReference,
-};
 use crate::test_helpers::TestParseContext;
+use crate::{
+    names::FullName,
+    sem::{
+        CastContext, CastDefinition, CreateDomain, PgBuiltInType, TypeCategory, TypeDefinition,
+        TypeReference,
+    },
+};
 
 pub(crate) fn context() -> TestParseContext {
     let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::postgres());

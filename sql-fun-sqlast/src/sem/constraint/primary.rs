@@ -1,9 +1,10 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    names::{ColumnName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnName, Constraint, CreateIndex, ImplicitChange,
-        ParseContext, TableName, create_index::IndexElementCollection,
+        AnalysisError, AnalysisProblem, Constraint, CreateIndex, ImplicitChange, ParseContext,
+        create_index::IndexElementCollection,
     },
     syn::ListOpt,
 };
@@ -54,10 +55,10 @@ impl PrimaryKeyConstraint {
         let key_columns = IndexElementCollection::from_column_names(&self.keys);
 
         Ok(vec![ImplicitChange::from(CreateIndex::new(
-            &crate::sem::FullName::new(
+            &crate::names::FullName::new(
                 &table.full_name().catalog().cloned(),
                 &table.full_name().schema().cloned(),
-                &crate::sem::LocalName::from(self.name.as_str()),
+                &crate::names::LocalName::from(self.name.as_str()),
             ),
             table,
             &key_columns,

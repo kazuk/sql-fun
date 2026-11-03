@@ -47,7 +47,7 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
     let query = ast.into_select_statemtnt().expect("SELECT");
     assert_eq!(
         query
-            .get_result_column_def(&crate::sem::ColumnName::from("n"))
+            .get_result_column_def(&crate::names::ColumnName::from("n"))
             .expect("n")
             .get_type_cloned(),
         Some(crate::sem::PgBuiltInType::int4())

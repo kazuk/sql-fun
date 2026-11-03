@@ -85,7 +85,7 @@ fn vector_catalog_reads_and_conversion_contexts(
     assert_eq!(restored, vector);
     assert_eq!(
         context.get_array_item_type(&TypeReference::from_full_name(
-            ::sql_fun_sqlast::sem::FullName::with_schema("public", "int2vector")
+            ::sql_fun_sqlast::names::FullName::with_schema("public", "int2vector")
         )),
         None
     );

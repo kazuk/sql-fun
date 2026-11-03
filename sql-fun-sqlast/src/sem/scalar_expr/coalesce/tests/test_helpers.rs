@@ -1,7 +1,8 @@
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, SchemaFileContext},
-    sem::{ParseContext, PgBuiltInType, SchemaName},
+    names::SchemaName,
+    sem::{ParseContext, PgBuiltInType},
     test_helpers::TestParseContext,
 };
 

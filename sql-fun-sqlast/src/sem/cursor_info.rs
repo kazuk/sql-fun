@@ -1,4 +1,4 @@
-use crate::sem::TableName;
+use crate::names::TableName;
 
 /// Static facts supplied by a session provider for one PostgreSQL portal.
 /// Unknown facts remain unknown; position and lifetime are execution concerns.

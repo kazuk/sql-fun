@@ -1,9 +1,12 @@
 use crate::ast::Dialect;
-use crate::sem::{
-    ColumnDefinition, ColumnName, CreateTableAs, CreateView, FullName, PgBuiltInType, SemAst,
-    ViewLike, ViewMergeSupport, ViewMergeTriggers,
-};
 use crate::test_helpers::TestParseContext;
+use crate::{
+    names::{ColumnName, FullName},
+    sem::{
+        ColumnDefinition, CreateTableAs, CreateView, PgBuiltInType, SemAst, ViewLike,
+        ViewMergeSupport, ViewMergeTriggers,
+    },
+};
 
 use super::test_helpers::{catalog, resolve};
 

@@ -11,9 +11,12 @@ pub use self::view_support::ViewInsertSupport;
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitorMut;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ParseContext, QueryCte,
-    ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TableName, TypeReference,
+use crate::{
+    names::TableName,
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnDefinition, ParseContext, QueryCte,
+        ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
+    },
 };
 
 /// An analyzed INSERT with destination bindings, source and RETURNING metadata.

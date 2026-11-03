@@ -1,5 +1,5 @@
 use crate::context::BaseParseContext;
-use crate::sem::{CatalogNameLookup, FullName};
+use crate::{names::FullName, sem::CatalogNameLookup};
 
 /// Qualified collation identity, including encoding eligibility.
 #[derive(Debug, Clone, Eq, PartialEq, serde::Deserialize)]

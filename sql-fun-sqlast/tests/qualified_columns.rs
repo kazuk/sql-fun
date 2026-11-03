@@ -1,7 +1,7 @@
 //! Qualified column binding through the public semantic-analysis boundary.
 
 use self::test_helpers::{assert_problem_code, heavy};
-use ::sql_fun_sqlast::sem::FullName;
+use ::sql_fun_sqlast::names::FullName;
 
 #[rstest::rstest]
 #[case::schema("SELECT a.t.id FROM a.t", "a", "t")]

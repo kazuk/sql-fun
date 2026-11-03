@@ -1,11 +1,12 @@
 use crate::{
     ast::{Alias, Delete, Dialect, Expr, FromItem},
     context::ParseContext,
+    names::{FullName, TableName},
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, DeleteCursor, DeleteDestination,
-        DeletePredicate, DeleteStatement, FromClause, FullName, PgBuiltInType,
-        ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
-        parameter_resolution::ParameterResolution, problem::DeleteProblemKind,
+        DeletePredicate, DeleteStatement, FromClause, PgBuiltInType, ResultColumnCollection,
+        ScalarAnalysisContext, WithClause, parameter_resolution::ParameterResolution,
+        problem::DeleteProblemKind,
     },
 };
 

@@ -1,5 +1,8 @@
 use crate::context::{BaseContext, BaseParseContext};
-use crate::sem::{FullName, TypeDefinition, TypeReference};
+use crate::{
+    names::FullName,
+    sem::{TypeDefinition, TypeReference},
+};
 use std::sync::Arc;
 
 /// An owned, immutable schema context that can be shared across threads.
@@ -86,7 +89,7 @@ impl From<BaseContext> for FrozenBaseContext {
 mod test_frozen_root {
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, GetSourcePathWithSpanOpt, SearchPathRead},
-        sem::FullName,
+        names::FullName,
     };
 
     #[test]
@@ -145,11 +148,11 @@ mod test_frozen_root {
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
         impl crate::context::ObjectInfoRead for $context {
-            fn relation_names(&self) -> Vec<crate::sem::FullName> {
+            fn relation_names(&self) -> Vec<crate::names::FullName> {
                 self.$catalog().relation_names()
             }
 
-            fn object_kind(&self, name: &crate::sem::FullName) -> Option<crate::sem::Kind> {
+            fn object_kind(&self, name: &crate::names::FullName) -> Option<crate::sem::Kind> {
                 self.$catalog().object_kind(name)
             }
         }
@@ -175,7 +178,7 @@ macro_rules! forward_catalog_reads {
             fn ownership_definitions(
                 &self,
                 kind: crate::sem::ObjectKind,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Vec<crate::sem::OwnedObjectDefinition> {
                 crate::context::OwnershipInfoRead::ownership_definitions(
                     self.$catalog(),
@@ -185,7 +188,7 @@ macro_rules! forward_catalog_reads {
             }
             fn routine_definitions(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Vec<crate::sem::CreateFunction> {
                 crate::context::OwnershipInfoRead::routine_definitions(self.$catalog(), name)
             }
@@ -241,16 +244,16 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::context::FunctionInfoRead for $context {
-            fn declared_routine_names(&self) -> Vec<crate::sem::FullName> {
+            fn declared_routine_names(&self) -> Vec<crate::names::FullName> {
                 self.$catalog().declared_routine_names()
             }
 
-            fn is_aggregate_impl(&self, name: &crate::sem::FullName) -> bool {
+            fn is_aggregate_impl(&self, name: &crate::names::FullName) -> bool {
                 crate::context::FunctionInfoRead::is_aggregate_impl(self.$catalog(), name)
             }
             fn function_returns_set(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
                 overload: &crate::sem::OverloadVariant,
             ) -> bool {
                 crate::context::FunctionInfoRead::function_returns_set(
@@ -261,7 +264,7 @@ macro_rules! forward_catalog_reads {
             }
             fn function_preserves_view_rows(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
                 overload: &crate::sem::OverloadVariant,
             ) -> bool {
                 crate::context::FunctionInfoRead::function_preserves_view_rows(
@@ -273,7 +276,7 @@ macro_rules! forward_catalog_reads {
 
             fn get_function_impl(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<crate::sem::FunctionOverloadCollection> {
                 crate::context::FunctionInfoRead::get_function_impl(self.$catalog(), name)
             }
@@ -285,32 +288,32 @@ macro_rules! forward_catalog_reads {
             }
             fn collation_definition(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<&crate::sem::CollationDefinition> {
                 self.$catalog().collation_definition(name)
             }
             fn operator_class_definition(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
                 method: &str,
             ) -> Option<&crate::sem::OperatorClassDefinition> {
                 self.$catalog().operator_class_definition(name, method)
             }
             fn lookup_sqlite_collation(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> crate::sem::CatalogNameLookup {
                 self.$catalog().lookup_sqlite_collation(name)
             }
             fn lookup_collation(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> crate::sem::CatalogNameLookup {
                 crate::context::ConflictInfoRead::lookup_collation(self.$catalog(), name)
             }
             fn lookup_operator_class(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
                 method: &str,
             ) -> crate::sem::CatalogNameLookup {
                 crate::context::ConflictInfoRead::lookup_operator_class(
@@ -321,7 +324,7 @@ macro_rules! forward_catalog_reads {
             }
             fn infer_conflict_arbiters(
                 &self,
-                table: &crate::sem::TableName,
+                table: &crate::names::TableName,
                 conflict: &crate::sem::InsertConflict,
             ) -> Result<crate::sem::ConflictArbiterInference, crate::sem::AnalysisError> {
                 crate::context::ConflictInfoRead::infer_conflict_arbiters(
@@ -335,26 +338,29 @@ macro_rules! forward_catalog_reads {
         impl crate::context::IndexInfoRead for $context {
             fn indexes_for_table(
                 &self,
-                table: &crate::sem::TableName,
+                table: &crate::names::TableName,
             ) -> Vec<&crate::sem::CreateIndex> {
                 crate::context::IndexInfoRead::indexes_for_table(self.$catalog(), table)
             }
             fn get_index_impl(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<&crate::sem::CreateIndex> {
                 crate::context::IndexInfoRead::get_index_impl(self.$catalog(), name)
             }
         }
 
         impl crate::context::OperatorInfoRead for $context {
-            fn operator_result_is_not_null(&self, name: &crate::sem::OperatorName) -> Option<bool> {
+            fn operator_result_is_not_null(
+                &self,
+                name: &crate::names::OperatorName,
+            ) -> Option<bool> {
                 crate::context::OperatorInfoRead::operator_result_is_not_null(self.$catalog(), name)
             }
 
             fn get_operator_op(
                 &self,
-                name: &crate::sem::OperatorName,
+                name: &crate::names::OperatorName,
                 left: bool,
                 right: bool,
             ) -> Option<&crate::sem::OperatorDefinition> {
@@ -370,14 +376,14 @@ macro_rules! forward_catalog_reads {
         impl crate::context::SequenceInfoRead for $context {
             fn sequences_owned_by(
                 &self,
-                table: &crate::sem::TableName,
+                table: &crate::names::TableName,
             ) -> Vec<crate::sem::CreateSequence> {
                 crate::context::SequenceInfoRead::sequences_owned_by(self.$catalog(), table)
             }
 
             fn get_sequence_impl(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<&crate::sem::CreateSequence> {
                 crate::context::SequenceInfoRead::get_sequence_impl(self.$catalog(), name)
             }
@@ -386,7 +392,7 @@ macro_rules! forward_catalog_reads {
         impl crate::context::TableInfoRead for $context {
             fn get_table_impl(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<&crate::sem::CreateTable> {
                 crate::context::TableInfoRead::get_table_impl(self.$catalog(), name)
             }
@@ -395,7 +401,7 @@ macro_rules! forward_catalog_reads {
         impl crate::context::ViewInsertInfoRead for $context {
             fn view_insert_support(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<&crate::sem::ViewInsertSupport> {
                 crate::context::ViewInsertInfoRead::view_insert_support(self.$catalog(), name)
             }
@@ -404,7 +410,7 @@ macro_rules! forward_catalog_reads {
         impl crate::context::ViewDeleteInfoRead for $context {
             fn view_delete_support(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> crate::sem::ViewDeleteSupport {
                 crate::context::ViewDeleteInfoRead::view_delete_support(self.$catalog(), name)
             }
@@ -412,7 +418,7 @@ macro_rules! forward_catalog_reads {
         impl crate::context::ViewUpdateInfoRead for $context {
             fn view_update_support(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> Option<&crate::sem::ViewUpdateSupport> {
                 crate::context::ViewUpdateInfoRead::view_update_support(self.$catalog(), name)
             }
@@ -421,24 +427,27 @@ macro_rules! forward_catalog_reads {
         impl crate::context::ViewMergeInfoRead for $context {
             fn view_merge_support(
                 &self,
-                name: &crate::sem::FullName,
+                name: &crate::names::FullName,
             ) -> crate::sem::ViewMergeSupport {
                 crate::context::ViewMergeInfoRead::view_merge_support(self.$catalog(), name)
             }
         }
 
         impl crate::context::ViewInfoRead for $context {
-            fn get_view_impl(&self, name: &crate::sem::FullName) -> Option<&crate::sem::ViewLike> {
+            fn get_view_impl(
+                &self,
+                name: &crate::names::FullName,
+            ) -> Option<&crate::sem::ViewLike> {
                 crate::context::ViewInfoRead::get_view_impl(self.$catalog(), name)
             }
         }
 
         impl crate::context::SearchPathRead for $context {
-            fn get_search_path(&self) -> &[crate::sem::SchemaName] {
+            fn get_search_path(&self) -> &[crate::names::SchemaName] {
                 crate::context::SearchPathRead::get_search_path(self.$catalog())
             }
 
-            fn get_default_schema(&self) -> Option<crate::sem::SchemaName> {
+            fn get_default_schema(&self) -> Option<crate::names::SchemaName> {
                 crate::context::SearchPathRead::get_default_schema(self.$catalog())
             }
         }
@@ -519,7 +528,7 @@ impl crate::context::TypeInfoRead for FrozenBaseContext {
 mod test_type_lookup_cost {
     use crate::{
         context::{BaseParseContext, ParseContext},
-        sem::FullName,
+        names::FullName,
     };
     use std::{path::Path, sync::atomic::Ordering};
 
@@ -544,7 +553,8 @@ mod test_type_lookup_cost {
     mod test_helpers {
         use crate::{
             context::{FrozenBaseContext, ParseContext, TypeInfoRead},
-            sem::{FullName, TypeDefinition, TypeReference},
+            names::FullName,
+            sem::{TypeDefinition, TypeReference},
             test_helpers::TestParseContext,
         };
         use std::sync::{

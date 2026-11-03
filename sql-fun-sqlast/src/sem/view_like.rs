@@ -1,9 +1,9 @@
 use crate::{
     context::ParseContext,
+    names::{ColumnName, FullName},
     sem::{
-        AlterView, AnalysisError, ColumnDefinition, ColumnName, CreateTableAs, CreateView,
-        FullName, OwnerSpecification, ResultColumnCollection, RuleIdentity, RuleReferences,
-        SelectStatement, TriggerReferences,
+        AlterView, AnalysisError, ColumnDefinition, CreateTableAs, CreateView, OwnerSpecification,
+        ResultColumnCollection, RuleIdentity, RuleReferences, SelectStatement, TriggerReferences,
     },
 };
 
@@ -39,8 +39,8 @@ impl ViewLike {
     }
     pub(crate) fn rename_relation(
         &mut self,
-        old: &crate::sem::TableName,
-        new: &crate::sem::TableName,
+        old: &crate::names::TableName,
+        new: &crate::names::TableName,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::View(value) => value.rename_relation(old, new),

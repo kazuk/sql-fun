@@ -1,6 +1,9 @@
-use crate::sem::{
-    AnalysisError, OperatorName, ParseContext, SemScalarExpr, TypeReference,
-    UnaryOperatorDefinition, scalar_expr::arith_expr::ArithExpr,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, ParseContext, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
+        scalar_expr::arith_expr::ArithExpr,
+    },
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -64,9 +67,10 @@ impl LeftUnaryCallSite {
 mod test_left_unary_call_site {
     use crate::sem::scalar_expr::arith_expr::call_sites::left_unary::LeftUnaryCallSite;
     use crate::{
+        names::{OperatorName, ValidOperatorName},
         sem::{
-            OperatorName, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
-            names::ValidOperatorName, scalar_expr::const_expr::ScalarConstExpr,
+            SemScalarExpr, TypeReference, UnaryOperatorDefinition,
+            scalar_expr::const_expr::ScalarConstExpr,
         },
         test_helpers::{TestParseContext, test_context},
     };

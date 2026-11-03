@@ -1,6 +1,9 @@
 //! Whole-row arguments retain source identity and nominal/structural row types.
 use self::test_helpers::{catalog_query, expression};
-use crate::sem::{FullName, PgBuiltInType, TypeReference};
+use crate::{
+    names::FullName,
+    sem::{PgBuiltInType, TypeReference},
+};
 
 #[rstest::rstest]
 #[case::positional(
@@ -461,9 +464,10 @@ mod test_helpers {
     use crate::{
         ast::{Dialect, StatementNode},
         context::ParseContext,
+        names::FullName,
         sem::{
-            FullName, FunctionParam, OverloadVariant, PgBuiltInType, SelectStatement,
-            SemScalarExpr, TypeReference,
+            FunctionParam, OverloadVariant, PgBuiltInType, SelectStatement, SemScalarExpr,
+            TypeReference,
         },
         test_helpers::TestParseContext,
     };
@@ -516,17 +520,17 @@ mod test_helpers {
         let columns = ty.row_columns(context).unwrap();
         assert!(
             columns
-                .get_column_def(&crate::sem::ColumnName::from("n"))
+                .get_column_def(&crate::names::ColumnName::from("n"))
                 .is_some()
         );
         assert!(
             columns
-                .get_column_def(&crate::sem::ColumnName::from("x"))
+                .get_column_def(&crate::names::ColumnName::from("x"))
                 .is_none()
         );
         assert!(
             columns
-                .get_column_def(&crate::sem::ColumnName::from("y"))
+                .get_column_def(&crate::names::ColumnName::from("y"))
                 .is_none()
         );
     }

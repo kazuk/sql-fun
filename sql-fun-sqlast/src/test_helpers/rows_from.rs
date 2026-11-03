@@ -1,8 +1,11 @@
-use crate::sem::{
-    AliasName, AnalysisError, DataSource, DataSourceRowFunctions, SelectStatement, SemScalarExpr,
-    TypeReference,
-};
 use crate::syn::ListOpt;
+use crate::{
+    names::AliasName,
+    sem::{
+        AnalysisError, DataSource, DataSourceRowFunctions, SelectStatement, SemScalarExpr,
+        TypeReference,
+    },
+};
 
 pub(crate) fn source<'a>(query: &'a SelectStatement, alias: &str) -> &'a DataSourceRowFunctions {
     let source = query

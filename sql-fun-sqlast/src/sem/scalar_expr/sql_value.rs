@@ -1,5 +1,8 @@
 use crate::sem::scalar_expr::SemScalarExprNode;
-use crate::sem::{AnalysisError, FullName, SemScalarExpr, TypeReference};
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, SemScalarExpr, TypeReference},
+};
 
 /// SQL value function
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

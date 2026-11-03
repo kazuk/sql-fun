@@ -1,5 +1,6 @@
-use crate::sem::{
-    AnalysisError, DropDependencyBehavior, FullName, ParseContext, SemAst, TriggerIdentity,
+use crate::{
+    names::FullName,
+    sem::{AnalysisError, DropDependencyBehavior, ParseContext, SemAst, TriggerIdentity},
 };
 
 /// Resolved DROP TRIGGER and the completed lookup outcome.

@@ -7,7 +7,7 @@ mod extracted_artifacts_helpers {
 
 use self::extracted_artifacts_helpers::heavy;
 
-use ::sql_fun_sqlast::{context::ConflictInfoRead, sem::FullName};
+use ::sql_fun_sqlast::{context::ConflictInfoRead, names::FullName};
 use std::path::PathBuf;
 
 #[rstest::rstest]

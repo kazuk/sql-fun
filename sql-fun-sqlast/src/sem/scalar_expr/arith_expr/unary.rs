@@ -1,7 +1,10 @@
 use crate::sem::overload_rank::OverloadRank;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, CastContext, OperatorDefinition, OperatorName, SemScalarExpr,
-    TypeReference, UnaryOperatorDefinition,
+use crate::{
+    names::OperatorName,
+    sem::{
+        AnalysisError, AnalysisProblem, CastContext, OperatorDefinition, SemScalarExpr,
+        TypeReference, UnaryOperatorDefinition,
+    },
 };
 
 struct UnaryCastCandidate {

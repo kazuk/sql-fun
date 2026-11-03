@@ -1,10 +1,13 @@
 use crate::ast::{Dialect, Statement};
 use crate::context::ParseContext;
-use crate::sem::{
-    ColumnDefinition, ColumnName, FunctionParam, OverloadVariant, PgBuiltInType, SchemaName,
-    TypeReference, WildcardExpansion,
-};
 use crate::test_helpers::{TestParseContext, source_span};
+use crate::{
+    names::{ColumnName, SchemaName},
+    sem::{
+        ColumnDefinition, FunctionParam, OverloadVariant, PgBuiltInType, TypeReference,
+        WildcardExpansion,
+    },
+};
 
 pub(super) fn statement(sql: &str) -> Statement {
     crate::parse_statements(sql, Dialect::postgres())
@@ -79,10 +82,10 @@ pub(super) fn rewritten(sql: &str) -> (Statement, usize) {
 pub(super) fn rows_catalog() -> TestParseContext {
     let mut context = catalog();
     context.setup_type(PgBuiltInType::int8());
-    let table = crate::sem::FullName::with_schema("public", "t");
+    let table = crate::names::FullName::with_schema("public", "t");
     context.set_get_type_impl_result(
         &table,
-        &crate::sem::TypeDefinition::table_ref(&crate::sem::TableName::from(table.clone())),
+        &crate::sem::TypeDefinition::table_ref(&crate::names::TableName::from(table.clone())),
     );
     context.setup_function(
         "rows_fun",
@@ -94,7 +97,7 @@ pub(super) fn rows_catalog() -> TestParseContext {
         )],
     );
     context.set_get_function_impl_result(
-        &crate::sem::FullName::with_schema("pg_catalog", "row_number"),
+        &crate::names::FullName::with_schema("pg_catalog", "row_number"),
         &crate::sem::FunctionOverloadCollection::new(&[OverloadVariant::new(
             &Some(PgBuiltInType::int8()),
             &vec![],
@@ -104,7 +107,7 @@ pub(super) fn rows_catalog() -> TestParseContext {
     );
     context.setup_type(PgBuiltInType::bool());
     context.set_get_operator_op_result(
-        &crate::sem::OperatorName::from_parts(Some("pg_catalog"), ">="),
+        &crate::names::OperatorName::from_parts(Some("pg_catalog"), ">="),
         true,
         true,
         Some(&crate::sem::OperatorDefinition::binary(&[
@@ -117,7 +120,7 @@ pub(super) fn rows_catalog() -> TestParseContext {
         ])),
     );
     context.set_get_function_impl_result(
-        &crate::sem::FullName::with_schema("pg_catalog", "count"),
+        &crate::names::FullName::with_schema("pg_catalog", "count"),
         &crate::sem::FunctionOverloadCollection::new(&[OverloadVariant::new(
             &Some(PgBuiltInType::int8()),
             &vec![],

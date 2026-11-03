@@ -1,9 +1,9 @@
 use super::TestParseContext;
 use crate::{
     context::ConflictInfoRead,
+    names::{FullName, TableName},
     sem::{
-        AnalysisError, CatalogNameLookup, FullName, InsertArbiter, InsertConflict,
-        InsertInferenceModifiers, TableName,
+        AnalysisError, CatalogNameLookup, InsertArbiter, InsertConflict, InsertInferenceModifiers,
     },
 };
 

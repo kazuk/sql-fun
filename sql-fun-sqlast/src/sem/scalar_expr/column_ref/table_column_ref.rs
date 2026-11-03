@@ -1,5 +1,6 @@
-use crate::sem::{
-    ColumnDefinition, ColumnName, Nullable, TableName, TypeReference, data_source::AliasName,
+use crate::{
+    names::{AliasName, ColumnName, TableName},
+    sem::{ColumnDefinition, Nullable, TypeReference},
 };
 
 /// table column reference
@@ -114,14 +115,14 @@ impl TableColumnRef {
         self.column_def = None;
     }
     /// Exact relation identity for this resolved column.
-    pub const fn relation(&self) -> &crate::sem::FullName {
+    pub const fn relation(&self) -> &crate::names::FullName {
         self.table_name.full_name()
     }
     /// Local source alias, including trigger OLD/NEW aliases.
     pub const fn alias(&self) -> &AliasName {
         &self.alias
     }
-    pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
+    pub(super) fn belongs_to(&self, relation: &crate::names::FullName) -> bool {
         self.table_name.full_name() == relation
     }
 
@@ -151,7 +152,7 @@ impl TableColumnRef {
 }
 
 impl TableColumnRef {
-    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::sem::ColumnName)> {
+    pub(super) const fn projection_reference(&self) -> Option<(&str, &crate::names::ColumnName)> {
         Some((self.alias.as_str(), &self.column))
     }
 }

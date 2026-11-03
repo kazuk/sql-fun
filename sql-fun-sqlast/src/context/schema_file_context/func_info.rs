@@ -2,7 +2,8 @@ use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
     context::{FunctionInfoRead, FunctionInfoWrite, ParseContext},
-    sem::{AnalysisError, CreateFunction, FullName, FunctionOverloadCollection},
+    names::FullName,
+    sem::{AnalysisError, CreateFunction, FunctionOverloadCollection},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -117,7 +118,7 @@ impl FunctionInfoRead for SchemaCatalog {
 #[cfg(test)]
 mod test_expression_classification {
     use crate::context::{BaseParseContext, FunctionInfoRead, ParseContext};
-    use crate::sem::FullName;
+    use crate::names::FullName;
     use crate::test_helpers::{ownership::apply_ownership_sql, sampling::schema_context};
 
     #[rstest::rstest]

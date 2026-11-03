@@ -119,7 +119,7 @@ pub enum OperatorDefinition {
 impl OperatorDefinition {
     pub(crate) fn diagnostic_definition(
         &self,
-        name: &crate::sem::OperatorName,
+        name: &crate::names::OperatorName,
     ) -> ::sql_fun_core::analysis_problem::OperatorDefinition {
         let (left_operand, right_operand) = match self {
             Self::Binary(_) => (true, true),

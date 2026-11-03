@@ -224,11 +224,11 @@ mod tests {
         let mut context = domain_casts::context();
         let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
         let other_schema =
-            TypeReference::from_full_name(crate::sem::FullName::with_schema("other", "amount"));
-        let other_catalog = TypeReference::from_full_name(crate::sem::FullName::new(
-            &Some(crate::sem::CatalogName::from("other")),
-            &Some(crate::sem::SchemaName::from("public")),
-            &crate::sem::LocalName::from("amount"),
+            TypeReference::from_full_name(crate::names::FullName::with_schema("other", "amount"));
+        let other_catalog = TypeReference::from_full_name(crate::names::FullName::new(
+            &Some(crate::names::CatalogName::from("other")),
+            &Some(crate::names::SchemaName::from("public")),
+            &crate::names::LocalName::from("amount"),
         ));
         let types = [
             domain.clone(),
@@ -319,7 +319,7 @@ mod tests {
         let mut context = domain_casts::context();
         let domain = domain_casts::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
         let other_schema =
-            TypeReference::from_full_name(crate::sem::FullName::with_schema("other", "amount"));
+            TypeReference::from_full_name(crate::names::FullName::with_schema("other", "amount"));
         let mut cache = crate::test_helpers::create_cache_context();
         // Each target, including same-local-name and array-qualified references,
         // must have its own result even when conversions overlap.

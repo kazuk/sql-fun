@@ -3,7 +3,8 @@ use crate::{
     context::{
         ObjectInfoRead, OwnershipInfoRead, ParseContext, TableInfoRead, TypeInfoRead, ViewInfoRead,
     },
-    sem::{ColumnName, FullName, Kind},
+    names::{ColumnName, FullName},
+    sem::Kind,
 };
 
 #[rstest::rstest]
@@ -473,7 +474,8 @@ mod sqlite {
     use crate::context::schema_file_context::creation_tests::test_helpers;
     use crate::{
         context::{ObjectInfoRead, ParseContext},
-        sem::{FullName, Kind},
+        names::FullName,
+        sem::Kind,
     };
 
     #[rstest::rstest]
@@ -571,7 +573,7 @@ mod test_helpers {
     pub(super) fn sqlite_context() -> SchemaFileContext {
         let mut root = crate::test_helpers::TestParseContext::default()
             .with_dialect(crate::ast::Dialect::sqlite());
-        root.set_search_path(&[crate::sem::SchemaName::from("main")]);
+        root.set_search_path(&[crate::names::SchemaName::from("main")]);
         child(root.freeze())
     }
     #[cfg(feature = "sqlite")]
@@ -802,7 +804,7 @@ fn temporary_relations_and_row_types_follow_search_path(
     #[values(false, true)] inherited: bool,
 ) -> testresult::TestResult {
     use crate::context::BaseParseContext;
-    use crate::sem::{SchemaName, TableName};
+    use crate::names::{SchemaName, TableName};
     let mut context = test_helpers::postgres(
         "CREATE TABLE public.t(permanent integer); CREATE TEMP TABLE t(temporary integer)",
     )?;
@@ -839,7 +841,7 @@ fn temporary_relations_and_row_types_follow_search_path(
 #[test]
 fn temporary_view_shadows_permanent_table_without_affecting_routines() -> testresult::TestResult {
     use crate::context::BaseParseContext;
-    use crate::sem::{SchemaName, TableName};
+    use crate::names::{SchemaName, TableName};
     let context = test_helpers::postgres(
         "CREATE TABLE public.t(permanent integer); CREATE TEMP VIEW t AS SELECT 1 AS temporary; CREATE FUNCTION public.f() RETURNS integer LANGUAGE SQL AS 'SELECT 1'; CREATE FUNCTION pg_temp.f() RETURNS bigint LANGUAGE SQL AS 'SELECT 1'",
     )?;
@@ -982,7 +984,7 @@ fn materialized_view_applies_the_output_column_name_list() -> testresult::TestRe
 fn postgres18_named_not_null_occupies_the_constraint_namespace() -> testresult::TestResult {
     use crate::{
         context::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext},
-        sem::SchemaName,
+        names::SchemaName,
     };
     let mut metadata = ::sql_fun_core::SqlFunMetadataCollection::load_from(concat!(
         env!("CARGO_MANIFEST_DIR"),

@@ -2,10 +2,8 @@ use crate::context::schema_file_context::{SchemaCatalog, SchemaFileContext};
 use crate::{
     TrieMap,
     context::{BaseParseContext, TypeInfoRead, TypeInfoWrite},
-    sem::{
-        CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
-        TypeReference,
-    },
+    names::{FullName, TableName},
+    sem::{CreateCompositeType, CreateDomain, CreateEnum, TypeDefinition, TypeReference},
 };
 
 impl TypeInfoRead for SchemaCatalog {

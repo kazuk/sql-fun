@@ -1,7 +1,10 @@
-use crate::sem::{
-    AnalysisError, AnalysisProblem, CreateIndex, FullName, Kind, ParseContext,
-    problem::{IndexProblem, IndexProblemKind},
-    search_path::expand_relation_search_path,
+use crate::{
+    names::FullName,
+    sem::{
+        AnalysisError, AnalysisProblem, CreateIndex, Kind, ParseContext,
+        problem::{IndexProblem, IndexProblemKind},
+        search_path::expand_relation_search_path,
+    },
 };
 
 /// Completed lookup of an ALTER INDEX target in the shared relation namespace.

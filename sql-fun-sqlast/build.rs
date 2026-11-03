@@ -13,10 +13,15 @@ fn main() {
         return;
     }
 
+    generate_parser();
+}
+
+fn generate_parser() {
     let source_path = "src/sqlite_parser/upstream/parser.rs";
     println!("cargo:rerun-if-changed={source_path}");
     println!("cargo:rerun-if-changed=src/sqlite_parser/type-spans.rs.txt");
     let mut source = fs::read_to_string(source_path).expect("pinned parser source");
+    adapt_join_diagnostic(&mut source);
     replace_once(
         &mut source,
         "pub struct Parser<'a> {\n    lexer: Lexer<'a>,",
@@ -108,4 +113,16 @@ fn main() {
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     fs::write(output.join("lexer.rs"), lexer).expect("generated lexer");
     fs::write(output.join("parser.rs"), source).expect("generated parser");
+}
+
+fn adapt_join_diagnostic(source: &mut String) {
+    // Present the offending SQL word, not Rust's Result wrapper. The common
+    // parser input is UTF-8; keep immutable upstream source and grammar intact.
+    replace_once(
+        source,
+        r#""unsupported JOIN type: {:?}",
+            str::from_utf8(s)"#,
+        r#""unsupported JOIN type: {}",
+            from_bytes_as_str(s)"#,
+    );
 }

@@ -10,6 +10,14 @@ pub struct BinaryOperatorDefinition {
 }
 
 impl BinaryOperatorDefinition {
+    fn diagnostic_signature(&self) -> ::sql_fun_core::analysis_problem::OperatorSignature {
+        ::sql_fun_core::analysis_problem::OperatorSignature::new(
+            &[(&self.left_arg_type).into(), (&self.right_arg_type).into()],
+            &(&self.result_type).into(),
+            self.strict,
+        )
+    }
+
     /// create instance
     #[must_use]
     pub fn new(
@@ -60,6 +68,14 @@ pub struct UnaryOperatorDefinition {
 }
 
 impl UnaryOperatorDefinition {
+    fn diagnostic_signature(&self) -> ::sql_fun_core::analysis_problem::OperatorSignature {
+        ::sql_fun_core::analysis_problem::OperatorSignature::new(
+            &[(&self.arg_type).into()],
+            &(&self.result_type).into(),
+            self.strict,
+        )
+    }
+
     /// create instance
     #[must_use]
     pub fn new(arg_type: &TypeReference, result_type: &TypeReference, strict: bool) -> Self {
@@ -101,6 +117,36 @@ pub enum OperatorDefinition {
 }
 
 impl OperatorDefinition {
+    pub(crate) fn diagnostic_definition(
+        &self,
+        name: &crate::sem::OperatorName,
+    ) -> ::sql_fun_core::analysis_problem::OperatorDefinition {
+        let (left_operand, right_operand) = match self {
+            Self::Binary(_) => (true, true),
+            Self::LeftUnary(_) => (true, false),
+            Self::RightUnary(_) => (false, true),
+        };
+        ::sql_fun_core::analysis_problem::OperatorDefinition::new(
+            name,
+            &self.diagnostic_signatures(),
+            left_operand,
+            right_operand,
+        )
+    }
+
+    fn diagnostic_signatures(&self) -> Vec<::sql_fun_core::analysis_problem::OperatorSignature> {
+        match self {
+            Self::Binary(overloads) => overloads
+                .iter()
+                .map(BinaryOperatorDefinition::diagnostic_signature)
+                .collect(),
+            Self::LeftUnary(overloads) | Self::RightUnary(overloads) => overloads
+                .iter()
+                .map(UnaryOperatorDefinition::diagnostic_signature)
+                .collect(),
+        }
+    }
+
     pub(crate) const fn binary_overloads(&self) -> Option<&[BinaryOperatorDefinition]> {
         match self {
             Self::Binary(overloads) => Some(overloads.as_slice()),

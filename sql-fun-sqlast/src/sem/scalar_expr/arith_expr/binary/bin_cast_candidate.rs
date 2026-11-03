@@ -2,7 +2,7 @@ use crate::sem::overload_rank::OverloadRank;
 use crate::sem::type_system::SimpleInferContext;
 use crate::sem::{
     AnalysisError, AnalysisProblem, BinaryOperatorDefinition, CastContext, OperatorDefinition,
-    ParseContext, SemScalarExpr, TypeReference,
+    OperatorName, ParseContext, SemScalarExpr, TypeReference,
 };
 
 pub struct BinaryCastCandidate {
@@ -134,6 +134,7 @@ impl BinaryCastCandidate {
 
     pub(super) fn resolve(
         context: &mut impl ParseContext,
+        name: &OperatorName,
         operator: &OperatorDefinition,
         left: &TypeReference,
         right: &TypeReference,
@@ -144,14 +145,22 @@ impl BinaryCastCandidate {
         let candidates = Self::enumerate_from_context_resolved(context, overloads, left, right);
         if candidates.is_empty() {
             context.report_analysis_problem(
-                AnalysisProblem::binary_operator_overload_resolution_failed(operator, left, right),
+                AnalysisProblem::binary_operator_overload_resolution_failed(
+                    operator.diagnostic_definition(name),
+                    left,
+                    right,
+                ),
             )?;
             return Ok(candidates);
         }
         let candidates = Self::filter_best_candidate(candidates);
         if candidates.len() > 1 {
             context.report_analysis_problem(
-                AnalysisProblem::binary_operator_overload_ambiguous(operator, left, right),
+                AnalysisProblem::binary_operator_overload_ambiguous(
+                    operator.diagnostic_definition(name),
+                    left,
+                    right,
+                ),
             )?;
         }
         Ok(candidates)
@@ -297,9 +306,35 @@ mod tests {
         let second =
             BinaryOperatorDefinition::new(&placeholder, &placeholder, &PgBuiltInType::text(), true);
         let operator = OperatorDefinition::binary(&[first, second]);
-        let best = BinaryCastCandidate::resolve(&mut context, &operator, &array, &array)?;
+        let best = BinaryCastCandidate::resolve(
+            &mut context,
+            &crate::sem::OperatorName::new("="),
+            &operator,
+            &array,
+            &array,
+        )?;
         assert_eq!(best.len(), 2);
         assert!(context.has_reported_problem("binary_operator_overload_ambiguous"));
+        let problem = &context.reported_problems()[0];
+        let encoded = ::serde_json::to_value(problem)?;
+        let reported_operator =
+            &encoded["OverloadResolution"]["BinaryOperatorOverloadAmbiguous"][0];
+        assert_eq!(reported_operator["name"], "=");
+        assert_eq!(
+            reported_operator["signatures"],
+            ::serde_json::json!([
+                {
+                    "operands": ["pg_catalog.anyarray", "pg_catalog.anyarray"],
+                    "result": "pg_catalog.bool",
+                    "strict": true
+                },
+                {
+                    "operands": ["pg_catalog.anyarray", "pg_catalog.anyarray"],
+                    "result": "pg_catalog.text",
+                    "strict": true
+                }
+            ])
+        );
         Ok(())
     }
 
@@ -340,6 +375,7 @@ mod tests {
         ];
         let best = BinaryCastCandidate::resolve(
             &mut context,
+            &crate::sem::OperatorName::new("="),
             &OperatorDefinition::binary(&overloads),
             &domain,
             &PgBuiltInType::int4(),
@@ -370,6 +406,7 @@ mod tests {
         };
         let best = BinaryCastCandidate::resolve(
             &mut context,
+            &crate::sem::OperatorName::new("="),
             &OperatorDefinition::binary(&overloads),
             &domain,
             &right,

@@ -31,11 +31,11 @@ impl ArithExpr {
                 }
                 (None, None) => AnalysisError::raise_unexpected_input("lexpr, rexpr both None")?,
                 (Some(a), None) => {
-                    let resolved = Self::resolve_overload_unary(context, operator_def, a)?;
+                    let resolved = Self::resolve_overload_unary(context, name, operator_def, a)?;
                     resolved.into_left_unary_call_site_expr(context, name)
                 }
                 (None, Some(a)) => {
-                    let resolved = Self::resolve_overload_unary(context, operator_def, a)?;
+                    let resolved = Self::resolve_overload_unary(context, name, operator_def, a)?;
                     resolved.into_right_unary_call_site_expr(context, name)
                 }
             }
@@ -58,8 +58,6 @@ mod test_arith_expr_build_op {
         test_helpers::{TestParseContext, test_context},
     };
 
-    use ::testresult::TestResult;
-
     #[rstest::rstest]
     #[case("+", Some(10), Some(10))]
     #[case("~", None, Some(10))]
@@ -69,7 +67,7 @@ mod test_arith_expr_build_op {
         #[case] op_name: &str,
         #[case] left: Option<i32>,
         #[case] right: Option<i32>,
-    ) -> TestResult {
+    ) -> ::testresult::TestResult {
         let name = OperatorName::Valid(ValidOperatorName::new(op_name));
         let ty_ref = TypeReference::from_master_type_name("int4");
 

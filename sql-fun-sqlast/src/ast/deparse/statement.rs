@@ -33,7 +33,7 @@ impl SqlEmit for StatementNode {
             Self::Table(v) => v.emit(writer),
             Self::AlterRelation(v) => v.emit(writer),
         })
-        .map_err(|error| error.context(&format!("{:?}", self.kind())))
+        .map_err(|error| error.context(&self.kind().to_string()))
     }
 }
 

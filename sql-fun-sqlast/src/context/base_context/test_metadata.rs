@@ -121,8 +121,8 @@ fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
         .analyze(context, &mut cache_context)
         .err()
         .expect("dialect mismatch");
-    assert!(error.to_string().contains("Sqlite"));
-    assert!(error.to_string().contains("Postgres"));
+    assert!(error.to_string().contains("SQLite"));
+    assert!(error.to_string().contains("PostgreSQL"));
     Ok(())
 }
 

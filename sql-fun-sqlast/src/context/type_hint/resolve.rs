@@ -10,13 +10,13 @@ pub(super) fn resolve_parameter_hint(
 ) -> Result<Option<TypeReference>, AnalysisError> {
     let reference = parse_client_type(hint, context).map_err(|error| {
         AnalysisError::unexpected_input_error(&format!(
-            "parameter ${} type hint {hint:?}: {error}",
+            "parameter ${} type hint '{hint}': {error}",
             slot + 1,
         ))
     })?;
     let Some(canonical) = context.canonicalize_type_ref(&reference) else {
         return Err(AnalysisError::unexpected_input_error(&format!(
-            "parameter ${} type hint {hint:?}: SQL type {reference} not found",
+            "parameter ${} type hint '{hint}': SQL type {reference} not found",
             slot + 1,
         )));
     };

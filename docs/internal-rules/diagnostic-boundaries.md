@@ -15,14 +15,22 @@ owning semantic objects:
 | --- | --- |
 | Qualified names, table/column/view/alias names | Distinct string-backed name wrappers |
 | Type references and definitions | Distinct diagnostic type wrappers |
-| Expressions and argument bindings | Diagnostic text wrappers, without a duplicate AST |
+| Expressions | Owned SQL construct/optional identity, optional type, and independent optional nullability |
+| Argument bindings and CASE types | Ordered diagnostic type lists with unknown arguments retained explicitly |
+| Operator candidates | Actual operator name and declared operand/result types and strictness |
 | Rule, trigger, and ownership identities | Typed identity text |
 | Existing reliable source locations | Statement-relative diagnostic byte spans |
 
-The conversion preserves retained identity text, including values originally
-formed with Rust debug formatting. These values are diagnostic evidence; they
-must not be parsed back into semantic facts to drive resolution or catalog
-application. Issue #717 tracks the missing structured facts.
+Conversions use intentional SQL-facing descriptions and existing semantic facts,
+never Rust Debug serialization. Diagnostic expression facts are a compact owned
+summary, not a duplicate semantic AST or reconstructed SQL. Missing operands and
+present expressions with unknown types remain distinct. Type and identity text
+is diagnostic evidence; it must not be parsed back to drive resolution or catalog
+application. Diagnostic payload and transport cleanup belongs to #924 when the
+producer already has the facts. Only facts requiring additional semantic analysis
+belong to #717; record their exact producer and missing analysis before deferral.
+See the [readability audit](diagnostic-readability-audit.md) for the migration and
+emitted-family inventory.
 
 `AnalysisProblem::code` and `severity` are available independently of rendering.
 `render_metadata` supplies the currently implemented message and labels without

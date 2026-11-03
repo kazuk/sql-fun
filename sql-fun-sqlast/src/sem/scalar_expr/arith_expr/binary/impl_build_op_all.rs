@@ -53,7 +53,7 @@ impl super::ArithExpr {
             );
         };
         let candidates =
-            BinaryCastCandidate::resolve(context, &operator_def, &left_type, &element_type)?;
+            BinaryCastCandidate::resolve(context, name, &operator_def, &left_type, &element_type)?;
         if candidates.len() != 1 {
             return UndefinedOperatorAllCallSite::undefined_operator_all_resolved(
                 context, name, lexpr, rexpr,
@@ -266,7 +266,7 @@ mod test_build_op_all {
             if problem.code() == "undefined_operator" {
                 assert_eq!(
                     ::serde_json::to_value(problem)?["UndefinedOperator"][0],
-                    "AexprOpAll"
+                    "ALL comparison"
                 );
             }
         }

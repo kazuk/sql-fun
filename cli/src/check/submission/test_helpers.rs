@@ -290,7 +290,10 @@ pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
     );
     let presentation =
         DiagnosticPresentation::new(&detailed, statement, SqlDialect::PostgreSQL, 10);
-    let warning = AnalysisProblem::unreachable_coalesce_argument("later", "first");
+    let warning = AnalysisProblem::unreachable_coalesce_argument(
+        ::sql_fun_core::analysis_problem::SemScalarExpr::new("literal", None, None),
+        ::sql_fun_core::analysis_problem::SemScalarExpr::new("literal", None, Some(true)),
+    );
     let advice = AnalysisProblem::parameter_constraint("consider a type hint");
     let fallback = AnalysisProblem::extension_not_found("missing_extension");
     let source = std::path::Path::new("<query>");

@@ -591,7 +591,10 @@ async fn diagnostics_keep_each_query_function_identity() -> ::testresult::TestRe
         &::sql_fun_core::ResolvedCteCatalog::default(),
     );
     let lockfiles = Lockfiles::new(&args, &requirements, false, false)?;
-    let problem = AnalysisProblem::unreachable_coalesce_argument("later", "first");
+    let problem = AnalysisProblem::unreachable_coalesce_argument(
+        ::sql_fun_core::analysis_problem::SemScalarExpr::new("literal", None, None),
+        ::sql_fun_core::analysis_problem::SemScalarExpr::new("literal", None, Some(true)),
+    );
     let mut response = test_helpers::successful_response(1);
     response["queries"]["items"][0]["probrems"] =
         test_helpers::diagnostic_page(&[AnalysisProbrem::new(

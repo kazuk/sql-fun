@@ -75,7 +75,7 @@ fn invalid_all_keeps_operands_and_failure(
         .find(|problem| problem.code() == "undefined_operator")
         .unwrap();
     let diagnostic = ::serde_json::to_value(diagnostic)?;
-    assert_eq!(diagnostic["UndefinedOperator"][0], "AexprOpAll");
+    assert_eq!(diagnostic["UndefinedOperator"][0], "ALL comparison");
     let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = select.result_columns().get_column_at(0).unwrap();
     assert_eq!(column.col_type(), &None);

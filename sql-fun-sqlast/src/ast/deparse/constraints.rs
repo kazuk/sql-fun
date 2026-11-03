@@ -1232,7 +1232,11 @@ mod test_constraint_emit {
 
         let error = statement.deparse_sql(Dialect::postgres()).unwrap_err();
         assert!(error.is_invalid_syntax(), "{error}");
-        assert_eq!(error.node(), "Table/ON DELETE column list", "{error}");
+        assert_eq!(
+            error.node(),
+            "CREATE TABLE/ON DELETE column list",
+            "{error}"
+        );
     }
 
     #[test]

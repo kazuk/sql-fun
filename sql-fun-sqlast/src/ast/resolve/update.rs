@@ -497,15 +497,19 @@ impl CurrentOf {
         let cursor = UpdateCursor::new(&self.name, context.resolve_cursor(&self.name));
         let problem = match cursor.binding() {
             None => Some(format!(
-                "cursor {:?} does not exist in the current session scope",
-                self.name
+                "cursor {} does not exist in the current session scope",
+                crate::identifier::QuotedIdentifier::from(self.name.as_str())
             )),
             Some(info) if info.updatable() == Some(false) => Some(format!(
-                "cursor {:?} is not statically updatable",
-                self.name
+                "cursor {} is not statically updatable",
+                crate::identifier::QuotedIdentifier::from(self.name.as_str())
             )),
             Some(info) if info.target().is_some_and(|relation| relation != target) => {
-                Some(format!("cursor {:?} does not target {}", self.name, target))
+                Some(format!(
+                    "cursor {} does not target {}",
+                    crate::identifier::QuotedIdentifier::from(self.name.as_str()),
+                    target
+                ))
             }
             Some(_) => None,
         };

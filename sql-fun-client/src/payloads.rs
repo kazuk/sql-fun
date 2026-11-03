@@ -257,6 +257,86 @@ mod test_retained_diagnostic {
         let _: AnalysisProbrem = ::serde_json::from_value(value).unwrap();
     }
 
+    #[rstest::rstest]
+    #[case::typed_with_source(true, Some("pg_catalog.int4"), Some(false))]
+    #[case::untyped_with_source(true, None, Some(true))]
+    #[case::typed_semantic_only(false, Some("pg_catalog.int4"), None)]
+    #[case::untyped_semantic_only(false, None, None)]
+    fn expression_facts_survive_both_diagnostic_envelopes(
+        #[case] has_source: bool,
+        #[case] type_name: Option<&str>,
+        #[case] not_null: Option<bool>,
+    ) {
+        use ::sql_fun_core::{
+            DiagnosticPresentation, SqlDialect,
+            analysis_problem::{
+                AExprKind, AnalysisProblem, DiagnosticMessage, SemScalarExpr, TypeReference,
+            },
+        };
+        let ty = type_name.map(TypeReference::new);
+        let operand = SemScalarExpr::new("column reference", ty.as_ref(), not_null)
+            .with_identity(Some("value"));
+        let problem = AnalysisProblem::undefined_operator(
+            AExprKind::new("operator"),
+            "-",
+            None::<SemScalarExpr>,
+            Some(operand),
+        );
+        let path = std::path::Path::new("query.sql");
+        let source = "SELECT -value";
+        let diagnostic = if has_source {
+            let presentation =
+                DiagnosticPresentation::new(&problem, source, SqlDialect::PostgreSQL, 16);
+            AnalysisProbrem::new(
+                problem.code(),
+                problem.severity().into(),
+                path,
+                Some(StatementByteRange::new(7, 6)),
+            )
+            .with_presentation(Some(&presentation))
+        } else {
+            AnalysisProbrem::new(problem.code(), problem.severity().into(), path, None)
+                .with_semantic_problem(&problem)
+        };
+        let encoded = ::serde_json::to_string(&diagnostic).unwrap();
+        let restored: AnalysisProbrem = ::serde_json::from_str(&encoded).unwrap();
+        assert_eq!(restored.code(), "undefined_operator");
+        assert_eq!(*restored.severity(), super::DiagnosticSeverity::error());
+        assert_eq!(restored.file_path(), path);
+        assert!(restored.statement_span().is_none());
+        assert!(restored.probrem_span().is_none());
+        let retained = if has_source {
+            assert!(restored.semantic_problem().is_none());
+            let presentation = restored.presentation().as_ref().unwrap();
+            assert_eq!(presentation.source(), source);
+            assert_eq!(presentation.statement_offset(), 16);
+            assert_eq!(presentation.dialect(), SqlDialect::PostgreSQL);
+            let span = restored.statement_relative_span().as_ref().unwrap();
+            assert_eq!(span.offset(), 7);
+            assert_eq!(span.length(), 6);
+            presentation.problem()
+        } else {
+            assert!(restored.presentation().is_none());
+            assert!(restored.statement_relative_span().is_none());
+            restored.semantic_problem().as_ref().unwrap()
+        };
+        assert_eq!(retained.code(), problem.code());
+        assert_eq!(retained.severity(), problem.severity());
+        assert_eq!(retained.diagnostic_message(), problem.diagnostic_message());
+        let facts = ::serde_json::to_value(retained).unwrap();
+        assert_eq!(facts, ::serde_json::to_value(&problem).unwrap());
+        assert_eq!(facts["UndefinedOperator"][2], ::serde_json::Value::Null);
+        assert_eq!(
+            facts["UndefinedOperator"][3],
+            ::serde_json::json!({
+                "kind": "column reference",
+                "identity": "value",
+                "type_reference": type_name,
+                "not_null": not_null,
+            })
+        );
+    }
+
     #[cfg(feature = "openrpc-schema")]
     #[test]
     fn schema_supports_unavailable_diagnostic_locations() {

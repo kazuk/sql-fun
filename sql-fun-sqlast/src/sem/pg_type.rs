@@ -61,7 +61,7 @@ impl std::fmt::Display for TypeDefinition {
                 if let Some(reference) = self.type_reference() {
                     write!(f, "{reference}")
                 } else {
-                    write!(f, "{self:?}")
+                    f.write_str("unnamed SQL type")
                 }
             }
         }

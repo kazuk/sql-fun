@@ -89,7 +89,7 @@ impl CoalesceExpr {
                 Err(_) => {
                     value.types = Some(InputTypeConstraint::types([]));
                     context.report_analysis_problem(
-                        AnalysisProblem::coalesce_expr_type_unknown(&arguments),
+                        AnalysisProblem::coalesce_expr_type_unknown(arguments.iter()),
                     )?;
                 }
             }

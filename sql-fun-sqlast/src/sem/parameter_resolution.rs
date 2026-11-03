@@ -1074,7 +1074,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitorMut
             {
                 self.context.report_analysis_problem(
                     crate::sem::AnalysisProblem::parameter_constraint(&format!(
-                        "cannot assign {source:?} to {ty:?}"
+                        "cannot assign {source} to {ty}"
                     )),
                 )?;
             }
@@ -1533,14 +1533,14 @@ impl<'cache> ParameterResolution<'cache> {
             let signatures = operator.parameter_signatures();
             return Ok(Some(self.call_with_diagnostic_name(
                 context,
-                &format!("{name:?}"),
+                &name.to_string(),
                 &name.to_name_string(),
                 &arguments,
                 &signatures,
             )?));
         }
         Ok(Some(self.operation(
-            &format!("{name:?}"),
+            &name.to_string(),
             &arguments,
             &InputTypeConstraint::any(),
             None,

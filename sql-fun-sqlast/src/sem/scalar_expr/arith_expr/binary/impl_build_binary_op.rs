@@ -44,7 +44,8 @@ impl super::ArithExpr {
         } else {
             (lexpr, rexpr)
         };
-        let resolved_bin_op = Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
+        let resolved_bin_op =
+            Self::resolve_overload_binary(context, name, operator_def, lexpr, rexpr)?;
         resolved_bin_op.into_call_site_expr(context, name)
     }
 }
@@ -61,10 +62,10 @@ mod test_arith_expr_build_binary_op {
         test_helpers::{TestParseContext, test_context},
     };
 
-    use ::testresult::TestResult;
-
     #[rstest::rstest]
-    fn test_arith_expr_build_binary_op(mut test_context: TestParseContext) -> TestResult {
+    fn test_arith_expr_build_binary_op(
+        mut test_context: TestParseContext,
+    ) -> ::testresult::TestResult {
         let name = OperatorName::Valid(ValidOperatorName::new("+"));
         let type_ref = TypeReference::from_master_type_name("int4");
         test_context.set_get_implicit_cast_result(

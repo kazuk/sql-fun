@@ -41,6 +41,35 @@ impl TriggerIdentity {
     }
 }
 
+impl std::fmt::Display for TriggerIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some(relation) = &self.relation {
+            write!(f, " on {relation}")?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod identity_display_tests {
+    use crate::sem::{FullName, TriggerIdentity};
+
+    #[test]
+    fn distinguishes_relation_and_schema_namespaces() {
+        let target: FullName = "public.items".parse().unwrap();
+        let name: FullName = r#"public."changed.items""#.parse().unwrap();
+        assert_eq!(
+            TriggerIdentity::postgres(&target, &name).to_string(),
+            r#"public."changed.items" on public.items"#
+        );
+        assert_eq!(
+            TriggerIdentity::sqlite(&name).to_string(),
+            r#"public."changed.items""#
+        );
+    }
+}
+
 /// Names of triggers attached to one relation; definitions live only in the context.
 #[derive(Debug, Clone, Default)]
 pub struct TriggerReferences(Vec<FullName>);

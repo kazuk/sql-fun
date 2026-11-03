@@ -25,6 +25,10 @@ pub use self::{
 pub struct ArgumentBindingCollection(VecDeque<Option<TypeReference>>);
 
 impl ArgumentBindingCollection {
+    pub(crate) fn types(&self) -> impl Iterator<Item = Option<&TypeReference>> {
+        self.0.iter().map(Option::as_ref)
+    }
+
     pub fn from_expr_list(expr_list: &[SemScalarExpr]) -> Self {
         Self(
             expr_list

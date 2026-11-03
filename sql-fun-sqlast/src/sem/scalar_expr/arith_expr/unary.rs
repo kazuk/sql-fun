@@ -161,6 +161,7 @@ impl ResolvedUnaryOperator {
 impl super::ArithExpr {
     pub(super) fn resolve_overload_unary<TParseContext>(
         context: &mut TParseContext,
+        name: &OperatorName,
         operator_def: OperatorDefinition,
         input: SemScalarExpr,
     ) -> Result<ResolvedUnaryOperator, AnalysisError>
@@ -179,7 +180,7 @@ impl super::ArithExpr {
             if candidates.is_empty() {
                 context.report_analysis_problem(
                     AnalysisProblem::unary_operator_overload_resolution_failed(
-                        &operator_def,
+                        operator_def.diagnostic_definition(name),
                         &arg_type,
                     ),
                 )?;
@@ -188,7 +189,10 @@ impl super::ArithExpr {
             let filtered = UnaryCastCandidate::filter_best_candidate(candidates);
             if filtered.len() > 1 {
                 context.report_analysis_problem(
-                    AnalysisProblem::unary_operator_overload_ambiguous(&operator_def, &arg_type),
+                    AnalysisProblem::unary_operator_overload_ambiguous(
+                        operator_def.diagnostic_definition(name),
+                        &arg_type,
+                    ),
                 )?;
             }
             let candidate = &filtered[0];

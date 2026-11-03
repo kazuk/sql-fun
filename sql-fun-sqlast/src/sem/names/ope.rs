@@ -91,6 +91,29 @@ pub enum OperatorName {
     Invalid,
 }
 
+impl Display for OperatorName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Valid(name) => Display::fmt(name, f),
+            Self::Invalid => f.write_str("invalid operator name"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod operator_display_tests {
+    use super::OperatorName;
+
+    #[test]
+    fn presents_valid_names_and_invalid_lookup_state() {
+        assert_eq!(
+            OperatorName::from_parts(Some("a.b"), "+").to_string(),
+            r#""a.b".+"#
+        );
+        assert_eq!(OperatorName::Invalid.to_string(), "invalid operator name");
+    }
+}
+
 impl OperatorName {
     pub(crate) fn from_parts(schema: Option<&str>, name: &str) -> Self {
         Self::Valid(ValidOperatorName::from_parts(schema, name))

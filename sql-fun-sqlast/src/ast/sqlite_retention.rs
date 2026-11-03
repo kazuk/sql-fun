@@ -217,7 +217,7 @@ impl SqliteTypeRetainer<'_> {
         };
         if !type_name.matches_sqlite_frontend_name(span.name())? {
             return Err(AnalysisError::unexpected_input_error(&format!(
-                "SQLite type source association does not match {:?}",
+                "SQLite type source association does not match {}",
                 span.name(),
             )));
         }

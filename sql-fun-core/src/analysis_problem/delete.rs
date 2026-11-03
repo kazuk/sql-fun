@@ -14,12 +14,15 @@ impl CursorNameProblem {
     }
     fn missing_message(&self) -> String {
         format!(
-            "cursor {:?} does not exist in the current session scope",
-            self.name
+            "cursor \"{}\" does not exist in the current session scope",
+            self.name.replace('"', "\"\"")
         )
     }
     fn non_updatable_message(&self) -> String {
-        format!("cursor {:?} is not statically updatable", self.name)
+        format!(
+            "cursor \"{}\" is not statically updatable",
+            self.name.replace('"', "\"\"")
+        )
     }
 }
 
@@ -41,8 +44,10 @@ impl CursorTargetMismatchProblem {
     }
     fn message(&self) -> String {
         format!(
-            "cursor {:?} targets {}, not DELETE destination {}",
-            self.name, self.actual, self.expected
+            "cursor \"{}\" targets {}, not DELETE destination {}",
+            self.name.replace('"', "\"\""),
+            self.actual,
+            self.expected
         )
     }
 }
@@ -164,6 +169,31 @@ impl DeleteProblemKind {
             Self::Predicate => "DELETE WHERE requires boolean type".to_owned(),
             Self::SqliteCte => "SQLite DELETE CTE is unsupported".to_owned(),
         }
+    }
+}
+
+#[cfg(test)]
+mod cursor_message_tests {
+    use super::DeleteProblemKind;
+
+    #[rstest::rstest]
+    #[case::missing(
+        DeleteProblemKind::missing_cursor(r#"a"b\c"#),
+        r#"cursor "a""b\c" does not exist in the current session scope"#
+    )]
+    #[case::non_updatable(
+        DeleteProblemKind::non_updatable_cursor(r#"a"b\c"#),
+        r#"cursor "a""b\c" is not statically updatable"#
+    )]
+    #[case::mismatch(
+        DeleteProblemKind::cursor_target_mismatch(r#"a"b\c"#, "public.expected", "public.actual"),
+        r#"cursor "a""b\c" targets public.actual, not DELETE destination public.expected"#
+    )]
+    fn cursor_names_use_sql_identifier_quoting(
+        #[case] problem: DeleteProblemKind,
+        #[case] expected: &str,
+    ) {
+        assert_eq!(problem.message(), expected);
     }
 }
 

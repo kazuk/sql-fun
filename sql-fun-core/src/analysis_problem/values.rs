@@ -159,10 +159,8 @@ diagnostic_text!(ColumnName);
 diagnostic_text!(TableName);
 diagnostic_text!(TypeReference);
 diagnostic_text!(TypeDefinition);
-diagnostic_text!(SemScalarExpr);
 diagnostic_text!(DefElemKey);
 diagnostic_text!(OperatorName);
-diagnostic_text!(ArgumentBindingCollection);
 diagnostic_text!(AExprKind);
 diagnostic_text!(AliasName);
 diagnostic_text!(CteName);
@@ -171,11 +169,7 @@ diagnostic_text!(RuleIdentity);
 diagnostic_text!(TriggerIdentity);
 diagnostic_text!(OwnershipIdentity);
 diagnostic_text!(Kind);
-diagnostic_text!(ExpressionList);
-diagnostic_text!(TypeList);
-diagnostic_text!(OptionalExpression);
 diagnostic_text!(TypeName);
-diagnostic_text!(OperatorDefinition);
 diagnostic_text!(DebugName);
 
 /// Diagnostic text for an ownership lookup outcome.

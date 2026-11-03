@@ -1,4 +1,4 @@
-use super::{DebugName, DiagnosticMetadata, TriggerIdentity};
+use super::{DebugName, DiagnosticMessage, DiagnosticMetadata, TriggerIdentity};
 /// Structured trigger-definition validation failure.
 #[derive(Debug, Clone, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
@@ -56,6 +56,31 @@ impl TriggerProblem {
     }
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
-        DiagnosticMetadata::from(format!("invalid trigger statement: {self:?}"))
+        DiagnosticMetadata::from(self.diagnostic_message())
+    }
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::TriggerProblem;
+
+    #[rstest::rstest]
+    #[case::missing(
+        TriggerProblem::missing("public.changed on public.items"),
+        "trigger public.changed on public.items does not exist"
+    )]
+    #[case::column(
+        TriggerProblem::column("public.items", "missing"),
+        "event column missing does not exist on trigger target public.items"
+    )]
+    #[case::options(
+        TriggerProblem::options("public.changed", "transition relations require AFTER"),
+        "trigger public.changed has incompatible options: transition relations require AFTER"
+    )]
+    fn metadata_explains_the_retained_failure(
+        #[case] problem: TriggerProblem,
+        #[case] expected: &str,
+    ) {
+        assert_eq!(problem.render_metadata().message(), expected);
     }
 }

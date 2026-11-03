@@ -31,12 +31,21 @@ impl From<&crate::sem::TypeReference> for diagnostic::TypeReference {
 }
 impl From<&crate::sem::TypeDefinition> for diagnostic::TypeDefinition {
     fn from(value: &crate::sem::TypeDefinition) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
     fn from(value: &crate::sem::SemScalarExpr) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(
+            value.diagnostic_kind(),
+            value
+                .get_type()
+                .as_ref()
+                .map(diagnostic::TypeReference::from)
+                .as_ref(),
+            value.is_not_null(),
+        )
+        .with_identity(value.diagnostic_identity().as_deref())
     }
 }
 impl From<crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
@@ -44,26 +53,76 @@ impl From<crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
         Self::from(&value)
     }
 }
+#[cfg(test)]
+mod expression_conversion_tests {
+    use super::diagnostic;
+    use crate::sem::{InputTypeConstraint, PgBuiltInType, SemScalarExpr};
+
+    #[rstest::rstest]
+    #[case::unknown(InputTypeConstraint::any(), None)]
+    #[case::known(InputTypeConstraint::types([PgBuiltInType::int4()]), Some("pg_catalog.int4"))]
+    fn retains_parameter_identity_and_known_type(
+        #[case] constraint: InputTypeConstraint,
+        #[case] expected: Option<&str>,
+    ) {
+        let expression = SemScalarExpr::parameter(2, 0, &constraint);
+        let facts = diagnostic::SemScalarExpr::from(&expression);
+        assert_eq!(facts.kind(), "parameter");
+        assert_eq!(facts.identity(), Some("$2"));
+        assert_eq!(
+            facts
+                .type_reference()
+                .map(diagnostic::TypeReference::as_str),
+            expected
+        );
+        assert_eq!(facts.not_null(), None);
+    }
+}
+
 impl From<&crate::sem::DefElemKey> for diagnostic::DefElemKey {
     fn from(value: &crate::sem::DefElemKey) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::OperatorName> for diagnostic::OperatorName {
     fn from(value: &crate::sem::OperatorName) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::type_system::ArgumentBindingCollection>
     for diagnostic::ArgumentBindingCollection
 {
     fn from(value: &crate::sem::type_system::ArgumentBindingCollection) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(
+            &value
+                .types()
+                .map(|ty| ty.map(diagnostic::TypeReference::from))
+                .collect::<Vec<_>>(),
+        )
     }
 }
 impl From<&crate::syn::AExprKind> for diagnostic::AExprKind {
     fn from(value: &crate::syn::AExprKind) -> Self {
-        Self::new(&format!("{value:?}"))
+        use crate::syn::AExprKind as Kind;
+        let description = match value {
+            Kind::AexprOp => "operator",
+            Kind::AexprOpAny => "ANY comparison",
+            Kind::AexprOpAll => "ALL comparison",
+            Kind::AexprDistinct => "IS DISTINCT FROM",
+            Kind::AexprNotDistinct => "IS NOT DISTINCT FROM",
+            Kind::AexprNullif => "NULLIF",
+            Kind::AexprIn => "IN",
+            Kind::AexprLike => "LIKE",
+            Kind::AexprIlike => "ILIKE",
+            Kind::AexprSimilar => "SIMILAR TO",
+            Kind::AexprBetween => "BETWEEN",
+            Kind::AexprNotBetween => "NOT BETWEEN",
+            Kind::AexprBetweenSym => "BETWEEN SYMMETRIC",
+            Kind::AexprNotBetweenSym => "NOT BETWEEN SYMMETRIC",
+            Kind::Undefined => "unrecognized operator expression",
+            Kind::OptionNone => "unspecified operator expression",
+        };
+        Self::new(description)
     }
 }
 impl From<crate::syn::AExprKind> for diagnostic::AExprKind {
@@ -83,17 +142,17 @@ impl From<&crate::sem::ViewName> for diagnostic::ViewName {
 }
 impl From<&crate::sem::RuleIdentity> for diagnostic::RuleIdentity {
     fn from(value: &crate::sem::RuleIdentity) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::TriggerIdentity> for diagnostic::TriggerIdentity {
     fn from(value: &crate::sem::TriggerIdentity) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::OwnershipIdentity> for diagnostic::OwnershipIdentity {
     fn from(value: &crate::sem::OwnershipIdentity) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }
 impl From<&crate::sem::OwnershipLookup> for diagnostic::OwnershipLookup {
@@ -111,11 +170,6 @@ impl From<crate::sem::Kind> for diagnostic::Kind {
         Self::from(&value)
     }
 }
-impl From<&crate::sem::OperatorDefinition> for diagnostic::OperatorDefinition {
-    fn from(value: &crate::sem::OperatorDefinition) -> Self {
-        Self::new(&format!("{value:?}"))
-    }
-}
 impl From<&crate::syn::TypeName> for diagnostic::TypeName {
     fn from(value: &crate::syn::TypeName) -> Self {
         Self::new(&value.full_name().to_string())
@@ -128,6 +182,6 @@ impl From<&crate::StringSpan> for diagnostic::StringSpan {
 }
 impl From<&crate::sem::FullName> for diagnostic::DebugName {
     fn from(value: &crate::sem::FullName) -> Self {
-        Self::new(&format!("{value:?}"))
+        Self::new(&value.to_string())
     }
 }

@@ -31,6 +31,25 @@ fn default_types() -> [TypeReference; 7] {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct InputTypeConstraint(Option<Vec<TypeReference>>);
 
+impl std::fmt::Display for InputTypeConstraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            None => f.write_str("any SQL type"),
+            Some(types) if types.is_empty() => f.write_str("an unsatisfiable type requirement"),
+            Some(types) => {
+                f.write_str("one of (")?;
+                for (index, ty) in types.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{ty}")?;
+                }
+                f.write_str(")")
+            }
+        }
+    }
+}
+
 impl InputTypeConstraint {
     /// No restriction on the input type.
     pub const fn any() -> Self {
@@ -431,7 +450,7 @@ impl ConstraintGraph {
     pub(crate) fn restrict(&mut self, node: usize, domain: &InputTypeConstraint) {
         self.resume_collection();
         self.requirements
-            .push(format!("input node {node}: {domain:?}"));
+            .push(format!("expression requires {domain}"));
         self.domains[node].intersect(domain);
     }
 

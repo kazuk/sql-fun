@@ -705,7 +705,7 @@ impl<C: ParseContext> SemanticVisitorMut for AssignmentChecker<'_, C> {
             self.context
                 .report_analysis_problem(AnalysisProblem::insert(
                     crate::sem::problem::InsertProblemKind::assignment_type(),
-                    &format!("cannot assign {source:?} to {ty:?}"),
+                    &format!("cannot assign {source} to {ty}"),
                 ))?;
         }
         if (value.get_type().is_some() || unknown_literal)

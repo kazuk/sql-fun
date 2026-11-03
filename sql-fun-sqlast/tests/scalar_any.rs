@@ -70,7 +70,7 @@ fn invalid_any_keeps_operands_and_failure(
         .find(|problem| problem.code() == "undefined_operator")
         .unwrap();
     let diagnostic = ::serde_json::to_value(diagnostic)?;
-    assert_eq!(diagnostic["UndefinedOperator"][0], "AexprOpAny");
+    assert_eq!(diagnostic["UndefinedOperator"][0], "ANY comparison");
     let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = select.result_columns().get_column_at(0).unwrap();
     assert_eq!(column.col_type(), &None);

@@ -7,6 +7,7 @@ mod creation;
 mod delete;
 mod distinct;
 mod engine_version;
+mod facts;
 mod index;
 mod insert;
 mod membership;
@@ -23,6 +24,7 @@ mod table_sample;
 mod trigger;
 mod truth_test;
 mod update;
+mod values;
 mod view;
 pub use self::alter_column::{AlterColumnProblem, ColumnAttributeProblem};
 pub use self::array::ArrayProblem;
@@ -34,6 +36,10 @@ pub use self::delete::{
 };
 pub use self::distinct::DistinctProblem;
 pub use self::engine_version::EngineVersionProblem;
+pub use self::facts::{
+    ArgumentBindingCollection, ExpressionList, OperatorDefinition, OperatorSignature,
+    OptionalExpression, SemScalarExpr, TypeList,
+};
 pub use self::index::{IndexProblem, IndexProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::membership::MembershipProblem;
@@ -49,15 +55,13 @@ pub use self::table_sample::TableSampleProblem;
 pub use self::trigger::TriggerProblem;
 pub use self::truth_test::TruthTestProblem;
 pub use self::update::{UpdateProblem, UpdateProblemKind};
-pub use self::view::ViewProblem;
-mod values;
 pub use self::values::{
-    AExprKind, AliasName, ArgumentBindingCollection, ColumnName, CteName, DebugName, DefElemKey,
-    DiagnosticLabel, DiagnosticMetadata, DiagnosticSeverity, ExpressionList, FullName, Kind,
-    OperatorDefinition, OperatorName, OptionalExpression, OwnershipIdentity, OwnershipLookup,
-    RuleIdentity, SemScalarExpr, StringSpan, TableName, TriggerIdentity, TypeDefinition, TypeList,
+    AExprKind, AliasName, ColumnName, CteName, DebugName, DefElemKey, DiagnosticLabel,
+    DiagnosticMetadata, DiagnosticSeverity, FullName, Kind, OperatorName, OwnershipIdentity,
+    OwnershipLookup, RuleIdentity, StringSpan, TableName, TriggerIdentity, TypeDefinition,
     TypeName, TypeReference, ViewName,
 };
+pub use self::view::ViewProblem;
 /// Explanatory text available for every semantic diagnostic, without source labels.
 pub trait DiagnosticMessage {
     /// Describe the problem using the facts retained by its semantic payload.
@@ -531,16 +535,14 @@ impl AnalysisProblem {
             Self::IncompatibleEngineVersion(_)
             | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ParameterTypeUnresolved(_)
-            | Self::InferenceCandidateSpaceUnsupported { .. } => {
+            | Self::InferenceCandidateSpaceUnsupported { .. }
+            | Self::CoalesceExprTypeUnknown(..) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
             Self::Index(problem) => problem.render_metadata(),
             Self::UnreachableCoalesceArgument(..) => DiagnosticMetadata::from(
                 "COALESCE argument is unreachable after a non-null operand",
-            ),
-            Self::CoalesceExprTypeUnknown(..) => DiagnosticMetadata::from(
-                "COALESCE operands do not have a common implicit result type",
             ),
             Self::AlterColumn(problem) => problem.render_metadata(),
             Self::Creation(problem) => problem.render_metadata(),
@@ -618,11 +620,11 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::ExplicitCastNotDefined(source, target) => {
                 format!("explicit cast from {source} to {target} is not defined")
             }
-            Self::ExpressionTypeNotKnown(_) => {
-                "SQL type of an expression could not be determined".to_owned()
+            Self::ExpressionTypeNotKnown(expression) => {
+                format!("SQL type of {} could not be determined", expression.kind())
             }
-            Self::UndefinedOperator(_, operator, _, _) => {
-                format!("operator {operator} has no definition for the supplied operands")
+            Self::UndefinedOperator(_, operator, left, right) => {
+                undefined_operator_message(operator, left, right)
             }
             Self::RequireArray(_, ty) => {
                 format!("array operation requires an array value, found {ty}")
@@ -630,8 +632,8 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::SubQueryNotHaveColumnForDerivedColumnName() => {
                 "subquery has no column for the derived column name".to_owned()
             }
-            Self::IncompatibleCaseValues(_) => {
-                "CASE result expressions have no common type".to_owned()
+            Self::IncompatibleCaseValues(types) => {
+                format!("CASE result expressions have no common type: {types}")
             }
             Self::CaseWhenExprTypeUnknown(_) => {
                 "SQL type of a CASE WHEN condition could not be determined".to_owned()
@@ -642,8 +644,10 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::MemberAccessRequiresCompositeType(name, member) => {
                 format!("member {member} of {name} requires a composite type")
             }
-            Self::FunctionArgImplicitCastNotFound(name, index, ty, _) => {
-                format!("argument {index} of {name} cannot be implicitly cast to {ty}")
+            Self::FunctionArgImplicitCastNotFound(name, index, ty, expression) => {
+                format!(
+                    "argument {index} of {name} ({expression}) cannot be implicitly cast to {ty}"
+                )
             }
             Self::ImplicitCastNotFound(source, target) => {
                 format!("implicit cast from {source} to {target} is not defined")
@@ -654,9 +658,29 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::UnreachableCoalesceArgument(..) => {
                 "COALESCE argument is unreachable after a non-null operand".to_owned()
             }
-            Self::CoalesceExprTypeUnknown(..) => {
-                "COALESCE operands do not have a common implicit result type".to_owned()
+            Self::CoalesceExprTypeUnknown(expressions) => {
+                format!(
+                    "COALESCE operands do not have a common implicit result type: {expressions}"
+                )
             }
+        }
+    }
+}
+
+fn undefined_operator_message(
+    operator: &OperatorName,
+    left: &OptionalExpression,
+    right: &OptionalExpression,
+) -> String {
+    match (left.expression(), right.expression()) {
+        (Some(left), Some(right)) => {
+            format!("operator {operator} has no definition for {left} and {right}")
+        }
+        (Some(operand), None) | (None, Some(operand)) => {
+            format!("operator {operator} has no definition for {operand}")
+        }
+        (None, None) => {
+            format!("operator {operator} has no definition for the supplied operands")
         }
     }
 }
@@ -686,22 +710,22 @@ mod diagnostic_message_tests {
         );
         assert_eq!(
             trigger.diagnostic_message(),
-            "trigger function public.audit is missing or cannot be called without arguments"
+            "trigger function public.audit is missing or is not usable as a trigger function"
         );
     }
 
     #[test]
     fn undefined_operator_message_does_not_expose_rust_expression_debug_text() {
         let problem = AnalysisProblem::undefined_operator(
-            AExprKind::new("AexprOp"),
+            AExprKind::new("operator"),
             "+",
-            &Some("left expression"),
-            &Some("right expression"),
+            Some(super::SemScalarExpr::new("literal", None, Some(true))),
+            None::<super::SemScalarExpr>,
         );
 
         assert_eq!(
             problem.diagnostic_message(),
-            "operator + has no definition for the supplied operands"
+            "operator + has no definition for literal of undetermined type"
         );
     }
 }
@@ -773,14 +797,14 @@ impl AnalysisProblem {
     pub fn undefined_operator(
         aexpr_op: impl Into<AExprKind>,
         name: impl Into<OperatorName>,
-        left_arg: &impl std::fmt::Debug,
-        right_arg: &impl std::fmt::Debug,
+        left_arg: Option<impl Into<SemScalarExpr>>,
+        right_arg: Option<impl Into<SemScalarExpr>>,
     ) -> Self {
         Self::UndefinedOperator(
             aexpr_op.into(),
             name.into(),
-            OptionalExpression::new(&format!("{left_arg:?}")),
-            OptionalExpression::new(&format!("{right_arg:?}")),
+            OptionalExpression::new(left_arg.map(Into::into).as_ref()),
+            OptionalExpression::new(right_arg.map(Into::into).as_ref()),
         )
     }
 
@@ -827,10 +851,11 @@ impl AnalysisProblem {
 
     /// all of coalesce type is not known
     #[must_use]
-    pub fn coalesce_expr_type_unknown(arg_exprs: &impl std::fmt::Debug) -> Self {
-        let arg_exprs = ExpressionList::new(&format!("{arg_exprs:#?}"));
-        tracing::warn!("{arg_exprs:#?}");
-        Self::CoalesceExprTypeUnknown(arg_exprs)
+    pub fn coalesce_expr_type_unknown(
+        arg_exprs: impl IntoIterator<Item = impl Into<SemScalarExpr>>,
+    ) -> Self {
+        let expressions: Vec<_> = arg_exprs.into_iter().map(Into::into).collect();
+        Self::CoalesceExprTypeUnknown(ExpressionList::new(&expressions))
     }
 
     /// implicit cast not allowed
@@ -879,8 +904,11 @@ impl AnalysisProblem {
 
     /// incompatible cast values
     #[must_use]
-    pub fn incompatible_case_values(result_types: impl std::fmt::Debug) -> Self {
-        Self::IncompatibleCaseValues(TypeList::new(&format!("{result_types:?}")))
+    pub fn incompatible_case_values(
+        result_types: impl IntoIterator<Item = impl Into<TypeReference>>,
+    ) -> Self {
+        let types: Vec<_> = result_types.into_iter().map(Into::into).collect();
+        Self::IncompatibleCaseValues(TypeList::new(&types))
     }
 
     /// unexpected dynamic type
@@ -938,7 +966,9 @@ mod coalesce_diagnostic_tests {
 
     #[test]
     fn unreachable_argument_is_a_serializable_warning() {
-        let problem = AnalysisProblem::unreachable_coalesce_argument("later", "first");
+        let later = super::SemScalarExpr::new("literal", None, None);
+        let first = super::SemScalarExpr::new("literal", None, Some(true));
+        let problem = AnalysisProblem::unreachable_coalesce_argument(&later, &first);
         assert_eq!(problem.code(), "unreachable_coalesce_argument");
         assert_eq!(problem.severity(), DiagnosticSeverity::Warning);
         assert!(problem.render_metadata().is_some());

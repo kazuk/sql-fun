@@ -1117,6 +1117,15 @@ impl Dialect {
     }
 }
 
+impl std::fmt::Display for Dialect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Postgres => "PostgreSQL",
+            Self::Sqlite => "SQLite",
+        })
+    }
+}
+
 impl From<&::sql_fun_core::SqlFunMetadata> for Dialect {
     fn from(metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
         match metadata.sql_dialect() {

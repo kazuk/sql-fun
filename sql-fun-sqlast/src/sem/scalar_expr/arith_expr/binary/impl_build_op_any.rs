@@ -54,6 +54,7 @@ impl super::ArithExpr {
         }
         let candidates = BinaryCastCandidate::resolve(
             context,
+            name,
             &operator_def,
             &left_type,
             &array_type.element_type(),

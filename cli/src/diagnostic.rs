@@ -105,6 +105,58 @@ impl DiagnosticRenderer {
 }
 
 #[cfg(test)]
+mod structured_fact_rendering_tests {
+    use super::DiagnosticRenderer;
+    use crate::highlighter_theme::HighlighterTheme;
+    use ::sql_fun_core::analysis_problem::{
+        AExprKind, AnalysisProblem, ArgumentBindingCollection, SemScalarExpr, TypeReference,
+    };
+
+    #[rstest::rstest]
+    #[case::operator(
+        AnalysisProblem::undefined_operator(
+            AExprKind::new("operator"),
+            "app.+",
+            Some(SemScalarExpr::new("literal", Some(&TypeReference::new("pg_catalog.int4")), Some(true))),
+            Some(SemScalarExpr::new("column reference", None, None)),
+        ),
+        "undefined_operator",
+        &["app.+", "literal of type pg_catalog.int4", "column reference of undetermined type"]
+    )]
+    #[case::function_overload(
+        AnalysisProblem::function_overload_resolution_failed(
+            "public.compute",
+            ArgumentBindingCollection::new(&[Some(TypeReference::new("pg_catalog.int4")), None]),
+        ),
+        "function_overload_resolution_failed",
+        &["public.compute", "pg_catalog.int4", "undetermined type"]
+    )]
+    fn renders_readable_names_and_known_facts_without_tokens(
+        #[case] problem: AnalysisProblem,
+        #[case] code: &str,
+        #[case] details: &[&str],
+        #[values(None, Some("SELECT 1 OPERATOR(app.+) value, public.compute(1, value)"))]
+        source: Option<&str>,
+    ) -> testresult::TestResult {
+        let renderer = DiagnosticRenderer {
+            theme: HighlighterTheme::default(),
+            color: false,
+        };
+        let output = renderer.render_problem(&problem, problem.severity(), source, None)?;
+        let normalized = output.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(output.contains(code), "{output}");
+        for detail in details {
+            assert!(normalized.contains(*detail), "missing {detail}: {output}");
+        }
+        assert!(!output.contains("SemScalarExpr {"), "{output}");
+        assert!(!output.contains("ArgumentBindingCollection("), "{output}");
+        assert!(!output.contains("Some("), "{output}");
+        assert!(!output.contains("\x1b["));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
 mod test_ansi_rendering {
     use super::DiagnosticRenderer;
     use crate::highlighter_theme::HighlighterTheme;
@@ -260,11 +312,11 @@ mod test_implemented_family_rendering {
     )]
     #[case::rule(
         AnalysisProblem::rule(&RuleProblem::target("missing")),
-        "rule_invalid_definition", "invalid rule statement: Target(missing)", false
+        "rule_invalid_definition", "rule target missing does not resolve to a supported relation", false
     )]
     #[case::trigger(
         AnalysisProblem::trigger(&TriggerProblem::target("missing")),
-        "trigger_invalid_definition", "invalid trigger statement: Target(missing)", false
+        "trigger_invalid_definition", "trigger target missing does not resolve to a supported relation", false
     )]
     #[tokio::test]
     #[ignore = "High CI disk usage from server builds"]

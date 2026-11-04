@@ -1,14 +1,18 @@
+mod check;
 mod foreign;
 mod primary;
 mod unique;
 
 pub use self::{
-    foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint, unique::UniqueConstraint,
+    check::CheckConstraint, foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint,
+    unique::UniqueConstraint,
 };
 
 use crate::{
+    ast::TableConstraint,
     names::ColumnName,
     sem::ColumnRename,
+    sem::traversal::SemanticVisitorMut,
     syn::{AlterTableCmd, Constraint as SynConstraint},
 };
 
@@ -36,6 +40,8 @@ where
 /// analyzed [`crate::syn::Constraint`]
 #[derive(Debug, Clone)]
 pub enum Constraint {
+    /// Table CHECK expression and applicability.
+    Check(CheckConstraint),
     /// primary key constraint
     PrimaryKey(PrimaryKeyConstraint),
     /// unique constraint
@@ -45,8 +51,30 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    /// Inspect a table CHECK, including a rejected definition's retained expression.
+    pub const fn as_check(&self) -> Option<&CheckConstraint> {
+        if let Self::Check(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn walk_check(
+        &mut self,
+        visitor: &mut impl SemanticVisitorMut,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Check(value) = self {
+            value.walk(visitor)?;
+        }
+        Ok(())
+    }
+}
+
+impl Constraint {
     pub(crate) const fn references_can_apply(&self) -> bool {
-        if let Self::Foreign(value) = self {
+        if let Self::Check(value) = self {
+            value.can_apply()
+        } else if let Self::Foreign(value) = self {
             value.references_can_apply()
         } else {
             true
@@ -65,16 +93,23 @@ impl Constraint {
         }
     }
 
-    pub(crate) fn rename_column(&mut self, rename: &ColumnRename, owned: bool) {
+    pub(crate) fn rename_column(
+        &mut self,
+        rename: &ColumnRename,
+        owned: bool,
+    ) -> Result<(), AnalysisError> {
         match self {
+            Self::Check(value) => value.rename_column(rename)?,
             Self::PrimaryKey(value) => value.rename_column(rename, owned),
             Self::Unique(value) => value.rename_column(rename, owned),
             Self::Foreign(value) => value.rename_column(rename, owned),
         }
+        Ok(())
     }
 
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         match self {
+            Self::Check(value) => value.rename_relation(old, new),
             Self::PrimaryKey(value) => value.rename_relation(old, new),
             Self::Unique(value) => value.rename_relation(old, new),
             Self::Foreign(value) => value.rename_relation(old, new),
@@ -85,7 +120,7 @@ impl Constraint {
         match self {
             Self::PrimaryKey(key) => key.keys().to_vec(),
             Self::Unique(key) => key.key_columns(),
-            Self::Foreign(_) => Vec::new(),
+            Self::Foreign(_) | Self::Check(_) => Vec::new(),
         }
     }
 
@@ -96,7 +131,7 @@ impl Constraint {
                     && key.keys().iter().all(|name| columns.contains(name))
             }
             Self::Unique(key) => key.matches_columns(columns),
-            Self::Foreign(_) => false,
+            Self::Foreign(_) | Self::Check(_) => false,
         }
     }
 
@@ -122,6 +157,7 @@ impl Constraint {
     #[must_use]
     pub fn name(&self) -> &str {
         match self {
+            Self::Check(check) => check.name(),
             Self::PrimaryKey(pk) => pk.name(),
             Self::Unique(u) => u.name(),
             Self::Foreign(f) => f.name(),
@@ -131,6 +167,7 @@ impl Constraint {
     /// get constraint derive index definition
     pub fn implicit_changes(&self) -> Result<Vec<ImplicitChange>, AnalysisError> {
         match self {
+            Self::Check(_) => Ok(Vec::new()),
             Self::PrimaryKey(pk) => pk.implicit_changes(),
             Self::Unique(u) => u.implicit_changes(),
             Self::Foreign(f) => f.implicit_changes(),
@@ -229,7 +266,9 @@ where
             ConstrType::ConstrDefault => todo!(),
             ConstrType::ConstrIdentity => todo!(),
             ConstrType::ConstrGenerated => todo!(),
-            ConstrType::ConstrCheck => todo!(),
+            ConstrType::ConstrCheck => {
+                TableConstraint::analyze_legacy_check(context, target_table, &constraint)
+            }
             ConstrType::ConstrPrimary => {
                 PrimaryKeyConstraint::analyze(context, target_table, constraint)
             }

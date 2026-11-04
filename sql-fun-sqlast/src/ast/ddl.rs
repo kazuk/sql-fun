@@ -1,6 +1,7 @@
 //! Owned DDL syntax. Catalog bindings are obtained only during resolution.
 
 mod alter_index;
+mod check;
 mod column_attributes;
 mod column_rename;
 mod serial;
@@ -198,9 +199,9 @@ impl super::AlterRelationKind {
         for command in syntax_commands {
             commands.push(command.resolve(context, &table)?);
         }
-        Ok(SemAst::alter_table(&AlterTable::new(
-            &table, &commands, source,
-        )))
+        let mut statement = AlterTable::new(&table, &commands, source);
+        statement.validate_check_names(context)?;
+        Ok(SemAst::alter_table(&statement))
     }
 
     fn resolve_view(
@@ -755,6 +756,12 @@ impl super::TableConstraint {
         context: &mut impl ParseContext,
         table: &TableName,
     ) -> Result<Constraint, AnalysisError> {
+        if self.is_check() {
+            let definition = context.get_table(table).cloned();
+            return self
+                .resolve_check(context, table, definition.as_ref(), true)
+                .map(Constraint::Check);
+        }
         let keys = self.column_names();
         if context.get_table(table).is_none() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(table))?;
@@ -975,6 +982,7 @@ impl super::Table {
         }
         if context.dialect() == Dialect::postgres()
             && let Some(constraint) = self.duplicate_constraint_name(&context)
+            && !self.check_name_used(constraint)
         {
             context.report_problem(AnalysisProblem::creation(CreationProblem::constraint(
                 &name,
@@ -1043,6 +1051,7 @@ impl super::Table {
         if context.dialect() == Dialect::postgres() {
             table.apply_primary_key_nullability();
         }
+        self.resolve_checks(context, &mut table)?;
         Ok(table)
     }
 }

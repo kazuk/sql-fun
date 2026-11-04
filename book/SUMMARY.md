@@ -123,6 +123,7 @@
   - [call_argument_duplicate_name](diagnostics/call_argument_duplicate_name.md)
   - [call_argument_positional_after_named](diagnostics/call_argument_positional_after_named.md)
   - [coalesce_expr_type_unknown](diagnostics/coalesce_expr_type_unknown.md)
+  - [check_constraint](diagnostics/check_constraint.md)
   - [collate_capability_undefined](diagnostics/collate_capability_undefined.md)
   - [collate_operand_type](diagnostics/collate_operand_type.md)
   - [collation_name_ambiguous](diagnostics/collation_name_ambiguous.md)

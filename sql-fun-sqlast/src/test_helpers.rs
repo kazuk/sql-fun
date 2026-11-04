@@ -13,6 +13,7 @@ pub(crate) mod call_arguments;
 pub(crate) mod case_parameters;
 pub(crate) mod cast_catalog;
 pub(crate) mod cast_layers;
+pub(crate) mod checks;
 pub(crate) mod coalesce;
 pub(crate) mod collate;
 pub(crate) mod column_attributes;

@@ -224,7 +224,7 @@ mod test_resolve {
 }
 
 impl TruthTestExpr {
-    fn accepts_type(context: &impl ParseContext, ty: &TypeReference) -> bool {
+    pub(crate) fn accepts_type(context: &impl ParseContext, ty: &TypeReference) -> bool {
         let canonical = if ty.is_dynamic() {
             ty.clone()
         } else {
@@ -266,7 +266,7 @@ impl TruthTestExpr {
 
     // PostgreSQL boolin accepts unique case-insensitive prefixes of these
     // words, plus 0/1, with ASCII whitespace at either end. "o" is ambiguous.
-    fn valid_boolean_input(text: &str) -> bool {
+    pub(crate) fn valid_boolean_input(text: &str) -> bool {
         let text = text.trim_matches([' ', '\t', '\n', '\r', '\u{000b}', '\u{000c}']);
         matches!(
             text.to_ascii_lowercase().as_str(),

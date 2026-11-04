@@ -1,11 +1,12 @@
 use crate::{
     ast::Dialect,
     context::ParseContext,
-    names::{AliasName, ColumnName, FullName, SchemaName},
+    names::{AliasName, ColumnName, FullName, SchemaName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnReferenceExpr, DataSource, DeleteRowVersion,
-        FromClause, MergeMatchKind, QueryNameResolution, QueryProblem, ResultColumnCollection,
-        RuleEvent, RuleIdentity, SemScalarExpr, WholeRowExpr, WithClause,
+        AnalysisError, AnalysisProblem, ColumnReferenceExpr, CreateTable, DataSource,
+        DeleteRowVersion, FromClause, MergeMatchKind, QueryNameResolution, QueryProblem,
+        ResultColumnCollection, RuleEvent, RuleIdentity, SemScalarExpr, WholeRowExpr,
+        WholeRowFields, WithClause,
         data_source::{MergeRecordRole, QualifiedSource, WildcardProjection},
         problem::{RuleProblem, TriggerProblem},
         scalar_expr::{
@@ -39,6 +40,14 @@ pub struct ScalarAnalysisContext<'a> {
     rule: Option<RuleScope>,
     trigger_namespace: Option<SchemaName>,
     projection_scope_id: Option<usize>,
+    declared_table: Option<DeclaredTableRow<'a>>,
+}
+
+/// Row declarations can precede catalog publication, but bindings use their canonical identity.
+#[derive(Debug, Clone)]
+struct DeclaredTableRow<'a> {
+    definition: &'a CreateTable,
+    identity: TableName,
 }
 
 #[derive(Debug, Clone)]
@@ -48,7 +57,100 @@ struct RuleScope {
     forbidden: Option<&'static str>,
 }
 
+impl<'a> ScalarAnalysisContext<'a> {
+    pub(crate) fn declared_table(table: &'a CreateTable, identity: &TableName) -> Self {
+        Self {
+            declared_table: Some(DeclaredTableRow {
+                definition: table,
+                identity: identity.clone(),
+            }),
+            ..Self::default()
+        }
+    }
+
+    fn resolve_declared_column(
+        &self,
+        context: &mut impl ParseContext,
+        alias: Option<&AliasName>,
+        column: &ColumnName,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if let Some(table) = &self.declared_table
+            && alias.is_none_or(|alias| {
+                if context.dialect() == Dialect::sqlite() {
+                    alias
+                        .as_str()
+                        .eq_ignore_ascii_case(table.identity.full_name().name().as_str())
+                } else {
+                    alias.as_str() == table.identity.full_name().name().as_str()
+                }
+            })
+        {
+            return self.declared_column(context, column).map(Some);
+        }
+        Ok(None)
+    }
+
+    fn declared_column(
+        &self,
+        context: &mut impl ParseContext,
+        column: &ColumnName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let table = self.declared_table.as_ref().expect("declared row scope");
+        let definition = table
+            .definition
+            .find_column(column, context.dialect() == Dialect::sqlite());
+        if definition.is_none()
+            && context.dialect() == Dialect::postgres()
+            && column.as_str() == table.identity.full_name().name().as_str()
+        {
+            return self.declared_whole_row(context, table.identity.full_name(), 0);
+        }
+        let canonical = if let Some(binding) = definition
+            && let Some(name) = binding.name().as_ref()
+        {
+            name
+        } else {
+            column
+        };
+        if definition.is_none() {
+            context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
+                &table.identity,
+                column,
+            ))?;
+        }
+        Ok(SemScalarExpr::ColumnRef(ColumnReferenceExpr::table_column(
+            &AliasName::from(table.identity.full_name().name().as_str()),
+            canonical,
+            &table.identity,
+            definition,
+            false,
+        )))
+    }
+}
+
 impl ScalarAnalysisContext<'_> {
+    fn declared_whole_row(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &FullName,
+        levels_up: usize,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let table = self.declared_table.as_ref().expect("declared row scope");
+        let mut fields = WholeRowFields::default();
+        for column in table.definition.column_names() {
+            fields.push(&column, &self.declared_column(context, &column)?);
+        }
+        let alias = AliasName::from(table.identity.full_name().name().as_str());
+        Ok(SemScalarExpr::whole_row(&WholeRowExpr::resolved(
+            requested,
+            &alias,
+            Some(table.identity.full_name()),
+            None,
+            levels_up,
+            Some(true),
+            &fields,
+        )))
+    }
     fn notify_unbound_row_image(
         &self,
         context: &mut impl ParseContext,
@@ -353,6 +455,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     fn clone_scope(&self) -> Self {
         Self {
+            declared_table: self.declared_table.clone(),
             windows: self.windows.clone(),
             grouping: self.grouping.clone(),
             output_aliases: self.output_aliases.clone(),
@@ -377,6 +480,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             with_clause: Cow::Borrowed(with_clause),
             from_clause: Cow::Borrowed(from_clause),
             parent: None,
+            declared_table: None,
             windows: Vec::new(),
             grouping: GroupingScope::new(),
             output_aliases: None,
@@ -398,6 +502,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             with_clause: Cow::Borrowed(with_clause),
             from_clause: Cow::Borrowed(from_clause),
             parent: parent.map(|parent| Box::new(parent.clone_scope())),
+            declared_table: None,
             windows: Vec::new(),
             grouping: GroupingScope::nested(parent.map(|scope| &scope.grouping)),
             output_aliases: None,
@@ -612,6 +717,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             with_clause: Cow::Borrowed(with_clause),
             from_clause: Cow::Owned(from_clause),
             parent: None,
+            declared_table: None,
             windows: Vec::new(),
             grouping: GroupingScope::new(),
             output_aliases: None,
@@ -670,6 +776,14 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
         use crate::sem::scalar_expr::column_ref::QualifiedColumnFailure;
+        if let Some(table) = &self.declared_table {
+            let name = table.identity.full_name();
+            if (context.dialect() == Dialect::sqlite() && relation.sqlite_eq(name))
+                || (context.dialect() != Dialect::sqlite() && relation == name)
+            {
+                return self.declared_column(context, column);
+            }
+        }
         // Row-image environments expose OLD/NEW aliases rather than relation names.
         let source = if self.qualified_only {
             Ok(None)
@@ -885,6 +999,9 @@ impl ScalarAnalysisContext<'_> {
         alias: Option<&AliasName>,
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut TContext), AnalysisError> {
+        if let Some(expression) = self.resolve_declared_column(context, alias, column)? {
+            return Ok((expression, context));
+        }
         if let Some(alias) = alias {
             if self.qualified_only && context.dialect() == Dialect::sqlite() {
                 let normalized = AliasName::from(alias.as_str().to_ascii_lowercase().as_str());
@@ -1048,6 +1165,14 @@ impl ScalarAnalysisContext<'_> {
         requested: &FullName,
         levels_up: usize,
     ) -> Result<SemScalarExpr, AnalysisError> {
+        if let Some(table) = &self.declared_table {
+            let name = table.identity.full_name();
+            if relation.name() == name.name()
+                && (relation.schema().is_none() || relation.schema() == name.schema())
+            {
+                return self.declared_whole_row(context, requested, levels_up);
+            }
+        }
         let source = if relation.schema().is_some() {
             if self.qualified_only {
                 Ok(None)

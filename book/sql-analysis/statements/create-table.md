@@ -46,6 +46,38 @@ names use ordinary type lookup. Invalid serial declarations report specific diag
 - IDENTITY: [serial_identity_conflict](../../diagnostics/serial_identity_conflict.md).
 - Generated expressions: [serial_generated_conflict](../../diagnostics/serial_generated_conflict.md).
 
+### Table CHECK constraints
+
+Named and unnamed table CHECK constraints are analyzed against all declared
+columns, including columns written after the constraint. PostgreSQL requires a boolean
+expression; NULL and valid unknown boolean strings are accepted. A CHECK permits
+NULL results and does not imply NOT NULL column metadata. Subqueries,
+aggregates, window functions, set-returning expressions and bind parameters
+are rejected. Failed definitions do not enter the analysis catalog.
+
+```sql
+CREATE TABLE bounds (
+    low integer,
+    high integer,
+    CONSTRAINT ordered CHECK (low < high) NO INHERIT
+);
+```
+
+Constraint names, NO INHERIT and applicable explicit enforcement choices are
+retained. CREATE accepts NOT VALID but records the new CHECK as validated;
+ALTER ADD CHECK NOT VALID instead retains an unvalidated constraint.
+CHECK is not deferrable. Inheritance propagation remains
+[#546](https://github.com/kazuk/sql-fun/issues/546);
+PostgreSQL 18 NOT ENFORCED remains
+[#887](https://github.com/kazuk/sql-fun/issues/887). SQLite table CHECK
+constraints use SQLite truth values rather than PostgreSQL boolean coercion.
+SQLite CHECK constraints using ordinary comparison/arithmetic operators can still
+reach the shared unimplemented
+operator path ([#504](https://github.com/kazuk/sql-fun/issues/504)); supported
+truth/null tests and logical expressions can bind multiple row columns.
+Analysis does not execute
+checks against database rows or infer an implicit index.
+
 ### CREATE TABLE AS
 
 The PostgreSQL table-as path analyzes its query and derives ordered columns. A
@@ -60,7 +92,9 @@ WITH NO DATA spelling does not turn static analysis into data loading.
 SQLite CREATE TABLE has a dedicated conversion and analysis path behind the
 sqlite feature, including declared types and retained foreign-key declarations.
 It does not use PostgreSQL assignment or implicit-cast rules. SQLite permits
-repeated constraint names, but that remains unsupported by schema analysis.
+repeated constraint names, but that remains unsupported by schema analysis;
+repeated named table CHECK constraints reach an explicit unimplemented path
+([#992](https://github.com/kazuk/sql-fun/issues/992)).
 Automatically generated database index names are not inferred. SQLite CREATE
 TABLE AS currently reaches an unimplemented table-query analysis path;
 PostgreSQL table-as support does not establish SQLite support.
@@ -74,12 +108,12 @@ paths; grammar acceptance is not full constraint validation.
 
 ### Remaining declaration limitations
 
-Table-level CHECK constraint binding/validation remains unimplemented
-([#525](https://github.com/kazuk/sql-fun/issues/525)), as does PostgreSQL
-EXCLUDE constraint analysis
-([#526](https://github.com/kazuk/sql-fun/issues/526)). These paths can terminate
-analysis; column CHECK handling does not implement table CHECK, and lack of
-static constraint analysis is separate from not checking live database rows.
+PostgreSQL EXCLUDE constraint analysis remains unimplemented
+([#526](https://github.com/kazuk/sql-fun/issues/526)) and can terminate analysis.
+Inline column CHECK constraints do not yet reliably bind row-column references
+or receive complete CHECK validation and catalog applicability
+([#991](https://github.com/kazuk/sql-fun/issues/991)). Table CHECK support above
+does not establish inline CHECK support.
 
 `CREATE TABLE name OF composite_type` is recognized but does not resolve
 and apply the typed table's column structure and dependent type association
@@ -109,6 +143,8 @@ establish successful catalog application.
 
 ## Diagnostics
 
+- [check_constraint](../../diagnostics/check_constraint.md): a table CHECK
+  expression, option or explicit constraint name is invalid.
 - [conflicting_creation](../../diagnostics/conflicting_creation.md): a table,
   relation identity or retained constraint name conflicts with an existing
   declaration.

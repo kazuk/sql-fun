@@ -1,6 +1,8 @@
 mod cast_info;
 
 #[cfg(test)]
+mod check_tests;
+#[cfg(test)]
 mod column_attribute_tests;
 mod column_rename;
 #[cfg(test)]

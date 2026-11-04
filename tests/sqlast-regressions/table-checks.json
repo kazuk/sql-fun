@@ -1,0 +1,282 @@
+[
+  {
+    "name": "cross-column-late",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a < b), b integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "named-qualified",
+    "sql": "CREATE TABLE check_sample (a integer, CONSTRAINT positive CHECK(check_sample.a > 0))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "two-unnamed",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a > 0), CHECK(a < 100))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "null",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "nullable-expression",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a > NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "false-is-a-valid-definition",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(false))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "boolean-input",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK('yes'))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "boolean-domain",
+    "sql": "CREATE TABLE check_sample (flag check_flag, CHECK(flag))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "no-inherit",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a > 0) NO INHERIT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "whole-row",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(check_sample.* IS NOT NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "integer",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "nested-integer",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a AND true))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "typed-text",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK('true'::text))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-boolean-input",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK('o'))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "missing-column",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(absent IS NULL))",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "aggregate",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(sum(a) > 0))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "window",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(row_number() OVER() > 0))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "set-returning",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(generate_series(1,2) > 0))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "subquery",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK((SELECT true)))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-name",
+    "sql": "CREATE TABLE check_sample (a integer, CONSTRAINT repeated CHECK(true), CONSTRAINT repeated CHECK(false))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-add",
+    "sql": "ALTER TABLE check_existing ADD CONSTRAINT positive CHECK(a > 0)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-options",
+    "sql": "ALTER TABLE check_existing ADD CONSTRAINT positive CHECK(a > 0) NO INHERIT NOT VALID",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-unnamed",
+    "sql": "ALTER TABLE check_existing ADD CHECK(a < b), ADD CHECK(NULL)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-invalid",
+    "sql": "ALTER TABLE check_existing ADD CONSTRAINT bad CHECK(a)",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-missing-column",
+    "sql": "ALTER TABLE check_existing ADD CHECK(absent IS NULL)",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-atomic-rejection",
+    "sql": "ALTER TABLE check_existing ADD CHECK(a > 0), ADD CHECK(a)",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-duplicate-name",
+    "sql": "ALTER TABLE check_existing ADD CONSTRAINT existing CHECK(true)",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "create-not-valid",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(a > 0) NOT VALID)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "searched-case",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(CASE WHEN a > 0 THEN true ELSE false END))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid-case-condition",
+    "sql": "CREATE TABLE check_sample (a integer, CHECK(CASE WHEN a THEN true ELSE false END))",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "alter-duplicate-in-statement",
+    "sql": "ALTER TABLE check_existing ADD CONSTRAINT repeated CHECK(true), ADD CONSTRAINT repeated CHECK(false)",
+    "expected": {
+      "diagnostics": [
+        "check_constraint"
+      ],
+      "columns": []
+    }
+  }
+]

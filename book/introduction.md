@@ -16,12 +16,15 @@ If you're writing raw SQL and wish Rust could help more: this is it.
 `sql-fun` is a code generator for executing SQL queries and statements.
 
 - It runs entirely at **compile time** — there is no runtime component.
-- It requires **no runtime dependencies** in your application.
+- Generated functions use your application's database driver and supporting
+  dependencies; `sql-fun` adds no runtime library of its own.
 - It is designed for `PostgreSQL` and `SQLite`:
   - `PostgreSQL` dialect
     - SQL is parsed using `pg_query`, a full `PostgreSQL` parser.
-      - You can use the full range of `PostgreSQL` syntax with no limitations.
-    - All SQL statements are validated at compile time.
+      - Parser acceptance and semantic support are separate; see
+        [SQL analysis coverage and limitations](sql-analysis.md).
+    - `sql-fun check` analyzes selected application SQL against the configured
+      catalog metadata before generated execution code is built.
   - `SQLite` dialect
     - SQL is parsed using `turso_parser`. SQLite support is under development
       and inherits [parser limitations](sql-analysis.md#sqlite-parser-limitations).

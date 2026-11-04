@@ -44,12 +44,49 @@ impl ItemFunction {
 
     pub fn into_inner(mut self) -> ItemFn {
         self.0.sig = self.codegen_signature();
-        self.0
-            .attrs
-            .retain(|attr| !attr.path().is_ident(Self::SQL_FRAGMENT_ATTR));
+        self.0.attrs.retain(|attr| {
+            !attr.path().is_ident(Self::SQL_FRAGMENT_ATTR)
+                && !attr.path().is_ident(CteReferenceAttr::ATTR_NAME)
+        });
         self.0
     }
+}
 
+#[cfg(test)]
+mod test_item_function_emission {
+    use crate::rust_syn::{CteReferenceAttr, ItemFunction};
+
+    #[test]
+    fn consumes_cte_helpers_only_at_emission_and_preserves_other_attributes() {
+        let original = ItemFunction::new(syn::parse_quote! {
+            #[allow(dead_code)]
+            #[with(cte_name = "parent", alias = "selected_parent")]
+            #[doc = "Catalog query"]
+            #[with(cte_name = "child", alias = "selected_child")]
+            #[sql_fragment(filter, selection, (), { All => "" })]
+            #[other::with(value)]
+            async fn query(connection: ()) -> Result<i64, ()> {}
+        });
+        let references = CteReferenceAttr::from_item_fn(&original).unwrap();
+        assert_eq!(references.len(), 2);
+        assert_eq!(references[0].cte_name().to_string(), "parent");
+        assert_eq!(references[0].alias().to_string(), "selected_parent");
+        assert_eq!(references[1].cte_name().to_string(), "child");
+        assert_eq!(references[1].alias().to_string(), "selected_child");
+
+        let emitted = original.into_inner();
+        assert_eq!(
+            emitted.attrs,
+            vec![
+                syn::parse_quote!(#[allow(dead_code)]),
+                syn::parse_quote!(#[doc = "Catalog query"]),
+                syn::parse_quote!(#[other::with(value)]),
+            ]
+        );
+    }
+}
+
+impl ItemFunction {
     pub fn codegen_signature(&self) -> Signature {
         let mut sig = self.0.sig.clone();
         for input in &mut sig.inputs {
@@ -576,6 +613,8 @@ mod test_item_func_get_fragment_spec_attr {
 pub struct CteReferenceAttr(CteCatalogReference);
 
 impl CteReferenceAttr {
+    const ATTR_NAME: &str = "with";
+
     pub fn new(cte_name: &str, alias: &str) -> Self {
         Self(CteCatalogReference::new(
             &CteName::new(cte_name),
@@ -602,7 +641,7 @@ impl CteReferenceAttr {
     /// - [`syn::Error`]: invalid syntax
     ///
     pub fn from_attr(attr: &syn::Attribute) -> Result<Option<Self>, syn::Error> {
-        if attr.meta.path().is_ident("with") {
+        if attr.meta.path().is_ident(Self::ATTR_NAME) {
             let arguments = attr
                 .parse_args_with(Punctuated::<syn::MetaNameValue, Token![,]>::parse_terminated)?;
             let mut cte_name = None;

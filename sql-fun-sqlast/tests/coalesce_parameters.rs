@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 // Removed the repeated numeric-input variant; restore from 81568731f391becc60f90cbeac057ddd96c0baa6.
 // Timed-out numeric_inputs_keep_admissible_assignments cases were deleted in c3fd85bad9570e8bf92c9d863bc885ab3b4ab84b.
 // Further timed-out numeric-input cases were deleted in 5deab88d08aa04b01b46c4809ab9c4e283330376.
-// Timed-out reverse case removed in 3e63bea6; recover it from Git history.
+// Timed-out reverse case removed in f2199134; recover it from Git history.
 #[rstest::rstest]
 // Timed-out nested COALESCE case removed in 5a87b43ee035cdc8f907221b0ee896af7ef6de4b.
 // Removed nested_case after a local timeout; restore from bb14217fb859c8255678c9c00c58fd5d2d6f0380.

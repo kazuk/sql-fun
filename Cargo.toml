@@ -6,7 +6,8 @@ version = "0.1.0"
 edition = "2024"
 authors = ["kazuk"]
 description = "SQL query/statement execution code generator"
-exclude = ["/postgres"]
+# Keep published sources separate from repository tooling and internal documents.
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE"]
 categories = ["database", "development-tools"]
 keywords.workspace = true
 repository.workspace = true

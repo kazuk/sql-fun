@@ -1,21 +1,15 @@
 #![deny(missing_docs)]
 //! procedural macro `sql-fun`
 //!
-mod errors;
-
 use std::{
     env::var,
     fs::File,
     sync::{LazyLock, Mutex, Once},
 };
 
-use self::errors::SqlFunError;
-
-use proc_macro2::TokenStream;
-
 use sql_fun_codegen::{QueryFunctionBase, QueryFunctionForGenerate, QueryFunctionKind};
 use sql_fun_core::{SqlFunArgs, SqlFunArgsError};
-use syn::{ItemFn, LitStr, parse_macro_input};
+use syn::{ItemFn, parse_macro_input};
 
 static TRACING_INIT: Once = Once::new();
 
@@ -39,39 +33,6 @@ fn init_tracing() {
                 .try_init();
         }
     });
-}
-
-///
-/// fill table/view fields to struct
-///
-#[proc_macro_attribute]
-pub fn from_table(
-    table_name: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    #[tracing::instrument()]
-    fn from_table_impl(
-        table_name: proc_macro::TokenStream,
-        item: proc_macro::TokenStream,
-    ) -> proc_macro::TokenStream {
-        let table_name = parse_macro_input!(table_name as LitStr).value();
-
-        match generate_table_struct(table_name, item.into()) {
-            Ok(ts) => ts.into(),
-            Err(err) => err.to_compile_error(),
-        }
-    }
-
-    init_tracing();
-    from_table_impl(table_name, item)
-}
-
-#[expect(clippy::unnecessary_wraps)]
-fn generate_table_struct(
-    _table_name: String,
-    item: TokenStream,
-) -> Result<TokenStream, SqlFunError> {
-    Ok(item)
 }
 
 static SQLFUN_ARGS: LazyLock<Result<SqlFunArgs, SqlFunArgsError>> =

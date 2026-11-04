@@ -120,12 +120,13 @@ independent schema definition.
 
 ## Relationship to Existing Code Generation
 
-This approach would complement narrower generation mechanisms such as
-`from_table` rather than requiring them to disappear.
+The implemented query macros (`sql_query_one`, `sql_query_opt`, `sql_query_many`,
+and `sql_statement`) generate functions from SQL. This proposal instead concerns
+Rust representations of the datasource schema as a whole.
 
-A module-wide generator is useful when the desired generation unit is the
-datasource schema as a whole. Existing item-level or function-like APIs remain
-useful when an application intentionally wants only selected generated items.
+The former `from_table` attribute was a pass-through stub, not an implemented
+table/view field generator, and has been removed. This proposal does not depend
+on that attribute or schedule a replacement for it.
 
 The example generator can exist independently of a proc-macro implementation.
 

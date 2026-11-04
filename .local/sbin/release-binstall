@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Materialize or check binary crate metadata for an explicitly selected release."""
+import argparse
+import copy
+import json
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import sys
+import tomllib
+
+TARGET = 'x86_64-unknown-linux-gnu'
+BINARIES = {'sql-fun-cli': 'sql-fun', 'sql-fun-server': 'sql-fun-server'}
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def expected_metadata(tag):
+    helpers = Path(__file__).resolve().parent
+    subprocess.run([str(helpers.parent / 'bin/parse-release-version'), tag],
+                   check=True, stdout=subprocess.DEVNULL)
+    # Consume the producer's filename contract, including the exact project tag.
+    archive = runpy.run_path(str(helpers / 'release-assets'))['inventory'](tag)[0]
+    return {'overrides': {TARGET: {
+        'pkg-url': f'https://github.com/kazuk/sql-fun/releases/download/{tag}/{archive}',
+        'pkg-fmt': 'tgz',
+        'bin-dir': '{ bin }',
+    }}}
+
+
+def check_package(document, path):
+    package = document['package']
+    name = package['name']
+    require(name in BINARIES, f'Not a release binary crate: {path}')
+    require([binary['name'] for binary in document.get('bin', [])] == [BINARIES[name]],
+            f'Unexpected binary entries for {name}: {path}')
+    return package
+
+
+def materialized_text(original, expected, path):
+    document = tomllib.loads(original)
+    package = check_package(document, path)
+    metadata = package.setdefault('metadata', {})
+    # Own only explicit binstall tables. Refuse other layouts rather than
+    # accidentally dropping inline/dotted metadata or unrelated manifest data.
+    active = False
+    retained = []
+    for line in original.splitlines(keepends=True):
+        if line.lstrip().startswith('['):
+            header = line.strip().split('#', 1)[0].strip()
+            active = bool(re.fullmatch(r'\[package\.metadata\.binstall(?:\.[A-Za-z0-9_-]+)*\]', header))
+        if not active:
+            retained.append(line)
+    stripped = ''.join(retained)
+    without = copy.deepcopy(document)
+    without['package']['metadata'].pop('binstall', None)
+    # An absent metadata table and an empty one are equivalent for this edit.
+    stripped_document = tomllib.loads(stripped)
+    stripped_document['package'].setdefault('metadata', {})
+    require(stripped_document == without, f'Unsupported binstall TOML layout: {path}')
+    values = expected['overrides'][TARGET]
+    table = f'\n[package.metadata.binstall.overrides.{TARGET}]\n'
+    table += ''.join(f'{key} = {json.dumps(value)}\n' for key, value in values.items())
+    updated = stripped.rstrip('\n') + '\n' + table
+    metadata['binstall'] = expected
+    require(tomllib.loads(updated) == document, f'Binstall generation changed unrelated TOML: {path}')
+    return updated
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('operation', choices=('materialize', 'check'))
+    parser.add_argument('tag')
+    parser.add_argument('manifests', nargs='+', type=Path)
+    args = parser.parse_args()
+    expected = expected_metadata(args.tag)
+    updates = []
+    for path in args.manifests:
+        original = path.read_text()
+        package = check_package(tomllib.loads(original), path)
+        if args.operation == 'materialize':
+            updates.append((path, materialized_text(original, expected, path)))
+        else:
+            require(package.get('metadata', {}).get('binstall') == expected,
+                    f'Missing or inconsistent binstall metadata for {package["name"]} at {args.tag}: {path}')
+    # Validate every supplied manifest before writing any of them.
+    for path, updated in updates:
+        path.write_text(updated)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
+        print(f'Release binstall failed: {error}', file=sys.stderr)
+        sys.exit(1)

@@ -3,17 +3,21 @@ set -euo pipefail
 
 function usage() {
   cat <<'USAGE'
-usage: publish-crates --manifest=PATH
+usage: publish-crates --manifest=PATH [--release-tag=PROJECT_TAG]
 
 Publish the crate/version pairs in PATH. Each line must be a tab-separated
 package name and version read from materialized workspace Cargo metadata. Existing
 crates.io versions are skipped so a partial publication can be resumed.
+New CLI/server versions require an explicit --release-tag and matching binstall
+metadata. Existing exact versions retain their original published mapping.
 USAGE
 }
 
 manifest=""
+release_tag=""
 for arg in "$@"; do
   case "$arg" in
+    --release-tag=*) release_tag="${arg#--release-tag=}" ;;
     --manifest=*) manifest="${arg#--manifest=}" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unsupported argument: $arg" >&2; usage >&2; exit 1 ;;
@@ -24,6 +28,9 @@ done
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
+if [[ -n "$release_tag" ]]; then
+  "$repo_root/.local/bin/parse-release-version" "$release_tag" > /dev/null
+fi
 
 declare -A expected_versions=()
 while IFS=$'\t' read -r package version; do
@@ -40,6 +47,29 @@ for package in "${!expected_versions[@]}"; do
     || { echo "manifest package is not publishable: $package" >&2; exit 1; }
   [[ "$actual_version" == "${expected_versions[$package]}" ]] \
     || { echo "manifest version does not match Cargo.toml for $package" >&2; exit 1; }
+done
+
+# Check all new binary mappings before publishing any package. Existing exact
+# versions retain their original manifests, even when supplied by another tag.
+declare -A version_statuses=()
+for package in "${!expected_versions[@]}"; do
+  version="${expected_versions[$package]}"
+  version_status="$(curl --silent --show-error --user-agent 'sql-fun-release-publication/1' --output /dev/null --write-out '%{http_code}' \
+    "https://crates.io/api/v1/crates/$package/$version")"
+  case "$version_status" in
+    200) ;;
+    404)
+      case "$package" in
+        sql-fun-cli|sql-fun-server)
+          [[ -n "$release_tag" ]] || { echo 'New binary versions require --release-tag' >&2; exit 1; }
+          package_manifest="$(jq -er --arg package "$package" '.packages[] | select(.name == $package) | .manifest_path' <<<"$metadata")"
+          "$repo_root/.local/sbin/release-binstall" check "$release_tag" "$package_manifest"
+          ;;
+      esac
+      ;;
+    *) echo "crates.io lookup failed for $package $version: HTTP $version_status" >&2; exit 1 ;;
+  esac
+  version_statuses["$package"]="$version_status"
 done
 
 declare -A remaining=()
@@ -67,8 +97,7 @@ while (( ${#remaining[@]} > 0 )); do
 
   [[ -n "$selected" ]] || { echo "cycle detected in publishable workspace dependencies" >&2; exit 1; }
   version="${expected_versions[$selected]}"
-  version_status="$(curl --silent --show-error --user-agent 'sql-fun-release-publication/1' --output /dev/null --write-out '%{http_code}' \
-    "https://crates.io/api/v1/crates/$selected/$version")"
+  version_status="${version_statuses[$selected]}"
   case "$version_status" in
     200) echo "skipping existing crates.io version: $selected $version" ;;
     404)

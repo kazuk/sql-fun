@@ -41,11 +41,11 @@ fn row_fields_preserve_order_types_nullability_and_nested_shape() {
 }
 
 #[rstest::rstest]
-#[case::later("SELECT (ROW($1, 2)).f1 AS value, $1::integer AS hint")]
-#[case::earlier("SELECT $1::integer AS hint, (ROW($1, 2)).f1 AS value")]
-#[case::record_cast("SELECT (ROW($1,2)::record).f1 AS value, $1::integer AS hint")]
-#[case::nested("SELECT ((ROW(2, ROW($1))).f2).f1 AS value, $1::integer AS hint")]
-fn parameter_field_remains_connected_to_its_source(#[case] sql: &str) {
+#[case::later("SELECT (ROW($1, 2)).f1 AS value, $1::integer AS hint", 0)]
+#[case::earlier("SELECT $1::integer AS hint, (ROW($1, 2)).f1 AS value", 1)]
+#[case::record_cast("SELECT (ROW($1,2)::record).f1 AS value, $1::integer AS hint", 0)]
+#[case::nested("SELECT ((ROW(2, ROW($1))).f2).f1 AS value, $1::integer AS hint", 0)]
+fn parameter_field_remains_connected_to_its_source(#[case] sql: &str, #[case] output: usize) {
     let (query, context) = resolve(sql, Dialect::postgres(), true).unwrap();
     assert_eq!(
         context.reported_problem_count(),
@@ -58,7 +58,15 @@ fn parameter_field_remains_connected_to_its_source(#[case] sql: &str) {
             .get_result_column_def(&ColumnName::from("value"))
             .unwrap()
             .get_type_cloned(),
-        Some(PgBuiltInType::int4())
+        None
+    );
+    assert_eq!(
+        context
+            .parameter_constraints()
+            .result_column(output)
+            .unwrap()
+            .admissible_types(),
+        Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
     );
     let expression = query
         .result_columns()

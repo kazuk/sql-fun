@@ -60,8 +60,8 @@ fn child_parameter_is_independent_of_boolean_result(#[case] sql: &str) {
             .parameter(1)
             .unwrap()
             .constraint()
-            .single_type(),
-        Some(PgBuiltInType::int4())
+            .admissible_types(),
+        Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
     );
     let mut parameters = Parameters::default();
     query.walk(&mut parameters).unwrap();

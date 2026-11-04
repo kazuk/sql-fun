@@ -53,11 +53,17 @@ pub(crate) fn catalog() -> TestParseContext {
         true,
         Some(&add),
     );
+    let comparison = OperatorDefinition::binary(&[BinaryOperatorDefinition::new(
+        &int,
+        &int,
+        &PgBuiltInType::bool(),
+        true,
+    )]);
     context.set_get_operator_op_result(
         &OperatorName::from_parts(None, "<"),
         true,
         true,
-        Some(&add),
+        Some(&comparison),
     );
     let sum = OverloadVariant::new(
         &Some(int.clone()),

@@ -42,7 +42,7 @@ keywords = ["postgresql", "sqlite", "sql", "semantic-validation", "schema-valida
 baseline = "v0.1.0-baseline"
 
 [workspace.metadata.next-release]
-sql-fun = "minor"
+sql-fun = "major"
 sql-fun-cli = "major"
 sql-fun-server = "major"
 sql-fun-server-api = "major"

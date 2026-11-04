@@ -12,7 +12,7 @@ macro_rules! walk_fields {
     ($($type:ty => $($field:ident),+;)+) => {
         $(impl ContainsInvalidCteClause for $type {
             fn contains_invalid_cte_clause(&self) -> bool {
-                crate::sem::with_stack(|| false $(|| self.$field.contains_invalid_cte_clause())+)
+                crate::stack::with_stack(|| false $(|| self.$field.contains_invalid_cte_clause())+)
             }
         })+
     };

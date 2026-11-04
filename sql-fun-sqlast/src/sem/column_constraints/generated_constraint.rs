@@ -1,7 +1,6 @@
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::GeneratedColumnConstraint as SqliteGeneratedColumnConstraint;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::GeneratedColumnType;
+pub use crate::syntax_options::GeneratedColumnMode;
 use crate::{
     sem::{ColumnRename, traversal::SemanticVisitorMut},
     syn::Constraint,
@@ -18,77 +17,6 @@ use crate::{
     },
     syn::{ConstrType, Opt, ScanToken},
 };
-
-/// generated column mode
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub enum GeneratedColumnMode {
-    /// generated value store in storage
-    Stored,
-    /// generated value computation at every read, not in storage
-    Virtual,
-}
-
-impl GeneratedColumnMode {
-    /// create Stored variant
-    pub const fn stored() -> Self {
-        Self::Stored
-    }
-
-    /// create Virtual variant
-    pub const fn r#virtual() -> Self {
-        Self::Virtual
-    }
-
-    const GENERATED_COLUMN_MODE_STORED: &'static str = "s";
-    const GENERATED_COLUMN_MODE_VIRTUAL: &'static str = "v";
-
-    /// from [`crate::syn::Constraint`] `generated_kind` value
-    pub fn from_postgres_generated_column_mode(value: &str) -> Result<Self, AnalysisError> {
-        if value == Self::GENERATED_COLUMN_MODE_STORED {
-            Ok(Self::stored())
-        } else if value == Self::GENERATED_COLUMN_MODE_VIRTUAL {
-            Ok(Self::r#virtual())
-        } else {
-            AnalysisError::raise_unexpected_input("generated_kind")?;
-            AnalysisError::never()
-        }
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl From<&GeneratedColumnType> for GeneratedColumnMode {
-    fn from(value: &GeneratedColumnType) -> Self {
-        match value {
-            GeneratedColumnType::Stored => Self::Stored,
-            GeneratedColumnType::Virtual => Self::Virtual,
-        }
-    }
-}
-
-#[cfg(test)]
-mod test_generated_column_mode_from_pg {
-    use testresult::TestResult;
-
-    use crate::sem::column_constraints::GeneratedColumnMode;
-
-    #[rstest::rstest]
-    #[case("s", GeneratedColumnMode::Stored)]
-    #[case("v", GeneratedColumnMode::Virtual)]
-    fn test_generated_column_mode(
-        #[case] value: &str,
-        #[case] expected: GeneratedColumnMode,
-    ) -> TestResult {
-        let actual = GeneratedColumnMode::from_postgres_generated_column_mode(value)?;
-        assert_eq!(expected, actual);
-        Ok(())
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_invalid_generated_column_mode() {
-        GeneratedColumnMode::from_postgres_generated_column_mode("x").unwrap();
-    }
-}
 
 /// generated column / computed column constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]

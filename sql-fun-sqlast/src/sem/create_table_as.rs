@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     CacheContext,
     ast::TableAs,
@@ -151,7 +152,7 @@ impl CreateTableAs {
     where
         TParseContext: ParseContext,
     {
-        TableAs::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
+        convert(&TableAs::try_from_with_tokens(&syn, tokens)?).resolve_and_apply_at(
             context,
             &mut CacheContext::new(),
             source_span,

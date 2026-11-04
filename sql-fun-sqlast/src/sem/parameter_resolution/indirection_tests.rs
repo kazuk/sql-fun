@@ -1,5 +1,6 @@
 //! Public analyzer regressions over a small in-memory catalog.
 
+use crate::sem::SemAst;
 use crate::test_helpers::indirection as test_helpers;
 
 use crate::{
@@ -23,7 +24,7 @@ fn postgres_assignment_subscripts_are_legal(
     let mut cache_context = create_cache_context();
     // The fixture explicitly supplies numeric-to-int4 assignment coercion.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -47,7 +48,7 @@ fn parameterized_array_access_links_results(
     let mut cache_context = create_cache_context();
     // Only int4 identity and numeric-to-int4 assignment are needed here.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, test_helpers::context(), &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -80,10 +81,11 @@ fn underconstrained_array_access_preserves_structure(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     // Assignment coercion constrains bounds without selecting a base type.
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.parameter(1).unwrap().constraint().is_any());
     assert!(constraints.result_column(0).unwrap().is_any());
@@ -120,10 +122,11 @@ fn invalid_parameterized_access_retains_conflicts(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     // The fixture supplies numeric assignment but no boolean assignment to int4.
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(!analyzed.context().problems().is_empty());
     assert!(
         !analyzed
@@ -143,10 +146,11 @@ fn surrounding_context_constrains_array_access(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     // One integer addition signature and identity casts constrain the result.
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -184,11 +188,10 @@ fn composite_access_propagates_named_field_types(
     )
     .next()
     .unwrap()?;
-    let context = definition
-        .analyze(test_helpers::context(), &mut cache_context)?
-        .into_context();
+    let context =
+        SemAst::from_ast(&definition, test_helpers::context(), &mut cache_context)?.into_context();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, context, &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -235,7 +238,7 @@ fn deferred_composite_accepts_owned_anonymous_definitions(
     let mut cache_context = create_cache_context();
     // The result-context case needs only an int4 identity cast.
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, test_helpers::context(), &mut cache_context)?;
     let constraints = analyzed.context().parameter_constraints().clone();
     drop(analyzed);
     assert!(constraints.parameter(1).unwrap().constraint().is_any());
@@ -281,7 +284,7 @@ fn nested_composite_and_table_fields_use_owned_definitions(
     )
     .next()
     .unwrap()?;
-    let analyzed = statement.analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, context, &mut cache_context)?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -323,10 +326,11 @@ fn deferred_member_access_retains_conflicts(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     let context = test_helpers::schema("create type public.point_value as (n integer)", false)?;
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed
             .context()
@@ -364,10 +368,11 @@ fn nested_deferred_members_report_structured_errors(
         "create type public.inner_value as (n integer); create type public.outer_value as (v public.inner_value);",
         false,
     )?;
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed
             .context()
@@ -399,10 +404,13 @@ fn owned_named_composites_preserve_nominal_identity() -> Result<(), Box<dyn std:
     let second = FullName::with_schema("public", "second_value");
     let owned_first = TypeReference::dynamic(context.get_type(&first).unwrap());
     let owned_second = TypeReference::dynamic(context.get_type(&second).unwrap());
-    let analyzed = parse_statements("select ($1).n, $1::public.first_value", Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements("select ($1).n, $1::public.first_value", Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     let constraints = analyzed.context().parameter_constraints().clone();
     drop(analyzed);
     assert!(constraints.allows(&BTreeMap::from([(1, owned_first)])));
@@ -429,10 +437,13 @@ fn declared_composite_array_fields_retain_result_types(
         frozen,
     )?;
     assert!(context.problems().is_empty(), "{:?}", context.problems());
-    let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -461,13 +472,16 @@ fn declared_composite_scalar_field_rejects_subscripts(
         frozen,
     )?;
     assert!(context.problems().is_empty(), "{:?}", context.problems());
-    let analyzed = parse_statements(
-        "SELECT ((NULL::public.array_value).scalar)[1]",
-        Dialect::postgres(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(
+            "SELECT ((NULL::public.array_value).scalar)[1]",
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert_eq!(analyzed.context().problems().len(), 1);
     assert_eq!(analyzed.context().problems()[0].code(), "require_array");
     Ok(())
@@ -490,10 +504,13 @@ fn consecutive_subscript_result_matches_postgres(
     #[case] array_result: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+            .next()
+            .unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -524,10 +541,11 @@ fn consecutive_subscripts_retain_all_parameter_domains(
     #[case] parameters: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -592,10 +610,11 @@ fn consecutive_subscripts_share_deferred_constraints(
     #[case] text_element_cast: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -638,10 +657,11 @@ fn consecutive_subscripts_retain_structured_failures(
     #[case] diagnostic: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed
             .context()
@@ -676,10 +696,11 @@ fn consecutive_assignment_subscripts_preserve_bound_constraints(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     let context = test_helpers::schema("CREATE TABLE arrays (a integer[])", false)?;
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -699,10 +720,13 @@ fn consecutive_assignment_subscripts_preserve_bound_constraints(
 fn consecutive_subscripts_preserve_source_bounds_and_nested_access()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements("SELECT ((NULL::integer[])[1:2])[:][2]", Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements("SELECT ((NULL::integer[])[1:2])[:][2]", Dialect::postgres())
+            .next()
+            .unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(analyzed.context().problems().is_empty());
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let expression = query
@@ -733,13 +757,16 @@ fn consecutive_subscripts_preserve_member_boundary() -> Result<(), Box<dyn std::
     let mut cache_context = create_cache_context();
     // SQL-declared scalar fields exercise member resolution after a group.
     let context = test_helpers::schema("CREATE TYPE public.point_value AS (n integer)", false)?;
-    let analyzed = parse_statements(
-        "SELECT ((NULL::public.point_value[])[1][2]).n",
-        Dialect::postgres(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(
+            "SELECT ((NULL::public.point_value[])[1][2]).n",
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",

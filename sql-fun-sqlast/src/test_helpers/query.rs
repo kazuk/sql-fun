@@ -3,6 +3,8 @@ use crate::ast::{Dialect, StatementNode};
 use crate::context::{MutSourcePathWithSpan as _, ParseContext as _};
 use crate::names::{ColumnName, FullName, OperatorName, SchemaName, TableName};
 use crate::parse_statements;
+use crate::sem::SemAst;
+use crate::sem::convert;
 use crate::sem::{
     AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, CatalogNameLookup,
     CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, CreateView,
@@ -96,7 +98,7 @@ pub(crate) fn resolve(
     };
     let mut catalog = catalog().with_dialect(dialect);
     catalog.begin_parameter_type_analysis();
-    let query = query.resolve_test_in(&mut catalog, None);
+    let query = convert(&query).resolve_test_in(&mut catalog, None);
     let query = if infer {
         catalog.infer_query_parameter_types(query, &mut create_cache_context())
     } else {
@@ -124,16 +126,16 @@ pub(crate) fn output_type(query: &SelectStatement, name: &str) -> Option<TypeRef
 /// Small explicitly selected table for grouping placement checks in DML.
 pub(crate) fn grouping_table_context() -> TestParseContext {
     let mut cache_context = create_cache_context();
-    parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(
-            catalog().with_dialect(Dialect::postgres()),
-            &mut cache_context,
-        )
-        .unwrap()
-        .into_context()
+    SemAst::from_ast(
+        &parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap(),
+        catalog().with_dialect(Dialect::postgres()),
+        &mut cache_context,
+    )
+    .unwrap()
+    .into_context()
 }
 
 /// Resolve a query against explicitly selected, minimal column-scope fixtures.
@@ -148,19 +150,19 @@ pub(crate) fn column_scope_query(
         "CREATE TABLE local_items(other integer)",
         "CREATE TABLE known_items(id integer)",
     ] {
-        context = parse_statements(ddl, dialect)
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(context, &mut cache_context)
-            .unwrap()
-            .into_context();
+        context = SemAst::from_ast(
+            &parse_statements(ddl, dialect).next().unwrap().unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .unwrap()
+        .into_context();
     }
     let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
     let StatementNode::Query(query) = statement.into_test_node() else {
         panic!("query fixture");
     };
-    let query = query.resolve_test_in(&mut context, None).unwrap();
+    let query = convert(&query).resolve_test_in(&mut context, None).unwrap();
     (query, context)
 }
 
@@ -202,9 +204,7 @@ CREATE TABLE "a.b"."t.x"(id integer NOT NULL);
 CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
 "#;
     for statement in parse_statements(schema, dialect) {
-        context = statement
-            .unwrap()
-            .analyze(context, &mut cache_context)
+        context = SemAst::from_ast(&statement.unwrap(), context, &mut cache_context)
             .unwrap()
             .into_context();
     }
@@ -229,15 +229,17 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
         ("a", "mixed_v", "a.mixed", "id, other"),
     ] {
         let sql = format!("SELECT {projection} FROM {source}");
-        let query = parse_statements(&sql, dialect)
-            .next()
-            .unwrap()
-            .unwrap()
-            .into_test_node()
-            .resolve(&mut context, &mut create_cache_context())
-            .unwrap()
-            .into_select_statemtnt()
-            .unwrap();
+        let query = convert(
+            &parse_statements(&sql, dialect)
+                .next()
+                .unwrap()
+                .unwrap()
+                .into_test_node(),
+        )
+        .resolve(&mut context, &mut create_cache_context())
+        .unwrap()
+        .into_select_statemtnt()
+        .unwrap();
         let name = FullName::with_schema(schema, name);
         let view = CreateView::new(&name, &query, &[], &None, false);
         context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
@@ -247,12 +249,12 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
         "{:?}",
         context.reported_problems()
     );
-    parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context, &mut cache_context)
-        .unwrap()
+    SemAst::from_ast(
+        &parse_statements(sql, dialect).next().unwrap().unwrap(),
+        context,
+        &mut cache_context,
+    )
+    .unwrap()
 }
 
 /// Analyze using only the signatures/types needed by record-output tests.
@@ -334,13 +336,16 @@ pub(crate) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         "pair_fun",
         &[OverloadVariant::new(&Some(pair), &vec![], false, false)],
     );
-    context = parse_statements("CREATE TABLE public.row_item(a integer NOT NULL)", dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context, &mut cache_context)
-        .unwrap()
-        .into_context();
+    context = SemAst::from_ast(
+        &parse_statements("CREATE TABLE public.row_item(a integer NOT NULL)", dialect)
+            .next()
+            .unwrap()
+            .unwrap(),
+        context,
+        &mut cache_context,
+    )
+    .unwrap()
+    .into_context();
     let row_name = FullName::with_schema("public", "row_item");
     context.set_get_type_impl_result(
         &row_name,
@@ -360,7 +365,7 @@ pub(crate) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
-    let query = query.resolve_test_in(&mut context, None);
+    let query = convert(&query).resolve_test_in(&mut context, None);
     let query = if infer {
         context.infer_query_parameter_types(query, &mut create_cache_context())
     } else {

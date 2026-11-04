@@ -1,12 +1,13 @@
+use crate::sem::convert;
 use crate::{
-    ast::CompositeType,
+    ast::{CompositeType, postgres::required},
     context::ParseContext,
     names::{ColumnName, TableName},
     sem::{
         AstAndContextPair, CatalogNameLookup, ColumnDefinition, DeclarationCollation, Nullable,
         OwnerSpecification, WithTypmod,
     },
-    syn::{ColumnDef, CompositeTypeStmt, Opt},
+    syn::{ColumnDef, CompositeTypeStmt, ListOpt, Opt},
 };
 
 use crate::{
@@ -149,8 +150,11 @@ impl CreateCompositeType {
         TParseContext: ParseContext,
     {
         use crate::ast::TryFromWithTokens;
-        CompositeType::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
-            .resolve_and_apply(context)
+        convert(&CompositeType::try_from_with_tokens(
+            &syn,
+            &sql_fun_core::IVec::default(),
+        )?)
+        .resolve_and_apply(context)
     }
 }
 
@@ -250,5 +254,25 @@ impl std::hash::Hash for CreateCompositeType {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::hash::Hash::hash(&self.type_ref, state);
         std::hash::Hash::hash(&self.fields, state);
+    }
+}
+
+impl TryFrom<&CompositeTypeStmt> for CreateCompositeType {
+    type Error = AnalysisError;
+
+    fn try_from(value: &CompositeTypeStmt) -> Result<Self, Self::Error> {
+        let typevar = required(
+            value.get_typevar().as_inner(),
+            "composite_type_stmt.typevar",
+        )?;
+        let fields = required(
+            value.get_coldeflist().map(|fields| fields.as_column_def()),
+            "composite_type_stmt.coldeflist",
+        )?;
+        let mut composite_fields = CompositeFieldCollection::default();
+        for field in fields {
+            composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
+        }
+        Ok(Self::new(&FullName::try_from(typevar)?, &composite_fields))
     }
 }

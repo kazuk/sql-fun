@@ -1,5 +1,6 @@
 //! ARRAY semantics through the maintained SQL analysis boundary.
 
+use ::sql_fun_sqlast::sem::SemAst;
 // Shared support lives below tests/ to avoid an extra Cargo test target.
 #[path = "test_helpers/shared.rs"]
 mod test_helpers;
@@ -74,13 +75,16 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
     assert_eq!(array["values"].as_array().unwrap().len(), count);
     assert_eq!(array["types"], ::serde_json::json!([]));
     let context = analyzed.into_context();
-    let next = ::sql_fun_sqlast::parse_statements(
-        "SELECT 1 AS n",
-        ::sql_fun_sqlast::ast::Dialect::postgres(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(context, &mut cache_context)?;
+    let next = SemAst::from_ast(
+        &::sql_fun_sqlast::parse_statements(
+            "SELECT 1 AS n",
+            ::sql_fun_sqlast::ast::Dialect::postgres(),
+        )
+        .next()
+        .unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert_eq!(
         next.ast()
             .clone()

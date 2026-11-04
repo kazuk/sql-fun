@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     ast::{AlterOwner as AstAlterOwner, TryFromWithTokens},
     names::FullName as NamesFullName,
@@ -172,8 +173,11 @@ impl AlterOwner {
         context: C,
         syntax: AlterOwnerStmt,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        AstAlterOwner::try_from_with_tokens(&syntax, &::sql_fun_core::IVec::default())?
-            .resolve_and_apply(context)
+        convert(&AstAlterOwner::try_from_with_tokens(
+            &syntax,
+            &::sql_fun_core::IVec::default(),
+        )?)
+        .resolve_and_apply(context)
     }
 }
 

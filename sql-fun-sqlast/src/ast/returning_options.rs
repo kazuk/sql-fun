@@ -1,6 +1,6 @@
 use crate::{
     ast::{ReturningOption, postgres::required},
-    sem::AnalysisError,
+    error::AnalysisError,
     syn::{self, ListOpt, Opt},
 };
 

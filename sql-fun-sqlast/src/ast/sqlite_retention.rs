@@ -7,7 +7,7 @@
 
 use crate::{
     ast::{CreateTrigger, TriggerBody},
-    sem::with_stack,
+    stack::with_stack,
 };
 
 #[cfg(feature = "sqlite")]
@@ -23,7 +23,7 @@ use crate::{
         TableFunction, TableFunctions, Target, TruthTest, TypeName, TypedColumn, Update, View,
         Window, With, document::DocumentExpr,
     },
-    sem::AnalysisError,
+    error::AnalysisError,
 };
 
 impl Statement {

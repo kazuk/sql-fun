@@ -1,3 +1,4 @@
+use ::sql_fun_sqlast::sem::SemAst;
 #[path = "test_helpers.rs"]
 mod test_helpers;
 
@@ -276,10 +277,12 @@ fn realized_query_analysis_ignores_parameter_hints(
         Dialect::postgres(),
     )
     .unwrap();
-    let analyzed = realized
-        .statement()
-        .analyze(project.analysis_context("products"), &mut cache_context)
-        .unwrap();
+    let analyzed = SemAst::from_ast(
+        realized.statement(),
+        project.analysis_context("products"),
+        &mut cache_context,
+    )
+    .unwrap();
     let inputs = analyzed.context().parameter_constraints();
     assert_eq!(
         inputs
@@ -447,14 +450,17 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
     );
     // The caller supplies one optional type per finalized SQL index. Occurrence
     // metadata does not introduce a second numbering or conflict-validation pass.
-    let mut context = ::sql_fun_sqlast::parse_statements(
-        "CREATE TYPE public.kind AS ENUM ('a')",
-        Dialect::postgres(),
+    let mut context = SemAst::from_ast(
+        &::sql_fun_sqlast::parse_statements(
+            "CREATE TYPE public.kind AS ENUM ('a')",
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()
+        .unwrap(),
+        project.analysis_context("products"),
+        &mut cache_context,
     )
-    .next()
-    .unwrap()
-    .unwrap()
-    .analyze(project.analysis_context("products"), &mut cache_context)
     .unwrap()
     .into_context();
     let kind = TypeReference::concrete_type_ref(&FullName::with_schema("public", "kind"), false);
@@ -465,10 +471,7 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
         .statement()
         .deparse_sql(Dialect::postgres())
         .unwrap();
-    let analyzed = realized
-        .statement()
-        .analyze(context, &mut cache_context)
-        .unwrap();
+    let analyzed = SemAst::from_ast(realized.statement(), context, &mut cache_context).unwrap();
     assert!(analyzed.context().problems().is_empty());
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     for (index, expected) in [PgBuiltInType::int4(), kind.clone(), PgBuiltInType::int4()]

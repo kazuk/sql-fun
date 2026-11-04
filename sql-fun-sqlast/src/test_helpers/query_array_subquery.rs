@@ -1,6 +1,7 @@
 use crate::AstAndContextPair;
 use crate::ast::Dialect;
 use crate::context::{BaseParseContext as _, ParseContext as _};
+use crate::sem::SemAst;
 use crate::test_helpers::query::catalog;
 
 use crate::context::SchemaFileContext;
@@ -46,16 +47,17 @@ pub(crate) fn composite_query(sql: &str) -> AstAndContextPair<SchemaFileContext>
         "CREATE TYPE singleton AS (n integer); CREATE TYPE pair AS (n integer, m integer); CREATE TYPE container AS (item singleton)",
         Dialect::postgres(),
     ) {
-        context = statement
-            .unwrap()
-            .analyze(context, &mut cache_context)
+        context = SemAst::from_ast(&statement.unwrap(), context, &mut cache_context)
             .unwrap()
             .into_context();
     }
-    parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context, &mut cache_context)
-        .unwrap()
+    SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap(),
+        context,
+        &mut cache_context,
+    )
+    .unwrap()
 }

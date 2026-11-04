@@ -4,7 +4,7 @@ mod query;
 
 use crate::{
     ast::{AlterRelation, CreateTrigger, DropTrigger, RaiseAction, Table},
-    sem::with_stack,
+    stack::with_stack,
 };
 
 use crate::ast::{
@@ -18,7 +18,7 @@ use crate::ast::{
 #[cfg(feature = "sqlite")]
 use crate::ast::{SqliteTypeModifier, SqliteTypeModifiers};
 #[cfg(feature = "sqlite")]
-use crate::{sem::AnalysisError, syn::sqlite as syn};
+use crate::{error::AnalysisError, syn::sqlite as syn};
 
 impl From<&syn::QualifiedName> for Name {
     fn from(value: &syn::QualifiedName) -> Self {

@@ -1,4 +1,5 @@
 use crate::parse_statements;
+use crate::sem::convert;
 use crate::sem::{CastContext, CastDefinition};
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::scalar_catalog::items_catalog;
@@ -24,12 +25,14 @@ pub(crate) fn resolve(
     context: &mut TestParseContext,
     dialect: Dialect,
 ) -> Result<SemAst, AnalysisError> {
-    parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(context, &mut create_cache_context())
+    convert(
+        &parse_statements(sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(context, &mut create_cache_context())
 }
 pub(crate) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
     let mut context = catalog(dialect);

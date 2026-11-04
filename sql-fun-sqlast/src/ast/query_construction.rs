@@ -5,7 +5,7 @@ use crate::ast::{
     QueryBody, Select, Target, TypeName, With,
 };
 impl Select {
-    pub(in crate::ast) fn projection(targets: &[Target], from: &[FromItem]) -> Self {
+    pub(crate) fn projection(targets: &[Target], from: &[FromItem]) -> Self {
         Self {
             into: None,
             distinct: None,
@@ -20,7 +20,7 @@ impl Select {
     }
 }
 impl Query {
-    pub(in crate::ast) fn projection(targets: &[Target], from: &[FromItem]) -> Self {
+    pub(crate) fn projection(targets: &[Target], from: &[FromItem]) -> Self {
         Self {
             with: With::default(),
             body: QueryBody::projection_select(&Select::projection(targets, from)),
@@ -33,7 +33,7 @@ impl Query {
     }
 }
 impl DerivedTable {
-    pub(in crate::ast) fn lateral_projection(query: &Query, alias: &str) -> Self {
+    pub(crate) fn lateral_projection(query: &Query, alias: &str) -> Self {
         Self {
             query: query.clone(),
             alias: Some(Alias::projection(alias)),
@@ -42,7 +42,7 @@ impl DerivedTable {
     }
 }
 impl Alias {
-    pub(in crate::ast) fn projection(name: &str) -> Self {
+    pub(crate) fn projection(name: &str) -> Self {
         Self {
             name: name.to_owned(),
             columns: Vec::new(),
@@ -50,11 +50,11 @@ impl Alias {
     }
 }
 impl Target {
-    pub(in crate::ast) const fn source_star_name(&self) -> Option<&Name> {
+    pub(crate) const fn source_star_name(&self) -> Option<&Name> {
         self.expression.source_star_name()
     }
 
-    pub(in crate::ast) fn projection(expression: &Expr, alias: &str) -> Self {
+    pub(crate) fn projection(expression: &Expr, alias: &str) -> Self {
         Self {
             implicit_alias: false,
             location: None,
@@ -64,7 +64,7 @@ impl Target {
     }
 }
 impl TypeName {
-    pub(in crate::ast) fn projection(name: &Name, array: bool) -> Self {
+    pub(crate) fn projection(name: &Name, array: bool) -> Self {
         Self {
             name: name.clone(),
             modifiers: Vec::new(),
@@ -98,7 +98,7 @@ impl Call {
     fn projection_function_alias(&self) -> Option<&str> {
         self.name.projection_local_name()
     }
-    pub(in crate::ast) fn coalesce_projection(arguments: &[Expr]) -> Self {
+    pub(crate) fn coalesce_projection(arguments: &[Expr]) -> Self {
         Self {
             sql_syntax: false,
             kind: CallKind::special("coalesce"),
@@ -118,28 +118,28 @@ impl Call {
     }
 }
 impl Expr {
-    pub(in crate::ast) fn projection_function_alias(&self) -> Option<&str> {
+    pub(crate) fn projection_function_alias(&self) -> Option<&str> {
         match self {
             Self::Call(call) => call.projection_function_alias(),
             _ => None,
         }
     }
-    pub(in crate::ast) fn projection_column(name: &Name) -> Self {
+    pub(crate) fn projection_column(name: &Name) -> Self {
         Self::Column(name.clone())
     }
-    pub(in crate::ast) fn projection_call(call: &Call) -> Self {
+    pub(crate) fn projection_call(call: &Call) -> Self {
         Self::Call(Box::new(call.clone()))
     }
-    pub(in crate::ast) fn projection_cast(argument: &Self, target: &TypeName) -> Self {
+    pub(crate) fn projection_cast(argument: &Self, target: &TypeName) -> Self {
         Self::Cast(Box::new(Cast::projection(argument, target)))
     }
-    pub(in crate::ast) fn projection_source_row(alias: &str) -> Self {
+    pub(crate) fn projection_source_row(alias: &str) -> Self {
         Self::Row(vec![Self::Star(Name::local(alias))])
     }
-    pub(in crate::ast) fn projection_field(argument: &Self, field: &str) -> Self {
+    pub(crate) fn projection_field(argument: &Self, field: &str) -> Self {
         Self::Indirection(Box::new(Indirection::projection_field(argument, field)))
     }
-    pub(in crate::ast) const fn is_projection_star(&self) -> bool {
+    pub(crate) const fn is_projection_star(&self) -> bool {
         matches!(self, Self::Star(_))
     }
 }
@@ -149,18 +149,18 @@ impl Access {
     }
 }
 impl QueryBody {
-    pub(in crate::ast) fn projection_select(select: &Select) -> Self {
+    pub(crate) fn projection_select(select: &Select) -> Self {
         Self::Select(Box::new(select.clone()))
     }
 }
 impl Name {
-    pub(in crate::ast) fn projection_local_name(&self) -> Option<&str> {
+    pub(crate) fn projection_local_name(&self) -> Option<&str> {
         self.0.last().map(String::as_str)
     }
 }
 
 impl Expr {
-    pub(in crate::ast) const fn source_star_name(&self) -> Option<&Name> {
+    pub(crate) const fn source_star_name(&self) -> Option<&Name> {
         match self {
             Self::Star(name) => Some(name),
             _ => None,

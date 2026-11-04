@@ -6,7 +6,7 @@ use crate::{
         TruthTest,
         deparse::{DeparseError, SqlEmit, SqlWriter},
     },
-    sem::with_stack,
+    stack::with_stack,
 };
 
 impl SqlEmit for Expr {

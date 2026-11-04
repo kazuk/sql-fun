@@ -7,7 +7,7 @@ use crate::{
         TableSample, Target, TypedColumn, Window, With,
         deparse::{DeparseError, SqlEmit, SqlWriter},
     },
-    sem::with_stack,
+    stack::with_stack,
 };
 
 impl SqlEmit for Query {
@@ -702,7 +702,7 @@ impl SqlEmit for Window {
     }
 }
 impl Window {
-    pub(in crate::ast) fn emit_definition(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+    pub(crate) fn emit_definition(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         w.sql("(");
         if let Some(reference) = &self.reference {
             w.ident(reference)?;
@@ -835,10 +835,7 @@ impl SqlEmit for Into {
     }
 }
 impl Into {
-    pub(in crate::ast) fn emit_without_persistence(
-        &self,
-        w: &mut SqlWriter,
-    ) -> Result<(), DeparseError> {
+    pub(crate) fn emit_without_persistence(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         self.relation.name.emit(w)?;
         if !self.columns.is_empty() {
             w.sql("(");
@@ -914,7 +911,7 @@ impl SqlEmit for IndexExpression {
     }
 }
 impl Name {
-    pub(in crate::ast) const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }

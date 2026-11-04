@@ -1,5 +1,6 @@
 use crate::AstAndContextPair;
 use crate::ast::Dialect;
+use crate::sem::SemAst;
 use crate::test_helpers::scalar_catalog::schema_from_base;
 
 use crate::context::SchemaFileContext;
@@ -116,15 +117,16 @@ pub(crate) fn analyze(
         functions[0], functions[1],
     );
     for statement in parse_statements(&schema, Dialect::postgres()) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
-    Ok(parse_statements(query, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(query, Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }
 
 pub(crate) fn analyze_vector(
@@ -136,16 +138,22 @@ pub(crate) fn analyze_vector(
     let mut context = context();
     let definition =
         format!("CREATE FUNCTION vf({parameters}) RETURNS {result} LANGUAGE sql AS ''");
-    context = parse_statements(&definition, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?
-        .into_context();
+    context = SemAst::from_ast(
+        &parse_statements(&definition, Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?
+    .into_context();
     assert!(context.problems().is_empty(), "{:?}", context.problems());
-    Ok(parse_statements(query, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(query, Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }
 
 /// A format-like builtin signature in the small explicit catalog.
@@ -159,13 +167,14 @@ pub(crate) fn analyze_variadic_any(
            CREATE FUNCTION format(text, VARIADIC "any") RETURNS text LANGUAGE internal AS 'text_format';"#,
         Dialect::postgres(),
     ) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
-    Ok(parse_statements(query, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(query, Dialect::postgres())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }

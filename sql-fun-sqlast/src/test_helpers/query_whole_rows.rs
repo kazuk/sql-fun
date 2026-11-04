@@ -1,6 +1,8 @@
 use crate::StringSpan;
 use crate::context::{MutSourcePathWithSpan, ParseContext as _, SchemaFileContext};
 use crate::parse_statements;
+use crate::sem::SemAst;
+use crate::sem::convert;
 use crate::sem::{AnalysisError, CastContext, CastDefinition, SourcePathWithSpan};
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::query::catalog;
@@ -96,9 +98,7 @@ fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, SchemaFileContext) {
         &SourcePathWithSpan::new("whole_rows.sql", &StringSpan::new(0, ddl.len())),
     );
     for statement in parse_statements(ddl, Dialect::postgres()) {
-        context = statement
-            .unwrap()
-            .analyze(context, &mut cache_context)
+        context = SemAst::from_ast(&statement.unwrap(), context, &mut cache_context)
             .unwrap()
             .into_context();
     }
@@ -115,7 +115,7 @@ fn schema_query(ddl: &str, sql: &str) -> (SelectStatement, SchemaFileContext) {
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
-    let result = query.resolve_test_in(&mut context, None);
+    let result = convert(&query).resolve_test_in(&mut context, None);
     let result = context.infer_query_parameter_types(result, &mut create_cache_context());
     let query = context.finish_analysis(result).unwrap();
     (query, context)
@@ -127,13 +127,16 @@ pub(crate) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
         "CREATE TABLE pg_catalog.pg_attribute(n integer)",
         "CREATE TABLE pg_catalog.pg_type(n integer)",
     ] {
-        context = parse_statements(ddl, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(context, &mut cache_context)
-            .unwrap()
-            .into_context();
+        context = SemAst::from_ast(
+            &parse_statements(ddl, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .unwrap()
+        .into_context();
     }
     let mut inputs = Vec::new();
     for (name, parameter) in [("pg_attribute", "left_row"), ("pg_type", "right_row")] {
@@ -203,7 +206,7 @@ pub(crate) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
-    let result = query.resolve_test_in(&mut context, None);
+    let result = convert(&query).resolve_test_in(&mut context, None);
     let result = context.infer_query_parameter_types(result, &mut create_cache_context());
     let query = context.finish_analysis(result).unwrap();
     (query, context)

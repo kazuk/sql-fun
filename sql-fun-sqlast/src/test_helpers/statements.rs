@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     AstAndContextPair,
     context::{FrozenBaseContext, MutSourcePathWithSpan},
@@ -19,12 +20,14 @@ pub(crate) fn resolve_postgres(
     sql: &str,
     context: &mut impl ParseContext,
 ) -> Result<SemAst, AnalysisError> {
-    parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(context, &mut create_cache_context())
+    convert(
+        &parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(context, &mut create_cache_context())
 }
 
 pub(crate) fn resolve_cursor(sql: &str, context: &mut TestParseContext) -> SemAst {
@@ -52,10 +55,11 @@ fn query(
     dialect: Dialect,
 ) -> Result<(SelectStatement, SchemaFileContext), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, dialect)
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, dialect).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     Ok((query, analyzed.into_context()))
 }
@@ -67,11 +71,14 @@ pub(crate) fn apply(
     dialect: Dialect,
 ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
     MutSourcePathWithSpan::set_source_path_with_span(&mut context, &source_span());
-    parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .expect("valid test SQL")
-        .analyze(context, &mut create_cache_context())
+    SemAst::from_ast(
+        &parse_statements(sql, dialect)
+            .next()
+            .unwrap()
+            .expect("valid test SQL"),
+        context,
+        &mut create_cache_context(),
+    )
 }
 
 pub(crate) fn layer(base: &FrozenBaseContext, path: &std::path::Path) -> SchemaFileContext {
@@ -89,9 +96,7 @@ pub(crate) fn schema_postgres(
         &StringSpan::new(0, sql.len()),
     ));
     for statement in parse_statements(sql, Dialect::postgres()) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(context)

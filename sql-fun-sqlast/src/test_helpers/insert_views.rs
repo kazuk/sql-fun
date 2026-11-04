@@ -1,6 +1,7 @@
 use crate::context::{BaseParseContext as _, ParseContext as _};
 use crate::names::{SchemaName, TableName};
 use crate::parse_statements;
+use crate::sem::convert;
 use crate::sem::{CreateView, InsertArbiter, InsertInferenceModifiers};
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::insert::catalog;
@@ -24,13 +25,15 @@ pub(crate) fn analyze(
     all_columns: bool,
 ) -> (Result<SemAst, AnalysisError>, TestParseContext) {
     let mut context = catalog(dialect);
-    let view = parse_statements("SELECT id, label FROM items", dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
+    let view = convert(
+        &parse_statements("SELECT id, label FROM items", dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(&mut context, &mut create_cache_context())
+    .unwrap();
     let query = view.into_select_statemtnt().unwrap();
     let name = FullName::with_schema("public", "writable_items");
     let view = CreateView::new(&name, &query, &[], &None, false);
@@ -93,11 +96,13 @@ pub(crate) fn analyze(
             ))],
         );
     }
-    let result = parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(&mut context, &mut create_cache_context());
+    let result = convert(
+        &parse_statements(sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(&mut context, &mut create_cache_context());
     (result, context)
 }

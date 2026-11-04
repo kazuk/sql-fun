@@ -2,6 +2,7 @@ use crate::AstAndContextPair;
 use crate::ast::{Dialect, Statement};
 use crate::names::{FullName, OperatorName};
 use crate::parse_statements;
+use crate::sem::SemAst;
 use crate::sem::{
     AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition,
     FunctionOverloadCollection, FunctionParam, OperatorDefinition, OverloadVariant, PgBuiltInType,
@@ -58,9 +59,9 @@ pub(crate) fn analyze(
     dialect: Dialect,
 ) -> Result<AstAndContextPair<TestParseContext>, AnalysisError> {
     let mut cache_context = create_cache_context();
-    parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context().with_dialect(dialect), &mut cache_context)
+    SemAst::from_ast(
+        &parse_statements(sql, dialect).next().unwrap().unwrap(),
+        context().with_dialect(dialect),
+        &mut cache_context,
+    )
 }

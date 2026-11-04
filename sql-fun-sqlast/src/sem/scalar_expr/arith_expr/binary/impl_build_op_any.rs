@@ -26,6 +26,8 @@ impl super::ArithExpr {
 
 #[cfg(test)]
 mod test_build_op_any {
+    use crate::sem::SemAst;
+
     use crate::test_helpers::quantified;
     use crate::test_helpers::quantified_any as test_helpers;
     use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
@@ -220,10 +222,13 @@ mod test_build_op_any {
     ) -> testresult::TestResult {
         let mut cache_context = create_cache_context();
         let context = test_helpers::schema()?;
-        let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(context, &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+                .next()
+                .unwrap()?,
+            context,
+            &mut cache_context,
+        )?;
         let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
         let column = select.result_columns().get_column_at(0).unwrap();
         let value = column.expression().unwrap();

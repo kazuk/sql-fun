@@ -2,6 +2,8 @@ use crate::ast::{Dialect, Statement};
 use crate::context::ParseContext as _;
 use crate::names::{ColumnName, FullName, OperatorName, SchemaName, TableName};
 use crate::parse_statements;
+use crate::rewrite_wildcards;
+use crate::sem::SemAst;
 use crate::sem::{
     BinaryOperatorDefinition, ColumnDefinition, FunctionOverloadCollection, FunctionParam,
     OperatorDefinition, OverloadVariant, PgBuiltInType, ResultColumnCollection, TypeDefinition,
@@ -60,7 +62,7 @@ impl ColumnDefinition {
 
 pub(crate) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
     let mut cache_context = create_cache_context();
-    let pair = statement.analyze(catalog(), &mut cache_context).unwrap();
+    let pair = SemAst::from_ast(statement, catalog(), &mut cache_context).unwrap();
     assert!(
         pair.context().reported_problems().is_empty(),
         "{:?}",
@@ -75,7 +77,7 @@ pub(crate) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {
 pub(crate) fn rewritten(sql: &str) -> (Statement, usize) {
     let mut statement = statement(sql);
     let groups = expansions(&statement);
-    let count = statement.rewrite_wildcards(&groups).unwrap();
+    let count = rewrite_wildcards(&mut statement, &groups).unwrap();
     (statement, count)
 }
 

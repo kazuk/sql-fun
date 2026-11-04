@@ -5,9 +5,7 @@ use crate::{
         deparse::{DeparseError, SqlEmit, SqlWriter},
         postgres::required,
     },
-    context::ParseContext,
-    engine_specific::{Postgres18Feature, Postgres18Syntax},
-    sem::AnalysisError,
+    error::AnalysisError,
     syn::{self, ListOpt, Opt},
 };
 use ::sql_fun_core::IVec;
@@ -252,17 +250,6 @@ impl DefaultPrivileges {
     /// Set WITH GRANT OPTION (GRANT) or GRANT OPTION FOR (REVOKE) immediately.
     pub const fn set_grant_option(&mut self, enabled: bool) {
         self.grant_option = enabled;
-    }
-
-    pub(super) fn check_engine_features(
-        &self,
-        context: &mut impl ParseContext,
-    ) -> Result<bool, AnalysisError> {
-        if self.object == PrivilegeObject::large_objects() {
-            context.postgres18_syntax_used(Postgres18Syntax::LargeObjectDefaultPrivileges)
-        } else {
-            Ok(true)
-        }
     }
 }
 impl TryFromWithTokens<&syn::AlterDefaultPrivilegesStmt> for DefaultPrivileges {

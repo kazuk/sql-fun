@@ -5,10 +5,10 @@ use crate::{
         JoinKind, Name, Order, Query, QueryBody, Relation, Select, SetOperation, SetQuery,
         TableFunction, TableFunctions, Target, TryFromList, TryFromOpt, Window, With,
     },
-    sem::with_stack,
+    stack::with_stack,
 };
 #[cfg(feature = "sqlite")]
-use crate::{sem::AnalysisError, syn::sqlite as syn};
+use crate::{error::AnalysisError, syn::sqlite as syn};
 
 impl From<QueryBody> for Query {
     fn from(body: QueryBody) -> Self {

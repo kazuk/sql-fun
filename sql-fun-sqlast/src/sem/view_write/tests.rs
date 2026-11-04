@@ -1,3 +1,4 @@
+use crate::sem::SemAst;
 use crate::{
     ast::Dialect,
     parse_statements,
@@ -20,8 +21,7 @@ fn queued_diagnostic_delivery_failure_still_stops_analysis(#[case] sql: &str) {
         .next()
         .unwrap()
         .unwrap();
-    let error = statement
-        .analyze(context, &mut cache_context)
+    let error = SemAst::from_ast(&statement, context, &mut cache_context)
         .err()
         .expect("diagnostic delivery fails");
     assert!(matches!(error, AnalysisError::Io(_)));

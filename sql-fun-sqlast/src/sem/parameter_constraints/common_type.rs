@@ -459,6 +459,8 @@ impl CommonTypeConstraint {
 
 #[cfg(test)]
 mod tests {
+    use crate::sem::SemAst;
+
     use crate::{ast::Dialect, parse_statements, test_helpers::create_cache_context};
 
     use crate::test_helpers::common_types as test_helpers;
@@ -536,13 +538,16 @@ mod tests {
         use crate::sem::ParseContext;
         let context = test_helpers::assignment_context();
         let mut cache = create_cache_context();
-        let analyzed = parse_statements(
-            "SELECT CASE WHEN true THEN $1 ELSE $2 END",
-            Dialect::postgres(),
-        )
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(
+                "SELECT CASE WHEN true THEN $1 ELSE $2 END",
+                Dialect::postgres(),
+            )
+            .next()
+            .unwrap()?,
+            context,
+            &mut cache,
+        )?;
         let constraints = analyzed.context().parameter_constraints().clone();
         drop(analyzed);
         assert_eq!(

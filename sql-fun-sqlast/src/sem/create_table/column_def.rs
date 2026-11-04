@@ -1,3 +1,4 @@
+use crate::sem::convert;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ColumnDefinition as SqliteColumnDefinition;
 use crate::{
@@ -388,7 +389,8 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        Column::try_from_with_tokens(column_def, tokens)?.resolve_and_report(context, table_name)
+        convert(&Column::try_from_with_tokens(column_def, tokens)?)
+            .resolve_and_report(context, table_name)
     }
 
     /// analyze [`crate::syn::sqlite::ColumnDefinition`]
@@ -402,7 +404,7 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        Column::try_from(syn)?.resolve_and_report(context, table_name)
+        convert(&Column::try_from(syn)?).resolve_and_report(context, table_name)
     }
 }
 

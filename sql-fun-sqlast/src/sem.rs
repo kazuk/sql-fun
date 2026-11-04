@@ -1,5 +1,13 @@
 #![doc = include_str!("sem.md")]
 
+mod ast_conversion;
+mod ddl_conversion;
+mod engine_features;
+mod ownership_conversion;
+mod statement_conversion;
+mod view_conversion;
+pub(crate) use self::ast_conversion::{AstConversion, convert};
+
 pub(crate) use self::constraint::ConstraintNames;
 mod alter_column;
 mod alter_index;

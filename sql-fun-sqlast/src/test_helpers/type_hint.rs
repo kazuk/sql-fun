@@ -5,6 +5,7 @@ use crate::context::{
 };
 use crate::names::SchemaName;
 use crate::parse_statements;
+use crate::sem::SemAst;
 use crate::sem::TypeReference;
 use crate::test_helpers::{TestParseContext, create_cache_context};
 
@@ -36,10 +37,13 @@ pub(crate) fn analyze(
     context: SchemaFileContext,
 ) -> AstAndContextPair<SchemaFileContext> {
     let mut cache_context = create_cache_context();
-    parse_statements(sql, context.dialect())
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context, &mut cache_context)
-        .unwrap()
+    SemAst::from_ast(
+        &parse_statements(sql, context.dialect())
+            .next()
+            .unwrap()
+            .unwrap(),
+        context,
+        &mut cache_context,
+    )
+    .unwrap()
 }

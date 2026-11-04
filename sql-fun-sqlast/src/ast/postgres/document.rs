@@ -12,7 +12,7 @@ use crate::{
         Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize, XmlTable, document::DocumentExpr,
         postgres::required,
     },
-    sem::AnalysisError,
+    error::AnalysisError,
     syn,
     syn::{ListOpt, Opt, ScanToken},
 };

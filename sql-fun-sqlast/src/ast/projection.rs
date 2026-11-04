@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(in crate::ast) enum ProjectionError {
+pub(crate) enum ProjectionError {
     Missing,
     Ambiguous,
     Duplicate,
@@ -19,19 +19,19 @@ pub(in crate::ast) enum ProjectionError {
     Incompatible,
 }
 impl ProjectionError {
-    pub(in crate::ast) const fn is_missing(&self) -> bool {
+    pub(crate) const fn is_missing(&self) -> bool {
         matches!(self, Self::Missing)
     }
-    pub(in crate::ast) const fn is_ambiguous(&self) -> bool {
+    pub(crate) const fn is_ambiguous(&self) -> bool {
         matches!(self, Self::Ambiguous)
     }
-    pub(in crate::ast) const fn is_duplicate(&self) -> bool {
+    pub(crate) const fn is_duplicate(&self) -> bool {
         matches!(self, Self::Duplicate)
     }
-    pub(in crate::ast) const fn is_wrong_kind(&self) -> bool {
+    pub(crate) const fn is_wrong_kind(&self) -> bool {
         matches!(self, Self::WrongKind)
     }
-    pub(in crate::ast) const fn is_empty_returning(&self) -> bool {
+    pub(crate) const fn is_empty_returning(&self) -> bool {
         matches!(self, Self::EmptyReturning)
     }
     const fn ambiguous() -> Self {
@@ -54,13 +54,13 @@ impl ProjectionError {
     }
 }
 
-pub(in crate::ast) struct ProjectionScope<'a> {
+pub(crate) struct ProjectionScope<'a> {
     targets: &'a mut Vec<Target>,
     sources: &'a mut [FromItem],
     returning: bool,
 }
 impl<'a> ProjectionScope<'a> {
-    pub(in crate::ast) const fn new(
+    pub(crate) const fn new(
         targets: &'a mut Vec<Target>,
         sources: &'a mut [FromItem],
         returning: bool,
@@ -122,7 +122,7 @@ impl LocationGroup {
     }
 }
 impl Target {
-    pub(in crate::ast) const fn projection_location(&self) -> Option<usize> {
+    pub(crate) const fn projection_location(&self) -> Option<usize> {
         self.location
     }
     const fn set_projection_location(&mut self, location: Option<usize>) {
@@ -130,23 +130,23 @@ impl Target {
     }
 }
 
-pub(in crate::ast) struct ProjectionLocations {
+pub(crate) struct ProjectionLocations {
     groups: Vec<LocationGroup>,
 }
 impl ProjectionLocations {
-    pub(in crate::ast) fn capture(statement: &mut StatementNode) -> Self {
+    pub(crate) fn capture(statement: &mut StatementNode) -> Self {
         let mut capture = Self { groups: Vec::new() };
         statement.walk_sql_mut(&mut capture);
         capture
     }
-    pub(in crate::ast) fn validate_source(&self) -> Result<(), ProjectionError> {
+    pub(crate) fn validate_source(&self) -> Result<(), ProjectionError> {
         let mut unique = std::collections::HashSet::new();
         for group in &self.groups {
             group.validate_locations(&mut unique)?;
         }
         Ok(())
     }
-    pub(in crate::ast) fn validate_destination(
+    pub(crate) fn validate_destination(
         &self,
         statement: &mut StatementNode,
     ) -> Result<(), ProjectionError> {
@@ -158,7 +158,7 @@ impl ProjectionLocations {
             Err(ProjectionError::incompatible())
         }
     }
-    pub(in crate::ast) fn apply(&self, statement: &mut StatementNode) {
+    pub(crate) fn apply(&self, statement: &mut StatementNode) {
         let mut visitor = LocationApplication::new(self);
         statement.walk_sql_mut(&mut visitor);
     }
@@ -202,14 +202,14 @@ impl ProjectionReplacement {
         }
     }
 }
-pub(in crate::ast) struct ProjectionReplacements {
+pub(crate) struct ProjectionReplacements {
     edits: Vec<ProjectionReplacement>,
 }
 impl ProjectionReplacements {
-    pub(in crate::ast) const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { edits: Vec::new() }
     }
-    pub(in crate::ast) fn add(
+    pub(crate) fn add(
         &mut self,
         location: usize,
         targets: &[Target],
@@ -221,10 +221,10 @@ impl ProjectionReplacements {
             .push(ProjectionReplacement::new(location, targets));
         Ok(())
     }
-    pub(in crate::ast) const fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.edits.len()
     }
-    pub(in crate::ast) fn validate_wildcards(
+    pub(crate) fn validate_wildcards(
         &self,
         statement: &mut StatementNode,
     ) -> Result<(), ProjectionError> {
@@ -232,7 +232,7 @@ impl ProjectionReplacements {
         statement.walk_sql_mut(&mut visitor);
         visitor.validate()
     }
-    pub(in crate::ast) fn apply(&mut self, statement: &mut StatementNode) {
+    pub(crate) fn apply(&mut self, statement: &mut StatementNode) {
         statement.walk_sql_mut(self);
     }
 }
@@ -394,12 +394,12 @@ impl ScopeRecord {
         }
     }
 }
-pub(in crate::ast) struct ProjectionScopes {
+pub(crate) struct ProjectionScopes {
     records: Vec<ScopeRecord>,
     stack: Vec<usize>,
 }
 impl ProjectionScopes {
-    pub(in crate::ast) fn capture(statement: &mut StatementNode) -> Self {
+    pub(crate) fn capture(statement: &mut StatementNode) -> Self {
         let mut scopes = Self {
             records: Vec::new(),
             stack: Vec::new(),
@@ -407,7 +407,7 @@ impl ProjectionScopes {
         statement.walk_sql_mut(&mut scopes);
         scopes
     }
-    pub(in crate::ast) fn source_for_target(
+    pub(crate) fn source_for_target(
         &self,
         location: usize,
         depth: usize,
@@ -445,18 +445,18 @@ impl AstVisitorMut for ProjectionScopes {
         self.stack.pop();
     }
 }
-pub(in crate::ast) struct ScopedSource {
+pub(crate) struct ScopedSource {
     scope: usize,
 }
 impl ScopedSource {
     const fn new(scope: usize) -> Self {
         Self { scope }
     }
-    pub(in crate::ast) const fn scope(&self) -> usize {
+    pub(crate) const fn scope(&self) -> usize {
         self.scope
     }
 }
-pub(in crate::ast) trait ScopedSourceEdit {
+pub(crate) trait ScopedSourceEdit {
     fn replace_sources(&mut self, scope: usize, projection: &mut ProjectionScope<'_>);
 }
 struct SourceApplication<'a, T> {
@@ -475,17 +475,13 @@ impl<T: ScopedSourceEdit> AstVisitorMut for SourceApplication<'_, T> {
     }
 }
 impl StatementNode {
-    pub(in crate::ast) fn apply_source_edits(&mut self, edits: &mut impl ScopedSourceEdit) {
+    pub(crate) fn apply_source_edits(&mut self, edits: &mut impl ScopedSourceEdit) {
         self.walk_sql_mut(&mut SourceApplication::new(edits));
     }
 }
 
 impl FromItem {
-    pub(in crate::ast) fn visit_visible_alias(
-        &mut self,
-        alias: &str,
-        visitor: &mut impl FnMut(&mut Self),
-    ) {
+    pub(crate) fn visit_visible_alias(&mut self, alias: &str, visitor: &mut impl FnMut(&mut Self)) {
         with_stack(|| {
             if let Some(name) = self.visible_alias() {
                 if name == alias {
@@ -515,7 +511,7 @@ impl FromItem {
             _ => {}
         }
     }
-    pub(in crate::ast) fn normalize_projection_groups(&mut self) {
+    pub(crate) fn normalize_projection_groups(&mut self) {
         with_stack(|| {
             let normalized = match self {
                 Self::Join(node) => node.normalize_source(),
@@ -532,7 +528,7 @@ impl FromItem {
     }
 }
 impl Alias {
-    pub(in crate::ast) fn visible_name(&self) -> &str {
+    pub(crate) fn visible_name(&self) -> &str {
         &self.name
     }
 }
@@ -607,10 +603,10 @@ impl TableSample {
     }
 }
 impl FromItem {
-    pub(in crate::ast) fn visible_source(&self, alias: &str) -> Result<Self, ProjectionError> {
+    pub(crate) fn visible_source(&self, alias: &str) -> Result<Self, ProjectionError> {
         SourceSet::single(self).source(alias)
     }
-    pub(in crate::ast) fn replace_visible_source(&mut self, alias: &str, replacement: &Self) {
+    pub(crate) fn replace_visible_source(&mut self, alias: &str, replacement: &Self) {
         self.visit_visible_alias(alias, &mut |source| *source = replacement.clone());
         self.normalize_projection_groups();
     }
@@ -692,7 +688,7 @@ impl FromGroup {
     }
 }
 impl ProjectionScope<'_> {
-    pub(in crate::ast) fn try_transform_source<E: From<ProjectionError>>(
+    pub(crate) fn try_transform_source<E: From<ProjectionError>>(
         &mut self,
         alias: &str,
         transform: &mut impl FnMut(&FromItem) -> Result<FromItem, E>,

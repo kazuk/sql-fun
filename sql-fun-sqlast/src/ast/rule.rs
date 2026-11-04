@@ -7,7 +7,7 @@ use crate::{
         CreateRule, Expr, Name, Relation, RuleEvent, StatementNode, TryFromWithTokens,
         TryFromWithTokensOpt,
     },
-    sem::AnalysisError,
+    error::AnalysisError,
     syn,
     syn::{ListOpt, Opt},
 };

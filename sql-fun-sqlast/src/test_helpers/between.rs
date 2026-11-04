@@ -1,3 +1,4 @@
+use crate::sem::SemAst;
 pub(crate) use crate::test_helpers::query::expression;
 use crate::{
     StringSpan,
@@ -80,9 +81,7 @@ pub(crate) fn schema(sql: &str) -> Result<SchemaFileContext, Box<dyn std::error:
         &StringSpan::new(0, sql.len()),
     ));
     for statement in parse_statements(sql, Dialect::postgres()) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(context)

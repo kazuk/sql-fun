@@ -1,7 +1,9 @@
+pub use crate::syntax_options::CreateTableMode;
 mod column_def;
 
 pub use self::column_def::ColumnDefinition;
 
+use crate::sem::convert;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ColumnsAndConstraint;
 #[cfg(feature = "sqlite")]
@@ -321,35 +323,6 @@ impl ColumnCollection {
     /// append column definition
     pub fn push(&mut self, column: &ColumnDefinition) {
         self.0.push(column.clone());
-    }
-}
-
-/// mode of `CREATE TABLE` statement
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CreateTableMode {
-    /// create table mode default
-    Default,
-    /// create table with `IF NOT EXISTS`
-    IfNotExists,
-    /// create table with `OR REPLACE`
-    ///
-    /// # Note
-    ///
-    /// This valiant is not used in now, `PostgreSQL` and `SQLite` not supports `create table or replace`
-    OrReplace,
-}
-
-impl CreateTableMode {
-    pub(crate) const fn if_not_exists(self) -> bool {
-        matches!(self, Self::IfNotExists)
-    }
-    /// create instance for if not exists
-    pub const fn from_if_not_exists(if_not_exists: bool) -> Self {
-        if if_not_exists {
-            Self::IfNotExists
-        } else {
-            Self::Default
-        }
     }
 }
 
@@ -875,7 +848,8 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        Table::try_from_with_tokens(&create, tokens)?.resolve_and_apply_at(context, source_span)
+        convert(&Table::try_from_with_tokens(&create, tokens)?)
+            .resolve_and_apply_at(context, source_span)
     }
 
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
@@ -901,7 +875,7 @@ impl CreateTable {
         TParseContext: ParseContext,
     {
         let syntax = Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
-        let table = syntax.resolve(&mut context, source_span)?;
+        let table = convert(&syntax).resolve(&mut context, source_span)?;
         Ok((table, context))
     }
 }
@@ -974,8 +948,7 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        Table::try_from(&syn)?
-            .named(table_name.full_name(), *mode, temporary)
+        convert(&Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary))
             .resolve_and_apply_at(context, source_span)
     }
 }
@@ -994,7 +967,7 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        Table::try_from(&syn)?.resolve_and_apply_at(context, source_span)
+        convert(&Table::try_from(&syn)?).resolve_and_apply_at(context, source_span)
     }
 }
 

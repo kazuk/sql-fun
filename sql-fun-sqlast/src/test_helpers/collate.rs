@@ -1,3 +1,4 @@
+use crate::sem::SemAst;
 pub(crate) use crate::test_helpers::query::expression;
 use crate::{
     ast::Dialect,
@@ -43,7 +44,7 @@ pub(crate) fn query(
     let statement = parse_statements(sql, context.dialect())
         .next()
         .expect("one query")?;
-    let analyzed = statement.analyze(std::mem::take(context), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, std::mem::take(context), &mut cache_context)?;
     let query = analyzed
         .ast()
         .clone()

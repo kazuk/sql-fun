@@ -9,6 +9,7 @@ use crate::ast::Join;
 use crate::ast::TableFunctions;
 #[cfg(test)]
 use crate::ast::XmlTable;
+use crate::sem::convert;
 #[cfg(test)]
 use crate::syn::JoinExpr;
 #[cfg(test)]
@@ -39,8 +40,11 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::query(DerivedTable::try_from_with_tokens(&range_subsel, tokens)?);
-        let outcome =
-            syntax.resolve_source(&mut context, &WithClause::default(), &FromClause::default());
+        let outcome = convert(&syntax).resolve_source(
+            &mut context,
+            &WithClause::default(),
+            &FromClause::default(),
+        );
         Ok((outcome?, context))
     }
 }
@@ -96,7 +100,7 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::join(Join::try_from_with_tokens(&join_expr, tokens)?);
-        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        let outcome = convert(&syntax).resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
 }
@@ -182,7 +186,7 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::xml(XmlTable::try_from_with_tokens(&node, tokens)?);
-        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        let outcome = convert(&syntax).resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
 }
@@ -248,7 +252,7 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::functions(TableFunctions::try_from_with_tokens(&node, tokens)?);
-        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        let outcome = convert(&syntax).resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
 }
@@ -324,7 +328,7 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::functions(TableFunctions::try_from_with_tokens(&node, tokens)?);
-        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        let outcome = convert(&syntax).resolve_source(&mut context, with_clause, from_clause);
         Ok((outcome?, context))
     }
 }
@@ -390,7 +394,7 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = FromItem::try_from_with_tokens(&node, tokens)?;
-        let result = syntax.resolve_source(&mut context, with_clause, from_clause);
+        let result = convert(&syntax).resolve_source(&mut context, with_clause, from_clause);
         Ok((result?, context))
     }
 }

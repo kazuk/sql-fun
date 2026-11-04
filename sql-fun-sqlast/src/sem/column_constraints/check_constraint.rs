@@ -1,3 +1,4 @@
+use crate::sem::convert;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint;
 use crate::{
@@ -146,7 +147,7 @@ impl CheckColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        TableConstraint::try_from_with_tokens(syn, tokens)?.resolve_legacy_inline_check(
+        convert(&TableConstraint::try_from_with_tokens(syn, tokens)?).resolve_legacy_inline_check(
             context,
             table_name,
             column_name,
@@ -166,7 +167,7 @@ impl CheckColumnConstraint {
         TParseContext: ParseContext,
     {
         let syntax = AstColumnConstraint::check(&Expr::try_from(syn.expr())?);
-        let (check, context) = TableConstraint::unnamed_check(&syntax)
+        let (check, context) = convert(&TableConstraint::unnamed_check(&syntax))
             .resolve_legacy_inline_check(context, table_name, column_name)?;
         Ok((ColumnConstraint::check(check), context))
     }

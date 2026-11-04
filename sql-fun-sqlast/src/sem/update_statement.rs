@@ -4,6 +4,7 @@ mod view_support;
 
 pub use self::{cursor::UpdateCursor, view_support::ViewUpdateSupport};
 pub(crate) use self::{cursor::UpdatePredicate, destination::UpdateDestination};
+use crate::sem::convert;
 
 use crate::{
     CacheContext,
@@ -423,6 +424,6 @@ pub fn analyze_update_statement<T: ParseContext>(
     AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
     let syntax = Update::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
     let statement =
-        StatementNode::Update(syntax).resolve(&mut context, &mut CacheContext::new())?;
+        convert(&StatementNode::Update(syntax)).resolve(&mut context, &mut CacheContext::new())?;
     Ok((statement, context))
 }

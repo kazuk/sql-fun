@@ -12,13 +12,13 @@ use crate::ast::{
 };
 
 impl TableFunctions {
-    pub(in crate::ast) const fn has_invocations(&self, count: usize) -> bool {
+    pub(crate) const fn has_invocations(&self, count: usize) -> bool {
         count != 0 && self.calls.len() == count
     }
 
     /// Retain a single invocation and its record definitions without relabeling
     /// columns through an alias-column list.
-    pub(in crate::ast) fn isolated_invocation(&self, index: usize, alias: &str) -> Option<Self> {
+    pub(crate) fn isolated_invocation(&self, index: usize, alias: &str) -> Option<Self> {
         let mut call = self.calls.get(index)?.clone();
         if self.calls.len() == 1 && !self.columns.is_empty() {
             call.set_column_definitions(&self.columns);
@@ -33,7 +33,7 @@ impl TableFunctions {
         })
     }
 
-    pub(in crate::ast) fn rendered_invocation(&self) -> Result<String, DeparseError> {
+    pub(crate) fn rendered_invocation(&self) -> Result<String, DeparseError> {
         let query = Query::projection(&[], &[FromItem::functions(self.clone())]);
         Statement::from_node(
             StatementNode::query(query),
@@ -45,7 +45,7 @@ impl TableFunctions {
 }
 
 impl Cte {
-    pub(in crate::ast) fn materialized_query(name: &str, query: &Query) -> Self {
+    pub(crate) fn materialized_query(name: &str, query: &Query) -> Self {
         Self {
             name: name.to_owned(),
             columns: Vec::new(),
@@ -58,7 +58,7 @@ impl Cte {
 }
 
 impl Join {
-    pub(in crate::ast) fn full_using(left: &FromItem, right: &FromItem, column: &str) -> Self {
+    pub(crate) fn full_using(left: &FromItem, right: &FromItem, column: &str) -> Self {
         Self {
             left: left.clone(),
             right: right.clone(),
@@ -79,7 +79,7 @@ impl JoinKind {
 }
 
 impl Relation {
-    pub(in crate::ast) fn local(name: &str) -> Self {
+    pub(crate) fn local(name: &str) -> Self {
         Self {
             name: Name::local(name),
             alias: None,
@@ -92,14 +92,14 @@ impl Relation {
 }
 
 impl Query {
-    pub(in crate::ast) fn order_materialized_sources(&mut self, sources: &[Cte], ordinal: &str) {
+    pub(crate) fn order_materialized_sources(&mut self, sources: &[Cte], ordinal: &str) {
         self.with = With::nonrecursive(sources);
         self.order.push(Order::ascending_column(ordinal));
     }
 
     /// Consume the preceding materialized source before invoking this source,
     /// even when a hash join requests inputs in the opposite order.
-    pub(in crate::ast) fn after_materialized_source(&mut self, prior: &str) {
+    pub(crate) fn after_materialized_source(&mut self, prior: &str) {
         let count = Target::projection(&Expr::projection_call(&Call::count_rows()), "count");
         let query = Self::projection(&[count], &[FromItem::relation(Relation::local(prior))]);
         self.body
@@ -174,7 +174,7 @@ impl Literal {
 }
 
 impl Call {
-    pub(in crate::ast) fn row_number() -> Self {
+    pub(crate) fn row_number() -> Self {
         let mut call = Self::system_rows_function("row_number");
         call.over = Some(Window::unpartitioned());
         call

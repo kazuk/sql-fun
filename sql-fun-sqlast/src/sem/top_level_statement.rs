@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     AstAndContextPair, CacheContext,
     ast::{Dialect, StatementNode, TryFromWithTokens},
@@ -79,7 +80,7 @@ impl SemAst {
         };
 
         let syntax = StatementNode::try_from_with_tokens(&statement, tokens)?;
-        syntax.resolve_and_apply(context, &mut CacheContext::new())
+        convert(&syntax).resolve_and_apply(context, &mut CacheContext::new())
     }
 
     /// analyze [`Stmt`]
@@ -99,18 +100,17 @@ impl SemAst {
 
         AnalysisError::check_dialect(Dialect::sqlite(), context.dialect())?;
         match syn {
-            Stmt::AlterTable(alter_table) => {
-                let syntax = StatementNode::try_from(&Stmt::AlterTable(alter_table))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::CreateTable(create_table_statement) => {
-                let syntax = StatementNode::try_from(&Stmt::CreateTable(create_table_statement))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::DropTable(drop_table_statement) => {
-                let syntax = StatementNode::try_from(&Stmt::DropTable(drop_table_statement))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
+            supported @ (Stmt::AlterTable(_)
+            | Stmt::CreateTable(_)
+            | Stmt::DropTable(_)
+            | Stmt::CreateTrigger(_)
+            | Stmt::DropTrigger(_)
+            | Stmt::CreateView(_)
+            | Stmt::Select(_)
+            | Stmt::Update(_)
+            | Stmt::Delete(_)
+            | Stmt::Insert(_)) => Self::analyze_supported_sqlite(context, &supported),
+
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
             Stmt::Detach(_detach_statement) => todo!(),
@@ -125,40 +125,14 @@ impl SemAst {
             Stmt::Reindex(_reindex_statement) => todo!(),
             Stmt::Optimize(_optimize_statement) => todo!(),
             Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
-            Stmt::CreateTrigger(trigger) => {
-                let syntax = StatementNode::try_from(&Stmt::CreateTrigger(trigger))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::DropTrigger(trigger) => {
-                let syntax = StatementNode::try_from(&Stmt::DropTrigger(trigger))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::CreateView(view) => {
-                let syntax = StatementNode::try_from(&Stmt::CreateView(view))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
+
             Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
             Stmt::DropView(_drop_view) => todo!(),
             Stmt::CreateType(_create_type_statement) => todo!(),
             Stmt::DropType(_drop_type_statement) => todo!(),
             Stmt::CreateSequence(_create_sequence_statement) => todo!(),
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
-            Stmt::Select(select) => {
-                let syntax = StatementNode::try_from(&Stmt::Select(select))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::Update(update) => {
-                let syntax = StatementNode::try_from(&Stmt::Update(update))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::Delete(delete) => {
-                let syntax = StatementNode::try_from(&Stmt::Delete(delete))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
-            Stmt::Insert(insert) => {
-                let syntax = StatementNode::try_from(&Stmt::Insert(insert))?;
-                syntax.resolve_and_apply(context, &mut CacheContext::new())
-            }
+
             Stmt::Pragma(_pragma_statement) => todo!(),
             Stmt::CreateDomain(_create_domain_statement) => todo!(),
             Stmt::DropDomain(_drop_domain_statement) => todo!(),
@@ -166,8 +140,20 @@ impl SemAst {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl SemAst {
+    fn analyze_supported_sqlite<TContext: ParseContext>(
+        context: TContext,
+        statement: &Stmt,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        let syntax = StatementNode::try_from(statement)?;
+        convert(&syntax).resolve_and_apply(context, &mut CacheContext::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
     use crate::{
         AstAndContextPair, PostgresDialect,
         context::{BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext},

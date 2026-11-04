@@ -420,6 +420,8 @@ impl SetOperationQuery {
 
 #[cfg(test)]
 mod test_set_operation {
+    use crate::sem::SemAst;
+
     use crate::{
         ast::Dialect,
         parse_statements,
@@ -495,13 +497,11 @@ mod test_set_operation {
         #[case] sql: &str,
         #[case] invalid: bool,
     ) -> testresult::TestResult {
-        let analyzed = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(
-                set_operations::composite_context()?,
-                &mut create_cache_context(),
-            )?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+            set_operations::composite_context()?,
+            &mut create_cache_context(),
+        )?;
         let query = analyzed.ast().select_statement().unwrap();
         let SelectStatement::Set(set) = query.query_clauses().unwrap().body() else {
             panic!("set");
@@ -609,10 +609,11 @@ mod test_set_operation {
             set_operations::context(Dialect::postgres()),
             "CREATE TABLE table_x(id integer)",
         )?;
-        let analyzed = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(catalog.into_context(), &mut create_cache_context())?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+            catalog.into_context(),
+            &mut create_cache_context(),
+        )?;
         assert!(analyzed.context().problems().is_empty());
         let constraints = analyzed.context().parameter_constraints();
         let input = constraints.parameter(1).unwrap().constraint();
@@ -665,13 +666,11 @@ mod test_set_operation {
             |row| row.get(0),
         )?;
         assert_eq!(count, 2);
-        let analyzed = parse_statements(sql, Dialect::sqlite())
-            .next()
-            .unwrap()?
-            .analyze(
-                set_operations::context(Dialect::sqlite()),
-                &mut create_cache_context(),
-            )?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::sqlite()).next().unwrap()?,
+            set_operations::context(Dialect::sqlite()),
+            &mut create_cache_context(),
+        )?;
         assert!(
             analyzed.context().problems().is_empty(),
             "{:?}",

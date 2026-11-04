@@ -1,4 +1,5 @@
 use crate::test_helpers::create_cache_context;
+use ::sql_fun_sqlast::sem::SemAst;
 
 use ::sql_fun_core::SqlFunArgs;
 use ::sql_fun_sqlast::{
@@ -43,15 +44,14 @@ pub(crate) fn analyze(
         ",
         Dialect::postgres(),
     ) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     base = context.freeze();
     let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-    Ok(parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }

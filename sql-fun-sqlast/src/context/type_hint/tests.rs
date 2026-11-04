@@ -1,3 +1,4 @@
+use crate::sem::SemAst;
 #[cfg(feature = "sqlite")]
 use crate::{names::FullName as NamesFullName, test_helpers::TestParseContext};
 use crate::{parse_statements, test_helpers::create_cache_context};
@@ -159,12 +160,15 @@ fn sqlite_uses_its_type_spelling_and_catalog() {
         .unwrap();
     assert_eq!(base.get_parameter_typehint(1), Some(expected.clone()));
     assert!(base.setup_typehinting(&[Some("pg_catalog.int4")]).is_err());
-    let analyzed = parse_statements("SELECT ?1", Dialect::sqlite())
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(base, &mut cache_context)
-        .unwrap();
+    let analyzed = SemAst::from_ast(
+        &parse_statements("SELECT ?1", Dialect::sqlite())
+            .next()
+            .unwrap()
+            .unwrap(),
+        base,
+        &mut cache_context,
+    )
+    .unwrap();
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     assert_eq!(
         query.result_columns().get_column_at(0).unwrap().col_type(),
@@ -228,7 +232,7 @@ fn operator_constraints_and_executable_sql_stay_consistent(#[case] hint: Option<
         .unwrap()
         .unwrap();
     let sql = statement.deparse_sql(context.dialect()).unwrap();
-    let analyzed = statement.analyze(context, &mut cache_context).unwrap();
+    let analyzed = SemAst::from_ast(&statement, context, &mut cache_context).unwrap();
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",

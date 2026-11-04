@@ -1,3 +1,6 @@
+pub use crate::syntax_options::ConflictClause;
+pub use crate::syntax_options::Deferrable;
+pub use crate::syntax_options::Validity;
 mod attr_constraint;
 mod check_constraint;
 mod collate_constraint;
@@ -31,18 +34,20 @@ pub use self::{
 
 #[cfg(any(test, feature = "sqlite"))]
 use crate::ast::ColumnConstraint as AstColumnConstraint;
+#[cfg(any(test, feature = "sqlite"))]
+use crate::sem::convert;
+use crate::sem::{ColumnRename, traversal::SemanticVisitorMut};
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ColumnConstraint as SqliteColumnConstraint;
-use crate::{
-    sem::{ColumnRename, traversal::SemanticVisitorMut},
-    syn::Constraint as SynConstraint,
-};
 
 #[cfg(any(test, feature = "sqlite"))]
 use ::sql_fun_core::IVec;
 
 #[cfg(test)]
-use crate::{ast::TryFromWithTokens, syn::ScanToken};
+use crate::{
+    ast::TryFromWithTokens,
+    syn::{Constraint as SynConstraint, ScanToken},
+};
 
 #[cfg(any(test, feature = "sqlite"))]
 use crate::sem::ParseContext;
@@ -64,7 +69,7 @@ pub trait ColumnConstraintTrait {
 }
 
 #[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::ResolveType};
+use crate::SqliteToken;
 
 /// column constraints
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
@@ -576,7 +581,7 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        AstColumnConstraint::try_from_with_tokens(syn, tokens)?.resolve_and_report(
+        convert(&AstColumnConstraint::try_from_with_tokens(syn, tokens)?).resolve_and_report(
             context,
             table_name,
             column_name,
@@ -705,86 +710,10 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        AstColumnConstraint::try_from(syn)?.resolve_and_report(context, table_name, column_name)
-    }
-}
-
-/// Conflict clause
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub enum ConflictClause {
-    /// Rollback
-    Rollback,
-    /// Abort
-    Abort,
-    /// fail
-    Fail,
-    /// ignore
-    Ignore,
-    /// replace
-    Replace,
-}
-
-/// Validity clause
-#[cfg(feature = "sqlite")]
-impl From<&ResolveType> for ConflictClause {
-    fn from(value: &ResolveType) -> Self {
-        match value {
-            ResolveType::Rollback => Self::Rollback,
-            ResolveType::Abort => Self::Abort,
-            ResolveType::Fail => Self::Fail,
-            ResolveType::Ignore => Self::Ignore,
-            ResolveType::Replace => Self::Replace,
-        }
-    }
-}
-
-/// validity value
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub struct Validity {
-    skip_validation: bool,
-    initially_valid: bool,
-}
-
-impl Validity {
-    /// create instance
-    pub const fn new(skip_validation: bool, initially_valid: bool) -> Self {
-        Self {
-            skip_validation,
-            initially_valid,
-        }
-    }
-
-    /// create from [`crate::syn::Constraint`]
-    pub const fn from_constraint(syn: &SynConstraint) -> Self {
-        Self::new(syn.get_skip_validation(), syn.get_initially_valid())
-    }
-}
-
-/// deferrable constraint
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub struct Deferrable {
-    init_deferred: bool,
-}
-
-impl Deferrable {
-    pub(crate) const fn is_initially_deferred(&self) -> bool {
-        self.init_deferred
-    }
-    /// create instance
-    pub const fn new(init_deferred: bool) -> Self {
-        Self { init_deferred }
-    }
-
-    /// from [`crate::syn::Constraint`]
-    pub fn try_from_constraint(syn: &SynConstraint) -> Result<Option<Self>, AnalysisError> {
-        let r = if syn.get_deferrable() {
-            Some(Self::new(syn.get_initdeferred()))
-        } else {
-            if syn.get_initdeferred() {
-                AnalysisError::raise_unexpected_input("defferable: false, but initdeferred")?;
-            }
-            None
-        };
-        Ok(r)
+        convert(&AstColumnConstraint::try_from(syn)?).resolve_and_report(
+            context,
+            table_name,
+            column_name,
+        )
     }
 }

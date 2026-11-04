@@ -1,11 +1,10 @@
 #[cfg(feature = "sqlite")]
 use crate::sem::AnalysisProblem;
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::DeferSubclause;
-#[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ForeignKeyColumnConstraint as SqliteForeignKeyColumnConstraint;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::RefAct;
+pub use crate::syntax_options::Deferrability;
+pub use crate::syntax_options::ForeignKeyAction;
+pub use crate::syntax_options::ForeignKeyMatchType;
 use crate::{sem::ColumnRename, syn::Constraint};
 
 use crate::{
@@ -16,143 +15,6 @@ use crate::{
     },
     syn::{ConstrType, ListOpt, Opt},
 };
-
-/// foreign key match type
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub enum ForeignKeyMatchType {
-    /// simple
-    Simple,
-    /// full
-    Full,
-    /// partial
-    ///
-    /// # Note
-    ///
-    /// partial match type not implemented in PostgreSQL 18, AST value defined but not used.
-    ///
-    Partial,
-}
-
-impl ForeignKeyMatchType {
-    /// convert from [`crate::syn::Constraint`]
-    pub fn try_from_postgres_constraint(syn: &Constraint) -> Result<Option<Self>, AnalysisError> {
-        let value = syn.get_fk_matchtype();
-        match value.as_str() {
-            "" => Ok(None),
-            "s" => Ok(Some(Self::Simple)),
-            "f" => Ok(Some(Self::Full)),
-            "p" => Ok(Some(Self::Partial)),
-            _ => AnalysisError::raise_unexpected_input("fk_matchtype"),
-        }
-    }
-}
-
-/// foreign key update action
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub enum ForeignKeyAction {
-    /// no-action
-    NoAction,
-    /// restrict
-    Restrict,
-    /// set null value
-    SetNull,
-    /// set default
-    SetDefault,
-    /// cascade
-    Cascade,
-}
-
-impl ForeignKeyAction {
-    fn try_from_value(value: &str, source: &str) -> Result<Self, AnalysisError> {
-        match value {
-            "a" => Ok(Self::NoAction),
-            "r" => Ok(Self::Restrict),
-            "c" => Ok(Self::Cascade),
-            "n" => Ok(Self::SetNull),
-            "d" => Ok(Self::SetDefault),
-            _ => AnalysisError::raise_unexpected_input(source),
-        }
-    }
-
-    /// get delete action from [`crate::syn::Constraint`]
-    pub fn try_from_delete_postgres_constraint(
-        syn: &Constraint,
-    ) -> Result<Option<Self>, AnalysisError> {
-        let del_action = syn.get_fk_del_action();
-        if del_action.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(Self::try_from_value(&del_action, "fk_del_action")?))
-        }
-    }
-
-    /// get update action from [`crate::syn::Constraint`]
-    pub fn try_from_update_postgres_constraint(
-        syn: &Constraint,
-    ) -> Result<Option<Self>, AnalysisError> {
-        let upd_action = syn.get_fk_upd_action();
-        if upd_action.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(Self::try_from_value(&upd_action, "fk_upd_action")?))
-        }
-    }
-
-    /// convert from [`crate::syn::sqlite::RefAct`]
-    #[cfg(feature = "sqlite")]
-    pub const fn from_ref_act(value: &RefAct) -> Self {
-        match value {
-            RefAct::SetNull => Self::SetNull,
-            RefAct::SetDefault => Self::SetDefault,
-            RefAct::Cascade => Self::Cascade,
-            RefAct::Restrict => Self::Restrict,
-            RefAct::NoAction => Self::NoAction,
-        }
-    }
-}
-
-/// deferrable / not deferrable, initially deferred
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub struct Deferrability {
-    deferrable: bool,
-    init_deferred: bool,
-}
-
-impl Deferrability {
-    /// Whether the constraint may be deferred.
-    pub const fn is_deferrable(&self) -> bool {
-        self.deferrable
-    }
-    /// Whether the constraint is initially deferred.
-    pub const fn is_initially_deferred(&self) -> bool {
-        self.init_deferred
-    }
-
-    pub(crate) const fn new(deferrable: bool, init_deferred: bool) -> Self {
-        Self {
-            deferrable,
-            init_deferred,
-        }
-    }
-    const fn from_postgres_constraint(syn: &Constraint) -> Self {
-        let deferrable = syn.get_deferrable();
-        let init_deferred = syn.get_initdeferred();
-        Self {
-            deferrable,
-            init_deferred,
-        }
-    }
-
-    #[cfg(feature = "sqlite")]
-    fn from_defer_subclause(syn: &DeferSubclause) -> Self {
-        let deferrable = *syn.deferrable();
-        let init_deferred = syn.init_deferred().unwrap_or_default().init_deferred();
-        Self {
-            deferrable,
-            init_deferred,
-        }
-    }
-}
 
 /// foreign key constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]

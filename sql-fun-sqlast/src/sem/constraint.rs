@@ -11,6 +11,7 @@ pub use self::{
     unique::UniqueConstraint,
 };
 
+use crate::sem::AstConversion;
 use crate::{
     ast::TableConstraint,
     names::ColumnName,
@@ -269,9 +270,11 @@ where
             ConstrType::ConstrDefault => todo!(),
             ConstrType::ConstrIdentity => todo!(),
             ConstrType::ConstrGenerated => todo!(),
-            ConstrType::ConstrCheck => {
-                TableConstraint::analyze_legacy_check(context, target_table, &constraint)
-            }
+            ConstrType::ConstrCheck => AstConversion::<TableConstraint>::analyze_legacy_check(
+                context,
+                target_table,
+                &constraint,
+            ),
             ConstrType::ConstrPrimary => {
                 PrimaryKeyConstraint::analyze(context, target_table, constraint)
             }

@@ -1,3 +1,4 @@
+pub use crate::syntax_options::IdentityColumnMode;
 use crate::{
     names::{ColumnName, TableName},
     sem::{
@@ -6,67 +7,6 @@ use crate::{
     },
     syn::{ConstrType, Constraint, Opt},
 };
-
-/// Identity column mode
-#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub enum IdentityColumnMode {
-    /// generate value always
-    Always,
-    /// generate value when not value supplied
-    ByDefault,
-}
-
-impl IdentityColumnMode {
-    /// create Always variant
-    pub const fn always() -> Self {
-        Self::Always
-    }
-
-    /// create ByDefault variant
-    pub const fn by_default() -> Self {
-        Self::ByDefault
-    }
-
-    const IDENTITY_MODE_ALWAYS: &'static str = "a";
-    const IDENTITY_MODE_BY_DEFAULT: &'static str = "d";
-
-    /// from [`crate::syn::Constraint`] `generated_when` value
-    pub fn from_postgres_generate_when(value: &str) -> Result<Self, AnalysisError> {
-        if value == Self::IDENTITY_MODE_ALWAYS {
-            Ok(Self::always())
-        } else if value == Self::IDENTITY_MODE_BY_DEFAULT {
-            Ok(Self::by_default())
-        } else {
-            AnalysisError::raise_unexpected_input("constraint.generated_when")?;
-            AnalysisError::never()
-        }
-    }
-}
-
-#[cfg(test)]
-mod identity_column_mode_from_postgres_generate_when {
-    use testresult::TestResult;
-
-    use crate::sem::column_constraints::identity_constraint::IdentityColumnMode;
-
-    #[rstest::rstest]
-    #[case("a", IdentityColumnMode::Always)]
-    #[case("d", IdentityColumnMode::ByDefault)]
-    fn test_from_pg_generate_when(
-        #[case] value: &str,
-        #[case] expect: IdentityColumnMode,
-    ) -> TestResult {
-        let actual = IdentityColumnMode::from_postgres_generate_when(value)?;
-        assert_eq!(actual, expect);
-        Ok(())
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_invalid_generate_when() {
-        let _ = IdentityColumnMode::from_postgres_generate_when("x").unwrap();
-    }
-}
 
 /// identity column constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]

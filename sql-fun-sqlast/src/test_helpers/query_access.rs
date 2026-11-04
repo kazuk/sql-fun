@@ -61,12 +61,12 @@ fn analyze_pair(
     context: TestParseContext,
     dialect: Dialect,
 ) -> AstAndContextPair<TestParseContext> {
-    parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context, &mut create_cache_context())
-        .unwrap()
+    SemAst::from_ast(
+        &parse_statements(sql, dialect).next().unwrap().unwrap(),
+        context,
+        &mut create_cache_context(),
+    )
+    .unwrap()
 }
 pub(crate) fn analyze_preserving_output(sql: &str) -> QueryAccess {
     let pair = analyze_pair(sql, context(), Dialect::postgres());
@@ -97,9 +97,7 @@ pub(crate) fn object_context() -> TestParseContext {
         .next()
         .unwrap()
         .unwrap();
-    let pair = statement
-        .analyze(context, &mut create_cache_context())
-        .unwrap();
+    let pair = SemAst::from_ast(&statement, context, &mut create_cache_context()).unwrap();
     let query = pair.ast().select_statement().unwrap().clone();
     context = pair.into_context();
     let name = FullName::with_schema("public", "v");

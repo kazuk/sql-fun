@@ -1,4 +1,5 @@
 use crate::context::SchemaFileContext;
+use crate::sem::SemAst;
 use crate::{
     ast::Dialect,
     names::SchemaName,
@@ -50,9 +51,7 @@ pub(crate) fn schema(sql: &str) -> testresult::TestResult<SchemaFileContext> {
     let mut context = schema_from_base(context(), std::path::Path::new("query.sql"));
     let mut cache_context = create_cache_context();
     for statement in parse_statements(sql, Dialect::postgres()) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(context)

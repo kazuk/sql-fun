@@ -91,10 +91,13 @@ fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
         ::sql_fun_core::SqlDialect::PostgreSQL
     );
     assert_eq!(context.metadata().name(), selected.name());
-    let analyzed = parse_statements("select cast(?1 as integer) as n", AstDialect::sqlite())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements("select cast(?1 as integer) as n", AstDialect::sqlite())
+            .next()
+            .unwrap()?,
+        context,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed
             .context()
@@ -128,8 +131,7 @@ fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
     let statement = parse_statements("select 1", AstDialect::sqlite())
         .next()
         .unwrap()?;
-    let error = statement
-        .analyze(context, &mut cache_context)
+    let error = SemAst::from_ast(&statement, context, &mut cache_context)
         .err()
         .expect("dialect mismatch");
     assert!(error.to_string().contains("SQLite"));

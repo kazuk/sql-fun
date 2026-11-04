@@ -1,3 +1,4 @@
+use crate::sem::convert;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::AlterTable as SqliteAlterTable;
 #[cfg(feature = "sqlite")]
@@ -183,7 +184,7 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        AlterRelation::try_from_with_tokens(&syn, tokens)?
+        convert(&AlterRelation::try_from_with_tokens(&syn, tokens)?)
             .resolve_and_apply_at(context, source_span)
     }
 
@@ -199,7 +200,7 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        AlterRelation::try_from_with_tokens(&syn, tokens)?
+        convert(&AlterRelation::try_from_with_tokens(&syn, tokens)?)
             .resolve_and_apply_at(context, source_span)
     }
 
@@ -215,7 +216,7 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        AlterRelation::try_from(&syn)?.resolve_and_apply_at(context, source_span)
+        convert(&AlterRelation::try_from(&syn)?).resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -394,9 +395,11 @@ impl AlterView {
     where
         TParseContext: ParseContext,
     {
-        AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
-            .with_view_kind(as_matview)
-            .resolve_and_apply(context)
+        convert(
+            &AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
+                .with_view_kind(as_matview),
+        )
+        .resolve_and_apply(context)
     }
 }
 
@@ -558,7 +561,8 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(context, table_name)
+        convert(&AlterCommand::try_from_with_tokens(&cmd, tokens)?)
+            .resolve_and_report(context, table_name)
     }
 }
 
@@ -633,7 +637,7 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        AlterCommand::try_from(body)?.resolve_and_report(context, table_name)
+        convert(&AlterCommand::try_from(body)?).resolve_and_report(context, table_name)
     }
 }
 
@@ -648,7 +652,8 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(context, table_name)
+        convert(&AlterCommand::try_from_with_tokens(&cmd, tokens)?)
+            .resolve_and_report(context, table_name)
     }
 }
 

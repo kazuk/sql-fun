@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Context-free SQL syntax shared by the parser frontends.
 //!
 //! Names in this module are spelling, not catalog bindings. In particular, type
@@ -6,24 +7,26 @@
 //! Converters consume newly built child nodes to avoid cloning recursive trees;
 //! ordinary semantic factories borrow their inputs.
 
+use crate::syntax_options::{
+    ConflictClause, CreateTableMode, Deferrability, Deferrable, ForeignKeyAction,
+    ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, ObjectKind, Validity,
+};
 // Syntax retention intentionally precedes semantic support for some SQL clauses.
 // Construction tests cover these fields even when resolution does not consume them.
-#![allow(dead_code)]
 
-mod ddl;
+pub(crate) mod ddl;
 mod default_privileges;
 pub(crate) mod deparse;
-mod document;
+pub(crate) mod document;
 mod drop_behavior;
 mod engine_features;
 mod foreign_table;
 mod mutation;
 mod ownership;
-mod postgres;
-mod projection;
+pub(crate) mod postgres;
+pub(crate) mod projection;
 mod public;
 mod query_construction;
-mod resolve;
 mod returning_options;
 mod rows_from;
 mod rule;
@@ -32,13 +35,10 @@ mod rule;
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
 mod sqlite_retention;
-#[cfg(test)]
-mod tests;
 mod traversal;
 mod trigger;
 mod utility;
-mod validation;
-mod view_definition;
+pub(crate) mod validation;
 mod wildcard;
 
 pub(crate) use self::ddl::{
@@ -57,21 +57,13 @@ pub use self::{
     },
     mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
     public::{CommonTableExpression, Statement, StatementKind, WithClause},
-    wildcard::WildcardRewriteError,
 };
 
-use crate::{
-    AstAndContextPair, CacheContext,
-    sem::{
-        AlterSequence as SemAlterSequence, Comment as SemComment, CreateRule as SemCreateRule,
-        DropTable as SemDropTable, VariableSet as SemVariableSet,
-    },
-    syn::ScanToken,
-};
+use crate::syn::ScanToken;
 
 use sql_fun_core::IVec;
 
-use self::document::{
+pub(crate) use self::document::{
     CmdType, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
     JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp, JsonFormat,
     JsonFormatType, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate, JsonOutput,
@@ -80,43 +72,33 @@ use self::document::{
     MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize,
 };
 
-use crate::{
-    StringSpan,
-    context::ParseContext,
-    names::{TableName, ViewName},
-    sem::{
-        AnalysisError, AnalysisProblem, ConflictClause, CreateEnum, CreateExtension,
-        CreateSequence, CreateTableMode, CreateView, Deferrability, Deferrable, ForeignKeyAction,
-        ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, Kind, ObjectKind,
-        ParameterConstraints, ScalarAnalysisContext, SemAst, Validity, problem::ViewProblem,
-    },
-};
+use crate::StringSpan;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct TableExtras {
-    unlogged: bool,
-    inherits: Vec<Name>,
-    of_type: Option<TypeName>,
-    on_commit: Option<CommitAction>,
-    tablespace: Option<String>,
-    access_method: Option<String>,
-    partition_spec: Option<PartitionSpec>,
-    partition_bound: Option<PartitionBound>,
+    pub(crate) unlogged: bool,
+    pub(crate) inherits: Vec<Name>,
+    pub(crate) of_type: Option<TypeName>,
+    pub(crate) on_commit: Option<CommitAction>,
+    pub(crate) tablespace: Option<String>,
+    pub(crate) access_method: Option<String>,
+    pub(crate) partition_spec: Option<PartitionSpec>,
+    pub(crate) partition_bound: Option<PartitionBound>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct PartitionSpec {
-    strategy: String,
-    keys: Vec<IndexExpression>,
+    pub(crate) strategy: String,
+    pub(crate) keys: Vec<IndexExpression>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct PartitionBound {
-    strategy: String,
-    is_default: bool,
-    modulus: i32,
-    remainder: i32,
-    list: Vec<Expr>,
-    lower: Vec<PartitionDatum>,
-    upper: Vec<PartitionDatum>,
+    pub(crate) strategy: String,
+    pub(crate) is_default: bool,
+    pub(crate) modulus: i32,
+    pub(crate) remainder: i32,
+    pub(crate) list: Vec<Expr>,
+    pub(crate) lower: Vec<PartitionDatum>,
+    pub(crate) upper: Vec<PartitionDatum>,
 }
 #[derive(Clone, Debug)]
 pub(crate) enum PartitionDatum {
@@ -126,62 +108,62 @@ pub(crate) enum PartitionDatum {
 }
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ConstraintExtras {
-    enforced: Option<bool>,
-    without_overlaps: bool,
-    fk_with_period: bool,
-    pk_with_period: bool,
-    deferrable: bool,
-    initially_deferred: bool,
-    skip_validation: bool,
-    no_inherit: bool,
-    nulls_not_distinct: bool,
-    include: Vec<String>,
-    options: Vec<SyntaxOption>,
-    index_name: Option<String>,
-    tablespace: Option<String>,
-    access_method: Option<String>,
-    predicate: Option<Expr>,
-    exclusions: Vec<ExclusionElement>,
-    delete_columns: Vec<String>,
+    pub(crate) enforced: Option<bool>,
+    pub(crate) without_overlaps: bool,
+    pub(crate) fk_with_period: bool,
+    pub(crate) pk_with_period: bool,
+    pub(crate) deferrable: bool,
+    pub(crate) initially_deferred: bool,
+    pub(crate) skip_validation: bool,
+    pub(crate) no_inherit: bool,
+    pub(crate) nulls_not_distinct: bool,
+    pub(crate) include: Vec<String>,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) index_name: Option<String>,
+    pub(crate) tablespace: Option<String>,
+    pub(crate) access_method: Option<String>,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) exclusions: Vec<ExclusionElement>,
+    pub(crate) delete_columns: Vec<String>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct ExclusionElement {
-    expression: IndexExpression,
-    operator: Name,
+    pub(crate) expression: IndexExpression,
+    pub(crate) operator: Name,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Table {
-    extras: TableExtras,
-    name: Name,
-    columns: Vec<Column>,
-    constraints: Vec<TableConstraint>,
-    temporary: bool,
-    mode: CreateTableMode,
-    query: Option<Query>,
-    options: Vec<SyntaxOption>,
+    pub(crate) extras: TableExtras,
+    pub(crate) name: Name,
+    pub(crate) columns: Vec<Column>,
+    pub(crate) constraints: Vec<TableConstraint>,
+    pub(crate) temporary: bool,
+    pub(crate) mode: CreateTableMode,
+    pub(crate) query: Option<Query>,
+    pub(crate) options: Vec<SyntaxOption>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Column {
-    collation: Name,
-    compression: Option<String>,
-    storage: Option<String>,
-    name: String,
-    type_name: Option<TypeName>,
-    type_mod: Option<i32>,
-    constraints: Vec<TableConstraint>,
-    not_null: Option<bool>,
+    pub(crate) collation: Name,
+    pub(crate) compression: Option<String>,
+    pub(crate) storage: Option<String>,
+    pub(crate) name: String,
+    pub(crate) type_name: Option<TypeName>,
+    pub(crate) type_mod: Option<i32>,
+    pub(crate) constraints: Vec<TableConstraint>,
+    pub(crate) not_null: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableConstraint {
-    extras: ConstraintExtras,
-    name: Option<String>,
-    keys: Vec<String>,
-    constraint: ColumnConstraint,
-    order: Vec<Order>,
-    auto_increment: bool,
+    pub(crate) extras: ConstraintExtras,
+    pub(crate) name: Option<String>,
+    pub(crate) keys: Vec<String>,
+    pub(crate) constraint: ColumnConstraint,
+    pub(crate) order: Vec<Order>,
+    pub(crate) auto_increment: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -204,23 +186,23 @@ pub(crate) enum ColumnConstraint {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ForeignReference {
-    table: Name,
-    columns: Vec<String>,
-    match_type: Option<ForeignKeyMatchType>,
-    delete_action: Option<ForeignKeyAction>,
-    update_action: Option<ForeignKeyAction>,
-    deferrability: Option<Deferrability>,
-    validity: Option<Validity>,
-    ignored_matches: Vec<String>,
+    pub(crate) table: Name,
+    pub(crate) columns: Vec<String>,
+    pub(crate) match_type: Option<ForeignKeyMatchType>,
+    pub(crate) delete_action: Option<ForeignKeyAction>,
+    pub(crate) update_action: Option<ForeignKeyAction>,
+    pub(crate) deferrability: Option<Deferrability>,
+    pub(crate) validity: Option<Validity>,
+    pub(crate) ignored_matches: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlterRelation {
-    name: Name,
-    kind: AlterRelationKind,
-    commands: Vec<AlterCommand>,
-    if_exists: bool,
-    only: bool,
+    pub(crate) name: Name,
+    pub(crate) kind: AlterRelationKind,
+    pub(crate) commands: Vec<AlterCommand>,
+    pub(crate) if_exists: bool,
+    pub(crate) only: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -394,211 +376,57 @@ impl StatementNode {
     const fn table(value: Table) -> Self {
         Self::Table(value)
     }
-
-    pub(crate) fn resolve(
-        &self,
-        context: &mut impl ParseContext,
-        cache: &mut CacheContext,
-    ) -> Result<SemAst, AnalysisError> {
-        if !self.check_engine_features(context)? {
-            return Ok(SemAst::unresolved_statement());
-        }
-        match self {
-            Self::DefaultPrivileges(_) => {
-                todo!("ALTER DEFAULT PRIVILEGES interpretation (#955)")
-            }
-            Self::ForeignTable(_) => {
-                todo!("CREATE FOREIGN TABLE interpretation (#956)")
-            }
-            Self::Query(query) => query
-                .resolve(context, cache)
-                .map(|query| SemAst::select(&query)),
-            Self::Insert(insert) => insert.resolve(context, cache).map(|value| {
-                value
-                    .as_ref()
-                    .map_or_else(SemAst::unresolved_statement, SemAst::insert)
-            }),
-            Self::Update(update) => update.resolve(context, cache).map(|value| {
-                value
-                    .as_ref()
-                    .map_or_else(SemAst::unresolved_statement, SemAst::update)
-            }),
-            Self::Delete(delete) => delete
-                .resolve(context, cache)
-                .map(|delete| SemAst::delete(&delete)),
-            Self::Merge(merge) => merge
-                .resolve(context, cache)
-                .map(|merge| SemAst::merge(&merge)),
-            Self::CreateRule(rule) => rule.resolve(context).map(|value| {
-                value
-                    .as_ref()
-                    .map_or_else(SemAst::unresolved_statement, SemAst::create_rule)
-            }),
-            Self::DropTrigger(trigger) => trigger.resolve(context).map(|value| {
-                value
-                    .as_ref()
-                    .map_or_else(SemAst::unresolved_statement, SemAst::drop_trigger)
-            }),
-            Self::CreateTrigger(trigger) => trigger.resolve(context).map(|value| {
-                value
-                    .as_ref()
-                    .map_or_else(SemAst::unresolved_statement, SemAst::create_trigger)
-            }),
-            Self::DropRule(rule) => rule.resolve(context).map(|value| {
-                value
-                    .as_ref()
-                    .map_or_else(SemAst::unresolved_statement, SemAst::drop_rule)
-            }),
-            Self::View(_) => {
-                AnalysisError::raise_unexpected_input("view requires catalog application")
-            }
-            Self::Extension(_) => {
-                AnalysisError::raise_unexpected_input("extension requires catalog application")
-            }
-            Self::VariableSet(_) => {
-                AnalysisError::raise_unexpected_input("variable set requires catalog application")
-            }
-            Self::EnumType(_) => {
-                AnalysisError::raise_unexpected_input("enum type requires catalog application")
-            }
-            Self::Sequence(_) => {
-                AnalysisError::raise_unexpected_input("sequence requires catalog application")
-            }
-            Self::DropTable(_) => {
-                AnalysisError::raise_unexpected_input("drop table requires catalog application")
-            }
-            Self::AlterSequence(_) => {
-                AnalysisError::raise_unexpected_input("alter sequence requires catalog application")
-            }
-            Self::Comment(_) => {
-                AnalysisError::raise_unexpected_input("comment requires catalog application")
-            }
-            Self::AlterOwner(alteration) => alteration
-                .resolve(context)
-                .map(|alteration| SemAst::alter_owner(&alteration)),
-            Self::CompositeType(composite_type) => {
-                composite_type.resolve(context).map(SemAst::CreateCompType)
-            }
-            Self::AlterRelation(_) => {
-                AnalysisError::raise_unexpected_input("statement requires catalog application")
-            }
-            Self::Function(function) => function
-                .resolve(context)
-                .map(|function| SemAst::create_function(&function)),
-            Self::Index(index) => index
-                .resolve(context)
-                .map(|index| SemAst::from_index_resolution(&index)),
-            Self::TableAs(_) => {
-                AnalysisError::raise_unexpected_input("table as requires catalog application")
-            }
-            Self::Table(_) => {
-                AnalysisError::raise_unexpected_input("table requires source metadata")
-            }
-            Self::Schema(_) => {
-                AnalysisError::raise_unexpected_input("schema requires catalog application")
-            }
-            Self::Domain(domain) => domain
-                .resolve(context)
-                .map(|domain| SemAst::create_domain(&domain)),
-        }
-    }
-
-    pub(crate) fn resolve_and_apply<TContext>(
-        &self,
-        context: TContext,
-        cache: &mut CacheContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let mut context = context;
-        context.set_parameter_constraints(&ParameterConstraints::default());
-        if !self.check_engine_features(&mut context)? {
-            return Ok(AstAndContextPair::new(
-                SemAst::unresolved_statement(),
-                context,
-            ));
-        }
-        match self {
-            Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
-            Self::DropTrigger(trigger) => trigger.resolve_and_apply(context),
-            Self::CreateRule(rule) => rule.resolve_and_apply(context),
-            Self::DropRule(rule) => rule.resolve_and_apply(context),
-            Self::View(view) => view.resolve_and_apply(context, cache),
-            Self::Extension(extension) => extension.apply(context),
-            Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),
-            Self::EnumType(enum_type) => enum_type.apply(context),
-            Self::Sequence(sequence) => sequence.apply(context),
-            Self::DropTable(drop_table) => drop_table.apply(context),
-            Self::AlterSequence(alter_sequence) => alter_sequence.apply(context),
-            Self::Comment(comment) => comment.apply(context),
-            Self::AlterOwner(alteration) => alteration.resolve_and_apply(context),
-            Self::CompositeType(composite_type) => composite_type.resolve_and_apply(context),
-            Self::AlterRelation(statement) => statement.resolve_and_apply(context),
-            Self::Domain(domain) => domain.resolve_and_apply(context),
-            Self::Function(function) => function.resolve_and_apply(context),
-            Self::Schema(schema) => schema.resolve_and_apply(context, cache),
-            Self::Index(index) => index.resolve_and_apply(context),
-            Self::TableAs(table_as) => table_as.resolve_and_apply(context, cache),
-            Self::Table(table) => table.resolve_and_apply(context),
-            _ => {
-                let outcome = self.resolve(&mut context, cache);
-                let statement = outcome?;
-                Ok(AstAndContextPair::new(statement, context))
-            }
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlterOwner {
-    object_kind: Option<ObjectKind>,
-    relation: Option<Name>,
-    object: Option<ObjectTarget>,
-    owner: Role,
+    pub(crate) object_kind: Option<ObjectKind>,
+    pub(crate) relation: Option<Name>,
+    pub(crate) object: Option<ObjectTarget>,
+    pub(crate) owner: Role,
 }
 
 /// A named database object, optionally identified by its argument type list.
 /// `None` distinguishes an unspecified signature from an explicitly empty `()`.
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectTarget {
-    name: Vec<String>,
-    argument_types: Option<Vec<ObjectArgument>>,
-    cast: Option<CastTarget>,
-    type_name: Option<TypeName>,
-    domain_constraint: Option<DomainConstraintTarget>,
-    transform: Option<TransformTarget>,
+    pub(crate) name: Vec<String>,
+    pub(crate) argument_types: Option<Vec<ObjectArgument>>,
+    pub(crate) cast: Option<CastTarget>,
+    pub(crate) type_name: Option<TypeName>,
+    pub(crate) domain_constraint: Option<DomainConstraintTarget>,
+    pub(crate) transform: Option<TransformTarget>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CastTarget {
-    source: TypeName,
-    target: TypeName,
+    pub(crate) source: TypeName,
+    pub(crate) target: TypeName,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct DomainConstraintTarget {
-    domain: TypeName,
-    constraint: String,
+    pub(crate) domain: TypeName,
+    pub(crate) constraint: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TransformTarget {
-    type_name: TypeName,
-    language: String,
+    pub(crate) type_name: TypeName,
+    pub(crate) language: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectArgument {
-    mode: Option<String>,
-    name: Option<String>,
-    type_name: Option<TypeName>,
+    pub(crate) mode: Option<String>,
+    pub(crate) name: Option<String>,
+    pub(crate) type_name: Option<TypeName>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Role {
-    kind: u32,
-    name: String,
+    pub(crate) kind: u32,
+    pub(crate) name: String,
 }
 
 impl AlterOwner {
@@ -628,9 +456,9 @@ impl Role {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Comment {
-    target: ObjectTarget,
-    object_kind: ObjectKind,
-    text: String,
+    pub(crate) target: ObjectTarget,
+    pub(crate) object_kind: ObjectKind,
+    pub(crate) text: String,
 }
 
 impl Comment {
@@ -641,29 +469,14 @@ impl Comment {
             text: text.to_owned(),
         }
     }
-
-    pub(crate) fn apply<TContext>(
-        &self,
-        context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let target = self
-            .canonical_target()
-            .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
-        let comment = SemComment::new(&target, self.object_kind, &self.text);
-        let context = context.apply_comment(&comment)?;
-        Ok(AstAndContextPair::new(SemAst::Comment(comment), context))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlterSequence {
-    name: Name,
-    options: Vec<SyntaxOption>,
-    for_identity: bool,
-    missing_ok: bool,
+    pub(crate) name: Name,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) for_identity: bool,
+    pub(crate) missing_ok: bool,
 }
 
 impl AlterSequence {
@@ -680,47 +493,14 @@ impl AlterSequence {
             missing_ok,
         }
     }
-
-    fn apply<TContext>(
-        &self,
-        context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let mut context = context;
-        let mut alter_sequence = SemAlterSequence::new(&self.name.full_name()?, &[]);
-        for option in &self.options {
-            if option.name == "owned_by" {
-                let relation = if let Some(requested) = option.owned_relation()? {
-                    if let Some(relation) = context.resolve_table_name(&requested) {
-                        Some(relation)
-                    } else {
-                        context.report_analysis_problem(AnalysisProblem::table_not_found(
-                            &requested,
-                        ))?;
-                        continue;
-                    }
-                } else {
-                    None
-                };
-                alter_sequence = alter_sequence.with_owned_by(relation.as_ref());
-            }
-        }
-        let context = context.apply_alter_sequence(&alter_sequence)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterSequence(alter_sequence),
-            context,
-        ))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct DropTable {
-    names: Vec<Name>,
-    if_exists: bool,
-    cascade: bool,
-    concurrent: bool,
+    pub(crate) names: Vec<Name>,
+    pub(crate) if_exists: bool,
+    pub(crate) cascade: bool,
+    pub(crate) concurrent: bool,
 }
 
 impl DropTable {
@@ -732,39 +512,16 @@ impl DropTable {
             concurrent,
         }
     }
-
-    fn apply<TContext>(
-        &self,
-        mut context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let mut names = Vec::new();
-        for name in &self.names {
-            let table_name = TableName::from(name.full_name()?);
-            if context.get_table(&table_name).is_none() {
-                context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
-            }
-            names.push(table_name);
-        }
-        let drop_table = SemDropTable::new(&names, self.if_exists, self.cascade);
-        context = context.apply_drop_table(&drop_table)?;
-        Ok(AstAndContextPair::new(
-            SemAst::DropTable(drop_table),
-            context,
-        ))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Sequence {
-    temporary: bool,
-    name: Name,
-    options: Vec<SyntaxOption>,
-    owner_id: u32,
-    for_identity: bool,
-    if_not_exists: bool,
+    pub(crate) temporary: bool,
+    pub(crate) name: Name,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) owner_id: u32,
+    pub(crate) for_identity: bool,
+    pub(crate) if_not_exists: bool,
 }
 
 impl Sequence {
@@ -788,69 +545,27 @@ impl Sequence {
             if_not_exists,
         }
     }
-
-    fn apply<TContext>(
-        &self,
-        mut context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let mut sequence = CreateSequence::new(&self.name.full_name()?)
-            .with_if_not_exists(self.if_not_exists)
-            .with_temporary(self.temporary);
-        for option in &self.options {
-            if let Some(table) = option.owned_relation()? {
-                let Some(resolved) = context.resolve_table_name(&table) else {
-                    context.report_analysis_problem(AnalysisProblem::table_not_found(&table))?;
-                    continue;
-                };
-                let table = resolved;
-                sequence.set_owned_by(&table);
-            }
-        }
-        let context = context.apply_create_sequence(&sequence)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateSequence(sequence),
-            context,
-        ))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct EnumType {
-    name: Name,
-    values: Vec<String>,
+    pub(crate) name: Name,
+    pub(crate) values: Vec<String>,
 }
 
 impl EnumType {
     const fn new(name: Name, values: Vec<String>) -> Self {
         Self { name, values }
     }
-
-    fn apply<TContext>(
-        &self,
-        context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let enum_type = CreateEnum::new(&self.name.full_name()?, &self.values);
-        let context = context.apply_create_enum(&enum_type)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateEnum(enum_type),
-            context,
-        ))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct VariableSet {
-    kind: VariableSetKind,
-    is_local: bool,
-    name: String,
-    arguments: Vec<Expr>,
-    transaction_options: Option<Vec<SyntaxOption>>,
+    pub(crate) kind: VariableSetKind,
+    pub(crate) is_local: bool,
+    pub(crate) name: String,
+    pub(crate) arguments: Vec<Expr>,
+    pub(crate) transaction_options: Option<Vec<SyntaxOption>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -873,33 +588,13 @@ impl VariableSet {
             transaction_options: None,
         }
     }
-
-    fn resolve_and_apply<TContext>(
-        &self,
-        mut context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let [argument] = self.arguments.as_slice() else {
-            return AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1");
-        };
-        let outcome = argument.resolve(&mut context, &ScalarAnalysisContext::default());
-        let value = outcome?;
-        let variable_set = SemVariableSet::new(&self.name, &value);
-        let context = context.apply_variable_set(&variable_set)?;
-        Ok(AstAndContextPair::new(
-            SemAst::VariableSet(variable_set),
-            context,
-        ))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Extension {
-    if_not_exists: bool,
-    options: Vec<SyntaxOption>,
-    name: String,
+    pub(crate) if_not_exists: bool,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) name: String,
 }
 
 impl Extension {
@@ -910,35 +605,19 @@ impl Extension {
             name: name.to_owned(),
         }
     }
-
-    fn apply<TContext>(
-        &self,
-        context: TContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let extension =
-            CreateExtension::from_name(&self.name).with_if_not_exists(self.if_not_exists);
-        let context = context.apply_create_extension(&extension)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateExtension(extension),
-            context,
-        ))
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct View {
-    name: Name,
-    aliases: Vec<String>,
-    query: Query,
-    replace: bool,
-    options: Vec<SyntaxOption>,
-    check_option: ViewCheckOption,
-    temporary: bool,
-    if_not_exists: bool,
-    materialized: bool,
+    pub(crate) name: Name,
+    pub(crate) aliases: Vec<String>,
+    pub(crate) query: Query,
+    pub(crate) replace: bool,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) check_option: ViewCheckOption,
+    pub(crate) temporary: bool,
+    pub(crate) if_not_exists: bool,
+    pub(crate) materialized: bool,
 }
 
 impl View {
@@ -965,68 +644,6 @@ impl View {
             if_not_exists,
             materialized,
         }
-    }
-
-    fn resolve_and_apply<TContext>(
-        &self,
-        context: TContext,
-        cache: &mut CacheContext,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let mut context = context;
-        let requested = self.name.full_name()?;
-        if requested.schema().is_none() && !self.temporary && context.get_default_schema().is_none()
-        {
-            context.report_analysis_problem(AnalysisProblem::view(
-                &ViewProblem::invalid_target(&requested),
-            ))?;
-            return Ok(AstAndContextPair::new(
-                SemAst::unresolved_statement(),
-                context,
-            ));
-        }
-        let name = context.creation_name(&requested, self.temporary)?;
-        let kind = if self.materialized {
-            Kind::materialized_view()
-        } else {
-            Kind::view()
-        };
-        if !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)? {
-            return Ok(AstAndContextPair::new(
-                SemAst::unresolved_statement(),
-                context,
-            ));
-        }
-        let outcome = self.query.resolve(&mut context, cache);
-        let mut query = outcome?;
-        query.rename_columns(&self.aliases);
-        let lineage = self.query.view_lineage(&context, &query)?;
-        let options = self.semantic_options(&mut context)?;
-        let mut view = CreateView::new(&name, &query, &[], &None, self.materialized)
-            .with_if_not_exists(self.if_not_exists)
-            .with_replace(self.replace)
-            .with_temporary(self.temporary)
-            .with_column_lineage(&lineage)
-            .with_options(&options, self.check_option.semantic());
-        let replacement_rule = if self.replace {
-            if let Some(existing) = context.get_view(&ViewName::from_full_name(&name))
-                && let Some(references) = existing.rules()
-            {
-                view.retain_rule_references(references);
-            }
-            SemCreateRule::replace_view_definition(&context, &name, &query)?
-        } else {
-            None
-        };
-        let context = context.apply_create_view(&view)?;
-        let context = if let Some(rule) = replacement_rule {
-            context.register_rule(&rule)?
-        } else {
-            context
-        };
-        Ok(AstAndContextPair::new(SemAst::CreateView(view), context))
     }
 }
 
@@ -1164,51 +781,51 @@ impl From<&::sql_fun_core::SqlFunMetadata> for Dialect {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Name(Vec<String>);
+pub(crate) struct Name(pub(crate) Vec<String>);
 
 impl Name {
-    fn from_parts(parts: &[String]) -> Self {
+    pub(crate) fn from_parts(parts: &[String]) -> Self {
         Self(parts.to_vec())
     }
 
-    fn local(value: &str) -> Self {
+    pub(crate) fn local(value: &str) -> Self {
         Self(vec![value.to_owned()])
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TypeName {
-    name: Name,
-    modifiers: Vec<Expr>,
-    array_bounds: Vec<Option<i32>>,
-    set_of: bool,
-    percent_type: bool,
-    sqlite_name_snapshot: Option<Name>,
-    sqlite_parts: Vec<SqliteTypeNamePart>,
-    sqlite_modifiers: Option<SqliteTypeModifiers>,
-    location: Option<StringSpan>,
+    pub(crate) name: Name,
+    pub(crate) modifiers: Vec<Expr>,
+    pub(crate) array_bounds: Vec<Option<i32>>,
+    pub(crate) set_of: bool,
+    pub(crate) percent_type: bool,
+    pub(crate) sqlite_name_snapshot: Option<Name>,
+    pub(crate) sqlite_parts: Vec<SqliteTypeNamePart>,
+    pub(crate) sqlite_modifiers: Option<SqliteTypeModifiers>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqliteTypeNamePart {
-    name: String,
-    quote: Option<char>,
-    leading_trivia: Vec<SqliteTypeNameTrivia>,
-    trailing_trivia: Vec<SqliteTypeNameTrivia>,
+    pub(crate) name: String,
+    pub(crate) quote: Option<char>,
+    pub(crate) leading_trivia: Vec<SqliteTypeNameTrivia>,
+    pub(crate) trailing_trivia: Vec<SqliteTypeNameTrivia>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqliteTypeModifiers {
-    values: Vec<SqliteTypeModifier>,
-    ast_spellings: Vec<String>,
-    trailing_trivia: Vec<SqliteTypeNameTrivia>,
+    pub(crate) values: Vec<SqliteTypeModifier>,
+    pub(crate) ast_spellings: Vec<String>,
+    pub(crate) trailing_trivia: Vec<SqliteTypeNameTrivia>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqliteTypeModifier {
-    leading_trivia: Vec<SqliteTypeNameTrivia>,
-    spelling: String,
-    trailing_trivia: Vec<SqliteTypeNameTrivia>,
+    pub(crate) leading_trivia: Vec<SqliteTypeNameTrivia>,
+    pub(crate) spelling: String,
+    pub(crate) trailing_trivia: Vec<SqliteTypeNameTrivia>,
 }
 
 #[derive(Clone, Debug)]
@@ -1275,32 +892,32 @@ impl Expr {
 
 #[derive(Clone, Debug)]
 pub(crate) struct CurrentOf {
-    name: String,
-    parameter: i32,
+    pub(crate) name: String,
+    pub(crate) parameter: i32,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Parameter {
-    position: u32,
-    name: Option<String>,
-    type_name: Option<String>,
+    pub(crate) position: u32,
+    pub(crate) name: Option<String>,
+    pub(crate) type_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct InTable {
-    argument: Expr,
-    negated: bool,
-    table: Name,
-    arguments: Vec<Expr>,
+    pub(crate) argument: Expr,
+    pub(crate) negated: bool,
+    pub(crate) table: Name,
+    pub(crate) arguments: Vec<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct OperatorExpr {
-    name: Name,
-    kind: OperatorKind,
-    left: Option<Expr>,
-    right: Option<Expr>,
-    escape: Option<Expr>,
+    pub(crate) name: Name,
+    pub(crate) kind: OperatorKind,
+    pub(crate) left: Option<Expr>,
+    pub(crate) right: Option<Expr>,
+    pub(crate) escape: Option<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1325,8 +942,8 @@ pub(crate) enum OperatorKind {
 
 #[derive(Clone, Debug)]
 pub(crate) struct BooleanExpr {
-    operator: BooleanOperator,
-    arguments: Vec<Expr>,
+    pub(crate) operator: BooleanOperator,
+    pub(crate) arguments: Vec<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1338,47 +955,47 @@ pub(crate) enum BooleanOperator {
 
 #[derive(Clone, Debug)]
 pub(crate) struct NullTest {
-    argument: Expr,
-    negated: bool,
-    row: bool,
+    pub(crate) argument: Expr,
+    pub(crate) negated: bool,
+    pub(crate) row: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TruthTest {
-    argument: Expr,
-    value: Option<bool>,
-    negated: bool,
+    pub(crate) argument: Expr,
+    pub(crate) value: Option<bool>,
+    pub(crate) negated: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cast {
-    argument: Expr,
-    target: TypeName,
+    pub(crate) argument: Expr,
+    pub(crate) target: TypeName,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Collate {
-    argument: Expr,
-    name: Name,
-    location: Option<StringSpan>,
+    pub(crate) argument: Expr,
+    pub(crate) name: Name,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Call {
-    sql_syntax: bool,
-    kind: CallKind,
-    name: Name,
-    arguments: Vec<Expr>,
-    argument_locations: Vec<Option<StringSpan>>,
-    star: bool,
-    distinct: bool,
-    variadic: bool,
-    within_group: bool,
-    within_order: Vec<Order>,
-    order: Vec<Order>,
-    filter: Option<Expr>,
-    over: Option<Window>,
-    location: Option<StringSpan>,
+    pub(crate) sql_syntax: bool,
+    pub(crate) kind: CallKind,
+    pub(crate) name: Name,
+    pub(crate) arguments: Vec<Expr>,
+    pub(crate) argument_locations: Vec<Option<StringSpan>>,
+    pub(crate) star: bool,
+    pub(crate) distinct: bool,
+    pub(crate) variadic: bool,
+    pub(crate) within_group: bool,
+    pub(crate) within_order: Vec<Order>,
+    pub(crate) order: Vec<Order>,
+    pub(crate) filter: Option<Expr>,
+    pub(crate) over: Option<Window>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1403,23 +1020,23 @@ impl CallKind {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Case {
-    argument: Option<Expr>,
-    arms: Vec<CaseArm>,
-    otherwise: Option<Expr>,
+    pub(crate) argument: Option<Expr>,
+    pub(crate) arms: Vec<CaseArm>,
+    pub(crate) otherwise: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CaseArm {
-    condition: Expr,
-    result: Expr,
+    pub(crate) condition: Expr,
+    pub(crate) result: Expr,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Subquery {
-    query: Query,
-    kind: SubqueryKind,
-    test: Option<Expr>,
-    operator: Name,
+    pub(crate) query: Query,
+    pub(crate) kind: SubqueryKind,
+    pub(crate) test: Option<Expr>,
+    pub(crate) operator: Name,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1435,8 +1052,8 @@ pub(crate) enum SubqueryKind {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Indirection {
-    argument: Expr,
-    items: Vec<Access>,
+    pub(crate) argument: Expr,
+    pub(crate) items: Vec<Access>,
 }
 
 #[derive(Clone, Debug)]
@@ -1449,27 +1066,27 @@ pub(crate) enum Access {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Slice {
-    lower: Option<Expr>,
-    upper: Option<Expr>,
+    pub(crate) lower: Option<Expr>,
+    pub(crate) upper: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct NamedArgument {
-    name: String,
-    argument: Expr,
-    location: Option<StringSpan>,
+    pub(crate) name: String,
+    pub(crate) argument: Expr,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqlValue {
-    name: String,
-    precision: Option<i32>,
+    pub(crate) name: String,
+    pub(crate) precision: Option<i32>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Raise {
-    action: RaiseAction,
-    message: Option<Expr>,
+    pub(crate) action: RaiseAction,
+    pub(crate) message: Option<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1483,13 +1100,13 @@ pub(crate) enum RaiseAction {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Query {
-    with: With,
-    body: QueryBody,
-    order: Vec<Order>,
-    limit: Option<Expr>,
-    offset: Option<Expr>,
-    with_ties: bool,
-    locks: Vec<Lock>,
+    pub(crate) with: With,
+    pub(crate) body: QueryBody,
+    pub(crate) order: Vec<Order>,
+    pub(crate) limit: Option<Expr>,
+    pub(crate) offset: Option<Expr>,
+    pub(crate) with_ties: bool,
+    pub(crate) locks: Vec<Lock>,
 }
 
 #[derive(Clone, Debug)]
@@ -1501,10 +1118,10 @@ pub(crate) enum QueryBody {
 
 #[derive(Clone, Debug)]
 pub(crate) struct SetQuery {
-    operation: SetOperation,
-    all: bool,
-    left: Query,
-    right: Query,
+    pub(crate) operation: SetOperation,
+    pub(crate) all: bool,
+    pub(crate) left: Query,
+    pub(crate) right: Query,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1516,23 +1133,23 @@ pub(crate) enum SetOperation {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Select {
-    into: Option<Into>,
-    distinct: Option<Vec<Expr>>,
-    targets: Vec<Target>,
-    from: Vec<FromItem>,
-    predicate: Option<Expr>,
-    group: Vec<Grouping>,
-    group_distinct: bool,
-    having: Option<Expr>,
-    windows: Vec<Window>,
+    pub(crate) into: Option<Into>,
+    pub(crate) distinct: Option<Vec<Expr>>,
+    pub(crate) targets: Vec<Target>,
+    pub(crate) from: Vec<FromItem>,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) group: Vec<Grouping>,
+    pub(crate) group_distinct: bool,
+    pub(crate) having: Option<Expr>,
+    pub(crate) windows: Vec<Window>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Target {
-    implicit_alias: bool,
-    location: Option<usize>,
-    expression: Expr,
-    alias: Option<String>,
+    pub(crate) implicit_alias: bool,
+    pub(crate) location: Option<usize>,
+    pub(crate) expression: Expr,
+    pub(crate) alias: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1547,37 +1164,37 @@ pub(crate) enum Grouping {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Order {
-    expression: Expr,
-    descending: Option<bool>,
-    nulls_first: Option<bool>,
-    using: Option<Name>,
+    pub(crate) expression: Expr,
+    pub(crate) descending: Option<bool>,
+    pub(crate) nulls_first: Option<bool>,
+    pub(crate) using: Option<Name>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct With {
-    recursive: bool,
-    entries: Vec<Cte>,
+    pub(crate) recursive: bool,
+    pub(crate) entries: Vec<Cte>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cte {
-    name: String,
-    columns: Vec<CteColumn>,
-    materialized: Option<bool>,
-    body: CteBody,
-    search: Option<Search>,
-    cycle: Option<Cycle>,
+    pub(crate) name: String,
+    pub(crate) columns: Vec<CteColumn>,
+    pub(crate) materialized: Option<bool>,
+    pub(crate) body: CteBody,
+    pub(crate) search: Option<Search>,
+    pub(crate) cycle: Option<Cycle>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CteColumn {
-    name: String,
-    collation: Option<String>,
-    descending: Option<bool>,
+    pub(crate) name: String,
+    pub(crate) collation: Option<String>,
+    pub(crate) descending: Option<bool>,
 }
 
 impl Cte {
-    fn column_names(&self) -> Vec<String> {
+    pub(crate) fn column_names(&self) -> Vec<String> {
         self.columns
             .iter()
             .map(|column| column.name.clone())
@@ -1632,24 +1249,24 @@ impl CteBody {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Search {
-    columns: Vec<String>,
-    breadth_first: bool,
-    sequence: String,
+    pub(crate) columns: Vec<String>,
+    pub(crate) breadth_first: bool,
+    pub(crate) sequence: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cycle {
-    columns: Vec<String>,
-    mark: String,
-    value: Option<Expr>,
-    default: Option<Expr>,
-    path: String,
+    pub(crate) columns: Vec<String>,
+    pub(crate) mark: String,
+    pub(crate) value: Option<Expr>,
+    pub(crate) default: Option<Expr>,
+    pub(crate) path: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Alias {
-    name: String,
-    columns: Vec<String>,
+    pub(crate) name: String,
+    pub(crate) columns: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1700,37 +1317,37 @@ impl FromItem {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Relation {
-    name: Name,
-    alias: Option<Alias>,
-    inherit: bool,
-    persistence: String,
-    indexed: Option<String>,
-    not_indexed: bool,
+    pub(crate) name: Name,
+    pub(crate) alias: Option<Alias>,
+    pub(crate) inherit: bool,
+    pub(crate) persistence: String,
+    pub(crate) indexed: Option<String>,
+    pub(crate) not_indexed: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct DerivedTable {
-    query: Query,
-    alias: Option<Alias>,
-    lateral: bool,
+    pub(crate) query: Query,
+    pub(crate) alias: Option<Alias>,
+    pub(crate) lateral: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct FromGroup {
-    items: Vec<FromItem>,
-    alias: Option<Alias>,
+    pub(crate) items: Vec<FromItem>,
+    pub(crate) alias: Option<Alias>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Join {
-    left: FromItem,
-    right: FromItem,
-    kind: JoinKind,
-    natural: bool,
-    condition: Option<Expr>,
-    using: Vec<String>,
-    using_alias: Option<Alias>,
-    alias: Option<Alias>,
+    pub(crate) left: FromItem,
+    pub(crate) right: FromItem,
+    pub(crate) kind: JoinKind,
+    pub(crate) natural: bool,
+    pub(crate) condition: Option<Expr>,
+    pub(crate) using: Vec<String>,
+    pub(crate) using_alias: Option<Alias>,
+    pub(crate) alias: Option<Alias>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1744,18 +1361,18 @@ pub(crate) enum JoinKind {
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableFunctions {
-    calls: Vec<TableFunction>,
-    alias: Option<Alias>,
-    lateral: bool,
-    ordinality: bool,
-    rows_from: bool,
-    columns: Vec<TypedColumn>,
+    pub(crate) calls: Vec<TableFunction>,
+    pub(crate) alias: Option<Alias>,
+    pub(crate) lateral: bool,
+    pub(crate) ordinality: bool,
+    pub(crate) rows_from: bool,
+    pub(crate) columns: Vec<TypedColumn>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableFunction {
-    expression: Expr,
-    columns: Vec<TypedColumn>,
+    pub(crate) expression: Expr,
+    pub(crate) columns: Vec<TypedColumn>,
 }
 
 impl TableFunctions {
@@ -1773,35 +1390,35 @@ impl TableFunctions {
 
 #[derive(Clone, Debug)]
 pub(crate) struct TypedColumn {
-    name: String,
-    type_name: TypeName,
-    collation: Option<Name>,
+    pub(crate) name: String,
+    pub(crate) type_name: TypeName,
+    pub(crate) collation: Option<Name>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableSample {
-    relation: FromItem,
-    method: Name,
-    arguments: Vec<Expr>,
-    repeatable: Option<Expr>,
+    pub(crate) relation: FromItem,
+    pub(crate) method: Name,
+    pub(crate) arguments: Vec<Expr>,
+    pub(crate) repeatable: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Window {
-    reference_only: bool,
-    name: Option<String>,
-    reference: Option<String>,
-    partition: Vec<Expr>,
-    order: Vec<Order>,
-    frame: Option<Frame>,
+    pub(crate) reference_only: bool,
+    pub(crate) name: Option<String>,
+    pub(crate) reference: Option<String>,
+    pub(crate) partition: Vec<Expr>,
+    pub(crate) order: Vec<Order>,
+    pub(crate) frame: Option<Frame>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Frame {
-    mode: FrameMode,
-    start: FrameBound,
-    end: Option<FrameBound>,
-    exclusion: Option<FrameExclusion>,
+    pub(crate) mode: FrameMode,
+    pub(crate) start: FrameBound,
+    pub(crate) end: Option<FrameBound>,
+    pub(crate) exclusion: Option<FrameExclusion>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1830,77 +1447,77 @@ pub(crate) enum FrameExclusion {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Lock {
-    relations: Vec<Name>,
-    strength: Option<LockStrength>,
-    wait: Option<LockWait>,
+    pub(crate) relations: Vec<Name>,
+    pub(crate) strength: Option<LockStrength>,
+    pub(crate) wait: Option<LockWait>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Assignment {
-    name: String,
-    indirection: Vec<Access>,
-    value: Option<Expr>,
+    pub(crate) name: String,
+    pub(crate) indirection: Vec<Access>,
+    pub(crate) value: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ReturningOption {
-    old: bool,
-    alias: String,
+    pub(crate) old: bool,
+    pub(crate) alias: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Insert {
-    with: With,
-    relation: Relation,
-    columns: Vec<Assignment>,
-    source: Option<Query>,
-    overriding: Option<OverridingKind>,
-    conflict: Option<Conflict>,
-    or_conflict: Option<ConflictClause>,
-    returning: Vec<Target>,
-    returning_options: Vec<ReturningOption>,
+    pub(crate) with: With,
+    pub(crate) relation: Relation,
+    pub(crate) columns: Vec<Assignment>,
+    pub(crate) source: Option<Query>,
+    pub(crate) overriding: Option<OverridingKind>,
+    pub(crate) conflict: Option<Conflict>,
+    pub(crate) or_conflict: Option<ConflictClause>,
+    pub(crate) returning: Vec<Target>,
+    pub(crate) returning_options: Vec<ReturningOption>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Conflict {
-    action: Option<ConflictAction>,
-    inference: Vec<IndexExpression>,
-    inference_predicate: Option<Expr>,
-    constraint: Option<String>,
-    assignments: Vec<Assignment>,
-    predicate: Option<Expr>,
-    next: Option<Box<Self>>,
+    pub(crate) action: Option<ConflictAction>,
+    pub(crate) inference: Vec<IndexExpression>,
+    pub(crate) inference_predicate: Option<Expr>,
+    pub(crate) constraint: Option<String>,
+    pub(crate) assignments: Vec<Assignment>,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) next: Option<Box<Self>>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct IndexExpression {
-    name: Option<String>,
-    alias: Option<String>,
-    expression: Option<Expr>,
-    collation: Name,
-    operator_class: Name,
-    options: Vec<SyntaxOption>,
-    descending: Option<bool>,
-    using_order: bool,
-    nulls_first: Option<bool>,
+    pub(crate) name: Option<String>,
+    pub(crate) alias: Option<String>,
+    pub(crate) expression: Option<Expr>,
+    pub(crate) collation: Name,
+    pub(crate) operator_class: Name,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) descending: Option<bool>,
+    pub(crate) using_order: bool,
+    pub(crate) nulls_first: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Into {
-    relation: Relation,
-    columns: Vec<String>,
-    access_method: Option<String>,
-    options: Vec<SyntaxOption>,
-    on_commit: Option<CommitAction>,
-    tablespace: Option<String>,
-    skip_data: bool,
+    pub(crate) relation: Relation,
+    pub(crate) columns: Vec<String>,
+    pub(crate) access_method: Option<String>,
+    pub(crate) options: Vec<SyntaxOption>,
+    pub(crate) on_commit: Option<CommitAction>,
+    pub(crate) tablespace: Option<String>,
+    pub(crate) skip_data: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SyntaxOption {
-    namespace: Option<String>,
-    name: String,
-    value: Option<SyntaxValue>,
+    pub(crate) namespace: Option<String>,
+    pub(crate) name: String,
+    pub(crate) value: Option<SyntaxValue>,
 }
 
 #[derive(Clone, Debug)]
@@ -1911,24 +1528,24 @@ pub(crate) enum SyntaxValue {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Update {
-    with: With,
-    relation: Relation,
-    assignments: Vec<Assignment>,
-    from: Vec<FromItem>,
-    predicate: Option<Expr>,
-    returning: Vec<Target>,
-    returning_options: Vec<ReturningOption>,
-    or_conflict: Option<ConflictClause>,
+    pub(crate) with: With,
+    pub(crate) relation: Relation,
+    pub(crate) assignments: Vec<Assignment>,
+    pub(crate) from: Vec<FromItem>,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) returning: Vec<Target>,
+    pub(crate) returning_options: Vec<ReturningOption>,
+    pub(crate) or_conflict: Option<ConflictClause>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Delete {
-    with: With,
-    relation: Relation,
-    using: Vec<FromItem>,
-    predicate: Option<Expr>,
-    returning: Vec<Target>,
-    returning_options: Vec<ReturningOption>,
+    pub(crate) with: With,
+    pub(crate) relation: Relation,
+    pub(crate) using: Vec<FromItem>,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) returning: Vec<Target>,
+    pub(crate) returning_options: Vec<ReturningOption>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2013,17 +1630,17 @@ impl SubqueryKind {
 // Unresolved PostgreSQL rule syntax; no catalog or writable-view assumptions.
 #[derive(Clone, Debug)]
 pub(crate) struct CreateRule {
-    name: Name,
-    relation: Relation,
-    replace: bool,
-    event: RuleEvent,
-    predicate: Option<Expr>,
-    instead: bool,
-    actions: Vec<StatementNode>,
+    pub(crate) name: Name,
+    pub(crate) relation: Relation,
+    pub(crate) replace: bool,
+    pub(crate) event: RuleEvent,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) instead: bool,
+    pub(crate) actions: Vec<StatementNode>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RuleEvent {
+pub(crate) enum RuleEvent {
     Select,
     Insert,
     Update,
@@ -2033,23 +1650,23 @@ enum RuleEvent {
 // Unresolved PostgreSQL DROP RULE syntax; the ON relation is always explicit.
 #[derive(Clone, Debug)]
 pub(crate) struct DropRule {
-    name: Name,
-    relation: Name,
-    if_exists: bool,
-    behavior: DropBehavior,
+    pub(crate) name: Name,
+    pub(crate) relation: Name,
+    pub(crate) if_exists: bool,
+    pub(crate) behavior: DropBehavior,
 }
 
 // DROP TRIGGER retains only syntax; SQLite has no ON relation or drop behavior.
 #[derive(Clone, Debug)]
 pub(crate) struct DropTrigger {
-    name: Name,
-    relation: Option<Name>,
-    if_exists: bool,
-    behavior: Option<DropBehavior>,
+    pub(crate) name: Name,
+    pub(crate) relation: Option<Name>,
+    pub(crate) if_exists: bool,
+    pub(crate) behavior: Option<DropBehavior>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum DropBehavior {
+pub(crate) enum DropBehavior {
     Cascade,
     Restrict,
 }
@@ -2057,35 +1674,35 @@ enum DropBehavior {
 // Unresolved trigger syntax; interpretation belongs to statement-specific analyzers.
 #[derive(Clone, Debug)]
 pub(crate) struct CreateTrigger {
-    name: Name,
-    relation: Relation,
-    replace: bool,
-    if_not_exists: bool,
-    temporary: bool,
-    timing: Option<TriggerTiming>,
-    events: Vec<TriggerEvent>,
-    granularity: Option<TriggerGranularity>,
-    predicate: Option<Expr>,
-    constraint: Option<TriggerConstraint>,
-    transitions: Vec<TriggerTransition>,
-    body: TriggerBody,
+    pub(crate) name: Name,
+    pub(crate) relation: Relation,
+    pub(crate) replace: bool,
+    pub(crate) if_not_exists: bool,
+    pub(crate) temporary: bool,
+    pub(crate) timing: Option<TriggerTiming>,
+    pub(crate) events: Vec<TriggerEvent>,
+    pub(crate) granularity: Option<TriggerGranularity>,
+    pub(crate) predicate: Option<Expr>,
+    pub(crate) constraint: Option<TriggerConstraint>,
+    pub(crate) transitions: Vec<TriggerTransition>,
+    pub(crate) body: TriggerBody,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TriggerTiming {
+pub(crate) enum TriggerTiming {
     Before,
     After,
     InsteadOf,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TriggerGranularity {
+pub(crate) enum TriggerGranularity {
     Row,
     Statement,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum TriggerEvent {
+pub(crate) enum TriggerEvent {
     Insert,
     Update(Vec<String>),
     Delete,
@@ -2093,29 +1710,29 @@ enum TriggerEvent {
 }
 
 #[derive(Clone, Debug)]
-struct TriggerConstraint {
-    relation: Option<Relation>,
-    deferrable: bool,
-    initially_deferred: bool,
+pub(crate) struct TriggerConstraint {
+    pub(crate) relation: Option<Relation>,
+    pub(crate) deferrable: bool,
+    pub(crate) initially_deferred: bool,
 }
 
 #[derive(Clone, Debug)]
-struct TriggerTransition {
-    name: String,
-    new: bool,
-    table: bool,
+pub(crate) struct TriggerTransition {
+    pub(crate) name: String,
+    pub(crate) new: bool,
+    pub(crate) table: bool,
 }
 
 #[derive(Clone, Debug)]
-enum TriggerBody {
+pub(crate) enum TriggerBody {
     Function(TriggerFunction),
     Commands(Vec<StatementNode>),
 }
 
 #[derive(Clone, Debug)]
-struct TriggerFunction {
-    name: Name,
-    arguments: Vec<String>,
+pub(crate) struct TriggerFunction {
+    pub(crate) name: Name,
+    pub(crate) arguments: Vec<String>,
 }
 
 #[cfg(test)]

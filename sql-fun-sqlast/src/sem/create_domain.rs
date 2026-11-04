@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     ast::Domain,
     names::TableName,
@@ -155,7 +156,7 @@ impl CreateDomain {
     where
         TParseContext: ParseContext,
     {
-        Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+        convert(&Domain::try_from_with_tokens(&syn, tokens)?).resolve_and_apply(context)
     }
 }
 

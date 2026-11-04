@@ -123,11 +123,11 @@ inputs analyze independently and never execute their writes.
 | `merge::rejects_invalid_merge::cte_unreadable` | [`schema-merge.json`](schema-merge.json), same case name | Original success/error outcome; strengthened to the exact public diagnostic set and result columns. | None; observable-only Rust case removed. |
 
 The source groups are in
-[`insert/tests.rs`](../../sql-fun-sqlast/src/ast/resolve/insert/tests.rs),
-[`update/tests.rs`](../../sql-fun-sqlast/src/ast/resolve/update/tests.rs),
-[`update/tests/assignments.rs`](../../sql-fun-sqlast/src/ast/resolve/update/tests/assignments.rs),
-[`delete/tests.rs`](../../sql-fun-sqlast/src/ast/resolve/delete/tests.rs), and
-[`merge/tests.rs`](../../sql-fun-sqlast/src/ast/document/merge/tests.rs).
+[`insert/tests.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/insert/tests.rs),
+[`update/tests.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/update/tests.rs),
+[`update/tests/assignments.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/update/tests/assignments.rs),
+[`delete/tests.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/delete/tests.rs), and
+[`merge/tests.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/merge/tests.rs).
 `merge::returning_star_preserves_source_then_target_order` is also superseded by
 `merge::resolves_merge::star`: all four columns are checked in exact order,
 including the originally asserted `sid` at position 0 and `id` at position 2.

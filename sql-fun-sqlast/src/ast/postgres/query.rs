@@ -1,3 +1,5 @@
+use crate::error::AnalysisError;
+use crate::stack::with_stack;
 use crate::{
     ast::{
         Access, Alias, Assignment, CommitAction, Conflict, ConflictAction, Cte, CteBody, CteColumn,
@@ -10,7 +12,6 @@ use crate::{
         XmlTable,
         postgres::{nonempty, required},
     },
-    sem::{AnalysisError, with_stack},
     syn,
     syn::{ListOpt, Opt, ScanToken},
 };

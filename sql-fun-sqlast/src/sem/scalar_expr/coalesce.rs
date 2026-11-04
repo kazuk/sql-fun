@@ -103,7 +103,9 @@ impl CoalesceExpr {
 
 #[cfg(test)]
 mod test_resolve {
-    //! Small-catalog semantic and failure-continuation contracts.
+    use crate::sem::SemAst;
+
+    // Small-catalog semantic and failure-continuation contracts.
 
     use crate::test_helpers::coalesce as test_helpers;
 
@@ -121,10 +123,11 @@ mod test_resolve {
         #[case] sql: &str,
     ) -> testresult::TestResult {
         let mut cache_context = create_cache_context();
-        let analyzed = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(test_helpers::context(), &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+            test_helpers::context(),
+            &mut cache_context,
+        )?;
         assert!(
             analyzed
                 .context()
@@ -154,10 +157,13 @@ mod test_resolve {
             coalesce.types().unwrap().admissible_types(),
             Some([].as_slice())
         );
-        let next = parse_statements("SELECT 1", Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(analyzed.into_context(), &mut cache_context)?;
+        let next = SemAst::from_ast(
+            &parse_statements("SELECT 1", Dialect::postgres())
+                .next()
+                .unwrap()?,
+            analyzed.into_context(),
+            &mut cache_context,
+        )?;
         assert!(
             next.context()
                 .parameter_constraints()
@@ -173,10 +179,11 @@ mod test_resolve {
     #[case::null("SELECT COALESCE(?1,NULL)")]
     fn sqlite_does_not_impose_postgres_common_types(#[case] sql: &str) -> testresult::TestResult {
         let mut cache_context = create_cache_context();
-        let analyzed = parse_statements(sql, Dialect::sqlite())
-            .next()
-            .unwrap()?
-            .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::sqlite()).next().unwrap()?,
+            test_helpers::sqlite_context(),
+            &mut cache_context,
+        )?;
         assert!(
             analyzed
                 .context()
@@ -224,10 +231,13 @@ mod test_resolve {
     #[test]
     fn sqlite_requires_two_arguments_without_losing_the_expression() -> testresult::TestResult {
         let mut cache_context = create_cache_context();
-        let analyzed = parse_statements("SELECT COALESCE(?1)", Dialect::sqlite())
-            .next()
-            .unwrap()?
-            .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements("SELECT COALESCE(?1)", Dialect::sqlite())
+                .next()
+                .unwrap()?,
+            test_helpers::sqlite_context(),
+            &mut cache_context,
+        )?;
         assert!(
             analyzed
                 .context()
@@ -262,10 +272,11 @@ mod test_resolve {
         #[case] count: usize,
     ) -> testresult::TestResult {
         let mut cache_context = create_cache_context();
-        let analyzed = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(test_helpers::context(), &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+            test_helpers::context(),
+            &mut cache_context,
+        )?;
         let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
         let coalesce = query
             .result_columns()
@@ -290,10 +301,13 @@ mod test_resolve {
     #[test]
     fn incompatible_concrete_operands_retain_a_failed_type_domain() -> testresult::TestResult {
         let mut cache_context = create_cache_context();
-        let analyzed = parse_statements("SELECT COALESCE(1,true)", Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(test_helpers::context(), &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements("SELECT COALESCE(1,true)", Dialect::postgres())
+                .next()
+                .unwrap()?,
+            test_helpers::context(),
+            &mut cache_context,
+        )?;
         let failure = analyzed
             .context()
             .problems()
@@ -433,7 +447,9 @@ impl CoalesceExpr {
 
 #[cfg(test)]
 mod test_parameter_constraints {
-    //! Small-catalog semantic and failure-continuation contracts.
+    use crate::sem::SemAst;
+
+    // Small-catalog semantic and failure-continuation contracts.
 
     use crate::test_helpers::coalesce as test_helpers;
 
@@ -450,10 +466,13 @@ mod test_parameter_constraints {
     #[test]
     fn an_unreachable_parameter_still_constrains_the_result() -> testresult::TestResult {
         let mut cache_context = create_cache_context();
-        let analyzed = parse_statements("SELECT COALESCE(1,$1)", Dialect::postgres())
-            .next()
-            .unwrap()?
-            .analyze(test_helpers::context(), &mut cache_context)?;
+        let analyzed = SemAst::from_ast(
+            &parse_statements("SELECT COALESCE(1,$1)", Dialect::postgres())
+                .next()
+                .unwrap()?,
+            test_helpers::context(),
+            &mut cache_context,
+        )?;
         assert!(
             analyzed
                 .context()

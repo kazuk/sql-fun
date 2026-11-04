@@ -350,6 +350,7 @@ impl ColumnReferenceExpr {
     }
     pub(super) fn constraint_binding(&self) -> Option<(&str, &ColumnName)> {
         match self {
+            Self::TableFuncColumn(value) => Some(value.constraint_binding()),
             Self::MergeRecord(value) => value.source().constraint_binding(),
             Self::CteColumn(value) => {
                 Some((value.binding_alias().as_str(), value.get_column_name()))

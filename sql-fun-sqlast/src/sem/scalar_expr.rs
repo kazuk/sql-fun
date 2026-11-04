@@ -721,6 +721,7 @@ impl SemScalarExpr {
     pub(crate) const fn constraint_node(&self) -> Option<usize> {
         match self {
             Self::SourceColumn(value) => value.value().constraint_node(),
+            Self::NamedArg(value) => value.value().constraint_node(),
             Self::Param(value) => Some(value.node()),
             Self::Constrained(value) => Some(value.node()),
             Self::MinMax(value) => value.node(),
@@ -1581,6 +1582,9 @@ impl SemScalarExpr {
         }
     }
     pub(crate) fn requires_argument_type(&self) -> bool {
+        if let Some(named) = self.as_named_argument() {
+            return named.value().requires_argument_type();
+        }
         self.get_type().is_none() && !self.as_const().is_some_and(ScalarConstExpr::is_null)
     }
     /// SQLite builtin LIKE predicate with its analyzed value, pattern and escape.
@@ -1797,6 +1801,28 @@ impl SemScalarExpr {
             Some(reference)
         } else {
             None
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn finalize_call(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Constrained(value) = self {
+            value.finalize_call(context)?;
+        }
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn function_call_snapshot(&self) -> Option<FuncCallExpr> {
+        if let Self::Constrained(value) = self {
+            value.function_call()
+        } else {
+            self.as_function_call().cloned()
         }
     }
 }

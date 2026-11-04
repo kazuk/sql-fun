@@ -3,10 +3,10 @@
 use crate::{
     names::{ColumnName, FullName, TableName},
     sem::{
-        AccessKind, AliasSpec, AnalysisError, ArraySubqueryExpr, ColumnDefinition, ColumnRename,
-        InsertTarget, MembershipExpr, QueryName, QueryOrder, QueryWindow, ResolvedOperator,
-        ResultColumnCollection, SemScalarExpr, SetOperationQuery, TableSampleSource, TypeReference,
-        data_source::JoinExprDataSource,
+        AccessKind, AliasSpec, AnalysisError, ArraySubqueryExpr, ColumnCollection,
+        ColumnDefinition, ColumnRename, InsertTarget, MembershipExpr, QueryName, QueryOrder,
+        QueryWindow, ResolvedOperator, ResultColumnCollection, SemScalarExpr, SetOperationQuery,
+        TableSampleSource, TypeReference, data_source::JoinExprDataSource,
     },
 };
 
@@ -138,6 +138,14 @@ pub(crate) trait SemanticVisitor {
 
 /// Rewrite semantic nodes and refresh metadata through mutable references.
 pub(crate) trait SemanticVisitorMut {
+    fn table_function(
+        &mut self,
+        _expression: &mut SemScalarExpr,
+        _alias: &AliasSpec,
+        _columns: &mut ColumnCollection,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
     // Placement validators inspect written operands, not definitions behind bindings.
     fn walk_source_column_values(&self) -> bool {
         true

@@ -32,6 +32,12 @@ This is result-column analysis; opt-in executable-SQL
 [wildcard expansion](../statements/select.md#wildcard-projection-expansion) is a
 separate operation.
 
+Named and explicit `VARIADIC` function arguments use the same signature binding
+and type inference as [scalar calls](../expressions/function-calls.md#postgresql-named-function-arguments).
+Declared scalar, composite and OUT/TABLE results determine visible columns;
+parameter-dependent calls retain their output relationships until inference
+can establish the types. Argument order remains the order written in SQL.
+
 ### ROWS FROM and ordinality
 
 PostgreSQL ROWS FROM combines function outputs in written order. Supported

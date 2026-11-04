@@ -133,7 +133,7 @@ collector and a row, call `push(row)?` on its `SortedVec`, and return the
 collector. Once the query completes, convert the accumulated rows with
 `into_sorted_slice`. Your error type must be able to propagate `OrderError`
 along with query and row-construction errors. See
-[SQL Functions](./sql_functions.md#collector-type) for the collector and handler
+[SQL Functions](./sql_functions/signatures.md#collector-type) for the collector and handler
 contract.
 
 ## Keep SQL ordering and Rust keys aligned
@@ -355,7 +355,7 @@ work within existing storage without additional queries, allocations for
 selected rows, or row copies.
 
 See the
-[aggregate fetch example](./sql_functions.md#aggregate-entity-fetch-example-for-sql-fun)
+[aggregate fetch example](./examples/aggregate-fetch.md)
 for collecting related data from multiple queries.
 
 ### Composing read models with capability traits

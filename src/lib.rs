@@ -149,7 +149,9 @@ pub fn sql_query_many(
     sql_query_many_impl(sql_attr, item)
 }
 
-/// This macro attribute is used to specify the SQL statement to be executed
+/// Execute a statement and return its affected-row count in a `Result`.
+/// PostgreSQL uses an async function returning `u64`; SQLite uses a synchronous
+/// function returning `usize` and requires the `sqlite` feature.
 ///
 /// ```no_run
 /// use tokio_postgres::{Client as PgClient, Error as PgError};
@@ -158,14 +160,10 @@ pub fn sql_query_many(
 /// async fn create_table_users(client: &PgClient) -> Result<u64, PgError> {}
 /// ```
 ///
-/// please set connector in Cargo.toml
-///
-/// ```toml
-/// [package.metadata.database]
-/// connector = "tokio-postgres"
-/// ```
-///
-/// `sql_fun` supports only the `tokio-postgres` for database connector(currently).
+/// Configure a named datasource with an engine, dialect and connector in package
+/// metadata. See the [SQL Functions reference](https://kazuk.github.io/sql-fun/sql_functions.html)
+/// for attributes, signatures, bindings and interruption contracts. This macro
+/// does not build rows; use a query macro to collect a RETURNING result.
 ///
 #[proc_macro_attribute]
 pub fn sql_statement(

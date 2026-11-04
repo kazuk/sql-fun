@@ -1,7 +1,7 @@
 # `sql_query_opt`
 
-This macro attribute is used to ad-hoc query returning a optional single row
-from the database
+Execute a query returning zero or one row as `Result<Option<Row>, E>`.
+Multiple rows are errors.
 
 ## Example
 
@@ -23,39 +23,19 @@ impl UserRow {
 }
 ```
 
-## Compile-time query checking
+## Reference
 
-- SQL syntax checked by `pq_query`
-- AST checked for parameter name and returning column
+The [SQL Functions reference](https://kazuk.github.io/sql-fun/sql_functions.html) covers the complete
+macro family. Use [attributes](https://kazuk.github.io/sql-fun/sql_functions/attributes.html) for
+`sql`, `sql_file`, datasource and builder options,
+[function signatures](https://kazuk.github.io/sql-fun/sql_functions/signatures.html) for row/error
+and connector contracts, and
+[parameter binding](https://kazuk.github.io/sql-fun/sql_functions/parameter-binding.html) for `${name}`
+and DTO sources. PostgreSQL functions are async; SQLite functions are synchronous
+and require the `sqlite` feature.
 
-## Query Execution
-
-- Executes the SQL query and **returns a single row**.
-- Converts **named parameters** (e.g., `${name}`) into
-  **PostgreSQL-style positional placeholders**.
-- Uses the function’s return type (`Result<IdRow, E>`) to determine the row type
-  and error type.
-  - requirements described bellow
-- Checking query with `prepare` (first time call only)
-
-## Row Type Requirements
-
-The returned row type must:
-
-- Require Option Type
-- Implement a **`builder` function** that returns a builder instance.
-- Have a builder type that provides **setter methods** for all columns.
-- Implement **`build()`** to construct the final instance.
-- Ensure that the builder type’s error type is compatible with the function’s
-  return error type `E`.
-
-The `derive_builder::Builder` crate satisfies these requirements.
-
-## Error Type Requirements
-
-This function returns `Result<IdRow, E>`, where `E` must:
-
-- Implement `From<tokio_postgres::Error>` (for query execution failures).
-- Implement `From<std::io::Error>` (for unexpected column mismatches in the
-  prepare check statement).
-- Be capable of handling any errors returned by the builder type.
+The generated code uses lockfile SQL and result-column metadata. It does not
+perform an additional first-call prepare/column-shape check. The error type must
+accept the connector's errors and any fallible builder/handler errors. See
+[query interruption](https://kazuk.github.io/sql-fun/sql_functions/query-interruption.html) for additional
+interrupt error requirements and cancellation limits.

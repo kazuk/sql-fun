@@ -100,8 +100,10 @@ newly claimed as supported.
   reporting-error precedence tests.
 - `tests/query_resolution.rs`: public PostgreSQL rejection behavior in the normal
   library build, separate from unit-test-only internal-invariant panics.
-- Existing expression/type-system tests and the AdventureWorks schema fixture:
-  PostgreSQL regression coverage through the public adapters.
+- Existing expression/type-system tests: PostgreSQL regression coverage through
+  the public adapters. The former AdventureWorks schema fixture also provided
+  coverage during this work; that test and its example schema have since been
+  removed.
 
 When adding syntax, update both applicable converters and the inventory fixture.
 When adding semantic support, keep recursion in common nodes and add explicit

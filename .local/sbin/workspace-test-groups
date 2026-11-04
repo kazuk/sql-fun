@@ -5,7 +5,7 @@
 # the paired archive execution. These are internal CI inputs, not local setup.
 WORKSPACE_TEST_GROUP_A=(
   sql-fun-core sql-fun-cli sql-fun-client sql-fun-codegen
-  sql-fun-collector parse_dat xbuild adventure-works
+  sql-fun-collector parse_dat xbuild
 )
 WORKSPACE_TEST_GROUP_B=(sql-fun-sqlast sql-fun-server sql-fun-server-api)
 

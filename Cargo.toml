@@ -21,7 +21,6 @@ connector = "tokio-postgres"
 resolver = "2"
 members = [
     "cli",
-    "examples/adventure-works",
     "parse_dat",
     "sql-fun-client",
     "sql-fun-codegen",

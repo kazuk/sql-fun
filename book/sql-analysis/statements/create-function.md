@@ -31,6 +31,15 @@ implemented; unresolved polymorphic call signatures retain the limitations
 described at the function-call page. Missing result/parameter facts do not prove
 that every valid routine declaration is rejected or fully checked.
 
+### Custom aggregates
+
+`CREATE AGGREGATE` is legal PostgreSQL syntax but is not converted into an
+analyzable top-level declaration. A schema file containing it fails initialization
+with `unexpected input :top-level PostgreSQL statement`
+([#987](https://github.com/kazuk/sql-fun/issues/987)). This prevents loading custom
+aggregate definitions from that file; it does not prevent using aggregate
+metadata already present in the selected builtin catalog.
+
 ### Declaration validation gaps
 
 Routine declaration analysis is incomplete

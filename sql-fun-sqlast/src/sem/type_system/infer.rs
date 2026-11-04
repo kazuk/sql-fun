@@ -20,7 +20,7 @@ pub struct SimpleInferResult {
 }
 
 impl SimpleInferResult {
-    fn new(element: &TypeReference, array: Option<&TypeReference>) -> Self {
+    pub(crate) fn new(element: &TypeReference, array: Option<&TypeReference>) -> Self {
         Self {
             element: element.clone(),
             array: array.cloned(),

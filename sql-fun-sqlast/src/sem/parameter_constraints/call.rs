@@ -1,5 +1,6 @@
 //! Deferred overload relations. Retained ranks are inference facts, not a catalog.
 
+use crate::sem::parameter_constraints::environment::InferenceEnvironment;
 use crate::{
     CacheContext,
     ast::Dialect,
@@ -198,6 +199,19 @@ impl ArrayCastRanks {
 struct RankedSignatures(Vec<RankedSignature>);
 
 impl RankedSignatures {
+    fn push_function(
+        &mut self,
+        context: &impl ParseContext,
+        cache: &mut CacheContext,
+        signature: &Signature,
+        sources: &HashSet<TypeReference>,
+    ) {
+        if !self.0.iter().any(|entry| &entry.signature == signature) {
+            self.0
+                .push(RankedSignature::prepare(context, cache, signature, sources));
+        }
+    }
+
     const fn len(&self) -> usize {
         self.0.len()
     }
@@ -330,8 +344,10 @@ impl RankedSignatures {
 #[derive(Clone, Debug)]
 struct CallFacts {
     postgres_defaults: bool,
+    environment: Option<Arc<InferenceEnvironment>>,
     concrete: RankedSignatures,
     arrays: Vec<Signature>,
+    simple_functions: Vec<Signature>,
     array_casts: ArrayCastRanks,
 }
 
@@ -366,19 +382,37 @@ impl CallFacts {
             .collect();
         let arrays = signatures
             .iter()
-            .filter(|signature| signature.is_array_comparison())
+            .filter(|signature| {
+                !signature.is_simple_function_template() && signature.is_array_comparison()
+            })
             .cloned()
             .collect();
         let mut facts = Self {
             postgres_defaults: context.dialect() == Dialect::postgres(),
+            environment: if signatures
+                .iter()
+                .any(Signature::is_simple_function_template)
+            {
+                Some(Arc::new(InferenceEnvironment::new(context)))
+            } else {
+                None
+            },
             concrete: RankedSignatures(concrete),
             arrays,
+            simple_functions: signatures
+                .iter()
+                .filter(|signature| signature.is_simple_function_template())
+                .cloned()
+                .collect(),
             array_casts: ArrayCastRanks::default(),
         };
         // Preserve actual array casts for the finite declared/default types so
         // explicit assignment inspection can outlive the borrowed context.
         for source in &candidates {
             facts.retain_array_source(context, cache, &source.array_type());
+        }
+        if !facts.simple_functions.is_empty() {
+            facts.retain(context, cache, default_types().iter());
         }
         facts.retain(
             context,
@@ -416,6 +450,14 @@ impl CallFacts {
             sources.extend(cache.declared_implicit_cast_sources(context, ty));
             self.retain_array_source(context, cache, ty);
         }
+        for template in &self.simple_functions {
+            for source in &sources {
+                for signature in template.instantiate_simple(context, source) {
+                    self.concrete
+                        .push_function(context, cache, &signature, &sources);
+                }
+            }
+        }
         self.concrete.retain_sources(context, cache, &sources);
         for source in sources {
             self.retain_array_source(context, cache, &source);
@@ -424,6 +466,7 @@ impl CallFacts {
 
     fn supplies_input_context(&self) -> bool {
         self.arrays.is_empty()
+            && self.simple_functions.is_empty()
             && (self.concrete.len() == 1 || !self.concrete.accepts_default_inputs())
     }
 
@@ -432,10 +475,17 @@ impl CallFacts {
     }
 
     const fn has_declarations(&self) -> bool {
-        !self.concrete.is_empty() || !self.arrays.is_empty()
+        !self.concrete.is_empty() || !self.arrays.is_empty() || !self.simple_functions.is_empty()
     }
 
     fn result_types(&self) -> InputTypeConstraint {
+        if self
+            .simple_functions
+            .iter()
+            .any(|signature| signature.result().is_simple_infer_arg())
+        {
+            return InputTypeConstraint::any();
+        }
         InputTypeConstraint::types(
             self.concrete.result_types().into_iter().chain(
                 self.arrays
@@ -587,19 +637,32 @@ impl CallConstraint {
         let result = graph
             .domain(*self.nodes.last().expect("call result"))
             .clone();
+        let mut facts = self.facts.clone();
+        if let Some(environment) = facts.environment.clone() {
+            let context = environment.context();
+            Arc::make_mut(&mut facts).retain(
+                &context,
+                &mut CacheContext::new(),
+                inputs
+                    .iter()
+                    .chain([&result])
+                    .filter_map(InputTypeConstraint::admissible_types)
+                    .flatten(),
+            );
+        }
         if inputs.iter().all(InputTypeConstraint::is_any)
-            && let Some(contextual) = self.facts.contextual_inputs(&result)
+            && let Some(contextual) = facts.contextual_inputs(&result)
         {
             inputs = contextual;
         }
-        if inputs.iter().all(InputTypeConstraint::is_any) && self.facts.supplies_input_context() {
-            inputs = self.facts.declared_inputs();
+        if inputs.iter().all(InputTypeConstraint::is_any) && facts.supplies_input_context() {
+            inputs = facts.declared_inputs();
         }
         // Wait for other occurrences, casts, projections and known operands.
         // A sole concrete declaration itself supplies SQL type context.
-        let default_inference = self.facts.postgres_defaults
+        let default_inference = facts.postgres_defaults
             && inputs.iter().all(InputTypeConstraint::is_any)
-            && !self.facts.supplies_input_context();
+            && !facts.supplies_input_context();
         if default_inference {
             if !defaults {
                 return false;
@@ -612,27 +675,28 @@ impl CallConstraint {
         }
         if defaults
             && inputs.iter().all(InputTypeConstraint::is_any)
-            && self
-                .facts
-                .arrays
-                .iter()
-                .any(|signature| result.allows(signature.result()))
+            && (!facts.simple_functions.is_empty()
+                || self
+                    .facts
+                    .arrays
+                    .iter()
+                    .any(|signature| result.allows(signature.result())))
         {
             graph.unsupported_inference.push(self.operation.clone());
             graph.restrict(
                 *self.nodes.last().expect("call result"),
-                &self.facts.result_types(),
+                &facts.result_types(),
             );
             return true;
         }
-        let alternatives = self.facts.alternatives(&inputs, &result);
-        if default_inference && alternatives.is_empty() && self.facts.has_declarations() {
+        let alternatives = facts.alternatives(&inputs, &result);
+        if default_inference && alternatives.is_empty() && facts.has_declarations() {
             // Missing default witnesses do not establish invalid SQL. Keep the
             // relationship for explicit assignment inspection and report the
             // still-unresolved application inputs at the normal boundary.
             graph.restrict(
                 *self.nodes.last().expect("call result"),
-                &self.facts.result_types(),
+                &facts.result_types(),
             );
             return false;
         }

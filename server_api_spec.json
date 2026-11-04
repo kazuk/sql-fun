@@ -1237,32 +1237,32 @@
               "description": "An invalid PostgreSQL serial-family column declaration.",
               "oneOf": [
                 {
-                  "description": "Serial arrays cannot be declared.",
+                  "description": "Serial arrays cannot be declared. Diagnostic code: `serial_array`.",
                   "type": "string",
                   "const": "Array"
                 },
                 {
-                  "description": "The underlying integer type does not accept modifiers.",
+                  "description": "The underlying integer type does not accept modifiers. Diagnostic code: `serial_modifier`.",
                   "type": "string",
                   "const": "Modifier"
                 },
                 {
-                  "description": "Explicit NULL conflicts with implicit NOT NULL.",
+                  "description": "Explicit NULL conflicts with implicit NOT NULL. Diagnostic code: `serial_nullable`.",
                   "type": "string",
                   "const": "Nullable"
                 },
                 {
-                  "description": "An explicit default conflicts with the sequence default.",
+                  "description": "An explicit default conflicts with the sequence default. Diagnostic code: `serial_default_conflict`.",
                   "type": "string",
                   "const": "Default"
                 },
                 {
-                  "description": "Identity conflicts with the sequence default.",
+                  "description": "Identity conflicts with the sequence default. Diagnostic code: `serial_identity_conflict`.",
                   "type": "string",
                   "const": "Identity"
                 },
                 {
-                  "description": "A generated expression conflicts with the sequence default.",
+                  "description": "A generated expression conflicts with the sequence default. Diagnostic code: `serial_generated_conflict`.",
                   "type": "string",
                   "const": "Generated"
                 }
@@ -5508,32 +5508,32 @@
               "description": "An invalid PostgreSQL serial-family column declaration.",
               "oneOf": [
                 {
-                  "description": "Serial arrays cannot be declared.",
+                  "description": "Serial arrays cannot be declared. Diagnostic code: `serial_array`.",
                   "type": "string",
                   "const": "Array"
                 },
                 {
-                  "description": "The underlying integer type does not accept modifiers.",
+                  "description": "The underlying integer type does not accept modifiers. Diagnostic code: `serial_modifier`.",
                   "type": "string",
                   "const": "Modifier"
                 },
                 {
-                  "description": "Explicit NULL conflicts with implicit NOT NULL.",
+                  "description": "Explicit NULL conflicts with implicit NOT NULL. Diagnostic code: `serial_nullable`.",
                   "type": "string",
                   "const": "Nullable"
                 },
                 {
-                  "description": "An explicit default conflicts with the sequence default.",
+                  "description": "An explicit default conflicts with the sequence default. Diagnostic code: `serial_default_conflict`.",
                   "type": "string",
                   "const": "Default"
                 },
                 {
-                  "description": "Identity conflicts with the sequence default.",
+                  "description": "Identity conflicts with the sequence default. Diagnostic code: `serial_identity_conflict`.",
                   "type": "string",
                   "const": "Identity"
                 },
                 {
-                  "description": "A generated expression conflicts with the sequence default.",
+                  "description": "A generated expression conflicts with the sequence default. Diagnostic code: `serial_generated_conflict`.",
                   "type": "string",
                   "const": "Generated"
                 }

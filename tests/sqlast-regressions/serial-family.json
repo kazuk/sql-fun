@@ -139,7 +139,7 @@
     "sql": "CREATE TABLE invalid_serial (id serial[])",
     "expected": {
       "diagnostics": [
-        "serial_invalid_declaration"
+        "serial_array"
       ],
       "columns": []
     }
@@ -149,7 +149,7 @@
     "sql": "CREATE TABLE invalid_serial (id serial(3))",
     "expected": {
       "diagnostics": [
-        "serial_invalid_declaration"
+        "serial_modifier"
       ],
       "columns": []
     }
@@ -159,7 +159,7 @@
     "sql": "CREATE TABLE invalid_serial (id serial NULL)",
     "expected": {
       "diagnostics": [
-        "serial_invalid_declaration"
+        "serial_nullable"
       ],
       "columns": []
     }
@@ -169,7 +169,7 @@
     "sql": "CREATE TABLE invalid_serial (id serial DEFAULT 1)",
     "expected": {
       "diagnostics": [
-        "serial_invalid_declaration"
+        "serial_default_conflict"
       ],
       "columns": []
     }
@@ -179,7 +179,7 @@
     "sql": "CREATE TABLE invalid_serial (id serial GENERATED ALWAYS AS IDENTITY)",
     "expected": {
       "diagnostics": [
-        "serial_invalid_declaration"
+        "serial_identity_conflict"
       ],
       "columns": []
     }
@@ -189,7 +189,7 @@
     "sql": "CREATE TABLE invalid_serial (id serial GENERATED ALWAYS AS (1) STORED)",
     "expected": {
       "diagnostics": [
-        "serial_invalid_declaration"
+        "serial_generated_conflict"
       ],
       "columns": []
     }

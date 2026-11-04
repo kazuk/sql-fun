@@ -6,7 +6,8 @@ CREATE SEQUENCE retains a PostgreSQL sequence identity, temporary/existence
 flags and available OWNED BY table association. Catalog creation participates in
 the shared relation namespace. ALTER SEQUENCE resolves its sequence target and
 updates the retained OWNED BY association, including clearing it for OWNED BY
-NONE.
+NONE. Serial-family CREATE TABLE declarations also register their implicit
+sequences and sequence-backed column defaults.
 
 ```sql
 CREATE SEQUENCE public.item_ids;
@@ -22,8 +23,10 @@ value.
 The current metadata application is narrower than PostgreSQL's full sequence
 command behavior: increment/start/minimum/maximum/cache/cycle options and
 runtime sequence state must not be inferred as validated/applied from retained
-syntax. ALTER SEQUENCE IF EXISTS syntax does not currently establish a
-no-diagnostic absent-target behavior; the implementation still reports a missing
+syntax. Ownership currently identifies the table only; the owning column is
+not retained ([#545](https://github.com/kazuk/sql-fun/issues/545)).
+ALTER SEQUENCE IF EXISTS syntax does not currently establish a no-diagnostic
+absent-target behavior; the implementation still reports a missing
 sequence. SQLite does not have this PostgreSQL sequence-analysis path.
 
 SQLite/Turso CREATE SEQUENCE and DROP SEQUENCE analysis remains unimplemented;

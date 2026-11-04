@@ -1,0 +1,45 @@
+[
+  {
+    "name": "original-bigserial",
+    "sql": "SELECT users.id, users.name FROM users",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "name",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "undefined-alias-after-initialization",
+    "sql": "SELECT u.id FROM users",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": null,
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

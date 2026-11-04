@@ -3,6 +3,7 @@
 mod alter_index;
 mod column_attributes;
 mod column_rename;
+mod serial;
 mod table_rename;
 
 #[path = "deparse/ddl.rs"]
@@ -1013,10 +1014,12 @@ impl super::Table {
         }
         let name = TableName::from(self.name.full_name()?);
         let mut columns = Vec::new();
+        let mut serials = serial::SerialSequences::default();
         for column in &self.columns {
-            columns.push(column.resolve(context, &name)?);
+            columns.push(column.resolve_serial(context, &name, self.temporary, &mut serials)?);
         }
         let mut table = CreateTable::new(&name, columns, self.mode, self.temporary, source);
+        table.retain_serial_sequences(serials.into_sequences());
         for definition in &self.constraints {
             if let Some(constraint) = definition.resolve_declared_key(context, &table)? {
                 table.record_declared_constraint(&constraint)?;

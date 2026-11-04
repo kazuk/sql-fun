@@ -1,0 +1,294 @@
+[
+  {
+    "name": "all-spellings",
+    "sql": "SELECT * FROM serial_family",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int2",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int2",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "c",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "d",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "e",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "f",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "quoted",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "written-keys",
+    "sql": "SELECT id, other FROM serial_keys",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "other",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "existing-sequence-name",
+    "sql": "SELECT id FROM serial_collision",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-identifiers",
+    "sql": "SELECT \"Serial Column\" FROM \"Serial Table\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "Serial Column",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "array",
+    "sql": "CREATE TABLE invalid_serial (id serial[])",
+    "expected": {
+      "diagnostics": [
+        "serial_invalid_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "modifier",
+    "sql": "CREATE TABLE invalid_serial (id serial(3))",
+    "expected": {
+      "diagnostics": [
+        "serial_invalid_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "null",
+    "sql": "CREATE TABLE invalid_serial (id serial NULL)",
+    "expected": {
+      "diagnostics": [
+        "serial_invalid_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "default",
+    "sql": "CREATE TABLE invalid_serial (id serial DEFAULT 1)",
+    "expected": {
+      "diagnostics": [
+        "serial_invalid_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "identity",
+    "sql": "CREATE TABLE invalid_serial (id serial GENERATED ALWAYS AS IDENTITY)",
+    "expected": {
+      "diagnostics": [
+        "serial_invalid_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "generated",
+    "sql": "CREATE TABLE invalid_serial (id serial GENERATED ALWAYS AS (1) STORED)",
+    "expected": {
+      "diagnostics": [
+        "serial_invalid_declaration"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-smallserial",
+    "sql": "CREATE TABLE declared_serial (id smallserial)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-serial2",
+    "sql": "CREATE TABLE declared_serial (id serial2)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-serial",
+    "sql": "CREATE TABLE declared_serial (id serial)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-serial4",
+    "sql": "CREATE TABLE declared_serial (id serial4)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-bigserial",
+    "sql": "CREATE TABLE declared_serial (id bigserial)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-serial8",
+    "sql": "CREATE TABLE declared_serial (id serial8)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "declare-quoted-serialquoted-",
+    "sql": "CREATE TABLE declared_serial (id \"serial\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "qualified-name",
+    "sql": "CREATE TABLE ordinary_type_lookup(id pg_catalog.serial)",
+    "expected": {
+      "diagnostics": [
+        "column_type_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "quoted-case",
+    "sql": "CREATE TABLE ordinary_type_lookup(id \"Serial\")",
+    "expected": {
+      "diagnostics": [
+        "column_type_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "cast-is-not-a-serial-declaration",
+    "sql": "SELECT 1::serial AS result",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint",
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "local_name": "serial",
+            "is_array": false,
+            "schema_name": ""
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

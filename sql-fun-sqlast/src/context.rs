@@ -477,6 +477,12 @@ where
                 return Ok(self);
             }
         }
+        if !create_table.permits_serial_creation(&mut self, &indexes)? {
+            return Ok(self);
+        }
+        for sequence in create_table.serial_sequences() {
+            self = self.apply_create_sequence(sequence)?;
+        }
         self.insert_create_table(&name, create_table);
         // when create table, define composite type as table
         if self.dialect() == Dialect::postgres() {

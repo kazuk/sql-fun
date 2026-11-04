@@ -470,6 +470,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "An invalid serial column declaration.",
+                  "type": "object",
+                  "properties": {
+                    "Serial": {
+                      "$ref": "#/$defs/SerialProblem"
+                    }
+                  },
+                  "required": [
+                    "Serial"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Syntax is unavailable on the explicitly selected engine version.",
                   "type": "object",
                   "properties": {
@@ -1217,6 +1230,41 @@
                     "ParameterTypeMismatchForTableFunction"
                   ],
                   "additionalProperties": false
+                }
+              ]
+            },
+            "SerialProblem": {
+              "description": "An invalid PostgreSQL serial-family column declaration.",
+              "oneOf": [
+                {
+                  "description": "Serial arrays cannot be declared.",
+                  "type": "string",
+                  "const": "Array"
+                },
+                {
+                  "description": "The underlying integer type does not accept modifiers.",
+                  "type": "string",
+                  "const": "Modifier"
+                },
+                {
+                  "description": "Explicit NULL conflicts with implicit NOT NULL.",
+                  "type": "string",
+                  "const": "Nullable"
+                },
+                {
+                  "description": "An explicit default conflicts with the sequence default.",
+                  "type": "string",
+                  "const": "Default"
+                },
+                {
+                  "description": "Identity conflicts with the sequence default.",
+                  "type": "string",
+                  "const": "Identity"
+                },
+                {
+                  "description": "A generated expression conflicts with the sequence default.",
+                  "type": "string",
+                  "const": "Generated"
                 }
               ]
             },
@@ -4693,6 +4741,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "An invalid serial column declaration.",
+                  "type": "object",
+                  "properties": {
+                    "Serial": {
+                      "$ref": "#/$defs/SerialProblem"
+                    }
+                  },
+                  "required": [
+                    "Serial"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Syntax is unavailable on the explicitly selected engine version.",
                   "type": "object",
                   "properties": {
@@ -5440,6 +5501,41 @@
                     "ParameterTypeMismatchForTableFunction"
                   ],
                   "additionalProperties": false
+                }
+              ]
+            },
+            "SerialProblem": {
+              "description": "An invalid PostgreSQL serial-family column declaration.",
+              "oneOf": [
+                {
+                  "description": "Serial arrays cannot be declared.",
+                  "type": "string",
+                  "const": "Array"
+                },
+                {
+                  "description": "The underlying integer type does not accept modifiers.",
+                  "type": "string",
+                  "const": "Modifier"
+                },
+                {
+                  "description": "Explicit NULL conflicts with implicit NOT NULL.",
+                  "type": "string",
+                  "const": "Nullable"
+                },
+                {
+                  "description": "An explicit default conflicts with the sequence default.",
+                  "type": "string",
+                  "const": "Default"
+                },
+                {
+                  "description": "Identity conflicts with the sequence default.",
+                  "type": "string",
+                  "const": "Identity"
+                },
+                {
+                  "description": "A generated expression conflicts with the sequence default.",
+                  "type": "string",
+                  "const": "Generated"
                 }
               ]
             },

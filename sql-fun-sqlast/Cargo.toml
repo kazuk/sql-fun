@@ -8,6 +8,14 @@ categories = ["database", "development-tools"]
 keywords.workspace = true
 repository.workspace = true
 readme = "README.md"
+# Publish checked-in syntax and SQLite build inputs, not AST generation tooling.
+include = [
+    "/src/**",
+    "/build.rs",
+    "/Cargo.toml",
+    "/README.md",
+    "/pg_query.proto.license-notice.md",
+]
 rust-version.workspace = true
 
 [features]

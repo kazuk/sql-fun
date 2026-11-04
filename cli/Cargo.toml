@@ -9,6 +9,8 @@ keywords.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 autotests = false
+# CLI contracts and integration fixtures belong to the repository test flow.
+include = ["/src/**", "/Cargo.toml", "/README.md"]
 
 [package.metadata.deb]
 name = "sql-fun"

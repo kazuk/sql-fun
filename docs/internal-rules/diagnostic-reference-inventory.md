@@ -5,7 +5,7 @@ work.
 
 ## Canonical set
 
-139 emitted codes are documented under `book/diagnostics/`. The table below
+141 emitted codes are documented under `book/diagnostics/`. The table below
 records static producer evidence; it is review material, not an input to the
 coverage checker. Runtime evidence and limitations are distinguished in the
 individual pages and the authoring baseline. The older #924 family inventory
@@ -40,14 +40,14 @@ separately produced by `Role::resolve_owner`.
 Unimplemented TODO-returning helper constructors do not yield AnalysisProblem
 codes. Existing readability audit lists these; avoid creating pages for
 function_result_set_type_not_found, unknown_type_in_coalesce_expr,
-coalesce_expr_type_ambiguous, view_not_matview, operator_name_syntax,
+coalesce_expr_type_ambiguous, view_not_matview,
 unexpected_dynamic_type, table_not_have_column_for_derived_column_name,
 cte_not_have_column_for_derived_column_name, foreign_key_column_type_mismatch,
 sqlite_ignores_match_option_in_fk_constraint.
 
 ## Severity
 
-All 139 codes have a fixed severity per code. Warning:
+All 141 codes have a fixed severity per code. Warning:
 `unreachable_coalesce_argument`, `index_statistics_clamped`,
 `alter_column_statistics_reduced`. Every other code is Error. Conditional
 *family* severity exists for IndexProblem and ColumnAttributeProblem, but their
@@ -271,3 +271,12 @@ current CLI cannot deserialize that payload (a null value is rejected for the
 SubQueryNotHaveColumnForDerivedColumnName tuple variant). That existing transport
 failure remains outside this documentation change. The diagnostic page records
 the user-visible limitation without modifying semantics or transport.
+
+## Operator-name validation (#946)
+
+`sem/name_conversion.rs` classifies malformed operator shapes as
+`operator_name_syntax` and parser-accepted database qualification as
+`cross_database_operator_reference`. The common-AST operator resolver uses the
+same component validator and reports a recoverable invalid binding. The shared
+CLI fixture covers the cross-database SQL examples on PostgreSQL 17/18;
+malformed internal node shapes are covered at the syntax adapter boundary.

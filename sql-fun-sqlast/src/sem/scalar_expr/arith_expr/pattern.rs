@@ -86,7 +86,7 @@ impl ArithExpr {
                 },
             ))));
         }
-        let overloads = if let Some(definition) = context.get_operator_op(name, true, true) {
+        let overloads = if let Some(definition) = context.get_operator(name, true, true) {
             definition.binary_overloads()
         } else {
             None

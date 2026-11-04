@@ -146,6 +146,9 @@ pub enum ProblemLikeError {
     /// invalid operator name
     #[error("invalid operator name {0:?}")]
     InvalidOperatorName(Vec<String>),
+    /// Parser-accepted database qualification on an operator.
+    #[error("cross-database operator reference {0:?}")]
+    CrossDatabaseOperatorReference(Vec<String>),
 }
 
 impl ProblemLikeError {
@@ -153,9 +156,16 @@ impl ProblemLikeError {
         Self::InvalidOperatorName(value)
     }
 
+    pub(crate) fn cross_database_operator_reference(parts: &[String]) -> Self {
+        Self::CrossDatabaseOperatorReference(parts.to_vec())
+    }
+
     pub fn into_problem(self) -> AnalysisProblem {
         match self {
             Self::InvalidOperatorName(v) => AnalysisProblem::operator_name_syntax(&v),
+            Self::CrossDatabaseOperatorReference(v) => {
+                AnalysisProblem::cross_database_operator_reference(&v)
+            }
         }
     }
 

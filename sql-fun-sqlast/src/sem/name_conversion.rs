@@ -343,16 +343,117 @@ mod sql_name_conversion_tests {
 impl ValidOperatorName {
     /// create from [`crate::syn::NodeListOpt`]
     pub fn try_from(value: NodeListOpt) -> Result<Option<Self>, ProblemLikeError> {
-        let Some(items) = value.map_values(|v| v.as_string().get_sval()) else {
+        let Some(nodes) = value.as_inner() else {
             return Ok(None);
         };
-        if items.is_empty() || items.len() >= 2 {
-            Err(ProblemLikeError::invalid_operator_name(items))?
-        } else if items.len() == 1 {
-            Ok(Some(Self::from_parts(None, &items[0])))
-        } else {
-            Ok(Some(Self::from_parts(Some(&items[0]), &items[1])))
+        let mut parts = Vec::new();
+        for node in nodes {
+            let Some(part) = node.as_string().get_sval() else {
+                return Err(ProblemLikeError::invalid_operator_name(parts));
+            };
+            parts.push(part);
         }
+        Self::try_from_components(&parts).map(Some)
+    }
+
+    pub(crate) fn try_from_components(parts: &[String]) -> Result<Self, ProblemLikeError> {
+        if parts.iter().any(String::is_empty) {
+            return Err(ProblemLikeError::invalid_operator_name(parts.to_vec()));
+        }
+        match parts {
+            [local] => Ok(Self::from_parts(None, local)),
+            [schema, local] => Ok(Self::from_parts(Some(schema), local)),
+            [] => Err(ProblemLikeError::invalid_operator_name(parts.to_vec())),
+            _ => Err(ProblemLikeError::cross_database_operator_reference(parts)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod operator_conversion_tests {
+    use crate::{
+        names::ValidOperatorName,
+        syn::{ListOpt, Node, NodeListOpt},
+        test_helpers::{SynBuilder, operator_names::parsed_name},
+    };
+
+    #[rstest::rstest]
+    #[case("SELECT 1 + 2", None, "+")]
+    #[case("SELECT 1 OPERATOR(+) 2", None, "+")]
+    #[case("SELECT 1 OPERATOR(pg_catalog.+) 2", Some("pg_catalog"), "+")]
+    #[case(r#"SELECT 1 OPERATOR("Mixed".+) 2"#, Some("Mixed"), "+")]
+    #[case(r#"SELECT 1 OPERATOR("a.b".+) 2"#, Some("a.b"), "+")]
+    #[case(r#"SELECT 1 OPERATOR("a""b".+) 2"#, Some("a\"b"), "+")]
+    #[case("SELECT 1 OPERATOR(pg_catalog.!=) 2", Some("pg_catalog"), "<>")]
+    #[case("SELECT OPERATOR(pg_catalog.-) 1", Some("pg_catalog"), "-")]
+    fn parser_components_retain_identity(
+        #[case] sql: &str,
+        #[case] schema: Option<&str>,
+        #[case] operator: &str,
+    ) -> testresult::TestResult {
+        let nodes = parsed_name(sql);
+        let parts = nodes
+            .map_values(|node| node.as_string().get_sval())
+            .unwrap();
+        let expected = if let Some(schema) = schema {
+            vec![schema.to_owned(), operator.to_owned()]
+        } else {
+            vec![operator.to_owned()]
+        };
+        assert_eq!(parts, expected);
+        assert_eq!(
+            ValidOperatorName::try_from(nodes)?,
+            Some(ValidOperatorName::from_parts(schema, operator))
+        );
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case("SELECT 1 OPERATOR(a.b.+) 2")]
+    #[case("SELECT 1 OPERATOR(a.b.c.+) 2")]
+    fn parser_accepted_database_qualification_is_semantic_error(
+        #[case] sql: &str,
+    ) -> testresult::TestResult {
+        let nodes = parsed_name(sql);
+        let problem = ValidOperatorName::try_from(nodes)
+            .unwrap_err()
+            .into_problem();
+        assert_eq!(problem.code(), "cross_database_operator_reference");
+        let serialized = serde_json::to_string(&problem)?;
+        let restored: sql_fun_core::analysis_problem::AnalysisProblem =
+            serde_json::from_str(&serialized)?;
+        assert_eq!(restored.code(), problem.code());
+        assert!(
+            restored
+                .render_metadata()
+                .unwrap()
+                .message()
+                .contains("cross-database")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn absence_and_malformed_nodes_remain_distinct() -> testresult::TestResult {
+        let builder = SynBuilder::new();
+        assert_eq!(ValidOperatorName::try_from(NodeListOpt::none())?, None);
+        for nodes in [
+            builder.empty_node_list(),
+            builder.as_node_list(&[Node::none()]),
+            builder.string_node_list(&[""]),
+            builder.as_node_list(&[
+                builder.as_string_node(builder.string("a")),
+                Node::none(),
+                builder.as_string_node(builder.string("+")),
+            ]),
+        ] {
+            let problem = ValidOperatorName::try_from(NodeListOpt::from(&nodes))
+                .unwrap_err()
+                .into_problem();
+            assert_eq!(problem.code(), "operator_name_syntax");
+            assert!(problem.render_metadata().is_some());
+        }
+        Ok(())
     }
 }
 
@@ -371,5 +472,57 @@ impl OperatorName {
                 Ok(Some(Self::invalid()))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod operator_reporting_tests {
+    use crate::{
+        names::OperatorName,
+        syn::NodeListOpt,
+        test_helpers::{SynBuilder, TestParseContext, operator_names::parsed_name},
+    };
+
+    #[rstest::rstest]
+    #[case("SELECT 1 OPERATOR(pg_catalog.+) 2", None)]
+    #[case(
+        "SELECT 1 OPERATOR(a.b.+) 2",
+        Some("cross_database_operator_reference")
+    )]
+    #[case(
+        "SELECT 1 OPERATOR(a.b.c.+) 2",
+        Some("cross_database_operator_reference")
+    )]
+    fn reports_semantic_failure_once(
+        #[case] sql: &str,
+        #[case] code: Option<&str>,
+    ) -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        let name = OperatorName::try_from_report(parsed_name(sql), &mut context)?.unwrap();
+        if let Some(code) = code {
+            assert!(!name.is_valid());
+            assert_eq!(context.reported_problem_count(), 1);
+            assert!(context.has_reported_problem(code));
+        } else {
+            assert_eq!(name, OperatorName::from_parts(Some("pg_catalog"), "+"));
+            assert_eq!(context.reported_problem_count(), 0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_shape_reports_syntax_but_absence_reports_nothing() -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        assert_eq!(
+            OperatorName::try_from_report(NodeListOpt::none(), &mut context)?,
+            None
+        );
+        assert_eq!(context.reported_problem_count(), 0);
+        let empty = SynBuilder::new().empty_node_list();
+        let name = OperatorName::try_from_report(NodeListOpt::from(&empty), &mut context)?.unwrap();
+        assert!(!name.is_valid());
+        assert_eq!(context.reported_problem_count(), 1);
+        assert!(context.has_reported_problem("operator_name_syntax"));
+        Ok(())
     }
 }

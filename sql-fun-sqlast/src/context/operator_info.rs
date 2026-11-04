@@ -9,7 +9,8 @@ pub trait OperatorInfoRead {
         None
     }
 
-    /// get operator definition,
+    /// Read an exact catalog identity, without search-path expansion.
+    /// Use `BaseParseContext::get_operator` to resolve SQL references.
     ///
     /// `has_left`, `has_right` both true then returns Binary operator.
     /// one of `has_left`, `has_right` is true then returns Left unary or Right unary operator.

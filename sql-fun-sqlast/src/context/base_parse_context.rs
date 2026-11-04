@@ -12,12 +12,13 @@ use crate::{
         OperatorInfoRead, RuleInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead,
         TriggerInfoRead, TypeInfoRead, ViewInfoRead,
     },
-    names::{FullName, TableName, ViewName},
+    names::{FullName, OperatorName, TableName, ViewName},
     sem::{
-        CreateIndex, CreateSequence, CreateTable, FunctionOverloadCollection, TypeDefinition,
-        TypeReference, ViewLike,
+        CreateIndex, CreateSequence, CreateTable, FunctionOverloadCollection, OperatorDefinition,
+        TypeDefinition, TypeReference, ViewLike,
         search_path::{
-            expand_relation_search_path, expand_search_path_inst, expand_type_search_path,
+            expand_operator_search_path, expand_relation_search_path, expand_search_path_inst,
+            expand_type_search_path,
         },
     },
 };
@@ -63,6 +64,36 @@ pub trait BaseParseContext:
 
     /// get SQL file path
     fn get_source_file_path(&self) -> Option<&Path>;
+
+    /// Look up an operator through the effective routine search path.
+    /// Qualified names are looked up directly without selecting another schema.
+    fn get_operator(
+        &self,
+        name: &OperatorName,
+        left: bool,
+        right: bool,
+    ) -> Option<&OperatorDefinition> {
+        expand_operator_search_path(self, name, |key| self.get_operator_op(key, left, right))
+    }
+
+    /// Retain the exact catalog identity selected for an operator reference.
+    fn resolve_operator_name(
+        &self,
+        name: &OperatorName,
+        left: bool,
+        right: bool,
+    ) -> Option<OperatorName> {
+        expand_operator_search_path(self, name, |key| {
+            self.get_operator_op(key, left, right)?;
+            Some(key.clone())
+        })
+    }
+
+    /// Non-null result guarantee for the operator selected by name resolution.
+    fn resolved_operator_result_is_not_null(&self, name: &OperatorName) -> Option<bool> {
+        let name = self.resolve_operator_name(name, true, true)?;
+        self.operator_result_is_not_null(&name)
+    }
 
     /// get type by name
     fn get_type(&self, key: &FullName) -> Option<&TypeDefinition> {
@@ -195,6 +226,51 @@ mod canonicalization_tests {
         assert_eq!(context.canonicalize_type_ref(&row), Some(row.clone()));
         let array = row.array_type();
         assert_eq!(context.canonicalize_type_ref(&array), Some(array));
+    }
+}
+
+#[cfg(test)]
+mod operator_resolution_tests {
+    use crate::{
+        context::BaseParseContext, names::OperatorName,
+        test_helpers::operator_names::lookup_context,
+    };
+
+    #[rstest::rstest]
+    #[case(&[], None, Some("pg_catalog"))]
+    #[case(&["a"], None, Some("pg_catalog"))]
+    #[case(&["a", "pg_catalog"], None, Some("a"))]
+    #[case(&["b", "a", "pg_catalog"], None, Some("b"))]
+    #[case(&["a"], Some("b"), Some("b"))]
+    #[case(&["a"], Some("a.b"), Some("a.b"))]
+    #[case(&[], Some("Mixed"), Some("Mixed"))]
+    #[case(&[], Some("mixed"), None)]
+    #[case(&[], Some("PG_CATALOG"), None)]
+    #[case(&[], Some("missing"), None)]
+    fn operators_follow_routine_search_path(
+        #[case] path: &[&str],
+        #[case] schema: Option<&str>,
+        #[case] expected: Option<&str>,
+        #[values((true, true), (true, false), (false, true))] operands: (bool, bool),
+    ) {
+        let context = lookup_context(path, operands.0, operands.1);
+        let name = OperatorName::from_parts(schema, "+");
+        let resolved = context.resolve_operator_name(&name, operands.0, operands.1);
+        assert_eq!(
+            resolved,
+            expected.map(|schema| OperatorName::from_parts(Some(schema), "+"))
+        );
+        assert_eq!(
+            context
+                .get_operator(&name, operands.0, operands.1)
+                .is_some(),
+            expected.is_some()
+        );
+        assert!(
+            context
+                .get_operator(&OperatorName::invalid(), operands.0, operands.1)
+                .is_none()
+        );
     }
 }
 

@@ -189,6 +189,7 @@ pub(crate) use self::{
     create_index::IndexElementCollection,
     data_source::JoinUsingClause,
     delete_statement::{DeleteDestination, DeletePredicate},
+    error::ProblemLikeError,
     parameter_constraints::{ConstraintGraph, SignatureAlternative, array_cast_ranks},
     scalar_expr::{SqliteCaseBuilder, WholeRowFields, grouping::ReferenceCapture},
     select_statement::{ResultColumn, SelectStatementNode},

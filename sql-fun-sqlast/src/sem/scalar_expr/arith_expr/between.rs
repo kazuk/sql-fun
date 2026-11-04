@@ -84,7 +84,7 @@ impl ArithExpr {
         let name = OperatorName::from_parts(None, name);
         let binding = ResolvedOperator::resolve(context, &name, true, true);
         let (left, right) = if coerce_literals {
-            let overloads = if let Some(definition) = context.get_operator_op(&name, true, true) {
+            let overloads = if let Some(definition) = context.get_operator(&name, true, true) {
                 definition.binary_overloads()
             } else {
                 None

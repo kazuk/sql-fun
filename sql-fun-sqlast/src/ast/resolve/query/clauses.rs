@@ -4,7 +4,7 @@ use crate::{
         LockStrength, LockWait, Name, Order, QueryBody, Select, Window,
     },
     context::ParseContext,
-    names::ColumnName,
+    names::{ColumnName, OperatorName},
     sem::{
         AnalysisError, AnalysisProblem, ColumnReferenceExpr, QueryFrame, QueryFrameBound,
         QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder, QueryProblem,
@@ -155,20 +155,33 @@ impl Order {
         let expression = self
             .expression
             .resolve_clause(context, scope, columns, binding)?;
-        let using = if let Some(name) = &self.using {
-            let operator_name = name.operator_name()?;
-            let binding = ResolvedOperator::resolve(context, &operator_name, true, true);
-            Self::checked_name(context, &name.0.join("."), binding.resolution().clone())?;
-            Some(binding)
-        } else {
-            None
-        };
+        let using = self.resolve_using_operator(context)?;
         Ok(QueryOrder::new(
             expression,
             self.descending,
             self.nulls_first,
             using,
         ))
+    }
+    fn resolve_using_operator(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<ResolvedOperator>, AnalysisError> {
+        let Some(name) = &self.using else {
+            return Ok(None);
+        };
+        let binding = match name.operator_name() {
+            Ok(operator_name) => {
+                let binding = ResolvedOperator::resolve(context, &operator_name, true, true);
+                Self::checked_name(context, &name.0.join("."), binding.resolution().clone())?;
+                binding
+            }
+            Err(problem) => {
+                problem.report_problem_to(context)?;
+                ResolvedOperator::from_definition(context, &OperatorName::invalid(), None)
+            }
+        };
+        Ok(Some(binding))
     }
     fn checked_name(
         context: &mut impl ParseContext,

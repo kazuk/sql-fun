@@ -1,4 +1,4 @@
-use crate::names::SchemaName;
+use crate::names::{FullName, SchemaName};
 use std::fmt::Display;
 
 /// operator name with schema(optional)
@@ -91,6 +91,21 @@ impl OperatorName {
 
     pub(crate) const fn invalid() -> Self {
         Self::Invalid
+    }
+
+    pub(crate) fn full_name(&self) -> Option<FullName> {
+        match self {
+            Self::Valid(name) => Some(if let Some(schema) = &name.schema_name {
+                FullName::with_schema(schema.as_str(), &name.op_name)
+            } else {
+                FullName::from_local_name(&name.op_name)
+            }),
+            Self::Invalid => None,
+        }
+    }
+
+    pub(crate) fn from_full_name(name: &FullName) -> Self {
+        Self::from_parts(name.schema().map(SchemaName::as_str), name.name().as_str())
     }
 
     /// operator name is valid

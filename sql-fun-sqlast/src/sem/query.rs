@@ -998,6 +998,8 @@ impl ResolvedOperator {
         left: bool,
         right: bool,
     ) -> Self {
+        let resolved = context.resolve_operator_name(name, left, right);
+        let name = resolved.as_ref().unwrap_or(name);
         Self::from_definition(context, name, context.get_operator_op(name, left, right))
     }
     /// Complete name binding from an already performed catalog lookup.

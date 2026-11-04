@@ -1,6 +1,7 @@
 use crate::{
     TrieMap,
     context::base_context::deserialize_from_path,
+    names::OperatorName,
     sem::{
         AnalysisError, BinaryOperatorDefinition, OperatorDefinition, TypeReference,
         UnaryOperatorDefinition,
@@ -46,7 +47,10 @@ impl PgBuiltinOperators {
                     &left, &right, &result, strict,
                 ));
             }
-            master.insert(k, OperatorDefinition::binary(&overloads));
+            master.insert(
+                &OperatorName::from_parts(Some("pg_catalog"), k).to_name_string(),
+                OperatorDefinition::binary(&overloads),
+            );
         }
         assert!(!master.is_empty());
         Ok(master)
@@ -67,7 +71,10 @@ impl PgBuiltinOperators {
                 let strict = overload.strict;
                 overloads.push(UnaryOperatorDefinition::new(&input, &result, strict));
             }
-            master.insert(k, OperatorDefinition::left_unary(&overloads));
+            master.insert(
+                &OperatorName::from_parts(Some("pg_catalog"), k).to_name_string(),
+                OperatorDefinition::left_unary(&overloads),
+            );
         }
         Ok(master)
     }
@@ -87,7 +94,10 @@ impl PgBuiltinOperators {
                 let strict = overload.strict;
                 overloads.push(UnaryOperatorDefinition::new(&input, &result, strict));
             }
-            master.insert(k, OperatorDefinition::right_unary(&overloads));
+            master.insert(
+                &OperatorName::from_parts(Some("pg_catalog"), k).to_name_string(),
+                OperatorDefinition::right_unary(&overloads),
+            );
         }
         Ok(master)
     }

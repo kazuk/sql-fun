@@ -16,8 +16,7 @@ impl ArithExpr {
     where
         TParseContext: ParseContext,
     {
-        if let Some(operator_def) = context.get_operator_op(name, lexpr.is_some(), rexpr.is_some())
-        {
+        if let Some(operator_def) = context.get_operator(name, lexpr.is_some(), rexpr.is_some()) {
             if lexpr
                 .as_ref()
                 .is_some_and(|value| value.get_type().is_none())

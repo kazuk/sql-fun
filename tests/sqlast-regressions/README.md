@@ -409,3 +409,14 @@ creation-time bindings, column order, attributes, rename propagation and frozen
 schema layers. SQLite feature tests use the embedded oracle for CREATE-table
 retention and permitted forward references; SQLite has no ALTER ADD CONSTRAINT
 counterpart.
+
+Issue #946 operator-name contracts live in `operator-names.json` against the
+PostgreSQL 17/18 builtin catalogs through both maintained paths. Cases cover
+unqualified/qualified names, quoted schema identity, prefix operators, normalized
+tokens, typed inputs, missing qualified operators and cross-database rejection.
+Parser-produced adapter tests and public analysis tests retain component identity,
+completed bindings, malformed-shape diagnostics and recovery after semantic errors.
+The cross-database CLI cases also assert the existing `query_deparse` diagnostic:
+the renderer currently rejects excessive operator qualification independently of
+the semantic classification. These tests do not claim cross-database SQL emission
+support.

@@ -487,7 +487,7 @@ impl OperatorInfoRead for SchemaCatalog {
 #[cfg(test)]
 mod test_operator_layers {
     use crate::test_helpers::operator_layers as test_helpers;
-    use crate::{context::OperatorInfoRead, names::OperatorName, sem::PgBuiltInType};
+    use crate::{context::BaseParseContext, names::OperatorName, sem::PgBuiltInType};
 
     #[rstest::rstest]
     #[case::binary(true, true)]
@@ -499,11 +499,11 @@ mod test_operator_layers {
     ) {
         let child = test_helpers::operator_layer(has_left, has_right);
         let local = child
-            .get_operator_op(&OperatorName::new("+"), has_left, has_right)
+            .get_operator(&OperatorName::new("+"), has_left, has_right)
             .expect("local operator");
         test_helpers::assert_returns(local, &PgBuiltInType::int8());
         let inherited = child
-            .get_operator_op(&OperatorName::new("-"), has_left, has_right)
+            .get_operator(&OperatorName::new("-"), has_left, has_right)
             .expect("inherited operator");
         test_helpers::assert_returns(inherited, &PgBuiltInType::int4());
     }
@@ -1176,15 +1176,16 @@ impl SchemaFileContext {
     }
 
     pub(crate) fn set_test_operator(&mut self, name: &str, operator: OperatorDefinition) {
+        let name = OperatorName::from_parts(Some("pg_catalog"), name).to_name_string();
         match operator {
             OperatorDefinition::Binary(_) => {
-                self.catalog.binary_operators.insert(name, operator);
+                self.catalog.binary_operators.insert(&name, operator);
             }
             OperatorDefinition::LeftUnary(_) => {
-                self.catalog.left_unary_operators.insert(name, operator);
+                self.catalog.left_unary_operators.insert(&name, operator);
             }
             OperatorDefinition::RightUnary(_) => {
-                self.catalog.right_unary_operators.insert(name, operator);
+                self.catalog.right_unary_operators.insert(&name, operator);
             }
         }
     }

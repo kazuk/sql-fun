@@ -339,18 +339,8 @@ Based on this, we define our implementation goal as follows:
 
 ### Result set definition
 
-First option , most faster way.
-
-`sql_fun` has a `from_table` derive macro, this works for view.
-
-```rust
-#[derive(sql_fun::from_table)]
-#[derive(Debug, derive_builder::Builder)]
-#[sql_fun::source("sales.vindividualcustomer")]
-struct IndividualCustomer {}
-```
-
-this struct fits `select ic.* from sales.vindividualcustomer ic`.
+Define result fields explicitly to match the columns selected by the query.
+The removed `from_table` attribute did not generate fields from a table or view.
 
 ## 🛠 Troubleshooting
 

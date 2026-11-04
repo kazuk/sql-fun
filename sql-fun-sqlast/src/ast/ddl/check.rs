@@ -7,8 +7,8 @@ use crate::{
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, AnalysisProblem, CheckColumnConstraint, CheckConstraint,
-        ColumnConstraint as SemColumnConstraint, ColumnDefinition, Constraint, CreateTable,
-        ScalarAnalysisContext, problem::CheckProblem,
+        ColumnConstraint as SemColumnConstraint, ColumnDefinition, Constraint, ConstraintNames,
+        CreateTable, ScalarAnalysisContext, problem::CheckProblem,
     },
     syn::{Constraint as SynConstraint, ScanToken},
 };
@@ -134,24 +134,11 @@ impl TableConstraint {
 }
 
 impl Table {
-    fn column_constraint_name_used(&self, context: &impl ParseContext, name: &str) -> bool {
-        for column in &self.columns {
-            for definition in &column.constraints {
-                if !definition.is_check()
-                    && definition.name.as_deref() == Some(name)
-                    && definition.constraint.has_catalog_name(context)
-                {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     pub(super) fn resolve_inline_checks(
         &self,
         context: &mut impl ParseContext,
         table: &mut CreateTable,
+        names: &mut ConstraintNames,
     ) -> Result<(), AnalysisError> {
         if !self.columns.iter().any(Column::has_inline_checks) {
             return Ok(());
@@ -167,7 +154,7 @@ impl Table {
                 .get_column_def(&name)
                 .expect("declared column")
                 .clone();
-            syntax.resolve_inline_checks(context, &target, Some(table), false, &mut column)?;
+            syntax.resolve_inline_checks(context, &target, Some(table), names, &mut column)?;
             table.replace_declared_column(&column);
         }
         Ok(())
@@ -177,6 +164,7 @@ impl Table {
         &self,
         context: &mut impl ParseContext,
         table: &mut CreateTable,
+        names: &mut ConstraintNames,
     ) -> Result<(), AnalysisError> {
         if !self.constraints.iter().any(TableConstraint::is_check) {
             return Ok(());
@@ -184,15 +172,15 @@ impl Table {
         let target = context.creation_name(table.name().full_name(), self.temporary)?;
         for definition in &self.constraints {
             if definition.is_check() {
-                let mut check = definition.resolve_check(
+                let scope =
+                    ScalarAnalysisContext::declared_table(table, &TableName::from(target.clone()));
+                let mut check = definition.resolve_check_expression(
                     context,
                     &TableName::from(target.clone()),
-                    Some(table),
+                    &scope,
                     false,
                 )?;
-                if !check.name().is_empty()
-                    && self.column_constraint_name_used(context, check.name())
-                {
+                if !names.reserve(check.name()) {
                     check.reject_duplicate_name(context)?;
                 }
                 table.record_declared_constraint(&Constraint::Check(check))?;
@@ -203,6 +191,18 @@ impl Table {
 }
 
 impl Column {
+    pub(super) fn reserve_constraint_names(
+        &self,
+        context: &impl ParseContext,
+        names: &mut ConstraintNames,
+    ) {
+        for definition in &self.constraints {
+            if !definition.is_check() && definition.constraint.has_catalog_name(context) {
+                names.reserve(definition.name.as_deref().unwrap_or_default());
+            }
+        }
+    }
+
     fn has_inline_checks(&self) -> bool {
         self.constraints.iter().any(TableConstraint::is_check)
     }
@@ -212,7 +212,7 @@ impl Column {
         context: &mut impl ParseContext,
         target: &TableName,
         table: Option<&CreateTable>,
-        alter: bool,
+        names: &mut ConstraintNames,
         column: &mut ColumnDefinition,
     ) -> Result<(), AnalysisError> {
         if !self.has_inline_checks() {
@@ -225,18 +225,12 @@ impl Column {
         };
         let name = ColumnName::from(self.name.as_str());
         let mut index = 0;
-        let mut names = Vec::new();
         for definition in &self.constraints {
             if definition.is_check() {
                 let mut check =
-                    definition.resolve_check_expression(context, target, &scope, alter)?;
-                if !check.name().is_empty() {
-                    if table.is_some_and(|table| table.has_constraint_name(check.name()))
-                        || names.contains(&check.name().to_owned())
-                    {
-                        check.reject_duplicate_name(context)?;
-                    }
-                    names.push(check.name().to_owned());
+                    definition.resolve_check_expression(context, target, &scope, false)?;
+                if !names.reserve(check.name()) {
+                    check.reject_duplicate_name(context)?;
                 }
                 let check = CheckColumnConstraint::from_analyzed(target, &name, &check);
                 column.insert_inline_check(index, &SemColumnConstraint::check(check));

@@ -473,13 +473,28 @@ fn inline_checks_preserve_ownership_order_options_and_serialization() -> testres
 )]
 #[case::table_check("a integer CONSTRAINT repeated CHECK(true), CONSTRAINT repeated CHECK(false)")]
 #[case::table_key("a integer CONSTRAINT repeated CHECK(true), CONSTRAINT repeated UNIQUE(a)")]
+#[case::inline_reference(
+    "a integer CONSTRAINT repeated REFERENCES parent(id) CONSTRAINT repeated CHECK(true)"
+)]
+#[case::later_reference(
+    "a integer CONSTRAINT repeated CHECK(true) CONSTRAINT repeated REFERENCES parent(id)"
+)]
+#[case::other_column_reference(
+    "a integer CONSTRAINT repeated CHECK(true), b integer CONSTRAINT repeated REFERENCES parent(id)"
+)]
+#[case::table_check_reference(
+    "a integer CONSTRAINT repeated REFERENCES parent(id), CONSTRAINT repeated CHECK(true)"
+)]
+
 fn inline_duplicate_names_retain_rejected_declarations(
     #[case] columns: &str,
 ) -> testresult::TestResult {
-    let pair = checks::apply(
+    let context = checks::apply(
         checks::context(Dialect::postgres()),
-        &format!("CREATE TABLE bounds({columns})"),
-    )?;
+        "CREATE TABLE parent(id integer PRIMARY KEY)",
+    )?
+    .into_context();
+    let pair = checks::apply(context, &format!("CREATE TABLE bounds({columns})"))?;
     assert!(
         !pair
             .ast()

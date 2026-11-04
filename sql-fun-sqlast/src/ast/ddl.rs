@@ -29,9 +29,9 @@ use crate::{
         AnalysisProblem, AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
         AttrImmediateColumnConstraint, CollateColumnConstraint, ColumnCollection, ColumnConstraint,
         ColumnDefinition, ColumnNullabilityConstraint, CompositeFieldCollection,
-        CompositeFieldDefinition, Constraint, CreateCompositeType, CreateDomain, CreateFunction,
-        CreateIndex, CreateSchema, CreateTable, CreateTableAs, CreateTableMode, DataSource,
-        DefaultColumnConstraint, ExclusionColumnConstraint, ForeignKeyColumnConstraint,
+        CompositeFieldDefinition, Constraint, ConstraintNames, CreateCompositeType, CreateDomain,
+        CreateFunction, CreateIndex, CreateSchema, CreateTable, CreateTableAs, CreateTableMode,
+        DataSource, DefaultColumnConstraint, ExclusionColumnConstraint, ForeignKeyColumnConstraint,
         ForeignKeyConstraint, FromClause, FunctionOverloadCollection, FunctionParam,
         GeneratedColumnConstraint, IdentityColumnConstraint, IndexElement, IndexElementCollection,
         IndexElementWithOrder, Kind, OverloadVariant, PrimaryKeyColumnConstraint,
@@ -933,33 +933,17 @@ impl super::Table {
         self.resolve_and_apply_at(context, &source)
     }
 
-    fn duplicate_constraint_name(&self, context: &impl ParseContext) -> Option<&str> {
-        let mut names = Vec::new();
+    fn constraint_names(&self, context: &impl ParseContext) -> ConstraintNames {
+        let mut names = ConstraintNames::default();
         for definition in &self.constraints {
-            // CHECK collisions are validated after the other declarations are retained.
-            if !definition.is_check()
-                && let Some(name) = definition.name.as_deref()
-            {
-                if names.contains(&name) {
-                    return Some(name);
-                }
-                names.push(name);
+            if !definition.is_check() {
+                names.reserve(definition.name.as_deref().unwrap_or_default());
             }
         }
         for column in &self.columns {
-            for definition in &column.constraints {
-                if !definition.is_check()
-                    && definition.constraint.has_catalog_name(context)
-                    && let Some(name) = definition.name.as_deref()
-                {
-                    if names.contains(&name) {
-                        return Some(name);
-                    }
-                    names.push(name);
-                }
-            }
+            column.reserve_constraint_names(context, &mut names);
         }
-        None
+        names
     }
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
@@ -984,8 +968,9 @@ impl super::Table {
                 context,
             ));
         }
+        let mut names = self.constraint_names(&context);
         if context.dialect() == Dialect::postgres()
-            && let Some(constraint) = self.duplicate_constraint_name(&context)
+            && let Some(constraint) = names.first_duplicate()
         {
             context.report_problem(AnalysisProblem::creation(CreationProblem::constraint(
                 &name,
@@ -997,7 +982,7 @@ impl super::Table {
                 context,
             ));
         }
-        let table = self.resolve(&mut context, source)?;
+        let table = self.resolve_with_names(&mut context, source, &mut names)?;
         let context = context.apply_create_table(&table)?;
         Ok(AstAndContextPair::new(
             SemAst::create_table(&table),
@@ -1010,8 +995,18 @@ impl super::Table {
         context: &mut impl ParseContext,
         source: &SourcePathWithSpan,
     ) -> Result<CreateTable, AnalysisError> {
+        let mut names = self.constraint_names(context);
+        self.resolve_with_names(context, source, &mut names)
+    }
+
+    fn resolve_with_names(
+        &self,
+        context: &mut impl ParseContext,
+        source: &SourcePathWithSpan,
+        names: &mut ConstraintNames,
+    ) -> Result<CreateTable, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, source);
+        let result = self.resolve_in(context, source, names);
         context.finish_analysis(result)
     }
 
@@ -1019,6 +1014,7 @@ impl super::Table {
         &self,
         context: &mut impl ParseContext,
         source: &SourcePathWithSpan,
+        names: &mut ConstraintNames,
     ) -> Result<CreateTable, AnalysisError> {
         if self.query.is_some() {
             todo!()
@@ -1054,8 +1050,8 @@ impl super::Table {
         if context.dialect() == Dialect::postgres() {
             table.apply_primary_key_nullability();
         }
-        self.resolve_inline_checks(context, &mut table)?;
-        self.resolve_checks(context, &mut table)?;
+        self.resolve_inline_checks(context, &mut table, names)?;
+        self.resolve_checks(context, &mut table, names)?;
         Ok(table)
     }
 }
@@ -1284,7 +1280,9 @@ impl super::Column {
         let canonical = context
             .resolve_table_name(table)
             .unwrap_or_else(|| table.clone());
-        self.resolve_inline_checks(context, &canonical, None, false, &mut column)?;
+        let mut names = ConstraintNames::default();
+        self.reserve_constraint_names(context, &mut names);
+        self.resolve_inline_checks(context, &canonical, None, &mut names, &mut column)?;
         Ok(column)
     }
 

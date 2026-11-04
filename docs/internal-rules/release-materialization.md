@@ -7,7 +7,8 @@ required normal CI. `R` is a direct child recording the materialized release
 state on that same branch. Preparation never writes to `main`.
 
 The shared project parser supplies product tag, classification and snapshot
-suffix. `.local/sbin/materialize-release-state` maps those explicit values to
+suffix. `.local/sbin/materialize-release-state` checks those values against the
+explicit product tag and maps them to
 `.local/bin/materialize-release-versions`; it does not introduce another mode
 or version algorithm. Each publishable crate uses its own current version and
 `workspace.metadata.next-release`, not the numeric product tag. Workspace
@@ -37,6 +38,24 @@ Materialization exposes external `versions` and `paths` files under
 contains only workspace manifests and `Cargo.lock`, including non-publishable
 member dependency edits from cargo-edit. The adapter rejects other tracked
 changes and requires an initially clean tracked worktree/index.
+
+The adapter also invokes `.local/sbin/release-binstall materialize` after version
+materialization and checks the result before handing off paths. Both binary
+crate manifests receive target-specific cargo-binstall metadata for
+`x86_64-unknown-linux-gnu`: a concrete product tag in the download URL and producer
+archive filename, `pkg-fmt = "tgz"`, and `bin-dir = "{ bin }"`. The helper consumes
+`release-assets`' archive inventory and preserves unrelated manifest values.
+These manifest changes enter `R` through the existing owned-path handoff, before
+builds or source packaging. Recorded-state reuse never regenerates metadata;
+old immutable releases are not rewritten to add support.
+
+Every publishable crate is currently bumped on each new materialization, even
+when its source is unchanged. Each newly published binary crate version is tied
+to the product release that materialized it. Exact versions already on crates.io
+retain their original published manifest and immutable archive URL; later
+product releases and partial-publication retries skip them. Selectively reusing
+unchanged versions would require preserving that original mapping; this feature
+does not introduce such a release policy.
 
 After materialization/manual preparation, the existing baseline operation
 receives the candidate from the single selected CI run. Downloaded inputs stay

@@ -26,6 +26,14 @@ Preparation builds and validates distributable packages from recorded source
 immutable project tag at `R`, then creates or repairs a draft GitHub Release
 with the complete public asset set. Normal-CI binaries from `S` are never distributed.
 
+Before the first stable v0.1 publication, verify the CLI/server manifests at `R`
+and their packaged `.crate` manifests contain cargo-binstall metadata naming the
+exact project-tag archive. Release preparation generates this metadata before
+recording `R`; publication rejects new binary versions with inconsistent metadata.
+Check each component version in the draft notes, independently of the project
+tag. An already recorded/tagged release cannot be repaired by rewriting its
+history: explicitly select a new release identity/source when necessary.
+
 Review the draft and its completed assets before publishing it manually.
 Publication authorizes #260 distribution.
 Only a published **stable** release permits a history-preserving merge of the

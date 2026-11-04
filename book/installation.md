@@ -11,12 +11,45 @@ cargo install sql-fun-cli sql-fun-server
 cargo install --locked cargo-expand
 ```
 
-Prebuilt installation through `cargo binstall` is not yet supported by the
-published CLI/server package metadata
-([#950](https://github.com/kazuk/sql-fun/issues/950)). Product release tags and
-component crate versions are independent; cargo-binstall cannot currently use
-package metadata to select the corresponding shared release archive. The Cargo
-installation commands above build from source.
+The `cargo install` commands above build the CLI and server from source.
+
+## Install prebuilt CLI and server executables
+
+Starting with the first project-wide v0.1 release, the CLI and server release
+crates support [cargo-binstall](https://github.com/cargo-bins/cargo-binstall).
+Install cargo-binstall first using its installation instructions. Choose the
+**component crate versions** listed in the product release notes; the project
+tag is independent of these versions. `sql-fun-cli` installs `sql-fun`, and
+`sql-fun-server` installs `sql-fun-server` from the same release archive.
+
+For example, if a stable release lists CLI `0.2.0` and server `0.1.1`, install
+those exact versions with:
+
+```console
+cargo binstall --strategies crate-meta-data --targets x86_64-unknown-linux-gnu \
+  --version '=0.2.0' sql-fun-cli
+cargo binstall --strategies crate-meta-data --targets x86_64-unknown-linux-gnu \
+  --version '=0.1.1' sql-fun-server
+```
+
+For a snapshot listing CLI `0.2.0-snapshotN` and server `0.1.1-snapshotN`, use
+`--version '=0.2.0-snapshotN'` and `--version '=0.1.1-snapshotN'` respectively,
+replacing `N` with the selected release's actual suffix. These are version
+examples, not a promise that those versions have been published. Historical
+crate versions published before this support cannot acquire the metadata.
+
+These commands retrieve project-provided binaries only and fail if unavailable;
+they do not fall back to compilation or third-party binaries. Prebuilt support
+is limited to `x86_64-unknown-linux-gnu`, built and validated on Ubuntu 24.04.
+Compatibility with older distributions is not promised. Archives contain the
+default-feature executables; use source installation for custom features or
+other targets. Ensure Cargo's binary directory is on `PATH`.
+
+The procedural macro remains a Cargo dependency. Command-specific prerequisites
+such as `cargo-expand` for `sql-fun check` and PostgreSQL client tools for
+extraction still apply, as described below.
+
+## Install from source
 
 Building the analyzer from source requires native compilation tools: a C compiler
 and assembler for stack growth, plus Clang for PostgreSQL parser bindings. On

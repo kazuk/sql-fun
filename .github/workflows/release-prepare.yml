@@ -95,11 +95,12 @@ jobs:
         id: materialize
         if: steps.tag.outputs.status == 'absent' && steps.state.outputs.status == 'new'
         env:
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
           RELEASE_SNAPSHOT: ${{ steps.identity.outputs.snapshot }}
         run: |
           state="$RUNNER_TEMP/release-state"
-          .local/sbin/materialize-release-state "$RELEASE_CLASSIFICATION" "$RELEASE_SNAPSHOT" "$state"
+          .local/sbin/materialize-release-state "$RELEASE_CLASSIFICATION" "$RELEASE_SNAPSHOT" "$state" "$RELEASE_TAG"
           {
             echo "versions=$state/crates.tsv"
             echo "paths=$state/changed-paths.txt"

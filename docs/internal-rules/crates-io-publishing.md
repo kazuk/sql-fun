@@ -67,6 +67,14 @@ there is no propagation retry loop. Cargo packages and verifies source during
 `cargo publish`; normal-CI `.crate` files are not inputs. No release binary,
 Debian package, or manual is rebuilt by this workflow.
 
+The workflow supplies the explicit product `--release-tag` to `publish-crates`.
+Before any crate upload, the publisher checks registry existence for all selected
+versions and validates binstall metadata for each **new** CLI/server version
+against that tag and the producer's archive inventory. Missing or inconsistent
+metadata stops publication. Existing exact versions are skipped without requiring
+their original metadata to name this newer product release. This preflight does
+not repair historical manifests or change executable contents.
+
 ## Stable release merge and repository authorization
 
 After crates.io succeeds, the stable-only merge job checks the remote tag and

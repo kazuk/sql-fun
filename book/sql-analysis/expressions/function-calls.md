@@ -2,8 +2,10 @@
 
 ## Overview
 
-Function analysis resolves the requested name against the selected catalog and
-search path, analyzes supplied arguments and selects an applicable overload.
+For ordinary positional calls, function analysis resolves the requested name
+against the selected catalog and search path, analyzes supplied arguments and
+selects an applicable overload. Named and explicit `VARIADIC` calls have the
+separate boundary described [below](#postgresql-named-function-arguments).
 Arguments are checked even when no applicable function signature can be
 selected. Duplicate named arguments and positional arguments following named
 arguments are diagnosed. Applicable declarations can include defaulted and
@@ -36,6 +38,31 @@ scope and legality boundaries. [Table functions](../clauses/from.md) own output
 definitions and FROM placement; [conditional expressions](conditional.md) own
 special CASE/COALESCE/min-max common-type rules. Analysis does not execute
 function bodies or interpret SQL text passed as a string argument.
+
+## PostgreSQL named function arguments
+
+PostgreSQL accepts positional arguments, named arguments (`f(arg => value)` or
+`f(arg := value)`), and positional arguments followed by named arguments. For
+example, given a SQL function `combine(a text, b text DEFAULT 'B')`,
+`combine(a => 'A')` omits `b`, while `combine('A', b => 'C')` supplies both.
+Unquoted argument names normalize to lowercase; quoted names retain their case.
+Duplicate names and positional arguments following named arguments are diagnosed.
+
+For named calls and calls with explicit `VARIADIC`, sql-fun checks function-name
+existence and preserves the supplied arguments in written order. It does **not**
+yet validate argument-to-signature matching, default applicability or infer the
+call's argument/result types ([#980](https://github.com/kazuk/sql-fun/issues/980)).
+Unknown formal parameter names or an unsuitable argument count can consequently
+remain undiagnosed when the function name exists. Omitted arguments remain
+omissions; default expressions are not inserted or evaluated.
+
+These are legal PostgreSQL call forms. Ordinary positional calls use the
+separate overload/type behavior described above. SQLite does not support
+PostgreSQL named-argument notation; its analysis limitations below are separate.
+
+A SQL function argument name identifies a parameter of that SQL function. It is
+distinct from [Rust query binding](../../sql_functions/parameter-binding.md):
+`${name}` supplies a query input from a Rust argument or DTO.
 
 ## Dialect and engine-specific behavior
 

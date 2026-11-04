@@ -61,49 +61,24 @@ will use schema.prod.sql instead.
 
 ## Reusable CTE
 
-`sql-fun` support query reuse as CTE.
-
-### Reuse a query function as CTE
-
-When `cte_name` references function name, function's query copies as CTE.
-
-```rust
-/// example query function definition
-#[sql_fun::sql_query_many(
-    sql="select u.id, u.name from users u where u.is_active=TRUE "
-)]
-async fn select_all_active_users(
-    client: &Client, collector: Collector, handler: Handler,
-)
-  -> Result<Vec<User>,Error>
-{
-}
-
-///
-/// with 
-///   active_users 
-///     as select u.id, u.name from users u where u.is_active=TRUE
-/// select ... from active_users au where au.id=$1
-/// 
-#[sql_fun::sql_query_one(sql = "select from active_users au where au.id=${id}")]
-#[with( cte_name="select_all_active_users", alias="active_users" )]
-async fn select_active_user_by_id( ... ) -> Result<User, Error>
-```
+Reusable SQL definitions can be stored in a [CTE Catalog](reusable_cte.md).
+The catalog defines SQL text and references to other catalog entries. It does
+not obtain query definitions from Rust function names.
 
 ### Reusable query definition in CTE catalog
 
-CTE catalog is a TOML file, CTE definition is a toml table `[cte."key"]`. with
-`query` value.
-
 ```toml
-sql_fun_cte_catalog_format_version="1"
-sql_dialect="PostgreSQL"
+sql_fun_cte_catalog_format_version = "1"
+sql_dialect = "PostgreSQL"
 
-[cte."select_all_active_users"]
-query="""
-select u.id, u.name from users u where u.is_active=TRUE
-""""
+[cte.select_all_active_users]
+query = """
+select u.id, u.name from users u where u.is_active = TRUE
+"""
 ```
+
+See the [CTE Catalog reference](reusable_cte.md) for formats, expansion and
+query macro integration.
 
 ## CRUD table generation
 

@@ -4,6 +4,12 @@
 - [Installation](./installation.md)
 - [SQLite project bootstrap](./sqlite-bootstrap.md)
 - [SQL Functions](./sql_functions.md)
+  - [Attributes](./sql_functions/attributes.md)
+  - [Function signatures](./sql_functions/signatures.md)
+  - [Parameter binding](./sql_functions/parameter-binding.md)
+  - [Conditional SQL](./sql_functions/conditional-sql.md)
+  - [Query interruption](./sql_functions/query-interruption.md)
+  - [Legacy sql_query_one links](./sql_functions/sql_query_one.md)
 - [SQL Analysis Reference](./sql-analysis.md)
   - [Top-level statements](./sql-analysis/statements.md)
     - [SELECT](./sql-analysis/statements/select.md)
@@ -53,6 +59,10 @@
 - [Reusable CTE](./reusable_cte.md)
 - [Database Performance Management](./database-performance-management.md)
 - [Design philosophies](./design-philosophies.md)
+
+## Examples
+
+- [Aggregate Fetch without sql-fun-collector](./examples/aggregate-fetch.md)
 
 ## SQL re-write features
 

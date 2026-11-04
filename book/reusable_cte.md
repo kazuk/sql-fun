@@ -4,10 +4,49 @@
 
 ## Reusable query
 
-Reusable query written in bellow.
+Reusable queries are SQL definitions in a CTE Catalog (JSON, TOML or YAML).
+Rust query function names are not CTE-definition sources.
 
-- CTE Catalog
-- SQL Function
+## Query macro integration
+
+Configure the selected datasource's catalog directory in `Cargo.toml`:
+
+```toml
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+connector = "tokio-postgres"
+cte_catalog = "cte-catalog"
+```
+
+Save the catalog definitions in that directory. A query macro references an
+entry by its catalog key and assigns the SQL alias used in the query:
+
+```rust,ignore
+#[sql_fun::sql_query_one(
+    sql = "select id, name from active_users where id = ${id}"
+)]
+#[with(cte_name = "select_active_users", alias = "active_users")]
+async fn find_active_user(
+    client: &tokio_postgres::Client,
+    id: i64,
+) -> Result<UserRow, anyhow::Error> {}
+```
+
+`#[with(...)]` is a helper interpreted by the query macro; `cte_name` and
+`alias` are string values. The name selects a Catalog entry, never a Rust
+function. More than one entry can be referenced with separate helper attributes.
+Missing catalogs/entries, invalid definitions and conflicting aliases are
+errors. The selected dialect applies to the resolved definitions.
+
+The macro resolves the Catalog reference and carries its SQL definitions into
+query analysis. The expanded SQL, including the WITH clause and its shared
+parameter numbering, is recorded in execution metadata and used by the generated
+function. Catalog files are compile-time inputs; generated functions do not
+load them at runtime. See the complete
+[aggregate fetch example](examples/aggregate-fetch.md) for root/child queries
+sharing one selection definition.
 
 ## CTE Catalog
 
@@ -170,19 +209,3 @@ in one place holder name.
 You can write positional place holder in CTE, Not arranged in `sql-fun`.
 
 Not to recommends use it. Makes breaking changes when CTE entry edited.
-
-## CTE catalog expansion in CLI
-
-You can use a CTE catalog in with `sql-fun` CLI subcommand `cte expand`.
-
-Example: Using CTE catalog entry `select_active_users`
-
-```console
-$ sql-fun cte expand \
-  --with select_active_users active_users \
-  `select id, name from active_users`
-with active_users as (
-  select u.id, u.name from users u where u.deleted_at is not null
-)
-select id, name from active_users
-```

@@ -46,14 +46,14 @@ impl Client {
 }
 
 #[sql_fun::sql_query_one(
-    sql = "select u.id, u.name from users",
+    sql = "select u.id, u.name from users AS u",
     builder_setter = "consuming",
     builder_build_fallible = true
 )]
 async fn rejected_row(client: &Client) -> Result<ConsumingRow, QueryError> {}
 
 #[sql_fun::sql_query_one(
-    sql = "select u.id, u.name from users",
+    sql = "select u.id, u.name from users AS u",
     builder_setter = "consuming",
     builder_build_fallible = false
 )]
@@ -163,14 +163,14 @@ impl RowsClient {
 }
 
 #[sql_fun::sql_query_opt(
-    sql = "select u.id, u.name from users",
+    sql = "select u.id, u.name from users AS u",
     builder_setter = "consuming",
     builder_build_fallible = false
 )]
 async fn optional_row(client: &RowsClient) -> Result<Option<BonRow>, QueryError> {}
 
 #[sql_fun::sql_query_many(
-    sql = "select u.id, u.name from users",
+    sql = "select u.id, u.name from users AS u",
     builder_setter = "consuming",
     builder_build_fallible = false
 )]

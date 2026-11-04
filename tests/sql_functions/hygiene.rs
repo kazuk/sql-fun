@@ -5,7 +5,7 @@ use std::future::Future;
 
 use ::tokio_postgres::Client;
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn legacy<F, Fut>(
     params: &Client,
     mut rows: Vec<IdWithName>,
@@ -17,7 +17,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn result_collector<F, Fut>(
     rows: &Client,
     mut result: Vec<IdWithName>,
@@ -29,7 +29,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn builder_collector<F, Fut>(
     statement: &Client,
     mut builder: Vec<IdWithName>,
@@ -41,7 +41,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn candidate<F, Fut>(
     __sql_fun_rows_1: &Client,
     mut __sql_fun_rows: Vec<IdWithName>,
@@ -53,7 +53,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn raw_candidate<F, Fut>(
     params: &Client,
     mut r#__sql_fun_rows: Vec<IdWithName>,
@@ -65,7 +65,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn interrupted<F, Fut>(
     params: &Client,
     #[interrupt_future] interrupt_message: &mut (impl Future<Output = anyhow::Error> + Unpin),
@@ -78,7 +78,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn wrapper<F, Fut>(
     query_result: &Client,
     #[interrupt_future] interrupt_message: &mut (impl Future<Output = anyhow::Error> + Unpin),
@@ -91,7 +91,7 @@ where
 {
 }
 
-#[sql_fun::sql_query_many(sql = "select u.id, u.name from users")]
+#[sql_fun::sql_query_many(sql = "select u.id, u.name from users AS u")]
 async fn candidate_interrupted<F, Fut>(
     __sql_fun_read_message: &Client,
     #[interrupt_future] __sql_fun_interrupt_message: &mut (impl Future<Output = anyhow::Error> + Unpin),
@@ -105,7 +105,7 @@ where
 }
 
 #[sql_fun::sql_query_many(
-    sql = "select u.id, u.name from users",
+    sql = "select u.id, u.name from users AS u",
     builder_setter = "consuming",
     builder_build_fallible = false
 )]

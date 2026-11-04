@@ -2,7 +2,7 @@ use crate::IdWithName;
 
 #[sql_fun::sql_query_many(sql = "#[choice]")]
 #[sql_fragment(choice, choice, (choice), {
-    (0, _, _) => "select u.id, u.name from users",
+    (0, _, _) => "select u.id, u.name from users AS u",
     #[args(id: i64)]
     (1, id, _) => "select id, name from users where id = ${id}",
     #[args(id: i64, extra: i64)]

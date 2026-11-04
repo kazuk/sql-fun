@@ -563,6 +563,27 @@ impl SqlEmit for DropTable {
     }
 }
 
+#[cfg(test)]
+mod test_drop_table_emit {
+    use crate::ast::{
+        Dialect, DropTable, Name,
+        deparse::{SqlEmit, SqlWriter},
+    };
+
+    #[test]
+    fn rejects_concurrent_drop_table() {
+        let statement = DropTable {
+            names: vec![Name::local("t")],
+            if_exists: true,
+            cascade: false,
+            concurrent: true,
+        };
+        let mut writer = SqlWriter::new(Dialect::postgres());
+        let error = statement.emit(&mut writer).expect_err("invalid syntax");
+        assert!(error.is_invalid_syntax());
+    }
+}
+
 impl SqlEmit for Comment {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("COMMENT")?;

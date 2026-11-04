@@ -54,7 +54,7 @@ integration groups above.
 
 The source tests in
 [`parameter_resolution/case_tests.rs`](../../sql-fun-sqlast/src/sem/parameter_resolution/case_tests.rs)
-and [`scalar_expr/coalesce/tests.rs`](../../sql-fun-sqlast/src/sem/scalar_expr/coalesce/tests.rs)
+and [`scalar_expr/coalesce.rs`](../../sql-fun-sqlast/src/sem/scalar_expr/coalesce.rs)
 use a small synthetic catalog. The public-boundary fixtures capture CLI
 diagnostics and column metadata under the builtin catalog; they do not replace
 the source tests' synthetic-context constraint and AST assertions:

@@ -75,22 +75,6 @@ impl Dialect {
         }
         Ok(result)
     }
-
-    fn numbered_placeholder(self, number: usize) -> Result<String, PlaceholderedSqlRenderError> {
-        match self {
-            Self::Postgres => Ok(format!("${number}")),
-            Self::Sqlite => {
-                #[cfg(feature = "sqlite")]
-                {
-                    Ok(format!("?{number}"))
-                }
-                #[cfg(not(feature = "sqlite"))]
-                {
-                    PlaceholderedSqlRenderError::sqlite_feature_required()
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -228,5 +212,23 @@ mod tests {
             .expect("rendered SQLite SQL");
         assert_eq!(actual, expected);
         SqliteDialect::parse(&actual).expect("valid SQLite SQL");
+    }
+}
+
+impl Dialect {
+    fn numbered_placeholder(self, number: usize) -> Result<String, PlaceholderedSqlRenderError> {
+        match self {
+            Self::Postgres => Ok(format!("${number}")),
+            Self::Sqlite => {
+                #[cfg(feature = "sqlite")]
+                {
+                    Ok(format!("?{number}"))
+                }
+                #[cfg(not(feature = "sqlite"))]
+                {
+                    PlaceholderedSqlRenderError::sqlite_feature_required()
+                }
+            }
+        }
     }
 }

@@ -82,3 +82,12 @@ pub(crate) fn columns(names: &[&str]) -> Vec<ColumnDefinition> {
         })
         .collect()
 }
+
+pub(crate) fn column_definition(name: &str) -> ColumnDefinition {
+    ColumnDefinition::new(
+        &Some(ColumnName::from(name)),
+        Some(&PgBuiltInType::int4()),
+        Some(true),
+        &[],
+    )
+}

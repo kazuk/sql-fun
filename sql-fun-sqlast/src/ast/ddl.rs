@@ -2002,7 +2002,40 @@ impl Function {
         let result = self.resolve_in(context);
         context.finish_analysis(result)
     }
+}
 
+#[cfg(test)]
+mod test_function_null_input_semantics {
+    use crate::{
+        ast::{TryFromWithTokens, ddl::Function},
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext},
+    };
+    use sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::called_on_null("CALLED ON NULL INPUT", false)]
+    #[case::returns_null("RETURNS NULL ON NULL INPUT", true)]
+    #[case::strict("STRICT", true)]
+    fn honors_the_explicit_null_input_choice(#[case] option: &str, #[case] expected: bool) {
+        let syntax = SynBuilder::new().parse(&format!(
+            "CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'"
+        ));
+        let function = Function::try_from_with_tokens(
+            &syntax.as_create_function_stmt().as_inner().unwrap(),
+            &IVec::default(),
+        )
+        .unwrap();
+        let mut context = TestParseContext::default();
+        let resolved = function.resolve(&mut context).unwrap();
+        assert_eq!(
+            expected,
+            resolved.overloads().get_at(0).unwrap().is_strict()
+        );
+    }
+}
+
+impl Function {
     fn resolve_in(&self, context: &mut impl ParseContext) -> Result<CreateFunction, AnalysisError> {
         let name = self.name.full_name()?;
         if self.procedure || self.result_type.is_none() {
@@ -2115,37 +2148,6 @@ impl Function {
             SemAst::create_function(&function),
             context,
         ))
-    }
-}
-
-#[cfg(test)]
-mod test_function_null_input_semantics {
-    use crate::{
-        ast::{TryFromWithTokens, ddl::Function},
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext},
-    };
-    use sql_fun_core::IVec;
-
-    #[rstest::rstest]
-    #[case::called_on_null("CALLED ON NULL INPUT", false)]
-    #[case::returns_null("RETURNS NULL ON NULL INPUT", true)]
-    #[case::strict("STRICT", true)]
-    fn honors_the_explicit_null_input_choice(#[case] option: &str, #[case] expected: bool) {
-        let syntax = SynBuilder::new().parse(&format!(
-            "CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'"
-        ));
-        let function = Function::try_from_with_tokens(
-            &syntax.as_create_function_stmt().as_inner().unwrap(),
-            &IVec::default(),
-        )
-        .unwrap();
-        let mut context = TestParseContext::default();
-        let resolved = function.resolve(&mut context).unwrap();
-        assert_eq!(
-            expected,
-            resolved.overloads().get_at(0).unwrap().is_strict()
-        );
     }
 }
 
@@ -2323,7 +2325,35 @@ impl Domain {
         let result = self.resolve_in(context);
         context.finish_analysis(result)
     }
+}
 
+#[cfg(test)]
+mod domain_tests {
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        ast::{StatementNode, TryFromWithTokens},
+        sem::SemAst,
+        test_helpers::{SynBuilder, TestParseContext},
+    };
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    fn missing_base_type_is_diagnosed_only_during_resolution() -> testresult::TestResult {
+        let parser = SynBuilder::new();
+        let syntax = StatementNode::try_from_with_tokens(
+            &parser.parse("create domain email as absent"),
+            &IVec::default(),
+        )?;
+        let mut context = TestParseContext::default();
+        let domain = syntax.resolve(&mut context, &mut create_cache_context())?;
+        assert!(matches!(domain, SemAst::CreateDomain(_)));
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
+}
+
+impl Domain {
     fn resolve_in(&self, context: &mut impl ParseContext) -> Result<CreateDomain, AnalysisError> {
         let name = self.name.full_name()?;
         let base_name = self.base.name.full_name()?;
@@ -2373,32 +2403,6 @@ impl Domain {
             SemAst::create_domain(&domain),
             context,
         ))
-    }
-}
-
-#[cfg(test)]
-mod domain_tests {
-    use crate::test_helpers::create_cache_context;
-
-    use crate::{
-        ast::{StatementNode, TryFromWithTokens},
-        sem::SemAst,
-        test_helpers::{SynBuilder, TestParseContext},
-    };
-    use ::sql_fun_core::IVec;
-
-    #[test]
-    fn missing_base_type_is_diagnosed_only_during_resolution() -> testresult::TestResult {
-        let parser = SynBuilder::new();
-        let syntax = StatementNode::try_from_with_tokens(
-            &parser.parse("create domain email as absent"),
-            &IVec::default(),
-        )?;
-        let mut context = TestParseContext::default();
-        let domain = syntax.resolve(&mut context, &mut create_cache_context())?;
-        assert!(matches!(domain, SemAst::CreateDomain(_)));
-        assert_eq!(context.reported_problem_count(), 1);
-        Ok(())
     }
 }
 

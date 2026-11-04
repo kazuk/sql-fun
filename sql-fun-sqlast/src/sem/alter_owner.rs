@@ -82,24 +82,6 @@ impl OwnershipLookup {
             }
         }
     }
-    /// Bound identity, available only for successful resolution.
-    pub const fn identity(&self) -> Option<&OwnershipIdentity> {
-        if let Self::Resolved(identity) = self {
-            Some(identity)
-        } else {
-            None
-        }
-    }
-    /// Stable outcome classification, independent of diagnostic wording.
-    pub const fn code(&self) -> &'static str {
-        match self {
-            Self::Resolved(_) => "resolved",
-            Self::NotFound(_) => "ownership_target_not_found",
-            Self::Ambiguous(_) => "ownership_target_ambiguous",
-            Self::InvalidKind(_) => "ownership_invalid_target_kind",
-            Self::ArgumentTypeNotFound(_) => "ownership_argument_type_not_found",
-        }
-    }
 }
 
 #[cfg(test)]
@@ -133,6 +115,27 @@ mod lookup_message_tests {
             problem.diagnostic_message(),
             r#"argument type not found for ownership target public.compute: public."missing.type""#
         );
+    }
+}
+
+impl OwnershipLookup {
+    /// Bound identity, available only for successful resolution.
+    pub const fn identity(&self) -> Option<&OwnershipIdentity> {
+        if let Self::Resolved(identity) = self {
+            Some(identity)
+        } else {
+            None
+        }
+    }
+    /// Stable outcome classification, independent of diagnostic wording.
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Resolved(_) => "resolved",
+            Self::NotFound(_) => "ownership_target_not_found",
+            Self::Ambiguous(_) => "ownership_target_ambiguous",
+            Self::InvalidKind(_) => "ownership_invalid_target_kind",
+            Self::ArgumentTypeNotFound(_) => "ownership_argument_type_not_found",
+        }
     }
 }
 

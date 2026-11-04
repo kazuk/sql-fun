@@ -455,6 +455,89 @@ impl FuncCallExpr {
     }
 }
 
+#[cfg(test)]
+mod test_func_call_expr_cast_operand_expression {
+    use crate::sem::scalar_expr::func_call::FuncCallExpr;
+
+    use crate::{
+        names::FullName,
+        sem::{
+            CastContext, CastDefinition, FunctionParam, OverloadVariant, PgBuiltInType,
+            ScalarConstExpr, SemScalarExpr,
+        },
+        test_helpers::{TestParseContext, test_context},
+    };
+
+    use ::sql_fun_core::IVec;
+    use ::testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_cast_operand_expression_inserts_implicit_cast(
+        mut test_context: TestParseContext,
+    ) -> TestResult {
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.setup_type(int4.clone());
+        test_context.setup_type(text.clone());
+        test_context.set_get_implicit_cast_result(
+            &int4,
+            &text,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_exprs: IVec<SemScalarExpr> =
+            vec![SemScalarExpr::new_const(ScalarConstExpr::new_integer(1))].into();
+        let params = vec![FunctionParam::new_input_param(
+            &Some("arg".to_string()),
+            &Some(text.clone()),
+            &None,
+        )];
+        let overload = OverloadVariant::new(&Some(text), &params, false, false);
+
+        let args = FuncCallExpr::cast_operand_expression(
+            &mut test_context,
+            &func_name,
+            &arg_exprs,
+            &overload,
+        )?;
+
+        assert!(matches!(args[0].arg_expr(), SemScalarExpr::ImplicitCast(_)));
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn test_cast_operand_expression_reports_missing_cast(
+        mut test_context: TestParseContext,
+    ) -> TestResult {
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.setup_type(int4.clone());
+        test_context.setup_type(text.clone());
+
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_exprs: IVec<SemScalarExpr> =
+            vec![SemScalarExpr::new_const(ScalarConstExpr::new_integer(1))].into();
+        let params = vec![FunctionParam::new_input_param(
+            &Some("arg".to_string()),
+            &Some(text),
+            &None,
+        )];
+        let overload = OverloadVariant::new(&None, &params, false, false);
+
+        let args = FuncCallExpr::cast_operand_expression(
+            &mut test_context,
+            &func_name,
+            &arg_exprs,
+            &overload,
+        )?;
+
+        assert!(matches!(args[0].arg_expr(), SemScalarExpr::Const(_)));
+        assert_eq!(1, test_context.reported_problem_count());
+        Ok(())
+    }
+}
+
 impl FuncCallExpr {
     pub(crate) fn resolve_common<TContext: ParseContext>(
         context: &mut TContext,
@@ -545,189 +628,6 @@ impl SemScalarExprNode for FuncCallExpr {
             // when overload not resolved, returns None meaning Unknown
             None
         }
-    }
-}
-
-#[cfg(test)]
-mod test_func_call_expr_analyze_scalar_expr {
-    use crate::test_helpers::function_syntax::func_name_tokens;
-
-    use crate::{
-        names::SchemaName,
-        sem::{
-            FromClause, FunctionParam, OverloadVariant, PgBuiltInType, ScalarAnalysisContext,
-            SemScalarExpr, WithClause,
-        },
-        syn::{Node, NodeInner, NodeList},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
-    };
-
-    use ::testresult::TestResult;
-
-    #[rstest::rstest]
-    fn test_analyze_scalar_expr_reports_missing_function(
-        mut test_context: TestParseContext,
-    ) -> TestResult {
-        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
-
-        let builder = SynBuilder::new();
-        let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
-        let args = NodeList::from(vec![arg_expr]);
-        let func_name_node = builder.as_string_node(builder.string("missing_func"));
-        let funcname = NodeList::from(vec![func_name_node]);
-        let func_call = builder.func_call(funcname, args);
-
-        let tokens = func_name_tokens();
-        let with_clause = WithClause::default();
-        let from_clause = FromClause::default();
-        let (expr, context) = SemScalarExpr::analyze_scaler_expr(
-            test_context,
-            &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            Node::from(NodeInner::from(func_call)),
-            &tokens,
-        )?;
-
-        assert_eq!(1, context.reported_problem_count());
-        let SemScalarExpr::FuncCall(func_call_expr) = expr else {
-            panic!("expected func call expression");
-        };
-        assert!(func_call_expr.overload().is_none());
-        assert_eq!(1, func_call_expr.args().len());
-        assert!(matches!(
-            func_call_expr.args()[0].arg_expr(),
-            SemScalarExpr::Const(_)
-        ));
-        assert!(func_call_expr.args()[0].arg_definition().is_none());
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    fn test_analyze_scalar_expr_resolves_overload(
-        mut test_context: TestParseContext,
-    ) -> TestResult {
-        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
-        let int4 = PgBuiltInType::int4();
-        test_context.setup_type(int4.clone());
-
-        let params = vec![FunctionParam::new_input_param(
-            &Some("arg".to_string()),
-            &Some(int4.clone()),
-            &None,
-        )];
-        let overload = OverloadVariant::new(&Some(int4.clone()), &params, false, false);
-        test_context.setup_function("test_func", std::slice::from_ref(&overload));
-
-        let builder = SynBuilder::new();
-        let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
-        let args = NodeList::from(vec![arg_expr]);
-        let func_name_node = builder.as_string_node(builder.string("test_func"));
-        let funcname = NodeList::from(vec![func_name_node]);
-        let func_call = builder.func_call(funcname, args);
-
-        let tokens = func_name_tokens();
-        let with_clause = WithClause::default();
-        let from_clause = FromClause::default();
-        let (expr, context) = SemScalarExpr::analyze_scaler_expr(
-            test_context,
-            &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            Node::from(NodeInner::from(func_call)),
-            &tokens,
-        )?;
-
-        assert_eq!(0, context.reported_problem_count());
-        let SemScalarExpr::FuncCall(func_call_expr) = expr else {
-            panic!("expected func call expression");
-        };
-        assert_eq!(Some(&overload), func_call_expr.overload().as_ref());
-        assert!(func_call_expr.args()[0].arg_definition().is_some());
-        assert!(matches!(
-            func_call_expr.args()[0].arg_expr(),
-            SemScalarExpr::Const(_)
-        ));
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod test_func_call_expr_cast_operand_expression {
-    use crate::sem::scalar_expr::func_call::FuncCallExpr;
-
-    use crate::{
-        names::FullName,
-        sem::{
-            CastContext, CastDefinition, FunctionParam, OverloadVariant, PgBuiltInType,
-            ScalarConstExpr, SemScalarExpr,
-        },
-        test_helpers::{TestParseContext, test_context},
-    };
-
-    use ::sql_fun_core::IVec;
-    use ::testresult::TestResult;
-
-    #[rstest::rstest]
-    fn test_cast_operand_expression_inserts_implicit_cast(
-        mut test_context: TestParseContext,
-    ) -> TestResult {
-        let int4 = PgBuiltInType::int4();
-        let text = PgBuiltInType::text();
-        test_context.setup_type(int4.clone());
-        test_context.setup_type(text.clone());
-        test_context.set_get_implicit_cast_result(
-            &int4,
-            &text,
-            Some(CastDefinition::new(CastContext::Implicit)),
-        );
-
-        let func_name = FullName::with_schema("public", "test_func");
-        let arg_exprs: IVec<SemScalarExpr> =
-            vec![SemScalarExpr::new_const(ScalarConstExpr::new_integer(1))].into();
-        let params = vec![FunctionParam::new_input_param(
-            &Some("arg".to_string()),
-            &Some(text.clone()),
-            &None,
-        )];
-        let overload = OverloadVariant::new(&Some(text), &params, false, false);
-
-        let args = FuncCallExpr::cast_operand_expression(
-            &mut test_context,
-            &func_name,
-            &arg_exprs,
-            &overload,
-        )?;
-
-        assert!(matches!(args[0].arg_expr(), SemScalarExpr::ImplicitCast(_)));
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    fn test_cast_operand_expression_reports_missing_cast(
-        mut test_context: TestParseContext,
-    ) -> TestResult {
-        let int4 = PgBuiltInType::int4();
-        let text = PgBuiltInType::text();
-        test_context.setup_type(int4.clone());
-        test_context.setup_type(text.clone());
-
-        let func_name = FullName::with_schema("public", "test_func");
-        let arg_exprs: IVec<SemScalarExpr> =
-            vec![SemScalarExpr::new_const(ScalarConstExpr::new_integer(1))].into();
-        let params = vec![FunctionParam::new_input_param(
-            &Some("arg".to_string()),
-            &Some(text),
-            &None,
-        )];
-        let overload = OverloadVariant::new(&None, &params, false, false);
-
-        let args = FuncCallExpr::cast_operand_expression(
-            &mut test_context,
-            &func_name,
-            &arg_exprs,
-            &overload,
-        )?;
-
-        assert!(matches!(args[0].arg_expr(), SemScalarExpr::Const(_)));
-        assert_eq!(1, test_context.reported_problem_count());
-        Ok(())
     }
 }
 

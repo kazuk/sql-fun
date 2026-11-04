@@ -19,38 +19,6 @@ impl super::ArithExpr {
             Self::build_binary_op_resolved(&mut context, name, lexpr, rexpr, operator_def)?;
         Ok((value, context))
     }
-
-    pub(crate) fn build_binary_op_resolved<'context, TParseContext>(
-        context: &'context mut TParseContext,
-        name: &OperatorName,
-        lexpr: SemScalarExpr,
-        rexpr: SemScalarExpr,
-        operator_def: OperatorDefinition,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        // Ordinary operators need the domain/unknown exact-match phase too.
-        // Other literal policies remain with their existing semantic consumers.
-        let has_domain = [&lexpr, &rexpr].into_iter().any(|operand| {
-            operand
-                .get_type()
-                .is_some_and(|ty| ty.domain_base_type(context).is_some_and(|base| base != ty))
-        });
-        let (lexpr, rexpr) = if has_domain {
-            SemScalarExpr::comparison_literal_operands(
-                context,
-                operator_def.binary_overloads(),
-                lexpr,
-                rexpr,
-            )
-        } else {
-            (lexpr, rexpr)
-        };
-        let resolved_bin_op =
-            Self::resolve_overload_binary(context, name, operator_def, lexpr, rexpr)?;
-        resolved_bin_op.into_call_site_expr(context, name)
-    }
 }
 
 #[cfg(test)]
@@ -89,5 +57,39 @@ mod test_arith_expr_build_binary_op {
         )?;
 
         Ok(())
+    }
+}
+
+impl super::ArithExpr {
+    pub(crate) fn build_binary_op_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+        operator_def: OperatorDefinition,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        // Ordinary operators need the domain/unknown exact-match phase too.
+        // Other literal policies remain with their existing semantic consumers.
+        let has_domain = [&lexpr, &rexpr].into_iter().any(|operand| {
+            operand
+                .get_type()
+                .is_some_and(|ty| ty.domain_base_type(context).is_some_and(|base| base != ty))
+        });
+        let (lexpr, rexpr) = if has_domain {
+            SemScalarExpr::comparison_literal_operands(
+                context,
+                operator_def.binary_overloads(),
+                lexpr,
+                rexpr,
+            )
+        } else {
+            (lexpr, rexpr)
+        };
+        let resolved_bin_op =
+            Self::resolve_overload_binary(context, name, operator_def, lexpr, rexpr)?;
+        resolved_bin_op.into_call_site_expr(context, name)
     }
 }

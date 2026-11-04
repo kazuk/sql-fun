@@ -266,7 +266,29 @@ impl ColumnDefinition {
             declaration: None,
         }
     }
+}
 
+#[cfg(test)]
+mod test_column_serialization {
+    //! SQL-to-semantics and catalog-chain regressions; no external server is required.
+
+    use crate::sem::ColumnDefinition as SemColumnDefinition;
+
+    use crate::test_helpers::column_attributes as test_helpers;
+
+    #[test]
+    fn legacy_column_json_shape_remains_readable() -> testresult::TestResult {
+        let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
+        let original = test_helpers::column(&context, "a");
+        let json = ::serde_json::to_value(original)?;
+        assert!(json.get("attributes").is_none());
+        let restored: SemColumnDefinition = ::serde_json::from_value(json)?;
+        assert_eq!(&restored, original);
+        Ok(())
+    }
+}
+
+impl ColumnDefinition {
     /// get name of column
     #[must_use]
     pub const fn name(&self) -> &Option<ColumnName> {

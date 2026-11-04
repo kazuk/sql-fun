@@ -28,6 +28,108 @@ pub fn tokenize_sql(source: &str, dialect: SqlDialect) -> Result<TokenStream, To
     Ok(TokenStream::new(source, dialect, tokens)?)
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::sql_tokens::tokenize_sql;
+    use ::sql_fun_core::SqlDialect;
+    #[cfg(feature = "sqlite")]
+    use ::sql_fun_core::TokenKind;
+
+    #[test]
+    fn postgres_preserves_utf8_comments_and_multiline_literals() {
+        let source = concat!(
+            "  SELECT ",
+            r#""名前", $tag$first"#,
+            "\r\n",
+            r#"second$tag$, $1 /* comment */;"#,
+            "\r\n-- end\n"
+        );
+        let stream = tokenize_sql(source, SqlDialect::PostgreSQL).unwrap();
+        let reconstructed: String = stream
+            .tokens()
+            .map(|token| &stream.source()[token.span()])
+            .collect();
+        assert_eq!(source, reconstructed);
+        assert!(stream.tokens().any(|token| token.kind().is_comment()));
+        assert!(stream.tokens().any(|token| token.kind().is_constant()
+            && stream.source()[token.span()].starts_with("$tag$")));
+    }
+
+    #[rstest::rstest]
+    #[case::unicode_identifier(r#"SELECT U&"d\0061t" UESCAPE '\'"#)]
+    #[case::escaped_string(r#"SELECT E'first\nsecond', U&'d\0061t'"#)]
+    #[case::quoted_identifiers(r#"SELECT "with space", "double""quote";"#)]
+    #[case::nested_comments("SELECT 1 /* outer /* inner */ end */;")]
+    fn postgres_retains_quoted_and_dialect_specific_forms(#[case] source: &str) {
+        let stream = tokenize_sql(source, SqlDialect::PostgreSQL).unwrap();
+        let reconstructed: String = stream
+            .tokens()
+            .map(|token| &stream.source()[token.span()])
+            .collect();
+        assert_eq!(reconstructed, source);
+    }
+
+    #[test]
+    fn lexical_failure_is_returned_without_panicking() {
+        assert!(tokenize_sql("SELECT 'unfinished", SqlDialect::PostgreSQL).is_err());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_uses_its_own_quoting_parameters_and_blob_tokens() {
+        let source = concat!(
+            r#"SELECT [名前], `odd`, "quoted", 'string', X'ab', :parameter, ?1, 6 / 2 - 1 /* multi"#,
+            "\n",
+            "line */; -- end\n"
+        );
+        let stream = tokenize_sql(source, SqlDialect::SQLite).unwrap();
+        let reconstructed: String = stream
+            .tokens()
+            .map(|token| &stream.source()[token.span()])
+            .collect();
+        assert_eq!(source, reconstructed);
+        assert!(
+            stream
+                .tokens()
+                .any(|token| token.kind() == TokenKind::constant()
+                    && &stream.source()[token.span()] == "X'ab'")
+        );
+        assert!(
+            stream
+                .tokens()
+                .any(|token| token.kind().is_identifier()
+                    && &stream.source()[token.span()] == "`odd`")
+        );
+        assert!(
+            stream.tokens().any(|token| token.kind().is_identifier()
+                && &stream.source()[token.span()] == r#""quoted""#)
+        );
+        assert!(stream.tokens().any(
+            |token| token.kind().is_constant() && &stream.source()[token.span()] == "'string'"
+        ));
+        // The existing Turso lexer exposes brackets separately for its array
+        // syntax. Preserve their bytes and categories without reinterpreting
+        // that lexer into a different semantic tokenizer.
+        assert!(
+            stream
+                .tokens()
+                .any(|token| token.kind().is_delimiter() && &stream.source()[token.span()] == "[")
+        );
+        assert!(
+            stream
+                .tokens()
+                .any(|token| token.kind().is_identifier()
+                    && &stream.source()[token.span()] == "名前")
+        );
+        assert!(
+            stream
+                .tokens()
+                .any(|token| token.kind().is_delimiter() && &stream.source()[token.span()] == "]")
+        );
+        assert!(stream.tokens().any(|token| token.kind().is_comment()));
+    }
+}
+
 fn postgres_tokens(source: &str) -> Result<Vec<SqlToken>, TokenizeSqlError> {
     let scan = ::pg_query::scan(source).map_err(|error| TokenizeSqlError(error.to_string()))?;
     let mut tokens = Vec::new();
@@ -166,107 +268,5 @@ fn sqlite_kind(kind: ::turso_parser::token::TokenType, text: &str) -> TokenKind 
         | TokenType::TK_ARRAY_CONTAINS
         | TokenType::TK_ARRAY_OVERLAP => TokenKind::operator(),
         _ => TokenKind::keyword(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::sql_tokens::tokenize_sql;
-    use ::sql_fun_core::SqlDialect;
-    #[cfg(feature = "sqlite")]
-    use ::sql_fun_core::TokenKind;
-
-    #[test]
-    fn postgres_preserves_utf8_comments_and_multiline_literals() {
-        let source = concat!(
-            "  SELECT ",
-            r#""名前", $tag$first"#,
-            "\r\n",
-            r#"second$tag$, $1 /* comment */;"#,
-            "\r\n-- end\n"
-        );
-        let stream = tokenize_sql(source, SqlDialect::PostgreSQL).unwrap();
-        let reconstructed: String = stream
-            .tokens()
-            .map(|token| &stream.source()[token.span()])
-            .collect();
-        assert_eq!(source, reconstructed);
-        assert!(stream.tokens().any(|token| token.kind().is_comment()));
-        assert!(stream.tokens().any(|token| token.kind().is_constant()
-            && stream.source()[token.span()].starts_with("$tag$")));
-    }
-
-    #[rstest::rstest]
-    #[case::unicode_identifier(r#"SELECT U&"d\0061t" UESCAPE '\'"#)]
-    #[case::escaped_string(r#"SELECT E'first\nsecond', U&'d\0061t'"#)]
-    #[case::quoted_identifiers(r#"SELECT "with space", "double""quote";"#)]
-    #[case::nested_comments("SELECT 1 /* outer /* inner */ end */;")]
-    fn postgres_retains_quoted_and_dialect_specific_forms(#[case] source: &str) {
-        let stream = tokenize_sql(source, SqlDialect::PostgreSQL).unwrap();
-        let reconstructed: String = stream
-            .tokens()
-            .map(|token| &stream.source()[token.span()])
-            .collect();
-        assert_eq!(reconstructed, source);
-    }
-
-    #[test]
-    fn lexical_failure_is_returned_without_panicking() {
-        assert!(tokenize_sql("SELECT 'unfinished", SqlDialect::PostgreSQL).is_err());
-    }
-
-    #[cfg(feature = "sqlite")]
-    #[test]
-    fn sqlite_uses_its_own_quoting_parameters_and_blob_tokens() {
-        let source = concat!(
-            r#"SELECT [名前], `odd`, "quoted", 'string', X'ab', :parameter, ?1, 6 / 2 - 1 /* multi"#,
-            "\n",
-            "line */; -- end\n"
-        );
-        let stream = tokenize_sql(source, SqlDialect::SQLite).unwrap();
-        let reconstructed: String = stream
-            .tokens()
-            .map(|token| &stream.source()[token.span()])
-            .collect();
-        assert_eq!(source, reconstructed);
-        assert!(
-            stream
-                .tokens()
-                .any(|token| token.kind() == TokenKind::constant()
-                    && &stream.source()[token.span()] == "X'ab'")
-        );
-        assert!(
-            stream
-                .tokens()
-                .any(|token| token.kind().is_identifier()
-                    && &stream.source()[token.span()] == "`odd`")
-        );
-        assert!(
-            stream.tokens().any(|token| token.kind().is_identifier()
-                && &stream.source()[token.span()] == r#""quoted""#)
-        );
-        assert!(stream.tokens().any(
-            |token| token.kind().is_constant() && &stream.source()[token.span()] == "'string'"
-        ));
-        // The existing Turso lexer exposes brackets separately for its array
-        // syntax. Preserve their bytes and categories without reinterpreting
-        // that lexer into a different semantic tokenizer.
-        assert!(
-            stream
-                .tokens()
-                .any(|token| token.kind().is_delimiter() && &stream.source()[token.span()] == "[")
-        );
-        assert!(
-            stream
-                .tokens()
-                .any(|token| token.kind().is_identifier()
-                    && &stream.source()[token.span()] == "名前")
-        );
-        assert!(
-            stream
-                .tokens()
-                .any(|token| token.kind().is_delimiter() && &stream.source()[token.span()] == "]")
-        );
-        assert!(stream.tokens().any(|token| token.kind().is_comment()));
     }
 }

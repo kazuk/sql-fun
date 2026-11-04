@@ -58,12 +58,6 @@ impl FunctionParamInOut {
     pub fn composite_field_definition(&self) -> Option<CompositeFieldDefinition> {
         output_field_definition(self.name.as_ref(), self.param_type.as_ref())
     }
-
-    pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {
-        let col_name = self.name.as_ref().map(|v| ColumnName::from(v.as_str()));
-        let col_def = ColumnDefinition::new(&col_name, self.param_type.as_ref(), None, &[]);
-        column_collection.push(&col_def);
-    }
 }
 
 #[cfg(test)]
@@ -112,6 +106,14 @@ mod test_output_field_definition {
         };
         assert_eq!(parameter.composite_field_definition(), expected);
         assert_eq!(FunctionParam::from(&parameter).field_definition(), expected);
+    }
+}
+
+impl FunctionParamInOut {
+    pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {
+        let col_name = self.name.as_ref().map(|v| ColumnName::from(v.as_str()));
+        let col_def = ColumnDefinition::new(&col_name, self.param_type.as_ref(), None, &[]);
+        column_collection.push(&col_def);
     }
 }
 

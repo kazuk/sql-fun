@@ -46,26 +46,6 @@ pub struct BuiltinTypeDefinition {
     collatable: Option<bool>,
 }
 
-impl std::fmt::Display for TypeDefinition {
-    /// Diagnostic spelling; anonymous structures have no canonical catalog text.
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Array(array) => write!(f, "{}[]", array.element()),
-            Self::ImplicitComposite(columns) => columns.fmt_type_shape(f),
-            Self::CompositeType(composite) if composite.name().is_none() => {
-                composite.get_column_collection().fmt_type_shape(f)
-            }
-            _ => {
-                if let Some(reference) = self.type_reference() {
-                    write!(f, "{reference}")
-                } else {
-                    f.write_str("unnamed SQL type")
-                }
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod builtin_type_definition_tests {
     use crate::test_helpers::TestParseContext;
@@ -121,6 +101,26 @@ mod builtin_type_definition_tests {
     }
 }
 
+impl std::fmt::Display for TypeDefinition {
+    /// Diagnostic spelling; anonymous structures have no canonical catalog text.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Array(array) => write!(f, "{}[]", array.element()),
+            Self::ImplicitComposite(columns) => columns.fmt_type_shape(f),
+            Self::CompositeType(composite) if composite.name().is_none() => {
+                composite.get_column_collection().fmt_type_shape(f)
+            }
+            _ => {
+                if let Some(reference) = self.type_reference() {
+                    write!(f, "{reference}")
+                } else {
+                    f.write_str("unnamed SQL type")
+                }
+            }
+        }
+    }
+}
+
 // deserialize_with makes presence mandatory while accepting explicit JSON null.
 pub(crate) fn deserialize_collatable<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
@@ -139,18 +139,6 @@ impl TypeDefinition {
             return None;
         }
         self.intrinsic_category()
-    }
-
-    pub(crate) fn intrinsic_category(&self) -> Option<TypeCategory> {
-        match self {
-            Self::Array(_) => TypeCategory::try_from('A').ok(),
-            Self::Builtin(definition) => definition.category,
-            Self::Enum(_) => TypeCategory::try_from('E').ok(),
-            Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
-                TypeCategory::try_from('C').ok()
-            }
-            Self::Domain(definition) => definition.category(),
-        }
     }
 }
 
@@ -202,6 +190,20 @@ mod category_tests {
         let definition = TypeDefinition::builtin_with_category(&name, Some(category), None);
         let context = TestParseContext::default().with_dialect(Dialect::sqlite());
         assert_eq!(definition.category(&context), None);
+    }
+}
+
+impl TypeDefinition {
+    pub(crate) fn intrinsic_category(&self) -> Option<TypeCategory> {
+        match self {
+            Self::Array(_) => TypeCategory::try_from('A').ok(),
+            Self::Builtin(definition) => definition.category,
+            Self::Enum(_) => TypeCategory::try_from('E').ok(),
+            Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
+                TypeCategory::try_from('C').ok()
+            }
+            Self::Domain(definition) => definition.category(),
+        }
     }
 }
 
@@ -456,6 +458,32 @@ impl TypeDefinition {
 }
 
 #[cfg(test)]
+mod array_definition_tests {
+    use crate::sem::pg_type::{PgBuiltInType, TypeDefinition, TypeReference};
+
+    #[rstest::rstest]
+    #[case::same_element("int4", true)]
+    #[case::different_element("text", false)]
+    fn array_definition_compatibility_retains_element_identity(
+        #[case] element: &str,
+        #[case] compatible: bool,
+    ) {
+        let left = TypeDefinition::array(&PgBuiltInType::int4());
+        let right = TypeDefinition::array(&TypeReference::from_master_type_name(element));
+        assert_eq!(left.compatible_with(&right), compatible);
+        assert_eq!(right.compatible_with(&left), compatible);
+        let scalar = TypeDefinition::builtin(
+            PgBuiltInType::int4()
+                .full_name()
+                .expect("nominal type identity"),
+            None,
+        );
+        assert!(!left.compatible_with(&scalar));
+        assert!(!scalar.compatible_with(&left));
+    }
+}
+
+#[cfg(test)]
 mod anonymous_compatibility_tests {
     use crate::sem::TypeReference;
 
@@ -556,16 +584,6 @@ impl TypeDefinition {
     {
         self.member_type_from_catalog(context, member)
     }
-
-    pub(crate) fn member_type_from_catalog<TCatalog: BaseParseContext>(
-        &self,
-        context: &TCatalog,
-        member: &str,
-    ) -> Option<TypeReference> {
-        self.row_columns(context)?
-            .get_column_def(&ColumnName::from(member))?
-            .get_type_cloned()
-    }
 }
 
 #[cfg(test)]
@@ -660,29 +678,15 @@ mod domain_member_tests {
     }
 }
 
-#[cfg(test)]
-mod array_definition_tests {
-    use crate::sem::pg_type::{PgBuiltInType, TypeDefinition, TypeReference};
-
-    #[rstest::rstest]
-    #[case::same_element("int4", true)]
-    #[case::different_element("text", false)]
-    fn array_definition_compatibility_retains_element_identity(
-        #[case] element: &str,
-        #[case] compatible: bool,
-    ) {
-        let left = TypeDefinition::array(&PgBuiltInType::int4());
-        let right = TypeDefinition::array(&TypeReference::from_master_type_name(element));
-        assert_eq!(left.compatible_with(&right), compatible);
-        assert_eq!(right.compatible_with(&left), compatible);
-        let scalar = TypeDefinition::builtin(
-            PgBuiltInType::int4()
-                .full_name()
-                .expect("nominal type identity"),
-            None,
-        );
-        assert!(!left.compatible_with(&scalar));
-        assert!(!scalar.compatible_with(&left));
+impl TypeDefinition {
+    pub(crate) fn member_type_from_catalog<TCatalog: BaseParseContext>(
+        &self,
+        context: &TCatalog,
+        member: &str,
+    ) -> Option<TypeReference> {
+        self.row_columns(context)?
+            .get_column_def(&ColumnName::from(member))?
+            .get_type_cloned()
     }
 }
 
@@ -756,30 +760,5 @@ impl PgBuiltInType {
     #[must_use]
     pub fn varbit() -> TypeReference {
         Self::builtin_reference("varbit")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::test_helpers::type_syntax::build_string_node_list_opt;
-
-    use crate::names::FullName;
-
-    #[test]
-    fn test_try_from_nodelistopt_two_elements() {
-        let nlo = build_string_node_list_opt(&["schema", "name"]);
-        let qt = FullName::try_from(nlo).unwrap();
-        assert!(qt.catalog().is_none());
-        assert_eq!(qt.schema().unwrap().as_str(), "schema");
-        assert_eq!(qt.name().as_str(), "name");
-    }
-
-    #[test]
-    fn test_try_from_nodelistopt_three_elements() {
-        let nlo = build_string_node_list_opt(&["cat", "sch", "nm"]);
-        let qt = FullName::try_from(nlo).unwrap();
-        assert_eq!(qt.catalog().unwrap().as_str(), "cat");
-        assert_eq!(qt.schema().unwrap().as_str(), "sch");
-        assert_eq!(qt.name().as_str(), "nm");
     }
 }

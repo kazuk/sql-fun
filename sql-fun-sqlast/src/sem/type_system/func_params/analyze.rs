@@ -91,18 +91,6 @@ impl super::FunctionParam {
         );
         Ok(value)
     }
-
-    /// test parameter is a output param
-    ///
-    /// # Errors
-    ///
-    /// Returns [`AnalysisError`] when the parameter mode is missing.
-    pub fn is_output_param(param: &FunctionParameter) -> Result<bool, AnalysisError> {
-        let Some(mode) = param.get_mode().as_inner() else {
-            AnalysisError::raise_unexpected_none("functionparameter.mode")?
-        };
-        Ok(matches!(mode, FunctionParameterMode::FuncParamOut))
-    }
 }
 
 #[cfg(test)]
@@ -140,5 +128,19 @@ mod test_function_param_analyze_as_column_definition {
         let _column_def = FunctionParam::analyze_as_column_definition(&func_param)?;
         assert!(FunctionParam::is_output_param(&func_param)?);
         Ok(())
+    }
+}
+
+impl super::FunctionParam {
+    /// test parameter is a output param
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] when the parameter mode is missing.
+    pub fn is_output_param(param: &FunctionParameter) -> Result<bool, AnalysisError> {
+        let Some(mode) = param.get_mode().as_inner() else {
+            AnalysisError::raise_unexpected_none("functionparameter.mode")?
+        };
+        Ok(matches!(mode, FunctionParameterMode::FuncParamOut))
     }
 }

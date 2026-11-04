@@ -545,4 +545,24 @@ where
 }
 
 #[cfg(test)]
+mod test_parameter_hint_initialization {
+
+    use crate::test_helpers::type_hint::context;
+
+    use crate::{
+        context::{ParameterTypeHintWrite, ParseContext},
+        sem::PgBuiltInType,
+    };
+
+    #[test]
+    fn hinted_type_is_assigned_before_constraint_collection() {
+        let mut context = context();
+        context.setup_typehinting(&[Some("int4")]).unwrap();
+        context.begin_parameter_type_analysis();
+        assert_eq!(context.parameter(1).get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(context.parameter(2).get_type(), None);
+    }
+}
+
+#[cfg(test)]
 pub(crate) use self::frozen_base_context::forward_catalog_reads;

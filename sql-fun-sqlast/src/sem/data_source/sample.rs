@@ -47,65 +47,6 @@ impl TableSampleSource {
         value.validate_inputs(context)?;
         Ok(value)
     }
-    /// The sampled relation, retaining its original column and alias bindings.
-    pub const fn source(&self) -> &DataSource {
-        &self.source
-    }
-    /// Method spelling supplied by the SQL statement.
-    pub const fn requested_method(&self) -> &FullName {
-        &self.requested_method
-    }
-    /// Completed lookup, independent of expression type validation.
-    pub const fn method(&self) -> &SamplingMethodLookup {
-        &self.method
-    }
-    /// Ordered analyzed sampling inputs.
-    pub fn arguments(&self) -> &[SamplingInput] {
-        &self.arguments
-    }
-    /// Explicit seed, absent when REPEATABLE was omitted.
-    pub const fn repeatable(&self) -> Option<&SamplingInput> {
-        self.repeatable.as_ref()
-    }
-    /// Whether the resolved relation supports TABLESAMPLE.
-    pub const fn relation_valid(&self) -> bool {
-        self.relation_valid
-    }
-    pub(crate) fn validate_inputs(
-        &mut self,
-        context: &mut impl ParseContext,
-    ) -> Result<(), AnalysisError> {
-        for argument in &mut self.arguments {
-            argument.validate(context)?;
-        }
-        if let Some(seed) = &mut self.repeatable {
-            seed.validate(context)?;
-        }
-        Ok(())
-    }
-    pub(crate) fn walk<V: SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        self.source.walk(visitor)?;
-        for argument in &mut self.arguments {
-            argument.walk(visitor)?;
-        }
-        if let Some(seed) = &mut self.repeatable {
-            seed.walk(visitor)?;
-        }
-        visitor.table_sample(self)
-    }
-    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
-        self.source.visit(visitor)?;
-        for argument in &self.arguments {
-            argument.visit(visitor)?;
-        }
-        if let Some(seed) = &self.repeatable {
-            seed.visit(visitor)?;
-        }
-        visitor.table_sample(self)
-    }
 }
 
 #[cfg(test)]
@@ -530,6 +471,68 @@ mod test_sampling_semantics {
         let samples = sources(&analyzed);
         assert!(samples[0].arguments()[0].target_type().is_some());
         Ok(())
+    }
+}
+
+impl TableSampleSource {
+    /// The sampled relation, retaining its original column and alias bindings.
+    pub const fn source(&self) -> &DataSource {
+        &self.source
+    }
+    /// Method spelling supplied by the SQL statement.
+    pub const fn requested_method(&self) -> &FullName {
+        &self.requested_method
+    }
+    /// Completed lookup, independent of expression type validation.
+    pub const fn method(&self) -> &SamplingMethodLookup {
+        &self.method
+    }
+    /// Ordered analyzed sampling inputs.
+    pub fn arguments(&self) -> &[SamplingInput] {
+        &self.arguments
+    }
+    /// Explicit seed, absent when REPEATABLE was omitted.
+    pub const fn repeatable(&self) -> Option<&SamplingInput> {
+        self.repeatable.as_ref()
+    }
+    /// Whether the resolved relation supports TABLESAMPLE.
+    pub const fn relation_valid(&self) -> bool {
+        self.relation_valid
+    }
+    pub(crate) fn validate_inputs(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        for argument in &mut self.arguments {
+            argument.validate(context)?;
+        }
+        if let Some(seed) = &mut self.repeatable {
+            seed.validate(context)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn walk<V: SemanticVisitorMut>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.source.walk(visitor)?;
+        for argument in &mut self.arguments {
+            argument.walk(visitor)?;
+        }
+        if let Some(seed) = &mut self.repeatable {
+            seed.walk(visitor)?;
+        }
+        visitor.table_sample(self)
+    }
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        self.source.visit(visitor)?;
+        for argument in &self.arguments {
+            argument.visit(visitor)?;
+        }
+        if let Some(seed) = &self.repeatable {
+            seed.visit(visitor)?;
+        }
+        visitor.table_sample(self)
     }
 }
 

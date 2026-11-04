@@ -59,77 +59,6 @@ impl DeclarationCollation {
             outcome,
         }
     }
-
-    /// Completed lookup, including missing and ambiguous outcomes.
-    pub fn lookup(&self) -> Option<&CatalogNameLookup> {
-        self.lookup.as_deref()
-    }
-
-    /// Whether this declaration's explicit collation permits catalog application.
-    pub const fn can_apply(&self) -> bool {
-        matches!(
-            self.outcome,
-            DeclarationCollationOutcome::Omitted | DeclarationCollationOutcome::Applicable
-        )
-    }
-
-    /// Whether the catalog leaves applicability indeterminate, rather than false.
-    pub const fn is_indeterminate(&self) -> bool {
-        matches!(
-            self.outcome,
-            DeclarationCollationOutcome::UndefinedCapability
-        )
-    }
-
-    /// Whether failed type resolution prevented applicability validation.
-    pub const fn has_unresolved_type(&self) -> bool {
-        matches!(self.outcome, DeclarationCollationOutcome::UnresolvedType)
-    }
-
-    /// Whether a known capability establishes that the type is non-collatable.
-    pub const fn is_non_collatable(&self) -> bool {
-        matches!(self.outcome, DeclarationCollationOutcome::NonCollatable)
-    }
-
-    pub(crate) fn report(
-        &self,
-        context: &mut impl ParseContext,
-        ty: Option<&TypeReference>,
-    ) -> Result<(), AnalysisError> {
-        let problem = match &self.outcome {
-            DeclarationCollationOutcome::Missing => {
-                Some(AnalysisProblem::collation_name_not_found(
-                    &self
-                        .lookup
-                        .as_ref()
-                        .expect("explicit lookup")
-                        .requested()
-                        .to_string(),
-                ))
-            }
-            DeclarationCollationOutcome::Ambiguous => {
-                Some(AnalysisProblem::collate(CollateProblem::ambiguous(
-                    &self
-                        .lookup
-                        .as_ref()
-                        .expect("explicit lookup")
-                        .requested()
-                        .to_string(),
-                )))
-            }
-            DeclarationCollationOutcome::NonCollatable => Some(AnalysisProblem::collate(
-                CollateProblem::operand_type(ty.expect("resolved type")),
-            )),
-            DeclarationCollationOutcome::UndefinedCapability => Some(AnalysisProblem::collate(
-                CollateProblem::undefined_capability(ty.expect("resolved type")),
-            )),
-            _ => None,
-        };
-        if let Some(problem) = problem {
-            context.report_analysis_problem(problem)?;
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -405,6 +334,79 @@ mod tests {
                 .get_type_impl(&FullName::with_schema("public", "rejected"))
                 .is_none()
         );
+        Ok(())
+    }
+}
+
+impl DeclarationCollation {
+    /// Completed lookup, including missing and ambiguous outcomes.
+    pub fn lookup(&self) -> Option<&CatalogNameLookup> {
+        self.lookup.as_deref()
+    }
+
+    /// Whether this declaration's explicit collation permits catalog application.
+    pub const fn can_apply(&self) -> bool {
+        matches!(
+            self.outcome,
+            DeclarationCollationOutcome::Omitted | DeclarationCollationOutcome::Applicable
+        )
+    }
+
+    /// Whether the catalog leaves applicability indeterminate, rather than false.
+    pub const fn is_indeterminate(&self) -> bool {
+        matches!(
+            self.outcome,
+            DeclarationCollationOutcome::UndefinedCapability
+        )
+    }
+
+    /// Whether failed type resolution prevented applicability validation.
+    pub const fn has_unresolved_type(&self) -> bool {
+        matches!(self.outcome, DeclarationCollationOutcome::UnresolvedType)
+    }
+
+    /// Whether a known capability establishes that the type is non-collatable.
+    pub const fn is_non_collatable(&self) -> bool {
+        matches!(self.outcome, DeclarationCollationOutcome::NonCollatable)
+    }
+
+    pub(crate) fn report(
+        &self,
+        context: &mut impl ParseContext,
+        ty: Option<&TypeReference>,
+    ) -> Result<(), AnalysisError> {
+        let problem = match &self.outcome {
+            DeclarationCollationOutcome::Missing => {
+                Some(AnalysisProblem::collation_name_not_found(
+                    &self
+                        .lookup
+                        .as_ref()
+                        .expect("explicit lookup")
+                        .requested()
+                        .to_string(),
+                ))
+            }
+            DeclarationCollationOutcome::Ambiguous => {
+                Some(AnalysisProblem::collate(CollateProblem::ambiguous(
+                    &self
+                        .lookup
+                        .as_ref()
+                        .expect("explicit lookup")
+                        .requested()
+                        .to_string(),
+                )))
+            }
+            DeclarationCollationOutcome::NonCollatable => Some(AnalysisProblem::collate(
+                CollateProblem::operand_type(ty.expect("resolved type")),
+            )),
+            DeclarationCollationOutcome::UndefinedCapability => Some(AnalysisProblem::collate(
+                CollateProblem::undefined_capability(ty.expect("resolved type")),
+            )),
+            _ => None,
+        };
+        if let Some(problem) = problem {
+            context.report_analysis_problem(problem)?;
+        }
         Ok(())
     }
 }

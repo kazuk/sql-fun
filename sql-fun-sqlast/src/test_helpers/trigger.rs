@@ -1,4 +1,5 @@
 use crate::AstAndContextPair;
+use crate::ast::{CreateTrigger, StatementKind, StatementNode};
 use crate::context::{BaseParseContext as _, ParseContext};
 use crate::parse_statements;
 use crate::sem::{CreateTableAs, CreateView, SelectStatement, SemAst, ViewLike};
@@ -133,4 +134,17 @@ pub(crate) fn sqlite_oracle() -> Result<::rusqlite::Connection, ::rusqlite::Erro
     let oracle = ::rusqlite::Connection::open_in_memory()?;
     oracle.execute_batch("CREATE TABLE items(id INTEGER); CREATE TABLE other(id INTEGER);")?;
     Ok(oracle)
+}
+
+pub(crate) fn trigger(sql: &str, dialect: Dialect) -> CreateTrigger {
+    let statement = parse_statements(sql, dialect)
+        .next()
+        .expect("statement")
+        .expect("context-free conversion");
+    assert_eq!(statement.kind(), StatementKind::create_trigger());
+    assert!(statement.with_clause().is_none());
+    match statement.into_test_node() {
+        StatementNode::CreateTrigger(value) => value,
+        _ => panic!("CREATE TRIGGER node"),
+    }
 }

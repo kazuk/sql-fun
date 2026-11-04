@@ -240,7 +240,23 @@ impl BaseContext {
             search_path,
         })
     }
+}
 
+#[cfg(test)]
+mod test_required_masters {
+
+    use crate::{ast::Dialect, test_helpers::conflict_masters as test_helpers};
+
+    #[test]
+    fn postgres_base_requires_masters() {
+        let error = test_helpers::base_without_masters(Dialect::postgres())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("collations.json"), "{error}");
+    }
+}
+
+impl BaseContext {
     /// Declare a connection-local SQLite collation without opening a connection.
     ///
     /// # Errors

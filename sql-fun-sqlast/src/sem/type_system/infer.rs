@@ -121,51 +121,6 @@ impl SimpleInferContext {
 
         Ok(())
     }
-
-    /// get inference result
-    pub fn get_inference_result(&self) -> Result<SimpleInferResult, TypeError> {
-        if self.element_types.is_empty() {
-            return Err(TypeError::SimpleInferNoArgs());
-        }
-        if self.element_types.len() != 1 {
-            return Err(TypeError::simple_infer_ambiguous(&self.element_types));
-        }
-        if self.array_types.len() > 1 {
-            return Err(TypeError::simple_infer_ambiguous(&self.array_types));
-        }
-        Ok(SimpleInferResult::new(
-            self.element_types.iter().next().unwrap(),
-            self.array_types.iter().next(),
-        ))
-    }
-
-    pub const fn set_require_infer(&mut self) {
-        self.require_infer = true;
-    }
-
-    pub const fn is_require_infer(&self) -> bool {
-        self.require_infer
-    }
-
-    pub fn collect<TParam>(
-        &mut self,
-        param: &TParam,
-        bind: &ParameterBindResult,
-        catalog: &impl BaseParseContext,
-    ) -> Result<(), TypeError>
-    where
-        TParam: FunctionParameterTrait + Sized,
-    {
-        if let Some(param_type) = param.param_type()
-            && param_type.is_simple_infer_arg()
-            && param.is_input_param()
-        {
-            for arg_type in bind.get_arg_types() {
-                self.push_input_param(param_type, &arg_type, catalog)?;
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -230,6 +185,53 @@ mod test_simple_infer_context {
             Err(TypeError::SimpleInferAmbiguous(_))
         ));
 
+        Ok(())
+    }
+}
+
+impl SimpleInferContext {
+    /// get inference result
+    pub fn get_inference_result(&self) -> Result<SimpleInferResult, TypeError> {
+        if self.element_types.is_empty() {
+            return Err(TypeError::SimpleInferNoArgs());
+        }
+        if self.element_types.len() != 1 {
+            return Err(TypeError::simple_infer_ambiguous(&self.element_types));
+        }
+        if self.array_types.len() > 1 {
+            return Err(TypeError::simple_infer_ambiguous(&self.array_types));
+        }
+        Ok(SimpleInferResult::new(
+            self.element_types.iter().next().unwrap(),
+            self.array_types.iter().next(),
+        ))
+    }
+
+    pub const fn set_require_infer(&mut self) {
+        self.require_infer = true;
+    }
+
+    pub const fn is_require_infer(&self) -> bool {
+        self.require_infer
+    }
+
+    pub fn collect<TParam>(
+        &mut self,
+        param: &TParam,
+        bind: &ParameterBindResult,
+        catalog: &impl BaseParseContext,
+    ) -> Result<(), TypeError>
+    where
+        TParam: FunctionParameterTrait + Sized,
+    {
+        if let Some(param_type) = param.param_type()
+            && param_type.is_simple_infer_arg()
+            && param.is_input_param()
+        {
+            for arg_type in bind.get_arg_types() {
+                self.push_input_param(param_type, &arg_type, catalog)?;
+            }
+        }
         Ok(())
     }
 }
@@ -310,7 +312,55 @@ impl CommonInferContext {
 
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_common_push_input_param {
+    use crate::{
+        names::FullName,
+        sem::{
+            TypeReference,
+            type_system::{TypeError, infer::CommonInferContext},
+        },
+        test_helpers::TestParseContext,
+    };
+
+    use ::testresult::TestResult;
+
+    #[test]
+    fn push_input_param_requires_array_argument() -> TestResult {
+        let mut context = CommonInferContext::default();
+        let param_type = TypeReference::from_full_name(FullName::with_schema(
+            "pg_catalog",
+            "anycompatiblearray",
+        ));
+        let arg_type = TypeReference::from_master_type_name("int4");
+
+        let result = context.push_input_param(&param_type, &arg_type, &TestParseContext::default());
+
+        assert!(matches!(result, Err(TypeError::RequireArray(_))));
+        assert!(context.element_types.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn push_input_param_rejects_array_for_non_array_constraint() -> TestResult {
+        let mut context = CommonInferContext::default();
+        let param_type = TypeReference::from_full_name(FullName::with_schema(
+            "pg_catalog",
+            "anycompatiblenonarray",
+        ));
+        let arg_type = TypeReference::from_master_type_name("_int4");
+
+        let result = context.push_input_param(&param_type, &arg_type, &TestParseContext::default());
+
+        assert!(matches!(result, Err(TypeError::RequireNonArray(_))));
+        assert!(context.element_types.is_empty());
+        Ok(())
+    }
+}
+
+impl CommonInferContext {
     fn common_types(castables: &IVec<HashSet<TypeReference>>) -> HashSet<TypeReference> {
         let mut iter = castables.iter();
         let Some(first) = iter.next() else {
@@ -333,7 +383,83 @@ impl CommonInferContext {
     {
         self.infer_from_catalog(context)
     }
+}
 
+#[cfg(test)]
+mod test_common_get_inference_result {
+    use crate::{
+        sem::{
+            CastContext, CastDefinition, TypeReference,
+            type_system::{TypeError, infer::CommonInferContext},
+        },
+        test_helpers::TestParseContext,
+    };
+
+    use std::collections::HashSet;
+
+    use ::testresult::TestResult;
+
+    #[test]
+    fn picks_candidate_with_highest_score() -> TestResult {
+        let mut context = CommonInferContext::default();
+        let int4 = TypeReference::from_master_type_name("int4");
+        let int8 = TypeReference::from_master_type_name("int8");
+        context.push_compat_element(&int4);
+        context.push_compat_element(&int8);
+
+        let mut parse_context = TestParseContext::default();
+        let mut int4_castables = HashSet::new();
+        int4_castables.insert(int4.clone());
+        int4_castables.insert(int8.clone());
+        parse_context.set_get_implicit_castable_result(&int4, &int4_castables);
+        let mut int8_castables = HashSet::new();
+        int8_castables.insert(int4.clone());
+        int8_castables.insert(int8.clone());
+        parse_context.set_get_implicit_castable_result(&int8, &int8_castables);
+
+        parse_context.set_get_implicit_cast_result(
+            &int4,
+            &int4,
+            Some(CastDefinition::new(CastContext::NoConversion)),
+        );
+        parse_context.set_get_implicit_cast_result(
+            &int8,
+            &int4,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+        parse_context.set_get_implicit_cast_result(
+            &int4,
+            &int8,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+        parse_context.set_get_implicit_cast_result(
+            &int8,
+            &int8,
+            Some(CastDefinition::new(CastContext::ImplicitPrefeerd)),
+        );
+
+        let result = context.get_inference_result(&parse_context)?;
+
+        assert_eq!(result, int4);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_error_when_no_implicit_castable() -> TestResult {
+        let mut context = CommonInferContext::default();
+        let int4 = TypeReference::from_master_type_name("int4");
+        context.push_compat_element(&int4);
+        let parse_context = TestParseContext::default();
+
+        assert!(matches!(
+            context.get_inference_result(&parse_context),
+            Err(TypeError::CommonInferNoImplicitCastable())
+        ));
+        Ok(())
+    }
+}
+
+impl CommonInferContext {
     pub(crate) fn infer_from_catalog<TCatalog: BaseParseContext>(
         &self,
         context: &TCatalog,
@@ -402,113 +528,6 @@ impl CommonInferContext {
                 }
             }
         }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod test_common_infer_context {
-    use crate::{
-        names::FullName,
-        sem::{
-            CastContext, CastDefinition, TypeReference,
-            type_system::{TypeError, infer::CommonInferContext},
-        },
-        test_helpers::TestParseContext,
-    };
-
-    use std::collections::HashSet;
-
-    use ::testresult::TestResult;
-
-    #[test]
-    fn push_input_param_requires_array_argument() -> TestResult {
-        let mut context = CommonInferContext::default();
-        let param_type = TypeReference::from_full_name(FullName::with_schema(
-            "pg_catalog",
-            "anycompatiblearray",
-        ));
-        let arg_type = TypeReference::from_master_type_name("int4");
-
-        let result = context.push_input_param(&param_type, &arg_type, &TestParseContext::default());
-
-        assert!(matches!(result, Err(TypeError::RequireArray(_))));
-        assert!(context.element_types.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn push_input_param_rejects_array_for_non_array_constraint() -> TestResult {
-        let mut context = CommonInferContext::default();
-        let param_type = TypeReference::from_full_name(FullName::with_schema(
-            "pg_catalog",
-            "anycompatiblenonarray",
-        ));
-        let arg_type = TypeReference::from_master_type_name("_int4");
-
-        let result = context.push_input_param(&param_type, &arg_type, &TestParseContext::default());
-
-        assert!(matches!(result, Err(TypeError::RequireNonArray(_))));
-        assert!(context.element_types.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn picks_candidate_with_highest_score() -> TestResult {
-        let mut context = CommonInferContext::default();
-        let int4 = TypeReference::from_master_type_name("int4");
-        let int8 = TypeReference::from_master_type_name("int8");
-        context.push_compat_element(&int4);
-        context.push_compat_element(&int8);
-
-        let mut parse_context = TestParseContext::default();
-        let mut int4_castables = HashSet::new();
-        int4_castables.insert(int4.clone());
-        int4_castables.insert(int8.clone());
-        parse_context.set_get_implicit_castable_result(&int4, &int4_castables);
-        let mut int8_castables = HashSet::new();
-        int8_castables.insert(int4.clone());
-        int8_castables.insert(int8.clone());
-        parse_context.set_get_implicit_castable_result(&int8, &int8_castables);
-
-        parse_context.set_get_implicit_cast_result(
-            &int4,
-            &int4,
-            Some(CastDefinition::new(CastContext::NoConversion)),
-        );
-        parse_context.set_get_implicit_cast_result(
-            &int8,
-            &int4,
-            Some(CastDefinition::new(CastContext::Implicit)),
-        );
-        parse_context.set_get_implicit_cast_result(
-            &int4,
-            &int8,
-            Some(CastDefinition::new(CastContext::Implicit)),
-        );
-        parse_context.set_get_implicit_cast_result(
-            &int8,
-            &int8,
-            Some(CastDefinition::new(CastContext::ImplicitPrefeerd)),
-        );
-
-        let result = context.get_inference_result(&parse_context)?;
-
-        assert_eq!(result, int4);
-        Ok(())
-    }
-
-    #[test]
-    fn reports_error_when_no_implicit_castable() -> TestResult {
-        let mut context = CommonInferContext::default();
-        let int4 = TypeReference::from_master_type_name("int4");
-        context.push_compat_element(&int4);
-        let parse_context = TestParseContext::default();
-
-        assert!(matches!(
-            context.get_inference_result(&parse_context),
-            Err(TypeError::CommonInferNoImplicitCastable())
-        ));
         Ok(())
     }
 }

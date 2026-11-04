@@ -31,39 +31,6 @@ impl LeftUnaryCallSite {
         let (value, _) = Self::op_left_unary_resolved(&mut context, name, operator_def, lexpr)?;
         Ok((value, context))
     }
-
-    pub(crate) fn op_left_unary_resolved<'context, TParseContext>(
-        context: &'context mut TParseContext,
-        name: &OperatorName,
-        operator_def: UnaryOperatorDefinition,
-        lexpr: SemScalarExpr,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let call_site = Self {
-            operator_name: name.clone(),
-            binding: None,
-            operator_def,
-            arg: lexpr,
-        };
-        Ok((
-            SemScalarExpr::Arith(ArithExpr::OpLeftUnary(Box::new(call_site))),
-            context,
-        ))
-    }
-
-    pub fn is_not_null(&self) -> Option<bool> {
-        self.arg.is_not_null()
-    }
-
-    pub const fn get_return_type(&self) -> &TypeReference {
-        self.operator_def.get_return_type()
-    }
-
-    pub const fn is_strict(&self) -> bool {
-        self.operator_def.is_strict()
-    }
 }
 
 #[cfg(test)]
@@ -95,6 +62,41 @@ mod test_left_unary_call_site {
             expr.clone(),
         )?;
         Ok(())
+    }
+}
+
+impl LeftUnaryCallSite {
+    pub(crate) fn op_left_unary_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        operator_def: UnaryOperatorDefinition,
+        lexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let call_site = Self {
+            operator_name: name.clone(),
+            binding: None,
+            operator_def,
+            arg: lexpr,
+        };
+        Ok((
+            SemScalarExpr::Arith(ArithExpr::OpLeftUnary(Box::new(call_site))),
+            context,
+        ))
+    }
+
+    pub fn is_not_null(&self) -> Option<bool> {
+        self.arg.is_not_null()
+    }
+
+    pub const fn get_return_type(&self) -> &TypeReference {
+        self.operator_def.get_return_type()
+    }
+
+    pub const fn is_strict(&self) -> bool {
+        self.operator_def.is_strict()
     }
 }
 

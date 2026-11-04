@@ -93,91 +93,16 @@ impl CacheContext {
             })
             .clone()
     }
-
-    /// Reuse immutable per-source facts; callers retain their own mutable maps.
-    pub(crate) fn array_cast_ranks(
-        &mut self,
-        context: &impl BaseParseContext,
-        source: &TypeReference,
-    ) -> HashMap<TypeReference, OverloadRank> {
-        self.array_cast_ranks
-            .entry(source.clone())
-            .or_insert_with(|| {
-                #[cfg(test)]
-                {
-                    self.array_rank_computations += 1;
-                }
-                sem_array_cast_ranks(context, source)
-            })
-            .clone()
-    }
-
-    /// Retain the complete assignment-eligible set, separately from cast sources.
-    pub(crate) fn assignment_sources(
-        &mut self,
-        context: &impl BaseParseContext,
-        target: &TypeReference,
-    ) -> HashSet<TypeReference> {
-        self.assignment_sources
-            .entry(target.clone())
-            .or_insert_with(|| {
-                #[cfg(test)]
-                {
-                    self.assignment_source_computations += 1;
-                }
-                context.assignment_sources(target)
-            })
-            .clone()
-    }
-
-    pub(crate) fn cast_sources(
-        &mut self,
-        context: &impl BaseParseContext,
-        target: &TypeReference,
-        explicit: bool,
-    ) -> HashSet<TypeReference> {
-        self.cast_sources
-            .entry((target.clone(), explicit))
-            .or_insert_with(|| {
-                #[cfg(test)]
-                {
-                    self.cast_source_computations += 1;
-                }
-                context.cast_sources(target, explicit)
-            })
-            .clone()
-    }
-
-    pub(crate) fn argument_rank(
-        &mut self,
-        context: &impl BaseParseContext,
-        signature: &Signature,
-        index: usize,
-        source: &TypeReference,
-    ) -> Option<OverloadRank> {
-        let input = ArgumentRankInput::new(signature, index, source);
-        self.argument_ranks.get_or_compute(&input, || {
-            #[cfg(test)]
-            {
-                self.rank_computations += 1;
-            }
-            signature.cast_score(context, source, index)
-        })
-    }
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::{
-        names::{CatalogName, FullName, LocalName, SchemaName},
-        sem::array_cast_ranks as sem_array_cast_ranks,
-        test_helpers::create_cache_context,
-    };
+mod test_declared_sources {
+    use crate::test_helpers::create_cache_context;
 
     use crate::{
-        context::{CastInfoRead, ParseContext},
-        sem::{PgBuiltInType, TypeReference, parameter_resolution::Signature},
-        test_helpers::{analysis_cache, domain_casts},
+        context::CastInfoRead,
+        sem::{PgBuiltInType, TypeReference},
+        test_helpers::domain_casts,
     };
 
     #[rstest::rstest]
@@ -208,6 +133,41 @@ mod tests {
         );
         assert_eq!(cache.declared_source_computations, 1);
     }
+}
+
+impl CacheContext {
+    /// Reuse immutable per-source facts; callers retain their own mutable maps.
+    pub(crate) fn array_cast_ranks(
+        &mut self,
+        context: &impl BaseParseContext,
+        source: &TypeReference,
+    ) -> HashMap<TypeReference, OverloadRank> {
+        self.array_cast_ranks
+            .entry(source.clone())
+            .or_insert_with(|| {
+                #[cfg(test)]
+                {
+                    self.array_rank_computations += 1;
+                }
+                sem_array_cast_ranks(context, source)
+            })
+            .clone()
+    }
+}
+
+#[cfg(test)]
+mod test_array_ranks {
+    use crate::{
+        names::{CatalogName, FullName, LocalName, SchemaName},
+        sem::array_cast_ranks as sem_array_cast_ranks,
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        context::CastInfoRead,
+        sem::{PgBuiltInType, TypeReference},
+        test_helpers::domain_casts,
+    };
 
     #[rstest::rstest]
     #[case::array(PgBuiltInType::int4().array_type())]
@@ -287,6 +247,37 @@ mod tests {
             assert_eq!(cache.declared_source_computations, 1);
         }
     }
+}
+
+impl CacheContext {
+    /// Retain the complete assignment-eligible set, separately from cast sources.
+    pub(crate) fn assignment_sources(
+        &mut self,
+        context: &impl BaseParseContext,
+        target: &TypeReference,
+    ) -> HashSet<TypeReference> {
+        self.assignment_sources
+            .entry(target.clone())
+            .or_insert_with(|| {
+                #[cfg(test)]
+                {
+                    self.assignment_source_computations += 1;
+                }
+                context.assignment_sources(target)
+            })
+            .clone()
+    }
+}
+
+#[cfg(test)]
+mod test_assignment_sources {
+    use crate::{names::FullName, test_helpers::create_cache_context};
+
+    use crate::{
+        context::CastInfoRead,
+        sem::{PgBuiltInType, TypeReference},
+        test_helpers::domain_casts,
+    };
 
     #[rstest::rstest]
     #[case::scalar(PgBuiltInType::int4())]
@@ -354,6 +345,33 @@ mod tests {
         }
         assert_eq!(cache.assignment_source_computations, targets.len());
     }
+}
+
+impl CacheContext {
+    pub(crate) fn cast_sources(
+        &mut self,
+        context: &impl BaseParseContext,
+        target: &TypeReference,
+        explicit: bool,
+    ) -> HashSet<TypeReference> {
+        self.cast_sources
+            .entry((target.clone(), explicit))
+            .or_insert_with(|| {
+                #[cfg(test)]
+                {
+                    self.cast_source_computations += 1;
+                }
+                context.cast_sources(target, explicit)
+            })
+            .clone()
+    }
+}
+
+#[cfg(test)]
+mod test_cast_sources {
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{context::CastInfoRead, sem::PgBuiltInType, test_helpers::domain_casts};
 
     #[rstest::rstest]
     #[case::implicit(false)]
@@ -396,6 +414,35 @@ mod tests {
         assert!(cache.cast_sources(&context, &broken, true).is_empty());
         assert_eq!(cache.cast_source_computations, 1);
     }
+}
+
+impl CacheContext {
+    pub(crate) fn argument_rank(
+        &mut self,
+        context: &impl BaseParseContext,
+        signature: &Signature,
+        index: usize,
+        source: &TypeReference,
+    ) -> Option<OverloadRank> {
+        let input = ArgumentRankInput::new(signature, index, source);
+        self.argument_ranks.get_or_compute(&input, || {
+            #[cfg(test)]
+            {
+                self.rank_computations += 1;
+            }
+            signature.cast_score(context, source, index)
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_argument_rank {
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{
+        sem::{PgBuiltInType, TypeReference, parameter_resolution::Signature},
+        test_helpers::domain_casts,
+    };
 
     #[rstest::rstest]
     #[case::identity(PgBuiltInType::int4())]
@@ -485,6 +532,13 @@ mod tests {
         );
         assert_eq!(cache.rank_computations, 3);
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::create_cache_context;
+
+    use crate::{context::ParseContext, test_helpers::analysis_cache};
 
     #[rstest::rstest]
     #[case::nested("SELECT COALESCE($1::int4, 2) BETWEEN SYMMETRIC 3 AND 1 AS result", 0)]

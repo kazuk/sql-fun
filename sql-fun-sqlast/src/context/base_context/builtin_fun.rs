@@ -43,21 +43,6 @@ impl PgFunctionProto {
         };
         kind == "f" && !returns_set
     }
-    const fn returns_set(&self) -> bool {
-        self.returns_set
-            .expect("builtin function returns_set metadata")
-    }
-    fn matches_input_signature(&self, overload: &OverloadVariant) -> bool {
-        let input: Vec<_> = overload
-            .params()
-            .iter()
-            .filter(|parameter| parameter.is_input())
-            .collect();
-        self.args.len() == input.len()
-            && self.args.iter().zip(input).all(|(name, parameter)| {
-                parameter.get_type() == Some(&TypeReference::from_master_type_name(name))
-            })
-    }
 }
 
 #[cfg(test)]
@@ -83,6 +68,24 @@ mod test_function_properties {
         };
         assert_eq!(definition.returns_set(), returns_set);
         assert_eq!(definition.preserves_view_rows(), preserves_rows);
+    }
+}
+
+impl PgFunctionProto {
+    const fn returns_set(&self) -> bool {
+        self.returns_set
+            .expect("builtin function returns_set metadata")
+    }
+    fn matches_input_signature(&self, overload: &OverloadVariant) -> bool {
+        let input: Vec<_> = overload
+            .params()
+            .iter()
+            .filter(|parameter| parameter.is_input())
+            .collect();
+        self.args.len() == input.len()
+            && self.args.iter().zip(input).all(|(name, parameter)| {
+                parameter.get_type() == Some(&TypeReference::from_master_type_name(name))
+            })
     }
 }
 

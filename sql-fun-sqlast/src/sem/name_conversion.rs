@@ -136,6 +136,31 @@ impl TryFrom<NodeListOpt> for FullName {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::test_helpers::type_syntax::build_string_node_list_opt;
+
+    use crate::names::FullName;
+
+    #[test]
+    fn test_try_from_nodelistopt_two_elements() {
+        let nlo = build_string_node_list_opt(&["schema", "name"]);
+        let qt = FullName::try_from(nlo).unwrap();
+        assert!(qt.catalog().is_none());
+        assert_eq!(qt.schema().unwrap().as_str(), "schema");
+        assert_eq!(qt.name().as_str(), "name");
+    }
+
+    #[test]
+    fn test_try_from_nodelistopt_three_elements() {
+        let nlo = build_string_node_list_opt(&["cat", "sch", "nm"]);
+        let qt = FullName::try_from(nlo).unwrap();
+        assert_eq!(qt.catalog().unwrap().as_str(), "cat");
+        assert_eq!(qt.schema().unwrap().as_str(), "sch");
+        assert_eq!(qt.name().as_str(), "nm");
+    }
+}
+
 impl TryFrom<RangeVar> for FullName {
     type Error = AnalysisError;
 

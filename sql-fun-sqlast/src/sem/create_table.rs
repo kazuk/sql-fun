@@ -163,7 +163,31 @@ impl ColumnCollection {
             .filter_map(|column| column.name().clone())
             .collect()
     }
+}
 
+#[cfg(test)]
+mod column_collection_tests {
+    use crate::{
+        names::ColumnName,
+        sem::create_table::{ColumnCollection, ColumnDefinition},
+    };
+
+    #[test]
+    fn names_keep_order_and_duplicates_without_unnamed_columns() {
+        let b = ColumnName::from("b");
+        let a = ColumnName::from("a");
+        let columns = ColumnCollection::new(vec![
+            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
+            ColumnDefinition::new(&None, None, None, &[]),
+            ColumnDefinition::new(&Some(a.clone()), None, None, &[]),
+            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
+        ]);
+        assert_eq!(columns.names(), vec![b.clone(), a, b]);
+        assert!(ColumnCollection::default().names().is_empty());
+    }
+}
+
+impl ColumnCollection {
     pub(crate) fn scalar_function_output(name: &ColumnName, ty: &TypeReference) -> Self {
         Self(vec![ColumnDefinition::new(
             &Some(name.clone()),
@@ -237,28 +261,6 @@ impl ColumnCollection {
     /// append column definition
     pub fn push(&mut self, column: &ColumnDefinition) {
         self.0.push(column.clone());
-    }
-}
-
-#[cfg(test)]
-mod column_collection_tests {
-    use crate::{
-        names::ColumnName,
-        sem::create_table::{ColumnCollection, ColumnDefinition},
-    };
-
-    #[test]
-    fn names_keep_order_and_duplicates_without_unnamed_columns() {
-        let b = ColumnName::from("b");
-        let a = ColumnName::from("a");
-        let columns = ColumnCollection::new(vec![
-            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
-            ColumnDefinition::new(&None, None, None, &[]),
-            ColumnDefinition::new(&Some(a.clone()), None, None, &[]),
-            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
-        ]);
-        assert_eq!(columns.names(), vec![b.clone(), a, b]);
-        assert!(ColumnCollection::default().names().is_empty());
     }
 }
 

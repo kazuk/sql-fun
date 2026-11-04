@@ -84,14 +84,6 @@ impl ArithExpr {
             },
         ))))
     }
-
-    /// SQLite builtin LIKE semantics, with no fabricated catalog operator binding.
-    pub(crate) const fn as_sqlite_like(&self) -> Option<&SqliteLikeExpr> {
-        match self {
-            Self::SqliteLike(value) => Some(value),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
@@ -203,5 +195,15 @@ mod tests {
         assert!(value.pattern().get_column_def().is_some());
         assert!(value.escape().unwrap().get_column_def().is_some());
         Ok(())
+    }
+}
+
+impl ArithExpr {
+    /// SQLite builtin LIKE semantics, with no fabricated catalog operator binding.
+    pub(crate) const fn as_sqlite_like(&self) -> Option<&SqliteLikeExpr> {
+        match self {
+            Self::SqliteLike(value) => Some(value),
+            _ => None,
+        }
     }
 }

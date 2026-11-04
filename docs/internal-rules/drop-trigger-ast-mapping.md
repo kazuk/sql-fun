@@ -12,7 +12,7 @@ by `syn/sqlite/trigger_statement.rs` and `syn/sqlite/names.rs`.
 
 ## Complete field and alternative checklist
 
-| Source | Owned common destination / handling | Coverage in `ast/trigger/drop_tests.rs` |
+| Source | Owned common destination / handling | Coverage in `ast/trigger.rs` colocated conversion tests |
 | --- | --- | --- |
 | PG `objects` | Exactly one List target; split the final trigger identifier from the preceding ON relation components | `postgres_preserves_target_names`, invalid-target tests |
 | PG nested List `items`, String `sval` | Shared `Name` conversion retains ordered identifier values; relation retains all supplied components, trigger has one | Target-name tests cover bare, schema/catalog qualification, quoted dots, escaped quotes, case folding and overqualified unresolved names |

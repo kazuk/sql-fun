@@ -87,6 +87,38 @@ impl CreateDomain {
             requested_base: None,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        names::FullName,
+        sem::{TypeReference, create_domain::CreateDomain},
+    };
+
+    #[rstest::rstest]
+    #[case::unresolved(None)]
+    #[case::scalar(Some(TypeReference::from_master_type_name("int4")))]
+    #[case::array(Some(TypeReference::from_master_type_name("_int4")))]
+    #[case::nested_domain(Some(TypeReference::from_full_name(FullName::with_schema(
+        "public", "amounts"
+    ))))]
+    fn domain_base_survives_serialization(#[case] base: Option<TypeReference>) {
+        let reference = TypeReference::from_full_name(FullName::with_schema("public", "amount"));
+        let domain = CreateDomain::new(&reference, &base);
+        let serialized = ::serde_json::to_value(&domain).unwrap();
+        assert_eq!(
+            serialized["base_type"],
+            ::serde_json::to_value(&base).unwrap()
+        );
+        let restored: CreateDomain = ::serde_json::from_value(serialized).unwrap();
+        assert_eq!(restored.base_type(), base.as_ref());
+        assert_eq!(restored.type_ref(), &reference);
+        assert_eq!(restored, domain);
+    }
+}
+
+impl CreateDomain {
     pub(crate) const fn category(&self) -> Option<TypeCategory> {
         self.category
     }
@@ -124,35 +156,6 @@ impl CreateDomain {
         TParseContext: ParseContext,
     {
         Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        names::FullName,
-        sem::{TypeReference, create_domain::CreateDomain},
-    };
-
-    #[rstest::rstest]
-    #[case::unresolved(None)]
-    #[case::scalar(Some(TypeReference::from_master_type_name("int4")))]
-    #[case::array(Some(TypeReference::from_master_type_name("_int4")))]
-    #[case::nested_domain(Some(TypeReference::from_full_name(FullName::with_schema(
-        "public", "amounts"
-    ))))]
-    fn domain_base_survives_serialization(#[case] base: Option<TypeReference>) {
-        let reference = TypeReference::from_full_name(FullName::with_schema("public", "amount"));
-        let domain = CreateDomain::new(&reference, &base);
-        let serialized = ::serde_json::to_value(&domain).unwrap();
-        assert_eq!(
-            serialized["base_type"],
-            ::serde_json::to_value(&base).unwrap()
-        );
-        let restored: CreateDomain = ::serde_json::from_value(serialized).unwrap();
-        assert_eq!(restored.base_type(), base.as_ref());
-        assert_eq!(restored.type_ref(), &reference);
-        assert_eq!(restored, domain);
     }
 }
 

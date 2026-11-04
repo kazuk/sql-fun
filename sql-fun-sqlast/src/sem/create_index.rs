@@ -139,10 +139,6 @@ impl IndexElementCollection {
                 .collect(),
         )
     }
-
-    pub(crate) fn push(&mut self, item: IndexElementWithOrder) {
-        self.0.push(item);
-    }
 }
 
 #[cfg(test)]
@@ -187,6 +183,12 @@ mod index_element_collection_tests {
             }
             _ => panic!("expected column name index element"),
         }
+    }
+}
+
+impl IndexElementCollection {
+    pub(crate) fn push(&mut self, item: IndexElementWithOrder) {
+        self.0.push(item);
     }
 }
 
@@ -340,38 +342,10 @@ impl CreateIndex {
             predicate: None,
         }
     }
-
-    /// Create a qualified index with `include_columns`
-    #[must_use]
-    pub fn new_with_include_column(
-        name: &FullName,
-        table: &TableName,
-        key_columns: &IndexElementCollection,
-        include_columns: &IndexElementCollection,
-    ) -> Self {
-        Self {
-            if_not_exists: false,
-            access_method: "btree".to_owned(),
-            storage_parameters: std::collections::BTreeMap::new(),
-            statistics: std::collections::BTreeMap::new(),
-            name: name.clone(),
-            table: table.clone(),
-            key_columns: key_columns.clone(),
-            include_columns: include_columns.clone(),
-            unique: true,
-            predicate: None,
-        }
-    }
-
-    /// Return the qualified catalog identity, including the target table schema.
-    #[must_use]
-    pub const fn name(&self) -> &FullName {
-        &self.name
-    }
 }
 
 #[cfg(test)]
-mod create_index_tests {
+mod test_new {
     use crate::{
         names::{ColumnName, FullName, TableName},
         sem::create_index::{CreateIndex, IndexElementCollection},
@@ -395,6 +369,38 @@ mod create_index_tests {
         assert_eq!(index.include_columns.0.len(), 0);
         assert!(index.unique);
     }
+}
+
+impl CreateIndex {
+    /// Create a qualified index with `include_columns`
+    #[must_use]
+    pub fn new_with_include_column(
+        name: &FullName,
+        table: &TableName,
+        key_columns: &IndexElementCollection,
+        include_columns: &IndexElementCollection,
+    ) -> Self {
+        Self {
+            if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
+            name: name.clone(),
+            table: table.clone(),
+            key_columns: key_columns.clone(),
+            include_columns: include_columns.clone(),
+            unique: true,
+            predicate: None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_new_with_include_column {
+    use crate::{
+        names::{ColumnName, FullName, TableName},
+        sem::create_index::{CreateIndex, IndexElementCollection},
+    };
 
     #[test]
     fn new_with_include_column_preserves_include_columns() {
@@ -414,6 +420,14 @@ mod create_index_tests {
         assert_eq!(index.key_columns.0.len(), 1);
         assert_eq!(index.include_columns.0.len(), 1);
         assert!(index.unique);
+    }
+}
+
+impl CreateIndex {
+    /// Return the qualified catalog identity, including the target table schema.
+    #[must_use]
+    pub const fn name(&self) -> &FullName {
+        &self.name
     }
 }
 

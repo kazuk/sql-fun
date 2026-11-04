@@ -61,7 +61,9 @@ impl ViewMergeSupport {
             update_columns: update_columns.map(<[ColumnDefinition]>::to_vec),
         }
     }
+}
 
+impl ViewMergeSupport {
     /// Whether the view can be a target for all action types present in MERGE.
     pub const fn supports_actions(&self, insert: bool, update: bool, delete: bool) -> bool {
         if self.has_rules {
@@ -74,40 +76,10 @@ impl ViewMergeSupport {
             && (!update || self.triggers.update)
             && (!delete || self.triggers.delete)
     }
-
-    /// Whether an INSERT action can use this view's effective column metadata.
-    pub const fn supports_insert(&self) -> bool {
-        self.insert_columns.is_some()
-    }
-
-    /// Whether an UPDATE action can use this view's effective column metadata.
-    pub const fn supports_update(&self) -> bool {
-        self.update_columns.is_some()
-    }
-
-    /// Effective assignment metadata for a MERGE INSERT target column.
-    pub fn insert_column_definition(&self, name: &ColumnName) -> Option<&ColumnDefinition> {
-        self.insert_columns
-            .as_ref()?
-            .iter()
-            .find(|column| column.name().as_ref() == Some(name))
-    }
-
-    /// Effective assignment metadata for a MERGE UPDATE target column.
-    pub fn update_column_definition(&self, name: &ColumnName) -> Option<&ColumnDefinition> {
-        self.update_columns
-            .as_ref()?
-            .iter()
-            .find(|column| column.name().as_ref() == Some(name))
-    }
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::{
-        names::ColumnName,
-        sem::{ColumnDefinition, PgBuiltInType},
-    };
+mod test_supports_actions {
 
     use crate::sem::merge_statement::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
@@ -160,6 +132,42 @@ mod tests {
         assert!(support.supports_actions(false, true, false));
         assert!(!support.supports_actions(true, false, false));
     }
+}
+
+impl ViewMergeSupport {
+    /// Whether an INSERT action can use this view's effective column metadata.
+    pub const fn supports_insert(&self) -> bool {
+        self.insert_columns.is_some()
+    }
+
+    /// Whether an UPDATE action can use this view's effective column metadata.
+    pub const fn supports_update(&self) -> bool {
+        self.update_columns.is_some()
+    }
+
+    /// Effective assignment metadata for a MERGE INSERT target column.
+    pub fn insert_column_definition(&self, name: &ColumnName) -> Option<&ColumnDefinition> {
+        self.insert_columns
+            .as_ref()?
+            .iter()
+            .find(|column| column.name().as_ref() == Some(name))
+    }
+
+    /// Effective assignment metadata for a MERGE UPDATE target column.
+    pub fn update_column_definition(&self, name: &ColumnName) -> Option<&ColumnDefinition> {
+        self.update_columns
+            .as_ref()?
+            .iter()
+            .find(|column| column.name().as_ref() == Some(name))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::names::ColumnName;
+    use crate::test_helpers::merge_views::column_definition as definition;
+
+    use crate::sem::merge_statement::view_support::{ViewMergeSupport, ViewMergeTriggers};
 
     #[test]
     fn action_columns_distinguish_default_values_and_assignable_columns() {
@@ -195,14 +203,5 @@ mod tests {
             ViewMergeSupport::new(true, false, ViewMergeTriggers::default(), Some(&[]), None);
         assert!(default_only.supports_insert());
         assert!(!default_only.supports_update());
-    }
-
-    fn definition(name: &str) -> ColumnDefinition {
-        ColumnDefinition::new(
-            &Some(ColumnName::from(name)),
-            Some(&PgBuiltInType::int4()),
-            Some(true),
-            &[],
-        )
     }
 }

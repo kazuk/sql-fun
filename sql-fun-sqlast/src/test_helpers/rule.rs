@@ -1,3 +1,4 @@
+use crate::ast::{CreateRule, StatementKind, StatementNode};
 use crate::context::{BaseParseContext as _, MutSourcePathWithSpan};
 use crate::names::OperatorName;
 use crate::parse_statements;
@@ -93,4 +94,34 @@ pub(crate) fn apply(
         .into_test_node()
         .resolve_and_apply(context, &mut create_cache_context())?
         .into_context())
+}
+
+pub(crate) fn rule(sql: &str) -> CreateRule {
+    let statement = parse_statements(sql, Dialect::postgres())
+        .next()
+        .expect("statement")
+        .expect("context-free conversion");
+    assert_eq!(statement.kind(), StatementKind::create_rule());
+    match statement.into_test_node() {
+        StatementNode::CreateRule(value) => value,
+        _ => panic!("CREATE RULE node"),
+    }
+}
+
+pub(crate) fn postgres_rule_syntax(sql: &str) -> ::pg_query::protobuf::RuleStmt {
+    let node = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
+        .expect("rule fixture")
+        .protobuf
+        .stmts
+        .into_iter()
+        .next()
+        .expect("statement")
+        .stmt
+        .expect("node")
+        .node
+        .expect("payload");
+    match node {
+        ::pg_query::protobuf::node::Node::RuleStmt(value) => *value,
+        _ => panic!("RuleStmt fixture"),
+    }
 }

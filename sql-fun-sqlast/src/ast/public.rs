@@ -106,15 +106,6 @@ impl Statement {
         AnalysisError::check_dialect(self.dialect, context.dialect())?;
         self.node.resolve_and_apply(context, cache_context)
     }
-
-    /// Inspect an existing WITH clause without exposing mutable node storage.
-    pub const fn with_clause(&self) -> Option<WithClause<'_>> {
-        if let Some(node) = self.node.with_node() {
-            WithClause::existing(node, self.dialect)
-        } else {
-            None
-        }
-    }
 }
 
 #[cfg(test)]
@@ -151,6 +142,17 @@ mod test_statement_analyze {
         let column = query.result_columns().get_column_at(0).unwrap();
         assert_eq!(column.col_type(), &Some(PgBuiltInType::int4()));
         assert_eq!(column.is_not_null(), &Some(true));
+    }
+}
+
+impl Statement {
+    /// Inspect an existing WITH clause without exposing mutable node storage.
+    pub const fn with_clause(&self) -> Option<WithClause<'_>> {
+        if let Some(node) = self.node.with_node() {
+            WithClause::existing(node, self.dialect)
+        } else {
+            None
+        }
     }
 }
 

@@ -217,28 +217,6 @@ impl ForeignKeyColumnConstraint {
             validity,
         }
     }
-
-    /// Canonical referenced relation, or `None` after failed target lookup.
-    ///
-    /// Later search-path changes do not alter this retained binding.
-    pub const fn primary_key_table(&self) -> Option<&TableName> {
-        self.primary_key_table.relation()
-    }
-
-    /// get primary key column name
-    pub const fn primary_key_column(&self) -> &ColumnName {
-        &self.primary_key_column
-    }
-
-    /// get primary key column type
-    pub const fn primary_key_column_type(&self) -> Option<&TypeReference> {
-        self.primary_key_column_type.as_ref()
-    }
-
-    /// get match type
-    pub const fn match_type(&self) -> Option<&ForeignKeyMatchType> {
-        self.match_type.as_ref()
-    }
 }
 
 #[cfg(test)]
@@ -279,6 +257,30 @@ mod test_foreign_key_serialization {
         let restored: ForeignKeyColumnConstraint = ::serde_json::from_value(json)?;
         assert_eq!(restored, unresolved);
         Ok(())
+    }
+}
+
+impl ForeignKeyColumnConstraint {
+    /// Canonical referenced relation, or `None` after failed target lookup.
+    ///
+    /// Later search-path changes do not alter this retained binding.
+    pub const fn primary_key_table(&self) -> Option<&TableName> {
+        self.primary_key_table.relation()
+    }
+
+    /// get primary key column name
+    pub const fn primary_key_column(&self) -> &ColumnName {
+        &self.primary_key_column
+    }
+
+    /// get primary key column type
+    pub const fn primary_key_column_type(&self) -> Option<&TypeReference> {
+        self.primary_key_column_type.as_ref()
+    }
+
+    /// get match type
+    pub const fn match_type(&self) -> Option<&ForeignKeyMatchType> {
+        self.match_type.as_ref()
     }
 }
 

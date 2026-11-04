@@ -1,8 +1,6 @@
-use crate::{
-    names::FullName as NamesFullName,
-    parse_statements,
-    test_helpers::{TestParseContext, create_cache_context},
-};
+#[cfg(feature = "sqlite")]
+use crate::{names::FullName as NamesFullName, test_helpers::TestParseContext};
+use crate::{parse_statements, test_helpers::create_cache_context};
 
 #[cfg(feature = "sqlite")]
 use crate::ast::Dialect;
@@ -14,85 +12,6 @@ use crate::{
     names::SchemaName,
     sem::{PgBuiltInType, TypeReference},
 };
-
-#[rstest::rstest]
-#[case::first(1, Some("int4"))]
-#[case::second(2, Some("text"))]
-#[case::missing(3, None)]
-#[case::zero(0, None)]
-#[case::beyond(4, None)]
-#[case::maximum(usize::MAX, None)]
-fn maps_sql_numbers(#[case] index: usize, #[case] expected: Option<&str>) {
-    let mut context = context();
-    context
-        .setup_typehinting(&[Some("int4"), Some("text"), None])
-        .unwrap();
-    assert_eq!(
-        context.get_parameter_typehint(index),
-        expected.map(TypeReference::from_master_type_name)
-    );
-}
-
-#[rstest::rstest]
-#[case::unqualified("int4", "int4")]
-#[case::qualified("pg_catalog.int4", "int4")]
-#[case::quoted(r#""pg_catalog"."int4""#, "int4")]
-#[case::array("int4[]", "_int4")]
-#[case::sql_alias("INTEGER", "int4")]
-#[case::sql_boolean("BOOLEAN", "bool")]
-#[case::sql_array("integer[2][]", "_int4")]
-#[case::sql_array_keyword("integer ARRAY[2]", "_int4")]
-#[case::unicode(r#"U&"int\0034""#, "int4")]
-fn resolves_existing_type_name_spelling(#[case] hint: &str, #[case] expected: &str) {
-    let mut context = context();
-    context.setup_typehinting(&[Some(hint)]).unwrap();
-    assert_eq!(
-        context.get_parameter_typehint(1),
-        Some(TypeReference::from_master_type_name(expected))
-    );
-}
-
-#[rstest::rstest]
-#[case::unknown("no_such_type")]
-#[case::wrong_schema("absent.int4")]
-#[case::syntax("int4[")]
-#[case::empty("")]
-#[case::two_types("int4, text")]
-#[case::extra_statement("int4; SELECT 1")]
-#[case::typmod("varchar(100)")]
-#[case::numeric_typmod("numeric(5,2)")]
-#[case::interval_typmod("interval day to second")]
-fn failure_is_atomic(#[case] invalid: &str) {
-    let mut context = context();
-    context
-        .setup_typehinting(&[Some("text"), Some("bool")])
-        .unwrap();
-    let error = context
-        .setup_typehinting(&[Some("int4"), Some(invalid)])
-        .unwrap_err();
-    assert!(error.to_string().contains("parameter $2"));
-    assert_eq!(
-        context.get_parameter_typehint(1),
-        Some(PgBuiltInType::text())
-    );
-    assert_eq!(
-        context.get_parameter_typehint(2),
-        Some(PgBuiltInType::bool())
-    );
-}
-
-#[rstest::rstest]
-#[case::empty(&[])]
-#[case::all_absent(&[None, None])]
-fn replaces_previous_setup(#[case] replacement: &[Option<&str>]) {
-    let mut context = context();
-    context
-        .setup_typehinting(&[Some("int4"), Some("text")])
-        .unwrap();
-    context.setup_typehinting(replacement).unwrap();
-    assert_eq!(context.get_parameter_typehint(1), None);
-    assert_eq!(context.get_parameter_typehint(2), None);
-}
 
 #[rstest::rstest]
 #[case::standalone("SELECT $1", &[Some("int4")], &[Some("int4")])]
@@ -145,15 +64,6 @@ fn typed_parameters_survive_full_analysis(
                 .is_any()
         );
     }
-}
-
-#[test]
-fn hinted_type_is_assigned_before_constraint_collection() {
-    let mut context = context();
-    context.setup_typehinting(&[Some("int4")]).unwrap();
-    context.begin_parameter_type_analysis();
-    assert_eq!(context.parameter(1).get_type(), Some(PgBuiltInType::int4()));
-    assert_eq!(context.parameter(2).get_type(), None);
 }
 
 #[test]
@@ -368,47 +278,4 @@ fn unknown_hint_leaves_parameter_for_inference(#[case] hint: &str) {
             .single_type(),
         Some(PgBuiltInType::int4())
     );
-}
-
-#[rstest::rstest]
-#[case::punctuation(r#""a.b""#, "a.b")]
-#[case::quotes(r#""a""b""#, "a\"b")]
-#[case::literal_suffix(r#""kind[]""#, "kind[]")]
-#[case::quoted_alias(r#""integer""#, "integer")]
-fn preserves_quoted_type_identity(#[case] hint: &str, #[case] logical: &str) {
-    let mut context = TestParseContext::default();
-    context.set_get_search_path_result(&[SchemaName::from("public")]);
-    let expected = TypeReference::from_full_name(NamesFullName::with_schema("public", logical));
-    context.setup_type(expected.clone());
-    context.setup_typehinting(&[Some(hint)]).unwrap();
-    assert_eq!(context.get_parameter_typehint(1), Some(expected));
-}
-
-#[cfg(feature = "sqlite")]
-#[rstest::rstest]
-#[case::double_quote(r#""a.b""#, "a.b", false)]
-#[case::literal_suffix(r#""kind[]""#, "kind[]", false)]
-#[case::backtick("`kind`", "kind", false)]
-#[case::bracket("[kind]", "kind", false)]
-#[case::multiword("DOUBLE PRECISION", "DOUBLE PRECISION", false)]
-#[case::array("kind[]", "kind", true)]
-fn preserves_sqlite_type_identity(#[case] hint: &str, #[case] logical: &str, #[case] array: bool) {
-    let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-    context.set_get_search_path_result(&[SchemaName::from("main")]);
-    let element = TypeReference::from_full_name(NamesFullName::with_schema("main", logical));
-    context.setup_type(element.clone());
-    let expected = if array { element.array_type() } else { element };
-    context.setup_typehinting(&[Some(hint)]).unwrap();
-    assert_eq!(context.get_parameter_typehint(1), Some(expected));
-}
-
-#[cfg(feature = "sqlite")]
-#[test]
-fn sqlite_unknown_type_remains_explicit() {
-    let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-    context.set_get_search_path_result(&[SchemaName::from("pg_catalog")]);
-    let expected = TypeReference::from_master_type_name("unknown");
-    context.setup_type(expected.clone());
-    context.setup_typehinting(&[Some("unknown")]).unwrap();
-    assert_eq!(context.get_parameter_typehint(1), Some(expected));
 }

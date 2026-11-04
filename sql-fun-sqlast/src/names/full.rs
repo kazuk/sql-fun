@@ -79,7 +79,23 @@ impl FullName {
             name: name.clone(),
         }
     }
+}
 
+#[cfg(test)]
+mod construction_tests {
+    use crate::names::{CatalogName, FullName, LocalName};
+    #[test]
+    #[should_panic(expected = "a catalog requires a schema")]
+    fn constructor_prevents_catalog_only_names() {
+        let _ = FullName::new(
+            &Some(CatalogName::from("db")),
+            &None,
+            &LocalName::from("items"),
+        );
+    }
+}
+
+impl FullName {
     /// get `local_name` part as String
     #[must_use]
     pub fn local_name(&self) -> String {
@@ -125,7 +141,34 @@ impl FullName {
     pub fn to_sql(&self, dialect: AstDialect) -> Result<String, DeparseError> {
         render_full_name(self, dialect)
     }
+}
 
+#[cfg(test)]
+mod render_tests {
+    use crate::{ast::Dialect, names::FullName};
+    #[rstest::rstest]
+    #[case::empty(FullName::from_local_name(""))]
+    #[case::empty_schema(FullName::with_schema("", "x"))]
+    #[case::nul(FullName::from_local_name("a\0b"))]
+    fn checked_postgres_emission_rejects_invalid_sql(#[case] name: FullName) {
+        assert!(
+            name.to_sql(Dialect::postgres())
+                .unwrap_err()
+                .is_invalid_syntax()
+        );
+    }
+
+    #[test]
+    fn checked_sqlite_emission_rejects_catalog() {
+        assert!(
+            FullName::with_catalog("db", "main", "x")
+                .to_sql(Dialect::sqlite())
+                .is_err()
+        );
+    }
+}
+
+impl FullName {
     /// create with schema
     #[must_use]
     pub fn with_schema(schema: &str, local: &str) -> Self {
@@ -157,45 +200,6 @@ impl FullName {
             schema: None,
             name: LocalName::from(local_name),
         }
-    }
-}
-
-#[cfg(test)]
-mod construction_tests {
-    use crate::names::{CatalogName, FullName, LocalName};
-    #[test]
-    #[should_panic(expected = "a catalog requires a schema")]
-    fn constructor_prevents_catalog_only_names() {
-        let _ = FullName::new(
-            &Some(CatalogName::from("db")),
-            &None,
-            &LocalName::from("items"),
-        );
-    }
-}
-
-#[cfg(test)]
-mod render_tests {
-    use crate::{ast::Dialect, names::FullName};
-    #[rstest::rstest]
-    #[case::empty(FullName::from_local_name(""))]
-    #[case::empty_schema(FullName::with_schema("", "x"))]
-    #[case::nul(FullName::from_local_name("a\0b"))]
-    fn checked_postgres_emission_rejects_invalid_sql(#[case] name: FullName) {
-        assert!(
-            name.to_sql(Dialect::postgres())
-                .unwrap_err()
-                .is_invalid_syntax()
-        );
-    }
-
-    #[test]
-    fn checked_sqlite_emission_rejects_catalog() {
-        assert!(
-            FullName::with_catalog("db", "main", "x")
-                .to_sql(Dialect::sqlite())
-                .is_err()
-        );
     }
 }
 

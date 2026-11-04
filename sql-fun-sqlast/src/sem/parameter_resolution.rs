@@ -565,7 +565,42 @@ impl<'cache> ParameterResolution<'cache> {
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
         self.common_type(context, operation, arguments, true)
     }
+}
 
+#[cfg(test)]
+mod test_missing_comparison_knowledge {
+    use crate::{
+        sem::{InputTypeConstraint, parameter_resolution::ParameterResolution},
+        test_helpers::create_cache_context,
+    };
+
+    use crate::{
+        sem::{PgBuiltInType, ScalarConstExpr, SemScalarExpr},
+        test_helpers::TestParseContext,
+    };
+
+    #[test]
+    fn absent_comparison_knowledge_does_not_eliminate_parameter_types() {
+        let mut context = TestParseContext::default();
+        let mut cache = create_cache_context();
+        let mut parameters = ParameterResolution::new(&mut cache);
+        let arguments = [
+            parameters.parameter(1, &InputTypeConstraint::any()),
+            SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),
+        ];
+        let (_, types) = parameters
+            .min_max(&mut context, "greatest", &arguments)
+            .unwrap();
+        assert_eq!(types.single_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(context.reported_problems().len(), 1);
+        assert_eq!(
+            context.reported_problems()[0].code(),
+            "min_max_missing_comparison_facts"
+        );
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     // Shared ordered selection relations; comparison validation belongs only
     // to GREATEST/LEAST. ARRAY lifts the selected type into its result below.
     fn common_type(

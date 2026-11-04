@@ -22,65 +22,6 @@ impl super::ArithExpr {
         let (value, _) = Self::build_op_any_resolved(&mut context, name, lexpr, rexpr)?;
         Ok((value, context))
     }
-
-    pub(crate) fn build_op_any_resolved<'context, TParseContext>(
-        context: &'context mut TParseContext,
-        name: &OperatorName,
-        lexpr: Option<SemScalarExpr>,
-        rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(lexpr) = lexpr else {
-            AnalysisError::raise_unexpected_none("a_expr.lexpr")?
-        };
-        let Some(rexpr) = rexpr else {
-            AnalysisError::raise_unexpected_none("a_expr.rexpr")?
-        };
-
-        let Some(operator_def) = context.get_operator(name, true, true).cloned() else {
-            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
-                context, name, lexpr, rexpr,
-            );
-        };
-        let (Some(left_type), Some(array_type)) = (lexpr.get_type(), rexpr.get_type()) else {
-            return Ok((Self::deferred_any_operator(name, lexpr, rexpr), context));
-        };
-        let array_type = MinMaxExpr::base_type(context, &array_type);
-        if array_type.is_array() != Some(true) {
-            rexpr.require_array_resolved(context)?;
-            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
-                context, name, lexpr, rexpr,
-            );
-        }
-        let candidates = BinaryCastCandidate::resolve(
-            context,
-            name,
-            &operator_def,
-            &left_type,
-            &array_type.element_type(),
-        )?;
-        if candidates.len() != 1 {
-            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
-                context, name, lexpr, rexpr,
-            );
-        }
-        let candidate = &candidates[0];
-        if candidate.operator().get_return_type() != &PgBuiltInType::bool() {
-            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
-                context, name, lexpr, rexpr,
-            );
-        }
-        let (left, right) = candidate.wrap_array_implicit_cast(lexpr, rexpr);
-        AnyBinaryCallSite::from_operator_definition_resolved(
-            context,
-            name,
-            candidate.operator().clone(),
-            left,
-            right,
-        )
-    }
 }
 
 #[cfg(test)]
@@ -365,5 +306,66 @@ mod test_build_op_any {
         assert_eq!(value.get_type(), None);
         assert!(context.has_reported_problem("undefined_operator"));
         Ok(())
+    }
+}
+
+impl super::ArithExpr {
+    pub(crate) fn build_op_any_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        lexpr: Option<SemScalarExpr>,
+        rexpr: Option<SemScalarExpr>,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(lexpr) = lexpr else {
+            AnalysisError::raise_unexpected_none("a_expr.lexpr")?
+        };
+        let Some(rexpr) = rexpr else {
+            AnalysisError::raise_unexpected_none("a_expr.rexpr")?
+        };
+
+        let Some(operator_def) = context.get_operator(name, true, true).cloned() else {
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
+        };
+        let (Some(left_type), Some(array_type)) = (lexpr.get_type(), rexpr.get_type()) else {
+            return Ok((Self::deferred_any_operator(name, lexpr, rexpr), context));
+        };
+        let array_type = MinMaxExpr::base_type(context, &array_type);
+        if array_type.is_array() != Some(true) {
+            rexpr.require_array_resolved(context)?;
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
+        }
+        let candidates = BinaryCastCandidate::resolve(
+            context,
+            name,
+            &operator_def,
+            &left_type,
+            &array_type.element_type(),
+        )?;
+        if candidates.len() != 1 {
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
+        }
+        let candidate = &candidates[0];
+        if candidate.operator().get_return_type() != &PgBuiltInType::bool() {
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
+        }
+        let (left, right) = candidate.wrap_array_implicit_cast(lexpr, rexpr);
+        AnyBinaryCallSite::from_operator_definition_resolved(
+            context,
+            name,
+            candidate.operator().clone(),
+            left,
+            right,
+        )
     }
 }

@@ -709,7 +709,152 @@ impl ScalarAnalysisContext<'_> {
         let (value, _) = self.resolve_column(&mut context, alias, column)?;
         Ok((value, context))
     }
+}
 
+#[cfg(test)]
+mod test_resolve_column_ref {
+    use crate::{
+        names::{AliasName, ColumnName},
+        sem::{
+            ColumnDefinition, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr, SubQueryColumnRef,
+            WithClause, scalar_expr::context::ScalarAnalysisContext,
+        },
+        test_helpers::TestParseContext,
+    };
+
+    #[rstest::rstest]
+    #[case(None)]
+    #[case(Some("missing"))]
+    fn empty_scope_reports_missing_reference(
+        #[case] alias: Option<&str>,
+    ) -> testresult::TestResult {
+        let column = ColumnName::from("n");
+        let alias = alias.map(AliasName::from);
+        let (expr, context) = ScalarAnalysisContext::default().resolve_column_ref(
+            TestParseContext::default(),
+            alias.as_ref(),
+            &column,
+        )?;
+        if alias.is_some() {
+            assert_matches::assert_matches!(
+                expr,
+                SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedAlias(_))
+            );
+        } else {
+            assert_eq!(
+                expr,
+                SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedColumn(column))
+            );
+        }
+        assert_eq!(expr.get_type(), None);
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case("(select 42 as n) a", None)]
+    #[case("(select 42 as n) a", Some("a"))]
+    #[case("(select 42 as n) a, (select true as n) b", Some("a"))]
+    fn resolves_column_and_preserves_metadata(
+        #[case] from_sql: &str,
+        #[case] alias: Option<&str>,
+    ) -> testresult::TestResult {
+        let (from, context) = TestParseContext::scalar_scope_from_sql(from_sql)?;
+        let with = WithClause::default();
+        let scope = ScalarAnalysisContext::new(&with, &from);
+        let column = ColumnName::from("n");
+        let alias = alias.map(AliasName::from);
+        let (expr, context) = scope.resolve_column_ref(context, alias.as_ref(), &column)?;
+        let definition = ColumnDefinition::new(
+            &Some(column.clone()),
+            Some(&PgBuiltInType::int4()),
+            Some(true),
+            &[],
+        );
+        assert_eq!(
+            expr,
+            SemScalarExpr::ColumnRef(ColumnReferenceExpr::SubQueryColumn(SubQueryColumnRef::new(
+                &AliasName::from("a"),
+                &column,
+                Some(&definition),
+                false
+            ),))
+        );
+        assert_eq!(expr.get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(expr.is_not_null(), Some(true));
+        assert_eq!(context.reported_problem_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn unqualified_column_reports_ambiguity() -> testresult::TestResult {
+        let (from, context) =
+            TestParseContext::scalar_scope_from_sql("(select 42 as n) a, (select 43 as n) b")?;
+        let with = WithClause::default();
+        let scope = ScalarAnalysisContext::new(&with, &from);
+        let column = ColumnName::from("n");
+        let (expr, context) = scope.resolve_column_ref(context, None, &column)?;
+        assert_eq!(
+            expr,
+            SemScalarExpr::ColumnRef(ColumnReferenceExpr::AmbiguousColumnRef(column))
+        );
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn qualified_lookup_does_not_fall_back_to_another_source() -> testresult::TestResult {
+        let (from, context) =
+            TestParseContext::scalar_scope_from_sql("(select 42 as n) a, (select 43 as m) b")?;
+        let with = WithClause::default();
+        let scope = ScalarAnalysisContext::new(&with, &from);
+        let alias = AliasName::from("a");
+        let column = ColumnName::from("m");
+        let (expr, context) = scope.resolve_column_ref(context, Some(&alias), &column)?;
+        assert_eq!(
+            expr,
+            SemScalarExpr::ColumnRef(ColumnReferenceExpr::SubQueryColumn(SubQueryColumnRef::new(
+                &alias, &column, None, false
+            ),))
+        );
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case("left", "a", "n", true)]
+    #[case("left", "b", "m", false)]
+    #[case("right", "a", "n", false)]
+    #[case("right", "b", "m", true)]
+    #[case("full", "a", "n", false)]
+    #[case("full", "b", "m", false)]
+    fn preserves_outer_join_nullability(
+        #[case] join: &str,
+        #[case] alias: &str,
+        #[case] column: &str,
+        #[case] not_null: bool,
+        #[values(false, true)] qualified: bool,
+    ) -> testresult::TestResult {
+        let (from, context) = TestParseContext::scalar_scope_from_sql(&format!(
+            "(select 42 as n) a {join} join (select 43 as m) b on true"
+        ))?;
+        let with = WithClause::default();
+        let scope = ScalarAnalysisContext::new(&with, &from);
+        let alias = if qualified {
+            Some(AliasName::from(alias))
+        } else {
+            None
+        };
+        let (expr, context) =
+            scope.resolve_column_ref(context, alias.as_ref(), &ColumnName::from(column))?;
+        assert_eq!(expr.get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(expr.is_not_null(), Some(not_null));
+        assert_eq!(context.reported_problem_count(), 0);
+        Ok(())
+    }
+}
+
+impl ScalarAnalysisContext<'_> {
     fn resolve_returning_image_column(
         &self,
         context: &mut impl ParseContext,
@@ -854,149 +999,6 @@ impl ScalarAnalysisContext<'_> {
         self.validate_rule_reference(context, source.alias())?;
         let expression = source.bind(context, &self.with_clause, column)?;
         Ok((expression, context))
-    }
-}
-
-#[cfg(test)]
-mod test_resolve_column_ref {
-    use crate::{
-        names::{AliasName, ColumnName},
-        sem::{
-            ColumnDefinition, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr, SubQueryColumnRef,
-            WithClause, scalar_expr::context::ScalarAnalysisContext,
-        },
-        test_helpers::TestParseContext,
-    };
-
-    #[rstest::rstest]
-    #[case(None)]
-    #[case(Some("missing"))]
-    fn empty_scope_reports_missing_reference(
-        #[case] alias: Option<&str>,
-    ) -> testresult::TestResult {
-        let column = ColumnName::from("n");
-        let alias = alias.map(AliasName::from);
-        let (expr, context) = ScalarAnalysisContext::default().resolve_column_ref(
-            TestParseContext::default(),
-            alias.as_ref(),
-            &column,
-        )?;
-        if alias.is_some() {
-            assert_matches::assert_matches!(
-                expr,
-                SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedAlias(_))
-            );
-        } else {
-            assert_eq!(
-                expr,
-                SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedColumn(column))
-            );
-        }
-        assert_eq!(expr.get_type(), None);
-        assert_eq!(context.reported_problem_count(), 1);
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    #[case("(select 42 as n) a", None)]
-    #[case("(select 42 as n) a", Some("a"))]
-    #[case("(select 42 as n) a, (select true as n) b", Some("a"))]
-    fn resolves_column_and_preserves_metadata(
-        #[case] from_sql: &str,
-        #[case] alias: Option<&str>,
-    ) -> testresult::TestResult {
-        let (from, context) = TestParseContext::scalar_scope_from_sql(from_sql)?;
-        let with = WithClause::default();
-        let scope = ScalarAnalysisContext::new(&with, &from);
-        let column = ColumnName::from("n");
-        let alias = alias.map(AliasName::from);
-        let (expr, context) = scope.resolve_column_ref(context, alias.as_ref(), &column)?;
-        let definition = ColumnDefinition::new(
-            &Some(column.clone()),
-            Some(&PgBuiltInType::int4()),
-            Some(true),
-            &[],
-        );
-        assert_eq!(
-            expr,
-            SemScalarExpr::ColumnRef(ColumnReferenceExpr::SubQueryColumn(SubQueryColumnRef::new(
-                &AliasName::from("a"),
-                &column,
-                Some(&definition),
-                false
-            ),))
-        );
-        assert_eq!(expr.get_type(), Some(PgBuiltInType::int4()));
-        assert_eq!(expr.is_not_null(), Some(true));
-        assert_eq!(context.reported_problem_count(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn unqualified_column_reports_ambiguity() -> testresult::TestResult {
-        let (from, context) =
-            TestParseContext::scalar_scope_from_sql("(select 42 as n) a, (select 43 as n) b")?;
-        let with = WithClause::default();
-        let scope = ScalarAnalysisContext::new(&with, &from);
-        let column = ColumnName::from("n");
-        let (expr, context) = scope.resolve_column_ref(context, None, &column)?;
-        assert_eq!(
-            expr,
-            SemScalarExpr::ColumnRef(ColumnReferenceExpr::AmbiguousColumnRef(column))
-        );
-        assert_eq!(context.reported_problem_count(), 1);
-        Ok(())
-    }
-
-    #[test]
-    fn qualified_lookup_does_not_fall_back_to_another_source() -> testresult::TestResult {
-        let (from, context) =
-            TestParseContext::scalar_scope_from_sql("(select 42 as n) a, (select 43 as m) b")?;
-        let with = WithClause::default();
-        let scope = ScalarAnalysisContext::new(&with, &from);
-        let alias = AliasName::from("a");
-        let column = ColumnName::from("m");
-        let (expr, context) = scope.resolve_column_ref(context, Some(&alias), &column)?;
-        assert_eq!(
-            expr,
-            SemScalarExpr::ColumnRef(ColumnReferenceExpr::SubQueryColumn(SubQueryColumnRef::new(
-                &alias, &column, None, false
-            ),))
-        );
-        assert_eq!(context.reported_problem_count(), 1);
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    #[case("left", "a", "n", true)]
-    #[case("left", "b", "m", false)]
-    #[case("right", "a", "n", false)]
-    #[case("right", "b", "m", true)]
-    #[case("full", "a", "n", false)]
-    #[case("full", "b", "m", false)]
-    fn preserves_outer_join_nullability(
-        #[case] join: &str,
-        #[case] alias: &str,
-        #[case] column: &str,
-        #[case] not_null: bool,
-        #[values(false, true)] qualified: bool,
-    ) -> testresult::TestResult {
-        let (from, context) = TestParseContext::scalar_scope_from_sql(&format!(
-            "(select 42 as n) a {join} join (select 43 as m) b on true"
-        ))?;
-        let with = WithClause::default();
-        let scope = ScalarAnalysisContext::new(&with, &from);
-        let alias = if qualified {
-            Some(AliasName::from(alias))
-        } else {
-            None
-        };
-        let (expr, context) =
-            scope.resolve_column_ref(context, alias.as_ref(), &ColumnName::from(column))?;
-        assert_eq!(expr.get_type(), Some(PgBuiltInType::int4()));
-        assert_eq!(expr.is_not_null(), Some(not_null));
-        assert_eq!(context.reported_problem_count(), 0);
-        Ok(())
     }
 }
 

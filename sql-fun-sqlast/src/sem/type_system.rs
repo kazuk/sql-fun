@@ -255,34 +255,6 @@ impl OverloadVariant {
         }
         column_collection
     }
-
-    /// Get column from function result set
-    #[must_use]
-    pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
-        let retuning_table = self.returning_table();
-        retuning_table.get_column_def(column).cloned()
-    }
-
-    /// get parameter list
-    #[must_use]
-    pub const fn params(&self) -> &Vec<FunctionParam> {
-        &self.params
-    }
-
-    /// bind arguments
-    fn bind_args(
-        &self,
-        mut arg_types: ArgumentBindingCollection,
-    ) -> Result<Vec<ParameterBindResult>, TypeError> {
-        let mut results = Vec::new();
-        for param in &self.params {
-            results.push(param.bind_arg(&mut arg_types)?);
-        }
-        if arg_types.pop_front().is_some() {
-            return Err(TypeError::too_many_arguments());
-        }
-        Ok(results)
-    }
 }
 
 #[cfg(test)]
@@ -359,5 +331,35 @@ mod test_output_return_shape {
             false,
         );
         assert_eq!(overload.scaler_ret_type(), ty);
+    }
+}
+
+impl OverloadVariant {
+    /// Get column from function result set
+    #[must_use]
+    pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
+        let retuning_table = self.returning_table();
+        retuning_table.get_column_def(column).cloned()
+    }
+
+    /// get parameter list
+    #[must_use]
+    pub const fn params(&self) -> &Vec<FunctionParam> {
+        &self.params
+    }
+
+    /// bind arguments
+    fn bind_args(
+        &self,
+        mut arg_types: ArgumentBindingCollection,
+    ) -> Result<Vec<ParameterBindResult>, TypeError> {
+        let mut results = Vec::new();
+        for param in &self.params {
+            results.push(param.bind_arg(&mut arg_types)?);
+        }
+        if arg_types.pop_front().is_some() {
+            return Err(TypeError::too_many_arguments());
+        }
+        Ok(results)
     }
 }

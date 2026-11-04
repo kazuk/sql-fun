@@ -1,10 +1,4 @@
-use crate::{
-    ast::{
-        Dialect, DropTable, Name,
-        deparse::{SqlEmit, SqlWriter},
-    },
-    test_helpers::assert_postgres_structure,
-};
+use crate::test_helpers::assert_postgres_structure;
 
 #[rstest::rstest]
 #[case("SET work_mem TO '64MB'")]
@@ -83,17 +77,4 @@ use crate::{
 #[case("ALTER TABLE app.t OWNER TO SESSION_USER")]
 fn simple_statement_preserves_native_tree(#[case] sql: &str) {
     assert_postgres_structure(sql);
-}
-
-#[test]
-fn rejects_concurrent_drop_table() {
-    let statement = DropTable {
-        names: vec![Name::local("t")],
-        if_exists: true,
-        cascade: false,
-        concurrent: true,
-    };
-    let mut writer = SqlWriter::new(Dialect::postgres());
-    let error = statement.emit(&mut writer).expect_err("invalid syntax");
-    assert!(error.is_invalid_syntax());
 }

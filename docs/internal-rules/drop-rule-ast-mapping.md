@@ -15,7 +15,7 @@ frontend shape but select distinct common statements.
 
 ## Complete field and alternative checklist
 
-| Frontend field / alternative | Common destination or validation | Coverage in `ast/rule/drop_tests.rs` |
+| Frontend field / alternative | Common destination or validation | Coverage in `ast/rule.rs` colocated conversion tests |
 | --- | --- | --- |
 | `objects` | Exactly one List; final component is rule name, preceding components are the required unresolved ON relation | `postgres_preserves_target_names`, `rejects_invalid_target_cardinality`, `rejects_missing_relation_in_target`, `rejects_non_list_target` |
 | Nested List `items`, String `sval` | Existing Name conversion retains every ordered identifier value; non-String/missing components are rejected | Target-name tests and `rejects_non_string_name_component` |

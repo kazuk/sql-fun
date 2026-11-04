@@ -124,7 +124,80 @@ impl SqliteDialect {
         let mut parser = TursoParser::new(sql.as_bytes());
         Ok(parser.next_cmd()?.map(Cmd::from))
     }
+}
 
+#[cfg(test)]
+mod test_expression_depth {
+    #[cfg(feature = "sqlite")]
+    use crate::sqlite::SqliteDialect;
+    use ::turso_parser::MAX_EXPR_DEPTH;
+
+    #[test]
+    fn propagates_tree_height_limit_for_left_associative_expressions() {
+        let accepted = format!("SELECT {}", vec!["1"; MAX_EXPR_DEPTH].join(" + "));
+        assert!(SqliteDialect::parse(&accepted).unwrap().is_some());
+        let rejected = format!("{accepted} + 1");
+        assert!(SqliteDialect::parse(&rejected).is_err());
+    }
+
+    #[test]
+    fn propagates_nested_expression_limit() {
+        // Combine nesting and a long tree without exhausting the debug test thread's stack.
+        let accepted = format!(
+            "SELECT abs(abs({}))",
+            vec!["1"; MAX_EXPR_DEPTH - 2].join(" + ")
+        );
+        assert!(SqliteDialect::parse(&accepted).unwrap().is_some());
+        let rejected = format!(
+            "SELECT abs(abs({}))",
+            vec!["1"; MAX_EXPR_DEPTH - 1].join(" + ")
+        );
+        assert!(SqliteDialect::parse(&rejected).is_err());
+    }
+}
+
+#[cfg(test)]
+mod test_parser_upgrade_boundary {
+    #[cfg(feature = "sqlite")]
+    use crate::sqlite::{SqliteDialect, SqliteLexer};
+    use ::turso_parser::parser::Parser;
+
+    #[rstest::rstest]
+    #[case::update_order_by("UPDATE items SET value = 1 ORDER BY value")]
+    #[case::update_limit("UPDATE items SET value = 1 LIMIT 1")]
+    #[case::update_order_by_limit("UPDATE items SET value = 1 ORDER BY value LIMIT 1")]
+    #[case::delete_order_by("DELETE FROM items ORDER BY value")]
+    #[case::delete_limit("DELETE FROM items LIMIT 1")]
+    #[case::delete_order_by_limit("DELETE FROM items ORDER BY value LIMIT 1")]
+    #[case::generated_default("CREATE TABLE items (base INT, derived INT AS (base) DEFAULT 1)")]
+    #[case::only_generated_column("CREATE TABLE items (derived INT AS (1))")]
+    #[case::compound_order_by("SELECT 1 ORDER BY 1 UNION SELECT 2")]
+    #[case::compound_limit("SELECT 1 LIMIT 1 UNION SELECT 2")]
+    fn propagates_upstream_rejections_without_replacing_diagnostics(#[case] sql: &str) {
+        let expected = Parser::new(sql.as_bytes())
+            .next_cmd()
+            .expect_err("upstream rejection");
+        let actual = SqliteDialect::parse(sql).expect_err("inherited rejection");
+        assert_eq!(actual.to_string(), expected.to_string(), "{sql}");
+    }
+
+    #[rstest::rstest]
+    fn blob_tokens_retain_complete_text_and_source_span(
+        #[values("x'ab'", "X'AB'", "x'aBcD'", "x''")] literal: &str,
+    ) {
+        let sql = format!("  {literal}");
+        let mut lexer = SqliteLexer::new(&sql);
+        let whitespace = lexer.next().unwrap().unwrap();
+        assert_eq!(whitespace.text(), "  ");
+        assert_eq!(*whitespace.span(), 0..2);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token.text(), literal);
+        assert_eq!(*token.span(), 2..sql.len());
+        assert!(lexer.next().unwrap().is_none());
+    }
+}
+
+impl SqliteDialect {
     /// scan a SQL Statement into lex tokens
     pub fn scan<'a>(sql: &'a str) -> Result<IVec<SqliteToken<'a>>, TursoError> {
         let mut lexer = SqliteLexer::new(sql);
@@ -181,7 +254,69 @@ impl SqliteDialect {
         *content_hash = Some(snapshot.content_hash().to_owned());
         Self::parse_schema_snapshot(&snapshot, input_context, args, metadata)
     }
+}
 
+#[cfg(test)]
+mod test_schema_content_hash {
+    #[cfg(feature = "sqlite")]
+    use crate::SqliteDialect;
+    use crate::ast::Dialect;
+    use crate::test_helpers::schema_content_hash as test_helpers;
+    use crate::{
+        ast::Dialect as AstDialect, context::BaseParseContext as ContextBaseParseContext,
+        test_helpers::TestParseContext as TestHelpersTestParseContext,
+    };
+
+    #[rstest::rstest]
+    #[case::success("CREATE TABLE hash_test (id);", true)]
+    #[case::failure("CREATE TABLE broken (id", false)]
+    fn preserves_original_hash_even_on_syntax_failure(#[case] sql: &str, #[case] succeeds: bool) {
+        let file = test_helpers::schema_file(sql);
+        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
+        let mut hash = None;
+        let result = {
+            let analysis_base = &base;
+            let environment =
+                TestHelpersTestParseContext::default().with_dialect(AstDialect::sqlite());
+            SqliteDialect::parse_schema_file(
+                file.path(),
+                analysis_base,
+                &mut hash,
+                ContextBaseParseContext::get_args(&environment),
+                ContextBaseParseContext::metadata(&environment),
+            )
+        };
+        assert_eq!(result.is_ok(), succeeds, "{result:?}");
+        assert_eq!(
+            hash,
+            Some(::sql_fun_core::Hasher::hash_file(file.path()).unwrap())
+        );
+    }
+
+    #[test]
+    fn read_failure_clears_output_hash() {
+        let directory = ::tempfile::tempdir().unwrap();
+        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
+        let mut hash = Some("previous".to_owned());
+        let error = {
+            let analysis_base = &base;
+            let environment =
+                TestHelpersTestParseContext::default().with_dialect(AstDialect::sqlite());
+            SqliteDialect::parse_schema_file(
+                &directory.path().join("missing.sql"),
+                analysis_base,
+                &mut hash,
+                ContextBaseParseContext::get_args(&environment),
+                ContextBaseParseContext::metadata(&environment),
+            )
+        }
+        .unwrap_err();
+        assert!(error.is_io());
+        assert!(hash.is_none());
+    }
+}
+
+impl SqliteDialect {
     /// Analyze exactly the previously read snapshot, without reopening its file.
     /// The supplied args and selected metadata configure this analysis independently
     /// of the frozen catalog; metadata must select this loader's dialect.
@@ -222,42 +357,15 @@ impl SqliteDialect {
 }
 
 #[cfg(test)]
-mod test_schema_content_hash {
+mod test_schema_snapshot {
     #[cfg(feature = "sqlite")]
     use crate::SqliteDialect;
-    use crate::ast::Dialect;
-    use crate::test_helpers::schema_content_hash as test_helpers;
-    use crate::{
-        SqlFileSnapshot, ast::Dialect as AstDialect,
-        context::BaseParseContext as ContextBaseParseContext,
-        test_helpers::TestParseContext as TestHelpersTestParseContext,
-    };
 
-    #[rstest::rstest]
-    #[case::success("CREATE TABLE hash_test (id);", true)]
-    #[case::failure("CREATE TABLE broken (id", false)]
-    fn preserves_original_hash_even_on_syntax_failure(#[case] sql: &str, #[case] succeeds: bool) {
-        let file = test_helpers::schema_file(sql);
-        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
-        let mut hash = None;
-        let result = {
-            let analysis_base = &base;
-            let environment =
-                TestHelpersTestParseContext::default().with_dialect(AstDialect::sqlite());
-            SqliteDialect::parse_schema_file(
-                file.path(),
-                analysis_base,
-                &mut hash,
-                ContextBaseParseContext::get_args(&environment),
-                ContextBaseParseContext::metadata(&environment),
-            )
-        };
-        assert_eq!(result.is_ok(), succeeds, "{result:?}");
-        assert_eq!(
-            hash,
-            Some(::sql_fun_core::Hasher::hash_file(file.path()).unwrap())
-        );
-    }
+    use crate::ast::Dialect;
+
+    use crate::test_helpers::schema_content_hash as test_helpers;
+
+    use crate::SqlFileSnapshot;
 
     #[test]
     fn analyzes_snapshot_after_source_is_deleted() {
@@ -279,98 +387,5 @@ mod test_schema_content_hash {
             }
             .is_ok()
         );
-    }
-
-    #[test]
-    fn read_failure_clears_output_hash() {
-        let directory = ::tempfile::tempdir().unwrap();
-        let base = test_helpers::base_with_public_schema(Dialect::sqlite());
-        let mut hash = Some("previous".to_owned());
-        let error = {
-            let analysis_base = &base;
-            let environment =
-                TestHelpersTestParseContext::default().with_dialect(AstDialect::sqlite());
-            SqliteDialect::parse_schema_file(
-                &directory.path().join("missing.sql"),
-                analysis_base,
-                &mut hash,
-                ContextBaseParseContext::get_args(&environment),
-                ContextBaseParseContext::metadata(&environment),
-            )
-        }
-        .unwrap_err();
-        assert!(error.is_io());
-        assert!(hash.is_none());
-    }
-}
-
-#[cfg(test)]
-mod test_parser_upgrade_boundary {
-    #[cfg(feature = "sqlite")]
-    use crate::sqlite::{SqliteDialect, SqliteLexer};
-    use ::turso_parser::parser::Parser;
-
-    #[rstest::rstest]
-    #[case::update_order_by("UPDATE items SET value = 1 ORDER BY value")]
-    #[case::update_limit("UPDATE items SET value = 1 LIMIT 1")]
-    #[case::update_order_by_limit("UPDATE items SET value = 1 ORDER BY value LIMIT 1")]
-    #[case::delete_order_by("DELETE FROM items ORDER BY value")]
-    #[case::delete_limit("DELETE FROM items LIMIT 1")]
-    #[case::delete_order_by_limit("DELETE FROM items ORDER BY value LIMIT 1")]
-    #[case::generated_default("CREATE TABLE items (base INT, derived INT AS (base) DEFAULT 1)")]
-    #[case::only_generated_column("CREATE TABLE items (derived INT AS (1))")]
-    #[case::compound_order_by("SELECT 1 ORDER BY 1 UNION SELECT 2")]
-    #[case::compound_limit("SELECT 1 LIMIT 1 UNION SELECT 2")]
-    fn propagates_upstream_rejections_without_replacing_diagnostics(#[case] sql: &str) {
-        let expected = Parser::new(sql.as_bytes())
-            .next_cmd()
-            .expect_err("upstream rejection");
-        let actual = SqliteDialect::parse(sql).expect_err("inherited rejection");
-        assert_eq!(actual.to_string(), expected.to_string(), "{sql}");
-    }
-
-    #[rstest::rstest]
-    fn blob_tokens_retain_complete_text_and_source_span(
-        #[values("x'ab'", "X'AB'", "x'aBcD'", "x''")] literal: &str,
-    ) {
-        let sql = format!("  {literal}");
-        let mut lexer = SqliteLexer::new(&sql);
-        let whitespace = lexer.next().unwrap().unwrap();
-        assert_eq!(whitespace.text(), "  ");
-        assert_eq!(*whitespace.span(), 0..2);
-        let token = lexer.next().unwrap().unwrap();
-        assert_eq!(token.text(), literal);
-        assert_eq!(*token.span(), 2..sql.len());
-        assert!(lexer.next().unwrap().is_none());
-    }
-}
-
-#[cfg(test)]
-mod test_expression_depth {
-    #[cfg(feature = "sqlite")]
-    use crate::sqlite::SqliteDialect;
-    use ::turso_parser::MAX_EXPR_DEPTH;
-
-    #[test]
-    fn propagates_tree_height_limit_for_left_associative_expressions() {
-        let accepted = format!("SELECT {}", vec!["1"; MAX_EXPR_DEPTH].join(" + "));
-        assert!(SqliteDialect::parse(&accepted).unwrap().is_some());
-        let rejected = format!("{accepted} + 1");
-        assert!(SqliteDialect::parse(&rejected).is_err());
-    }
-
-    #[test]
-    fn propagates_nested_expression_limit() {
-        // Combine nesting and a long tree without exhausting the debug test thread's stack.
-        let accepted = format!(
-            "SELECT abs(abs({}))",
-            vec!["1"; MAX_EXPR_DEPTH - 2].join(" + ")
-        );
-        assert!(SqliteDialect::parse(&accepted).unwrap().is_some());
-        let rejected = format!(
-            "SELECT abs(abs({}))",
-            vec!["1"; MAX_EXPR_DEPTH - 1].join(" + ")
-        );
-        assert!(SqliteDialect::parse(&rejected).is_err());
     }
 }

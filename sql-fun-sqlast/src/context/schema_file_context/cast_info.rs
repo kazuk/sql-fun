@@ -181,65 +181,118 @@ impl CastInfoRead for SchemaCatalog {
     }
 }
 
-impl SchemaCatalog {
-    fn direct_implicit_cast(
-        &self,
-        source_type: &TypeReference,
-        target_type: &TypeReference,
-    ) -> Option<CastDefinition> {
-        if let Some(s) = self.casts.get(&source_type.to_string())
-            && let Some(t) = s.get(&target_type.to_string())
-        {
-            if t.use_in_implicit() {
-                Some(t.clone())
-            } else {
-                None
-            }
-        } else {
-            self.base
-                .get_implicit_cast(source_type, target_type)
-                .filter(CastDefinition::use_in_implicit)
-        }
+#[cfg(test)]
+mod test_cast_layers {
+    use crate::test_helpers::cast_layers as test_helpers;
+    use crate::{
+        context::{CastInfoRead, ParseContext},
+        sem::CastContext,
+    };
+    use crate::{names::FullName as NamesFullName, test_helpers::schema_layer};
+    use std::collections::HashSet;
+
+    #[rstest::rstest]
+    #[case::implicit(CastContext::implicit(), true)]
+    #[case::explicit(CastContext::explicit(), false)]
+    #[case::assignment(CastContext::assignment(), false)]
+    fn local_cast_eligibility_shadows_parent_and_absent_pairs_fall_back(
+        #[case] local_context: CastContext,
+        #[case] implicit: bool,
+    ) {
+        let (mut child, source, shared, inherited) = test_helpers::cast_layer();
+        test_helpers::register(&mut child, &source, &shared, local_context);
+        let frozen = child.freeze();
+
+        assert_eq!(
+            frozen.get_implicit_cast(&source, &shared).is_some(),
+            implicit
+        );
+        assert_eq!(
+            frozen
+                .get_explicit_cast(&source, &shared)
+                .expect("eligible explicit local cast")
+                .context(),
+            local_context
+        );
+        assert!(frozen.get_implicit_cast(&source, &inherited).is_some());
+        assert!(frozen.get_explicit_cast(&source, &inherited).is_some());
     }
 
-    /// Preserve local shadowing, inherited lookup, and I/O fallback for base types.
-    fn direct_explicit_cast(
-        &self,
-        source_type: &TypeReference,
-        target_type: &TypeReference,
-    ) -> Option<CastDefinition> {
-        if let Some(s) = self.casts.get(&source_type.to_string())
-            && let Some(t) = s.get(&target_type.to_string())
-        {
-            if t.use_in_explicit() {
-                Some(t.clone())
-            } else {
-                None
-            }
-        } else if let Some(cast) = self.base.get_explicit_cast(source_type, target_type) {
-            Some(cast)
-        } else {
-            self.io_cast(source_type, target_type)
-        }
-    }
-    /// Resolve domains only; an array of domains remains an array type.
-    /// Broken or cyclic domain definitions cannot establish cast eligibility.
-    fn domain_base(&self, reference: &TypeReference) -> Option<TypeReference> {
-        reference.domain_base_type(self)
+    #[test]
+    fn implicit_targets_include_parent_local_and_identity_but_not_explicit_only() {
+        let (mut child, source, shared, inherited) = test_helpers::cast_layer();
+        let local = test_helpers::named_type("local");
+        let explicit = test_helpers::named_type("explicit");
+        test_helpers::register(&mut child, &source, &local, CastContext::implicit());
+        test_helpers::register(&mut child, &source, &explicit, CastContext::explicit());
+        let frozen = child.freeze();
+
+        assert_eq!(
+            frozen.get_implicit_castable(&source),
+            HashSet::from([source.clone(), shared, inherited, local])
+        );
+        assert!(!frozen.get_implicit_castable(&source).contains(&explicit));
     }
 
-    fn io_string_types() -> [TypeReference; 4] {
-        ["text", "varchar", "bpchar", "name"].map(TypeReference::from_master_type_name)
-    }
-
-    fn io_cast(&self, source: &TypeReference, target: &TypeReference) -> Option<CastDefinition> {
-        self.get_type_impl(source.full_name()?)?;
-        self.get_type_impl(target.full_name()?)?;
-        let strings = Self::io_string_types();
-        if strings.contains(source) || strings.contains(target) {
-            return Some(CastDefinition::new(CastContext::explicit()));
-        }
-        None
+    #[rstest::rstest]
+    #[case::dot_scalar(
+        crate::names::FullName::with_schema("a.b", "c"),
+        crate::names::FullName::with_schema("a", "b.c"),
+        false,
+        false
+    )]
+    #[case::dot_arrays(
+        crate::names::FullName::with_schema("a.b", "c"),
+        crate::names::FullName::with_schema("a", "b.c"),
+        true,
+        true
+    )]
+    #[case::quotes(
+        crate::names::FullName::with_schema("a\"b", "c"),
+        crate::names::FullName::with_schema("a", "b\"c"),
+        false,
+        false
+    )]
+    #[case::array_suffix(
+        crate::names::FullName::with_schema("a", "item[]"),
+        crate::names::FullName::with_schema("a", "item"),
+        false,
+        true
+    )]
+    #[case::array_flag(
+        crate::names::FullName::with_schema("a", "item"),
+        crate::names::FullName::with_schema("a", "item"),
+        false,
+        true
+    )]
+    fn preserves_cast_keys_and_enumerated_types(
+        #[case] left: NamesFullName,
+        #[case] right: NamesFullName,
+        #[case] source_array: bool,
+        #[case] other_array: bool,
+    ) {
+        use crate::sem::TypeReference;
+        let (mut child, _, _, _) = test_helpers::cast_layer();
+        let source = TypeReference::concrete_type_ref(&left, source_array);
+        let other = TypeReference::concrete_type_ref(&right, other_array);
+        let target = test_helpers::named_type("target");
+        test_helpers::register(&mut child, &source, &target, CastContext::implicit());
+        test_helpers::register(&mut child, &other, &target, CastContext::explicit());
+        test_helpers::register(&mut child, &target, &source, CastContext::implicit());
+        test_helpers::register(&mut child, &target, &other, CastContext::explicit());
+        let parent = child.freeze();
+        let child = schema_layer(std::path::Path::new("cast-child.sql"), &parent);
+        assert!(child.get_implicit_cast(&source, &target).is_some());
+        assert!(child.get_implicit_cast(&other, &target).is_none());
+        assert!(child.get_implicit_cast(&target, &source).is_some());
+        assert!(child.get_implicit_cast(&target, &other).is_none());
+        let sources = child.cast_sources(&target, false);
+        assert!(sources.contains(&source));
+        assert!(!sources.contains(&other));
+        let targets = child.get_implicit_castable(&target);
+        assert!(targets.contains(&source));
+        assert!(!targets.contains(&other));
+        assert!(child.cast_sources(&target, true).contains(&other));
     }
 }
 
@@ -497,117 +550,64 @@ mod test_domain_casts {
     }
 }
 
-#[cfg(test)]
-mod test_cast_layers {
-    use crate::test_helpers::cast_layers as test_helpers;
-    use crate::{
-        context::{CastInfoRead, ParseContext},
-        sem::CastContext,
-    };
-    use crate::{names::FullName as NamesFullName, test_helpers::schema_layer};
-    use std::collections::HashSet;
-
-    #[rstest::rstest]
-    #[case::implicit(CastContext::implicit(), true)]
-    #[case::explicit(CastContext::explicit(), false)]
-    #[case::assignment(CastContext::assignment(), false)]
-    fn local_cast_eligibility_shadows_parent_and_absent_pairs_fall_back(
-        #[case] local_context: CastContext,
-        #[case] implicit: bool,
-    ) {
-        let (mut child, source, shared, inherited) = test_helpers::cast_layer();
-        test_helpers::register(&mut child, &source, &shared, local_context);
-        let frozen = child.freeze();
-
-        assert_eq!(
-            frozen.get_implicit_cast(&source, &shared).is_some(),
-            implicit
-        );
-        assert_eq!(
-            frozen
-                .get_explicit_cast(&source, &shared)
-                .expect("eligible explicit local cast")
-                .context(),
-            local_context
-        );
-        assert!(frozen.get_implicit_cast(&source, &inherited).is_some());
-        assert!(frozen.get_explicit_cast(&source, &inherited).is_some());
+impl SchemaCatalog {
+    fn direct_implicit_cast(
+        &self,
+        source_type: &TypeReference,
+        target_type: &TypeReference,
+    ) -> Option<CastDefinition> {
+        if let Some(s) = self.casts.get(&source_type.to_string())
+            && let Some(t) = s.get(&target_type.to_string())
+        {
+            if t.use_in_implicit() {
+                Some(t.clone())
+            } else {
+                None
+            }
+        } else {
+            self.base
+                .get_implicit_cast(source_type, target_type)
+                .filter(CastDefinition::use_in_implicit)
+        }
     }
 
-    #[test]
-    fn implicit_targets_include_parent_local_and_identity_but_not_explicit_only() {
-        let (mut child, source, shared, inherited) = test_helpers::cast_layer();
-        let local = test_helpers::named_type("local");
-        let explicit = test_helpers::named_type("explicit");
-        test_helpers::register(&mut child, &source, &local, CastContext::implicit());
-        test_helpers::register(&mut child, &source, &explicit, CastContext::explicit());
-        let frozen = child.freeze();
-
-        assert_eq!(
-            frozen.get_implicit_castable(&source),
-            HashSet::from([source.clone(), shared, inherited, local])
-        );
-        assert!(!frozen.get_implicit_castable(&source).contains(&explicit));
+    /// Preserve local shadowing, inherited lookup, and I/O fallback for base types.
+    fn direct_explicit_cast(
+        &self,
+        source_type: &TypeReference,
+        target_type: &TypeReference,
+    ) -> Option<CastDefinition> {
+        if let Some(s) = self.casts.get(&source_type.to_string())
+            && let Some(t) = s.get(&target_type.to_string())
+        {
+            if t.use_in_explicit() {
+                Some(t.clone())
+            } else {
+                None
+            }
+        } else if let Some(cast) = self.base.get_explicit_cast(source_type, target_type) {
+            Some(cast)
+        } else {
+            self.io_cast(source_type, target_type)
+        }
+    }
+    /// Resolve domains only; an array of domains remains an array type.
+    /// Broken or cyclic domain definitions cannot establish cast eligibility.
+    fn domain_base(&self, reference: &TypeReference) -> Option<TypeReference> {
+        reference.domain_base_type(self)
     }
 
-    #[rstest::rstest]
-    #[case::dot_scalar(
-        crate::names::FullName::with_schema("a.b", "c"),
-        crate::names::FullName::with_schema("a", "b.c"),
-        false,
-        false
-    )]
-    #[case::dot_arrays(
-        crate::names::FullName::with_schema("a.b", "c"),
-        crate::names::FullName::with_schema("a", "b.c"),
-        true,
-        true
-    )]
-    #[case::quotes(
-        crate::names::FullName::with_schema("a\"b", "c"),
-        crate::names::FullName::with_schema("a", "b\"c"),
-        false,
-        false
-    )]
-    #[case::array_suffix(
-        crate::names::FullName::with_schema("a", "item[]"),
-        crate::names::FullName::with_schema("a", "item"),
-        false,
-        true
-    )]
-    #[case::array_flag(
-        crate::names::FullName::with_schema("a", "item"),
-        crate::names::FullName::with_schema("a", "item"),
-        false,
-        true
-    )]
-    fn preserves_cast_keys_and_enumerated_types(
-        #[case] left: NamesFullName,
-        #[case] right: NamesFullName,
-        #[case] source_array: bool,
-        #[case] other_array: bool,
-    ) {
-        use crate::sem::TypeReference;
-        let (mut child, _, _, _) = test_helpers::cast_layer();
-        let source = TypeReference::concrete_type_ref(&left, source_array);
-        let other = TypeReference::concrete_type_ref(&right, other_array);
-        let target = test_helpers::named_type("target");
-        test_helpers::register(&mut child, &source, &target, CastContext::implicit());
-        test_helpers::register(&mut child, &other, &target, CastContext::explicit());
-        test_helpers::register(&mut child, &target, &source, CastContext::implicit());
-        test_helpers::register(&mut child, &target, &other, CastContext::explicit());
-        let parent = child.freeze();
-        let child = schema_layer(std::path::Path::new("cast-child.sql"), &parent);
-        assert!(child.get_implicit_cast(&source, &target).is_some());
-        assert!(child.get_implicit_cast(&other, &target).is_none());
-        assert!(child.get_implicit_cast(&target, &source).is_some());
-        assert!(child.get_implicit_cast(&target, &other).is_none());
-        let sources = child.cast_sources(&target, false);
-        assert!(sources.contains(&source));
-        assert!(!sources.contains(&other));
-        let targets = child.get_implicit_castable(&target);
-        assert!(targets.contains(&source));
-        assert!(!targets.contains(&other));
-        assert!(child.cast_sources(&target, true).contains(&other));
+    fn io_string_types() -> [TypeReference; 4] {
+        ["text", "varchar", "bpchar", "name"].map(TypeReference::from_master_type_name)
+    }
+
+    fn io_cast(&self, source: &TypeReference, target: &TypeReference) -> Option<CastDefinition> {
+        self.get_type_impl(source.full_name()?)?;
+        self.get_type_impl(target.full_name()?)?;
+        let strings = Self::io_string_types();
+        if strings.contains(source) || strings.contains(target) {
+            return Some(CastDefinition::new(CastContext::explicit()));
+        }
+        None
     }
 }

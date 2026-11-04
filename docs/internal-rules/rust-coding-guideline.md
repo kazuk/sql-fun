@@ -117,6 +117,14 @@ use ::url::Url;
   distant `tests` modules merely for organization. Parameterized tests follow
   the same rule. Broader integration tests that exercise multiple components
   may live in dedicated integration-test modules/files.
+- **Split inherent impl blocks where needed (MUST).** An inherent `impl Type`
+  block MUST be split into multiple inherent impl blocks when necessary to place
+  a focused unit-test module immediately after the method or implementation it
+  verifies. Associated methods follow the same placement rule as standalone
+  functions; keeping an inherent impl together does not justify distant tests.
+  Trait implementations (`impl Trait for Type`) are exempt from splitting:
+  preserve the coherent trait implementation and place its tests as close as
+  possible after that implementation.
 - When modifying an implementation, inspect the placement of its existing unit
   tests and correct placement violations in the affected implementation area.
   Unrelated legacy violations can be corrected incrementally.
@@ -164,6 +172,13 @@ mod test_foo_new {
     fn constructs_foo_with_value() {
         let foo = Foo::new(10);
         assert_eq!(10, foo.value);
+    }
+}
+
+// Resume the inherent implementation after the focused constructor tests.
+impl Foo {
+    pub fn value(&self) -> i32 {
+        self.value
     }
 }
 ```

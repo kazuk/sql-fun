@@ -39,7 +39,32 @@ impl AliasSpec {
             explicit: true,
         }
     }
+}
 
+#[cfg(test)]
+mod test_alias_provenance {
+    use crate::sem::data_source::alias::AliasSpec;
+
+    #[rstest::rstest]
+    #[case::implicit(AliasSpec::from_local_name("t"), false)]
+    #[case::explicit_same_name(AliasSpec::from_names("t", &[]), true)]
+    fn serialization_retains_alias_hiding(#[case] alias: AliasSpec, #[case] explicit: bool) {
+        let serialized = ::serde_json::to_string(&alias).unwrap();
+        let restored: AliasSpec = ::serde_json::from_str(&serialized).unwrap();
+        assert_eq!(restored.is_explicit(), explicit);
+        assert_eq!(restored, alias);
+    }
+
+    #[test]
+    fn missing_provenance_is_not_inferred() {
+        assert!(
+            ::serde_json::from_str::<AliasSpec>(r#"{"alias_name":"t","derived_column_names":[]}"#)
+                .is_err()
+        );
+    }
+}
+
+impl AliasSpec {
     pub(crate) fn derived_column_at(&self, index: usize) -> Option<&ColumnName> {
         self.derived_column_names.get(index)
     }
@@ -145,29 +170,6 @@ impl AliasSpec {
     #[must_use]
     pub const fn len_derived_column(&self) -> usize {
         self.derived_column_names.len()
-    }
-}
-
-#[cfg(test)]
-mod test_alias_provenance {
-    use crate::sem::data_source::alias::AliasSpec;
-
-    #[rstest::rstest]
-    #[case::implicit(AliasSpec::from_local_name("t"), false)]
-    #[case::explicit_same_name(AliasSpec::from_names("t", &[]), true)]
-    fn serialization_retains_alias_hiding(#[case] alias: AliasSpec, #[case] explicit: bool) {
-        let serialized = ::serde_json::to_string(&alias).unwrap();
-        let restored: AliasSpec = ::serde_json::from_str(&serialized).unwrap();
-        assert_eq!(restored.is_explicit(), explicit);
-        assert_eq!(restored, alias);
-    }
-
-    #[test]
-    fn missing_provenance_is_not_inferred() {
-        assert!(
-            ::serde_json::from_str::<AliasSpec>(r#"{"alias_name":"t","derived_column_names":[]}"#)
-                .is_err()
-        );
     }
 }
 

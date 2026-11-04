@@ -136,38 +136,6 @@ impl RowExpr {
             .collect();
         Some(Self::new(&fields?))
     }
-
-    fn get_type(&self) -> TypeReference {
-        let columns = self
-            .0
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                ColumnDefinition::new(
-                    &Some(ColumnName::from(format!("f{}", index + 1).as_str())),
-                    value.get_type().as_ref(),
-                    value.is_not_null(),
-                    &[],
-                )
-            })
-            .collect();
-        TypeReference::dynamic(&SemTypeDefinition::ImplicitComposite(
-            SemColumnCollection::new(columns),
-        ))
-    }
-
-    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
-        for field in &mut self.0 {
-            field.walk(visitor)?;
-        }
-        Ok(())
-    }
-    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
-        for field in &self.0 {
-            field.visit(visitor)?;
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -226,6 +194,40 @@ mod row_cast_tests {
     }
 }
 
+impl RowExpr {
+    fn get_type(&self) -> TypeReference {
+        let columns = self
+            .0
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                ColumnDefinition::new(
+                    &Some(ColumnName::from(format!("f{}", index + 1).as_str())),
+                    value.get_type().as_ref(),
+                    value.is_not_null(),
+                    &[],
+                )
+            })
+            .collect();
+        TypeReference::dynamic(&SemTypeDefinition::ImplicitComposite(
+            SemColumnCollection::new(columns),
+        ))
+    }
+
+    fn walk<V: SemanticVisitorMut>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        for field in &mut self.0 {
+            field.walk(visitor)?;
+        }
+        Ok(())
+    }
+    fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        for field in &self.0 {
+            field.visit(visitor)?;
+        }
+        Ok(())
+    }
+}
+
 impl ListExpr {
     pub const fn len(&self) -> usize {
         self.0.len()
@@ -233,10 +235,6 @@ impl ListExpr {
 
     pub fn get(&self, index: usize) -> Option<&SemScalarExpr> {
         self.0.get(index)
-    }
-
-    pub fn into_inner(self) -> Vec<SemScalarExpr> {
-        self.0
     }
 }
 
@@ -254,6 +252,12 @@ mod list_contract_tests {
         assert_eq!(list.get_column_def(), None);
         assert_eq!(list.get_column_name(), "");
         assert_eq!(list.into_list_values().unwrap(), vec![element]);
+    }
+}
+
+impl ListExpr {
+    pub fn into_inner(self) -> Vec<SemScalarExpr> {
+        self.0
     }
 }
 
@@ -1077,31 +1081,6 @@ impl SemScalarExpr {
     {
         Self::implicit_cast_resolved(context, result_type, expr)
     }
-
-    pub(crate) fn implicit_cast_resolved<TContext: ParseContext>(
-        context: &mut TContext,
-        result_type: &TypeReference,
-        expr: &mut Self,
-    ) -> Result<(), AnalysisError> {
-        let Some(ty) = expr.get_type() else {
-            return Ok(());
-        };
-        if &ty == result_type {
-            return Ok(());
-        }
-
-        let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
-            context.report_analysis_problem(AnalysisProblem::implicit_cast_not_found(
-                &ty,
-                result_type,
-            ))?;
-            return Ok(());
-        };
-        if !cast.is_no_conversion() {
-            *expr = Self::wrap_implicit_cast(result_type, expr);
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -1162,6 +1141,33 @@ mod test_implicit_cast_if_require {
 }
 
 impl SemScalarExpr {
+    pub(crate) fn implicit_cast_resolved<TContext: ParseContext>(
+        context: &mut TContext,
+        result_type: &TypeReference,
+        expr: &mut Self,
+    ) -> Result<(), AnalysisError> {
+        let Some(ty) = expr.get_type() else {
+            return Ok(());
+        };
+        if &ty == result_type {
+            return Ok(());
+        }
+
+        let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
+            context.report_analysis_problem(AnalysisProblem::implicit_cast_not_found(
+                &ty,
+                result_type,
+            ))?;
+            return Ok(());
+        };
+        if !cast.is_no_conversion() {
+            *expr = Self::wrap_implicit_cast(result_type, expr);
+        }
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
     /// test expression is array and report
     pub fn require_array<TParseContext>(
         &self,
@@ -1171,19 +1177,6 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         self.require_array_resolved(context)
-    }
-
-    pub(crate) fn require_array_resolved<TContext: ParseContext>(
-        &self,
-        context: &mut TContext,
-    ) -> Result<(), AnalysisError> {
-        if let Some(ty) = self.get_type()
-            && let Some(is_array) = ty.is_array()
-            && !is_array
-        {
-            context.report_analysis_problem(AnalysisProblem::array_required(self, &ty))?;
-        }
-        Ok(())
     }
 }
 
@@ -1219,6 +1212,21 @@ mod test_require_array {
 }
 
 impl SemScalarExpr {
+    pub(crate) fn require_array_resolved<TContext: ParseContext>(
+        &self,
+        context: &mut TContext,
+    ) -> Result<(), AnalysisError> {
+        if let Some(ty) = self.get_type()
+            && let Some(is_array) = ty.is_array()
+            && !is_array
+        {
+            context.report_analysis_problem(AnalysisProblem::array_required(self, &ty))?;
+        }
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
     /// test fits array index
     pub fn fits_array_index<TParseContext>(
         &self,
@@ -1228,22 +1236,6 @@ impl SemScalarExpr {
         TParseContext: ParseContext,
     {
         self.fits_array_index_resolved(context)
-    }
-
-    pub(crate) fn fits_array_index_resolved<TContext: ParseContext>(
-        &self,
-        context: &mut TContext,
-    ) -> Result<(), AnalysisError> {
-        if let Some(ty) = self.get_type()
-            && ty != PgBuiltInType::int4()
-            && context
-                .get_assignment_cast(&ty, &PgBuiltInType::int4())
-                .is_none()
-        {
-            context
-                .report_analysis_problem(AnalysisProblem::array_index_type_mismatch(self, &ty))?;
-        }
-        Ok(())
     }
 }
 
@@ -1281,6 +1273,24 @@ mod test_fits_array_index {
         expr.fits_array_index(&mut context)
             .expect("array index check");
         assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn fits_array_index_resolved<TContext: ParseContext>(
+        &self,
+        context: &mut TContext,
+    ) -> Result<(), AnalysisError> {
+        if let Some(ty) = self.get_type()
+            && ty != PgBuiltInType::int4()
+            && context
+                .get_assignment_cast(&ty, &PgBuiltInType::int4())
+                .is_none()
+        {
+            context
+                .report_analysis_problem(AnalysisProblem::array_index_type_mismatch(self, &ty))?;
+        }
+        Ok(())
     }
 }
 

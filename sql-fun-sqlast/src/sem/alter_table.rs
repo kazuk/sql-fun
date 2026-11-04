@@ -624,3 +624,47 @@ impl AlterObjSubCommand {
         AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(context, table_name)
     }
 }
+
+#[cfg(test)]
+mod test_column_attribute_command {
+    //! SQL-to-semantics and catalog-chain regressions; no external server is required.
+
+    use crate::{
+        sem::AlterObjSubCommand,
+        syn::{ListOpt, Opt},
+        test_helpers::SynBuilder,
+    };
+
+    use crate::test_helpers::column_attributes as test_helpers;
+
+    #[test]
+    fn standalone_semantic_command_api_resolves_column_attributes() -> testresult::TestResult {
+        let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
+        let node = SynBuilder::new().parse("ALTER TABLE t ALTER a SET STATISTICS 42");
+        let statement = node.as_alter_table_stmt().as_inner().unwrap();
+        let commands = statement.get_cmds().as_inner().unwrap();
+        let command = commands[0].as_alter_table_cmd().as_inner().unwrap();
+        let subtype = command.get_subtype().as_inner().unwrap();
+        let (command, context) = AlterObjSubCommand::analyze_alter_table_cmd(
+            context,
+            &test_helpers::table_name(),
+            command,
+            subtype,
+            &::sql_fun_core::IVec::default(),
+        )?;
+        let change = command.column_attribute_change().unwrap();
+        assert!(change.can_apply());
+        assert_eq!(
+            change.action().statistics_target().unwrap().effective(),
+            Some(42)
+        );
+        assert!(change.binding().definition().is_some());
+        assert!(context.problems().is_empty());
+        // Command analysis returns semantics without applying the enclosing DDL.
+        assert_eq!(
+            test_helpers::column(&context, "a").statistics_target(),
+            None
+        );
+        Ok(())
+    }
+}

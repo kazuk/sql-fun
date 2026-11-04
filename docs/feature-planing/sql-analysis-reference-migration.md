@@ -500,7 +500,7 @@ existing `book/diagnostics/<code>.md` supplies the canonical diagnostic links.
   PostgreSQL coercion behavior. Maintained `case-common-types.json`,
   `case_semantic.json`, `coalesce_semantic.json` and local SQLite tests support
   the dialect distinction and alternatives retained by CASE/COALESCE.
-- **D**: `src/sem/scalar_expr/distinct.rs` and `distinct/tests.rs` preserve
+- **D**: `src/sem/scalar_expr/distinct.rs` and its colocated tests preserve
   bare-null versus typed-null handling, row width and equality-result checks;
   retained custom equality nullability remains explicit. The old #799 domain
   limitation is corrected: `domain-operators.json` includes ordinary domain/base

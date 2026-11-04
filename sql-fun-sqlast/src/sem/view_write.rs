@@ -49,6 +49,30 @@ impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
         let result = insert_support(self.context, view);
         ResolutionFailure::finish(result, self.context)
     }
+}
+
+#[cfg(test)]
+mod test_diagnostic_delivery {
+    use crate::{
+        names::FullName,
+        sem::{AnalysisError, ViewWriteEvaluation},
+        test_helpers::TestParseContext,
+    };
+
+    #[test]
+    fn diagnostic_delivery_failure_is_propagated() {
+        let mut context = TestParseContext::default();
+        context.reject_diagnostics_after(0);
+        let error = ViewWriteEvaluation::new(&mut context)
+            .insert(&FullName::with_schema("public", "missing"))
+            .unwrap_err();
+        assert!(matches!(error, AnalysisError::Io(_)));
+        assert_eq!(error.to_string(), "diagnostic sink rejected a problem");
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
     /// Evaluate UPDATE support; None means a semantic problem was reported.
     /// # Errors
     /// Returns only an unrecoverable analysis or diagnostic delivery failure.
@@ -56,6 +80,43 @@ impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
         let result = update_support(self.context, view);
         ResolutionFailure::finish(result, self.context)
     }
+}
+
+#[cfg(test)]
+mod test_evaluate_missing_definition {
+    use crate::{names::FullName, sem::ViewWriteEvaluation, test_helpers::TestParseContext};
+
+    #[rstest::rstest]
+    #[case::insert(true)]
+    #[case::update(false)]
+    fn direct_evaluation_reports_missing_definition_once(#[case] insert: bool) {
+        let mut context = TestParseContext::default();
+        let name = FullName::with_schema("public", "missing");
+        let unresolved = if insert {
+            ViewWriteEvaluation::new(&mut context)
+                .insert(&name)
+                .unwrap()
+                .is_none()
+        } else {
+            ViewWriteEvaluation::new(&mut context)
+                .update(&name)
+                .unwrap()
+                .is_none()
+        };
+        assert!(unresolved);
+        assert_eq!(context.reported_problem_count(), 1);
+        assert_eq!(
+            context.reported_problems()[0]
+                .view_problem()
+                .unwrap()
+                .missing_metadata_view()
+                .map(|view| view.as_str()),
+            Some(name.to_string().as_str())
+        );
+    }
+}
+
+impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
     /// Evaluate both operations; None means a semantic problem was reported.
     /// # Errors
     /// Returns only an unrecoverable analysis or diagnostic delivery failure.

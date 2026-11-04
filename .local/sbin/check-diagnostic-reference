@@ -220,7 +220,7 @@ SOURCE_WITNESS = {
         "OwnershipLookup": 1
     },
     "sql-fun-sqlast/src/sem/alter_owner.rs": {
-        "OwnershipLookup": 5
+        "OwnershipLookup": 6
     },
     "sql-fun-sqlast/src/sem/problem.rs": {
         "OwnershipLookup": 4,

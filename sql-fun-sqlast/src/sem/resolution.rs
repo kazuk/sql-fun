@@ -40,6 +40,28 @@ impl ResolutionFailure {
         }
     }
 }
+
+#[cfg(test)]
+mod test_finish {
+    use crate::{
+        sem::{AnalysisError, ResolutionFailure},
+        test_helpers::TestParseContext,
+    };
+
+    #[test]
+    fn internal_contract_failure_is_propagated_without_a_semantic_problem() {
+        let mut context = TestParseContext::default();
+        let result: Result<(), ResolutionFailure> = Err(AnalysisError::unexpected_input_error(
+            "projection analysis contract failed",
+        )
+        .into());
+        let error = ResolutionFailure::finish(result, &mut context).unwrap_err();
+        assert!(
+            matches!(error, AnalysisError::UnexpectedInput(ref message) if message == "projection analysis contract failed")
+        );
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
 impl From<AnalysisError> for ResolutionFailure {
     fn from(error: AnalysisError) -> Self {
         Self::Fatal(error)

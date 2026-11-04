@@ -217,10 +217,6 @@ impl BinaryCastCandidate {
             .filter(|v| v.priority == priority)
             .collect()
     }
-
-    pub const fn operator(&self) -> &BinaryOperatorDefinition {
-        &self.operator
-    }
 }
 
 #[cfg(test)]
@@ -429,5 +425,11 @@ mod tests {
             assert!(best[0].right.is_no_conversion());
         }
         Ok(())
+    }
+}
+
+impl BinaryCastCandidate {
+    pub const fn operator(&self) -> &BinaryOperatorDefinition {
+        &self.operator
     }
 }

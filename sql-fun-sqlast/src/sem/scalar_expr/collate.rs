@@ -63,65 +63,6 @@ impl CollateExpr {
         value.validate_type(context)?;
         Ok(value)
     }
-
-    /// Analyzed operand, including nested explicit annotations and failed bindings.
-    pub const fn argument(&self) -> &SemScalarExpr {
-        &self.argument
-    }
-
-    /// Completed collation lookup, retaining requested spelling and failure state.
-    pub const fn collation(&self) -> &CatalogNameLookup {
-        &self.collation
-    }
-
-    /// Parser-provided location of the COLLATE annotation, when available.
-    pub const fn source_span(&self) -> Option<&StringSpan> {
-        self.source_span.as_ref()
-    }
-
-    pub(crate) fn validate_type(
-        &mut self,
-        context: &mut impl ParseContext,
-    ) -> Result<(), AnalysisError> {
-        if context.dialect() != Dialect::postgres() {
-            return Ok(());
-        }
-        let Some(ty) = MinMaxExpr::input_type(&self.argument) else {
-            return Ok(());
-        };
-        // Unknown literals are legal here; resolving their type is the owning
-        // expression's job. Missing catalog facts do not prove inapplicability.
-        if ty == MinMaxExpr::unknown() || self.checked_type.as_ref() == Some(&ty) {
-            return Ok(());
-        }
-        if let Some(collatable) = ty.collation_capability(context) {
-            if !collatable {
-                context.report_analysis_problem(AnalysisProblem::collate(
-                    CollateProblem::operand_type(&ty),
-                ))?;
-            }
-            self.checked_type = Some(ty);
-        }
-        Ok(())
-    }
-
-    pub(super) fn canonicalize_grouping_key(&mut self) {
-        self.source_span = None;
-        self.checked_type = None;
-        if let Some(resolved) = self.collation.resolved_name() {
-            self.collation = CatalogNameLookup::found(resolved, resolved);
-        }
-    }
-
-    pub(crate) fn walk<V: SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        self.argument.walk(visitor)
-    }
-    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
-        self.argument.visit(visitor)
-    }
 }
 
 #[cfg(test)]
@@ -304,6 +245,67 @@ mod test_collate_resolution {
         let next = query("SELECT 1", &mut context)?;
         assert_eq!(expression(&next).get_type(), Some(PgBuiltInType::int4()));
         Ok(())
+    }
+}
+
+impl CollateExpr {
+    /// Analyzed operand, including nested explicit annotations and failed bindings.
+    pub const fn argument(&self) -> &SemScalarExpr {
+        &self.argument
+    }
+
+    /// Completed collation lookup, retaining requested spelling and failure state.
+    pub const fn collation(&self) -> &CatalogNameLookup {
+        &self.collation
+    }
+
+    /// Parser-provided location of the COLLATE annotation, when available.
+    pub const fn source_span(&self) -> Option<&StringSpan> {
+        self.source_span.as_ref()
+    }
+
+    pub(crate) fn validate_type(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if context.dialect() != Dialect::postgres() {
+            return Ok(());
+        }
+        let Some(ty) = MinMaxExpr::input_type(&self.argument) else {
+            return Ok(());
+        };
+        // Unknown literals are legal here; resolving their type is the owning
+        // expression's job. Missing catalog facts do not prove inapplicability.
+        if ty == MinMaxExpr::unknown() || self.checked_type.as_ref() == Some(&ty) {
+            return Ok(());
+        }
+        if let Some(collatable) = ty.collation_capability(context) {
+            if !collatable {
+                context.report_analysis_problem(AnalysisProblem::collate(
+                    CollateProblem::operand_type(&ty),
+                ))?;
+            }
+            self.checked_type = Some(ty);
+        }
+        Ok(())
+    }
+
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.source_span = None;
+        self.checked_type = None;
+        if let Some(resolved) = self.collation.resolved_name() {
+            self.collation = CatalogNameLookup::found(resolved, resolved);
+        }
+    }
+
+    pub(crate) fn walk<V: SemanticVisitorMut>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.argument.walk(visitor)
+    }
+    pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
+        self.argument.visit(visitor)
     }
 }
 

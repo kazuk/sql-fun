@@ -40,30 +40,6 @@ impl TypeReference {
         }
         self.collation_capability_in(context, &mut HashSet::new())
     }
-
-    pub(super) fn collation_capability_in(
-        &self,
-        context: &impl ParseContext,
-        visited: &mut HashSet<FullName>,
-    ) -> Option<bool> {
-        match self {
-            Self::Concrete(reference) => {
-                if reference.is_array() {
-                    return reference
-                        .element_type()
-                        .collation_capability_in(context, visited);
-                }
-                if !visited.insert(reference.full_name().clone()) {
-                    return None;
-                }
-                self.definition_from_catalog(context)?
-                    .collation_capability_in(context, visited)
-            }
-            Self::Dynamic(reference) => reference
-                .type_definition()
-                .collation_capability_in(context, visited),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -176,6 +152,32 @@ mod collation_capability_tests {
 }
 
 impl TypeReference {
+    pub(super) fn collation_capability_in(
+        &self,
+        context: &impl ParseContext,
+        visited: &mut HashSet<FullName>,
+    ) -> Option<bool> {
+        match self {
+            Self::Concrete(reference) => {
+                if reference.is_array() {
+                    return reference
+                        .element_type()
+                        .collation_capability_in(context, visited);
+                }
+                if !visited.insert(reference.full_name().clone()) {
+                    return None;
+                }
+                self.definition_from_catalog(context)?
+                    .collation_capability_in(context, visited)
+            }
+            Self::Dynamic(reference) => reference
+                .type_definition()
+                .collation_capability_in(context, visited),
+        }
+    }
+}
+
+impl TypeReference {
     pub(crate) fn rename_relation(&mut self, old: &TableName, new: &TableName) {
         if let Self::Dynamic(value) = self {
             value.rename_relation(old, new);
@@ -192,7 +194,91 @@ impl TypeReference {
     pub fn dynamic(type_def: &TypeDefinition) -> Self {
         Self::Dynamic(DynamicTypeReference::new(type_def))
     }
+}
 
+#[cfg(test)]
+mod test_dynamic_identity {
+    use crate::{
+        names::FullName,
+        sem::{PgBuiltInType, TypeDefinition, TypeReference},
+        test_helpers::{TestParseContext, dynamic_types::record},
+    };
+
+    #[rstest::rstest]
+    fn anonymous_identity_retains_definition_and_elements(#[values(false, true)] array: bool) {
+        let row = record(&PgBuiltInType::int4());
+        let reference = if array { row.array_type() } else { row.clone() };
+        assert_eq!(reference.full_name(), None);
+        assert_eq!(reference.is_array(), Some(array));
+        assert_eq!(reference.is_record(), !array);
+        assert_eq!(reference.type_definition().unwrap().type_reference(), None);
+        let restored: TypeReference =
+            ::serde_json::from_str(&::serde_json::to_string(&reference).unwrap()).unwrap();
+        assert_eq!(restored, reference);
+        if array {
+            assert_eq!(reference.element_type(), row);
+        } else {
+            let context = TestParseContext::default();
+            let columns = reference.row_columns(&context).unwrap();
+            assert_eq!(
+                columns.column_at(0).unwrap().get_type(),
+                Some(&PgBuiltInType::int4())
+            );
+            let implicit = TypeDefinition::implicit_composite(&columns);
+            assert_eq!(implicit.full_name(), None);
+            assert_eq!(implicit.type_reference(), None);
+            assert!(reference.matches_structure(&TypeReference::dynamic(&implicit), &context));
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::row(false)]
+    #[case::array(true)]
+    fn anonymous_types_are_neither_ranges_nor_placeholders(#[case] array: bool) {
+        let row = record(&PgBuiltInType::int4());
+        let reference = if array { row.array_type() } else { row };
+        assert!(!reference.is_range());
+        assert!(!reference.is_multi_range());
+        assert!(!reference.is_simple_infer_arg());
+        assert!(!reference.is_common_infer_arg());
+        assert!(!reference.is_any_element());
+        assert!(!reference.is_any_array());
+        assert!(!reference.is_any_non_array());
+        assert!(!reference.is_any_range());
+        assert!(!reference.is_any_multi_range());
+        assert!(!reference.is_any_compatible());
+        assert!(!reference.is_any_compatible_array());
+        assert!(!reference.is_any_compatible_non_array());
+        assert!(!reference.is_any_compatible_range());
+        assert!(!reference.is_any_compatible_multi_range());
+        let mut fixed = reference.clone();
+        fixed.apply_simple_infer_result(&PgBuiltInType::text());
+        fixed.apply_common_infer_result(&PgBuiltInType::text());
+        assert_eq!(fixed, reference);
+    }
+
+    #[rstest::rstest]
+    #[case::scalar("int4", false, false, false)]
+    #[case::record("record", true, false, false)]
+    #[case::range("int4range", false, true, false)]
+    #[case::multirange("int4multirange", false, false, true)]
+    fn owned_nominal_classification_uses_its_definition(
+        #[case] name: &str,
+        #[case] record: bool,
+        #[case] range: bool,
+        #[case] multirange: bool,
+    ) {
+        let name = FullName::with_schema("pg_catalog", name);
+        let reference = TypeReference::dynamic(&TypeDefinition::builtin(&name, None));
+        assert_eq!(reference.full_name(), Some(&name));
+        assert_eq!(reference.to_string(), name.to_string());
+        assert_eq!(reference.is_record(), record);
+        assert_eq!(reference.is_range(), range);
+        assert_eq!(reference.is_multi_range(), multirange);
+    }
+}
+
+impl TypeReference {
     /// Nominal identity, or `None` for an anonymous row or structural array.
     /// Owned named definitions retain their actual catalog name.
     #[must_use]
@@ -215,7 +301,46 @@ impl TypeReference {
             Self::Dynamic(_) => Self::dynamic(&TypeDefinition::array(self)),
         }
     }
+}
 
+#[cfg(test)]
+mod test_array_identity {
+
+    use crate::sem::{PgBuiltInType, pg_type::type_ref::TypeReference};
+
+    use crate::test_helpers::dynamic_types::record;
+
+    #[test]
+    fn dynamic_array_preserves_element_identity_and_serialization() -> testresult::TestResult {
+        let element = record(&PgBuiltInType::int4());
+        let array = element.array_type();
+        assert!(array.is_dynamic());
+        assert_eq!(array.is_array(), Some(true));
+        assert!(!array.is_record());
+        assert_eq!(array.element_type(), element);
+        assert_eq!(array.array_type(), array);
+        assert_ne!(array, record(&PgBuiltInType::text()).array_type());
+        let encoded = ::serde_json::to_string(&array)?;
+        let decoded: TypeReference = ::serde_json::from_str(&encoded)?;
+        assert_eq!(decoded, array);
+        assert_eq!(decoded.element_type(), element);
+        Ok(())
+    }
+
+    #[test]
+    fn named_arrays_keep_the_existing_serialized_representation() -> testresult::TestResult {
+        let array = PgBuiltInType::int4().array_type();
+        assert_eq!(array, TypeReference::from_master_type_name("_int4"));
+        assert_eq!(
+            ::serde_json::to_value(&array)?,
+            ::serde_json::to_value(TypeReference::from_master_type_name("_int4"))?
+        );
+        assert_eq!(array.element_type(), PgBuiltInType::int4());
+        Ok(())
+    }
+}
+
+impl TypeReference {
     /// get type definition when owned
     #[must_use]
     pub fn type_definition(&self) -> Option<&TypeDefinition> {
@@ -328,7 +453,161 @@ impl TypeReference {
                 .map(|cast| cast.context())
         }
     }
+}
 
+#[cfg(test)]
+mod test_dynamic_matching {
+    use crate::test_helpers::TestParseContext;
+
+    use crate::sem::{
+        CreateCompositeType, PgBuiltInType, TypeDefinition,
+        create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+        pg_type::type_ref::TypeReference,
+    };
+
+    use crate::test_helpers::dynamic_types::record;
+
+    #[test]
+    fn anonymous_record_accepts_generic_record_without_cast_master() {
+        let mut context = TestParseContext::default();
+        let source = record(&PgBuiltInType::int4());
+        let target = TypeReference::from_master_type_name("record");
+        context.set_get_implicit_cast_result(&source, &target, None);
+        assert!(source.implicit_match_context(&target, &context).is_some());
+        assert!(!source.matches_structure(&target, &context));
+    }
+
+    #[rstest::rstest]
+    fn dynamic_matching_uses_structure_instead_of_cast_master(
+        #[values(false, true)] arrays: bool,
+        #[values(false, true)] dynamic_target: bool,
+        #[values(false, true)] reverse: bool,
+        #[values(false, true)] matching: bool,
+    ) {
+        use crate::{
+            names::FullName,
+            sem::{CastContext, CastDefinition},
+            test_helpers::TestParseContext,
+        };
+
+        let mut context = TestParseContext::default();
+        let source = record(&PgBuiltInType::int4());
+        let field_type = if matching {
+            PgBuiltInType::int4()
+        } else {
+            PgBuiltInType::text()
+        };
+        let mut fields = CompositeFieldCollection::default();
+        fields.push(CompositeFieldDefinition::new(
+            "different_name",
+            &Some(field_type),
+            &None,
+        ));
+        let target = if dynamic_target {
+            TypeReference::dynamic(&TypeDefinition::from(&CreateCompositeType::from_fields(
+                &fields,
+            )))
+        } else {
+            let name = FullName::with_schema("public", "row_type");
+            let definition = TypeDefinition::from(&CreateCompositeType::new(&name, &fields));
+            context.set_get_type_impl_result(&name, &definition);
+            TypeReference::from_full_name(name)
+        };
+        let (source, target) = if arrays {
+            (source.array_type(), target.array_type())
+        } else {
+            (source, target)
+        };
+        let (source, target) = if reverse {
+            (target, source)
+        } else {
+            (source, target)
+        };
+        let expected = matching && dynamic_target;
+        // A deliberately contradictory catalog answer proves that Dynamic
+        // operands are evaluated without consulting the cast master.
+        context.set_get_implicit_cast_result(
+            &source,
+            &target,
+            if expected {
+                None
+            } else {
+                Some(CastDefinition::new(CastContext::implicit()))
+            },
+        );
+        assert_eq!(
+            source.implicit_match_context(&target, &context).is_some(),
+            expected
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::same_definition("row_type", "int4", true)]
+    #[case::different_name("other_type", "int4", false)]
+    #[case::different_field("row_type", "text", false)]
+    fn loaded_nominal_types_compare_definitions_without_cast_lookup(
+        #[case] target_name: &str,
+        #[case] field_type: &str,
+        #[case] expected: bool,
+        #[values(false, true)] arrays: bool,
+        #[values(false, true)] reverse: bool,
+    ) {
+        use crate::{
+            names::FullName,
+            sem::{CastContext, CastDefinition},
+            test_helpers::TestParseContext,
+        };
+
+        let mut context = TestParseContext::default();
+        let name = FullName::with_schema("public", "row_type");
+        let mut fields = CompositeFieldCollection::default();
+        fields.push(CompositeFieldDefinition::new(
+            "n",
+            &Some(PgBuiltInType::int4()),
+            &None,
+        ));
+        let source = TypeReference::dynamic(&TypeDefinition::from(&CreateCompositeType::new(
+            &name, &fields,
+        )));
+        let target_name = FullName::with_schema("public", target_name);
+        let mut fields = CompositeFieldCollection::default();
+        fields.push(CompositeFieldDefinition::new(
+            "n",
+            &Some(TypeReference::from_master_type_name(field_type)),
+            &None,
+        ));
+        context.set_get_type_impl_result(
+            &target_name,
+            &TypeDefinition::from(&CreateCompositeType::new(&target_name, &fields)),
+        );
+        let target = TypeReference::from_full_name(target_name);
+        let (source, target) = if arrays {
+            (source.array_type(), target.array_type())
+        } else {
+            (source, target)
+        };
+        let (source, target) = if reverse {
+            (target, source)
+        } else {
+            (source, target)
+        };
+        context.set_get_implicit_cast_result(
+            &source,
+            &target,
+            if expected {
+                None
+            } else {
+                Some(CastDefinition::new(CastContext::implicit()))
+            },
+        );
+        assert_eq!(
+            source.implicit_match_context(&target, &context).is_some(),
+            expected
+        );
+    }
+}
+
+impl TypeReference {
     /// Structural evidence available without a borrowed catalog. Named types
     /// still require identity; anonymous records compare positional field types.
     pub(crate) fn implicit_match_owned(&self, target: &Self) -> bool {
@@ -696,94 +975,46 @@ impl TypeReference {
             *self = infer_result_type.into_multi_range_type();
         }
     }
+}
 
-    /// type is dynamic
-    #[must_use]
-    pub const fn is_dynamic(&self) -> bool {
-        matches!(self, Self::Dynamic(_))
+#[cfg(test)]
+mod test_structural_substitution {
+
+    use crate::sem::{PgBuiltInType, pg_type::type_ref::TypeReference};
+
+    use crate::test_helpers::dynamic_types::record;
+
+    #[rstest::rstest]
+    #[case::element("anyelement", false, false)]
+    #[case::array("anyarray", false, true)]
+    #[case::nonarray("anynonarray", false, false)]
+    #[case::compatible("anycompatible", true, false)]
+    #[case::compatible_array("anycompatiblearray", true, true)]
+    #[case::compatible_nonarray("anycompatiblenonarray", true, false)]
+    fn substitution_keeps_anonymous_type_components(
+        #[case] name: &str,
+        #[case] common: bool,
+        #[case] array: bool,
+    ) {
+        let element = record(&PgBuiltInType::int4());
+        let mut placeholder = TypeReference::from_master_type_name(name);
+        if common {
+            placeholder.apply_common_infer_result(&element);
+        } else {
+            placeholder.apply_simple_infer_result(&element);
+        }
+        let expected = if array { element.array_type() } else { element };
+        assert_eq!(placeholder, expected);
     }
 }
 
 #[cfg(test)]
-mod dynamic_accessor_tests {
+mod test_owned_substitution {
     use crate::{
         names::FullName,
         sem::{PgBuiltInType, TypeDefinition, TypeReference},
-        test_helpers::{TestParseContext, dynamic_types::record},
+        test_helpers::dynamic_types::record,
     };
-
-    #[rstest::rstest]
-    fn anonymous_identity_retains_definition_and_elements(#[values(false, true)] array: bool) {
-        let row = record(&PgBuiltInType::int4());
-        let reference = if array { row.array_type() } else { row.clone() };
-        assert_eq!(reference.full_name(), None);
-        assert_eq!(reference.is_array(), Some(array));
-        assert_eq!(reference.is_record(), !array);
-        assert_eq!(reference.type_definition().unwrap().type_reference(), None);
-        let restored: TypeReference =
-            ::serde_json::from_str(&::serde_json::to_string(&reference).unwrap()).unwrap();
-        assert_eq!(restored, reference);
-        if array {
-            assert_eq!(reference.element_type(), row);
-        } else {
-            let context = TestParseContext::default();
-            let columns = reference.row_columns(&context).unwrap();
-            assert_eq!(
-                columns.column_at(0).unwrap().get_type(),
-                Some(&PgBuiltInType::int4())
-            );
-            let implicit = TypeDefinition::implicit_composite(&columns);
-            assert_eq!(implicit.full_name(), None);
-            assert_eq!(implicit.type_reference(), None);
-            assert!(reference.matches_structure(&TypeReference::dynamic(&implicit), &context));
-        }
-    }
-
-    #[rstest::rstest]
-    #[case::row(false)]
-    #[case::array(true)]
-    fn anonymous_types_are_neither_ranges_nor_placeholders(#[case] array: bool) {
-        let row = record(&PgBuiltInType::int4());
-        let reference = if array { row.array_type() } else { row };
-        assert!(!reference.is_range());
-        assert!(!reference.is_multi_range());
-        assert!(!reference.is_simple_infer_arg());
-        assert!(!reference.is_common_infer_arg());
-        assert!(!reference.is_any_element());
-        assert!(!reference.is_any_array());
-        assert!(!reference.is_any_non_array());
-        assert!(!reference.is_any_range());
-        assert!(!reference.is_any_multi_range());
-        assert!(!reference.is_any_compatible());
-        assert!(!reference.is_any_compatible_array());
-        assert!(!reference.is_any_compatible_non_array());
-        assert!(!reference.is_any_compatible_range());
-        assert!(!reference.is_any_compatible_multi_range());
-        let mut fixed = reference.clone();
-        fixed.apply_simple_infer_result(&PgBuiltInType::text());
-        fixed.apply_common_infer_result(&PgBuiltInType::text());
-        assert_eq!(fixed, reference);
-    }
-
-    #[rstest::rstest]
-    #[case::scalar("int4", false, false, false)]
-    #[case::record("record", true, false, false)]
-    #[case::range("int4range", false, true, false)]
-    #[case::multirange("int4multirange", false, false, true)]
-    fn owned_nominal_classification_uses_its_definition(
-        #[case] name: &str,
-        #[case] record: bool,
-        #[case] range: bool,
-        #[case] multirange: bool,
-    ) {
-        let name = FullName::with_schema("pg_catalog", name);
-        let reference = TypeReference::dynamic(&TypeDefinition::builtin(&name, None));
-        assert_eq!(reference.full_name(), Some(&name));
-        assert_eq!(reference.to_string(), name.to_string());
-        assert_eq!(reference.is_record(), record);
-        assert_eq!(reference.is_range(), range);
-        assert_eq!(reference.is_multi_range(), multirange);
-    }
 
     #[rstest::rstest]
     #[case::simple_element("anyelement", false, false)]
@@ -811,207 +1042,11 @@ mod dynamic_accessor_tests {
     }
 }
 
-#[cfg(test)]
-mod array_identity_tests {
-    use crate::test_helpers::TestParseContext;
-
-    use crate::sem::{
-        CreateCompositeType, PgBuiltInType, TypeDefinition,
-        create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
-        pg_type::type_ref::TypeReference,
-    };
-
-    use crate::test_helpers::dynamic_types::record;
-
-    #[test]
-    fn anonymous_record_accepts_generic_record_without_cast_master() {
-        let mut context = TestParseContext::default();
-        let source = record(&PgBuiltInType::int4());
-        let target = TypeReference::from_master_type_name("record");
-        context.set_get_implicit_cast_result(&source, &target, None);
-        assert!(source.implicit_match_context(&target, &context).is_some());
-        assert!(!source.matches_structure(&target, &context));
-    }
-
-    #[rstest::rstest]
-    fn dynamic_matching_uses_structure_instead_of_cast_master(
-        #[values(false, true)] arrays: bool,
-        #[values(false, true)] dynamic_target: bool,
-        #[values(false, true)] reverse: bool,
-        #[values(false, true)] matching: bool,
-    ) {
-        use crate::{
-            names::FullName,
-            sem::{CastContext, CastDefinition},
-            test_helpers::TestParseContext,
-        };
-
-        let mut context = TestParseContext::default();
-        let source = record(&PgBuiltInType::int4());
-        let field_type = if matching {
-            PgBuiltInType::int4()
-        } else {
-            PgBuiltInType::text()
-        };
-        let mut fields = CompositeFieldCollection::default();
-        fields.push(CompositeFieldDefinition::new(
-            "different_name",
-            &Some(field_type),
-            &None,
-        ));
-        let target = if dynamic_target {
-            TypeReference::dynamic(&TypeDefinition::from(&CreateCompositeType::from_fields(
-                &fields,
-            )))
-        } else {
-            let name = FullName::with_schema("public", "row_type");
-            let definition = TypeDefinition::from(&CreateCompositeType::new(&name, &fields));
-            context.set_get_type_impl_result(&name, &definition);
-            TypeReference::from_full_name(name)
-        };
-        let (source, target) = if arrays {
-            (source.array_type(), target.array_type())
-        } else {
-            (source, target)
-        };
-        let (source, target) = if reverse {
-            (target, source)
-        } else {
-            (source, target)
-        };
-        let expected = matching && dynamic_target;
-        // A deliberately contradictory catalog answer proves that Dynamic
-        // operands are evaluated without consulting the cast master.
-        context.set_get_implicit_cast_result(
-            &source,
-            &target,
-            if expected {
-                None
-            } else {
-                Some(CastDefinition::new(CastContext::implicit()))
-            },
-        );
-        assert_eq!(
-            source.implicit_match_context(&target, &context).is_some(),
-            expected
-        );
-    }
-
-    #[rstest::rstest]
-    #[case::same_definition("row_type", "int4", true)]
-    #[case::different_name("other_type", "int4", false)]
-    #[case::different_field("row_type", "text", false)]
-    fn loaded_nominal_types_compare_definitions_without_cast_lookup(
-        #[case] target_name: &str,
-        #[case] field_type: &str,
-        #[case] expected: bool,
-        #[values(false, true)] arrays: bool,
-        #[values(false, true)] reverse: bool,
-    ) {
-        use crate::{
-            names::FullName,
-            sem::{CastContext, CastDefinition},
-            test_helpers::TestParseContext,
-        };
-
-        let mut context = TestParseContext::default();
-        let name = FullName::with_schema("public", "row_type");
-        let mut fields = CompositeFieldCollection::default();
-        fields.push(CompositeFieldDefinition::new(
-            "n",
-            &Some(PgBuiltInType::int4()),
-            &None,
-        ));
-        let source = TypeReference::dynamic(&TypeDefinition::from(&CreateCompositeType::new(
-            &name, &fields,
-        )));
-        let target_name = FullName::with_schema("public", target_name);
-        let mut fields = CompositeFieldCollection::default();
-        fields.push(CompositeFieldDefinition::new(
-            "n",
-            &Some(TypeReference::from_master_type_name(field_type)),
-            &None,
-        ));
-        context.set_get_type_impl_result(
-            &target_name,
-            &TypeDefinition::from(&CreateCompositeType::new(&target_name, &fields)),
-        );
-        let target = TypeReference::from_full_name(target_name);
-        let (source, target) = if arrays {
-            (source.array_type(), target.array_type())
-        } else {
-            (source, target)
-        };
-        let (source, target) = if reverse {
-            (target, source)
-        } else {
-            (source, target)
-        };
-        context.set_get_implicit_cast_result(
-            &source,
-            &target,
-            if expected {
-                None
-            } else {
-                Some(CastDefinition::new(CastContext::implicit()))
-            },
-        );
-        assert_eq!(
-            source.implicit_match_context(&target, &context).is_some(),
-            expected
-        );
-    }
-
-    #[test]
-    fn dynamic_array_preserves_element_identity_and_serialization() -> testresult::TestResult {
-        let element = record(&PgBuiltInType::int4());
-        let array = element.array_type();
-        assert!(array.is_dynamic());
-        assert_eq!(array.is_array(), Some(true));
-        assert!(!array.is_record());
-        assert_eq!(array.element_type(), element);
-        assert_eq!(array.array_type(), array);
-        assert_ne!(array, record(&PgBuiltInType::text()).array_type());
-        let encoded = ::serde_json::to_string(&array)?;
-        let decoded: TypeReference = ::serde_json::from_str(&encoded)?;
-        assert_eq!(decoded, array);
-        assert_eq!(decoded.element_type(), element);
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    #[case::element("anyelement", false, false)]
-    #[case::array("anyarray", false, true)]
-    #[case::nonarray("anynonarray", false, false)]
-    #[case::compatible("anycompatible", true, false)]
-    #[case::compatible_array("anycompatiblearray", true, true)]
-    #[case::compatible_nonarray("anycompatiblenonarray", true, false)]
-    fn substitution_keeps_anonymous_type_components(
-        #[case] name: &str,
-        #[case] common: bool,
-        #[case] array: bool,
-    ) {
-        let element = record(&PgBuiltInType::int4());
-        let mut placeholder = TypeReference::from_master_type_name(name);
-        if common {
-            placeholder.apply_common_infer_result(&element);
-        } else {
-            placeholder.apply_simple_infer_result(&element);
-        }
-        let expected = if array { element.array_type() } else { element };
-        assert_eq!(placeholder, expected);
-    }
-
-    #[test]
-    fn named_arrays_keep_the_existing_serialized_representation() -> testresult::TestResult {
-        let array = PgBuiltInType::int4().array_type();
-        assert_eq!(array, TypeReference::from_master_type_name("_int4"));
-        assert_eq!(
-            ::serde_json::to_value(&array)?,
-            ::serde_json::to_value(TypeReference::from_master_type_name("_int4"))?
-        );
-        assert_eq!(array.element_type(), PgBuiltInType::int4());
-        Ok(())
+impl TypeReference {
+    /// type is dynamic
+    #[must_use]
+    pub const fn is_dynamic(&self) -> bool {
+        matches!(self, Self::Dynamic(_))
     }
 }
 

@@ -230,6 +230,85 @@ impl Statement {
     }
 }
 
+#[cfg(test)]
+mod test_deparse_errors {
+    use crate::test_helpers::deparse::statement;
+
+    use crate::ast::{Dialect, Expr as AstExpr, Literal as AstLiteral, QueryBody, StatementNode};
+
+    #[test]
+    fn reports_dialect_mismatch_without_modifying_statement() {
+        let value = statement("select 1", Dialect::postgres());
+        let original = value.deparse_sql(Dialect::postgres()).unwrap();
+        let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
+        assert!(error.is_dialect_mismatch());
+        assert_eq!(error.dialect(), Dialect::sqlite());
+        assert_eq!(original, value.deparse_sql(Dialect::postgres()).unwrap());
+    }
+
+    #[test]
+    fn unsupported_node_is_structured_and_does_not_return_partial_sql() {
+        let mut value = statement("alter table t add column x int", Dialect::postgres());
+        let StatementNode::AlterRelation(relation) = &mut value.node else {
+            panic!("alter fixture");
+        };
+        relation.commands = vec![crate::ast::AlterCommand::Unsupported(
+            "future command".to_owned(),
+        )];
+        let before = format!("{value:?}");
+        let error = value.deparse_sql(Dialect::postgres()).unwrap_err();
+        assert!(error.is_unsupported());
+        assert!(!error.is_invalid_syntax());
+        assert!(error.node().contains("future command"));
+        assert!(!error.message().is_empty());
+        assert_eq!(format!("{value:?}"), before);
+    }
+
+    #[test]
+    fn rejects_invalid_retained_literal_without_a_panic() {
+        let mut value = statement("select 'valid'", Dialect::postgres());
+        let StatementNode::Query(query) = &mut value.node else {
+            panic!("query fixture");
+        };
+        let QueryBody::Select(select) = &mut query.body else {
+            panic!("select fixture");
+        };
+        select.targets[0].expression = AstExpr::Literal(AstLiteral::String("\0".to_owned()));
+        let error = value.deparse_sql(Dialect::postgres()).unwrap_err();
+        assert!(error.is_invalid_syntax());
+        assert!(!error.is_unsupported());
+        assert!(error.node().contains("literal"));
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn rejects_turso_array_extension_as_invalid_sqlite_syntax() {
+        let mut value = statement("select 1", Dialect::sqlite());
+        let StatementNode::Query(query) = &mut value.node else {
+            panic!("query fixture");
+        };
+        let QueryBody::Select(select) = &mut query.body else {
+            panic!("select fixture");
+        };
+        select.targets[0].expression = AstExpr::Array(vec![crate::ast::Expr::Literal(
+            crate::ast::Literal::Integer(1),
+        )]);
+        let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
+        assert!(error.is_invalid_syntax());
+        assert_eq!(error.dialect(), Dialect::sqlite());
+    }
+
+    #[cfg(not(feature = "sqlite"))]
+    #[test]
+    fn unavailable_dialect_has_its_own_classification() {
+        let mut value = statement("select 1", Dialect::postgres());
+        value.dialect = Dialect::sqlite();
+        let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
+        assert!(error.is_unavailable_dialect());
+        assert!(!error.is_dialect_mismatch());
+    }
+}
+
 /// Render a semantic name using the same checked identifier emitter as the AST.
 pub(crate) fn render_full_name(name: &FullName, dialect: Dialect) -> Result<String, DeparseError> {
     let mut writer = SqlWriter::new(dialect);

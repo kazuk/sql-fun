@@ -292,19 +292,6 @@ impl FromClause {
     {
         self.find_alias_resolved(column, context, with_clause)
     }
-
-    pub(crate) fn find_alias_resolved<TContext: ParseContext>(
-        &self,
-        column: &ColumnName,
-        context: &TContext,
-        with_clause: &WithClause,
-    ) -> Result<::sql_fun_core::LookupResult<AliasSpec>, Vec<AliasSpec>> {
-        let mut candidates = ColumnCandidates::default();
-        for source in &self.0 {
-            candidates.append(source.aliases_for_column_resolved(column, context, with_clause));
-        }
-        candidates.resolve()
-    }
 }
 
 #[cfg(test)]
@@ -362,6 +349,21 @@ mod test_find_alias_for_column {
             expected
         );
         Ok(())
+    }
+}
+
+impl FromClause {
+    pub(crate) fn find_alias_resolved<TContext: ParseContext>(
+        &self,
+        column: &ColumnName,
+        context: &TContext,
+        with_clause: &WithClause,
+    ) -> Result<::sql_fun_core::LookupResult<AliasSpec>, Vec<AliasSpec>> {
+        let mut candidates = ColumnCandidates::default();
+        for source in &self.0 {
+            candidates.append(source.aliases_for_column_resolved(column, context, with_clause));
+        }
+        candidates.resolve()
     }
 }
 

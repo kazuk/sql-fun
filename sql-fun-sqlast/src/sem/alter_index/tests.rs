@@ -3,11 +3,7 @@
 use crate::{
     context::IndexInfoRead,
     names::{FullName, SchemaName, TableName},
-    sem::{
-        Kind, ParseContext,
-        alter_index::{AlterIndex, IndexAlteration, IndexStorageParameter},
-        problem::IndexProblemKind,
-    },
+    sem::{Kind, ParseContext, problem::IndexProblemKind},
 };
 
 #[rstest::rstest]
@@ -458,41 +454,6 @@ use crate::test_helpers::alter_index as test_helpers;
 #[case::ordinal_limit("ALTER INDEX idx ALTER COLUMN 32768 SET STATISTICS 100")]
 fn parser_rejects_column_numbers_outside_the_postgresql_syntax_range(#[case] sql: &str) {
     assert!(crate::PostgresDialect::parse(sql).is_err());
-}
-
-#[test]
-fn rejected_alteration_is_inapplicable_even_when_diagnostics_are_suppressed()
--> testresult::TestResult {
-    let mut context = test_helpers::catalog()?;
-    context.begin_parameter_type_analysis();
-    let statement = AlterIndex::resolve(
-        &mut context,
-        &test_helpers::index_name(),
-        false,
-        &[IndexAlteration::storage(
-            false,
-            &[IndexStorageParameter::new(None, "fillfactor", Some("2"))],
-        )],
-    )?;
-    // Simulate a diagnostic policy discarding delivery, after semantic validation.
-    assert_eq!(context.analysis_state_mut().take_problems().len(), 1);
-    context.finish_analysis(Ok(()))?;
-    assert!(context.problems().is_empty());
-    assert!(!statement.is_applicable());
-    assert_eq!(
-        statement.problems()[0].kind(),
-        IndexProblemKind::invalid_value()
-    );
-    let context = context.apply_alter_index(&statement)?;
-    assert_eq!(test_helpers::fillfactor(&context), None);
-    assert!(
-        test_helpers::alter(context, "SET (fillfactor=85)")?
-            .ast()
-            .as_alter_index()
-            .unwrap()
-            .is_applicable()
-    );
-    Ok(())
 }
 
 #[test]

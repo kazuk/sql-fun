@@ -63,33 +63,6 @@ impl BinaryOpCallSite {
         )?;
         Ok((value, context))
     }
-
-    pub(crate) fn from_operator_definition_resolved<'context, TParseContext>(
-        context: &'context mut TParseContext,
-        name: &OperatorName,
-        operator_def: BinaryOperatorDefinition,
-        lexpr: SemScalarExpr,
-        rexpr: SemScalarExpr,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let call_site = Self {
-            operator_name: name.clone(),
-            binding: None,
-            left_arg_type: lexpr.get_type().clone(),
-            right_arg_type: rexpr.get_type().clone(),
-            left_arg: lexpr,
-            right_arg: rexpr,
-            return_type: operator_def.get_return_type().clone(),
-            strict: operator_def.is_strict(),
-        };
-
-        Ok((
-            SemScalarExpr::Arith(ArithExpr::OpBinary(Box::new(call_site))),
-            context,
-        ))
-    }
 }
 
 #[cfg(test)]
@@ -120,6 +93,35 @@ mod test_binary_op_call_site {
             expr.clone(),
         )?;
         Ok(())
+    }
+}
+
+impl BinaryOpCallSite {
+    pub(crate) fn from_operator_definition_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
+        name: &OperatorName,
+        operator_def: BinaryOperatorDefinition,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let call_site = Self {
+            operator_name: name.clone(),
+            binding: None,
+            left_arg_type: lexpr.get_type().clone(),
+            right_arg_type: rexpr.get_type().clone(),
+            left_arg: lexpr,
+            right_arg: rexpr,
+            return_type: operator_def.get_return_type().clone(),
+            strict: operator_def.is_strict(),
+        };
+
+        Ok((
+            SemScalarExpr::Arith(ArithExpr::OpBinary(Box::new(call_site))),
+            context,
+        ))
     }
 }
 

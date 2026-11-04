@@ -3,12 +3,7 @@
 use crate::{
     context::{BaseParseContext, ParseContext},
     names::{ColumnName, FullName as NamesFullName, TableName as NamesTableName},
-    sem::{
-        AlterObjSubCommand, ColumnConstraint as SemColumnConstraint,
-        ColumnDefinition as SemColumnDefinition,
-    },
-    syn::{ListOpt, Opt},
-    test_helpers::SynBuilder,
+    sem::{ColumnConstraint as SemColumnConstraint, ColumnDefinition as SemColumnDefinition},
 };
 
 #[rstest::rstest]
@@ -432,37 +427,6 @@ fn a_failed_repeated_drop_expression_is_atomic() -> testresult::TestResult {
 }
 
 #[test]
-fn standalone_semantic_command_api_resolves_column_attributes() -> testresult::TestResult {
-    let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
-    let node = SynBuilder::new().parse("ALTER TABLE t ALTER a SET STATISTICS 42");
-    let statement = node.as_alter_table_stmt().as_inner().unwrap();
-    let commands = statement.get_cmds().as_inner().unwrap();
-    let command = commands[0].as_alter_table_cmd().as_inner().unwrap();
-    let subtype = command.get_subtype().as_inner().unwrap();
-    let (command, context) = AlterObjSubCommand::analyze_alter_table_cmd(
-        context,
-        &test_helpers::table_name(),
-        command,
-        subtype,
-        &::sql_fun_core::IVec::default(),
-    )?;
-    let change = command.column_attribute_change().unwrap();
-    assert!(change.can_apply());
-    assert_eq!(
-        change.action().statistics_target().unwrap().effective(),
-        Some(42)
-    );
-    assert!(change.binding().definition().is_some());
-    assert!(context.problems().is_empty());
-    // Command analysis returns semantics without applying the enclosing DDL.
-    assert_eq!(
-        test_helpers::column(&context, "a").statistics_target(),
-        None
-    );
-    Ok(())
-}
-
-#[test]
 fn virtual_generated_column_rejects_statistics_changes() -> testresult::TestResult {
     let result = test_helpers::apply(
         test_helpers::virtual_column_context(),
@@ -477,17 +441,6 @@ fn virtual_generated_column_rejects_statistics_changes() -> testresult::TestResu
         test_helpers::column(result.context(), "g").statistics_target(),
         None
     );
-    Ok(())
-}
-
-#[test]
-fn legacy_column_json_shape_remains_readable() -> testresult::TestResult {
-    let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
-    let original = test_helpers::column(&context, "a");
-    let json = ::serde_json::to_value(original)?;
-    assert!(json.get("attributes").is_none());
-    let restored: SemColumnDefinition = ::serde_json::from_value(json)?;
-    assert_eq!(&restored, original);
     Ok(())
 }
 

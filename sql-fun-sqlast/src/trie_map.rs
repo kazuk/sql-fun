@@ -79,7 +79,77 @@ impl<TValue> TrieMap<TValue> {
             None
         }
     }
+}
 
+#[cfg(test)]
+mod test_insert {
+    use crate::trie_map::TrieMap;
+
+    #[test]
+    fn test_insert_and_get() {
+        let mut map = TrieMap::new();
+        assert_eq!(map.len(), 0);
+        assert!(map.get("key1").is_none());
+
+        map.insert("key1", 10);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get("key1"), Some(&10));
+        assert!(map.get("key2").is_none());
+
+        // overwrite existing key
+        let old = map.insert("key1", 20);
+        assert_eq!(old, Some(10));
+        assert_eq!(map.get("key1"), Some(&20));
+    }
+
+    #[test]
+    fn test_empty_key() {
+        let mut map = TrieMap::new();
+        map.insert("", 5);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get(""), Some(&5));
+        let old = map.insert("", 7);
+        assert_eq!(old, Some(5));
+        assert_eq!(map.get(""), Some(&7));
+    }
+
+    #[test]
+    fn test_get_common_prefix_loop() {
+        let mut map = TrieMap::new();
+        map.insert("foobarbaz", 3);
+        map.insert("foo", 1);
+        map.insert("foobar", 2);
+        map.insert("fool_ploof_needed", 4);
+        assert_eq!(map.get("foo"), Some(&1));
+        assert_eq!(map.get("foobar"), Some(&2));
+        assert_eq!(map.get("foobarbaz"), Some(&3));
+        assert_eq!(map.get("fool_ploof_needed"), Some(&4));
+    }
+
+    #[test]
+    fn test_partial_split() {
+        let mut map = TrieMap::new();
+        // insert in normal order
+        assert_eq!(map.insert("abcd", 1), None);
+        assert_eq!(map.insert("abxy", 2), None);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get("abcd"), Some(&1));
+        assert_eq!(map.get("abxy"), Some(&2));
+        // reverse order
+        let mut map2 = TrieMap::new();
+        assert_eq!(map2.insert("abxy", 20), None);
+        assert_eq!(map2.insert("abcd", 10), None);
+        assert_eq!(map2.len(), 2);
+        assert_eq!(map2.get("abcd"), Some(&10));
+        assert_eq!(map2.get("abxy"), Some(&20));
+        // add third partial key
+        assert_eq!(map.insert("abmn", 3), None);
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.get("abmn"), Some(&3));
+    }
+}
+
+impl<TValue> TrieMap<TValue> {
     /// get iterator
     pub fn iter(&self) -> impl Iterator<Item = (String, &TValue)> {
         TrieMapIter {
@@ -170,36 +240,8 @@ impl<'a, TValue> Iterator for TrieMapIter<'a, TValue> {
 }
 
 #[cfg(test)]
-mod tests {
+mod test_iteration {
     use crate::trie_map::TrieMap;
-
-    #[test]
-    fn test_insert_and_get() {
-        let mut map = TrieMap::new();
-        assert_eq!(map.len(), 0);
-        assert!(map.get("key1").is_none());
-
-        map.insert("key1", 10);
-        assert_eq!(map.len(), 1);
-        assert_eq!(map.get("key1"), Some(&10));
-        assert!(map.get("key2").is_none());
-
-        // overwrite existing key
-        let old = map.insert("key1", 20);
-        assert_eq!(old, Some(10));
-        assert_eq!(map.get("key1"), Some(&20));
-    }
-
-    #[test]
-    fn test_empty_key() {
-        let mut map = TrieMap::new();
-        map.insert("", 5);
-        assert_eq!(map.len(), 1);
-        assert_eq!(map.get(""), Some(&5));
-        let old = map.insert("", 7);
-        assert_eq!(old, Some(5));
-        assert_eq!(map.get(""), Some(&7));
-    }
 
     #[test]
     fn test_iter_order() {
@@ -221,41 +263,6 @@ mod tests {
         );
         let values: Vec<i32> = items.iter().map(|(_, v)| **v).collect();
         assert_eq!(values, vec![1, 11, 12, 2]);
-    }
-
-    #[test]
-    fn test_get_common_prefix_loop() {
-        let mut map = TrieMap::new();
-        map.insert("foobarbaz", 3);
-        map.insert("foo", 1);
-        map.insert("foobar", 2);
-        map.insert("fool_ploof_needed", 4);
-        assert_eq!(map.get("foo"), Some(&1));
-        assert_eq!(map.get("foobar"), Some(&2));
-        assert_eq!(map.get("foobarbaz"), Some(&3));
-        assert_eq!(map.get("fool_ploof_needed"), Some(&4));
-    }
-
-    #[test]
-    fn test_partial_split() {
-        let mut map = TrieMap::new();
-        // insert in normal order
-        assert_eq!(map.insert("abcd", 1), None);
-        assert_eq!(map.insert("abxy", 2), None);
-        assert_eq!(map.len(), 2);
-        assert_eq!(map.get("abcd"), Some(&1));
-        assert_eq!(map.get("abxy"), Some(&2));
-        // reverse order
-        let mut map2 = TrieMap::new();
-        assert_eq!(map2.insert("abxy", 20), None);
-        assert_eq!(map2.insert("abcd", 10), None);
-        assert_eq!(map2.len(), 2);
-        assert_eq!(map2.get("abcd"), Some(&10));
-        assert_eq!(map2.get("abxy"), Some(&20));
-        // add third partial key
-        assert_eq!(map.insert("abmn", 3), None);
-        assert_eq!(map.len(), 3);
-        assert_eq!(map.get("abmn"), Some(&3));
     }
 
     #[test]

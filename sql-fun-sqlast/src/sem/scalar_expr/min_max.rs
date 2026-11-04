@@ -264,7 +264,28 @@ impl MinMaxExpr {
         }
         Ok(target)
     }
+}
 
+#[cfg(test)]
+mod comparison_knowledge_tests {
+
+    use crate::{
+        sem::{AnalysisProblem, PgBuiltInType, scalar_expr::min_max::MinMaxExpr},
+        test_helpers::TestParseContext,
+    };
+
+    #[test]
+    fn absent_comparison_knowledge_reports_missing_metadata() {
+        let context = TestParseContext::default();
+        let problem = MinMaxExpr::common_type(&context, &[PgBuiltInType::int4()]).unwrap_err();
+        assert_eq!(
+            AnalysisProblem::min_max(problem).code(),
+            "min_max_missing_comparison_facts"
+        );
+    }
+}
+
+impl MinMaxExpr {
     /// PostgreSQL ordered common-type selection, without comparison requirements.
     pub(crate) fn select_common_type(
         context: &impl ParseContext,
@@ -347,52 +368,6 @@ impl MinMaxExpr {
                 self.coerce(&ty);
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod comparison_knowledge_tests {
-    use crate::{
-        sem::{InputTypeConstraint, parameter_resolution::ParameterResolution},
-        test_helpers::create_cache_context,
-    };
-
-    use crate::{
-        sem::{
-            AnalysisProblem, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
-            scalar_expr::min_max::MinMaxExpr,
-        },
-        test_helpers::TestParseContext,
-    };
-
-    #[test]
-    fn absent_comparison_knowledge_reports_missing_metadata() {
-        let context = TestParseContext::default();
-        let problem = MinMaxExpr::common_type(&context, &[PgBuiltInType::int4()]).unwrap_err();
-        assert_eq!(
-            AnalysisProblem::min_max(problem).code(),
-            "min_max_missing_comparison_facts"
-        );
-    }
-
-    #[test]
-    fn absent_comparison_knowledge_does_not_eliminate_parameter_types() {
-        let mut context = TestParseContext::default();
-        let mut cache = create_cache_context();
-        let mut parameters = ParameterResolution::new(&mut cache);
-        let arguments = [
-            parameters.parameter(1, &InputTypeConstraint::any()),
-            SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),
-        ];
-        let (_, types) = parameters
-            .min_max(&mut context, "greatest", &arguments)
-            .unwrap();
-        assert_eq!(types.single_type(), Some(PgBuiltInType::int4()));
-        assert_eq!(context.reported_problems().len(), 1);
-        assert_eq!(
-            context.reported_problems()[0].code(),
-            "min_max_missing_comparison_facts"
-        );
     }
 }
 

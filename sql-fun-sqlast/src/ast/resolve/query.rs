@@ -70,6 +70,59 @@ impl Query {
     ) -> Result<SelectStatement, AnalysisError> {
         self.resolve_query_body(context, outer)
     }
+}
+
+#[cfg(test)]
+mod test_name_resolution_phase {
+    use crate::{
+        parse_statements,
+        sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+    };
+
+    use crate::{
+        ast::{Dialect, StatementNode},
+        context::ParseContext,
+        names::OperatorName,
+        sem::{BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType},
+        test_helpers::TestParseContext,
+    };
+
+    #[rstest::rstest]
+    #[case("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
+    #[case("SELECT COALESCE($1, 1)")]
+    #[case("SELECT ($1)[$2]")]
+    #[case("SELECT $1 = ANY($2)")]
+    #[case("SELECT $1 = ALL($2)")]
+    fn untyped_operands_do_not_prevent_name_resolution(#[case] sql: &str) {
+        let dialect = Dialect::postgres();
+        let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
+        let StatementNode::Query(query) = statement.node else {
+            panic!("query fixture expected");
+        };
+        let mut catalog = TestParseContext::default();
+        let int = PgBuiltInType::int4();
+        let operator = OperatorDefinition::binary(&[BinaryOperatorDefinition::new(
+            &int,
+            &int,
+            &PgBuiltInType::bool(),
+            true,
+        )]);
+        catalog.set_get_operator_op_result(
+            &OperatorName::from_parts(None, "="),
+            true,
+            true,
+            Some(&operator),
+        );
+        let before = parameter_resolution_inference_runs();
+        catalog.begin_parameter_type_analysis();
+        let result = query.resolve_in(&mut catalog, None);
+        catalog.finish_analysis(result).unwrap();
+        assert_eq!(catalog.reported_problem_count(), 0);
+        assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
+    }
+}
+
+impl Query {
     fn resolve_query_body(
         &self,
         context: &mut impl ParseContext,
@@ -126,56 +179,6 @@ impl Query {
         let mut query = SelectStatement::query(query);
         query.complete_grouping(context)?;
         Ok(query)
-    }
-}
-
-#[cfg(test)]
-mod test_name_resolution_phase {
-    use crate::{
-        parse_statements,
-        sem::parameter_resolution::inference_runs as parameter_resolution_inference_runs,
-    };
-
-    use crate::{
-        ast::{Dialect, StatementNode},
-        context::ParseContext,
-        names::OperatorName,
-        sem::{BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType},
-        test_helpers::TestParseContext,
-    };
-
-    #[rstest::rstest]
-    #[case("SELECT CASE WHEN true THEN $1 ELSE 1 END")]
-    #[case("SELECT COALESCE($1, 1)")]
-    #[case("SELECT ($1)[$2]")]
-    #[case("SELECT $1 = ANY($2)")]
-    #[case("SELECT $1 = ALL($2)")]
-    fn untyped_operands_do_not_prevent_name_resolution(#[case] sql: &str) {
-        let dialect = Dialect::postgres();
-        let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
-        let StatementNode::Query(query) = statement.node else {
-            panic!("query fixture expected");
-        };
-        let mut catalog = TestParseContext::default();
-        let int = PgBuiltInType::int4();
-        let operator = OperatorDefinition::binary(&[BinaryOperatorDefinition::new(
-            &int,
-            &int,
-            &PgBuiltInType::bool(),
-            true,
-        )]);
-        catalog.set_get_operator_op_result(
-            &OperatorName::from_parts(None, "="),
-            true,
-            true,
-            Some(&operator),
-        );
-        let before = parameter_resolution_inference_runs();
-        catalog.begin_parameter_type_analysis();
-        let result = query.resolve_in(&mut catalog, None);
-        catalog.finish_analysis(result).unwrap();
-        assert_eq!(catalog.reported_problem_count(), 0);
-        assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
     }
 }
 

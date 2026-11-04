@@ -70,7 +70,37 @@ impl PgBuiltinCasts {
 }
 
 #[cfg(test)]
-mod loader_tests;
+mod test_load {
+    use crate::{
+        context::{ConflictMasters, base_context::builtin_casts::PgBuiltinCasts},
+        sem::CastContext,
+    };
+
+    use crate::test_helpers::cast_catalog as test_helpers;
+
+    #[rstest::rstest]
+    #[case::preferred_implicit("i", Some(true), CastContext::ImplicitPrefeerd)]
+    #[case::ordinary_implicit("i", Some(false), CastContext::Implicit)]
+    #[case::legacy_implicit("i", None, CastContext::Implicit)]
+    #[case::preferred_assignment("a", Some(true), CastContext::Assignment)]
+    #[case::preferred_explicit("e", Some(true), CastContext::Explicit)]
+    fn loader_preserves_preference_only_for_implicit_casts(
+        #[case] context: &str,
+        #[case] preferred: Option<bool>,
+        #[case] expected: CastContext,
+    ) -> testresult::TestResult {
+        let catalog = test_helpers::cast_catalog(context, preferred)?;
+        let (casts, _) = PgBuiltinCasts::load(catalog.path(), &ConflictMasters::sqlite())?;
+        let cast = casts.get("source").unwrap().get("target").unwrap();
+        assert_eq!(cast.context(), expected);
+        assert_eq!(cast.use_in_implicit(), expected.use_in_implicit());
+        assert_eq!(
+            cast.context().overload_priority_score(),
+            expected.overload_priority_score()
+        );
+        Ok(())
+    }
+}
 
 impl CastInfoRead for BaseContextBaseContext {
     fn get_assignment_cast(
@@ -226,53 +256,6 @@ impl CastInfoRead for BaseContextBaseContext {
     }
 }
 
-impl super::BaseContext {
-    // PostgreSQL derives vector-source array conversions from the element cast;
-    // the inverse conversion to a vector is deliberately not synthesized.
-    fn vector_array_cast(
-        &self,
-        source: &TypeReference,
-        target: &TypeReference,
-        implicit: bool,
-    ) -> Option<CastDefinition> {
-        if source.is_array() != Some(false) || target.is_array() != Some(true) {
-            return None;
-        }
-        let element = self.get_array_item_type(source)?;
-        let target_element = self.get_array_item_type(target)?;
-        let cast = if implicit {
-            self.get_implicit_cast(&element, &target_element)?
-        } else {
-            self.get_explicit_cast(&element, &target_element)?
-        };
-        // Equal elements still require a conversion between distinct containers.
-        // An element's preferred-conversion score is not a container preference.
-        let context = if cast.use_in_implicit() {
-            CastContext::implicit()
-        } else {
-            cast.context()
-        };
-        Some(CastDefinition::new(context))
-    }
-
-    pub(super) fn builtin_cast_type<'a>(&self, ty: &'a TypeReference) -> Option<(&'a str, bool)> {
-        if ty.is_dynamic() {
-            return None;
-        }
-        let name = ty.full_name()?;
-        if name.catalog().is_some()
-            || name
-                .schema()
-                .is_some_and(|schema| schema.as_str() != "pg_catalog")
-        {
-            return None;
-        }
-        let builtin_name = FullName::with_schema("pg_catalog", name.name().as_str());
-        self.types.get(&builtin_name.to_string())?;
-        Some((name.name().as_str(), ty.is_array()?))
-    }
-}
-
 #[cfg(test)]
 mod test_builtin_cast_identity {
     use crate::{
@@ -369,5 +352,52 @@ mod test_builtin_cast_identity {
         );
         assert!(schema_context.get_explicit_cast(&text, &xml).is_some());
         assert!(schema_context.get_implicit_cast(&text, &xml).is_none());
+    }
+}
+
+impl super::BaseContext {
+    // PostgreSQL derives vector-source array conversions from the element cast;
+    // the inverse conversion to a vector is deliberately not synthesized.
+    fn vector_array_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+        implicit: bool,
+    ) -> Option<CastDefinition> {
+        if source.is_array() != Some(false) || target.is_array() != Some(true) {
+            return None;
+        }
+        let element = self.get_array_item_type(source)?;
+        let target_element = self.get_array_item_type(target)?;
+        let cast = if implicit {
+            self.get_implicit_cast(&element, &target_element)?
+        } else {
+            self.get_explicit_cast(&element, &target_element)?
+        };
+        // Equal elements still require a conversion between distinct containers.
+        // An element's preferred-conversion score is not a container preference.
+        let context = if cast.use_in_implicit() {
+            CastContext::implicit()
+        } else {
+            cast.context()
+        };
+        Some(CastDefinition::new(context))
+    }
+
+    pub(super) fn builtin_cast_type<'a>(&self, ty: &'a TypeReference) -> Option<(&'a str, bool)> {
+        if ty.is_dynamic() {
+            return None;
+        }
+        let name = ty.full_name()?;
+        if name.catalog().is_some()
+            || name
+                .schema()
+                .is_some_and(|schema| schema.as_str() != "pg_catalog")
+        {
+            return None;
+        }
+        let builtin_name = FullName::with_schema("pg_catalog", name.name().as_str());
+        self.types.get(&builtin_name.to_string())?;
+        Some((name.name().as_str(), ty.is_array()?))
     }
 }

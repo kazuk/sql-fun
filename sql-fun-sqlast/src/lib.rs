@@ -145,38 +145,6 @@ impl PostgresDialect {
         *content_hash = Some(snapshot.content_hash().to_owned());
         Self::parse_schema_snapshot(&snapshot, input_context, args, metadata)
     }
-
-    /// Analyze exactly the previously read snapshot, without reopening its file.
-    /// The supplied args and selected metadata configure this analysis independently
-    /// of the frozen catalog; metadata must select this loader's dialect.
-    ///
-    /// # Errors
-    /// Returns syntax or fatal semantic analysis failures.
-    pub fn parse_schema_snapshot(
-        snapshot: &SqlFileSnapshot,
-        input_context: &FrozenBaseContext,
-        args: &::sql_fun_core::SqlFunArgs,
-        metadata: &::sql_fun_core::SqlFunMetadata,
-    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        let sql_statements = snapshot.postgres_text();
-        let dump_file = snapshot.path();
-
-        let statements = split_postgres_statements(&sql_statements)?;
-        let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
-        AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-        let mut sem_results = Vec::new();
-        for statement in statements {
-            context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
-            context.set_diagnostic_source(statement);
-            let syn = Self::parse(statement)?;
-            let tokens = Self::scan(statement)?;
-            let AstAndContextPair(sem, rcontext) =
-                SemAst::semantic_analysis(context, syn, &tokens)?;
-            sem_results.push(sem);
-            context = rcontext;
-        }
-        Ok(context.into_parsed(sem_results))
-    }
 }
 
 #[cfg(test)]
@@ -231,6 +199,40 @@ mod test_schema_content_hash {
         .unwrap_err();
         assert!(error.is_io());
         assert!(hash.is_none());
+    }
+}
+
+impl PostgresDialect {
+    /// Analyze exactly the previously read snapshot, without reopening its file.
+    /// The supplied args and selected metadata configure this analysis independently
+    /// of the frozen catalog; metadata must select this loader's dialect.
+    ///
+    /// # Errors
+    /// Returns syntax or fatal semantic analysis failures.
+    pub fn parse_schema_snapshot(
+        snapshot: &SqlFileSnapshot,
+        input_context: &FrozenBaseContext,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        let sql_statements = snapshot.postgres_text();
+        let dump_file = snapshot.path();
+
+        let statements = split_postgres_statements(&sql_statements)?;
+        let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
+        AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
+        let mut sem_results = Vec::new();
+        for statement in statements {
+            context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
+            context.set_diagnostic_source(statement);
+            let syn = Self::parse(statement)?;
+            let tokens = Self::scan(statement)?;
+            let AstAndContextPair(sem, rcontext) =
+                SemAst::semantic_analysis(context, syn, &tokens)?;
+            sem_results.push(sem);
+            context = rcontext;
+        }
+        Ok(context.into_parsed(sem_results))
     }
 }
 

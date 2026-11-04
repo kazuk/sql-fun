@@ -1,67 +1,10 @@
+use crate::test_helpers::rule::postgres_rule_syntax;
+use crate::test_helpers::rule::rule;
 use crate::{
     PostgresDialect,
-    ast::{
-        CreateRule, Dialect, Expr, QueryBody, RuleEvent, SetOperation, StatementKind,
-        StatementNode, TryFromWithTokens,
-    },
-    parse_statements, syn,
-    syn::Opt,
+    ast::{CreateRule, Expr, QueryBody, RuleEvent, SetOperation, StatementNode, TryFromWithTokens},
+    syn,
 };
-
-impl StatementNode {
-    fn into_test_rule(self) -> CreateRule {
-        match self {
-            Self::CreateRule(value) => value,
-            _ => panic!("CREATE RULE node"),
-        }
-    }
-}
-
-fn rule(sql: &str) -> CreateRule {
-    let statement = parse_statements(sql, Dialect::postgres())
-        .next()
-        .expect("statement")
-        .expect("context-free conversion");
-    assert_eq!(statement.kind(), StatementKind::create_rule());
-    statement.node.into_test_rule()
-}
-
-#[rstest::rstest]
-#[case::select("SELECT", RuleEvent::select())]
-#[case::insert("INSERT", RuleEvent::insert())]
-#[case::update("UPDATE", RuleEvent::update())]
-#[case::delete("DELETE", RuleEvent::delete())]
-fn preserves_every_event_without_catalog(#[case] event: &str, #[case] expected: RuleEvent) {
-    let rule = rule(&format!(
-        "CREATE RULE MiXeD AS ON {event} TO absent DO NOTHING"
-    ));
-    assert_eq!(rule.name.0, ["mixed"]);
-    assert_eq!(rule.relation.name.0, ["absent"]);
-    assert_eq!(rule.event, expected);
-    assert!(!rule.replace);
-    assert!(!rule.instead);
-    assert!(rule.predicate.is_none());
-    assert!(rule.actions.is_empty());
-}
-
-#[test]
-fn preserves_identity_replacement_and_complete_condition() {
-    let rule = rule(
-        r#"CREATE OR REPLACE RULE "Rule" AS ON UPDATE TO "Catalog"."Schema"."Target"
-        WHERE NEW."Value"::numeric(12, 3) > OLD."Value" DO INSTEAD NOTHING"#,
-    );
-    assert_eq!(rule.name.0, ["Rule"]);
-    assert_eq!(rule.relation.name.0, ["Catalog", "Schema", "Target"]);
-    assert!(rule.relation.alias.is_none());
-    assert!(rule.relation.inherit);
-    assert_eq!(rule.relation.persistence, "p");
-    assert!(rule.replace);
-    assert!(rule.instead);
-    assert_eq!(rule.event, RuleEvent::update());
-    let predicate = rule.predicate.expect("WHERE condition");
-    predicate.assert_test_rule_condition();
-    assert!(rule.actions.is_empty());
-}
 
 impl Expr {
     fn assert_test_rule_condition(&self) {
@@ -90,20 +33,6 @@ impl Expr {
     }
 }
 
-#[rstest::rstest]
-#[case::omitted("", false)]
-#[case::also("ALSO", false)]
-#[case::instead("INSTEAD", true)]
-fn preserves_action_mode(#[case] mode: &str, #[case] instead: bool) {
-    let rule = rule(&format!(
-        "CREATE RULE r AS ON INSERT TO s.t DO {mode} SELECT NEW.id"
-    ));
-    assert_eq!(rule.relation.name.0, ["s", "t"]);
-    assert_eq!(rule.instead, instead);
-    assert_eq!(rule.actions.len(), 1);
-    rule.actions[0].assert_test_select_new_id();
-}
-
 impl StatementNode {
     fn assert_test_select_new_id(&self) {
         let Self::Query(query) = self else {
@@ -123,17 +52,6 @@ impl QueryBody {
             .expression
             .assert_test_column(&["new", "id"]);
     }
-}
-
-#[rstest::rstest]
-#[case::nothing("NOTHING")]
-#[case::empty_list("()")]
-#[case::empty_statements("(;;)")]
-fn retains_parser_no_action_forms(#[case] body: &str) {
-    let sql = format!("CREATE RULE r AS ON DELETE TO t DO INSTEAD {body}");
-    let frontend = postgres_rule_syntax(&sql);
-    assert!(frontend.actions.is_empty());
-    assert!(rule(&sql).actions.is_empty());
 }
 
 #[test]
@@ -295,51 +213,6 @@ impl QueryBody {
     }
 }
 
-fn postgres_rule_syntax(sql: &str) -> ::pg_query::protobuf::RuleStmt {
-    let node = ::pg_query::parse(sql, ::pg_query::ParserOptions::default())
-        .expect("rule fixture")
-        .protobuf
-        .stmts
-        .into_iter()
-        .next()
-        .expect("statement")
-        .stmt
-        .expect("node")
-        .node
-        .expect("payload");
-    match node {
-        ::pg_query::protobuf::node::Node::RuleStmt(value) => *value,
-        _ => panic!("RuleStmt fixture"),
-    }
-}
-
-#[rstest::rstest]
-#[case::unspecified(0)]
-#[case::non_event(::pg_query::protobuf::CmdType::CmdUtility as i32)]
-#[case::invalid(999)]
-#[should_panic(expected = "CREATE RULE event")]
-fn rejects_invalid_frontend_events(#[case] event: i32) {
-    let mut syntax = postgres_rule_syntax("CREATE RULE r AS ON INSERT TO t DO NOTHING");
-    syntax.event = event;
-    let _ = CreateRule::try_from_with_tokens(&syn::RuleStmt::from(syntax), &Default::default());
-}
-
-#[test]
-fn rejects_missing_target() {
-    let mut syntax = postgres_rule_syntax("CREATE RULE r AS ON INSERT TO t DO NOTHING");
-    syntax.relation = None;
-    let result =
-        CreateRule::try_from_with_tokens(&syn::RuleStmt::from(syntax), &Default::default());
-    assert!(result.is_err());
-}
-
-#[test]
-#[should_panic(expected = "CREATE RULE NOTIFY action syntax conversion: #608")]
-fn notify_is_an_explicit_tracked_nested_boundary() {
-    let _ =
-        rule("CREATE RULE r AS ON INSERT TO absent DO (SELECT NEW.id; NOTIFY channel, 'payload')");
-}
-
 #[test]
 fn retains_nested_type_diagnostic_locations() {
     let sql = r#"CREATE RULE r AS ON INSERT TO t WHERE NEW.id::"Types"."Number"(12,3) > 0 DO SELECT NEW.id::"Types"."Text"(7)"#;
@@ -394,36 +267,6 @@ impl QueryBody {
 }
 
 #[rstest::rstest]
-#[case::minimal("CREATE RULE r AS ON SELECT TO missing DO NOTHING")]
-#[case::full(r#"CREATE OR REPLACE RULE "R" AS ON UPDATE TO "C"."S"."T" WHERE NEW.x > OLD.x DO INSTEAD (SELECT NEW.x; DELETE FROM absent WHERE x=OLD.x RETURNING x)"#)]
-fn frontend_fields_agree_with_common_ast(#[case] sql: &str) {
-    let frontend = postgres_rule_syntax(sql);
-    let common = rule(sql);
-    let relation = frontend.relation.expect("frontend relation");
-    let mut name = Vec::new();
-    if !relation.catalogname.is_empty() {
-        name.push(relation.catalogname);
-    }
-    if !relation.schemaname.is_empty() {
-        name.push(relation.schemaname);
-    }
-    name.push(relation.relname);
-    assert_eq!(common.name.0, [frontend.rulename]);
-    assert_eq!(common.relation.name.0, name);
-    assert_eq!(common.relation.inherit, relation.inh);
-    assert_eq!(common.relation.persistence, relation.relpersistence);
-    assert_eq!(common.relation.alias.is_some(), relation.alias.is_some());
-    assert_eq!(common.replace, frontend.replace);
-    assert_eq!(common.instead, frontend.instead);
-    assert_eq!(common.predicate.is_some(), frontend.where_clause.is_some());
-    assert_eq!(common.actions.len(), frontend.actions.len());
-    assert_eq!(
-        common.event,
-        RuleEvent::try_from(syn::CmdTypeOpt::from(frontend.event).as_inner()).expect("event")
-    );
-}
-
-#[rstest::rstest]
 #[case::union("UNION", false)]
 #[case::union_all("UNION ALL", true)]
 #[case::intersect("INTERSECT", false)]
@@ -473,4 +316,37 @@ impl SetOperation {
         };
         assert_eq!(operation.split_whitespace().next(), Some(name));
     }
+}
+
+#[test]
+fn preserves_identity_replacement_and_complete_condition() {
+    let rule = rule(
+        r#"CREATE OR REPLACE RULE "Rule" AS ON UPDATE TO "Catalog"."Schema"."Target"
+        WHERE NEW."Value"::numeric(12, 3) > OLD."Value" DO INSTEAD NOTHING"#,
+    );
+    assert_eq!(rule.name.0, ["Rule"]);
+    assert_eq!(rule.relation.name.0, ["Catalog", "Schema", "Target"]);
+    assert!(rule.relation.alias.is_none());
+    assert!(rule.relation.inherit);
+    assert_eq!(rule.relation.persistence, "p");
+    assert!(rule.replace);
+    assert!(rule.instead);
+    assert_eq!(rule.event, RuleEvent::update());
+    let predicate = rule.predicate.expect("WHERE condition");
+    predicate.assert_test_rule_condition();
+    assert!(rule.actions.is_empty());
+}
+
+#[rstest::rstest]
+#[case::omitted("", false)]
+#[case::also("ALSO", false)]
+#[case::instead("INSTEAD", true)]
+fn preserves_action_mode(#[case] mode: &str, #[case] instead: bool) {
+    let rule = rule(&format!(
+        "CREATE RULE r AS ON INSERT TO s.t DO {mode} SELECT NEW.id"
+    ));
+    assert_eq!(rule.relation.name.0, ["s", "t"]);
+    assert_eq!(rule.instead, instead);
+    assert_eq!(rule.actions.len(), 1);
+    rule.actions[0].assert_test_select_new_id();
 }

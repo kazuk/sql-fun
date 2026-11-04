@@ -425,7 +425,8 @@ Issue #978 serial-family contracts live in `serial-original.json` and
 `serial-family.json` on PostgreSQL 17/18 through both maintained paths.
 `serial-original.sql` is a byte-for-byte copy of the unmodified SQL-function
 schema fixture (`tests/sql_functions/default.develop.sql`). It is a regular file
-because isolated semver source materialization rejects symbolic links. Queries check canonical integer types, implicit non-nullability,
+because isolated semver source materialization rejects symbolic links. Queries
+check canonical integer types, implicit non-nullability,
 written keys, collision handling and quoted names. Declaration cases check
 all six spellings and conflicting attributes; ordinary type lookup/casts do
 not gain serial aliases. Rust tests retain the generated nextval binding,

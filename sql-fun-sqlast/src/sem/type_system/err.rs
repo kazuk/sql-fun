@@ -4,6 +4,12 @@ use crate::sem::{FunctionParam, TypeReference};
 
 #[derive(thiserror::Error, Debug)]
 pub enum TypeError {
+    #[error("unknown argument name {0}")]
+    UnknownArgumentName(String),
+
+    #[error("argument assigned twice: {0}")]
+    ArgumentAssignedTwice(String),
+
     #[error("too many function arguments")]
     TooManyArguments,
 

@@ -5,6 +5,7 @@ use crate::{
         ColumnCollection, OverloadVariant, TypeReference,
         overload_rank::OverloadRank,
         parameter_resolution::Signature,
+        problem::CallArgumentProblem,
         type_system::{
             ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
             func_params::ParameterBindResult,
@@ -28,6 +29,39 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    /// Report a specific binding cause only when every candidate agrees.
+    /// A bindable candidate suppresses binding diagnostics even if its types fail.
+    pub(crate) fn binding_problem(
+        &self,
+        arguments: &ArgumentBindingCollection,
+    ) -> Option<CallArgumentProblem> {
+        let problems: Vec<_> = self
+            .overloads
+            .iter()
+            .map(|overload| match arguments.supplied_parameters(overload) {
+                Err(TypeError::UnknownArgumentName(name)) => {
+                    Some(CallArgumentProblem::unknown_name(&name))
+                }
+                Err(TypeError::ArgumentAssignedTwice(name)) => {
+                    Some(CallArgumentProblem::assigned_twice(&name))
+                }
+                Err(TypeError::BindFailed(parameter)) => Some(
+                    CallArgumentProblem::missing_required(parameter.name().map(String::as_str)),
+                ),
+                _ => None,
+            })
+            .collect();
+        let first = problems.first()?.as_ref()?;
+        if problems
+            .iter()
+            .all(|problem| problem.as_ref() == Some(first))
+        {
+            Some(first.clone())
+        } else {
+            None
+        }
+    }
+
     // Shared declaration result, without binding or selecting an overload.
     pub(crate) fn common_scalar_result(&self) -> Option<TypeReference> {
         let result = self.overloads.first()?.scaler_ret_type()?;

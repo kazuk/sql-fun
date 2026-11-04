@@ -16,7 +16,10 @@ use crate::{
     ast::TryFromWithTokens,
     context::GetSourcePathWithSpan,
     names::{ColumnName, ViewName},
-    sem::{AstAndContextPair, ColumnDefinition, Constraint, SemScalarExpr, SourcePathWithSpan},
+    sem::{
+        AstAndContextPair, ColumnDefinition, Constraint, ConstraintNames, SemScalarExpr,
+        SourcePathWithSpan,
+    },
     syn::{AlterTableType, ScanToken},
 };
 
@@ -114,19 +117,18 @@ impl AlterTable {
         &mut self,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        let mut names = std::collections::HashSet::new();
-        let mut duplicates = std::collections::HashSet::new();
+        let mut names = ConstraintNames::default();
+        let mut reported = ConstraintNames::default();
         for command in &self.commands {
             if let Some(constraint) = command.added_constraint() {
                 let name = constraint.name();
-                if !name.is_empty() && !names.insert(name.to_owned()) {
-                    duplicates.insert(name.to_owned());
-                }
+                names.reserve(name);
             }
         }
         for command in &mut self.commands {
             if let AlterObjSubCommand::AddConstraint(Constraint::Check(check)) = command
-                && duplicates.remove(check.name())
+                && names.is_duplicate(check.name())
+                && reported.reserve(check.name())
             {
                 check.reject_duplicate_name(context)?;
                 self.applicable = false;
@@ -136,15 +138,12 @@ impl AlterTable {
     }
 
     pub(crate) fn conflicting_constraint(&self, table: &CreateTable) -> Option<String> {
-        let mut names = Vec::new();
+        let mut names = ConstraintNames::default();
         for command in &self.commands {
             if let Some(constraint) = command.added_constraint() {
                 let name = constraint.name();
-                if !name.is_empty() {
-                    if table.constraint(name).is_some() || names.contains(&name) {
-                        return Some(name.to_owned());
-                    }
-                    names.push(name);
+                if !name.is_empty() && (table.constraint(name).is_some() || !names.reserve(name)) {
+                    return Some(name.to_owned());
                 }
             }
         }

@@ -550,5 +550,53 @@
       "diagnostics": [],
       "columns": []
     }
+  },
+  {
+    "name": "inline-reference-collision",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated REFERENCES check_parent(id) CONSTRAINT repeated CHECK(true))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-later-reference-collision",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated CHECK(true) CONSTRAINT repeated REFERENCES check_parent(id))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-other-column-reference-collision",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated CHECK(true), b integer CONSTRAINT repeated REFERENCES check_parent(id))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "table-check-inline-reference-collision",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated REFERENCES check_parent(id), CONSTRAINT repeated CHECK(true))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-distinct-reference-check-names",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT reference_name REFERENCES check_parent(id) CONSTRAINT check_name CHECK(true))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
   }
 ]

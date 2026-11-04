@@ -1,5 +1,6 @@
 #![doc = include_str!("sem.md")]
 
+pub(crate) use self::constraint::ConstraintNames;
 mod alter_column;
 mod alter_index;
 mod alter_owner;

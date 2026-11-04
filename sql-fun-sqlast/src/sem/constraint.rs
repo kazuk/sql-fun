@@ -1,5 +1,8 @@
+pub(crate) use self::names::ConstraintNames;
+
 mod check;
 mod foreign;
+mod names;
 mod primary;
 mod unique;
 

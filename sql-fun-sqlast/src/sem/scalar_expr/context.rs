@@ -85,6 +85,15 @@ impl<'a> ScalarAnalysisContext<'a> {
                 }
             })
         {
+            if alias.is_none()
+                && context.dialect() == Dialect::postgres()
+                && column.as_str() == table.identity.full_name().name().as_str()
+                && table.definition.find_column(column, false).is_none()
+            {
+                return self
+                    .declared_whole_row(context, table.identity.full_name(), 0)
+                    .map(Some);
+            }
             return self.declared_column(context, column).map(Some);
         }
         Ok(None)
@@ -99,12 +108,6 @@ impl<'a> ScalarAnalysisContext<'a> {
         let definition = table
             .definition
             .find_column(column, context.dialect() == Dialect::sqlite());
-        if definition.is_none()
-            && context.dialect() == Dialect::postgres()
-            && column.as_str() == table.identity.full_name().name().as_str()
-        {
-            return self.declared_whole_row(context, table.identity.full_name(), 0);
-        }
         let canonical = if let Some(binding) = definition
             && let Some(name) = binding.name().as_ref()
         {

@@ -84,7 +84,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK(a))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_type"
       ],
       "columns": []
     }
@@ -94,7 +94,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK(a AND true))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_type"
       ],
       "columns": []
     }
@@ -104,7 +104,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK('true'::text))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_type"
       ],
       "columns": []
     }
@@ -114,7 +114,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK('o'))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_literal"
       ],
       "columns": []
     }
@@ -134,7 +134,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK(sum(a) > 0))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_expression_placement"
       ],
       "columns": []
     }
@@ -144,7 +144,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK(row_number() OVER() > 0))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_expression_placement"
       ],
       "columns": []
     }
@@ -154,7 +154,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK(generate_series(1,2) > 0))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_expression_placement"
       ],
       "columns": []
     }
@@ -164,7 +164,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK((SELECT true)))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_expression_placement"
       ],
       "columns": []
     }
@@ -174,7 +174,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CONSTRAINT repeated CHECK(true), CONSTRAINT repeated CHECK(false))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_duplicate_name"
       ],
       "columns": []
     }
@@ -208,7 +208,7 @@
     "sql": "ALTER TABLE check_existing ADD CONSTRAINT bad CHECK(a)",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_type"
       ],
       "columns": []
     }
@@ -228,7 +228,7 @@
     "sql": "ALTER TABLE check_existing ADD CHECK(a > 0), ADD CHECK(a)",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_type"
       ],
       "columns": []
     }
@@ -238,7 +238,7 @@
     "sql": "ALTER TABLE check_existing ADD CONSTRAINT existing CHECK(true)",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_duplicate_name"
       ],
       "columns": []
     }
@@ -264,7 +264,7 @@
     "sql": "CREATE TABLE check_sample (a integer, CHECK(CASE WHEN a THEN true ELSE false END))",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_boolean_type"
       ],
       "columns": []
     }
@@ -274,7 +274,53 @@
     "sql": "ALTER TABLE check_existing ADD CONSTRAINT repeated CHECK(true), ADD CONSTRAINT repeated CHECK(false)",
     "expected": {
       "diagnostics": [
-        "check_constraint"
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "bare-whole-row",
+    "sql": "CREATE TABLE check_sample(a integer, CHECK(check_sample IS NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "qualified-missing-same-as-relation",
+    "sql": "CREATE TABLE check_sample(a integer, CHECK(check_sample.check_sample IS NULL))",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "schema-qualified-missing-same-as-relation",
+    "sql": "CREATE TABLE public.check_sample(a integer, CHECK(public.check_sample.check_sample IS NULL))",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "qualified-column-same-as-relation",
+    "sql": "CREATE TABLE check_sample(check_sample integer, CHECK(check_sample.check_sample IS NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "duplicate-keys-with-check-name",
+    "sql": "CREATE TABLE check_sample(a integer, CONSTRAINT x UNIQUE(a), CONSTRAINT x UNIQUE(a), CONSTRAINT x CHECK(true))",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation"
       ],
       "columns": []
     }

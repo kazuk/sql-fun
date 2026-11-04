@@ -76,12 +76,6 @@ impl TableConstraint {
 }
 
 impl Table {
-    pub(super) fn check_name_used(&self, name: &str) -> bool {
-        self.constraints
-            .iter()
-            .any(|definition| definition.is_check() && definition.name.as_deref() == Some(name))
-    }
-
     fn column_constraint_name_used(&self, context: &impl ParseContext, name: &str) -> bool {
         for column in &self.columns {
             for definition in &column.constraints {

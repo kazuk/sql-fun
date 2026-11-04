@@ -504,7 +504,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.code(),
             Self::Array(problem) => problem.code(),
             Self::TruthTest(problem) => problem.code(),
-            Self::Check(_) => CheckProblem::CODE,
+            Self::Check(problem) => problem.code(),
             Self::Collate(problem) => problem.code(),
             Self::TableSample(problem) => problem.code(),
             Self::Distinct(problem) => problem.code(),

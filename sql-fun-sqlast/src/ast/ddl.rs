@@ -936,7 +936,10 @@ impl super::Table {
     fn duplicate_constraint_name(&self, context: &impl ParseContext) -> Option<&str> {
         let mut names = Vec::new();
         for definition in &self.constraints {
-            if let Some(name) = definition.name.as_deref() {
+            // CHECK collisions are validated after the other declarations are retained.
+            if !definition.is_check()
+                && let Some(name) = definition.name.as_deref()
+            {
                 if names.contains(&name) {
                     return Some(name);
                 }
@@ -982,7 +985,6 @@ impl super::Table {
         }
         if context.dialect() == Dialect::postgres()
             && let Some(constraint) = self.duplicate_constraint_name(&context)
-            && !self.check_name_used(constraint)
         {
             context.report_problem(AnalysisProblem::creation(CreationProblem::constraint(
                 &name,

@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     ast::{Dialect, StatementNode},
     context::ParseContext,
@@ -145,7 +146,7 @@ pub(crate) fn resolve(sql: &str, infer: bool) -> (SelectStatement, TestParseCont
         panic!("query")
     };
     context.begin_parameter_type_analysis();
-    let query = query.resolve_test_in(&mut context, None);
+    let query = convert(&query).resolve_test_in(&mut context, None);
     let query = if infer {
         context.infer_query_parameter_types(query, &mut create_cache_context())
     } else {

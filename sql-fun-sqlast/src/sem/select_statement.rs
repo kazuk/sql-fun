@@ -4,6 +4,7 @@ mod set_operation;
 pub(crate) use self::result_column::ResultColumn;
 pub use self::result_column::ResultColumnCollection;
 pub use self::set_operation::{SetOperationKind, SetOperationQuery};
+use crate::sem::convert;
 
 use crate::{
     CacheContext,
@@ -183,7 +184,7 @@ impl SelectStatement {
         TParseContext: ParseContext,
     {
         let syntax = AstQuery::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&mut context, &mut CacheContext::new());
+        let outcome = convert(&syntax).resolve(&mut context, &mut CacheContext::new());
         let query = outcome?;
         Ok(AstAndContextPair::new(SemAst::select(&query), context))
     }
@@ -264,7 +265,7 @@ impl SelectStatementNode {
         TParseContext: ParseContext,
     {
         let syntax = AstQuery::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&mut context, &mut CacheContext::new());
+        let outcome = convert(&syntax).resolve(&mut context, &mut CacheContext::new());
         let query = outcome?;
         Ok((query, context))
     }

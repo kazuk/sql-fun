@@ -6,9 +6,7 @@ use crate::{
         postgres::required,
         traversal::{AstVisitorMut, WalkSqlMut},
     },
-    context::ParseContext,
-    engine_specific::{Postgres18Feature, Postgres18Syntax},
-    sem::AnalysisError,
+    error::AnalysisError,
     syn::{self, ListOpt, Opt},
 };
 use ::sql_fun_core::IVec;
@@ -326,20 +324,6 @@ impl ForeignTable {
         AstMutationError::check_identifier(name, Dialect::postgres())?;
         self.server = name.to_owned();
         Ok(())
-    }
-    pub(super) fn check_engine_features(
-        &self,
-        context: &mut impl ParseContext,
-    ) -> Result<bool, AnalysisError> {
-        if self
-            .elements
-            .iter()
-            .any(|value| value.like_clause().is_some())
-        {
-            context.postgres18_syntax_used(Postgres18Syntax::ForeignTableLike)
-        } else {
-            Ok(true)
-        }
     }
 }
 impl TryFromWithTokens<&syn::CreateForeignTableStmt> for ForeignTable {

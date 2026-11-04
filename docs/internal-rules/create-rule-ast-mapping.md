@@ -95,7 +95,7 @@ conversion identified by this audit.
 `StatementNode::CreateRule` and `StatementKind::CreateRule` replace only CREATE
 RULE's legacy route. DROP RULE now has its dedicated route under #601; the
 aggregate ViewWrite variant and WriteDeclaration syntax adapter are removed.
-Semantic analysis is implemented by `ast/resolve/rule.rs` over common syntax
+Semantic analysis is implemented by `sem/ast_conversion/rule.rs` over common syntax
 and the shared ParseContext. `sem::CreateRule` retains the analyzed statement;
 context storage receives explicit definition and target-link operations. No
 legacy metadata adapter or raw frontend-node resolver is installed. Existing

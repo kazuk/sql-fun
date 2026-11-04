@@ -1,11 +1,10 @@
 mod deparse;
-mod merge;
+
 mod projection_walk;
 
 #[path = "postgres/document.rs"]
 mod postgres;
-#[path = "resolve/document.rs"]
-mod resolve;
+
 #[path = "document_validation.rs"]
 mod validation;
 
@@ -150,226 +149,226 @@ pub(crate) enum OverridingKind {
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonFormat {
-    format_type: JsonFormatType,
-    encoding: JsonEncoding,
-    location: Option<StringSpan>,
+    pub(crate) format_type: JsonFormatType,
+    pub(crate) encoding: JsonEncoding,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonOutput {
-    type_name: Option<TypeName>,
-    returning: Option<JsonReturning>,
+    pub(crate) type_name: Option<TypeName>,
+    pub(crate) returning: Option<JsonReturning>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonReturning {
-    format: Option<JsonFormat>,
+    pub(crate) format: Option<JsonFormat>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonValue {
-    raw_expr: Expr,
-    format: Option<JsonFormat>,
+    pub(crate) raw_expr: Expr,
+    pub(crate) format: Option<JsonFormat>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonArgument {
-    val: JsonValue,
-    name: String,
+    pub(crate) val: JsonValue,
+    pub(crate) name: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonBehavior {
-    btype: JsonBehaviorType,
-    expr: Option<Expr>,
-    location: Option<StringSpan>,
+    pub(crate) btype: JsonBehaviorType,
+    pub(crate) expr: Option<Expr>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonPath {
-    string: Expr,
-    name: String,
-    name_location: Option<StringSpan>,
-    location: Option<StringSpan>,
+    pub(crate) string: Expr,
+    pub(crate) name: String,
+    pub(crate) name_location: Option<StringSpan>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonKeyValue {
-    key: Expr,
-    value: JsonValue,
+    pub(crate) key: Expr,
+    pub(crate) value: JsonValue,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonFunction {
-    op: JsonExprOp,
-    column_name: String,
-    context_item: JsonValue,
-    pathspec: Expr,
-    passing: Vec<JsonArgument>,
-    output: Option<JsonOutput>,
-    on_empty: Option<JsonBehavior>,
-    on_error: Option<JsonBehavior>,
-    wrapper: JsonWrapper,
-    quotes: JsonQuotes,
-    location: Option<StringSpan>,
+    pub(crate) op: JsonExprOp,
+    pub(crate) column_name: String,
+    pub(crate) context_item: JsonValue,
+    pub(crate) pathspec: Expr,
+    pub(crate) passing: Vec<JsonArgument>,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) on_empty: Option<JsonBehavior>,
+    pub(crate) on_error: Option<JsonBehavior>,
+    pub(crate) wrapper: JsonWrapper,
+    pub(crate) quotes: JsonQuotes,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonPredicate {
-    expr: Expr,
-    format: Option<JsonFormat>,
-    item_type: JsonValueType,
-    unique_keys: bool,
-    location: Option<StringSpan>,
+    pub(crate) expr: Expr,
+    pub(crate) format: Option<JsonFormat>,
+    pub(crate) item_type: JsonValueType,
+    pub(crate) unique_keys: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonParse {
-    expr: JsonValue,
-    output: Option<JsonOutput>,
-    unique_keys: bool,
-    location: Option<StringSpan>,
+    pub(crate) expr: JsonValue,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) unique_keys: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonScalar {
-    expr: Expr,
-    output: Option<JsonOutput>,
-    location: Option<StringSpan>,
+    pub(crate) expr: Expr,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonSerialize {
-    expr: JsonValue,
-    output: Option<JsonOutput>,
-    location: Option<StringSpan>,
+    pub(crate) expr: JsonValue,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonObject {
-    exprs: Vec<JsonKeyValue>,
-    output: Option<JsonOutput>,
-    absent_on_null: bool,
-    unique: bool,
-    location: Option<StringSpan>,
+    pub(crate) exprs: Vec<JsonKeyValue>,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) absent_on_null: bool,
+    pub(crate) unique: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonArray {
-    exprs: Vec<JsonValue>,
-    output: Option<JsonOutput>,
-    absent_on_null: bool,
-    location: Option<StringSpan>,
+    pub(crate) exprs: Vec<JsonValue>,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) absent_on_null: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonArrayQuery {
-    query: Query,
-    output: Option<JsonOutput>,
-    format: Option<JsonFormat>,
-    absent_on_null: bool,
-    location: Option<StringSpan>,
+    pub(crate) query: Query,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) format: Option<JsonFormat>,
+    pub(crate) absent_on_null: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonAggregate {
-    output: Option<JsonOutput>,
-    agg_filter: Option<Expr>,
-    agg_order: Vec<Order>,
-    over: Option<Window>,
-    location: Option<StringSpan>,
+    pub(crate) output: Option<JsonOutput>,
+    pub(crate) agg_filter: Option<Expr>,
+    pub(crate) agg_order: Vec<Order>,
+    pub(crate) over: Option<Window>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonObjectAggregate {
-    constructor: JsonAggregate,
-    arg: JsonKeyValue,
-    absent_on_null: bool,
-    unique: bool,
+    pub(crate) constructor: JsonAggregate,
+    pub(crate) arg: JsonKeyValue,
+    pub(crate) absent_on_null: bool,
+    pub(crate) unique: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonArrayAggregate {
-    constructor: JsonAggregate,
-    arg: JsonValue,
-    absent_on_null: bool,
+    pub(crate) constructor: JsonAggregate,
+    pub(crate) arg: JsonValue,
+    pub(crate) absent_on_null: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonTable {
-    context_item: JsonValue,
-    pathspec: JsonPath,
-    passing: Vec<JsonArgument>,
-    columns: Vec<JsonColumn>,
-    on_error: Option<JsonBehavior>,
-    alias: Option<Alias>,
-    lateral: bool,
-    location: Option<StringSpan>,
+    pub(crate) context_item: JsonValue,
+    pub(crate) pathspec: JsonPath,
+    pub(crate) passing: Vec<JsonArgument>,
+    pub(crate) columns: Vec<JsonColumn>,
+    pub(crate) on_error: Option<JsonBehavior>,
+    pub(crate) alias: Option<Alias>,
+    pub(crate) lateral: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct JsonColumn {
-    coltype: JsonTableColumnType,
-    name: String,
-    type_name: Option<TypeName>,
-    pathspec: Option<JsonPath>,
-    format: Option<JsonFormat>,
-    wrapper: JsonWrapper,
-    quotes: JsonQuotes,
-    columns: Vec<Self>,
-    on_empty: Option<JsonBehavior>,
-    on_error: Option<JsonBehavior>,
-    location: Option<StringSpan>,
+    pub(crate) coltype: JsonTableColumnType,
+    pub(crate) name: String,
+    pub(crate) type_name: Option<TypeName>,
+    pub(crate) pathspec: Option<JsonPath>,
+    pub(crate) format: Option<JsonFormat>,
+    pub(crate) wrapper: JsonWrapper,
+    pub(crate) quotes: JsonQuotes,
+    pub(crate) columns: Vec<Self>,
+    pub(crate) on_empty: Option<JsonBehavior>,
+    pub(crate) on_error: Option<JsonBehavior>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Xml {
-    op: XmlExprOp,
-    name: String,
-    named_args: Vec<Target>,
-    arg_names: Name,
-    args: Vec<Expr>,
-    xmloption: XmlOptionType,
-    indent: bool,
-    location: Option<StringSpan>,
+    pub(crate) op: XmlExprOp,
+    pub(crate) name: String,
+    pub(crate) named_args: Vec<Target>,
+    pub(crate) arg_names: Name,
+    pub(crate) args: Vec<Expr>,
+    pub(crate) xmloption: XmlOptionType,
+    pub(crate) indent: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct XmlSerialize {
-    xmloption: XmlOptionType,
-    expr: Expr,
-    type_name: TypeName,
-    indent: bool,
-    location: Option<StringSpan>,
+    pub(crate) xmloption: XmlOptionType,
+    pub(crate) expr: Expr,
+    pub(crate) type_name: TypeName,
+    pub(crate) indent: bool,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct XmlTable {
-    lateral: bool,
-    docexpr: Option<Expr>,
-    rowexpr: Expr,
-    namespaces: Vec<Target>,
-    columns: Vec<XmlColumn>,
-    alias: Option<Alias>,
-    location: Option<StringSpan>,
+    pub(crate) lateral: bool,
+    pub(crate) docexpr: Option<Expr>,
+    pub(crate) rowexpr: Expr,
+    pub(crate) namespaces: Vec<Target>,
+    pub(crate) columns: Vec<XmlColumn>,
+    pub(crate) alias: Option<Alias>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct XmlColumn {
-    colname: String,
-    type_name: Option<TypeName>,
-    for_ordinality: bool,
-    is_not_null: bool,
-    colexpr: Option<Expr>,
-    coldefexpr: Option<Expr>,
-    location: Option<StringSpan>,
+    pub(crate) colname: String,
+    pub(crate) type_name: Option<TypeName>,
+    pub(crate) for_ordinality: bool,
+    pub(crate) is_not_null: bool,
+    pub(crate) colexpr: Option<Expr>,
+    pub(crate) coldefexpr: Option<Expr>,
+    pub(crate) location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct MultiAssignment {
-    source: Expr,
-    colno: i32,
-    ncolumns: i32,
+    pub(crate) source: Expr,
+    pub(crate) colno: i32,
+    pub(crate) ncolumns: i32,
 }
 
 impl MultiAssignment {
@@ -396,13 +395,13 @@ impl Expr {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Merge {
-    relation: Relation,
-    source_relation: FromItem,
-    join_condition: Expr,
-    merge_when_clauses: Vec<MergeWhen>,
-    returning_list: Vec<Target>,
-    pub(super) returning_options: Vec<ReturningOption>,
-    pub(super) with_clause: With,
+    pub(crate) relation: Relation,
+    pub(crate) source_relation: FromItem,
+    pub(crate) join_condition: Expr,
+    pub(crate) merge_when_clauses: Vec<MergeWhen>,
+    pub(crate) returning_list: Vec<Target>,
+    pub(crate) returning_options: Vec<ReturningOption>,
+    pub(crate) with_clause: With,
 }
 
 impl Merge {
@@ -417,16 +416,16 @@ impl Merge {
 
 #[derive(Clone, Debug)]
 pub(crate) struct MergeWhen {
-    match_kind: MergeMatchKind,
-    command_type: CmdType,
-    overriding: OverridingKind,
-    condition: Option<Expr>,
-    target_list: Vec<Assignment>,
-    values: Vec<Expr>,
+    pub(crate) match_kind: MergeMatchKind,
+    pub(crate) command_type: CmdType,
+    pub(crate) overriding: OverridingKind,
+    pub(crate) condition: Option<Expr>,
+    pub(crate) target_list: Vec<Assignment>,
+    pub(crate) values: Vec<Expr>,
 }
 
 impl Expr {
-    pub(in crate::ast) fn multi_assignment_data(&self) -> Option<(&Self, i32, i32)> {
+    pub(crate) fn multi_assignment_data(&self) -> Option<(&Self, i32, i32)> {
         self.document_multi_assignment()
     }
     fn document_multi_assignment(&self) -> Option<(&Self, i32, i32)> {

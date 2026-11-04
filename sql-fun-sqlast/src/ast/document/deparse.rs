@@ -12,7 +12,7 @@ use crate::{
             XmlExprOp, XmlOptionType, XmlSerialize, XmlTable,
         },
     },
-    sem::with_stack,
+    stack::with_stack,
 };
 
 impl SqlEmit for DocumentExpr {

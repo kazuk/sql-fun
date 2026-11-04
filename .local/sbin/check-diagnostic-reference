@@ -212,7 +212,7 @@ SOURCE_WITNESS = {
     "sql-fun-core/src/extensions/name_version_pair.rs": {
         "extension_not_found": 1
     },
-    "sql-fun-sqlast/src/ast/ownership.rs": {
+    "sql-fun-sqlast/src/sem/ownership_conversion.rs": {
         "OwnershipLookup": 15,
         "ownership_target": 1
     },
@@ -520,7 +520,7 @@ impl From<&OwnershipLookup> for diagnostic::OwnershipLookup {
 """)
     if not has_import(adapter, 'crate::sem::OwnershipLookup') or not contains(adapter, conversion):
         raise InvalidSource('ownership classification adapter changed')
-    ts = production(lex((root / 'sql-fun-sqlast/src/ast/ownership.rs').read_text()))
+    ts = production(lex((root / 'sql-fun-sqlast/src/sem/ownership_conversion.rs').read_text()))
     guard = lex("""
 if target.identity().is_none() {
     context.report_analysis_problem(AnalysisProblem::ownership_target(&target))?;

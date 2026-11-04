@@ -16,7 +16,15 @@ pub mod names;
 pub mod sem;
 pub mod syn;
 
+#[cfg(test)]
+mod ast_integration_tests;
 mod cache_context;
+mod error;
+mod syntax_options;
+mod wildcard_rewrite;
+mod wildcard_rewrite_error;
+pub use self::wildcard_rewrite::rewrite_wildcards;
+pub use self::wildcard_rewrite_error::WildcardRewriteError;
 mod identifier;
 mod parse_statements;
 mod placeholdered_sql;

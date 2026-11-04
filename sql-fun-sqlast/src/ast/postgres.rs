@@ -1,3 +1,6 @@
+use crate::error::AnalysisError;
+use crate::stack::with_stack;
+use crate::syntax_options::ObjectKind;
 mod ddl;
 mod query;
 
@@ -9,8 +12,6 @@ use crate::{
         ddl::{Domain, Function, Index as DdlIndex, Schema, TableAs},
         document::DocumentExpr,
     },
-    names::FullName as NamesFullName,
-    sem::{CreateCompositeType, ObjectKind, with_stack},
     syn::{FunctionParameterMode as SynFunctionParameterMode, ScanToken, String as SynString},
 };
 
@@ -25,14 +26,13 @@ use crate::{
         SyntaxOption, TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
         TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
     },
-    sem::{AnalysisError, CompositeFieldCollection, CompositeFieldDefinition},
     syn,
     syn::{ListOpt, Opt},
 };
 
 use ::sql_fun_core::IVec;
 
-pub(in crate::ast) fn required<T>(value: Option<T>, field: &str) -> Result<T, AnalysisError> {
+pub(crate) fn required<T>(value: Option<T>, field: &str) -> Result<T, AnalysisError> {
     match value {
         Some(value) => Ok(value),
         None => AnalysisError::raise_unexpected_none(field),
@@ -98,33 +98,6 @@ impl From<&syn::RangeVar> for Name {
         }
         parts.push(value.get_relname());
         Self::from_parts(&parts)
-    }
-}
-
-#[cfg(test)]
-mod test_name_from_range_var {
-    use crate::{
-        ast::{FromOpt, Name},
-        names::{FullName, LocalName},
-        syn::AliasOpt,
-        test_helpers::SynBuilder,
-    };
-
-    #[rstest::rstest]
-    #[case(FullName::new(&None, &None, &LocalName::from("items")))]
-    #[case(FullName::with_schema("app", "items"))]
-    #[case(FullName::with_catalog("catalog", "app", "items"))]
-    fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
-        let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
-        assert_eq!(Name::from(&source).full_name()?, expected);
-        let optional = Name::from_opt(Some(&source)).expect("present relation");
-        assert_eq!(optional.full_name()?, expected);
-        Ok(())
-    }
-
-    #[test]
-    fn absent_relation_remains_absent() {
-        assert!(Name::from_opt(None::<&crate::syn::RangeVar>).is_none());
     }
 }
 
@@ -805,29 +778,6 @@ impl TryFromWithTokens<&syn::CreateDomainStmt> for Domain {
             source_span(base.get_location(), tokens).unwrap_or_else(|| StringSpan::new(0, 0)),
             constraints,
             Name::try_from(value.get_coll_clause().get_collname())?,
-        ))
-    }
-}
-
-impl TryFrom<&syn::CompositeTypeStmt> for CreateCompositeType {
-    type Error = AnalysisError;
-
-    fn try_from(value: &syn::CompositeTypeStmt) -> Result<Self, Self::Error> {
-        let typevar = required(
-            value.get_typevar().as_inner(),
-            "composite_type_stmt.typevar",
-        )?;
-        let fields = required(
-            value.get_coldeflist().map(|fields| fields.as_column_def()),
-            "composite_type_stmt.coldeflist",
-        )?;
-        let mut composite_fields = CompositeFieldCollection::default();
-        for field in fields {
-            composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
-        }
-        Ok(Self::new(
-            &NamesFullName::try_from(typevar)?,
-            &composite_fields,
         ))
     }
 }

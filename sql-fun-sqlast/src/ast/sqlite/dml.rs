@@ -1,13 +1,12 @@
+use crate::ast::{
+    Alias, Assignment, Conflict, ConflictAction, Delete, Expr, FromItem, FromOpt, IndexExpression,
+    Insert, Name, Query, Relation, StatementNode, Target, TryFromList, TryFromOpt, Update, With,
+};
+use crate::error::AnalysisError;
+use crate::stack::with_stack;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite as syn;
-use crate::{
-    ast::{
-        Alias, Assignment, Conflict, ConflictAction, Delete, Expr, FromItem, FromOpt,
-        IndexExpression, Insert, Name, Query, Relation, StatementNode, Target, TryFromList,
-        TryFromOpt, Update, With,
-    },
-    sem::{AnalysisError, ConflictClause, with_stack},
-};
+use crate::syntax_options::ConflictClause;
 
 impl TryFrom<&syn::InsertStatement> for Insert {
     type Error = AnalysisError;

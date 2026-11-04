@@ -1,4 +1,5 @@
 use crate::ast::TryFromWithTokens;
+use crate::sem::convert;
 use crate::test_helpers::{create_cache_context, source_span};
 use crate::{
     context::{MutSourcePathWithSpan, ParseContext},
@@ -51,7 +52,7 @@ pub(crate) fn apply_sql(
         &SynBuilder::new().parse(sql),
         &::sql_fun_core::IVec::default(),
     )?;
-    Ok(statement
+    Ok(convert(&statement)
         .resolve_and_apply(context, &mut create_cache_context())?
         .into_context())
 }

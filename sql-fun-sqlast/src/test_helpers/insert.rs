@@ -1,5 +1,6 @@
 use crate::names::{FullName as NamesFullName, TableName};
 use crate::parse_statements;
+use crate::sem::convert;
 use crate::sem::{
     CatalogNameLookup as SemCatalogNameLookup, ColumnConstraint, IdentityColumnConstraint,
     IdentityColumnMode,
@@ -96,20 +97,21 @@ pub(crate) fn modifier_analysis(
     };
     context.expect_conflict_modifiers(&[modifier], &arbiters);
     let sql = format!("INSERT INTO items VALUES(1,'x') ON CONFLICT({target}) DO NOTHING");
-    let statement = parse_statements(&sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
+    let statement = convert(
+        &parse_statements(&sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(&mut context, &mut create_cache_context())
+    .unwrap();
     (statement, context, lookup)
 }
 pub(crate) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
     let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
     let mut context = catalog(dialect);
-    let result = statement
-        .into_test_node()
+    let result = convert(&statement.into_test_node())
         .resolve(&mut context, &mut create_cache_context())
         .expect("semantic analysis");
     (result, context)

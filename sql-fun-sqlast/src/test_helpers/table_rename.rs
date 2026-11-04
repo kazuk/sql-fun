@@ -9,6 +9,8 @@ use crate::context::{
 use crate::names::{FullName, SchemaName};
 #[cfg(feature = "sqlite")]
 use crate::parse_statements;
+#[cfg(feature = "sqlite")]
+use crate::sem::SemAst;
 use crate::sem::{AnalysisError, PgBuiltInType, TypeReference};
 use crate::test_helpers::TestParseContext;
 #[cfg(feature = "sqlite")]
@@ -94,9 +96,12 @@ pub(crate) fn apply_sqlite(
     sql: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
     let mut cache_context = create_cache_context();
-    parse_statements(sql, Dialect::sqlite())
-        .next()
-        .unwrap()
-        .expect("valid SQLite SQL")
-        .analyze(context, &mut cache_context)
+    SemAst::from_ast(
+        &parse_statements(sql, Dialect::sqlite())
+            .next()
+            .unwrap()
+            .expect("valid SQLite SQL"),
+        context,
+        &mut cache_context,
+    )
 }

@@ -1,3 +1,4 @@
+use crate::sem::SemAst;
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext},
@@ -27,11 +28,14 @@ pub(crate) fn context(dialect: Dialect) -> SchemaFileContext {
 
 /// Analyze through the public statement boundary without loading builtin catalogs.
 pub(crate) fn analyze(sql: &str) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-    parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context(Dialect::postgres()), &mut create_cache_context())
+    SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap(),
+        context(Dialect::postgres()),
+        &mut create_cache_context(),
+    )
 }
 
 /// A local two-column record for deferred projection/width contracts.

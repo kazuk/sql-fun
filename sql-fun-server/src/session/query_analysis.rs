@@ -17,6 +17,8 @@ use ::sql_fun_server_api::{
         TypeReference,
     },
 };
+use ::sql_fun_sqlast::rewrite_wildcards;
+use ::sql_fun_sqlast::sem::SemAst;
 use ::sql_fun_sqlast::{
     CacheContext,
     ast::{Dialect, Statement},
@@ -411,7 +413,7 @@ impl<'a> StatementAnalysis<'a> {
             Err(error) => return self.output_failure(result, QueryAnalysisStage::parse(), &error),
         };
         let statement = output.as_ref().unwrap_or(self.statement);
-        match statement.analyze(context, cache_context) {
+        match SemAst::from_ast(statement, context, cache_context) {
             Ok(pair) => self.complete(&mut result, pair, output.as_mut(), analyze_access),
             Err(error) => result.report(self, QueryAnalysisStage::analysis(), &error.to_string()),
         }
@@ -517,9 +519,7 @@ fn rewrite_executable_sql(
     statement: &mut Statement,
     expansions: &[::sql_fun_sqlast::sem::WildcardExpansion],
 ) -> Result<String, String> {
-    statement
-        .rewrite_wildcards(expansions)
-        .map_err(|error| error.to_string())?;
+    rewrite_wildcards(statement, expansions).map_err(|error| error.to_string())?;
     statement
         .deparse_sql(statement.dialect())
         .map_err(|error| error.to_string())

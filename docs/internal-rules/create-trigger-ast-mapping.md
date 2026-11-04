@@ -102,7 +102,7 @@ existing nodes.
 
 `StatementKind::CreateTrigger` and its constructor are the new public
 classification API. Payloads remain private, like other common statements.
-`Statement::analyze` reaches an explicit `todo!()` owned by #602/#555; it cannot
+`SemAst::from_ast` reaches an explicit `todo!()` owned by #602/#555; it cannot
 register legacy `WriteDeclaration`/`ViewWriteChange` trigger metadata. Deparsing
 returns the existing unsupported-node error. DROP TRIGGER and CREATE/DROP RULE
 now have dedicated routes under #599–#601; the aggregate ViewWrite variant and

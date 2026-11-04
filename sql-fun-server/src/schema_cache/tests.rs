@@ -3,6 +3,7 @@ use crate::{
     schema_cache::{SchemaCacheService, SchemaContextKey, SchemaSelection},
     test_helpers::create_cache_context,
 };
+use ::sql_fun_sqlast::sem::SemAst;
 use ::sql_fun_sqlast::{
     context::BaseParseContext,
     names::{FullName, TableName},
@@ -25,14 +26,17 @@ async fn new_analysis_uses_selected_environment_over_shared_normalized_catalog()
         context.metadata().name(),
         schema.base_context().metadata().name()
     );
-    let query = ::sql_fun_sqlast::parse_statements(
-        "select id from app_table",
-        ::sql_fun_sqlast::ast::Dialect::postgres(),
+    let query = SemAst::from_ast(
+        &::sql_fun_sqlast::parse_statements(
+            "select id from app_table",
+            ::sql_fun_sqlast::ast::Dialect::postgres(),
+        )
+        .next()
+        .unwrap()
+        .unwrap(),
+        context,
+        &mut cache_context,
     )
-    .next()
-    .unwrap()
-    .unwrap()
-    .analyze(context, &mut cache_context)
     .unwrap();
     assert_eq!(query.context().metadata().name(), "products");
     assert!(query.context().problems().is_empty());

@@ -7,6 +7,8 @@ use crate::ast::Dialect;
 #[cfg(feature = "sqlite")]
 use crate::parse_statements;
 #[cfg(feature = "sqlite")]
+use crate::sem::SemAst;
+#[cfg(feature = "sqlite")]
 use crate::test_helpers::create_cache_context;
 use crate::{
     context::{
@@ -61,11 +63,14 @@ pub(crate) fn sqlite(
     sql: &str,
 ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
     let mut cache_context = create_cache_context();
-    parse_statements(sql, Dialect::sqlite())
-        .next()
-        .unwrap()
-        .expect("valid SQLite syntax")
-        .analyze(context, &mut cache_context)
+    SemAst::from_ast(
+        &parse_statements(sql, Dialect::sqlite())
+            .next()
+            .unwrap()
+            .expect("valid SQLite syntax"),
+        context,
+        &mut cache_context,
+    )
 }
 
 pub(crate) fn child(base: &FrozenBaseContext) -> SchemaFileContext {

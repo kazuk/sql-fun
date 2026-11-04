@@ -1,5 +1,6 @@
 use crate::ast::TryFromWithTokens;
 use crate::context::{BaseParseContext as _, MutSourcePathWithSpan as _};
+use crate::sem::convert;
 use crate::syn::Node;
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::ownership::{apply_ownership_sql, ownership_context};
@@ -53,7 +54,7 @@ pub(crate) fn seed(sql: &str) -> Result<SchemaFileContext, AnalysisError> {
     for raw in parsed.protobuf.stmts {
         let node = Node::from(raw.stmt.expect("statement").as_ref().clone());
         let syntax = StatementNode::try_from_with_tokens(&node, &::sql_fun_core::IVec::default())?;
-        context = syntax
+        context = convert(&syntax)
             .resolve_and_apply(context, &mut create_cache_context())?
             .into_context();
     }

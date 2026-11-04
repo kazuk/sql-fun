@@ -2,6 +2,7 @@ use crate::AstAndContextPair;
 use crate::ast::{CreateTrigger, StatementKind, StatementNode};
 use crate::context::{BaseParseContext as _, ParseContext};
 use crate::parse_statements;
+use crate::sem::convert;
 use crate::sem::{CreateTableAs, CreateView, SelectStatement, SemAst, ViewLike};
 use crate::test_helpers::{create_cache_context, source_span};
 
@@ -40,13 +41,15 @@ pub(crate) fn catalog(dialect: Dialect) -> TestParseContext {
     };
     context.set_get_search_path_result(&[SchemaName::from(schema)]);
     add_tables(&mut context, schema);
-    let statement = parse_statements("SELECT id FROM items", dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
+    let statement = convert(
+        &parse_statements("SELECT id FROM items", dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(&mut context, &mut create_cache_context())
+    .unwrap();
     let query = statement.into_select_statemtnt().unwrap();
     let view_name = FullName::with_schema(schema, "item_view");
     let view = CreateView::new(&view_name, &query, &[], &None, false);
@@ -111,23 +114,27 @@ pub(crate) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
     )
 }
 pub(crate) fn resolve(sql: &str, context: &mut TestParseContext) -> Result<SemAst, AnalysisError> {
-    parse_statements(sql, ParseContext::dialect(context))
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve(context, &mut create_cache_context())
+    convert(
+        &parse_statements(sql, ParseContext::dialect(context))
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve(context, &mut create_cache_context())
 }
 pub(crate) fn apply(
     sql: &str,
     context: SchemaFileContext,
 ) -> Result<AstAndContextPair<SchemaFileContext>, AnalysisError> {
-    parse_statements(sql, ParseContext::dialect(&context))
-        .next()
-        .unwrap()
-        .unwrap()
-        .into_test_node()
-        .resolve_and_apply(context, &mut create_cache_context())
+    convert(
+        &parse_statements(sql, ParseContext::dialect(&context))
+            .next()
+            .unwrap()
+            .unwrap()
+            .into_test_node(),
+    )
+    .resolve_and_apply(context, &mut create_cache_context())
 }
 #[cfg(feature = "sqlite")]
 pub(crate) fn sqlite_oracle() -> Result<::rusqlite::Connection, ::rusqlite::Error> {

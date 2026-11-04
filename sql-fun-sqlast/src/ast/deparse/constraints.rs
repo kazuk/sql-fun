@@ -1,13 +1,11 @@
-use crate::{
-    ast::{
-        Column, ColumnConstraint, ConstraintExtras, ExclusionElement, Expr as AstExpr, FdwOption,
-        ForeignReference, Literal as AstLiteral, SyntaxOption, SyntaxValue, TableConstraint,
-        deparse::{DeparseError, SqlEmit, SqlWriter},
-    },
-    sem::{
-        ConflictClause, Deferrability, Deferrable, ForeignKeyAction, ForeignKeyMatchType,
-        GeneratedColumnMode, IdentityColumnMode,
-    },
+use crate::ast::{
+    Column, ColumnConstraint, ConstraintExtras, ExclusionElement, Expr as AstExpr, FdwOption,
+    ForeignReference, Literal as AstLiteral, SyntaxOption, SyntaxValue, TableConstraint,
+    deparse::{DeparseError, SqlEmit, SqlWriter},
+};
+use crate::syntax_options::{
+    ConflictClause, Deferrability, Deferrable, ForeignKeyAction, ForeignKeyMatchType,
+    GeneratedColumnMode, IdentityColumnMode,
 };
 
 impl SqlEmit for Column {
@@ -987,21 +985,18 @@ impl ConflictClause {
 
 #[cfg(test)]
 mod test_constraint_emit {
+    use crate::syntax_options::{
+        ConflictClause, Deferrability, ForeignKeyAction, GeneratedColumnMode, IdentityColumnMode,
+    };
     use crate::test_helpers::deparse::render;
     use crate::test_helpers::deparse_constraints::constraint;
 
     use crate::{ast::StatementNode, parse_statements, test_helpers::assert_postgres_structure};
 
-    use crate::{
-        ast::{
-            Column, Dialect, Expr, ForeignReference, Literal, Name, SyntaxOption, SyntaxValue,
-            TypeName,
-            deparse::constraints::{ColumnConstraint, SqlWriter},
-        },
-        sem::{
-            ConflictClause, Deferrability, ForeignKeyAction, GeneratedColumnMode,
-            IdentityColumnMode,
-        },
+    use crate::ast::{
+        Column, Dialect, Expr, ForeignReference, Literal, Name, SyntaxOption, SyntaxValue,
+        TypeName,
+        deparse::constraints::{ColumnConstraint, SqlWriter},
     };
 
     #[rstest::rstest]

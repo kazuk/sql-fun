@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     ast::{Expr, TryFromWithTokens},
     context::ParseContext,
@@ -227,7 +228,7 @@ impl DataSourceRowsFromFunc {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from_with_tokens(&func_call, tokens)?;
-        let result = syntax.resolve_rows(
+        let result = convert(&syntax).resolve_rows(
             &mut context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
         );
@@ -246,7 +247,7 @@ impl DataSourceRowsFromFunc {
         TParseContext: ParseContext,
     {
         let syntax = Expr::try_from_with_tokens(&function, tokens)?;
-        let result = syntax.resolve_rows(
+        let result = convert(&syntax).resolve_rows(
             &mut context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
         );

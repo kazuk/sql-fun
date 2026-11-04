@@ -1,11 +1,9 @@
-use crate::{
-    ast::{
-        PartitionBound, PartitionDatum, PartitionSpec, StatementNode, SyntaxOption, Table,
-        TableExtras,
-        deparse::{DeparseError, SqlEmit, SqlWriter},
-    },
-    sem::{CreateTableMode, with_stack},
+use crate::ast::{
+    PartitionBound, PartitionDatum, PartitionSpec, StatementNode, SyntaxOption, Table, TableExtras,
+    deparse::{DeparseError, SqlEmit, SqlWriter},
 };
+use crate::stack::with_stack;
+use crate::syntax_options::CreateTableMode;
 
 impl SqlEmit for StatementNode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {

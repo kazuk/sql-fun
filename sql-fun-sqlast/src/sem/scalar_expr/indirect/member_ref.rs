@@ -133,6 +133,8 @@ impl MemberRef {
 
 #[cfg(test)]
 mod domain_member_tests {
+    use crate::sem::SemAst;
+
     use crate::test_helpers::{column_rename::schema, create_cache_context, dynamic_types::record};
 
     use crate::{
@@ -155,12 +157,15 @@ mod domain_member_tests {
         #[values(false, true)] frozen: bool,
     ) {
         let mut cache = create_cache_context();
-        let analyzed = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(composite_domains::context(frozen).unwrap(), &mut cache)
-            .unwrap();
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            composite_domains::context(frozen).unwrap(),
+            &mut cache,
+        )
+        .unwrap();
         assert!(
             analyzed.context().problems().is_empty(),
             "{:?}",
@@ -213,12 +218,15 @@ mod domain_member_tests {
     #[test]
     fn encountered_domain_assignments_prepare_nested_members_after_analysis() {
         let mut cache = create_cache_context();
-        let analyzed = parse_statements("SELECT (($1).item).n, $2::outer_d", Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(composite_domains::context(true).unwrap(), &mut cache)
-            .unwrap();
+        let analyzed = SemAst::from_ast(
+            &parse_statements("SELECT (($1).item).n, $2::outer_d", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            composite_domains::context(true).unwrap(),
+            &mut cache,
+        )
+        .unwrap();
         let constraints = analyzed.context().parameter_constraints().clone();
         drop(analyzed);
         assert!(constraints.allows(&BTreeMap::from([(
@@ -237,12 +245,15 @@ mod domain_member_tests {
     #[test]
     fn previously_unknown_owned_domains_keep_nested_parameter_relationships() {
         let mut cache = create_cache_context();
-        let analyzed = parse_statements("SELECT (($1).n).n, ($1).n", Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(schema(&[]).unwrap(), &mut cache)
-            .unwrap();
+        let analyzed = SemAst::from_ast(
+            &parse_statements("SELECT (($1).n).n, ($1).n", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            schema(&[]).unwrap(),
+            &mut cache,
+        )
+        .unwrap();
         let constraints = analyzed.context().parameter_constraints().clone();
         drop(analyzed);
         let inner = composite_domains::owned_domain("inner", &record(&PgBuiltInType::int4()));
@@ -293,12 +304,15 @@ mod domain_member_tests {
         #[case] diagnostic: AnalysisProblem,
     ) {
         let mut cache = create_cache_context();
-        let analyzed = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(composite_domains::context(false).unwrap(), &mut cache)
-            .unwrap();
+        let analyzed = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            composite_domains::context(false).unwrap(),
+            &mut cache,
+        )
+        .unwrap();
         let problems = ::serde_json::to_value(analyzed.context().problems()).unwrap();
         let expected = ::serde_json::to_value(&diagnostic).unwrap();
         assert!(

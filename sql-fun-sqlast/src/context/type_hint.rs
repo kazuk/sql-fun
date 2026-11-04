@@ -17,7 +17,7 @@ pub trait ParameterTypeHintRead {
 /// Install explicit SQL input types before analyzing an independent query.
 ///
 /// SQLAST API callers can install explicit SQL input types on a mutable context
-/// before calling [`crate::ast::Statement::analyze`]. Import `ParameterTypeHintWrite` and call
+/// before calling [`crate::sem::SemAst::from_ast`]. Import `ParameterTypeHintWrite` and call
 /// `context.setup_typehinting(&[Some("pg_catalog.int4"), None])`: the first slot
 /// supplies the type of `$1`, and the second leaves `$2` for normal inference.
 /// [`ParameterTypeHintRead::get_parameter_typehint`] takes the SQL parameter

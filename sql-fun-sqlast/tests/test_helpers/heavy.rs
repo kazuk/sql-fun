@@ -1,3 +1,4 @@
+use ::sql_fun_sqlast::sem::SemAst;
 pub(crate) mod domain_casts;
 pub(crate) mod extracted_artifacts;
 pub(crate) mod parameter_resolution;
@@ -37,10 +38,11 @@ pub(crate) fn analyze(
         base = schema.base_context().clone();
     }
     let context = SchemaFileContext::new(Path::new("query.sql"), &base, &args, &selected);
-    Ok(parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }
 
 pub(crate) fn environment(

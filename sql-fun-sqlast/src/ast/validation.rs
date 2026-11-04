@@ -1,6 +1,6 @@
 //! Walk every query-bearing edge when a statement becomes a nested CTE body.
 
-use crate::sem::with_stack as sem_with_stack;
+use crate::stack::with_stack as sem_with_stack;
 
 use crate::ast::{
     Access, Assignment, BooleanExpr, Call, Case, CaseArm, Cast, Collate, Conflict, Cte, CteBody,
@@ -17,7 +17,7 @@ use crate::ast::{
 /// modifying WITH entry reached here violates PostgreSQL placement rules. The
 /// body's own statement kind is checked separately by the mutation boundary.
 /// SELECT INTO is likewise restricted to the top-level statement.
-pub(super) trait ContainsInvalidCteClause {
+pub(crate) trait ContainsInvalidCteClause {
     fn contains_invalid_cte_clause(&self) -> bool;
 }
 
@@ -48,7 +48,7 @@ macro_rules! walk_fields {
     ($($type:ty => $($field:ident),+;)+) => {
         $(impl ContainsInvalidCteClause for $type {
             fn contains_invalid_cte_clause(&self) -> bool {
-                crate::sem::with_stack(|| false $(|| self.$field.contains_invalid_cte_clause())+)
+                crate::stack::with_stack(|| false $(|| self.$field.contains_invalid_cte_clause())+)
             }
         })+
     };

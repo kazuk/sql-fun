@@ -12,7 +12,7 @@ use crate::{
         },
         postgres::{nonempty, required},
     },
-    sem::CreateTableMode,
+    syntax_options::CreateTableMode,
 };
 
 impl TryFrom<syn::ObjectType> for AstAlterRelationKind {
@@ -261,7 +261,7 @@ impl TryFromWithTokens<&syn::Constraint> for ColumnConstraint {
     ) -> Result<Self, Self::Error> {
         use crate::{
             ast::ForeignReference,
-            sem::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity},
+            syntax_options::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity},
         };
         let kind = required(value.get_contype().as_inner(), "constraint.contype")?;
         Ok(match kind {
@@ -315,7 +315,7 @@ impl TryFrom<&syn::Constraint> for ForeignReference {
     fn try_from(value: &syn::Constraint) -> Result<Self, Self::Error> {
         use crate::{
             ast::Relation,
-            sem::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
+            syntax_options::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity},
         };
         let table = required(value.get_pktable().as_inner(), "constraint.pktable")?;
         Ok(Self {
@@ -342,7 +342,7 @@ use crate::{
             ParameterMode, Schema,
         },
     },
-    sem::AnalysisError,
+    error::AnalysisError,
     syn::{self, ListOpt, Opt},
 };
 use ::sql_fun_core::IVec;

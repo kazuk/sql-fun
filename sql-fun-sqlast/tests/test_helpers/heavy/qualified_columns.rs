@@ -1,4 +1,5 @@
 use crate::test_helpers::create_cache_context;
+use ::sql_fun_sqlast::sem::SemAst;
 
 use ::sql_fun_sqlast::{
     AstAndContextPair, PostgresDialect, SqlFunArgs,
@@ -42,10 +43,11 @@ pub(crate) fn analyze_sqlite(
         &args,
         &metadata,
     );
-    Ok(parse_statements(sql, Dialect::sqlite())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(sql, Dialect::sqlite()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }
 
 /// Loads the shipped `PostgreSQL` builtin catalog per invocation. The public
@@ -93,8 +95,9 @@ CREATE VIEW a.v AS SELECT id FROM a.t;"#,
         &args,
         &selected,
     );
-    Ok(parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, &mut cache_context)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        &mut cache_context,
+    )?)
 }

@@ -10,6 +10,7 @@ pub use self::{
     },
     view_support::ViewInsertSupport,
 };
+use crate::sem::convert;
 
 use crate::{
     CacheContext,
@@ -728,6 +729,6 @@ where
     AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
     let syntax = Insert::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
     let statement =
-        StatementNode::Insert(syntax).resolve(&mut context, &mut CacheContext::new())?;
+        convert(&StatementNode::Insert(syntax)).resolve(&mut context, &mut CacheContext::new())?;
     Ok((statement, context))
 }

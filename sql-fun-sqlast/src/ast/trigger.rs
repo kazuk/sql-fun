@@ -10,7 +10,7 @@ use crate::{
         TriggerFunction, TriggerGranularity, TriggerTiming, TriggerTransition, TryFromWithTokens,
         TryFromWithTokensOpt,
     },
-    sem::AnalysisError,
+    error::AnalysisError,
     syn,
     syn::{ListOpt, Opt},
 };

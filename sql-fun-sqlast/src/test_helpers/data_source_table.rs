@@ -1,5 +1,6 @@
 use crate::ast::Dialect;
 use crate::context::{BaseParseContext as _, MutSourcePathWithSpan as _, ParseContext as _};
+use crate::sem::SemAst;
 
 use crate::context::SchemaFileContext;
 use crate::names::SchemaName;
@@ -30,20 +31,20 @@ pub(crate) fn analyze(sql: &str, dialect: Dialect) -> (SelectStatement, SchemaFi
         "CREATE TABLE u(id integer)",
         "CREATE VIEW v AS SELECT id FROM t",
     ] {
-        context = parse_statements(ddl, dialect)
-            .next()
-            .unwrap()
-            .unwrap()
-            .analyze(context, &mut cache_context)
-            .unwrap()
-            .into_context();
+        context = SemAst::from_ast(
+            &parse_statements(ddl, dialect).next().unwrap().unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .unwrap()
+        .into_context();
     }
-    let analyzed = parse_statements(sql, dialect)
-        .next()
-        .unwrap()
-        .unwrap()
-        .analyze(context, &mut cache_context)
-        .unwrap();
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, dialect).next().unwrap().unwrap(),
+        context,
+        &mut cache_context,
+    )
+    .unwrap();
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     (query, analyzed.into_context())
 }

@@ -1,6 +1,7 @@
 use crate::StringSpan;
 use crate::ast::Dialect;
 use crate::context::{BaseParseContext as _, MutSourcePathWithSpan as _, ParseContext as _};
+use crate::sem::SemAst;
 use crate::test_helpers::scalar_catalog::schema_from_base;
 
 use crate::context::SchemaFileContext;
@@ -44,9 +45,7 @@ pub(crate) fn schema(
         &StringSpan::new(0, sql.len()),
     ));
     for statement in parse_statements(sql, Dialect::postgres()) {
-        context = statement?
-            .analyze(context, &mut cache_context)?
-            .into_context();
+        context = SemAst::from_ast(&statement?, context, &mut cache_context)?.into_context();
     }
     if frozen {
         let args = context.get_args().clone();

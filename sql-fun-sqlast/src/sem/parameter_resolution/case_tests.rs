@@ -1,5 +1,6 @@
 //! CASE contracts at the public analysis boundary with a small explicit catalog.
 
+use crate::sem::SemAst;
 use crate::test_helpers::case_parameters as test_helpers;
 
 use crate::{sem::TypeReference, test_helpers::create_cache_context};
@@ -17,10 +18,11 @@ use std::collections::BTreeMap;
 #[case::repeated_condition("SELECT CASE WHEN $1 THEN 1 WHEN $1 THEN 2 ELSE 3 END")]
 fn searched_conditions_require_boolean(#[case] sql: &str) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -41,10 +43,11 @@ fn searched_conditions_require_boolean(#[case] sql: &str) -> testresult::TestRes
 #[case::outer_parameter("SELECT $1 IS NULL, CASE WHEN $1 IS NULL THEN 1 ELSE 2 END")]
 fn null_test_does_not_choose_an_input_type(#[case] sql: &str) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -63,10 +66,11 @@ fn null_test_does_not_choose_an_input_type(#[case] sql: &str) -> testresult::Tes
 #[case::typed_result("SELECT CASE 1 WHEN 1 THEN $1::integer ELSE 3 END")]
 fn simple_case_keeps_the_resolved_comparison(#[case] sql: &str) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -107,10 +111,11 @@ fn simple_case_keeps_the_resolved_comparison(#[case] sql: &str) -> testresult::T
 #[case::contradictory("SELECT CASE WHEN $1 THEN $1 ELSE 1 END")]
 fn failures_retain_case_and_allow_next_statement(#[case] sql: &str) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed
             .context()
@@ -140,10 +145,13 @@ fn failures_retain_case_and_allow_next_statement(#[case] sql: &str) -> testresul
             .len(),
         1
     );
-    let next = parse_statements("SELECT 1", Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(analyzed.into_context(), &mut cache_context)?;
+    let next = SemAst::from_ast(
+        &parse_statements("SELECT 1", Dialect::postgres())
+            .next()
+            .unwrap()?,
+        analyzed.into_context(),
+        &mut cache_context,
+    )?;
     assert!(
         next.context()
             .parameter_constraints()
@@ -158,10 +166,11 @@ fn failures_retain_case_and_allow_next_statement(#[case] sql: &str) -> testresul
 #[case::selector("SELECT CASE ?1 WHEN 1 THEN 2 ELSE 3 END")]
 fn sqlite_does_not_use_postgres_condition_constraints(#[case] sql: &str) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::sqlite())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::sqlite()).next().unwrap()?,
+        test_helpers::sqlite_context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -203,10 +212,11 @@ fn typed_sqlite_results_preserve_operands(
     #[case] expected: Option<TypeReference>,
 ) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::sqlite())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::sqlite_context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::sqlite()).next().unwrap()?,
+        test_helpers::sqlite_context(),
+        &mut cache_context,
+    )?;
     assert!(analyzed.context().problems().is_empty());
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = query.result_columns().get_column_at(0).unwrap();
@@ -315,10 +325,13 @@ fn known_results_use_ordered_common_types(
     #[case] not_null: bool,
 ) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+            .next()
+            .unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -340,13 +353,16 @@ fn known_results_use_ordered_common_types(
 #[test]
 fn deferred_array_results_keep_parameter_requirements() -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(
-        "SELECT CASE WHEN $1 THEN $2::integer[] ELSE NULL::amount[] END",
-        Dialect::postgres(),
-    )
-    .next()
-    .unwrap()?
-    .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(
+            "SELECT CASE WHEN $1 THEN $2::integer[] ELSE NULL::amount[] END",
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     assert!(analyzed.context().problems().is_empty());
     let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([
@@ -391,10 +407,11 @@ fn incompatible_known_results_keep_specific_diagnostic(
     #[case] sql: &str,
 ) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(test_helpers::context(), &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        test_helpers::context(),
+        &mut cache_context,
+    )?;
     let problems = analyzed.context().problems();
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert_eq!(problems[0].code(), "incompatible_case_values");
@@ -407,10 +424,13 @@ fn incompatible_known_results_keep_specific_diagnostic(
     let column = query.result_columns().get_column_at(0).unwrap();
     assert!(column.col_type().is_none());
     assert!(column.expression().unwrap().as_case().is_some());
-    let next = parse_statements("SELECT 1", Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(analyzed.into_context(), &mut cache_context)?;
+    let next = SemAst::from_ast(
+        &parse_statements("SELECT 1", Dialect::postgres())
+            .next()
+            .unwrap()?,
+        analyzed.into_context(),
+        &mut cache_context,
+    )?;
     assert!(
         next.context()
             .parameter_constraints()

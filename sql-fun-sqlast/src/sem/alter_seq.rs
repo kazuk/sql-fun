@@ -1,3 +1,4 @@
+use crate::sem::convert;
 use crate::{
     ast::{AlterRelation, TryFromWithTokens},
     names::{FullName, TableName},
@@ -67,8 +68,11 @@ impl AlterSequence {
     where
         TParseContext: ParseContext,
     {
-        AlterRelation::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
-            .resolve_and_apply(context)
+        convert(&AlterRelation::try_from_with_tokens(
+            &syn,
+            &sql_fun_core::IVec::default(),
+        )?)
+        .resolve_and_apply(context)
     }
 }
 

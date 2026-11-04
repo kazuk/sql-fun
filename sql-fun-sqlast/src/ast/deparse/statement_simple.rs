@@ -381,10 +381,7 @@ impl SqlEmit for AlterSequence {
 }
 
 impl SyntaxOption {
-    pub(in crate::ast) fn emit_sequence_option(
-        &self,
-        writer: &mut SqlWriter,
-    ) -> Result<(), DeparseError> {
+    pub(crate) fn emit_sequence_option(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if self.namespace.is_some() {
             return writer.unsupported("sequence option namespace");
         }
@@ -604,7 +601,7 @@ impl SqlEmit for Comment {
 }
 
 impl Comment {
-    pub(in crate::ast) fn canonical_target(&self) -> Result<String, DeparseError> {
+    pub(crate) fn canonical_target(&self) -> Result<String, DeparseError> {
         let mut writer = SqlWriter::new(Dialect::postgres());
         self.target
             .emit_comment_target(self.object_kind.code(), &mut writer)?;
@@ -943,7 +940,7 @@ impl ObjectTarget {
 }
 
 impl Role {
-    pub(in crate::ast) fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    pub(crate) fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self.kind {
             1 => writer.ident(&self.name),
             2 => {

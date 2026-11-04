@@ -1,5 +1,6 @@
 //! SQL input constraints are independent of parameter hints and Rust code generation.
 
+use ::sql_fun_sqlast::sem::SemAst;
 // Shared support lives below tests/ to avoid an extra Cargo test target.
 #[path = "test_helpers/shared.rs"]
 mod test_helpers;
@@ -22,8 +23,11 @@ fn real_catalog_contexts_produce_constraints(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cache_context = create_cache_context();
     let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed =
-        statement.analyze(heavy::parameter_resolution::context()?, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &statement,
+        heavy::parameter_resolution::context()?,
+        &mut cache_context,
+    )?;
     assert!(
         !analyzed
             .context()
@@ -53,8 +57,11 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
     )
     .next()
     .unwrap()?;
-    let defined =
-        definition.analyze(heavy::parameter_resolution::context()?, &mut cache_context)?;
+    let defined = SemAst::from_ast(
+        &definition,
+        heavy::parameter_resolution::context()?,
+        &mut cache_context,
+    )?;
     let context = {
         let (args, selected) = heavy::environment("17")?;
         let analysis_base = &defined.into_context().freeze();
@@ -72,7 +79,7 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
     let statement = parse_statements("select $1::public.mood, $1::text", Dialect::postgres())
         .next()
         .unwrap()?;
-    let analyzed = statement.analyze(context, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(&statement, context, &mut cache_context)?;
     assert!(
         analyzed
             .context()
@@ -111,10 +118,11 @@ fn explicit_assignment_inspection_keeps_declared_cast_sources(
 ) -> testresult::TestResult {
     let mut cache_context = create_cache_context();
     // Actual overload declarations and declared casts are the contract here.
-    let analyzed = parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(heavy::parameter_resolution::context()?, &mut cache_context)?;
+    let analyzed = SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        heavy::parameter_resolution::context()?,
+        &mut cache_context,
+    )?;
     assert!(
         analyzed
             .context()

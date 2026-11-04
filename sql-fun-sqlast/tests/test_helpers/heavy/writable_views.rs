@@ -124,11 +124,13 @@ impl ViewSchema {
             sql,
             ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
         ) {
-            context = statement
-                .map_err(|error| error.to_string())?
-                .analyze(context, &mut cache_context)
-                .map_err(|error| error.to_string())?
-                .into_context();
+            context = SemAst::from_ast(
+                &statement.map_err(|error| error.to_string())?,
+                context,
+                &mut cache_context,
+            )
+            .map_err(|error| error.to_string())?
+            .into_context();
         }
         if !context.problems().is_empty() {
             return Err(format!("{:?}", context.problems()));
@@ -202,8 +204,7 @@ impl ViewSchema {
         .next()
         .unwrap()
         .map_err(|error| error.to_string())?;
-        Ok(statement
-            .analyze(context, &mut cache_context)
+        Ok(SemAst::from_ast(&statement, context, &mut cache_context)
             .map_err(|error| error.to_string())?
             .into_context()
             .freeze())
@@ -229,8 +230,7 @@ impl ViewSchema {
         ) {
             let statement = statement.map_err(|error| error.to_string())?;
             context.set_statement_span(*statement.span());
-            context = statement
-                .analyze(context, &mut cache_context)
+            context = SemAst::from_ast(&statement, context, &mut cache_context)
                 .map_err(|error| error.to_string())?
                 .into_context();
         }
@@ -251,8 +251,7 @@ impl ViewSchema {
         .next()
         .unwrap()
         .map_err(|error| error.to_string())?;
-        let result = statement
-            .analyze(context, &mut cache_context)
+        let result = SemAst::from_ast(&statement, context, &mut cache_context)
             .map_err(|error| error.to_string())?;
         let ast = result.ast().clone();
         let context = result.into_context();

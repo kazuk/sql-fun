@@ -4,8 +4,9 @@ use crate::{
         ColumnConstraint, ConstraintExtras, Expr, ForeignReference, Name, Order, Query,
         SyntaxOption, Table, TableConstraint, TableExtras, TypeName,
     },
-    sem::{AnalysisError, ConflictClause, CreateTableMode, GeneratedColumnMode},
+    error::AnalysisError,
     syn::sqlite as syn,
+    syntax_options::{ConflictClause, CreateTableMode, GeneratedColumnMode},
 };
 
 impl TryFrom<&syn::AlterTable> for AlterRelation {
@@ -205,7 +206,7 @@ impl ForeignReference {
         value: &syn::ForeignKeyClause,
         defer: Option<&syn::DeferSubclause>,
     ) -> Result<Self, AnalysisError> {
-        use crate::sem::{Deferrability, ForeignKeyAction};
+        use crate::syntax_options::{Deferrability, ForeignKeyAction};
         let mut result = Self {
             table: Name::from_parts(&[value.table_name().value().to_owned()]),
             columns: value

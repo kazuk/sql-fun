@@ -1,5 +1,6 @@
 //! Small owned catalog and public analysis comparisons for cache contracts.
 
+use crate::sem::SemAst;
 use crate::{
     AstAndContextPair, CacheContext,
     ast::Dialect,
@@ -38,10 +39,11 @@ pub(crate) fn analyze(
     cache: &mut CacheContext,
 ) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
     let context = schema_layer(std::path::Path::new("query.sql"), base);
-    Ok(parse_statements(sql, Dialect::postgres())
-        .next()
-        .unwrap()?
-        .analyze(context, cache)?)
+    Ok(SemAst::from_ast(
+        &parse_statements(sql, Dialect::postgres()).next().unwrap()?,
+        context,
+        cache,
+    )?)
 }
 
 pub(crate) fn assert_equivalent(

@@ -6,7 +6,7 @@ for the current destinations and retained internal assertions.
 
 These tests arrived in [#761](https://github.com/kazuk/sql-fun/pull/761) before
 this migration merged. The source is
-[`array_subquery.rs`](../../sql-fun-sqlast/src/ast/resolve/query/tests/array_subquery.rs).
+[`array_subquery.rs`](../../sql-fun-sqlast/src/sem/ast_conversion/query/tests/array_subquery.rs).
 The fixture [array-subqueries.json](array-subqueries.json) stores 28 named case
 objects and runs against PostgreSQL 17 and 18. The two isolated expressions from
 `builtin_bootstrap.rs` (discarded in #828 for execution cost) are in

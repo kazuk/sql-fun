@@ -2,6 +2,7 @@ use crate::ast::Dialect;
 use crate::parse_statements;
 use crate::sem::ParseContext;
 use crate::sem::PgBuiltInType;
+use crate::sem::SemAst;
 use crate::sem::SemScalarExpr;
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::membership::composite_schema;
@@ -183,7 +184,7 @@ fn rejection_does_not_stop_following_statement() -> testresult::TestResult {
         "SELECT 1 IN (SELECT 1,2); SELECT 1 IN (1)",
         Dialect::postgres(),
     ) {
-        let analyzed = statement?.analyze(context, &mut cache_context)?;
+        let analyzed = SemAst::from_ast(&statement?, context, &mut cache_context)?;
         statements.push(analyzed.ast().clone().into_select_statemtnt().unwrap());
         context = analyzed.into_context();
     }

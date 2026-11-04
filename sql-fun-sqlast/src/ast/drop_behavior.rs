@@ -1,5 +1,5 @@
 use crate::ast::DropBehavior;
-use crate::sem::AnalysisError;
+use crate::error::AnalysisError;
 use crate::syn;
 
 impl DropBehavior {

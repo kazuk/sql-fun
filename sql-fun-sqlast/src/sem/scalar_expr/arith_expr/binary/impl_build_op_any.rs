@@ -39,7 +39,7 @@ impl super::ArithExpr {
             AnalysisError::raise_unexpected_none("a_expr.rexpr")?
         };
 
-        let Some(operator_def) = context.get_operator_op(name, true, true).cloned() else {
+        let Some(operator_def) = context.get_operator(name, true, true).cloned() else {
             return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
                 context, name, lexpr, rexpr,
             );

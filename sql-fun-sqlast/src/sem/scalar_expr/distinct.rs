@@ -233,7 +233,7 @@ impl DistinctExpr {
         right: SemScalarExpr,
     ) -> Result<DistinctComparison, AnalysisError> {
         let name = OperatorName::from_parts(None, "=");
-        self.not_null = context.operator_result_is_not_null(&name);
+        self.not_null = context.resolved_operator_result_is_not_null(&name);
         let binding = ResolvedOperator::resolve_comparison(context, &name);
         if !binding.resolution().is_resolved() {
             self.types = InputTypeConstraint::types([]);
@@ -246,7 +246,7 @@ impl DistinctExpr {
             return Ok(DistinctComparison::deferred(left, right, binding));
         }
 
-        let overloads = if let Some(definition) = context.get_operator_op(&name, true, true) {
+        let overloads = if let Some(definition) = context.get_operator(&name, true, true) {
             definition.binary_overloads()
         } else {
             None

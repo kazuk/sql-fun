@@ -37,6 +37,8 @@ struct MembershipOperator {
 }
 impl MembershipOperator {
     fn resolve(context: &impl ParseContext, name: &OperatorName) -> Self {
+        let resolved = context.resolve_operator_name(name, true, true);
+        let name = resolved.as_ref().unwrap_or(name);
         let definition = context.get_operator_op(name, true, true);
         let candidates = match definition {
             Some(OperatorDefinition::Binary(candidates)) => Some(candidates.clone()),
@@ -301,7 +303,7 @@ impl MembershipExpr {
         let comparison_not_null = if binding.is_none() {
             Some(true)
         } else {
-            context.operator_result_is_not_null(&name)
+            context.resolved_operator_result_is_not_null(&name)
         };
         Self {
             left: left.clone(),

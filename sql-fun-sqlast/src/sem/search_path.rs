@@ -1,7 +1,7 @@
 use crate::{
     ast::Dialect,
     context::BaseParseContext,
-    names::{FullName, SchemaName},
+    names::{FullName, OperatorName, SchemaName},
 };
 
 pub fn expand_search_path_inst<TBaseParseContext, TResult, F>(
@@ -85,4 +85,25 @@ fn search_schemas(context: &(impl BaseParseContext + ?Sized), temporary: bool) -
         }
     }
     schemas
+}
+
+/// Operators share routine search-path rules; SQLite operator tokens are local.
+pub(crate) fn expand_operator_search_path<TContext, TResult, F>(
+    context: &TContext,
+    name: &OperatorName,
+    getter: F,
+) -> Option<TResult>
+where
+    TContext: BaseParseContext + ?Sized,
+    F: Fn(&OperatorName) -> Option<TResult>,
+{
+    if !name.is_valid() {
+        return None;
+    }
+    if Dialect::from(context.metadata()) == Dialect::sqlite() {
+        return getter(name);
+    }
+    expand_search_path_inst(context, &name.full_name()?, |key| {
+        getter(&OperatorName::from_full_name(key))
+    })
 }

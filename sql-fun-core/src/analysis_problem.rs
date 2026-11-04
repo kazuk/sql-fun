@@ -83,6 +83,10 @@ pub enum AnalysisProblem {
         /// SQL operation whose unresolved input requires that search.
         operation: String,
     },
+    /// Malformed operator-name components.
+    OperatorNameSyntax(Vec<String>),
+    /// A PostgreSQL operator reference has database qualification.
+    CrossDatabaseOperatorReference(Vec<String>),
     /// Input could not be parsed, realized, hinted, analyzed, or deparsed.
     QueryAnalysis(QueryAnalysisProblem),
     /// Invalid ARRAY constructor typing.
@@ -466,6 +470,8 @@ impl AnalysisProblem {
             Self::InferenceCandidateSpaceUnsupported { .. } => {
                 "inference_candidate_space_unsupported"
             }
+            Self::OperatorNameSyntax(_) => "operator_name_syntax",
+            Self::CrossDatabaseOperatorReference(_) => "cross_database_operator_reference",
             Self::QueryAnalysis(problem) => problem.code(),
             Self::Index(problem) => problem.code(),
             Self::AlterColumn(problem) => problem.code(),
@@ -536,7 +542,9 @@ impl AnalysisProblem {
             | Self::ForeignKeyReferencedPrimaryKeyMissing(_)
             | Self::ParameterTypeUnresolved(_)
             | Self::InferenceCandidateSpaceUnsupported { .. }
-            | Self::CoalesceExprTypeUnknown(..) => {
+            | Self::CoalesceExprTypeUnknown(..)
+            | Self::OperatorNameSyntax(_)
+            | Self::CrossDatabaseOperatorReference(_) => {
                 DiagnosticMetadata::from(self.diagnostic_message())
             }
             Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
@@ -582,6 +590,11 @@ impl DiagnosticMessage for AnalysisProblem {
                     "application input binding for parameter ${index} is unresolved; supply a supported explicit input type hint; an SQL result cast may be insufficient"
                 )
             }
+            Self::OperatorNameSyntax(parts) => Self::operator_name_syntax_message(parts),
+            Self::CrossDatabaseOperatorReference(parts) => format!(
+                "cross-database operator references are not supported: {}",
+                parts.join(".")
+            ),
             Self::QueryAnalysis(problem) => problem.diagnostic_message(),
             Self::Array(problem) => problem.diagnostic_message(),
             Self::TruthTest(problem) => problem.diagnostic_message(),
@@ -881,8 +894,21 @@ impl AnalysisProblem {
 
     /// operator name syntax is invalid
     #[must_use]
-    pub fn operator_name_syntax(_v: &[String]) -> Self {
-        todo!()
+    pub fn operator_name_syntax(parts: &[String]) -> Self {
+        Self::OperatorNameSyntax(parts.to_vec())
+    }
+
+    fn operator_name_syntax_message(parts: &[String]) -> String {
+        format!(
+            "operator reference requires nonempty string components for an operator and optional schema; received {} components",
+            parts.len()
+        )
+    }
+
+    /// Operator qualification requests an unsupported cross-database reference.
+    #[must_use]
+    pub fn cross_database_operator_reference(parts: &[String]) -> Self {
+        Self::CrossDatabaseOperatorReference(parts.to_vec())
     }
 
     /// expression type not known

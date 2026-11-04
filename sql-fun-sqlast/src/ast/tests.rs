@@ -1,5 +1,6 @@
 //! End-to-end fixtures for the expression/query recursive component.
 
+mod operator_names;
 #[cfg(feature = "sqlite")]
 mod sqlite_from_groups;
 mod stack_regressions;

@@ -33,7 +33,7 @@ Several error-reporting paths can still panic before producing a structured
 diagnostic ([#523](https://github.com/kazuk/sql-fun/issues/523)). Remaining cases
 include missing set-returning function result types, some COALESCE unknown-type
 or ambiguity paths, using an ordinary view where a materialized view is
-required, invalid operator-name syntax, unexpected dynamic types, table/CTE
+required, unexpected dynamic types, table/CTE
 alias-count failures, foreign-key column-type mismatches and SQLite ignored
 MATCH-option reporting. Type canonicalization failure also has an unfinished
 fatal-error path. This list describes incomplete reporting helpers, not a claim
@@ -91,6 +91,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [column_type_not_found](column_type_not_found.md)
 - [composite_type_field_not_found](composite_type_field_not_found.md)
 - [conflicting_creation](conflicting_creation.md)
+- [cross_database_operator_reference](cross_database_operator_reference.md)
 - [delete_semantics](delete_semantics.md)
 - [distinct_equality_result](distinct_equality_result.md)
 - [distinct_row_arity](distinct_row_arity.md)
@@ -120,6 +121,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [min_max_missing_comparison_facts](min_max_missing_comparison_facts.md)
 - [min_max_missing_type_facts](min_max_missing_type_facts.md)
 - [min_max_not_ordered](min_max_not_ordered.md)
+- [operator_name_syntax](operator_name_syntax.md)
 - [ownership_argument_type_not_found](ownership_argument_type_not_found.md)
 - [ownership_invalid_target_kind](ownership_invalid_target_kind.md)
 - [ownership_role_not_found](ownership_role_not_found.md)

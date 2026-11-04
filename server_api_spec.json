@@ -520,6 +520,38 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Malformed operator-name components.",
+                  "type": "object",
+                  "properties": {
+                    "OperatorNameSyntax": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "OperatorNameSyntax"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A PostgreSQL operator reference has database qualification.",
+                  "type": "object",
+                  "properties": {
+                    "CrossDatabaseOperatorReference": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "CrossDatabaseOperatorReference"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Input could not be parsed, realized, hinted, analyzed, or deparsed.",
                   "type": "object",
                   "properties": {
@@ -4707,6 +4739,38 @@
                   },
                   "required": [
                     "InferenceCandidateSpaceUnsupported"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Malformed operator-name components.",
+                  "type": "object",
+                  "properties": {
+                    "OperatorNameSyntax": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "OperatorNameSyntax"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A PostgreSQL operator reference has database qualification.",
+                  "type": "object",
+                  "properties": {
+                    "CrossDatabaseOperatorReference": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "CrossDatabaseOperatorReference"
                   ],
                   "additionalProperties": false
                 },

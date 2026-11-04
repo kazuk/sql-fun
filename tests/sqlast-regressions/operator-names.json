@@ -1,0 +1,281 @@
+[
+  {
+    "name": "unqualified",
+    "sql": "SELECT 1 + 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "explicit-unqualified",
+    "sql": "SELECT 1 OPERATOR(+) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified",
+    "sql": "SELECT 1 OPERATOR(pg_catalog.+) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-schema",
+    "sql": "SELECT 1 OPERATOR(\"pg_catalog\".+) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "prefix",
+    "sql": "SELECT OPERATOR(pg_catalog.-) 1 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "normalized-token",
+    "sql": "SELECT 1 OPERATOR(pg_catalog.!=) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "typed-input",
+    "sql": "SELECT ${value:int4} OPERATOR(pg_catalog.+) 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing-schema",
+    "sql": "SELECT 1 OPERATOR(missing.+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-case",
+    "sql": "SELECT 1 OPERATOR(\"PG_CATALOG\".+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "undefined_operator"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cross-database",
+    "sql": "SELECT 1 OPERATOR(a.b.+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference",
+        "query_deparse"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "long-qualification",
+    "sql": "SELECT 1 OPERATOR(a.b.c.+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference",
+        "query_deparse"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cross-database-input",
+    "sql": "SELECT ${value:int4} OPERATOR(a.b.+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference",
+        "query_deparse"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified-order",
+    "sql": "SELECT 1 + 2 AS result ORDER BY result USING OPERATOR(pg_catalog.<)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "cross-database-order",
+    "sql": "SELECT 1 + 2 AS result ORDER BY result USING OPERATOR(a.b.<)",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference",
+        "query_deparse"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unqualified-prefix",
+    "sql": "SELECT - n AS result FROM (SELECT 1 AS n) s",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unqualified-typed-input",
+    "sql": "SELECT ${value:int4} + 2 AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  }
+]

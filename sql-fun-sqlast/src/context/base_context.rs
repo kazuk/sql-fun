@@ -444,8 +444,8 @@ impl OperatorInfoRead for BaseContext {
         // The shipped equality/inequality implementations return a boolean for non-null
         // operands. This guarantee does not extend to arbitrary SQL functions.
         if [
-            OperatorName::from_parts(None, "="),
-            OperatorName::from_parts(None, "<>"),
+            OperatorName::from_parts(Some("pg_catalog"), "="),
+            OperatorName::from_parts(Some("pg_catalog"), "<>"),
         ]
         .contains(name)
             && self.get_operator_op(name, true, true).is_some()

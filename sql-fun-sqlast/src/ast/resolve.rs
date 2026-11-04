@@ -11,7 +11,7 @@ mod update;
 
 use crate::{
     CacheContext,
-    sem::{MembershipExpr, SamplingInput, TruthTestExpr, WithTypmod, with_stack},
+    sem::{MembershipExpr, ProblemLikeError, SamplingInput, TruthTestExpr, WithTypmod, with_stack},
 };
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
         Subquery, SubqueryKind, TruthTest, TypeName,
     },
     context::ParseContext,
-    names::{AliasName, ColumnName, FullName, OperatorName},
+    names::{AliasName, ColumnName, FullName, OperatorName, ValidOperatorName},
     sem::{
         AnalysisError, AnalysisProblem, ArithExpr, ArrayExpr, ArraySubscript, CaseExpr,
         CoalesceExpr, CollateExpr, DistinctExpr, FuncCallExpr, IndirectionExpr, MinMaxExpr,
@@ -66,12 +66,8 @@ impl Name {
         }
     }
 
-    fn operator_name(&self) -> Result<OperatorName, AnalysisError> {
-        match self.0.as_slice() {
-            [local] => Ok(OperatorName::from_parts(None, local)),
-            [schema, local] => Ok(OperatorName::from_parts(Some(schema), local)),
-            _ => AnalysisError::raise_unexpected_input("operator name component count"),
-        }
+    fn operator_name(&self) -> Result<OperatorName, ProblemLikeError> {
+        ValidOperatorName::try_from_components(&self.0).map(|name| OperatorName::from_valid(&name))
     }
 
     fn resolve_column(
@@ -110,6 +106,27 @@ impl Name {
         } else {
             value
         })
+    }
+}
+
+#[cfg(test)]
+mod operator_name_validation_tests {
+    use crate::ast::Name;
+
+    #[rstest::rstest]
+    #[case(&[], "operator_name_syntax")]
+    #[case(&[""], "operator_name_syntax")]
+    #[case(&["schema", ""], "operator_name_syntax")]
+    #[case(&["a", "b", "+"], "cross_database_operator_reference")]
+    #[case(&["a", "b", "c", "+"], "cross_database_operator_reference")]
+    fn common_names_classify_invalid_components(#[case] parts: &[&str], #[case] code: &str) {
+        let parts: Vec<_> = parts.iter().map(|part| (*part).to_owned()).collect();
+        let problem = Name::from_parts(&parts)
+            .operator_name()
+            .unwrap_err()
+            .into_problem();
+        assert_eq!(problem.code(), code);
+        assert!(problem.render_metadata().is_some());
     }
 }
 
@@ -476,6 +493,30 @@ impl OperatorExpr {
         if context.dialect() == Dialect::sqlite() && self.kind.is_pattern() {
             return self.resolve_sqlite_pattern(context, scope, left, right);
         }
+        self.resolve_operator(context, left, right)
+    }
+
+    fn resolve_operator(
+        &self,
+        context: &mut impl ParseContext,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let name = if self.kind.has_named_operator() {
+            match self.name.operator_name() {
+                Ok(name) => name,
+                Err(problem) => {
+                    problem.report_problem_to(context)?;
+                    let name = OperatorName::invalid();
+                    let binding = ResolvedOperator::from_definition(context, &name, None);
+                    let mut expression = ArithExpr::deferred_operator(&name, left, right);
+                    expression.set_operator_binding(binding);
+                    return Ok(expression);
+                }
+            }
+        } else {
+            OperatorName::invalid()
+        };
         if context.dialect() == Dialect::sqlite() && !self.kind.without_catalog_operator() {
             if left
                 .as_ref()
@@ -484,26 +525,20 @@ impl OperatorExpr {
                     .as_ref()
                     .is_some_and(|value| value.get_type().is_none())
             {
-                return Ok(ArithExpr::deferred_operator(
-                    &self.name.operator_name()?,
-                    left,
-                    right,
-                ));
+                return Ok(ArithExpr::deferred_operator(&name, left, right));
             }
             todo!("SQLite operator semantics");
         }
-        let binding = self.kind.resolve_operator_name(
-            context,
-            &self.name,
-            left.is_some(),
-            right.is_some(),
-        )?;
-        let mut expression = self.kind.resolve(context, &self.name, left, right)?;
+        let binding =
+            self.kind
+                .resolve_operator_name(context, &name, left.is_some(), right.is_some());
+        let mut expression = self.kind.resolve(context, &name, left, right)?;
         if let Some(binding) = binding {
             expression.set_operator_binding(binding);
         }
         Ok(expression)
     }
+
     fn resolve_sqlite_pattern(
         &self,
         context: &mut impl ParseContext,
@@ -608,27 +643,30 @@ impl OperatorKind {
         }
     }
 
+    const fn has_named_operator(&self) -> bool {
+        matches!(
+            self,
+            Self::Ordinary
+                | Self::Any
+                | Self::All
+                | Self::Like
+                | Self::NotLike
+                | Self::ILike
+                | Self::Similar
+        )
+    }
+
     fn resolve_operator_name(
         &self,
         context: &impl ParseContext,
-        name: &Name,
+        name: &OperatorName,
         left: bool,
         right: bool,
-    ) -> Result<Option<ResolvedOperator>, AnalysisError> {
-        match self {
-            Self::Ordinary
-            | Self::Any
-            | Self::All
-            | Self::Like
-            | Self::NotLike
-            | Self::ILike
-            | Self::Similar => Ok(Some(ResolvedOperator::resolve(
-                context,
-                &name.operator_name()?,
-                left,
-                right,
-            ))),
-            _ => Ok(None),
+    ) -> Option<ResolvedOperator> {
+        if self.has_named_operator() {
+            Some(ResolvedOperator::resolve(context, name, left, right))
+        } else {
+            None
         }
     }
 
@@ -638,29 +676,17 @@ impl OperatorKind {
     fn resolve(
         &self,
         context: &mut impl ParseContext,
-        name: &Name,
+        name: &OperatorName,
         left: Option<SemScalarExpr>,
         right: Option<SemScalarExpr>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
-            Self::Ordinary => {
-                Ok(ArithExpr::build_op(context, &name.operator_name()?, left, right)?.0)
-            }
+            Self::Ordinary => Ok(ArithExpr::build_op(context, name, left, right)?.0),
             Self::Like | Self::NotLike | Self::ILike | Self::Similar => {
-                ArithExpr::pattern(context, &name.operator_name()?, left, right)
+                ArithExpr::pattern(context, name, left, right)
             }
-            Self::Any => {
-                Ok(
-                    ArithExpr::build_op_any_resolved(context, &name.operator_name()?, left, right)?
-                        .0,
-                )
-            }
-            Self::All => {
-                Ok(
-                    ArithExpr::build_op_all_resolved(context, &name.operator_name()?, left, right)?
-                        .0,
-                )
-            }
+            Self::Any => Ok(ArithExpr::build_op_any_resolved(context, name, left, right)?.0),
+            Self::All => Ok(ArithExpr::build_op_all_resolved(context, name, left, right)?.0),
             Self::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
             Self::Between | Self::NotBetween => self.resolve_between(context, left, right),
             Self::BetweenSymmetric | Self::NotBetweenSymmetric => {

@@ -366,6 +366,18 @@ impl TestParseContext {
         has_right: bool,
         result: Option<&OperatorDefinition>,
     ) {
+        // Test catalogs model builtin declarations in pg_catalog. Keep the supplied
+        // key as well for exact-read mocks and SQLite's local operator namespace.
+        if let Some(name) = operator_name.full_name() {
+            let name = if name.schema().is_some() {
+                name
+            } else {
+                name.replace_schema(&SchemaName::from("pg_catalog"))
+            };
+            let name = OperatorName::from_full_name(&name);
+            self.operator_op_results
+                .insert((name, has_left, has_right), result.cloned());
+        }
         self.operator_op_results.insert(
             (operator_name.clone(), has_left, has_right),
             result.cloned(),

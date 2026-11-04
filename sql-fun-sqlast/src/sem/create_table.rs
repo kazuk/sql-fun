@@ -43,6 +43,34 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn check_scope_columns(&self) -> Self {
+        // Bind CHECK to row fields, not recursively retained column CHECK bodies.
+        Self(
+            self.0
+                .iter()
+                .map(|column| {
+                    ColumnDefinition::new(
+                        column.name(),
+                        column.get_type(),
+                        column.is_not_null(),
+                        &[],
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    pub(crate) fn with_declared_column(mut self, column: &ColumnDefinition) -> Self {
+        if let Some(name) = column.name()
+            && let Some(existing) = self.get_column_mut(name)
+        {
+            *existing = column.clone();
+            return self;
+        }
+        self.0.push(column.clone());
+        self
+    }
+
     pub(crate) fn common_function_shape(outputs: &[Self]) -> Option<Self> {
         let first = outputs.first()?;
         if outputs.iter().any(|output| output.names() != first.names()) {
@@ -382,6 +410,24 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    pub(crate) const fn declared_columns(&self) -> &ColumnCollection {
+        &self.columns
+    }
+
+    pub(crate) fn has_constraint_name(&self, name: &str) -> bool {
+        self.constraint(name).is_some()
+            || self
+                .columns
+                .0
+                .iter()
+                .any(|column| column.has_check_name(name))
+    }
+
+    pub(crate) fn replace_declared_column(&mut self, column: &ColumnDefinition) {
+        let name = column.name().as_ref().expect("declared column name");
+        *self.columns.get_column_mut(name).expect("declared column") = column.clone();
+    }
+
     pub(crate) fn find_column(&self, name: &ColumnName, sqlite: bool) -> Option<&ColumnDefinition> {
         self.columns.find_column(name, sqlite)
     }

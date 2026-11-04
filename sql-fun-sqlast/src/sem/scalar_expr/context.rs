@@ -3,9 +3,9 @@ use crate::{
     context::ParseContext,
     names::{AliasName, ColumnName, FullName, SchemaName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnReferenceExpr, CreateTable, DataSource,
-        DeleteRowVersion, FromClause, MergeMatchKind, QueryNameResolution, QueryProblem,
-        ResultColumnCollection, RuleEvent, RuleIdentity, SemScalarExpr, WholeRowExpr,
+        AnalysisError, AnalysisProblem, ColumnCollection, ColumnDefinition, ColumnReferenceExpr,
+        CreateTable, DataSource, DeleteRowVersion, FromClause, MergeMatchKind, QueryNameResolution,
+        QueryProblem, ResultColumnCollection, RuleEvent, RuleIdentity, SemScalarExpr, WholeRowExpr,
         WholeRowFields, WithClause,
         data_source::{MergeRecordRole, QualifiedSource, WildcardProjection},
         problem::{RuleProblem, TriggerProblem},
@@ -46,7 +46,7 @@ pub struct ScalarAnalysisContext<'a> {
 /// Row declarations can precede catalog publication, but bindings use their canonical identity.
 #[derive(Debug, Clone)]
 struct DeclaredTableRow<'a> {
-    definition: &'a CreateTable,
+    definition: Cow<'a, ColumnCollection>,
     identity: TableName,
 }
 
@@ -59,13 +59,36 @@ struct RuleScope {
 
 impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn declared_table(table: &'a CreateTable, identity: &TableName) -> Self {
+        Self::declared_columns(
+            Cow::Owned(table.declared_columns().check_scope_columns()),
+            identity,
+        )
+    }
+
+    pub(crate) fn declared_columns(
+        columns: Cow<'a, ColumnCollection>,
+        identity: &TableName,
+    ) -> Self {
         Self {
             declared_table: Some(DeclaredTableRow {
-                definition: table,
+                definition: columns,
                 identity: identity.clone(),
             }),
             ..Self::default()
         }
+    }
+
+    pub(crate) fn column_declaration(
+        context: &impl ParseContext,
+        identity: &TableName,
+        column: &ColumnDefinition,
+    ) -> Self {
+        let columns = context
+            .get_table(identity)
+            .map(|table| table.declared_columns().check_scope_columns())
+            .unwrap_or_default()
+            .with_declared_column(column);
+        Self::declared_columns(Cow::Owned(columns), identity)
     }
 
     fn resolve_declared_column(
@@ -140,7 +163,7 @@ impl ScalarAnalysisContext<'_> {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let table = self.declared_table.as_ref().expect("declared row scope");
         let mut fields = WholeRowFields::default();
-        for column in table.definition.column_names() {
+        for column in table.definition.names() {
             fields.push(&column, &self.declared_column(context, &column)?);
         }
         let alias = AliasName::from(table.identity.full_name().name().as_str());

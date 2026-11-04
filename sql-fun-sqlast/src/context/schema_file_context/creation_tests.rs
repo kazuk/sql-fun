@@ -852,22 +852,28 @@ fn invalid_table_as_column_names_do_not_publish_definitions(
 
 #[rstest::rstest]
 #[case::check(
-    "CREATE TABLE t(a integer CONSTRAINT same CHECK (a>0), b integer CONSTRAINT same CHECK (b>0))"
+    "CREATE TABLE t(a integer CONSTRAINT same CHECK (a IS NOT NULL), b integer CONSTRAINT same CHECK (b IS NOT NULL))",
+    "check_duplicate_name"
 )]
 #[case::foreign_key(
-    "CREATE TABLE t(a integer CONSTRAINT same REFERENCES parent(id), b integer CONSTRAINT same REFERENCES parent(id))"
+    "CREATE TABLE t(a integer CONSTRAINT same REFERENCES parent(id), b integer CONSTRAINT same REFERENCES parent(id))",
+    "conflicting_creation"
 )]
-#[case::mixed("CREATE TABLE t(a integer CONSTRAINT same CHECK (a>0), CONSTRAINT same UNIQUE(a))")]
+#[case::mixed(
+    "CREATE TABLE t(a integer CONSTRAINT same CHECK (a IS NOT NULL), CONSTRAINT same UNIQUE(a))",
+    "check_duplicate_name"
+)]
 fn all_named_column_constraints_participate_in_collision_checks(
     #[case] sql: &str,
+    #[case] diagnostic: &str,
 ) -> testresult::TestResult {
     let context = test_helpers::postgres(sql)?;
     assert_eq!(context.problems().len(), 1);
-    let problem = context.problems()[0]
-        .creation_problem()
-        .expect("constraint conflict");
-    assert_eq!(problem.namespace(), "constraint");
-    assert_eq!(problem.name().as_str(), "same");
+    assert_eq!(context.problems()[0].code(), diagnostic);
+    if let Some(problem) = context.problems()[0].creation_problem() {
+        assert_eq!(problem.namespace(), "constraint");
+        assert_eq!(problem.name().as_str(), "same");
+    }
     assert!(
         context
             .object_kind(&FullName::with_schema("public", "t"))

@@ -4,7 +4,7 @@ Code: `check_deferrability`. Severity: Error.
 
 ## Meaning
 
-A table CHECK declares DEFERRABLE or INITIALLY DEFERRED.
+A CHECK declares DEFERRABLE or INITIALLY DEFERRED.
 
 Rejected CREATE/ALTER definitions do not modify the analysis catalog.
 
@@ -20,5 +20,5 @@ not make CHECK deferrable.
 CREATE TABLE sample(value integer, CHECK(value > 0) DEFERRABLE);
 ```
 
-See [table CHECK constraints](../sql-analysis/statements/create-table.md#table-check-constraints)
+See [CHECK constraints](../sql-analysis/statements/create-table.md#check-constraints)
 and [ALTER ADD CHECK](../sql-analysis/statements/alter-table.md#adding-table-check-constraints).

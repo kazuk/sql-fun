@@ -16,7 +16,7 @@ live rows. CHECK is not deferrable. PostgreSQL 18 NOT ENFORCED and constraint
 state transitions remain [#887](https://github.com/kazuk/sql-fun/issues/887).
 
 An invalid CHECK leaves the entire ALTER statement unapplied. Column and table
-renames update retained CHECK bindings. See [table CHECK rules](create-table.md#table-check-constraints)
+renames update retained CHECK bindings. See [table CHECK rules](create-table.md#check-constraints)
 for expression restrictions and NULL behavior. SQLite has no ADD CONSTRAINT
 counterpart.
 
@@ -137,6 +137,12 @@ ALTER FOREIGN TABLE analysis also remains unimplemented
 does not establish foreign-table alterations. ALTER TYPE's composite-type
 analysis has its own [unsupported
 analysis](create-type.md#dialect-and-engine-specific-behavior).
+
+ALTER ADD COLUMN remains unimplemented for PostgreSQL and SQLite: even an
+ordinary column addition reaches an unimplemented catalog-application path.
+This includes columns with inline CHECK
+([#528](https://github.com/kazuk/sql-fun/issues/528)). Supported CREATE inline
+CHECK analysis does not establish ALTER ADD COLUMN support.
 
 ## Diagnostics
 

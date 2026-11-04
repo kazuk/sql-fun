@@ -78,6 +78,19 @@ fn postgres_native_tree_survives_emission(#[case] sql: &str) {
 }
 
 #[rstest::rstest]
+#[case::binary("SELECT 1 OPERATOR(a.b.+) 2")]
+#[case::long_qualification("SELECT 1 OPERATOR(a.b.c.+) 2")]
+#[case::quoted(r#"SELECT 1 OPERATOR("A.B"."c""d".+) 2"#)]
+#[case::quoted_long(r#"SELECT 1 OPERATOR("A"."b.c"."d""e".+) 2"#)]
+#[case::prefix("SELECT OPERATOR(a.b.-) 1")]
+#[case::quoted_prefix(r#"SELECT OPERATOR("A.B"."c""d".-) 1"#)]
+#[case::order("SELECT 1 ORDER BY 1 USING OPERATOR(a.b.<)")]
+#[case::quoted_order(r#"SELECT 1 ORDER BY 1 USING OPERATOR("A.B"."c""d".<)"#)]
+fn postgres_operator_identity_survives_emission(#[case] sql: &str) {
+    assert_postgres_structure(sql);
+}
+
+#[rstest::rstest]
 #[case::postgres(Dialect::postgres(), "$7", "$2")]
 #[cfg_attr(feature = "sqlite", case::sqlite(Dialect::sqlite(), "?7", "?2"))]
 fn renders_inserted_and_existing_bodies_without_source(

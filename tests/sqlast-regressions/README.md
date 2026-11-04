@@ -416,10 +416,11 @@ unqualified/qualified names, quoted schema identity, prefix operators, normalize
 tokens, typed inputs, missing qualified operators and cross-database rejection.
 Parser-produced adapter tests and public analysis tests retain component identity,
 completed bindings, malformed-shape diagnostics and recovery after semantic errors.
-The cross-database CLI cases also assert the existing `query_deparse` diagnostic:
-the renderer currently rejects excessive operator qualification independently of
-the semantic classification. These tests do not claim cross-database SQL emission
-support.
+Issue #969 extends these contracts to quoted multi-component names and prefix
+operators. Cross-database cases retain `cross_database_operator_reference` without
+`query_deparse`; the renderer preserves the syntax independently of semantic
+rejection. Deparse integration tests compare reparsed PostgreSQL structures,
+including quoted identifiers and ORDER BY USING.
 
 Issue #978 serial-family contracts live in `serial-original.json` and
 `serial-family.json` on PostgreSQL 17/18 through both maintained paths.

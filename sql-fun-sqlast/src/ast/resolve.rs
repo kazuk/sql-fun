@@ -1144,7 +1144,7 @@ impl CallKind {
 }
 
 impl Call {
-    fn uses_supplied_binding(&self) -> bool {
+    fn defers_function_signature(&self) -> bool {
         self.variadic || self.arguments.iter().any(Expr::is_named_argument)
     }
 
@@ -1159,8 +1159,6 @@ impl Call {
             arguments,
             &self.argument_locations,
             &self.location,
-            self.variadic,
-            self.over.is_some(),
         )
     }
 
@@ -1179,7 +1177,7 @@ impl Call {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_scalar_list(&self.arguments, context, scope)?;
-        if self.uses_supplied_binding() {
+        if self.defers_function_signature() {
             return Ok(SemScalarExpr::function_call(
                 &self.resolve_supplied_call(context, &arguments)?,
             ));

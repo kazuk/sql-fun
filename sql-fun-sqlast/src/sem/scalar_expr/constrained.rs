@@ -1,6 +1,6 @@
 use crate::sem::{
     AnalysisError, FuncCallExpr, IndirectionExpr, InputTypeConstraint, ParameterConstraints,
-    ParseContext, QueryNameResolution, ResolvedOperator, SemScalarExpr, TypeReference,
+    QueryNameResolution, ResolvedOperator, SemScalarExpr, TypeReference,
     scalar_expr::func_call::FunctionBinding,
     traversal::{SemanticVisitor, SemanticVisitorMut},
 };
@@ -150,22 +150,5 @@ impl ConstrainedExpr {
         if let Some(indirection) = &mut self.indirection {
             indirection.set_result_type(&domain.single_type());
         }
-    }
-}
-
-impl ConstrainedExpr {
-    pub(crate) fn function_call(&self) -> Option<FuncCallExpr> {
-        self.semantic_call
-            .as_ref()
-            .map(|binding| binding.invocation(&self.arguments))
-    }
-    pub(crate) fn finalize_call(
-        &mut self,
-        context: &mut impl ParseContext,
-    ) -> Result<(), AnalysisError> {
-        if let Some(binding) = &mut self.semantic_call {
-            binding.finalize(context, &mut self.arguments, &mut self.not_null)?;
-        }
-        Ok(())
     }
 }

@@ -7,14 +7,13 @@ mod indirection_tests;
 
 use crate::{
     CacheContext,
-    names::{ColumnName, OperatorName},
+    names::OperatorName,
     sem::{
-        AliasSpec, AnalysisProblem, ArraySubqueryExpr, ColumnCollection, ColumnDefinition,
-        ColumnReferenceExpr, DeleteStatement, InsertStatement, InsertTarget, MembershipExpr,
-        MergeStatement, MinMaxExpr, ParseContext, PgBuiltInType, QueryName, QueryOrder,
-        QueryWindow, ResolvedOperator, ResultColumnCollection, SelectStatement, SetOperationQuery,
-        TableSampleSource, TruthTestExpr, UpdateStatement, parameter_constraints::TypeProjection,
-        problem::MinMaxProblem,
+        AnalysisProblem, ArraySubqueryExpr, DeleteStatement, InsertStatement, InsertTarget,
+        MembershipExpr, MergeStatement, MinMaxExpr, ParseContext, PgBuiltInType, QueryName,
+        QueryOrder, QueryWindow, ResolvedOperator, ResultColumnCollection, SelectStatement,
+        SetOperationQuery, TableSampleSource, TruthTestExpr, UpdateStatement,
+        parameter_constraints::TypeProjection, problem::MinMaxProblem,
     },
 };
 
@@ -23,9 +22,7 @@ use crate::{
     context::BaseParseContext,
     sem::{
         AnalysisError, ConstrainedExpr, ConstraintGraph, InputTypeConstraint, ParameterConstraints,
-        SemScalarExpr, SignatureAlternative, TypeReference,
-        overload_rank::OverloadRank,
-        type_system::{ArgumentBindingCollection, SimpleInferResult},
+        SemScalarExpr, SignatureAlternative, TypeReference, overload_rank::OverloadRank,
     },
 };
 use std::collections::BTreeMap;
@@ -911,69 +908,6 @@ impl<'cache> ParameterResolution<'cache> {
         }
     }
 
-    fn function_source(
-        &mut self,
-        expression: &SemScalarExpr,
-        alias: &AliasSpec,
-        columns: &ColumnCollection,
-        context: &impl ParseContext,
-    ) -> Result<(), AnalysisError> {
-        if expression.constraint_node().is_none() {
-            return Ok(());
-        }
-        let mut outputs = Outputs::default();
-        for name in columns.names() {
-            let definition = columns.get_column_def(&name).expect("declared output");
-            let value = self.table_function_column(context, expression, alias, definition)?;
-            outputs.push(name.as_str(), &value, false);
-        }
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.derived(alias.name().as_str(), &outputs, &alias.inference_columns());
-        }
-        Ok(())
-    }
-
-    fn table_function_column(
-        &mut self,
-        context: &impl ParseContext,
-        expression: &SemScalarExpr,
-        alias: &AliasSpec,
-        definition: &ColumnDefinition,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        if definition.get_type().is_some() {
-            return Ok(ColumnReferenceExpr::function_output(alias, definition));
-        }
-        let name = definition.name().as_ref().expect("named function column");
-        let Some(call) = expression.function_call_snapshot() else {
-            return Ok(self.member_access(expression, name.as_str()));
-        };
-        let scalar = if let Some(overload) = call.overload() {
-            overload.has_scalar_table_output(context)
-        } else {
-            call.candidates().is_some_and(|candidates| {
-                candidates
-                    .iter()
-                    .all(|overload| overload.has_scalar_table_output(context))
-            })
-        };
-        if scalar {
-            return Ok(expression.clone());
-        }
-        let Some(candidates) = call.candidates() else {
-            return Ok(self.member_access(expression, name.as_str()));
-        };
-        let (_, arguments) = call.inference_call();
-        let types = ArgumentBindingCollection::from_expr_list(&arguments)
-            .with_explicit_variadic(call.modifiers().variadic());
-        let signatures = candidates.column_signatures(
-            context,
-            &types,
-            &ColumnName::from(alias.name().as_str()),
-            name,
-        );
-        self.call(context, &call.name().to_string(), &arguments, &signatures)
-    }
-
     pub(crate) fn derived(&mut self, alias: &str, columns: &[String]) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.derived(alias, &self.completed, columns);
@@ -1008,8 +942,6 @@ pub(crate) struct Signature {
     declared_inputs: Option<Vec<TypeReference>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     unrestricted_inputs: Vec<usize>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    exact_inputs: Vec<usize>,
 }
 impl Signature {
     pub(crate) fn new(inputs: &[TypeReference], result: &TypeReference) -> Self {
@@ -1018,7 +950,6 @@ impl Signature {
             result: result.clone(),
             declared_inputs: None,
             unrestricted_inputs: Vec::new(),
-            exact_inputs: Vec::new(),
         }
     }
     pub(crate) fn new_function(
@@ -1057,92 +988,12 @@ impl Signature {
         self.unrestricted_inputs.contains(&index)
     }
 
-    pub(crate) fn simple_function_template(
-        inputs: &[TypeReference],
-        declarations: &[TypeReference],
-        result: &TypeReference,
-    ) -> Option<Self> {
-        let mut signature = Self::new(inputs, result);
-        signature.declared_inputs = Some(declarations.to_vec());
-        if signature.is_simple_function_template() {
-            Some(signature.with_simple_identity())
-        } else {
-            None
-        }
-    }
-    pub(crate) fn is_simple_function_template(&self) -> bool {
-        self.declared_inputs.is_some()
-            && self.inputs.iter().any(TypeReference::is_simple_infer_arg)
-            && self.inputs.iter().chain([&self.result]).all(|ty| {
-                !ty.is_dynamic()
-                    && !ty.is_common_infer_arg()
-                    && !ty.is_any_range()
-                    && !ty.is_any_multi_range()
-            })
-    }
-    pub(crate) fn instantiate_simple(
-        &self,
-        context: &impl ParseContext,
-        source: &TypeReference,
-    ) -> Vec<Self> {
-        let mut seeds = vec![(source.clone(), None)];
-        if let Some(element) = context.get_array_item_type(source) {
-            seeds.push((element, Some(source)));
-        }
-        let mut signatures = Vec::new();
-        for (element, array) in seeds {
-            if context.get_array_item_type(&element).is_some()
-                && self.inputs.iter().any(TypeReference::is_any_non_array)
-            {
-                continue;
-            }
-            if self.inputs.iter().any(TypeReference::is_any_array) {
-                let candidate = array.cloned().unwrap_or_else(|| element.array_type());
-                // array_type() preserves dimensional identity. An array operand
-                // cannot thereby become its own element in an anyarray input.
-                if context.get_array_item_type(&candidate).as_ref() != Some(&element) {
-                    continue;
-                }
-            }
-            let substitution = SimpleInferResult::new(&element, array);
-            let mut signature = self.clone();
-            for input in &mut signature.inputs {
-                substitution.apply(input);
-            }
-            substitution.apply(&mut signature.result);
-            if signature.is_concrete_for_arity(self.inputs.len()) {
-                signatures.push(signature);
-            }
-        }
-        signatures
-    }
-
-    pub(crate) fn with_simple_identity(mut self) -> Self {
-        if let Some(declarations) = &self.declared_inputs {
-            self.exact_inputs = declarations
-                .iter()
-                .enumerate()
-                .filter_map(|(index, ty)| {
-                    if ty.is_simple_infer_arg() {
-                        Some(index)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-        }
-        self
-    }
-
     pub(crate) fn cast_score(
         &self,
         catalog: &impl BaseParseContext,
         source: &TypeReference,
         index: usize,
     ) -> Option<OverloadRank> {
-        if self.exact_inputs.contains(&index) && source != &self.inputs[index] {
-            return None;
-        }
         if self.accepts_any_type(index) {
             return Some(OverloadRank::default());
         }
@@ -1209,17 +1060,6 @@ struct Collector<'context, 'cache, C: ParseContext> {
 }
 
 impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Collector<'_, '_, C> {
-    fn table_function(
-        &mut self,
-        expression: &mut SemScalarExpr,
-        alias: &AliasSpec,
-        columns: &mut ColumnCollection,
-    ) -> Result<(), AnalysisError> {
-        self.parameters
-            .function_source(expression, alias, columns, self.context)?;
-        Ok(())
-    }
-
     fn enter_expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.resolve_between(self.context)
     }
@@ -1445,23 +1285,6 @@ impl<'a, C: ParseContext> Finalizer<'a, C> {
     }
 }
 impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Finalizer<'_, C> {
-    fn table_function(
-        &mut self,
-        expression: &mut SemScalarExpr,
-        alias: &AliasSpec,
-        columns: &mut ColumnCollection,
-    ) -> Result<(), AnalysisError> {
-        if let Some(call) = expression.function_call_snapshot()
-            && let Some(overload) = call.overload()
-        {
-            columns.refresh_function_output(&overload.table_function_output_columns(
-                self.context,
-                &ColumnName::from(alias.name().as_str()),
-            ));
-        }
-        Ok(())
-    }
-
     fn enter_set_operand(&mut self) {
         self.set_scopes.enter_operand();
     }
@@ -1499,7 +1322,6 @@ impl<C: ParseContext> crate::sem::traversal::SemanticVisitorMut for Finalizer<'_
     }
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.apply_constraints(self.constraints);
-        expression.finalize_call(self.context)?;
         expression.validate_collation(self.context)
     }
     fn output(&mut self, _name: &str, expression: &mut SemScalarExpr) {

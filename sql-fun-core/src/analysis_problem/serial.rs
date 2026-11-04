@@ -4,17 +4,17 @@ use crate::analysis_problem::{DiagnosticMessage, DiagnosticMetadata};
 #[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum SerialProblem {
-    /// Serial arrays cannot be declared.
+    /// Serial arrays cannot be declared. Diagnostic code: `serial_array`.
     Array,
-    /// The underlying integer type does not accept modifiers.
+    /// The underlying integer type does not accept modifiers. Diagnostic code: `serial_modifier`.
     Modifier,
-    /// Explicit NULL conflicts with implicit NOT NULL.
+    /// Explicit NULL conflicts with implicit NOT NULL. Diagnostic code: `serial_nullable`.
     Nullable,
-    /// An explicit default conflicts with the sequence default.
+    /// An explicit default conflicts with the sequence default. Diagnostic code: `serial_default_conflict`.
     Default,
-    /// Identity conflicts with the sequence default.
+    /// Identity conflicts with the sequence default. Diagnostic code: `serial_identity_conflict`.
     Identity,
-    /// A generated expression conflicts with the sequence default.
+    /// A generated expression conflicts with the sequence default. Diagnostic code: `serial_generated_conflict`.
     Generated,
 }
 impl SerialProblem {
@@ -47,6 +47,16 @@ impl SerialProblem {
     #[must_use]
     pub const fn generated() -> Self {
         Self::Generated
+    }
+    pub(super) const fn code(&self) -> &'static str {
+        match self {
+            Self::Array => "serial_array",
+            Self::Modifier => "serial_modifier",
+            Self::Nullable => "serial_nullable",
+            Self::Default => "serial_default_conflict",
+            Self::Identity => "serial_identity_conflict",
+            Self::Generated => "serial_generated_conflict",
+        }
     }
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         DiagnosticMetadata::from(self.diagnostic_message())

@@ -37,9 +37,14 @@ unsupported ([#545](https://github.com/kazuk/sql-fun/issues/545)); see
 [sequences](sequences.md). Serial is declaration shorthand, so it is not added
 as a general cast or function-signature type. A quoted lowercase `"serial"`
 declaration has the same meaning; qualified names and differently cased quoted
-names use ordinary type lookup. Serial arrays, type modifiers, explicit NULL,
-and conflicting DEFAULT, IDENTITY or generated expressions produce
-[serial_invalid_declaration](../../diagnostics/serial_invalid_declaration.md).
+names use ordinary type lookup. Invalid serial declarations report specific diagnostics:
+
+- Arrays: [serial_array](../../diagnostics/serial_array.md).
+- Type modifiers: [serial_modifier](../../diagnostics/serial_modifier.md).
+- Explicit NULL: [serial_nullable](../../diagnostics/serial_nullable.md).
+- Explicit DEFAULT: [serial_default_conflict](../../diagnostics/serial_default_conflict.md).
+- IDENTITY: [serial_identity_conflict](../../diagnostics/serial_identity_conflict.md).
+- Generated expressions: [serial_generated_conflict](../../diagnostics/serial_generated_conflict.md).
 
 ### CREATE TABLE AS
 

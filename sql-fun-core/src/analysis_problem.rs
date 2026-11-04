@@ -485,7 +485,7 @@ impl AnalysisProblem {
             Self::QueryAnalysis(problem) => problem.code(),
             Self::Index(problem) => problem.code(),
             Self::AlterColumn(problem) => problem.code(),
-            Self::Serial(_) => "serial_invalid_declaration",
+            Self::Serial(problem) => problem.code(),
             Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
             Self::Rule(_) => "rule_invalid_definition",

@@ -226,13 +226,14 @@ mod serial_catalog_tests {
     }
 
     #[rstest::rstest]
-    #[case::nullable("serial NULL")]
-    #[case::default("serial DEFAULT 1")]
-    #[case::identity("serial GENERATED ALWAYS AS IDENTITY")]
-    #[case::array("serial[]")]
-    #[case::modifier("serial(3)")]
+    #[case::nullable("serial NULL", "serial_nullable")]
+    #[case::default("serial DEFAULT 1", "serial_default_conflict")]
+    #[case::identity("serial GENERATED ALWAYS AS IDENTITY", "serial_identity_conflict")]
+    #[case::array("serial[]", "serial_array")]
+    #[case::modifier("serial(3)", "serial_modifier")]
     fn rejected_serial_does_not_publish_objects(
         #[case] declaration: &str,
+        #[case] expected_code: &str,
     ) -> testresult::TestResult {
         let pair = apply_ownership_sql(
             serial::context(),
@@ -256,12 +257,7 @@ mod serial_catalog_tests {
                 .get_sequence_impl(&FullName::with_schema("public", "users_id_seq"))
                 .is_none()
         );
-        assert!(
-            context
-                .problems()
-                .iter()
-                .any(|p| p.code() == "serial_invalid_declaration")
-        );
+        assert!(context.problems().iter().any(|p| p.code() == expected_code));
         let context = apply_ownership_sql(context, "CREATE TABLE good(id integer)")?.into_context();
         assert!(
             context

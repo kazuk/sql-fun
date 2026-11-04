@@ -120,7 +120,22 @@ impl ColumnDefinition {
         self.declaration.get_or_insert_default().rejected = true;
     }
 
+    pub(crate) fn has_check_name(&self, name: &str) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint
+                .as_check()
+                .is_some_and(|check| check.name() == Some(name))
+        })
+    }
+
     pub(crate) fn declaration_can_apply(&self) -> bool {
+        if self.constraints.iter().any(|constraint| {
+            constraint
+                .as_check()
+                .is_some_and(|check| !check.can_apply())
+        }) {
+            return false;
+        }
         let Some(declaration) = &self.declaration else {
             return true;
         };
@@ -357,6 +372,10 @@ impl ColumnDefinition {
     /// add column constraint
     pub fn push_constraint(&mut self, constraint: ColumnConstraint) {
         self.constraints.push(constraint)
+    }
+
+    pub(crate) fn insert_inline_check(&mut self, index: usize, check: &ColumnConstraint) {
+        self.constraints.insert(index, check.clone());
     }
 
     /// analyze [`crate::syn::ColumnDef`]

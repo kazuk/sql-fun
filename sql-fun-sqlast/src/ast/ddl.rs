@@ -27,17 +27,17 @@ use crate::{
     sem::{
         AliasSpec, AlterIndex, AlterObjSubCommand, AlterTable, AlterView, AnalysisError,
         AnalysisProblem, AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
-        AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
-        ColumnCollection, ColumnConstraint, ColumnDefinition, ColumnNullabilityConstraint,
-        CompositeFieldCollection, CompositeFieldDefinition, Constraint, CreateCompositeType,
-        CreateDomain, CreateFunction, CreateIndex, CreateSchema, CreateTable, CreateTableAs,
-        CreateTableMode, DataSource, DefaultColumnConstraint, ExclusionColumnConstraint,
-        ForeignKeyColumnConstraint, ForeignKeyConstraint, FromClause, FunctionOverloadCollection,
-        FunctionParam, GeneratedColumnConstraint, IdentityColumnConstraint, IndexElement,
-        IndexElementCollection, IndexElementWithOrder, Kind, OverloadVariant,
-        PrimaryKeyColumnConstraint, PrimaryKeyConstraint, ResolutionFailure, ScalarAnalysisContext,
-        SemAst, SemScalarExpr, SortOrder, SourcePathWithSpan, TypeCategory, TypeReference,
-        UniqueColumnConstraint, UniqueConstraint, WithClause,
+        AttrImmediateColumnConstraint, CollateColumnConstraint, ColumnCollection, ColumnConstraint,
+        ColumnDefinition, ColumnNullabilityConstraint, CompositeFieldCollection,
+        CompositeFieldDefinition, Constraint, CreateCompositeType, CreateDomain, CreateFunction,
+        CreateIndex, CreateSchema, CreateTable, CreateTableAs, CreateTableMode, DataSource,
+        DefaultColumnConstraint, ExclusionColumnConstraint, ForeignKeyColumnConstraint,
+        ForeignKeyConstraint, FromClause, FunctionOverloadCollection, FunctionParam,
+        GeneratedColumnConstraint, IdentityColumnConstraint, IndexElement, IndexElementCollection,
+        IndexElementWithOrder, Kind, OverloadVariant, PrimaryKeyColumnConstraint,
+        PrimaryKeyConstraint, ResolutionFailure, ScalarAnalysisContext, SemAst, SemScalarExpr,
+        SortOrder, SourcePathWithSpan, TypeCategory, TypeReference, UniqueColumnConstraint,
+        UniqueConstraint, WithClause,
         problem::{CreationProblem, ViewProblem},
         search_path::expand_relation_search_path,
     },
@@ -382,7 +382,7 @@ impl super::AlterCommand {
         table: &TableName,
         column: &AstColumn,
     ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let column = column.resolve(context, table)?;
+        let column = column.resolve_standalone(context, table)?;
         if let Some(name) = column.name() {
             Self::existing_column(context, table, name)?;
         }
@@ -948,7 +948,8 @@ impl super::Table {
         }
         for column in &self.columns {
             for definition in &column.constraints {
-                if definition.constraint.has_catalog_name(context)
+                if !definition.is_check()
+                    && definition.constraint.has_catalog_name(context)
                     && let Some(name) = definition.name.as_deref()
                 {
                     if names.contains(&name) {
@@ -1053,6 +1054,7 @@ impl super::Table {
         if context.dialect() == Dialect::postgres() {
             table.apply_primary_key_nullability();
         }
+        self.resolve_inline_checks(context, &mut table)?;
         self.resolve_checks(context, &mut table)?;
         Ok(table)
     }
@@ -1269,10 +1271,23 @@ impl super::Column {
         table: &TableName,
     ) -> Result<(ColumnDefinition, TContext), AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve(&mut context, table);
+        let result = self.resolve_standalone(&mut context, table);
         let column = context.finish_analysis(result)?;
         Ok((column, context))
     }
+    fn resolve_standalone(
+        &self,
+        context: &mut impl ParseContext,
+        table: &TableName,
+    ) -> Result<ColumnDefinition, AnalysisError> {
+        let mut column = self.resolve(context, table)?;
+        let canonical = context
+            .resolve_table_name(table)
+            .unwrap_or_else(|| table.clone());
+        self.resolve_inline_checks(context, &canonical, None, false, &mut column)?;
+        Ok(column)
+    }
+
     pub(super) fn resolve(
         &self,
         context: &mut impl ParseContext,
@@ -1352,6 +1367,10 @@ impl super::Column {
         column: &mut ColumnDefinition,
     ) -> Result<(), AnalysisError> {
         for constraint in &self.constraints {
+            // CHECK needs the complete row, which is declared before expression analysis.
+            if constraint.is_check() {
+                continue;
+            }
             // ENFORCED is the existing constraint behavior. Retain its explicit
             // syntax, but it does not add a separate semantic column constraint.
             if matches!(
@@ -1431,11 +1450,7 @@ impl super::ColumnConstraint {
                 column,
                 expr.resolve_in(context, &scope)?,
             )),
-            Self::Check(expr) => ColumnConstraint::check(CheckColumnConstraint::new(
-                table,
-                column,
-                expr.resolve_in(context, &scope)?,
-            )),
+            Self::Check(_) => self.resolve_standalone_check(context, table, column)?,
             Self::PrimaryKey(conflict, deferrable) => {
                 ColumnConstraint::primary_key(PrimaryKeyColumnConstraint::new(
                     table,

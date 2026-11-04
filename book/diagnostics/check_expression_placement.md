@@ -4,7 +4,7 @@ Code: `check_expression_placement`. Severity: Error.
 
 ## Meaning
 
-A table CHECK contains a subquery, aggregate, window function or set-returning
+A CHECK contains a subquery, aggregate, window function or set-returning
 expression.
 
 Rejected CREATE/ALTER definitions do not modify the analysis catalog.
@@ -21,5 +21,5 @@ live database rows.
 CREATE TABLE sample(value integer, CHECK((SELECT true)));
 ```
 
-See [table CHECK constraints](../sql-analysis/statements/create-table.md#table-check-constraints)
+See [CHECK constraints](../sql-analysis/statements/create-table.md#check-constraints)
 and [ALTER ADD CHECK](../sql-analysis/statements/alter-table.md#adding-table-check-constraints).

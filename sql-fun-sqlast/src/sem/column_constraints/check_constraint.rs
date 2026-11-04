@@ -1,20 +1,24 @@
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint;
 use crate::{
-    sem::{ColumnRename, traversal::SemanticVisitorMut},
+    ast::{TableConstraint, TryFromWithTokens},
+    sem::{CheckConstraint, ColumnRename, traversal::SemanticVisitorMut},
     syn::Constraint,
 };
 use sql_fun_core::IVec;
 
 #[cfg(feature = "sqlite")]
-use crate::SqliteToken;
+use crate::{
+    SqliteToken,
+    ast::{ColumnConstraint as AstColumnConstraint, Expr},
+};
 use crate::{
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ParseContext,
-        ScalarAnalysisContext, SemScalarExpr,
+        SemScalarExpr,
     },
-    syn::{ConstrType, Opt, ScanToken},
+    syn::ScanToken,
 };
 
 /// column value constraint
@@ -23,6 +27,16 @@ pub struct CheckColumnConstraint {
     table_name: TableName,
     column_name: ColumnName,
     expr: SemScalarExpr,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    analysis: Option<Box<InlineCheckAnalysis>>,
+}
+
+#[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
+struct InlineCheckAnalysis {
+    name: String,
+    applicable: bool,
+    no_inherit: bool,
+    enforced: Option<bool>,
 }
 
 impl CheckColumnConstraint {
@@ -43,12 +57,60 @@ impl CheckColumnConstraint {
         self.table_name.rename_reference(old, new);
     }
 
-    /// create instance
+    /// Construct an unanalyzed CHECK; `can_apply()` remains false until analysis.
     pub fn new(table_name: &TableName, column_name: &ColumnName, expr: SemScalarExpr) -> Self {
         Self {
             table_name: table_name.clone(),
             column_name: column_name.clone(),
             expr,
+            analysis: None,
+        }
+    }
+
+    pub(crate) fn from_analyzed(
+        table: &TableName,
+        column: &ColumnName,
+        check: &CheckConstraint,
+    ) -> Self {
+        let mut result = Self::new(table, column, check.expression().clone());
+        result.analysis = Some(Box::new(InlineCheckAnalysis {
+            name: check.name().to_owned(),
+            applicable: check.can_apply(),
+            no_inherit: check.no_inherit(),
+            enforced: check.enforced(),
+        }));
+        result
+    }
+
+    /// Explicit constraint name, when supplied in analyzed SQL.
+    pub fn name(&self) -> Option<&str> {
+        self.analysis
+            .as_ref()
+            .map(|analysis| analysis.name.as_str())
+            .filter(|name| !name.is_empty())
+    }
+
+    /// Whether completed CHECK analysis permits catalog application.
+    /// Unanalyzed constructor values and legacy serialized values are not applicable.
+    pub fn can_apply(&self) -> bool {
+        self.analysis
+            .as_ref()
+            .is_some_and(|analysis| analysis.applicable)
+    }
+
+    /// Whether NO INHERIT was declared.
+    pub fn no_inherit(&self) -> bool {
+        self.analysis
+            .as_ref()
+            .is_some_and(|analysis| analysis.no_inherit)
+    }
+
+    /// Explicit enforcement choice; omission remains absent.
+    pub fn enforced(&self) -> Option<bool> {
+        if let Some(analysis) = &self.analysis {
+            analysis.enforced
+        } else {
+            None
         }
     }
 
@@ -84,51 +146,29 @@ impl CheckColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.contype")?;
-            AnalysisError::never()
-        };
-        if !matches!(contype, ConstrType::ConstrCheck) {
-            AnalysisError::raise_unexpected_input("constraint.contype")?;
-            AnalysisError::never()
-        }
-        let Some(check_expr) = syn.get_raw_expr().as_inner() else {
-            AnalysisError::raise_unexpected_none("constraint.raw_expr")?;
-            AnalysisError::never()
-        };
-
-        let (expr, new_context) = SemScalarExpr::analyze_scaler_expr(
+        TableConstraint::try_from_with_tokens(syn, tokens)?.resolve_legacy_inline_check(
             context,
-            &ScalarAnalysisContext::default(),
-            check_expr,
-            tokens,
-        )?;
-        Ok((Self::new(table_name, column_name, expr), new_context))
+            table_name,
+            column_name,
+        )
     }
 
     /// analyze [`crate::syn::sqlite::CheckColumnConstraint`]
     #[cfg(feature = "sqlite")]
     pub fn analyze_constraint_sqlite<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         column_name: &ColumnName,
         syn: &SqliteCheckColumnConstraint,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (expr, new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
-            context,
-            &ScalarAnalysisContext::default(),
-            syn.expr(),
-            tokens,
-        )?;
-        context = new_context;
-        Ok((
-            ColumnConstraint::check(Self::new(table_name, column_name, expr)),
-            context,
-        ))
+        let syntax = AstColumnConstraint::check(&Expr::try_from(syn.expr())?);
+        let (check, context) = TableConstraint::unnamed_check(&syntax)
+            .resolve_legacy_inline_check(context, table_name, column_name)?;
+        Ok((ColumnConstraint::check(check), context))
     }
 }
 

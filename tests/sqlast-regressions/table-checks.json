@@ -324,5 +324,231 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "inline-cross-column-late",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(a < b), b integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-two-unnamed",
+    "sql": "CREATE TABLE check_sample(a integer CHECK(a > 0) CHECK(a < 100))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-null",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-nullable-expression",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(a > NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-false-is-a-valid-definition",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(false))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-boolean-input",
+    "sql": "CREATE TABLE check_sample (a integer CHECK('yes'))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-no-inherit",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(a > 0) NO INHERIT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-whole-row",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(check_sample.* IS NOT NULL))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-integer",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(a))",
+    "expected": {
+      "diagnostics": [
+        "check_boolean_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-nested-integer",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(a AND true))",
+    "expected": {
+      "diagnostics": [
+        "check_boolean_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-typed-text",
+    "sql": "CREATE TABLE check_sample (a integer CHECK('true'::text))",
+    "expected": {
+      "diagnostics": [
+        "check_boolean_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-invalid-boolean-input",
+    "sql": "CREATE TABLE check_sample (a integer CHECK('o'))",
+    "expected": {
+      "diagnostics": [
+        "check_boolean_literal"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-missing-column",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(absent IS NULL))",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-aggregate",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(sum(a) > 0))",
+    "expected": {
+      "diagnostics": [
+        "check_expression_placement"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-window",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(row_number() OVER() > 0))",
+    "expected": {
+      "diagnostics": [
+        "check_expression_placement"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-set-returning",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(generate_series(1,2) > 0))",
+    "expected": {
+      "diagnostics": [
+        "check_expression_placement"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-subquery",
+    "sql": "CREATE TABLE check_sample (a integer CHECK((SELECT true)))",
+    "expected": {
+      "diagnostics": [
+        "check_expression_placement"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-searched-case",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(CASE WHEN a > 0 THEN true ELSE false END))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-invalid-case-condition",
+    "sql": "CREATE TABLE check_sample (a integer CHECK(CASE WHEN a THEN true ELSE false END))",
+    "expected": {
+      "diagnostics": [
+        "check_boolean_type"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-named-options",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT positive CHECK(a > 0) NO INHERIT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-boolean-domain",
+    "sql": "CREATE TABLE check_sample(flag check_flag CHECK(flag))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-duplicate-name",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated CHECK(true), b integer CONSTRAINT repeated CHECK(false))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-table-duplicate-name",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated CHECK(true), CONSTRAINT repeated CHECK(false))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-key-duplicate-name",
+    "sql": "CREATE TABLE check_sample(a integer CONSTRAINT repeated CHECK(true), CONSTRAINT repeated UNIQUE(a))",
+    "expected": {
+      "diagnostics": [
+        "check_duplicate_name"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "inline-other-column-only",
+    "sql": "CREATE TABLE check_sample(a integer CHECK(b > 0), b integer)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
   }
 ]

@@ -442,3 +442,12 @@ Rust schema-chain tests inspect retained expressions and applicability,
 multiple unnamed checks, atomic rejection, frozen layers and rename propagation;
 feature-enabled SQLite tests compare its truth-value acceptance with the embedded
 oracle. PostgreSQL 18 NOT ENFORCED remains #887.
+
+Issue #991 extends `table-checks.json` with CREATE inline CHECK contracts through
+both PostgreSQL 17/18 source and installed checks: later/cross-column bindings,
+boolean/domain/NULL inputs, prohibited expressions, names and CHECK options.
+Rust schema-chain tests retain inline ownership, completed binding failures,
+applicability, rejection-safe catalog updates, rename propagation, frozen layers
+and additive serialization. SQLite feature tests verify distinct truth rules.
+ALTER ADD COLUMN application remains tracked by #528, as explicitly separated
+from #991 by the maintainer.

@@ -21,5 +21,5 @@ an ambiguous abbreviation or another invalid spelling cannot be coerced.
 CREATE TABLE sample(value integer, CHECK('bad'));
 ```
 
-See [table CHECK constraints](../sql-analysis/statements/create-table.md#table-check-constraints)
+See [CHECK constraints](../sql-analysis/statements/create-table.md#check-constraints)
 and [ALTER ADD CHECK](../sql-analysis/statements/alter-table.md#adding-table-check-constraints).

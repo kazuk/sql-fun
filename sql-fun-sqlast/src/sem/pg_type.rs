@@ -726,10 +726,10 @@ impl PgBuiltInType {
         Self::builtin_reference("bool")
     }
 
-    /// get built-in `int4` type reference
+    /// get built-in `int2` type reference
     #[must_use]
     pub fn int2() -> TypeReference {
-        Self::builtin_reference("int4")
+        Self::builtin_reference("int2")
     }
 
     /// get built-in `int4` type reference
@@ -738,12 +738,35 @@ impl PgBuiltInType {
         Self::builtin_reference("int4")
     }
 
-    /// get built-in `int4` type reference
+    /// get built-in `int8` type reference
     #[must_use]
     pub fn int8() -> TypeReference {
         Self::builtin_reference("int8")
     }
+}
 
+#[cfg(test)]
+mod builtin_integer_type_tests {
+    use crate::names::FullName;
+    use crate::sem::{PgBuiltInType, TypeReference};
+
+    #[rstest::rstest]
+    #[case::int2(PgBuiltInType::int2(), "int2")]
+    #[case::int4(PgBuiltInType::int4(), "int4")]
+    #[case::int8(PgBuiltInType::int8(), "int8")]
+    fn returns_explicit_integer_identity(
+        #[case] actual: TypeReference,
+        #[case] expected_name: &str,
+    ) {
+        let expected = TypeReference::concrete_type_ref(
+            &FullName::with_schema("pg_catalog", expected_name),
+            false,
+        );
+        assert_eq!(actual, expected);
+    }
+}
+
+impl PgBuiltInType {
     /// get built-in `numeric` type reference
     #[must_use]
     pub fn numeric() -> TypeReference {

@@ -119,7 +119,10 @@ fn explicit_variadic_binds_an_array_identity(#[case] sql: &str, #[case] name: Op
 
 #[test]
 fn inference_preserves_reordered_positions_and_formal_associations() {
-    let (mut query, context) = resolve("SELECT f(c => $7, a => $2, b => $7)", true);
+    let (mut query, context) = resolve(
+        "SELECT f(c => $7::integer, a => $2::integer, b => $7::integer)",
+        true,
+    );
     assert_eq!(
         context.reported_problem_count(),
         0,
@@ -133,8 +136,8 @@ fn inference_preserves_reordered_positions_and_formal_associations() {
                 .parameter(position)
                 .unwrap()
                 .constraint()
-                .single_type(),
-            Some(PgBuiltInType::int4())
+                .admissible_types(),
+            Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
         );
     }
     let SemScalarExpr::Constrained(constrained) = expression(&query) else {
@@ -169,7 +172,7 @@ fn inference_preserves_reordered_positions_and_formal_associations() {
 
 #[rstest::rstest]
 #[case::scalar("SELECT f(a => $1) FROM f(a => 1) AS t")]
-#[case::table("SELECT t.* FROM f(a => $1) AS t")]
+#[case::table("SELECT t.* FROM f(a => $1::integer) AS t")]
 #[case::rows_from("SELECT t.* FROM ROWS FROM(f(a => $1)) AS t")]
 fn table_consumers_receive_call_constraints(#[case] sql: &str) {
     let (query, context) = resolve(sql, true);
@@ -185,8 +188,8 @@ fn table_consumers_receive_call_constraints(#[case] sql: &str) {
             .parameter(1)
             .unwrap()
             .constraint()
-            .single_type(),
-        Some(PgBuiltInType::int4())
+            .admissible_types(),
+        Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
     );
     assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
     let source = query
@@ -214,7 +217,15 @@ fn deferred_polymorphism_uses_other_occurrences(#[case] sql: &str) {
         "{:?}",
         context.reported_problems()
     );
-    assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+    assert_eq!(expression(&query).get_type(), None);
+    assert_eq!(
+        context
+            .parameter_constraints()
+            .result_column(0)
+            .unwrap()
+            .admissible_types(),
+        Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
+    );
 }
 
 #[rstest::rstest]

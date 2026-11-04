@@ -96,7 +96,10 @@ fn child_parameters_are_visited_and_finalized(#[case] sql: &str) {
     let mut parameters = Parameters(Vec::new());
     query.walk(&mut parameters).unwrap();
     assert!(!parameters.0.is_empty());
-    assert!(parameters.0.into_iter().all(|ty| ty.is_some()));
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int2())])));
+    // Both smallint and integer inputs can satisfy the cast, so the parameter
+    // has no single inferred type even after its constraints are finalized.
+    assert!(parameters.0.into_iter().all(|ty| ty.is_none()));
 }
 
 #[test]

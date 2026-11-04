@@ -35,9 +35,9 @@ To select the builtin addition operator in the current database:
 SELECT 1 OPERATOR(pg_catalog.+) 2;
 ```
 
-The current CLI also reports `query_deparse` for this example because its SQL
-renderer cannot reproduce operator references with database qualification. The
-semantic diagnostic remains distinct from that rendering limitation.
+The SQL renderer preserves these operator references, including quoted identifier
+components. Successful rendering does not make a cross-database reference
+semantically valid.
 
 ## Related diagnostics
 
@@ -45,5 +45,3 @@ semantic diagnostic remains distinct from that rendering limitation.
 shapes rather than unsupported database qualification.
 [undefined_operator](undefined_operator.md) reports an operator that cannot be
 resolved or used with the selected operands.
-
-[query_deparse](query_deparse.md) reports the separate SQL rendering limitation.

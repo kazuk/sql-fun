@@ -27,39 +27,70 @@ impl Name {
     }
 
     pub(super) fn emit_operator(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-        let Some(operator) = self.last_component() else {
+        let Some((operator, qualifiers)) = self.0.split_last() else {
             return writer.invalid("operator", "operator name has no components");
         };
         if !valid_operator(operator, writer.dialect()) {
             return writer.invalid("operator", "operator contains invalid punctuation");
         }
 
-        match self.0.as_slice() {
-            [_] => writer.sql(operator),
-            [schema, _] if writer.is_postgres() => {
-                if schema.is_empty() || schema.contains('\0') {
-                    return writer.invalid("operator", "operator schema is empty or contains NUL");
-                }
+        match qualifiers {
+            [] => writer.sql(operator),
+            _ if writer.is_postgres() => {
                 writer.sql("OPERATOR(");
-                writer.ident(schema)?;
+                writer.names(qualifiers, ".")?;
                 writer.sql(".");
                 writer.sql(operator);
                 writer.sql(")");
             }
-            [_schema, _] => {
+            _ => {
                 return writer.invalid(
                     "operator",
                     "schema-qualified operators are not legal SQLite SQL",
                 );
             }
-            _ => {
-                return writer.invalid(
-                    "operator",
-                    "schema-qualified operators require one schema component",
-                );
-            }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_emit_operator {
+    use crate::ast::{Dialect, Name, deparse::SqlWriter};
+
+    #[rstest::rstest]
+    #[case::unqualified(vec!["+".into()], Dialect::postgres(), "+")]
+    #[case::schema(vec!["math".into(), "+".into()], Dialect::postgres(), r#"OPERATOR("math".+)"#)]
+    #[case::database(vec!["a".into(), "b".into(), "+".into()], Dialect::postgres(), r#"OPERATOR("a"."b".+)"#)]
+    #[case::quoted(vec!["A.B".into(), r#"c"d"#.into(), "+".into()], Dialect::postgres(), r#"OPERATOR("A.B"."c""d".+)"#)]
+    #[case::sqlite(vec!["+".into()], Dialect::sqlite(), "+")]
+    fn preserves_components(
+        #[case] parts: Vec<String>,
+        #[case] dialect: Dialect,
+        #[case] expected: &str,
+    ) {
+        let operator = Name::from_parts(&parts);
+        let mut writer = SqlWriter::new(dialect);
+        operator.emit_operator(&mut writer).unwrap();
+        assert_eq!(writer.sql, expected);
+    }
+
+    #[rstest::rstest]
+    #[case::absent(vec![], Dialect::postgres())]
+    #[case::empty_token(vec!["a".into(), "b".into(), "".into()], Dialect::postgres())]
+    #[case::invalid_token(vec!["a".into(), "b".into(), "word".into()], Dialect::postgres())]
+    #[case::comment_token(vec!["a".into(), "b".into(), "--".into()], Dialect::postgres())]
+    #[case::empty_schema(vec!["a".into(), "".into(), "+".into()], Dialect::postgres())]
+    #[case::empty_database(vec!["".into(), "b".into(), "+".into()], Dialect::postgres())]
+    #[case::nul_schema(vec!["a".into(), "b\0".into(), "+".into()], Dialect::postgres())]
+    #[case::nul_database(vec!["a\0".into(), "b".into(), "+".into()], Dialect::postgres())]
+    #[case::sqlite_schema(vec!["a".into(), "+".into()], Dialect::sqlite())]
+    #[case::sqlite_database(vec!["a".into(), "b".into(), "+".into()], Dialect::sqlite())]
+    fn rejects_invalid_names(#[case] parts: Vec<String>, #[case] dialect: Dialect) {
+        let operator = Name::from_parts(&parts);
+        let mut writer = SqlWriter::new(dialect);
+        let error = operator.emit_operator(&mut writer).unwrap_err();
+        assert!(error.is_invalid_syntax());
     }
 }
 
@@ -708,6 +739,7 @@ fn emit_sqlite_type_modifiers(
 
 #[cfg(test)]
 mod test_lexical_emit {
+    use crate::ast::deparse::SqlWriter;
     use crate::test_helpers::deparse::render;
     #[cfg(feature = "sqlite")]
     use crate::test_helpers::deparse_lexical::{declared_types, sqlite_statement};
@@ -717,7 +749,7 @@ mod test_lexical_emit {
     use crate::ast::{
         Dialect, Expr, Literal, SqliteTypeModifier, SqliteTypeModifiers, SqliteTypeNamePart,
         SqliteTypeNameTrivia,
-        deparse::lexical::{Name, Parameter, SqlWriter, TypeName},
+        deparse::lexical::{Name, Parameter, TypeName},
     };
 
     #[rstest::rstest]
@@ -732,14 +764,6 @@ mod test_lexical_emit {
             render(&Name::from_parts(&parts), dialect).unwrap(),
             expected
         );
-    }
-
-    #[test]
-    fn emits_schema_qualified_postgres_operators_with_operator_syntax() {
-        let operator = Name::from_parts(&["math".to_owned(), "+".to_owned()]);
-        let mut writer = SqlWriter::new(Dialect::postgres());
-        operator.emit_operator(&mut writer).unwrap();
-        assert_eq!(writer.sql, "OPERATOR(\"math\".+)");
     }
 
     #[rstest::rstest]

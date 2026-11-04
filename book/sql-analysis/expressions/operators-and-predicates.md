@@ -148,10 +148,11 @@ incomplete ([#797](https://github.com/kazuk/sql-fun/issues/797)); an operator
 spelling or boolean result alone does not establish a valid row comparison.
 
 Schema-qualified PostgreSQL operator names such as `OPERATOR(pg_catalog.+)`
-currently encounter an incorrect name-conversion rejection
-([#946](https://github.com/kazuk/sql-fun/issues/946)). This is a limitation of
-sql-fun, although the syntax is valid PostgreSQL; it can fail before ordinary
-overload resolution or diagnostic delivery completes.
+retain their schema identity and participate in ordinary operator resolution.
+Quoted identifiers preserve case and embedded punctuation. Operator references
+with three or more components can be parsed and rendered, but analysis reports
+[cross_database_operator_reference](../../diagnostics/cross_database_operator_reference.md);
+it does not resolve operators in another database.
 
 ## Diagnostics
 

@@ -160,8 +160,7 @@
     "sql": "SELECT 1 OPERATOR(a.b.+) 2 AS result",
     "expected": {
       "diagnostics": [
-        "cross_database_operator_reference",
-        "query_deparse"
+        "cross_database_operator_reference"
       ],
       "columns": [
         {
@@ -176,8 +175,7 @@
     "sql": "SELECT 1 OPERATOR(a.b.c.+) 2 AS result",
     "expected": {
       "diagnostics": [
-        "cross_database_operator_reference",
-        "query_deparse"
+        "cross_database_operator_reference"
       ],
       "columns": [
         {
@@ -192,8 +190,7 @@
     "sql": "SELECT ${value:int4} OPERATOR(a.b.+) 2 AS result",
     "expected": {
       "diagnostics": [
-        "cross_database_operator_reference",
-        "query_deparse"
+        "cross_database_operator_reference"
       ],
       "columns": [
         {
@@ -226,8 +223,7 @@
     "sql": "SELECT 1 + 2 AS result ORDER BY result USING OPERATOR(a.b.<)",
     "expected": {
       "diagnostics": [
-        "cross_database_operator_reference",
-        "query_deparse"
+        "cross_database_operator_reference"
       ],
       "columns": [
         {
@@ -269,6 +265,86 @@
         {
           "name": "result",
           "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-cross-database",
+    "sql": "SELECT 1 OPERATOR(\"A.B\".\"c\"\"d\".+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-long-qualification",
+    "sql": "SELECT 1 OPERATOR(\"A\".\"b.c\".\"d\"\"e\".+) 2 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "cross-database-prefix",
+    "sql": "SELECT OPERATOR(a.b.-) 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-cross-database-prefix",
+    "sql": "SELECT OPERATOR(\"A.B\".\"c\"\"d\".-) 1 AS result",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted-cross-database-order",
+    "sql": "SELECT 1 + 2 AS result ORDER BY result USING OPERATOR(\"A.B\".\"c\"\"d\".<)",
+    "expected": {
+      "diagnostics": [
+        "cross_database_operator_reference"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "nullable",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

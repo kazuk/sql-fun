@@ -5,8 +5,10 @@ mod implementation {
         names::TableName,
         sem::{
             AnalysisError, FunctionModifiers, FunctionOverloadCollection, NamedArgExpr,
-            QueryNameResolution,
+            ParseContext, QueryNameResolution,
+            scalar_expr::SemScalarExprNode,
             traversal::{SemanticVisitor, SemanticVisitorMut},
+            type_system::ArgumentBindingCollection,
         },
     };
 
@@ -61,8 +63,37 @@ mod implementation {
         name: FullName,
         resolution: QueryNameResolution,
         modifiers: Box<FunctionModifiers>,
+        #[serde(default)]
+        overload: Option<OverloadVariant>,
+        #[serde(default)]
+        candidates: Option<Vec<OverloadVariant>>,
+        #[serde(default)]
+        argument_definitions: Vec<Option<FunctionParam>>,
     }
     impl FunctionBinding {
+        /// Selected signature, when the supplied types establish one.
+        pub const fn overload(&self) -> Option<&OverloadVariant> {
+            self.overload.as_ref()
+        }
+        /// Formal association at a position in the supplied argument order.
+        pub fn argument_definition(&self, position: usize) -> Option<&FunctionParam> {
+            if let Some(definition) = self.argument_definitions.get(position) {
+                definition.as_ref()
+            } else {
+                None
+            }
+        }
+        pub(super) fn retain_bound_arguments(
+            &mut self,
+            overload: &OverloadVariant,
+            args: &IVec<FuncCallArgs>,
+        ) {
+            self.overload = Some(overload.clone());
+            self.argument_definitions = args
+                .iter()
+                .map(|argument| argument.arg_definition().clone())
+                .collect();
+        }
         /// Resolved function identity (or original name after a failed lookup).
         pub const fn name(&self) -> &FullName {
             &self.name
@@ -119,6 +150,13 @@ mod implementation {
                 name: self.func_name.clone(),
                 resolution: self.name_resolution.clone(),
                 modifiers: self.modifiers.clone(),
+                overload: self.overload.clone(),
+                candidates: self.candidates.clone(),
+                argument_definitions: self
+                    .args
+                    .iter()
+                    .map(|argument| argument.arg_definition.clone())
+                    .collect(),
             }
         }
     }
@@ -194,8 +232,19 @@ mod implementation {
     }
 
     impl FuncCallExpr {
-        pub(super) const fn defer_signature(&mut self) {
-            self.signature_deferred = true;
+        pub(super) fn retain_signature(
+            &mut self,
+            overload: &OverloadVariant,
+            args: &IVec<FuncCallArgs>,
+        ) {
+            self.overload = Some(overload.clone());
+            self.args = args
+                .iter()
+                .enumerate()
+                .map(|(position, argument)| argument.at_position(position))
+                .collect::<Vec<_>>()
+                .into();
+            self.signature_deferred = false;
         }
         /// Whether signature binding is explicitly deferred, independently of name lookup.
         pub const fn signature_is_deferred(&self) -> bool {
@@ -340,6 +389,55 @@ mod implementation {
             )
         }
     }
+
+    impl FunctionBinding {
+        pub(crate) fn invocation(&self, arguments: &[SemScalarExpr]) -> FuncCallExpr {
+            let args = arguments
+                .iter()
+                .enumerate()
+                .map(|(position, argument)| {
+                    FuncCallArgs::new(argument, &self.argument_definition(position).cloned())
+                })
+                .collect::<Vec<_>>();
+            let mut call = FuncCallExpr::new(&self.name, &self.overload, &args.into());
+            call.set_name_resolution(self.resolution.clone());
+            call.set_candidates(self.candidates.clone());
+            call.set_modifiers(*self.modifiers.clone());
+            call
+        }
+        pub(crate) fn finalize(
+            &mut self,
+            context: &mut impl ParseContext,
+            arguments: &mut Vec<SemScalarExpr>,
+            not_null: &mut Option<bool>,
+        ) -> Result<(), AnalysisError> {
+            let types = ArgumentBindingCollection::from_expr_list(arguments)
+                .with_explicit_variadic(self.modifiers.variadic());
+            if !types.has_call_notation() {
+                return Ok(());
+            }
+            if let Some(candidates) = &self.candidates
+                && !arguments.iter().any(SemScalarExpr::requires_argument_type)
+                && let Some(overload) = FunctionOverloadCollection::new(candidates)
+                    .resolve_from_catalog(context, &types)
+            {
+                let args = FuncCallExpr::cast_call_operands(
+                    context,
+                    &self.name,
+                    &arguments.clone().into(),
+                    &overload,
+                    self.modifiers.variadic(),
+                )?;
+                self.retain_bound_arguments(&overload, &args);
+                *arguments = args
+                    .iter()
+                    .map(|argument| argument.arg_expr().clone())
+                    .collect();
+            }
+            *not_null = self.invocation(arguments).is_not_null();
+            Ok(())
+        }
+    }
 }
 
 use crate::{
@@ -347,10 +445,11 @@ use crate::{
     context::ParseContext as ContextParseContext,
     names::FullName,
     sem::{
-        AnalysisError, AnalysisProblem, FunctionOverloadCollection, InputTypeConstraint,
-        OverloadVariant, ParseContext, QueryNameResolution, SemScalarExpr, TypeReference,
-        parameter_resolution::ParameterResolution, problem::CallArgumentProblem,
-        scalar_expr::SemScalarExprNode, type_system::ArgumentBindingCollection,
+        AnalysisError, AnalysisProblem, FunctionModifiers, FunctionOverloadCollection,
+        FunctionParam, InputTypeConstraint, OverloadVariant, ParseContext, QueryNameResolution,
+        SemScalarExpr, TypeReference, parameter_resolution::ParameterResolution,
+        problem::CallArgumentProblem, scalar_expr::SemScalarExprNode,
+        type_system::ArgumentBindingCollection,
     },
 };
 
@@ -365,36 +464,30 @@ impl FuncCallExpr {
         arguments: &[SemScalarExpr],
         argument_spans: &[Option<StringSpan>],
         span: &Option<StringSpan>,
+        explicit_variadic: bool,
+        window: bool,
     ) -> Result<Self, AnalysisError> {
-        let mut names = std::collections::HashSet::new();
-        let mut args = Vec::new();
-        for argument in arguments {
-            let position = args.len();
-            if let Some(named) = argument.as_named_argument() {
-                if !names.insert(named.name()) {
-                    context.report_analysis_problem(AnalysisProblem::call_argument(
-                        CallArgumentProblem::duplicate_name(
-                            named.name(),
-                            &named.source_span().map(Into::into),
-                        ),
-                    ))?;
-                }
-            } else if !names.is_empty() {
-                context.report_analysis_problem(AnalysisProblem::call_argument(
-                    CallArgumentProblem::positional_after_named(
-                        position,
-                        &argument_spans
-                            .get(position)
-                            .copied()
-                            .flatten()
-                            .as_ref()
-                            .map(Into::into),
-                    ),
-                ))?;
-            }
-            args.push(FuncCallArgs::new(argument, &None));
-        }
+        let mut invalid = Self::validate_supplied_notation(context, arguments, argument_spans)?;
+        let args: Vec<_> = arguments
+            .iter()
+            .map(|argument| FuncCallArgs::new(argument, &None))
+            .collect();
         let candidates = context.get_function_by_name(name);
+        if !invalid
+            && arguments
+                .iter()
+                .any(|argument| argument.as_named_argument().is_some())
+            && !window
+            && context.is_aggregate_impl(&context.resolve_function_name_with_search_path(name))
+        {
+            context.report_analysis_problem(
+                AnalysisProblem::function_overload_resolution_failed(
+                    name,
+                    &ArgumentBindingCollection::from_expr_list(arguments),
+                ),
+            )?;
+            invalid = true;
+        }
         let found = candidates.is_some();
         if !found {
             context.report_analysis_problem(AnalysisProblem::function_not_found(
@@ -408,9 +501,71 @@ impl FuncCallExpr {
         } else {
             QueryNameResolution::not_found()
         });
-        call.set_candidates(candidates.map(FunctionOverloadCollection::into_snapshot));
-        call.defer_signature();
+        let mut modifiers = FunctionModifiers::default();
+        modifiers.set_flags(false, false, explicit_variadic, false);
+        call.set_modifiers(modifiers);
+        if !invalid && let Some(candidates) = &candidates {
+            let types = ArgumentBindingCollection::from_expr_list(arguments)
+                .with_explicit_variadic(explicit_variadic);
+            if !arguments.iter().any(SemScalarExpr::requires_argument_type) {
+                if let Some(overload) = candidates.resolve_from_catalog(context, &types) {
+                    let bound = Self::cast_call_operands(
+                        context,
+                        name,
+                        &arguments.to_vec().into(),
+                        &overload,
+                        explicit_variadic,
+                    )?;
+                    call.retain_signature(&overload, &bound);
+                } else {
+                    context.report_analysis_problem(
+                        AnalysisProblem::function_overload_resolution_failed(name, &types),
+                    )?;
+                }
+            }
+        }
+        call.set_candidates(if invalid {
+            Some(Vec::new())
+        } else {
+            candidates.map(FunctionOverloadCollection::into_snapshot)
+        });
         Ok(call)
+    }
+
+    fn validate_supplied_notation(
+        context: &mut impl ParseContext,
+        arguments: &[SemScalarExpr],
+        argument_spans: &[Option<StringSpan>],
+    ) -> Result<bool, AnalysisError> {
+        let mut names = std::collections::HashSet::new();
+        let mut invalid = false;
+        for (position, argument) in arguments.iter().enumerate() {
+            if let Some(named) = argument.as_named_argument() {
+                if !names.insert(named.name()) {
+                    invalid = true;
+                    context.report_analysis_problem(AnalysisProblem::call_argument(
+                        CallArgumentProblem::duplicate_name(
+                            named.name(),
+                            &named.source_span().map(Into::into),
+                        ),
+                    ))?;
+                }
+            } else if !names.is_empty() {
+                invalid = true;
+                context.report_analysis_problem(AnalysisProblem::call_argument(
+                    CallArgumentProblem::positional_after_named(
+                        position,
+                        &argument_spans
+                            .get(position)
+                            .copied()
+                            .flatten()
+                            .as_ref()
+                            .map(Into::into),
+                    ),
+                ))?;
+            }
+        }
+        Ok(invalid)
     }
 
     fn cast_operand_expression<TParseContext>(
@@ -422,36 +577,81 @@ impl FuncCallExpr {
     where
         TParseContext: ParseContext,
     {
+        Self::cast_call_operands(context, func_name, arg_exprs, overload, false)
+    }
+
+    fn cast_call_operands(
+        context: &mut impl ParseContext,
+        func_name: &FullName,
+        arg_exprs: &IVec<SemScalarExpr>,
+        overload: &OverloadVariant,
+        explicit_variadic: bool,
+    ) -> Result<IVec<FuncCallArgs>, AnalysisError> {
+        let types = ArgumentBindingCollection::from_expr_list(arg_exprs)
+            .with_explicit_variadic(explicit_variadic);
+        let supplied = if types.has_call_notation() {
+            types.supplied_parameters(overload).ok()
+        } else {
+            None
+        };
         let mut args = Vec::new();
         for (index, arg) in arg_exprs.iter().enumerate() {
-            let mut arg = arg.clone();
-            let arg_def = overload.call_argument(index);
-            if let Some(arg_definition) = arg_def
-                && !arg_definition.accepts_any_type()
-                && let Some(arg_def_type) = arg_definition.call_argument_type()
-                && let Some(arg_val_type) = arg.get_type()
-            {
-                let Some(t) = arg_def_type.definition_from_catalog(context) else {
-                    AnalysisError::raise_unexpected_input(&format!(
-                        "type {arg_def_type} not found in context"
-                    ))?
-                };
-                if let Some(cast) = arg_val_type.implicit_match_context(&arg_def_type, context) {
-                    if !cast.is_no_conversion() {
-                        arg = SemScalarExpr::wrap_implicit_cast(&arg_def_type, &arg);
-                    }
-                } else {
-                    context.report_analysis_problem(
-                        AnalysisProblem::function_arg_implicit_cast_not_found(
-                            func_name, index, t, &arg,
-                        ),
-                    )?;
-                }
-            }
+            let arg_def = if let Some(parameters) = &supplied {
+                parameters.get(index).copied()
+            } else {
+                overload.call_argument(index)
+            };
+            let arg =
+                Self::cast_call_value(context, func_name, index, arg, arg_def, explicit_variadic)?;
 
             args.push(FuncCallArgs::new(&arg, &arg_def.cloned()));
         }
         Ok(args.into())
+    }
+    fn cast_call_value(
+        context: &mut impl ParseContext,
+        func_name: &FullName,
+        index: usize,
+        argument: &SemScalarExpr,
+        argument_definition: Option<&FunctionParam>,
+        explicit_variadic: bool,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let mut arg = argument.clone();
+        if let Some(arg_definition) = argument_definition
+            && !arg_definition.accepts_any_type()
+            && let Some(arg_def_type) = if explicit_variadic {
+                arg_definition.get_type().cloned()
+            } else {
+                arg_definition.call_argument_type()
+            }
+            && let Some(arg_val_type) = arg.get_type()
+        {
+            let Some(t) = arg_def_type.definition_from_catalog(context) else {
+                AnalysisError::raise_unexpected_input(&format!(
+                    "type {arg_def_type} not found in context"
+                ))?
+            };
+            if let Some(cast) = arg_val_type.implicit_match_context(&arg_def_type, context) {
+                if !cast.is_no_conversion() && arg_val_type != arg_def_type {
+                    arg = if let Some(named) = arg.as_named_argument() {
+                        SemScalarExpr::named_argument(
+                            named.name(),
+                            &SemScalarExpr::wrap_implicit_cast(&arg_def_type, named.value()),
+                            &named.source_span().copied(),
+                        )
+                    } else {
+                        SemScalarExpr::wrap_implicit_cast(&arg_def_type, &arg)
+                    };
+                }
+            } else {
+                context.report_analysis_problem(
+                    AnalysisProblem::function_arg_implicit_cast_not_found(
+                        func_name, index, t, &arg,
+                    ),
+                )?;
+            }
+        }
+        Ok(arg)
     }
 }
 
@@ -615,6 +815,9 @@ impl SemScalarExprNode for FuncCallExpr {
     fn is_not_null(&self) -> Option<bool> {
         if let Some(overload) = &self.overload() {
             if overload.is_strict() {
+                if overload.has_omitted_inputs(self.args().len(), self.modifiers().variadic()) {
+                    return Some(false);
+                }
                 for arg in self.args() {
                     let arg_is_not_null = matches!(arg.arg_expr().is_not_null(), Some(true));
 
@@ -636,7 +839,7 @@ mod test_func_call_expr_is_not_null {
     use crate::{
         names::FullName,
         sem::{
-            OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+            FunctionParam, OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
             scalar_expr::{
                 SemScalarExprNode,
                 func_call::{FuncCallArgs, FuncCallExpr},
@@ -645,6 +848,20 @@ mod test_func_call_expr_is_not_null {
     };
 
     use ::sql_fun_core::IVec;
+
+    #[test]
+    fn empty_expanded_variadic_is_not_an_omitted_default() {
+        let int = PgBuiltInType::int4();
+        let parameter =
+            FunctionParam::new_variadig_param(&Some("xs".to_owned()), &Some(int.array_type()));
+        let overload = OverloadVariant::new(&Some(int), &vec![parameter], true, true);
+        let call = FuncCallExpr::new(
+            &FullName::with_schema("public", "f"),
+            &Some(overload),
+            &IVec::default(),
+        );
+        assert_eq!(call.is_not_null(), Some(true));
+    }
 
     #[test]
     fn test_is_not_null_strict_with_nullable_arg_returns_false() {
@@ -697,7 +914,12 @@ impl FuncCallExpr {
             return Ok(None);
         }
         if let Some(overloads) = self.candidates() {
-            let signatures = overloads.parameter_signatures(context, &arguments);
+            let types = ArgumentBindingCollection::from_expr_list(&arguments)
+                .with_explicit_variadic(self.modifiers().variadic());
+            for position in overloads.explicit_array_positions(&types) {
+                parameters.array_access(context, &arguments[position], &[], false);
+            }
+            let signatures = overloads.call_signatures(context, &types);
             let mut result =
                 parameters.call(context, &name.to_string(), &arguments, &signatures)?;
             result.retain_semantic_call(self);

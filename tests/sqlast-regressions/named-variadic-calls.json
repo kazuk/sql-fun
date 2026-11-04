@@ -1,0 +1,932 @@
+[
+  {
+    "name": "named",
+    "sql": "SELECT f(a => 1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "old_notation",
+    "sql": "SELECT f(a := 1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "reordered",
+    "sql": "SELECT f(c => 9, a => 1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "mixed",
+    "sql": "SELECT f(1,c => 9)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "folded",
+    "sql": "SELECT f(A => 1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "null",
+    "sql": "SELECT f(a => NULL)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "supplied_defaults",
+    "sql": "SELECT f(c => 9,b => NULL,a => 1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "explicit_array",
+    "sql": "SELECT v(1,VARIADIC ARRAY[2,3])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "named_array",
+    "sql": "SELECT v(a=>1,VARIADIC xs=>ARRAY[2,3])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty_array",
+    "sql": "SELECT v(a=>1,VARIADIC xs=>ARRAY[]::int[])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "null_array",
+    "sql": "SELECT v(a=>1,VARIADIC xs=>NULL::int[])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "v",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary_array",
+    "sql": "SELECT arr(VARIADIC xs=>ARRAY[1])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "arr",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary_scalar_keyword",
+    "sql": "SELECT scalar(VARIADIC a=>1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "scalar",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted",
+    "sql": "SELECT quoted(\"Arg\"=>1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "quoted",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "overload_name",
+    "sql": "SELECT pick(a=>1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "pick",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "inout",
+    "sql": "SELECT inout_value(a=>1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "inout_value",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "concrete_poly",
+    "sql": "SELECT poly(value=>1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "poly",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "poly_array",
+    "sql": "SELECT polyarray(VARIADIC xs=>ARRAY[1])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "polyarray",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "nested",
+    "sql": "SELECT f(a=>f(a=>1))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "input_hint",
+    "sql": "SELECT f(a=>${input:int4})",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "reordered_hints",
+    "sql": "SELECT f(c=>${last:int4},a=>${first:int4})",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "deferred_occurrences",
+    "sql": "SELECT poly(value=>$1) FROM uuid_value(value=>$1) AS t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "poly",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "table_scalar",
+    "sql": "SELECT t.* FROM f(a=>1) AS t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "t",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "table_inference",
+    "sql": "SELECT t.* FROM poly(value=>$1) AS t, uuid_value(value=>$1) AS other",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "t",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_scalar",
+    "sql": "SELECT t.* FROM ROWS FROM(f(a=>1)) AS t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "t",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "text_overload_name",
+    "sql": "SELECT pick(b=>'s')",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "pick",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "compatible",
+    "sql": "SELECT compatible(b=>'b'::text,a=>'a'::text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "compatible",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "builtin_any",
+    "sql": "SELECT concat(VARIADIC ARRAY[1,2])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "concat",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "builtin_any_null",
+    "sql": "SELECT concat(VARIADIC NULL::int[])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "concat",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "builtin_format",
+    "sql": "SELECT format('%s',VARIADIC ARRAY['a'])",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "format",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "unknown_name",
+    "sql": "SELECT f(z=>1)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "required_omission",
+    "sql": "SELECT f(c=>1)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "double_assignment",
+    "sql": "SELECT f(1,a=>2)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "quoted_distinct",
+    "sql": "SELECT f(\"A\"=>1)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "too_many",
+    "sql": "SELECT f(1,'s',2, c=>3)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "wrong_type",
+    "sql": "SELECT f(a=>TRUE)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "scalar_variadic",
+    "sql": "SELECT v(1,VARIADIC xs=>2)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "v",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "named_expansion",
+    "sql": "SELECT v(a=>1,xs=>ARRAY[1])",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "v",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "default_ambiguity",
+    "sql": "SELECT collide(a=>1)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "collide",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_not_input",
+    "sql": "SELECT output(a=>1,x=>2)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "output",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "wrong_named_overload",
+    "sql": "SELECT pick(a=>TRUE)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "pick",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "any_requires_array",
+    "sql": "SELECT concat(VARIADIC 1)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "concat",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate",
+    "sql": "SELECT f(a=>1,a=>2)",
+    "expected": {
+      "diagnostics": [
+        "call_argument_duplicate_name"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "positional_after_named",
+    "sql": "SELECT f(a=>1,2)",
+    "expected": {
+      "diagnostics": [
+        "call_argument_positional_after_named"
+      ],
+      "columns": [
+        {
+          "name": "f",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing_function",
+    "sql": "SELECT no_such_function(a=>1)",
+    "expected": {
+      "diagnostics": [
+        "function_not_found"
+      ],
+      "columns": [
+        {
+          "name": "no_such_function",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_columns",
+    "sql": "SELECT t.* FROM output(a=>1) AS t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "y",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "table_alias",
+    "sql": "SELECT t.* FROM f(a=>1) AS t(value)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "value",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "table_ordinality_inference",
+    "sql": "SELECT t.* FROM poly(value=>$1) WITH ORDINALITY AS t, uuid_value(value=>$1) AS other",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "t",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          }
+        },
+        {
+          "name": "ordinality",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "rows_inference",
+    "sql": "SELECT t.* FROM ROWS FROM(poly(value=>$1)) AS t, uuid_value(value=>$1) AS other",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "t",
+          "nullability": "unknown",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "table_output_inference",
+    "sql": "SELECT t.* FROM polyout(value=>$1) AS t, uuid_value(value=>$1) AS other",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "y",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unresolved_polymorphic_input",
+    "sql": "SELECT poly(value=>$1)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "poly",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unresolved_multiple_input_types",
+    "sql": "SELECT poly(value=>$1) FROM f(a=>$1) AS t",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "poly",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "deferred_variadic_array",
+    "sql": "SELECT polyarray(VARIADIC xs=>$1) FROM uuid_array(value=>$1) AS t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "polyarray",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "uuid",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

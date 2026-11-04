@@ -40,6 +40,17 @@ impl TableFunctionOutput {
         self.problems
             .push(TableFunctionProblem::invalid_expression());
     }
+    pub(super) fn inferred(columns: &ColumnCollection) -> Self {
+        Self {
+            columns: columns.clone(),
+            ..Self::default()
+        }
+    }
+    pub(super) fn refresh_inferred(&mut self, columns: &ColumnCollection) {
+        if !self.has_declarations() {
+            self.columns = columns.clone();
+        }
+    }
     pub(crate) fn declared(overload: &OverloadVariant) -> Self {
         Self {
             columns: overload.returning_table(),

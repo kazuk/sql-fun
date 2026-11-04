@@ -15,16 +15,29 @@ pub struct DeferredTableFunction {
     call: FuncCallExpr,
     alias: AliasSpec,
     output: TableFunctionOutput,
+    #[serde(default)]
+    inference: Option<Box<SemScalarExpr>>,
+    #[serde(default)]
+    shape_known: bool,
 }
 impl DeferredTableFunction {
     pub(super) fn retain_invalid_expression(&mut self) {
         self.output.retain_invalid_expression();
     }
-    pub(super) fn new(call: &FuncCallExpr, alias: &AliasSpec) -> Self {
+    pub(super) fn new(
+        call: &FuncCallExpr,
+        alias: &AliasSpec,
+        columns: &Option<ColumnCollection>,
+    ) -> Self {
         Self {
             call: call.clone(),
             alias: alias.clone(),
-            output: TableFunctionOutput::default(),
+            output: columns
+                .as_ref()
+                .map(TableFunctionOutput::inferred)
+                .unwrap_or_default(),
+            shape_known: columns.is_some(),
+            inference: None,
         }
     }
     /// Preserved invocation, including name lookup, supplied arguments and modifiers.
@@ -53,7 +66,18 @@ impl DeferredTableFunction {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        self.call.walk(visitor)
+        let expression = self
+            .inference
+            .get_or_insert_with(|| Box::new(SemScalarExpr::function_call(&self.call)));
+        expression.walk(visitor)?;
+        let mut columns = self.output.columns().clone();
+        visitor.table_function(expression, &self.alias, &mut columns)?;
+        self.output.refresh_inferred(&columns);
+        if let Some(call) = expression.function_call_snapshot() {
+            self.shape_known |= call.overload().is_some();
+            self.call = call;
+        }
+        Ok(())
     }
     pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let Some(name) = self.call.name_resolution().function_identity() {
@@ -63,8 +87,20 @@ impl DeferredTableFunction {
     }
 }
 impl DataSource {
-    pub(crate) fn deferred_table_function(call: &FuncCallExpr, alias: &AliasSpec) -> Self {
-        Self::DeferredTableFunc(DeferredTableFunction::new(call, alias))
+    pub(crate) fn deferred_table_function(
+        context: &impl ParseContext,
+        call: &FuncCallExpr,
+        alias: &AliasSpec,
+    ) -> Self {
+        let name = ColumnName::from(alias.name().as_str());
+        let columns = if let Some(overload) = call.overload() {
+            Some(overload.table_function_output_columns(context, &name))
+        } else if let Some(candidates) = call.candidates() {
+            candidates.common_table_output(context, &name)
+        } else {
+            None
+        };
+        Self::DeferredTableFunc(DeferredTableFunction::new(call, alias, &columns))
     }
     /// Table invocation whose signature and output columns remain deferred.
     pub const fn deferred_function(&self) -> Option<&DeferredTableFunction> {
@@ -81,7 +117,11 @@ impl DeferredTableFunction {
         context: &mut impl ParseContext,
         output: &TableFunctionOutput,
     ) -> Result<(), AnalysisError> {
+        let inferred = self.output.columns().clone();
         self.output.replace_definition(output);
+        if self.shape_known {
+            self.output.refresh_inferred(&inferred);
+        }
         if let Some(overload) = self.call.overload() {
             self.output.apply(context, overload, &self.alias)?;
         } else if let Some(candidates) = self.call.candidates()
@@ -95,7 +135,7 @@ impl DeferredTableFunction {
         self.output.names()
     }
     pub(super) fn candidates(&self, column: &ColumnName) -> ColumnCandidates {
-        if self.output.has_declarations() {
+        if self.shape_known || self.output.has_declarations() {
             ColumnCandidates::from(self.output.candidates(column, &self.alias))
         } else {
             ColumnCandidates::from(vec![self.alias.clone()])
@@ -108,7 +148,7 @@ impl DeferredTableFunction {
         column: &ColumnName,
         nullable: bool,
     ) -> Result<(SemScalarExpr, &'a mut C), AnalysisError> {
-        if !self.output.has_declarations() {
+        if !self.shape_known && !self.output.has_declarations() {
             return ColumnReferenceExpr::unknown_function_source_ref(context, alias, column);
         }
         let (expression, context) = ColumnReferenceExpr::function_source_ref(
@@ -135,7 +175,7 @@ impl DeferredTableFunction {
         &mut self,
         context: &mut impl ParseContext,
     ) -> Result<(), AnalysisError> {
-        if self.output.has_declarations() {
+        if self.shape_known || self.output.has_declarations() {
             self.output.validate_aliases(context, &self.alias)
         } else {
             Ok(())
@@ -163,7 +203,7 @@ impl DeferredTableFunction {
 
 impl DeferredTableFunction {
     pub(super) fn known_column_names(&self) -> Option<Vec<ColumnName>> {
-        if self.output.has_declarations() {
+        if self.shape_known || self.output.has_declarations() {
             Some(self.output.names())
         } else {
             None

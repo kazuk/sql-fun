@@ -140,8 +140,18 @@ analysis](create-type.md#dialect-and-engine-specific-behavior).
 
 ## Diagnostics
 
-- [check_constraint](../../diagnostics/check_constraint.md): an added CHECK
-  expression, option or explicit constraint name is invalid.
+- [check_boolean_type](../../diagnostics/check_boolean_type.md): a CHECK boolean
+  operand has an incompatible PostgreSQL type.
+- [check_boolean_literal](../../diagnostics/check_boolean_literal.md): a CHECK
+  uses invalid PostgreSQL boolean literal input.
+- [check_expression_placement](../../diagnostics/check_expression_placement.md):
+  a CHECK contains a prohibited expression form.
+- [check_parameter](../../diagnostics/check_parameter.md): a CHECK uses a bind
+  parameter.
+- [check_deferrability](../../diagnostics/check_deferrability.md): a CHECK
+  requests deferral.
+- [check_duplicate_name](../../diagnostics/check_duplicate_name.md): a CHECK
+  repeats an explicit PostgreSQL constraint name.
 - [relation_not_found](../../diagnostics/relation_not_found.md): a required
   table target cannot be resolved.
 - [column_not_found_in_table](../../diagnostics/column_not_found_in_table.md): a

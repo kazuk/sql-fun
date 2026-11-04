@@ -49,14 +49,16 @@ fn create_retains_all_checks_and_late_column_bindings() -> testresult::TestResul
 }
 
 #[rstest::rstest]
-#[case::integer("a", "check_constraint")]
-#[case::nested_integer("a AND true", "check_constraint")]
-#[case::invalid_case("CASE WHEN a THEN true ELSE false END", "check_constraint")]
-#[case::invalid_literal("'bad'", "check_constraint")]
+#[case::integer("a", "check_boolean_type")]
+#[case::nested_integer("a AND true", "check_boolean_type")]
+#[case::invalid_case("CASE WHEN a THEN true ELSE false END", "check_boolean_type")]
+#[case::invalid_literal("'bad'", "check_boolean_literal")]
 #[case::missing("missing IS NULL", "column_not_found_in_table")]
+#[case::qualified_same_name("bounds.bounds IS NULL", "column_not_found_in_table")]
+#[case::schema_qualified_same_name("public.bounds.bounds IS NULL", "column_not_found_in_table")]
 #[case::wrong_table("absent.a IS NULL", "undefined_alias")]
-#[case::parameter("$1", "check_constraint")]
-#[case::subquery("(SELECT true)", "check_constraint")]
+#[case::parameter("$1", "check_parameter")]
+#[case::subquery("(SELECT true)", "check_expression_placement")]
 fn rejected_create_retains_expression_and_does_not_publish(
     #[case] expression: &str,
     #[case] diagnostic: &str,
@@ -287,7 +289,7 @@ fn duplicate_names_within_one_alter_are_inapplicable_before_application() -> tes
         pair.context()
             .problems()
             .iter()
-            .any(|problem| problem.code() == "check_constraint")
+            .any(|problem| problem.code() == "check_duplicate_name")
     );
     Ok(())
 }
@@ -310,6 +312,79 @@ fn missing_alter_target_is_a_completed_failed_binding() -> testresult::TestResul
         pair.context()
             .get_table_impl(&FullName::with_schema("public", "missing"))
             .is_none()
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::bare_row("a integer", "bounds IS NULL", "WholeRow")]
+#[case::star_row("a integer", "bounds.* IS NULL", "WholeRow")]
+#[case::shadowing_column("bounds integer", "bounds.bounds IS NULL", "ColumnRef")]
+fn whole_row_lookup_preserves_column_qualification(
+    #[case] columns: &str,
+    #[case] expression: &str,
+    #[case] binding: &str,
+) -> testresult::TestResult {
+    let pair = checks::apply(
+        checks::context(Dialect::postgres()),
+        &format!("CREATE TABLE bounds({columns}, CHECK({expression}))"),
+    )?;
+    let check = pair
+        .ast()
+        .as_create_table()
+        .unwrap()
+        .checks()
+        .next()
+        .unwrap();
+    assert!(check.can_apply());
+    let encoded = ::serde_json::to_string(check.expression())?;
+    assert!(encoded.contains(binding), "{encoded}");
+    assert!(
+        pair.context().problems().is_empty(),
+        "{:?}",
+        pair.context().problems()
+    );
+    assert!(
+        pair.context()
+            .get_table_impl(&FullName::with_schema("public", "bounds"))
+            .is_some()
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::table_keys(
+    "a integer, CONSTRAINT x UNIQUE(a), CONSTRAINT x UNIQUE(a), CONSTRAINT x CHECK(true)"
+)]
+#[case::column_keys(
+    "a integer CONSTRAINT x UNIQUE, b integer CONSTRAINT x UNIQUE, CONSTRAINT x CHECK(true)"
+)]
+fn duplicate_keys_sharing_a_check_name_allow_later_statement_recovery(
+    #[case] declarations: &str,
+) -> testresult::TestResult {
+    let pair = checks::apply(
+        checks::context(Dialect::postgres()),
+        &format!("CREATE TABLE bounds({declarations})"),
+    )?;
+    assert!(
+        pair.context()
+            .get_table_impl(&FullName::with_schema("public", "bounds"))
+            .is_none()
+    );
+    assert!(
+        pair.context()
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == "conflicting_creation")
+    );
+    let pair = checks::apply(
+        pair.into_context(),
+        "CREATE TABLE later(a integer, CHECK(true))",
+    )?;
+    assert!(
+        pair.context()
+            .get_table_impl(&FullName::with_schema("public", "later"))
+            .is_some()
     );
     Ok(())
 }

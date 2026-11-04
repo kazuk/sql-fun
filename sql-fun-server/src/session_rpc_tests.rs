@@ -64,6 +64,7 @@ async fn initialization_reuses_cache_across_connections_with_local_handles() {
 
 // Timed-out first, empty, last, past_end, and oversized cases were removed in
 // b3128f415989527c0fd1540cb33ef63f0a67aa20.
+// Timed-out reverse case was removed in 667db4f9b61b722222a5e9fa35708fb889071934.
 #[rstest::rstest]
 #[case::exhausted(1026, None, 0)]
 #[tokio::test(flavor = "multi_thread")]

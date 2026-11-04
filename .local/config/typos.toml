@@ -1,7 +1,6 @@
 [files]
 extend-exclude = [
     "postgres",
-    "examples/adventure-works/schema.develop.sql",
     "sql-fun-sqlast/src/syn/generated.rs",
     "**/*.svg",
     "graphify-out/"

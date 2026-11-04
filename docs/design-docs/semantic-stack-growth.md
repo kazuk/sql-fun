@@ -52,9 +52,11 @@ serialization and other AST consumers are not comprehensively instrumented.
 
 Abort-prone tests run their own exact test case in a subprocess and analyze on
 explicit worker stacks. This prevents `RUST_MIN_STACK` from masking failures and
-keeps an overflow from aborting the parent suite. The unchanged AdventureWorks
-schema includes PostgreSQL 17 builtin and tablefunc bootstrap and asserts all
-employee-view output columns and the employee-id type. Separate cases cover both
+keeps an overflow from aborting the parent suite. At the time of this work, the
+AdventureWorks schema test included PostgreSQL 17 builtin and tablefunc bootstrap
+and asserted all employee-view output columns and the employee-id type. That test
+and its example schema have since been removed; this records historical
+verification, not maintained coverage. Separate cases cover both
 JOIN directions, nested expressions, scalar/derived subqueries, CTE bodies, set
 operations and a normal unresolved-column diagnostic for both frontends.
 Parsing/conversion uses a separate 2 MiB worker; resolution runs with both 512
@@ -65,6 +67,6 @@ isolates the improvement from parser stack requirements and verifies conversion
 independently of Cargo's stack default. Forced growth checks same-thread
 execution, normal return, panic propagation and destructor execution.
 
-The baseline after the shared unresolved-AST refactor already analyzes
-AdventureWorks on 2 MiB. This change preserves that behavior and adds stack-growth
-protection rather than claiming the original historical backtrace still occurs.
+The baseline after the shared unresolved-AST refactor already analyzed
+AdventureWorks on 2 MiB. This change preserved that behavior and added stack-growth
+protection rather than claiming the original historical backtrace still occurred.

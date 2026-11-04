@@ -29,7 +29,8 @@ The baseline from #824 revision `7ddd5c30fc770aa40e7fba0844a3edd7b4aa7fa2`
 has SHA-256
 `7985670a095dc6b696edc471f9dbfdbc5947f7d5fcebcb960e68412b0cf91cec`.
 It records default-enabled `postgres` coverage for ten packages, nine of which
-have library/proc-macro APIs; `adventure-works` is binary-only.
+have library/proc-macro APIs; the binary-only `adventure-works` package belonged
+to that historical baseline and has since been removed from the workspace.
 
 Rust/Cargo 1.99.1 on `x86_64-unknown-linux-gnu`, rustdoc schema 61,
 `public-api 0.52.0` and stock cargo-semver-checks 0.51.0 reproduce the

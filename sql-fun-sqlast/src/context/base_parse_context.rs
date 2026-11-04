@@ -174,14 +174,14 @@ pub trait BaseParseContext:
 }
 
 #[cfg(test)]
-mod canonicalization_tests {
+mod base_parse_context_tests {
     use crate::{sem::PgBuiltInType, test_helpers::dynamic_types::record};
 
     use crate::{
         context::{BaseParseContext, ParseContext},
-        names::{FullName, SchemaName},
+        names::{FullName, OperatorName, SchemaName},
         sem::{TypeDefinition, TypeReference},
-        test_helpers::TestParseContext,
+        test_helpers::{TestParseContext, operator_names::lookup_context},
     };
 
     #[rstest::rstest]
@@ -227,15 +227,6 @@ mod canonicalization_tests {
         let array = row.array_type();
         assert_eq!(context.canonicalize_type_ref(&array), Some(array));
     }
-}
-
-#[cfg(test)]
-mod operator_resolution_tests {
-    use crate::{
-        context::BaseParseContext, names::OperatorName,
-        test_helpers::operator_names::lookup_context,
-    };
-
     #[rstest::rstest]
     #[case(&[], None, Some("pg_catalog"))]
     #[case(&["a"], None, Some("pg_catalog"))]

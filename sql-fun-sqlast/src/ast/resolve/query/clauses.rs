@@ -194,6 +194,33 @@ impl Order {
         Ok(QueryName::new(name, resolution))
     }
 }
+
+#[cfg(test)]
+mod ordering_operator_tests {
+    use crate::{
+        sem::QueryNameResolution,
+        test_helpers::operator_names::{addition_context, analyze},
+    };
+
+    #[test]
+    fn cross_database_ordering_operator_retains_failed_binding() -> testresult::TestResult {
+        let (query, context) = analyze(
+            "SELECT 1 + 2 ORDER BY 1 USING OPERATOR(a.b.<)",
+            addition_context(None),
+        )?;
+        assert_eq!(context.reported_problem_count(), 1);
+        assert!(context.has_reported_problem("cross_database_operator_reference"));
+        assert_eq!(
+            query.query_clauses().unwrap().order()[0]
+                .using()
+                .unwrap()
+                .resolution(),
+            &QueryNameResolution::not_found()
+        );
+        Ok(())
+    }
+}
+
 impl Grouping {
     pub(super) fn resolve_list(
         values: &[Self],

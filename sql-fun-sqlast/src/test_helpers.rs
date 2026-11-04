@@ -83,6 +83,7 @@ pub(crate) mod schema_content_hash;
 pub(crate) mod schema_creation;
 pub(crate) mod search_path;
 pub(crate) mod selected_metadata;
+pub(crate) mod serial;
 pub(crate) mod set_operations;
 #[cfg(feature = "sqlite")]
 pub(crate) mod sqlite_from_groups;

@@ -19,6 +19,7 @@ mod ownership;
 mod parameter_constraint;
 mod query;
 mod rule;
+mod serial;
 mod table_function;
 mod table_sample;
 mod trigger;
@@ -49,6 +50,7 @@ pub use self::{
     parameter_constraint::ParameterConstraintProblem,
     query::QueryProblem,
     rule::{RuleDefinitionProblem, RuleProblem},
+    serial::SerialProblem,
     table_function::TableFunctionProblem,
     table_sample::TableSampleProblem,
     trigger::TriggerProblem,
@@ -72,6 +74,8 @@ pub trait DiagnosticMessage {
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// An invalid serial column declaration.
+    Serial(SerialProblem),
     /// Syntax is unavailable on the explicitly selected engine version.
     IncompatibleEngineVersion(EngineVersionProblem),
 
@@ -200,6 +204,12 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Report an invalid PostgreSQL serial-family declaration.
+    #[must_use]
+    pub const fn serial(problem: SerialProblem) -> Self {
+        Self::Serial(problem)
+    }
+
     /// Report an omitted foreign-key column list without a referenced primary key.
     #[must_use]
     pub fn foreign_key_referenced_primary_key_missing(table: impl Into<TableName>) -> Self {
@@ -475,6 +485,7 @@ impl AnalysisProblem {
             Self::QueryAnalysis(problem) => problem.code(),
             Self::Index(problem) => problem.code(),
             Self::AlterColumn(problem) => problem.code(),
+            Self::Serial(_) => "serial_invalid_declaration",
             Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
             Self::Rule(_) => "rule_invalid_definition",
@@ -553,6 +564,7 @@ impl AnalysisProblem {
                 "COALESCE argument is unreachable after a non-null operand",
             ),
             Self::AlterColumn(problem) => problem.render_metadata(),
+            Self::Serial(problem) => problem.render_metadata(),
             Self::Creation(problem) => problem.render_metadata(),
             Self::Ownership(problem) => problem.render_metadata(),
             Self::Rule(problem) => problem.render_metadata(),
@@ -606,6 +618,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::AlterColumn(problem) => problem.diagnostic_message(),
             Self::MinMax(problem) => problem.diagnostic_message(),
             Self::CallArgument(problem) => problem.diagnostic_message(),
+            Self::Serial(problem) => problem.diagnostic_message(),
             Self::Creation(problem) => problem.diagnostic_message(),
             Self::Rule(problem) => problem.diagnostic_message(),
             Self::Ownership(problem) => problem.diagnostic_message(),

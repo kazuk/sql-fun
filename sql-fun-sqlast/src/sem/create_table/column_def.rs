@@ -41,6 +41,8 @@ pub struct ColumnDefinition {
 // Keep declaration-only metadata out of the inline size of every column binding.
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 struct ColumnDeclaration {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    rejected: bool,
     requested_type: Option<WithTypmod<TypeReference>>,
     collation: DeclarationCollation,
 }
@@ -114,6 +116,10 @@ impl ColumnDefinition {
             .report(context, self.type_ref.as_ref())
     }
 
+    pub(crate) fn reject_declaration(&mut self) {
+        self.declaration.get_or_insert_default().rejected = true;
+    }
+
     pub(crate) fn declaration_can_apply(&self) -> bool {
         let Some(declaration) = &self.declaration else {
             return true;
@@ -121,7 +127,7 @@ impl ColumnDefinition {
         // An absent type is not itself a failed declaration (SQLite permits
         // typeless columns, and query-derived columns may remain unknown).
         let type_resolved = declaration.requested_type.is_none() || self.type_ref.is_some();
-        type_resolved && declaration.collation.can_apply()
+        !declaration.rejected && type_resolved && declaration.collation.can_apply()
     }
 
     pub(super) fn rename_expressions(

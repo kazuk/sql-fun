@@ -22,6 +22,25 @@ declaration collations are checked separately from the column type; see
 [types and casts](../expressions/types-and-casts.md) and
 [COLLATE](../expressions/collate.md).
 
+### PostgreSQL serial columns
+
+Schema loading accepts `smallserial`/`serial2`, `serial`/`serial4`, and
+`bigserial`/`serial8` in CREATE TABLE column declarations. Later queries see
+`smallint`, `integer`, and `bigint`, respectively. Serial columns are implicitly
+NOT NULL and have a sequence-backed default; serial alone does not declare a
+primary key or uniqueness. Written key constraints still apply.
+
+The generated sequence is registered in the analysis catalog with a dependency
+on its table. Analysis does not execute `nextval` or allocate database values.
+Column-level sequence ownership and complete sequence-option validation remain
+unsupported ([#545](https://github.com/kazuk/sql-fun/issues/545)); see
+[sequences](sequences.md). Serial is declaration shorthand, so it is not added
+as a general cast or function-signature type. A quoted lowercase `"serial"`
+declaration has the same meaning; qualified names and differently cased quoted
+names use ordinary type lookup. Serial arrays, type modifiers, explicit NULL,
+and conflicting DEFAULT, IDENTITY or generated expressions produce
+[serial_invalid_declaration](../../diagnostics/serial_invalid_declaration.md).
+
 ### CREATE TABLE AS
 
 The PostgreSQL table-as path analyzes its query and derives ordered columns. A

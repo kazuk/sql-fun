@@ -31,7 +31,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 146 groups are split 10/68/68.
+in the committed file. The current 162 groups are split 10/76/76.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering
@@ -420,3 +420,13 @@ The cross-database CLI cases also assert the existing `query_deparse` diagnostic
 the renderer currently rejects excessive operator qualification independently of
 the semantic classification. These tests do not claim cross-database SQL emission
 support.
+
+Issue #978 serial-family contracts live in `serial-original.json` and
+`serial-family.json` on PostgreSQL 17/18 through both maintained paths.
+`serial-original.sql` links directly to the unmodified SQL-function schema
+fixture. Queries check canonical integer types, implicit non-nullability,
+written keys, collision handling and quoted names. Declaration cases check
+all six spellings and conflicting attributes; ordinary type lookup/casts do
+not gain serial aliases. Rust tests retain the generated nextval binding,
+sequence identity/table dependency, frozen layers and rejected/skipped creation
+atomicity. Column-level sequence ownership remains tracked by #545.

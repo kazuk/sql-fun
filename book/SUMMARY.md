@@ -204,6 +204,7 @@
   - [require_array](diagnostics/require_array.md)
   - [rule_invalid_definition](diagnostics/rule_invalid_definition.md)
   - [sequence_not_found](diagnostics/sequence_not_found.md)
+  - [serial_invalid_declaration](diagnostics/serial_invalid_declaration.md)
   - [sub_query_not_have_column_for_derived_column_name](diagnostics/sub_query_not_have_column_for_derived_column_name.md)
   - [table_function_definition_not_allowed](diagnostics/table_function_definition_not_allowed.md)
   - [table_function_definition_placement](diagnostics/table_function_definition_placement.md)

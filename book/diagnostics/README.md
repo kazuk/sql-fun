@@ -153,6 +153,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [require_array](require_array.md)
 - [rule_invalid_definition](rule_invalid_definition.md)
 - [sequence_not_found](sequence_not_found.md)
+- [serial_invalid_declaration](serial_invalid_declaration.md)
 - [sub_query_not_have_column_for_derived_column_name](sub_query_not_have_column_for_derived_column_name.md)
 - [table_function_definition_not_allowed](table_function_definition_not_allowed.md)
 - [table_function_definition_placement](table_function_definition_placement.md)

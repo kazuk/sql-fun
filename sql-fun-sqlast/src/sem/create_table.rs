@@ -11,8 +11,8 @@ use crate::syn::sqlite::DropTableStatement;
 use crate::{
     ast::{Dialect, Table},
     sem::{
-        ColumnAttributeAction, ColumnRename, CreateIndex, ForeignKeyConstraint, IndirectionExpr,
-        SemScalarExpr, TypeReference,
+        ColumnAttributeAction, ColumnRename, CreateIndex, CreateSequence, ForeignKeyConstraint,
+        IndirectionExpr, SemScalarExpr, TypeReference,
         traversal::{RelationRenamer, SemanticVisitorMut},
     },
     syn::{CreateStmt, DropStmt},
@@ -28,8 +28,9 @@ use crate::{
     names::FullName,
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, ImplicitChange,
-        InsertArbiter, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
+        InsertArbiter, Kind, OwnerSpecification, RuleIdentity, RuleReferences, SemAst,
         SourcePathWithSpan, TriggerReferences, alter_table::AlterObjSubCommand,
+        problem::CreationProblem,
     },
     syn::{ListOpt, Opt, ScanToken},
 };
@@ -296,6 +297,7 @@ impl CreateTableMode {
 /// `create table` SQL statement
 #[derive(Debug, Clone)]
 pub struct CreateTable {
+    serial_sequences: Vec<CreateSequence>,
     name: TableName,
     columns: ColumnCollection,
     triggers: TriggerReferences,
@@ -364,6 +366,41 @@ impl CreateTable {
             constraint.rename_column(rename, owned);
         }
         Ok(())
+    }
+
+    pub(crate) fn retain_serial_sequences(&mut self, sequences: Vec<CreateSequence>) {
+        self.serial_sequences = sequences;
+    }
+
+    pub(crate) fn permits_serial_creation(
+        &self,
+        context: &mut impl ParseContext,
+        indexes: &[CreateIndex],
+    ) -> Result<bool, AnalysisError> {
+        for sequence in &self.serial_sequences {
+            if !context.permits_relation_creation(
+                sequence.name(),
+                Kind::sequence(),
+                false,
+                false,
+            )? {
+                return Ok(false);
+            }
+            if CreateIndex::contains_name(indexes, sequence.name()) {
+                context.report_problem(AnalysisProblem::creation(CreationProblem::relation(
+                    sequence.name(),
+                    Kind::index(),
+                    Kind::sequence(),
+                    self.source.span(),
+                )))?;
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    pub(crate) fn serial_sequences(&self) -> &[CreateSequence] {
+        &self.serial_sequences
     }
 
     /// Whether analyzed column and foreign-key declarations permit catalog application.
@@ -445,6 +482,7 @@ impl CreateTable {
     ) -> Self {
         Self {
             name: name.clone(),
+            serial_sequences: Vec::new(),
             triggers: TriggerReferences::default(),
             rules: RuleReferences::default(),
             columns: ColumnCollection(columns),

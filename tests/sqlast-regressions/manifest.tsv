@@ -80,3 +80,5 @@ output-function-params	project	output-function-params.sql	5	17,18
 composite-domains	project	composite-domains.sql	19	17,18
 table-foreign-keys	project	table-foreign-keys.sql	9	17,18
 operator-names	builtin	-	16	17,18
+serial-original	project	serial-original.sql	2	17,18
+serial-family	project	serial-family.sql	20	17,18

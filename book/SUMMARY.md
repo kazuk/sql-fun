@@ -9,7 +9,6 @@
   - [Parameter binding](./sql_functions/parameter-binding.md)
   - [Conditional SQL](./sql_functions/conditional-sql.md)
   - [Query interruption](./sql_functions/query-interruption.md)
-  - [Legacy sql_query_one links](./sql_functions/sql_query_one.md)
 - [SQL Analysis Reference](./sql-analysis.md)
   - [Top-level statements](./sql-analysis/statements.md)
     - [SELECT](./sql-analysis/statements/select.md)

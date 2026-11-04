@@ -544,7 +544,7 @@
     "sql": "SELECT f(z=>1)",
     "expected": {
       "diagnostics": [
-        "function_overload_resolution_failed"
+        "call_argument_unknown_name"
       ],
       "columns": [
         {
@@ -559,7 +559,7 @@
     "sql": "SELECT f(c=>1)",
     "expected": {
       "diagnostics": [
-        "function_overload_resolution_failed"
+        "call_argument_missing_required"
       ],
       "columns": [
         {
@@ -574,7 +574,7 @@
     "sql": "SELECT f(1,a=>2)",
     "expected": {
       "diagnostics": [
-        "function_overload_resolution_failed"
+        "call_argument_assigned_twice"
       ],
       "columns": [
         {
@@ -589,7 +589,7 @@
     "sql": "SELECT f(\"A\"=>1)",
     "expected": {
       "diagnostics": [
-        "function_overload_resolution_failed"
+        "call_argument_unknown_name"
       ],
       "columns": [
         {
@@ -604,7 +604,7 @@
     "sql": "SELECT f(1,'s',2, c=>3)",
     "expected": {
       "diagnostics": [
-        "function_overload_resolution_failed"
+        "call_argument_assigned_twice"
       ],
       "columns": [
         {
@@ -679,7 +679,7 @@
     "sql": "SELECT output(a=>1,x=>2)",
     "expected": {
       "diagnostics": [
-        "function_overload_resolution_failed"
+        "call_argument_unknown_name"
       ],
       "columns": [
         {
@@ -925,6 +925,66 @@
             "is_array": false
           },
           "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "all_candidates_unknown",
+    "sql": "SELECT pick(z=>1)",
+    "expected": {
+      "diagnostics": [
+        "call_argument_unknown_name"
+      ],
+      "columns": [
+        {
+          "name": "pick",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "later_candidate_type_failure",
+    "sql": "SELECT pick(b=>TRUE)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "pick",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "different_binding_failures",
+    "sql": "SELECT pick(1,a=>2)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "pick",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "all_candidates_require_input",
+    "sql": "SELECT collide(b=>1)",
+    "expected": {
+      "diagnostics": [
+        "call_argument_missing_required"
+      ],
+      "columns": [
+        {
+          "name": "collide",
+          "nullability": "unknown"
         }
       ]
     }

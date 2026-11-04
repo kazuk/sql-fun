@@ -507,7 +507,10 @@ impl FuncCallExpr {
         if !invalid && let Some(candidates) = &candidates {
             let types = ArgumentBindingCollection::from_expr_list(arguments)
                 .with_explicit_variadic(explicit_variadic);
-            if !arguments.iter().any(SemScalarExpr::requires_argument_type) {
+            if let Some(problem) = candidates.binding_problem(&types) {
+                context.report_analysis_problem(AnalysisProblem::call_argument(problem))?;
+                invalid = true;
+            } else if !arguments.iter().any(SemScalarExpr::requires_argument_type) {
                 if let Some(overload) = candidates.resolve_from_catalog(context, &types) {
                     let bound = Self::cast_call_operands(
                         context,

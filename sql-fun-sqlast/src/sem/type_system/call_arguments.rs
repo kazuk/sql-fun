@@ -83,9 +83,12 @@ impl OverloadVariant {
             };
             let index = if let Some(name) = name {
                 named_seen = true;
-                inputs
-                    .iter()
-                    .position(|parameter| parameter.name().map(String::as_str) == Some(name))
+                Some(
+                    inputs
+                        .iter()
+                        .position(|parameter| parameter.name().map(String::as_str) == Some(name))
+                        .ok_or_else(|| TypeError::UnknownArgumentName(name.to_owned()))?,
+                )
             } else if named_seen {
                 None
             } else {
@@ -94,7 +97,12 @@ impl OverloadVariant {
             let Some(index) = index.filter(|index| *index < inputs.len()) else {
                 return Err(TypeError::too_many_arguments());
             };
-            if used[index] || (inputs[index].is_variadic() && !arguments.explicit_variadic) {
+            if used[index] {
+                return Err(TypeError::ArgumentAssignedTwice(
+                    inputs[index].name().cloned().unwrap_or_default(),
+                ));
+            }
+            if inputs[index].is_variadic() && !arguments.explicit_variadic {
                 return Err(TypeError::too_many_arguments());
             }
             used[index] = true;

@@ -2045,7 +2045,7 @@
               ]
             },
             "CallArgumentProblem": {
-              "description": "Invocation-shape violations decidable without a function signature.",
+              "description": "Invocation syntax and candidate-set argument binding failures.",
               "oneOf": [
                 {
                   "description": "A supplied argument name occurs more than once.",
@@ -2074,6 +2074,48 @@
                   },
                   "required": [
                     "DuplicateName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No candidate recognizes the supplied argument name.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UnknownName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Every candidate requires this omitted input.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRequired": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingRequired"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Every candidate assigns this formal both positionally and by name.",
+                  "type": "object",
+                  "properties": {
+                    "AssignedTwice": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AssignedTwice"
                   ],
                   "additionalProperties": false
                 },
@@ -6316,7 +6358,7 @@
               ]
             },
             "CallArgumentProblem": {
-              "description": "Invocation-shape violations decidable without a function signature.",
+              "description": "Invocation syntax and candidate-set argument binding failures.",
               "oneOf": [
                 {
                   "description": "A supplied argument name occurs more than once.",
@@ -6345,6 +6387,48 @@
                   },
                   "required": [
                     "DuplicateName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "No candidate recognizes the supplied argument name.",
+                  "type": "object",
+                  "properties": {
+                    "UnknownName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "UnknownName"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Every candidate requires this omitted input.",
+                  "type": "object",
+                  "properties": {
+                    "MissingRequired": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "MissingRequired"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Every candidate assigns this formal both positionally and by name.",
+                  "type": "object",
+                  "properties": {
+                    "AssignedTwice": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "AssignedTwice"
                   ],
                   "additionalProperties": false
                 },

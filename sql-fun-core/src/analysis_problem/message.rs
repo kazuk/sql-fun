@@ -48,6 +48,18 @@ impl DiagnosticMessage for MinMaxProblem {
 impl DiagnosticMessage for CallArgumentProblem {
     fn diagnostic_message(&self) -> String {
         match self {
+            Self::UnknownName(name) => {
+                format!("no function candidate recognizes argument name \"{name}\"")
+            }
+            Self::MissingRequired(Some(name)) => {
+                format!("required argument \"{name}\" was not supplied")
+            }
+            Self::MissingRequired(None) => {
+                "a required unnamed argument was not supplied".to_owned()
+            }
+            Self::AssignedTwice(name) => {
+                format!("argument \"{name}\" was assigned both positionally and by name")
+            }
             Self::DuplicateName(name, _) => format!("argument name \"{name}\" used more than once"),
             Self::PositionalAfterNamed(position, _) => format!(
                 "positional argument at call position {position} cannot follow named argument"

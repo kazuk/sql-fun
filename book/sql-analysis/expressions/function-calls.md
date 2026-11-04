@@ -117,6 +117,10 @@ function name.
 applicable function signature.
 - [function_arg_implicit_cast_not_found]: a selected formal argument requires an
 unavailable implicit conversion.
+- [call_argument_unknown_name]: no candidate recognizes a supplied name.
+- [call_argument_missing_required]: all candidates require the same omitted input.
+- [call_argument_assigned_twice]: all candidates assign the same formal both
+  positionally and by name.
 - [call_argument_duplicate_name]: a named argument is supplied more than once.
 - [call_argument_positional_after_named]: a positional argument follows a named
   argument.
@@ -129,3 +133,7 @@ unavailable implicit conversion.
 
 [Parameter diagnostics](parameters.md#diagnostics) also apply to deferred calls.
 Clause pages document diagnostics from FILTER/ordering/window expressions.
+
+[call_argument_unknown_name]: ../../diagnostics/call_argument_unknown_name.md
+[call_argument_missing_required]: ../../diagnostics/call_argument_missing_required.md
+[call_argument_assigned_twice]: ../../diagnostics/call_argument_assigned_twice.md

@@ -2,6 +2,7 @@
 
 mod call;
 mod common_type;
+mod environment;
 mod memo;
 mod structural;
 

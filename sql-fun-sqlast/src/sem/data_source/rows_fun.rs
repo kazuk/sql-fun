@@ -343,7 +343,7 @@ mod test_expression_sources {
     #[rstest::rstest]
     #[case::plain("1", false)]
     #[case::nested_set("set507(1)", true)]
-    fn deferred_placement_retains_uncertainty_and_known_violations(
+    fn named_placement_resolves_signature_and_retains_known_violations(
         #[case] argument: &str,
         #[case] invalid: bool,
     ) {
@@ -355,7 +355,7 @@ mod test_expression_sources {
         .unwrap();
         let source = rows_from::source(&query, "r");
         let element = &source.functions()[0];
-        assert!(element.has_pending_placement());
+        assert!(!element.has_pending_placement());
         assert_eq!(element.has_invalid_expression(), invalid);
         assert_eq!(context.reported_problem_count(), usize::from(invalid));
         let restored: DataSourceRowFunctions =

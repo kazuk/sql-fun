@@ -22,6 +22,12 @@ pub enum ParameterBindResult {
 }
 
 impl ParameterBindResult {
+    pub(crate) fn supplied_variadic(parameter: &FunctionParam, ty: Option<&TypeReference>) -> Self {
+        Self::VariadicParam(vec![ty.cloned()].into(), parameter.clone())
+    }
+    pub(crate) fn supplied(ty: Option<&TypeReference>, parameter: &FunctionParam) -> Self {
+        Self::One(ty.cloned(), parameter.clone())
+    }
     pub fn one_in(param: &FunctionParamIn, arg: Option<&TypeReference>) -> Self {
         Self::One(arg.cloned(), FunctionParam::from(param))
     }
@@ -186,9 +192,8 @@ impl ParameterBindResult {
 
     fn call_argument_type(&self) -> Option<TypeReference> {
         match self {
-            Self::One(_, parameter) | Self::VariadicParam(_, parameter) => {
-                parameter.call_argument_type()
-            }
+            Self::One(_, parameter) => parameter.get_type().cloned(),
+            Self::VariadicParam(_, parameter) => parameter.call_argument_type(),
             Self::NoInputParam(_) => None,
         }
     }

@@ -30,7 +30,7 @@ impl NamedArgExpr {
         &self.name
     }
     /// Analyzed argument value, without signature-derived casts or defaults.
-    pub fn value(&self) -> &SemScalarExpr {
+    pub const fn value(&self) -> &SemScalarExpr {
         &self.value
     }
     /// Source span of the supplied name, when provided by the parser.

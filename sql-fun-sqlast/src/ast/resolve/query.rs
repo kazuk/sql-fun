@@ -961,10 +961,10 @@ impl Call {
         let alias = alias
             .map(Alias::resolve)
             .unwrap_or_else(|| AliasSpec::from_local_name(&name.local_name()));
-        if self.defers_function_signature() {
+        if self.uses_supplied_binding() {
             let mut call = self.resolve_supplied_call(context, &arguments)?;
             call.set_modifiers(self.resolve_modifiers(context, scope)?);
-            let mut source = DataSource::deferred_table_function(&call, &alias);
+            let mut source = DataSource::deferred_table_function(context, &call, &alias);
             source.validate_table_function(context, invalid_arguments)?;
             return Ok(source);
         }

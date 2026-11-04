@@ -50,9 +50,6 @@ impl ColumnReference for TableFunctionColumnRef {
 }
 
 impl TableFunctionColumnRef {
-    pub(super) const fn constraint_binding(&self) -> (&str, &ColumnName) {
-        (self.alias.as_str(), &self.column)
-    }
     /// Declaration-local modifiers retained from the table invocation.
     pub const fn type_declaration(&self) -> Option<&WithTypmod<TypeReference>> {
         self.type_declaration.as_ref()

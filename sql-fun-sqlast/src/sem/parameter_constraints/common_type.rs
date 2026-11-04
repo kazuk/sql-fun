@@ -1,9 +1,9 @@
 //! Owned common-type facts and relationships for initially unrestricted inputs.
 //! These are inference data, not a second catalog or analysis environment.
 
-use crate::sem::parameter_constraints::environment::InferenceEnvironment;
 use crate::{
-    context::CastInfoRead,
+    ast::Dialect,
+    context::{CastInfoRead, FrozenBaseContext, SchemaFileContext},
     sem::{
         MinMaxExpr, ParseContext, PgBuiltInType, TypeReference,
         parameter_constraints::{
@@ -25,23 +25,51 @@ struct TypeFacts {
     ordered: Option<bool>,
 }
 
+/// Original catalog and explicit configuration for post-analysis inspection.
+/// The frozen base is shared; only the current catalog layer is copied.
+#[derive(Debug)]
+struct CommonTypeEnvironment {
+    catalog: FrozenBaseContext,
+    args: sql_fun_core::SqlFunArgs,
+    metadata: sql_fun_core::SqlFunMetadata,
+}
+
+impl CommonTypeEnvironment {
+    fn new(context: &impl ParseContext) -> Self {
+        Self {
+            catalog: context.retain_catalog(),
+            args: context.get_args().clone(),
+            metadata: context.metadata().clone(),
+        }
+    }
+
+    fn context(&self) -> SchemaFileContext {
+        SchemaFileContext::new(
+            std::path::Path::new("<assignment>"),
+            &self.catalog,
+            &self.args,
+            &self.metadata,
+        )
+    }
+}
+
 /// Query-owned semantic facts, prepared only for encountered types.
 #[derive(Clone, Debug)]
 pub(super) struct CommonTypeFacts {
     types: HashMap<TypeReference, TypeFacts>,
-    environment: Arc<InferenceEnvironment>,
+    environment: Arc<CommonTypeEnvironment>,
 }
 
 impl CommonTypeFacts {
     pub(super) fn prepare(context: &impl ParseContext) -> Self {
         Self {
             types: HashMap::new(),
-            environment: Arc::new(InferenceEnvironment::new(context)),
+            environment: Arc::new(CommonTypeEnvironment::new(context)),
         }
     }
 
     fn permits_defaults(&self) -> bool {
-        self.environment.postgres_defaults()
+        Dialect::from(&self.environment.metadata) == Dialect::postgres()
     }
 
     pub(super) fn retain(&mut self, context: &impl ParseContext, ty: &TypeReference) {

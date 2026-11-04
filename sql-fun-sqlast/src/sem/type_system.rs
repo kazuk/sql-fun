@@ -1,4 +1,3 @@
-mod call_arguments;
 mod err;
 mod func_params;
 mod function_overload_collection;
@@ -33,47 +32,29 @@ use crate::{
 use self::func_params::ParameterBindResult;
 
 #[derive(Clone, Debug, Default)]
-pub struct ArgumentBindingCollection {
-    types: VecDeque<Option<TypeReference>>,
-    names: VecDeque<Option<String>>,
-    explicit_variadic: bool,
-}
+pub struct ArgumentBindingCollection(VecDeque<Option<TypeReference>>);
 
 impl ArgumentBindingCollection {
     pub(crate) fn types(&self) -> impl Iterator<Item = Option<&TypeReference>> {
-        self.types.iter().map(Option::as_ref)
+        self.0.iter().map(Option::as_ref)
     }
 
     pub fn from_expr_list(expr_list: &[SemScalarExpr]) -> Self {
-        Self {
-            types: expr_list
+        Self(
+            expr_list
                 .iter()
                 .map(ScalarExprSemScalarExpr::get_type)
                 .collect(),
-            names: expr_list
-                .iter()
-                .map(|expression| {
-                    expression
-                        .as_named_argument()
-                        .map(|named| named.name().to_owned())
-                })
-                .collect(),
-            explicit_variadic: false,
-        }
+        )
     }
 
     #[allow(clippy::option_option)]
     pub fn pop_front(&mut self) -> Option<Option<TypeReference>> {
-        let ty = self.types.pop_front();
-        if ty.is_some() {
-            self.names.pop_front();
-        }
-        ty
+        self.0.pop_front()
     }
 
     pub fn push(&mut self, arg_type: Option<TypeReference>) {
-        self.types.push_back(arg_type);
-        self.names.push_back(None);
+        self.0.push_back(arg_type);
     }
 }
 
@@ -207,14 +188,6 @@ impl OverloadVariant {
             return false;
         };
         definition.row_table_name(context).is_some()
-    }
-
-    pub(crate) fn has_scalar_table_output(&self, context: &impl ParseContext) -> bool {
-        self.returning_table().is_empty()
-            && self
-                .ret_type()
-                .as_ref()
-                .is_some_and(|ty| !ty.is_record() && ty.row_columns(context).is_none())
     }
 
     pub(crate) fn table_function_output_columns(
@@ -380,9 +353,6 @@ impl OverloadVariant {
         &self,
         mut arg_types: ArgumentBindingCollection,
     ) -> Result<Vec<ParameterBindResult>, TypeError> {
-        if arg_types.has_call_notation() {
-            return self.bind_supplied(&arg_types);
-        }
         let mut results = Vec::new();
         for param in &self.params {
             results.push(param.bind_arg(&mut arg_types)?);

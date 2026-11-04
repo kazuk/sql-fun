@@ -128,25 +128,6 @@ impl FunctionParam {
         }
     }
 
-    pub(crate) fn name(&self) -> Option<&String> {
-        match self {
-            Self::In(p) => p.name(),
-            Self::Out(p) => p.name(),
-            Self::InOut(p) => p.name(),
-            Self::Variadic(p) => p.name(),
-            Self::Table(p) => p.name(),
-        }
-    }
-    pub(crate) fn default_expression(&self) -> Option<&SemScalarExpr> {
-        match self {
-            Self::In(p) => p.default_expr(),
-            Self::Out(p) => p.default_expr(),
-            Self::InOut(p) => p.default_expr(),
-            Self::Variadic(p) => p.default_expr(),
-            Self::Table(p) => p.default_expr(),
-        }
-    }
-
     pub(crate) const fn is_variadic(&self) -> bool {
         matches!(self, Self::Variadic(_))
     }

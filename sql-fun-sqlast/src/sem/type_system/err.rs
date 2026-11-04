@@ -46,10 +46,6 @@ impl TypeError {
         Self::SimpleInferAmbiguous(types.iter().cloned().collect())
     }
 
-    pub(crate) fn binding_failed(parameter: &FunctionParam) -> Self {
-        Self::BindFailed(Box::new(parameter.clone()))
-    }
-
     pub(crate) const fn too_many_arguments() -> Self {
         Self::TooManyArguments
     }

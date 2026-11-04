@@ -1,8 +1,8 @@
 use crate::{
     context::{BaseParseContext, ParseContext},
-    names::{ColumnName, FullName, TableName},
+    names::{FullName, TableName},
     sem::{
-        ColumnCollection, OverloadVariant, TypeReference,
+        OverloadVariant, SemScalarExpr, TypeReference,
         overload_rank::OverloadRank,
         parameter_resolution::Signature,
         type_system::{
@@ -216,7 +216,7 @@ impl FunctionOverloadCollection {
         bindings: &[ParameterBindResult],
         arguments: &ArgumentBindingCollection,
     ) -> bool {
-        if !overload.is_variadic() || arguments.explicit_variadic() {
+        if !overload.is_variadic() {
             return false;
         }
         let Some(inputs) = ParameterBindResult::constraint_inputs(bindings) else {
@@ -263,9 +263,6 @@ impl FunctionOverloadCollection {
 
         'overload: for overload in &self.overloads {
             let mut overload = overload.clone();
-            if !arg_types.valid_explicit_arrays(context, &overload) {
-                continue;
-            }
             let Ok(bind_result) = overload.bind_args(arg_types.clone()) else {
                 continue 'overload;
             };
@@ -309,18 +306,19 @@ impl FunctionOverloadCollection {
 mod tests;
 
 impl FunctionOverloadCollection {
-    pub(crate) fn call_signatures(
+    pub(crate) fn parameter_signatures(
         &self,
         catalog: &impl BaseParseContext,
-        arguments: &ArgumentBindingCollection,
+        arguments: &[SemScalarExpr],
     ) -> Vec<Signature> {
+        let arguments = ArgumentBindingCollection::from_expr_list(arguments);
         let mut signatures = Vec::new();
         for overload in &self.overloads {
             let mut overload = overload.clone();
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {
                 continue;
             };
-            if self.shadows_expanded_variadic(&overload, &bindings, arguments) {
+            if self.shadows_expanded_variadic(&overload, &bindings, &arguments) {
                 continue;
             }
             let declared_bindings = bindings;
@@ -332,16 +330,8 @@ impl FunctionOverloadCollection {
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {
                 continue;
             };
-            if let Some(signature) = overload.parameter_signature(
-                &bindings,
-                &declared_bindings,
-                arguments.has_call_notation(),
-            ) {
-                signatures.push(if arguments.has_call_notation() {
-                    signature.with_simple_identity()
-                } else {
-                    signature
-                });
+            if let Some(signature) = overload.parameter_signature(&bindings, &declared_bindings) {
+                signatures.push(signature);
             }
         }
         signatures
@@ -353,78 +343,14 @@ impl OverloadVariant {
         &self,
         bindings: &[ParameterBindResult],
         declarations: &[ParameterBindResult],
-        allow_template: bool,
     ) -> Option<Signature> {
         let inputs = ParameterBindResult::constraint_inputs(bindings)?;
         let declared_inputs = ParameterBindResult::constraint_inputs(declarations)?;
-        let signature = Signature::new_function(
+        Signature::new_function(
             &inputs,
             &declared_inputs,
             &ParameterBindResult::unrestricted_inputs(bindings),
             self.ret_type.as_ref()?,
-        );
-        if signature.is_some() {
-            signature
-        } else if allow_template {
-            Signature::simple_function_template(&inputs, &declared_inputs, self.ret_type.as_ref()?)
-        } else {
-            None
-        }
-    }
-}
-
-impl FunctionOverloadCollection {
-    pub(crate) fn column_signatures(
-        &self,
-        context: &impl ParseContext,
-        arguments: &ArgumentBindingCollection,
-        scalar_name: &ColumnName,
-        column: &ColumnName,
-    ) -> Vec<Signature> {
-        let overloads: Vec<_> = self
-            .overloads
-            .iter()
-            .filter_map(|overload| {
-                let columns = overload.table_function_output_columns(context, scalar_name);
-                let ty = columns.get_column_def(column)?.get_type_cloned()?;
-                let mut projection = overload.clone();
-                projection.ret_type = Some(ty);
-                Some(projection)
-            })
-            .collect();
-        Self::new(&overloads).call_signatures(context, arguments)
-    }
-
-    pub(crate) fn common_table_output(
-        &self,
-        context: &impl ParseContext,
-        name: &ColumnName,
-    ) -> Option<ColumnCollection> {
-        ColumnCollection::common_function_shape(
-            &self
-                .overloads
-                .iter()
-                .map(|overload| overload.table_function_output_columns(context, name))
-                .collect::<Vec<_>>(),
         )
-    }
-}
-
-impl FunctionOverloadCollection {
-    pub(crate) fn explicit_array_positions(
-        &self,
-        arguments: &ArgumentBindingCollection,
-    ) -> Vec<usize> {
-        let mut intersection: Option<Vec<usize>> = None;
-        for overload in &self.overloads {
-            if let Some(positions) = arguments.explicit_array_positions(overload) {
-                if let Some(previous) = &mut intersection {
-                    previous.retain(|position| positions.contains(position));
-                } else {
-                    intersection = Some(positions);
-                }
-            }
-        }
-        intersection.unwrap_or_default()
     }
 }

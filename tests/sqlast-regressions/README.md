@@ -31,7 +31,7 @@ in half into `medium` and `light` (the extra group goes to medium for odd sizes)
 For inventories smaller than ten, every group is heavy. Duration ties are
 resolved by group name. Each tier is name-sorted: changes in timing order inside
 a tier produce no Git diff. Timings, timestamps and numeric ranks are not stored
-in the committed file. The current 164 groups are split 10/77/77.
+in the committed file. The current 162 groups are split 10/76/76.
 
 CI's archived execution phases validate that the committed tiers exactly cover
 the manifest, without duplicates or unknown groups, and have canonical ordering

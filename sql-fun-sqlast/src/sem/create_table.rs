@@ -43,37 +43,6 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
-    pub(crate) fn common_function_shape(outputs: &[Self]) -> Option<Self> {
-        let first = outputs.first()?;
-        if outputs.iter().any(|output| output.names() != first.names()) {
-            return None;
-        }
-        Some(Self(
-            first
-                .0
-                .iter()
-                .enumerate()
-                .map(|(index, column)| {
-                    let ty = column.get_type().filter(|ty| {
-                        !ty.is_simple_infer_arg()
-                            && !ty.is_common_infer_arg()
-                            && outputs
-                                .iter()
-                                .all(|output| output.0[index].get_type() == Some(*ty))
-                    });
-                    ColumnDefinition::new(column.name(), ty, column.is_not_null(), &[])
-                })
-                .collect(),
-        ))
-    }
-
-    pub(crate) fn refresh_function_output(&mut self, columns: &Self) {
-        // Ordinality belongs to the invocation and follows the function's fields.
-        let trailing = self.0.get(columns.0.len()..).unwrap_or_default().to_vec();
-        *self = columns.clone();
-        self.0.extend(trailing);
-    }
-
     pub(crate) fn fmt_type_shape(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "row(")?;
         for (index, column) in self.0.iter().enumerate() {

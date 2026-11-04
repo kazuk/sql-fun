@@ -1018,7 +1018,7 @@
             "local_name": "int4",
             "is_array": false
           },
-          "nullability": "nullable"
+          "nullability": "unknown"
         }
       ]
     }
@@ -1038,7 +1038,7 @@
             "local_name": "int8",
             "is_array": false
           },
-          "nullability": "nullable"
+          "nullability": "unknown"
         }
       ]
     }

@@ -6,6 +6,20 @@ Supported schema changes update the analysis catalog for later statements in
 explicitly selected schema files; they do not execute database migrations. See
 the [shared schema-definition policy](../statements.md).
 
+### Adding table CHECK constraints
+
+`ADD [CONSTRAINT name] CHECK (condition)` retains the analyzed expression and
+its target-column bindings. Multiple unnamed checks remain distinct. NO INHERIT
+and NOT VALID are retained; NOT VALID describes omitted validation of existing
+rows, not permission to accept an invalid expression. Analysis does not inspect
+live rows. CHECK is not deferrable. PostgreSQL 18 NOT ENFORCED and constraint
+state transitions remain [#887](https://github.com/kazuk/sql-fun/issues/887).
+
+An invalid CHECK leaves the entire ALTER statement unapplied. Column and table
+renames update retained CHECK bindings. See [table CHECK rules](create-table.md#table-check-constraints)
+for expression restrictions and NULL behavior. SQLite has no ADD CONSTRAINT
+counterpart.
+
 ### Column attributes
 
 Schema analysis supports these operations on ordinary table columns:
@@ -126,6 +140,8 @@ analysis](create-type.md#dialect-and-engine-specific-behavior).
 
 ## Diagnostics
 
+- [check_constraint](../../diagnostics/check_constraint.md): an added CHECK
+  expression, option or explicit constraint name is invalid.
 - [relation_not_found](../../diagnostics/relation_not_found.md): a required
   table target cannot be resolved.
 - [column_not_found_in_table](../../diagnostics/column_not_found_in_table.md): a

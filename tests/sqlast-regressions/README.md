@@ -433,3 +433,12 @@ all six spellings and conflicting attributes; ordinary type lookup/casts do
 not gain serial aliases. Rust tests retain the generated nextval binding,
 sequence identity/table dependency, frozen layers and rejected/skipped creation
 atomicity. Column-level sequence ownership remains tracked by #545.
+
+Issue #525 adds `table-checks.json` with the explicitly selected
+`table-checks.sql` schema for PostgreSQL 17/18 through source and installed
+verification. Cases cover late/cross-column bindings, names, NULL/boolean
+coercion, domains, prohibited expression forms and ALTER options/diagnostics.
+Rust schema-chain tests inspect retained expressions and applicability,
+multiple unnamed checks, atomic rejection, frozen layers and rename propagation;
+feature-enabled SQLite tests compare its truth-value acceptance with the embedded
+oracle. PostgreSQL 18 NOT ENFORCED remains #887.

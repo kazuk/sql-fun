@@ -191,6 +191,9 @@ impl CaseExpr {
     ) -> Result<(), AnalysisError> {
         optional(&mut self.arg_expr, visitor)?;
         for arm in &mut self.when_exprs {
+            if self.arg_expr.is_none() {
+                visitor.boolean_input(&mut arm.when_value)?;
+            }
             arm.walk(visitor)?;
         }
         optional(&mut self.default_expr, visitor)?;
@@ -214,6 +217,7 @@ impl CaseWhen {
         self.when_value.walk(visitor)?;
         self.result.walk(visitor)?;
         if let Some(comparison) = &mut self.comparison {
+            visitor.boolean_input(comparison)?;
             comparison.walk(visitor)?;
         }
         Ok(())

@@ -153,10 +153,14 @@ impl BooleanExprBody {
         match self {
             Self::And(values) | Self::Or(values) => {
                 for value in values {
+                    visitor.boolean_input(value)?;
                     value.walk(visitor)?;
                 }
             }
-            Self::Not(value) => value.walk(visitor)?,
+            Self::Not(value) => {
+                visitor.boolean_input(value)?;
+                value.walk(visitor)?;
+            }
         }
         Ok(())
     }

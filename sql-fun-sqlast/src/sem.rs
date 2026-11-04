@@ -113,7 +113,7 @@ pub use self::{
         CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
         OperatorClassDefinition, OperatorFamilyIdentity,
     },
-    constraint::{AnalyzeConstraint, Constraint, PrimaryKeyConstraint},
+    constraint::{AnalyzeConstraint, CheckConstraint, Constraint, PrimaryKeyConstraint},
     create_comp_type::{CompositeFieldCollection, CreateCompositeType},
     create_domain::CreateDomain,
     create_enum_type::CreateEnum,

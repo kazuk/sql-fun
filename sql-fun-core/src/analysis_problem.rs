@@ -2,6 +2,7 @@
 mod alter_column;
 mod array;
 mod call_argument;
+mod check;
 mod collate;
 mod creation;
 mod delete;
@@ -31,6 +32,7 @@ pub use self::{
     alter_column::{AlterColumnProblem, ColumnAttributeProblem},
     array::ArrayProblem,
     call_argument::CallArgumentProblem,
+    check::CheckProblem,
     collate::CollateProblem,
     creation::CreationProblem,
     delete::{CursorNameProblem, CursorTargetMismatchProblem, DeleteProblem, DeleteProblemKind},
@@ -74,6 +76,8 @@ pub trait DiagnosticMessage {
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// An invalid CHECK constraint definition.
+    Check(CheckProblem),
     /// An invalid serial column declaration.
     Serial(SerialProblem),
     /// Syntax is unavailable on the explicitly selected engine version.
@@ -500,6 +504,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.code(),
             Self::Array(problem) => problem.code(),
             Self::TruthTest(problem) => problem.code(),
+            Self::Check(_) => CheckProblem::CODE,
             Self::Collate(problem) => problem.code(),
             Self::TableSample(problem) => problem.code(),
             Self::Distinct(problem) => problem.code(),
@@ -579,6 +584,7 @@ impl AnalysisProblem {
             Self::MinMax(problem) => problem.render_metadata(),
             Self::Array(problem) => problem.render_metadata(),
             Self::TruthTest(problem) => problem.render_metadata(),
+            Self::Check(problem) => problem.render_metadata(),
             Self::Collate(problem) => problem.render_metadata(),
             Self::TableSample(problem) => problem.render_metadata(),
             Self::Distinct(problem) => problem.render_metadata(),
@@ -610,6 +616,7 @@ impl DiagnosticMessage for AnalysisProblem {
             Self::QueryAnalysis(problem) => problem.diagnostic_message(),
             Self::Array(problem) => problem.diagnostic_message(),
             Self::TruthTest(problem) => problem.diagnostic_message(),
+            Self::Check(problem) => problem.diagnostic_message(),
             Self::Collate(problem) => problem.diagnostic_message(),
             Self::TableSample(problem) => problem.diagnostic_message(),
             Self::Distinct(problem) => problem.diagnostic_message(),

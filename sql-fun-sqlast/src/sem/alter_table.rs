@@ -110,6 +110,31 @@ impl AlterTable {
                 .all(AlterObjSubCommand::can_apply_column_attributes);
         statement
     }
+    pub(crate) fn validate_check_names(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        let mut names = std::collections::HashSet::new();
+        let mut duplicates = std::collections::HashSet::new();
+        for command in &self.commands {
+            if let Some(constraint) = command.added_constraint() {
+                let name = constraint.name();
+                if !name.is_empty() && !names.insert(name.to_owned()) {
+                    duplicates.insert(name.to_owned());
+                }
+            }
+        }
+        for command in &mut self.commands {
+            if let AlterObjSubCommand::AddConstraint(Constraint::Check(check)) = command
+                && duplicates.remove(check.name())
+            {
+                check.reject_duplicate_name(context)?;
+                self.applicable = false;
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn conflicting_constraint(&self, table: &CreateTable) -> Option<String> {
         let mut names = Vec::new();
         for command in &self.commands {
@@ -397,6 +422,9 @@ pub enum AlterObjSubCommand {
 impl AlterObjSubCommand {
     fn declaration_can_apply(&self) -> bool {
         match self {
+            Self::AddConstraint(constraint) => {
+                constraint.as_check().is_none_or(|check| check.can_apply())
+            }
             Self::RenameColumn(rename) => rename.can_apply(),
             Self::AddColumn(column) | Self::AlterColumn(_, column) => {
                 column.declaration_can_apply()

@@ -11,8 +11,8 @@ use crate::syn::sqlite::DropTableStatement;
 use crate::{
     ast::{Dialect, Table},
     sem::{
-        ColumnAttributeAction, ColumnRename, CreateIndex, CreateSequence, ForeignKeyConstraint,
-        IndirectionExpr, SemScalarExpr, TypeReference,
+        CheckConstraint, ColumnAttributeAction, ColumnRename, CreateIndex, CreateSequence,
+        ForeignKeyConstraint, IndirectionExpr, SemScalarExpr, TypeReference,
         traversal::{RelationRenamer, SemanticVisitorMut},
     },
     syn::{CreateStmt, DropStmt},
@@ -394,7 +394,7 @@ impl CreateTable {
             column.rename_column_dependencies(rename, owned)?;
         }
         for constraint in self.constraints.values_mut() {
-            constraint.rename_column(rename, owned);
+            constraint.rename_column(rename, owned)?;
         }
         Ok(())
     }
@@ -448,8 +448,12 @@ impl CreateTable {
         old: &TableName,
         new: &TableName,
     ) -> Result<(), AnalysisError> {
-        self.columns
-            .rename_expressions(&mut RelationRenamer::new(old, new))
+        let mut visitor = RelationRenamer::new(old, new);
+        self.columns.rename_expressions(&mut visitor)?;
+        for constraint in self.constraints.values_mut() {
+            constraint.walk_check(&mut visitor)?;
+        }
+        Ok(())
     }
 
     /// Applied ALTER statements in source order, retaining their original bindings and spans.
@@ -647,9 +651,7 @@ impl CreateTable {
                 }
                 AlterObjSubCommand::DropColumnDefault(_) => todo!(),
                 AlterObjSubCommand::AddConstraint(constraint) => {
-                    self.constraints
-                        .insert(constraint.name().to_string(), constraint.clone());
-                    implicit_changes.extend(constraint.implicit_changes()?);
+                    implicit_changes.extend(self.apply_added_constraint(constraint)?);
                 }
                 AlterObjSubCommand::ClusterOn(index_name) => {
                     self.cluster_on = Some(index_name.clone())
@@ -685,6 +687,19 @@ impl CreateTable {
         }
     }
 
+    fn apply_added_constraint(
+        &mut self,
+        constraint: &Constraint,
+    ) -> Result<Vec<ImplicitChange>, AnalysisError> {
+        if constraint.as_check().is_some() {
+            self.record_declared_constraint(constraint)?;
+        } else {
+            self.constraints
+                .insert(constraint.name().to_owned(), constraint.clone());
+        }
+        constraint.implicit_changes()
+    }
+
     pub(crate) fn record_declared_constraint(
         &mut self,
         constraint: &Constraint,
@@ -696,6 +711,15 @@ impl CreateTable {
         } else {
             constraint.name().to_owned()
         };
+        let key = if self.constraints.contains_key(&key)
+            && constraint
+                .as_check()
+                .is_some_and(|check| !check.can_apply())
+        {
+            format!("<rejected-check:{}>", self.constraints.len())
+        } else {
+            key
+        };
         if self.constraints.contains_key(&key) {
             return Err(AnalysisError::unexpected_input_error(
                 "duplicate constraint name",
@@ -703,6 +727,11 @@ impl CreateTable {
         }
         self.constraints.insert(key, constraint.clone());
         Ok(())
+    }
+
+    /// Inspect analyzed table CHECK constraints, including unnamed and rejected definitions.
+    pub fn checks(&self) -> impl Iterator<Item = &CheckConstraint> {
+        self.constraints.values().filter_map(Constraint::as_check)
     }
 
     /// Inspect retained table-level foreign keys, including unnamed declarations.

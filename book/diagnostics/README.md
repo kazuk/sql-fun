@@ -72,6 +72,7 @@ repository do not establish corresponding `.md` URLs on the documentation site.
 - [call_argument_duplicate_name](call_argument_duplicate_name.md)
 - [call_argument_positional_after_named](call_argument_positional_after_named.md)
 - [coalesce_expr_type_unknown](coalesce_expr_type_unknown.md)
+- [check_constraint](check_constraint.md)
 - [collate_capability_undefined](collate_capability_undefined.md)
 - [collate_operand_type](collate_operand_type.md)
 - [collation_name_ambiguous](collation_name_ambiguous.md)

@@ -146,6 +146,11 @@ pub(crate) trait SemanticVisitorMut {
     ) -> Result<(), AnalysisError> {
         Ok(())
     }
+    /// An operand used as a SQL boolean, independently of its surrounding result.
+    fn boolean_input(&mut self, _value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+
     // Placement validators inspect written operands, not definitions behind bindings.
     fn walk_source_column_values(&self) -> bool {
         true

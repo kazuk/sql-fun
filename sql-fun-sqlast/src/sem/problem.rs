@@ -1,13 +1,13 @@
 //! SQL analysis diagnostic adapters.
 
 pub use ::sql_fun_core::analysis_problem::{
-    AlterColumnProblem, AnalysisProblem, ArrayProblem, CallArgumentProblem, CollateProblem,
-    ColumnAttributeProblem, CreationProblem, DeleteProblem, DeleteProblemKind, DistinctProblem,
-    DomainBaseTypeNameNotFound, FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem,
-    InsertProblemKind, MembershipProblem, MinMaxProblem, NameResolution, OverloadResolution,
-    OwnershipProblem, ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem,
-    TableFunctionProblem, TableSampleProblem, TriggerProblem, TruthTestProblem, UpdateProblem,
-    UpdateProblemKind, ViewProblem,
+    AlterColumnProblem, AnalysisProblem, ArrayProblem, CallArgumentProblem, CheckProblem,
+    CollateProblem, ColumnAttributeProblem, CreationProblem, DeleteProblem, DeleteProblemKind,
+    DistinctProblem, DomainBaseTypeNameNotFound, FunctionNotFound, IndexProblem, IndexProblemKind,
+    InsertProblem, InsertProblemKind, MembershipProblem, MinMaxProblem, NameResolution,
+    OverloadResolution, OwnershipProblem, ParameterConstraintProblem, QueryProblem,
+    RuleDefinitionProblem, RuleProblem, TableFunctionProblem, TableSampleProblem, TriggerProblem,
+    TruthTestProblem, UpdateProblem, UpdateProblemKind, ViewProblem,
 };
 
 use crate::{

@@ -442,6 +442,15 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) fn check_references_resolved(&self) -> bool {
+        self.grouping_references_resolved()
+            && match self {
+                Self::ColumnRef(_) => self.get_column_def().is_some(),
+                Self::WholeRow(value) => value.failure_code().is_none(),
+                _ => self.get_type().is_some() || self.as_const().is_some(),
+            }
+    }
+
     pub(super) fn grouping_references_resolved(&self) -> bool {
         match self {
             Self::ColumnRef(value) => value.grouping_reference_resolved(),

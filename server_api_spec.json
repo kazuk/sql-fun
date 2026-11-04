@@ -470,6 +470,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "An invalid CHECK constraint definition.",
+                  "type": "object",
+                  "properties": {
+                    "Check": {
+                      "$ref": "#/$defs/CheckProblem"
+                    }
+                  },
+                  "required": [
+                    "Check"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An invalid serial column declaration.",
                   "type": "object",
                   "properties": {
@@ -1228,6 +1241,57 @@
                   },
                   "required": [
                     "ParameterTypeMismatchForTableFunction"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CheckProblem": {
+              "description": "A CHECK definition that cannot be applied to the analysis catalog.",
+              "oneOf": [
+                {
+                  "description": "The expression cannot be coerced to boolean.",
+                  "type": "string",
+                  "const": "BooleanType"
+                },
+                {
+                  "description": "An unknown string is not valid boolean input.",
+                  "type": "object",
+                  "properties": {
+                    "BooleanLiteral": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "BooleanLiteral"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "CHECK cannot contain a subquery, aggregate, window or set-returning expression.",
+                  "type": "string",
+                  "const": "ExpressionPlacement"
+                },
+                {
+                  "description": "CHECK cannot contain a bind parameter.",
+                  "type": "string",
+                  "const": "Parameter"
+                },
+                {
+                  "description": "CHECK constraints cannot be deferred.",
+                  "type": "string",
+                  "const": "Deferrability"
+                },
+                {
+                  "description": "An explicit constraint name is already used on this table.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateName"
                   ],
                   "additionalProperties": false
                 }
@@ -4783,6 +4847,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "An invalid CHECK constraint definition.",
+                  "type": "object",
+                  "properties": {
+                    "Check": {
+                      "$ref": "#/$defs/CheckProblem"
+                    }
+                  },
+                  "required": [
+                    "Check"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "An invalid serial column declaration.",
                   "type": "object",
                   "properties": {
@@ -5541,6 +5618,57 @@
                   },
                   "required": [
                     "ParameterTypeMismatchForTableFunction"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "CheckProblem": {
+              "description": "A CHECK definition that cannot be applied to the analysis catalog.",
+              "oneOf": [
+                {
+                  "description": "The expression cannot be coerced to boolean.",
+                  "type": "string",
+                  "const": "BooleanType"
+                },
+                {
+                  "description": "An unknown string is not valid boolean input.",
+                  "type": "object",
+                  "properties": {
+                    "BooleanLiteral": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "BooleanLiteral"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "CHECK cannot contain a subquery, aggregate, window or set-returning expression.",
+                  "type": "string",
+                  "const": "ExpressionPlacement"
+                },
+                {
+                  "description": "CHECK cannot contain a bind parameter.",
+                  "type": "string",
+                  "const": "Parameter"
+                },
+                {
+                  "description": "CHECK constraints cannot be deferred.",
+                  "type": "string",
+                  "const": "Deferrability"
+                },
+                {
+                  "description": "An explicit constraint name is already used on this table.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateName"
                   ],
                   "additionalProperties": false
                 }

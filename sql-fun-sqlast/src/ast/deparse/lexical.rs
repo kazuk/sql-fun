@@ -739,18 +739,21 @@ fn emit_sqlite_type_modifiers(
 
 #[cfg(test)]
 mod test_lexical_emit {
-    use crate::ast::deparse::SqlWriter;
-    use crate::test_helpers::deparse::render;
+    use crate::{
+        ast::{
+            Dialect, Expr, Literal, SqliteTypeModifier, SqliteTypeModifiers, SqliteTypeNamePart,
+            SqliteTypeNameTrivia,
+            deparse::{
+                SqlWriter,
+                lexical::{Name, Parameter, TypeName},
+            },
+        },
+        parse_statements,
+        test_helpers::deparse::render,
+    };
+
     #[cfg(feature = "sqlite")]
     use crate::test_helpers::deparse_lexical::{declared_types, sqlite_statement};
-
-    use crate::parse_statements;
-
-    use crate::ast::{
-        Dialect, Expr, Literal, SqliteTypeModifier, SqliteTypeModifiers, SqliteTypeNamePart,
-        SqliteTypeNameTrivia,
-        deparse::lexical::{Name, Parameter, TypeName},
-    };
 
     #[rstest::rstest]
     #[case::quoted_component(vec!["select".to_owned(), "a\"b".to_owned()], Dialect::postgres(), "\"select\".\"a\"\"b\"")]

@@ -1156,8 +1156,8 @@ impl TypeReference {
 impl TypeReference {
     pub(crate) fn from_ast(ast: &TypeName) -> Result<Self, AnalysisError> {
         Ok(Self::concrete_type_ref(
-            &FullName::from_ast_name(&ast.name)?,
-            !ast.array_bounds.is_empty(),
+            &FullName::from_ast_name(ast.name())?,
+            !ast.array_bounds().is_empty(),
         ))
     }
 }

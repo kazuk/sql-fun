@@ -882,8 +882,8 @@ mod test_constraint_emit {
     use crate::{
         ast::{
             Column, ConflictClause, Deferrability, Dialect, Expr, ForeignKeyAction,
-            ForeignReference, GeneratedColumnMode, IdentityColumnMode, Literal, Name,
-            StatementNode, SyntaxOption, SyntaxValue, TypeName,
+            ForeignReference, GeneratedColumnMode, IdentityColumnMode, Literal, Name, SyntaxOption,
+            SyntaxValue, TypeName,
             deparse::constraints::{ColumnConstraint, SqlWriter},
         },
         parse_statements,
@@ -1094,36 +1094,6 @@ mod test_constraint_emit {
             .deparse_sql(Dialect::postgres())
             .unwrap();
         assert_eq!(first, second, "{sql} => {first}");
-    }
-
-    #[rstest::rstest]
-    #[case::cascade(Some(ForeignKeyAction::Cascade))]
-    #[case::missing_action(None)]
-    fn rejects_on_delete_column_lists_with_other_actions_as_invalid_syntax(
-        #[case] action: Option<ForeignKeyAction>,
-    ) {
-        let mut statement = parse_statements(
-            "CREATE TABLE child (parent_id integer, FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE SET DEFAULT (parent_id))",
-            Dialect::postgres(),
-        )
-        .next()
-        .unwrap()
-        .unwrap();
-        let StatementNode::Table(table) = &mut statement.node else {
-            panic!("table fixture");
-        };
-        let ColumnConstraint::ForeignKey(reference) = &mut table.constraints[0].constraint else {
-            panic!("foreign key fixture");
-        };
-        reference.delete_action = action;
-
-        let error = statement.deparse_sql(Dialect::postgres()).unwrap_err();
-        assert!(error.is_invalid_syntax(), "{error}");
-        assert_eq!(
-            error.node(),
-            "CREATE TABLE/ON DELETE column list",
-            "{error}"
-        );
     }
 
     #[test]

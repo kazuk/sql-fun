@@ -220,6 +220,6 @@ impl CheckColumnConstraint {
 
 impl CheckColumnConstraint {
     pub(crate) fn has_ast_column_checks(ast: &AstColumn) -> bool {
-        ast.constraints.iter().any(TableConstraint::is_check)
+        ast.constraints().iter().any(TableConstraint::is_check)
     }
 }

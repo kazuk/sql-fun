@@ -43,9 +43,9 @@ impl ColumnDefinition {
         context: &mut impl ParseContext,
         table: &TableName,
     ) -> Result<Self, AnalysisError> {
-        let name = ColumnName::from(ast.name.as_str());
+        let name = ColumnName::from(ast.name().as_str());
         let type_ref = Self::type_from_ast(ast, context, table, &name)?;
-        let mut column = Self::new(&Some(name.clone()), type_ref.as_ref(), ast.not_null, &[]);
+        let mut column = Self::new(&Some(name.clone()), type_ref.as_ref(), ast.not_null(), &[]);
         Self::retain_ast_declaration(ast, context, &mut column)?;
         Self::resolve_ast_constraints(ast, context, table, &name, &mut column)?;
         Ok(column)
@@ -57,16 +57,16 @@ impl ColumnDefinition {
         table: &TableName,
         name: &ColumnName,
     ) -> Result<Option<TypeReference>, AnalysisError> {
-        let type_ref = if let Some(ty) = &ast.type_name {
-            let type_name = FullName::from_ast_name(&ty.name)?;
+        let type_ref = if let Some(ty) = &ast.type_name() {
+            let type_name = FullName::from_ast_name(ty.name())?;
             if let Some(ty) = context.get_type(&type_name) {
                 if context.dialect() == AstDialect::sqlite() {
                     Some(TypeReference::from_full_name(type_name))
                 } else if let Some(type_ref) = ty.type_reference() {
                     let array = ast
-                        .type_name
+                        .type_name()
                         .as_ref()
-                        .is_some_and(|syntax| !syntax.array_bounds.is_empty());
+                        .is_some_and(|syntax| !syntax.array_bounds().is_empty());
                     Some(TypeReference::concrete_type_ref(
                         type_ref
                             .full_name()
@@ -96,13 +96,13 @@ impl ColumnDefinition {
         column: &mut Self,
     ) -> Result<(), AnalysisError> {
         if context.dialect() == AstDialect::postgres() {
-            if let Some(type_name) = &ast.type_name {
+            if let Some(type_name) = &ast.type_name() {
                 column.retain_requested_type(&WithTypmod::<TypeReference>::from_ast_declaration(
                     type_name,
                     column.get_type(),
                 )?);
             }
-            let lookup = FullName::from_optional_ast_name(&ast.collation)?
+            let lookup = FullName::from_optional_ast_name(ast.collation())?
                 .map(|name| context.lookup_collation(&name));
             column.validate_collation(context, lookup.as_ref())?;
         }
@@ -116,7 +116,7 @@ impl ColumnDefinition {
         name: &ColumnName,
         column: &mut Self,
     ) -> Result<(), AnalysisError> {
-        for constraint in &ast.constraints {
+        for constraint in ast.constraints() {
             // CHECK needs the complete row, which is declared before expression analysis.
             if constraint.is_check() {
                 continue;
@@ -124,16 +124,16 @@ impl ColumnDefinition {
             // ENFORCED is the existing constraint behavior. Retain its explicit
             // syntax, but it does not add a separate semantic column constraint.
             if matches!(
-                constraint.constraint,
+                constraint.constraint(),
                 AstColumnConstraint::Enforcement(true)
             ) {
                 continue;
             }
-            if constraint.constraint.is_unique_key() && constraint.extras.deferrable {
+            if constraint.constraint().is_unique_key() && constraint.extras().deferrable() {
                 todo!("deferrable unique-key catalog representation");
             }
             let constraint =
-                ColumnConstraint::from_ast(&constraint.constraint, context, table, name)?;
+                ColumnConstraint::from_ast(constraint.constraint(), context, table, name)?;
             if let Some(nullability) = constraint.as_nullability() {
                 column.set_not_null(Some(nullability.is_not_null()));
             }
@@ -183,8 +183,8 @@ impl ColumnDefinition {
             return Ok(column);
         }
         let owner = TableName::from(context.creation_name(table.full_name(), temporary)?);
-        let sequence_name = sequences.stage(context, &owner, &ast.name, temporary);
-        let name = ColumnName::from(ast.name.as_str());
+        let sequence_name = sequences.stage(context, &owner, ast.name(), temporary);
+        let name = ColumnName::from(ast.name().as_str());
         let not_null = AstColumnConstraint::serial_not_null();
         column.push_constraint(ColumnConstraint::from_ast(
             &not_null, context, table, &name,
@@ -365,9 +365,9 @@ impl ColumnDefinition {
         } else {
             ScalarAnalysisContext::column_declaration(context, target, column)
         };
-        let name = ColumnName::from(ast.name.as_str());
+        let name = ColumnName::from(ast.name().as_str());
         let mut index = 0;
-        for definition in &ast.constraints {
+        for definition in ast.constraints() {
             if definition.is_check() {
                 let mut check = CheckConstraint::from_ast_expression(
                     definition, context, target, &scope, false,
@@ -378,7 +378,7 @@ impl ColumnDefinition {
                 let check = CheckColumnConstraint::from_analyzed(target, &name, &check);
                 column.insert_inline_check(index, &ColumnConstraint::check(check));
             }
-            if !matches!(definition.constraint, AstColumnConstraint::Enforcement(_)) {
+            if !matches!(definition.constraint(), AstColumnConstraint::Enforcement(_)) {
                 index += 1;
             }
         }

@@ -26,7 +26,7 @@ impl ArithExpr {
 impl ArithExpr {
     pub(crate) fn ast_membership_negated(ast: &OperatorKind, name: &Name) -> Option<bool> {
         match ast {
-            OperatorKind::In => Some(name.0.as_slice() == ["<>"]),
+            OperatorKind::In => Some(name.parts() == ["<>"]),
             OperatorKind::NotIn => Some(true),
             _ => None,
         }

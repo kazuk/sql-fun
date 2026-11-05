@@ -723,7 +723,7 @@ impl Comment {
         let target = ast
             .canonical_target()
             .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
-        let comment = Self::new(&target, ast.object_kind, &ast.text);
+        let comment = Self::new(&target, ast.object_kind(), ast.text());
         let context = context.apply_comment(&comment)?;
         Ok(AstAndContextPair::new(
             SemAst::from_comment(&comment),
@@ -832,7 +832,7 @@ impl CreateExtension {
     where
         TContext: ParseContext,
     {
-        let extension = Self::from_name(&ast.name).with_if_not_exists(ast.if_not_exists);
+        let extension = Self::from_name(ast.name()).with_if_not_exists(ast.if_not_exists());
         let context = context.apply_create_extension(&extension)?;
         Ok(AstAndContextPair::new(
             SemAst::from_create_extension(&extension),

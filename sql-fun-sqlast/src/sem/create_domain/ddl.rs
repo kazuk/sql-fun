@@ -51,19 +51,19 @@ impl CreateDomain {
         ast: &AstDomain,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let name = FullName::from_ast_name(&ast.name)?;
-        let base_name = FullName::from_ast_name(&ast.base.name)?;
-        let base = context.canonicalize_type_ref(&TypeReference::from_ast(&ast.base)?);
+        let name = FullName::from_ast_name(ast.name())?;
+        let base_name = FullName::from_ast_name(ast.base().name())?;
+        let base = context.canonicalize_type_ref(&TypeReference::from_ast(ast.base())?);
         if base.is_none() {
             context.report_analysis_problem(AnalysisProblem::domain_base_type_not_found(
                 &name,
                 &base_name.to_string(),
-                &ast.base_span,
+                ast.base_span(),
             ))?;
         }
         let mut domain = Self::new(&TypeReference::from_full_name(name), &base);
         let category = if let Some(base) = context.get_type(&base_name) {
-            if ast.base.array_bounds.is_empty() {
+            if ast.base().array_bounds().is_empty() {
                 base.category(context)
             } else if context.dialect() == AstDialect::postgres() {
                 TypeCategory::try_from('A').ok()
@@ -75,10 +75,10 @@ impl CreateDomain {
         };
         domain.set_category(category);
         domain.retain_requested_type(&WithTypmod::<TypeReference>::from_ast_declaration(
-            &ast.base,
+            ast.base(),
             domain.base_type(),
         )?);
-        let lookup = FullName::from_optional_ast_name(&ast.collation)?
+        let lookup = FullName::from_optional_ast_name(ast.collation())?
             .map(|name| context.lookup_collation(&name));
         domain.validate_collation(context, lookup.as_ref())?;
         Ok(domain)

@@ -32,12 +32,12 @@ impl CreateTable {
         context: &impl ParseContext,
     ) -> ConstraintNames {
         let mut names = ConstraintNames::default();
-        for definition in &ast.constraints {
+        for definition in ast.constraints() {
             if !definition.is_check() {
-                names.reserve(definition.name.as_deref().unwrap_or_default());
+                names.reserve(definition.name().as_deref().unwrap_or_default());
             }
         }
-        for column in &ast.columns {
+        for column in ast.columns() {
             ConstraintNames::reserve_ast_column(column, context, &mut names);
         }
         names
@@ -54,11 +54,11 @@ impl CreateTable {
                 context,
             ));
         }
-        let name = context.creation_name(&FullName::from_ast_name(&ast.name)?, ast.temporary)?;
+        let name = context.creation_name(&FullName::from_ast_name(ast.name())?, ast.temporary())?;
         if !context.permits_relation_creation(
             &name,
             Kind::table(),
-            ast.mode.if_not_exists(),
+            ast.mode().if_not_exists(),
             false,
         )? {
             return Ok(AstAndContextPair::new(
@@ -115,39 +115,39 @@ impl CreateTable {
         source: &SourcePathWithSpan,
         names: &mut ConstraintNames,
     ) -> Result<Self, AnalysisError> {
-        if ast.query.is_some() {
+        if ast.query().is_some() {
             todo!()
         }
-        let name = TableName::from(FullName::from_ast_name(&ast.name)?);
+        let name = TableName::from(FullName::from_ast_name(ast.name())?);
         let mut columns = Vec::new();
         let mut serials = SerialSequences::default();
-        for column in &ast.columns {
+        for column in ast.columns() {
             columns.push(ColumnDefinition::from_ast_serial(
                 column,
                 context,
                 &name,
-                ast.temporary,
+                ast.temporary(),
                 &mut serials,
             )?);
         }
-        let mut table = Self::new(&name, columns, ast.mode, ast.temporary, source);
+        let mut table = Self::new(&name, columns, ast.mode(), ast.temporary(), source);
         table.retain_serial_sequences(serials.into_sequences());
-        for definition in &ast.constraints {
+        for definition in ast.constraints() {
             if let Some(constraint) =
                 Constraint::from_ast_declared_key(definition, context, &table)?
             {
                 table.record_declared_constraint(&constraint)?;
             }
         }
-        for column in &ast.columns {
-            for definition in &column.constraints {
-                if definition.name.is_some() && definition.constraint.is_unique_key() {
-                    let keys = [ColumnName::from(column.name.as_str())];
+        for column in ast.columns() {
+            for definition in column.constraints() {
+                if definition.name().is_some() && definition.constraint().is_unique_key() {
+                    let keys = [ColumnName::from(column.name().as_str())];
                     let constraint = Constraint::from_ast_column_table(
-                        &definition.constraint,
+                        definition.constraint(),
                         context,
                         &name,
-                        definition.name.as_deref().expect("named inline key"),
+                        definition.name().as_deref().expect("named inline key"),
                         &keys,
                     )?;
                     table.record_declared_constraint(&constraint)?;
@@ -168,7 +168,7 @@ impl CreateTable {
         context: &mut impl ParseContext,
         table: &mut Self,
     ) -> Result<(), AnalysisError> {
-        for definition in &ast.constraints {
+        for definition in ast.constraints() {
             if let Some(constraint) =
                 Constraint::from_ast_declared_foreign_key(definition, context, table)?
             {
@@ -322,19 +322,19 @@ impl CreateTable {
         names: &mut ConstraintNames,
     ) -> Result<(), AnalysisError> {
         if !ast
-            .columns
+            .columns()
             .iter()
             .any(CheckColumnConstraint::has_ast_column_checks)
         {
             return Ok(());
         }
         let target =
-            TableName::from(context.creation_name(table.name().full_name(), ast.temporary)?);
-        for syntax in &ast.columns {
+            TableName::from(context.creation_name(table.name().full_name(), ast.temporary())?);
+        for syntax in ast.columns() {
             if !CheckColumnConstraint::has_ast_column_checks(syntax) {
                 continue;
             }
-            let name = ColumnName::from(syntax.name.as_str());
+            let name = ColumnName::from(syntax.name().as_str());
             let mut column = table
                 .get_column_def(&name)
                 .expect("declared column")
@@ -358,11 +358,11 @@ impl CreateTable {
         table: &mut Self,
         names: &mut ConstraintNames,
     ) -> Result<(), AnalysisError> {
-        if !ast.constraints.iter().any(AstTableConstraint::is_check) {
+        if !ast.constraints().iter().any(AstTableConstraint::is_check) {
             return Ok(());
         }
-        let target = context.creation_name(table.name().full_name(), ast.temporary)?;
-        for definition in &ast.constraints {
+        let target = context.creation_name(table.name().full_name(), ast.temporary())?;
+        for definition in ast.constraints() {
             if definition.is_check() {
                 let scope =
                     ScalarAnalysisContext::declared_table(table, &TableName::from(target.clone()));
@@ -392,14 +392,14 @@ impl DropTable {
         TContext: ParseContext,
     {
         let mut names = Vec::new();
-        for name in &ast.names {
+        for name in ast.names() {
             let table_name = TableName::from(FullName::from_ast_name(name)?);
             if context.get_table(&table_name).is_none() {
                 context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
             }
             names.push(table_name);
         }
-        let drop_table = Self::new(&names, ast.if_exists, ast.cascade);
+        let drop_table = Self::new(&names, ast.if_exists(), ast.cascade());
         context = context.apply_drop_table(&drop_table)?;
         Ok(AstAndContextPair::new(
             SemAst::from_drop_table(&drop_table),

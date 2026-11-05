@@ -20,19 +20,19 @@ impl Constraint {
         context: &mut impl ParseContext,
         table: &CreateTable,
     ) -> Result<Option<Self>, AnalysisError> {
-        if !ast.constraint.is_unique_key() {
+        if !ast.constraint().is_unique_key() {
             return Ok(None);
         }
-        if ast.extras.deferrable {
+        if ast.extras().deferrable() {
             todo!("deferrable unique-key catalog representation");
         }
         let keys = Self::columns_from_ast(ast);
         table.check_reference_columns(context, table.name(), &keys)?;
         Self::from_ast_column_table(
-            &ast.constraint,
+            ast.constraint(),
             context,
             table.name(),
-            ast.name.as_deref().unwrap_or_default(),
+            ast.name().as_deref().unwrap_or_default(),
             &keys,
         )
         .map(Some)
@@ -61,12 +61,12 @@ impl Constraint {
         for key in &keys {
             AlterObjSubCommand::check_ast_missing_column(context, table, key)?;
         }
-        if ast.constraint.is_unique_key() && ast.extras.deferrable {
+        if ast.constraint().is_unique_key() && ast.extras().deferrable() {
             todo!("deferrable unique-key catalog representation");
         }
-        let name = ast.name.as_deref().unwrap_or_default();
+        let name = ast.name().as_deref().unwrap_or_default();
         let mut constraint =
-            Self::from_ast_column_table(&ast.constraint, context, table, name, &keys)?;
+            Self::from_ast_column_table(ast.constraint(), context, table, name, &keys)?;
         constraint.set_foreign_key_delete_columns(&Self::delete_columns_from_ast(ast));
         Ok(constraint)
     }
@@ -126,7 +126,7 @@ impl Constraint {
         for column in keys {
             Self::report_ast_ignored_matches(ast, context, table, column)?;
         }
-        let requested = TableName::from(FullName::from_ast_name(&ast.table)?);
+        let requested = TableName::from(FullName::from_ast_name(ast.table())?);
         let explicit = Self::referenced_columns_from_ast(ast);
         let (binding, target_columns, target_valid) = if let Some(pending) = pending {
             ForeignKeyTarget::resolve_declared_reference(
@@ -149,11 +149,11 @@ impl Constraint {
         let mut constraint =
             ForeignKeyConstraint::new(name, Some(table), binding.relation(), keys, &target_columns)
                 .with_attributes(
-                    ast.match_type.as_ref(),
-                    ast.delete_action.as_ref(),
-                    ast.update_action.as_ref(),
-                    ast.deferrability.as_ref(),
-                    ast.validity.as_ref(),
+                    ast.match_type().as_ref(),
+                    ast.delete_action().as_ref(),
+                    ast.update_action().as_ref(),
+                    ast.deferrability().as_ref(),
+                    ast.validity().as_ref(),
                 );
         constraint.restrict_reference_application(source_valid && target_valid);
         Ok(Self::foreign(&constraint))
@@ -166,7 +166,7 @@ impl Constraint {
         table: &TableName,
         column: &ColumnName,
     ) -> Result<(), AnalysisError> {
-        for name in &ast.ignored_matches {
+        for name in ast.ignored_matches() {
             context.report_analysis_problem(
                 AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(table, column, name),
             )?;
@@ -177,11 +177,11 @@ impl Constraint {
     pub(crate) fn referenced_columns_from_ast(
         ast: &AstForeignReference,
     ) -> Option<Vec<ColumnName>> {
-        if ast.columns.is_empty() {
+        if ast.columns().is_empty() {
             None
         } else {
             Some(
-                ast.columns
+                ast.columns()
                     .iter()
                     .map(|key| ColumnName::from(key.as_str()))
                     .collect(),
@@ -197,10 +197,10 @@ impl Constraint {
         table: &CreateTable,
     ) -> Result<Option<Self>, AnalysisError> {
         let result = Self::from_ast_column_foreign_key(
-            &ast.constraint,
+            ast.constraint(),
             context,
             table,
-            ast.name.as_deref().unwrap_or_default(),
+            ast.name().as_deref().unwrap_or_default(),
             &Self::columns_from_ast(ast),
         )?;
         if let Some(mut constraint) = result {
@@ -215,15 +215,15 @@ impl Constraint {
     }
 
     pub(crate) fn delete_columns_from_ast(ast: &AstTableConstraint) -> Vec<ColumnName> {
-        ast.extras
-            .delete_columns
+        ast.extras()
+            .delete_columns()
             .iter()
             .map(|key| ColumnName::from(key.as_str()))
             .collect()
     }
 
     pub(crate) fn columns_from_ast(ast: &AstTableConstraint) -> Vec<ColumnName> {
-        ast.keys
+        ast.keys()
             .iter()
             .map(|key| ColumnName::from(key.as_str()))
             .collect()

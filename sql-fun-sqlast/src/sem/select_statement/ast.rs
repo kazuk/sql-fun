@@ -3773,7 +3773,7 @@ mod test_name_resolution_phase {
     fn untyped_operands_do_not_prevent_name_resolution(#[case] sql: &str) {
         let dialect = Dialect::postgres();
         let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
-        let StatementNode::Query(query) = statement.node else {
+        let StatementNode::Query(query) = statement.node() else {
             panic!("query fixture expected");
         };
         let mut catalog = TestParseContext::default();
@@ -3792,7 +3792,7 @@ mod test_name_resolution_phase {
         );
         let before = parameter_resolution_inference_runs();
         catalog.begin_parameter_type_analysis();
-        let result = SelectStatement::from_ast_in(&query, &mut catalog, None);
+        let result = SelectStatement::from_ast_in(query, &mut catalog, None);
         catalog.finish_analysis(result).unwrap();
         assert_eq!(catalog.reported_problem_count(), 0);
         assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
@@ -3816,8 +3816,8 @@ impl SelectStatement {
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<Self, AnalysisError> {
-        let with = WithClause::from_ast(&ast.with, context, outer)?;
-        let restricted = if Self::ast_is_compound(&ast.body)
+        let with = WithClause::from_ast(ast.with(), context, outer)?;
+        let restricted = if Self::ast_is_compound(ast.body())
             && outer.is_some_and(|scope| scope.direct_rule_identity().is_some())
         {
             outer.map(ScalarAnalysisContext::without_rule_rows)
@@ -3826,7 +3826,7 @@ impl SelectStatement {
         };
         let query_id = context.analysis_state_mut().grouping_mut().new_query();
         let body = Self::from_ast_body(
-            &ast.body,
+            ast.body(),
             context,
             &with,
             restricted.as_ref().or(outer),
@@ -3840,7 +3840,7 @@ impl SelectStatement {
             )?;
         }
         let empty = FromClause::default();
-        let order_outer = if Self::ast_is_compound(&ast.body) {
+        let order_outer = if Self::ast_is_compound(ast.body()) {
             None
         } else {
             outer
@@ -3851,14 +3851,14 @@ impl SelectStatement {
             order_outer,
         );
         scope.set_grouping_query(query_id);
-        scope.set_windows(Self::ast_window_names(&ast.body));
+        scope.set_windows(Self::ast_window_names(ast.body()));
         if context.dialect() == Dialect::sqlite() {
             scope.set_output_aliases(body.result_columns());
         }
-        let binding = QueryOrder::ast_order_binding(&ast.body);
+        let binding = QueryOrder::ast_order_binding(ast.body());
         let order = QueryOrder::from_ast_for_query(
-            &ast.order,
-            &ast.body,
+            ast.order(),
+            ast.body(),
             context,
             &scope,
             body.result_columns(),
@@ -3866,12 +3866,13 @@ impl SelectStatement {
         )?;
         let row_scope = ScalarAnalysisContext::nested(&with, &empty, outer);
         let row_scope = row_scope.with_grouping_placement("LIMIT/OFFSET");
-        let limit = SemScalarExpr::from_ast_optional(&ast.limit, context, &row_scope)?;
-        let offset = SemScalarExpr::from_ast_optional(&ast.offset, context, &row_scope)?;
-        let locks = QueryLock::from_ast_list(&ast.locks, context, &scope)?;
-        let local = WithClause::ast_local_definitions(&ast.with, with);
-        let mut query = SemanticQuery::new(local, ast.with.recursive, body, order, limit, offset);
-        query.set_modifiers(ast.with_ties, Self::ast_set_all(&ast.body), locks);
+        let limit = SemScalarExpr::from_ast_optional(ast.limit(), context, &row_scope)?;
+        let offset = SemScalarExpr::from_ast_optional(ast.offset(), context, &row_scope)?;
+        let locks = QueryLock::from_ast_list(ast.locks(), context, &scope)?;
+        let local = WithClause::ast_local_definitions(ast.with(), with);
+        let mut query =
+            SemanticQuery::new(local, ast.with().recursive(), body, order, limit, offset);
+        query.set_modifiers(ast.with_ties(), Self::ast_set_all(ast.body()), locks);
         let mut query = Self::query(query);
         query.complete_grouping(context)?;
         Ok(query)
@@ -3960,7 +3961,7 @@ impl SelectStatement {
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<(), AnalysisError> {
-        if ast.into.is_some()
+        if ast.into().is_some()
             && let Some(scope) = outer
             && let Some(identity) = scope.rule_identity()
         {
@@ -3985,7 +3986,7 @@ impl SelectStatement {
         let mut from_scope = ScalarAnalysisContext::nested(with, &empty, outer);
         from_scope.set_grouping_query(query_id);
         let from_scope = from_scope.with_grouping_placement("FROM clause of its own query level");
-        let from = DataSource::from_ast_list_in_scope(&ast.from, context, with, &from_scope)?;
+        let from = DataSource::from_ast_list_in_scope(ast.from(), context, with, &from_scope)?;
         if let Some(scope) = outer {
             scope.validate_rule_sources(context, &from)?;
         }
@@ -4003,7 +4004,7 @@ impl SelectStatement {
     ) -> ScalarAnalysisContext<'a> {
         let mut scope = ScalarAnalysisContext::nested(with, from, outer);
         scope.set_grouping_query(query_id);
-        scope.set_windows(QueryWindow::ast_names(&ast.windows));
+        scope.set_windows(QueryWindow::ast_names(ast.windows()));
         scope
     }
 }
@@ -4014,7 +4015,7 @@ impl SelectStatement {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Vec<QueryWindow>, AnalysisError> {
-        QueryWindow::from_ast_definitions(&ast.windows, context, scope)
+        QueryWindow::from_ast_definitions(ast.windows(), context, scope)
     }
 }
 
@@ -4025,7 +4026,7 @@ impl SelectStatement {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         SemScalarExpr::from_ast_optional(
-            &ast.predicate,
+            ast.predicate(),
             context,
             &scope.with_grouping_placement("WHERE"),
         )
@@ -4041,7 +4042,7 @@ impl SelectStatement {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<ResultColumnCollection, AnalysisError> {
         let mut results = ResultColumnCollection::default();
-        for target in &ast.targets {
+        for target in ast.targets() {
             ResultColumnCollection::ast_append_to_results(
                 target,
                 context,
@@ -4062,7 +4063,7 @@ impl SelectStatement {
         scope: &ScalarAnalysisContext<'_>,
         results: &ResultColumnCollection,
     ) -> Result<Option<Vec<SemScalarExpr>>, AnalysisError> {
-        let distinct = if let Some(distinct) = &ast.distinct {
+        let distinct = if let Some(distinct) = &ast.distinct() {
             let mut resolved = Vec::new();
             for expression in distinct {
                 resolved.push(SemScalarExpr::from_ast_clause(
@@ -4092,7 +4093,7 @@ impl SelectStatement {
         if context.dialect() == Dialect::sqlite() {
             scope.set_output_aliases(results);
         }
-        let group = QueryGrouping::from_ast_list(&ast.group, context, scope, results)?;
+        let group = QueryGrouping::from_ast_list(ast.group(), context, scope, results)?;
         for grouping in &group {
             grouping.validate_grouping_targets(results, query_id, context)?;
         }
@@ -4408,14 +4409,14 @@ mod test_from_ast_grouping {
             .next()
             .unwrap()
             .unwrap();
-        let StatementNode::Query(query) = statement.node else {
+        let StatementNode::Query(query) = statement.node() else {
             panic!("query");
         };
         let mut context = catalog();
         context.reject_diagnostics_after(0);
         assert!(
             SelectStatement::from_ast(
-                &query,
+                query,
                 &mut context,
                 &mut crate::test_helpers::create_cache_context()
             )
@@ -4510,7 +4511,7 @@ impl SelectStatement {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        SemScalarExpr::from_ast_optional(&ast.having, context, scope)
+        SemScalarExpr::from_ast_optional(ast.having(), context, scope)
     }
 }
 
@@ -4522,9 +4523,10 @@ impl SelectStatement {
         having: Option<SemScalarExpr>,
         windows: Vec<QueryWindow>,
     ) -> Result<SelectClauses, AnalysisError> {
-        let mut clauses = SelectClauses::new(distinct, group, ast.group_distinct, having, windows);
+        let mut clauses =
+            SelectClauses::new(distinct, group, ast.group_distinct(), having, windows);
         let destination = ast
-            .into
+            .into()
             .as_ref()
             .map(SelectDestination::from_ast_destination)
             .transpose()?;
@@ -4572,9 +4574,9 @@ impl SelectStatement {
     ) -> Result<Self, AnalysisError> {
         let from = FromClause::default();
         let scope = ScalarAnalysisContext::nested(with, &from, outer);
-        let left = Self::from_ast_in(&ast.left, context, Some(&scope))?;
-        let right = Self::from_ast_in(&ast.right, context, Some(&scope))?;
-        Self::from_ast_set_operation(&ast.operation, context, left, right)
+        let left = Self::from_ast_in(ast.left(), context, Some(&scope))?;
+        let right = Self::from_ast_in(ast.right(), context, Some(&scope))?;
+        Self::from_ast_set_operation(&ast.operation(), context, left, right)
     }
 }
 
@@ -4587,7 +4589,7 @@ impl SelectStatement {
 impl SelectStatement {
     pub(crate) fn ast_window_names(ast: &QueryBody) -> Vec<String> {
         match ast {
-            QueryBody::Select(select) => QueryWindow::ast_names(&select.windows),
+            QueryBody::Select(select) => QueryWindow::ast_names(select.windows()),
             _ => Vec::new(),
         }
     }
@@ -4596,7 +4598,7 @@ impl SelectStatement {
 impl SelectStatement {
     pub(crate) fn ast_set_all(ast: &QueryBody) -> bool {
         match ast {
-            QueryBody::Set(set) => set.all,
+            QueryBody::Set(set) => set.all(),
             _ => false,
         }
     }
@@ -4607,8 +4609,8 @@ impl SelectStatement {
         ast: &Query,
         identity: &RuleIdentity,
     ) -> Result<(), ResolutionFailure> {
-        for entry in &ast.with.entries {
-            CteStatement::validate_ast_select_rule_ctes(&entry.body, identity)?;
+        for entry in ast.with().entries() {
+            CteStatement::validate_ast_select_rule_ctes(entry.body(), identity)?;
         }
         Ok(())
     }

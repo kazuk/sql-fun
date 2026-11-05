@@ -59,18 +59,18 @@ impl CreateFunction {
         ast: &AstFunction,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let name = FullName::from_ast_name(&ast.name)?;
-        if ast.procedure || ast.result_type.is_none() {
+        let name = FullName::from_ast_name(ast.name())?;
+        if ast.procedure() || ast.result_type().is_none() {
             let mut params = Vec::new();
             let mut outputs = Vec::new();
-            for param in &ast.parameters {
+            for param in ast.parameters() {
                 let resolved = FunctionParam::from_ast(param, context)?;
-                if param.mode.is_output() {
+                if param.mode().is_output() {
                     outputs.push(resolved.get_type().cloned());
                 }
                 params.push(resolved);
             }
-            let ret_type = if ast.procedure {
+            let ret_type = if ast.procedure() {
                 None
             } else if outputs.len() == 1 {
                 outputs.pop().flatten()
@@ -82,27 +82,27 @@ impl CreateFunction {
             } else {
                 return AnalysisError::raise_unexpected_none("create_function.return_type");
             };
-            let strict = ast.options.iter().any(AstFunctionOption::is_strict);
+            let strict = ast.options().iter().any(AstFunctionOption::is_strict);
             let overload = OverloadVariant::new(&ret_type, &params, strict, false);
             return Ok(
                 Self::new(&name, &FunctionOverloadCollection::new(&[overload]), &None)
-                    .with_procedure_kind(ast.procedure),
+                    .with_procedure_kind(ast.procedure()),
             );
         }
-        let Some(result_type) = &ast.result_type else {
+        let Some(result_type) = &ast.result_type() else {
             return AnalysisError::raise_unexpected_none("create_function.return_type");
         };
-        let ret_name = FullName::from_ast_name(&result_type.name)?;
-        let returning = if result_type.set_of {
+        let ret_name = FullName::from_ast_name(result_type.name())?;
+        let returning = if result_type.set_of() {
             if ret_name.name().as_str() == "record" {
                 let mut columns = Vec::new();
-                for param in &ast.parameters {
-                    if param.mode.is_output() {
+                for param in ast.parameters() {
+                    if param.mode().is_output() {
                         let ty = TypeReference::from_full_name(FullName::from_ast_name(
-                            &param.type_name.name,
+                            param.type_name().name(),
                         )?);
                         columns.push(ColumnDefinition::new(
-                            &Some(ColumnName::from(param.name.as_str())),
+                            &Some(ColumnName::from(param.name().as_str())),
                             Some(&ty),
                             None,
                             &[],
@@ -133,7 +133,7 @@ impl CreateFunction {
             None
         };
         let mut params = Vec::new();
-        for param in &ast.parameters {
+        for param in ast.parameters() {
             params.push(FunctionParam::from_ast(param, context)?);
         }
         let ret_type = if let Some(ty) = context.get_type(&ret_name) {
@@ -141,7 +141,7 @@ impl CreateFunction {
         } else {
             None
         };
-        let strict = ast.options.iter().any(AstFunctionOption::is_strict);
+        let strict = ast.options().iter().any(AstFunctionOption::is_strict);
         let overload = OverloadVariant::new(&ret_type, &params, strict, false);
         Ok(Self::new(
             &name,
@@ -154,10 +154,13 @@ impl CreateFunction {
         ast: &AstFunction,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let function = Self::from_ast(ast, &mut context)?.with_replace(ast.replace);
-        let preserves_rows = ast.result_type.as_ref().is_none_or(|result| !result.set_of)
+        let function = Self::from_ast(ast, &mut context)?.with_replace(ast.replace());
+        let preserves_rows = ast
+            .result_type()
+            .as_ref()
+            .is_none_or(|result| !result.set_of())
             && !ast
-                .options
+                .options()
                 .iter()
                 .any(|option| matches!(option, AstFunctionOption::Window));
         let context = context

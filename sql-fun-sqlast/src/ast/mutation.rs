@@ -1,9 +1,8 @@
 //! Checked CTE declaration and collection editing.
 
-use crate::ast::validation::ContainsInvalidCteClause;
 use crate::ast::{
     CommonTableExpression, Cte, CteBody, CteColumn, Dialect, Statement, StatementNode, With,
-    WithClause,
+    WithClause, validation::ContainsInvalidCteClause,
 };
 
 /// A rejected common AST edit. The destination remains unchanged on failure.
@@ -175,6 +174,13 @@ pub struct CteDefinition {
 }
 
 impl CteDefinition {
+    pub(in crate::ast) fn copy_declaration(node: &Cte, dialect: Dialect) -> Self {
+        Self {
+            node: node.clone(),
+            dialect,
+        }
+    }
+
     /// Construct a CTE from a query or a dialect-permitted modifying statement.
     ///
     /// The declaration initially has no column aliases or materialization hint.
@@ -183,18 +189,18 @@ impl CteDefinition {
     /// Names cannot contain NUL; PostgreSQL also rejects empty names. Whitespace
     /// is preserved without trimming, and SQL quote delimiters must be omitted.
     pub fn new(name: &str, body: &Statement) -> Result<Self, AstMutationError> {
-        Self::validate_name(name, body.dialect)?;
+        Self::validate_name(name, body.dialect())?;
         let node = Cte {
             name: name.to_owned(),
             columns: Vec::new(),
             materialized: None,
-            body: body.node.cte_body(body.dialect)?,
+            body: body.node().cte_body(body.dialect())?,
             search: None,
             cycle: None,
         };
         let definition = Self {
             node,
-            dialect: body.dialect,
+            dialect: body.dialect(),
         };
         definition.validate()?;
         Ok(definition)
@@ -233,10 +239,7 @@ impl CteDefinition {
 
     /// Inspect the complete declaration before insertion.
     pub const fn view(&self) -> CommonTableExpression<'_> {
-        CommonTableExpression {
-            node: &self.node,
-            dialect: self.dialect,
-        }
+        CommonTableExpression::from_node(&self.node, self.dialect)
     }
 
     fn validate_name(name: &str, dialect: Dialect) -> Result<(), AstMutationError> {
@@ -253,20 +256,29 @@ impl CteDefinition {
     }
 }
 
-impl CommonTableExpression<'_> {
-    /// Copy this declaration, preserving its body and all declaration attributes.
-    ///
-    /// Insertion rechecks dialect and placement constraints, including when the
-    /// source was parsed without semantic analysis.
-    pub fn to_owned(&self) -> CteDefinition {
-        CteDefinition {
-            node: self.node.clone(),
-            dialect: self.dialect,
+impl StatementNode {
+    pub(in crate::ast) fn existing_with_editor(
+        &mut self,
+        dialect: Dialect,
+    ) -> Option<WithClauseMut<'_>> {
+        let node = self.with_node_mut()?;
+        if node.entries.is_empty() {
+            None
+        } else {
+            Some(WithClauseMut::new(node, dialect))
         }
     }
-}
 
-impl StatementNode {
+    pub(in crate::ast) fn ensure_with_editor(
+        &mut self,
+        dialect: Dialect,
+    ) -> Result<WithClauseMut<'_>, AstMutationError> {
+        let node = self
+            .with_node_mut()
+            .ok_or_else(MutationProblem::unsupported_carrier)?;
+        Ok(WithClauseMut::new(node, dialect))
+    }
+
     fn cte_body(&self, dialect: Dialect) -> Result<CteBody, AstMutationError> {
         match self {
             Self::Query(node) => Ok(CteBody::query(node.clone())),
@@ -334,29 +346,6 @@ pub trait HaveWithClause {
     /// An absent clause is committed only on the first successful insertion.
     /// Abandoning an empty editor leaves the statement unchanged.
     fn ensure_with_clause(&mut self) -> Result<WithClauseMut<'_>, AstMutationError>;
-}
-
-impl HaveWithClause for Statement {
-    fn with_clause(&self) -> Option<WithClause<'_>> {
-        Self::with_clause(self)
-    }
-
-    fn with_clause_mut(&mut self) -> Option<WithClauseMut<'_>> {
-        let node = self.node.with_node_mut()?;
-        if node.entries.is_empty() {
-            None
-        } else {
-            Some(WithClauseMut::new(node, self.dialect))
-        }
-    }
-
-    fn ensure_with_clause(&mut self) -> Result<WithClauseMut<'_>, AstMutationError> {
-        let node = self
-            .node
-            .with_node_mut()
-            .ok_or_else(MutationProblem::unsupported_carrier)?;
-        Ok(WithClauseMut::new(node, self.dialect))
-    }
 }
 
 /// A checked editor bound to one statement's dialect and WITH collection.
@@ -445,9 +434,6 @@ impl<'a> WithClauseMut<'a> {
 
     /// Inspect the collection, including an editor's not-yet-populated clause.
     pub const fn view(&self) -> WithClause<'_> {
-        WithClause {
-            node: self.current(),
-            dialect: self.dialect,
-        }
+        WithClause::from_node(self.current(), self.dialect)
     }
 }

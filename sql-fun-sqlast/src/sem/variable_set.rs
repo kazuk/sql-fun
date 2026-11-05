@@ -98,13 +98,13 @@ impl VariableSet {
     where
         TContext: ParseContext,
     {
-        let [argument] = ast.arguments.as_slice() else {
+        let [argument] = ast.arguments().as_slice() else {
             return AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1");
         };
         let outcome =
             SemScalarExpr::from_ast(argument, &mut context, &ScalarAnalysisContext::default());
         let value = outcome?;
-        let variable_set = Self::new(&ast.name, &value);
+        let variable_set = Self::new(ast.name(), &value);
         let context = context.apply_variable_set(&variable_set)?;
         Ok(AstAndContextPair::new(
             SemAst::from_variable_set(&variable_set),

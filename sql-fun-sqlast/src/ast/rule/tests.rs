@@ -1,9 +1,8 @@
-use crate::test_helpers::rule::postgres_rule_syntax;
-use crate::test_helpers::rule::rule;
 use crate::{
     PostgresDialect,
     ast::{CreateRule, Expr, QueryBody, RuleEvent, SetOperation, StatementNode, TryFromWithTokens},
     syn,
+    test_helpers::rule::{postgres_rule_syntax, rule},
 };
 
 impl Expr {

@@ -26,7 +26,7 @@ impl TryFromWithTokens<&syn::RuleStmt> for CreateRule {
             event: RuleEvent::try_from(value.get_event().as_inner())?,
             predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
             instead: value.get_instead(),
-            actions: Self::actions(value.get_actions(), tokens)?,
+            actions: Self::parse_actions(value.get_actions(), tokens)?,
         })
     }
 }
@@ -123,7 +123,7 @@ mod test_rule_conversion {
 mod tests;
 
 impl CreateRule {
-    fn actions(
+    fn parse_actions(
         nodes: syn::NodeListOpt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Vec<StatementNode>, AnalysisError> {

@@ -47,7 +47,7 @@ impl ViewColumnLineage {
                 None => column.name().as_ref().map(ColumnName::as_str),
             };
             if ast
-                .0
+                .parts()
                 .last()
                 .is_some_and(|name| visible == Some(name.as_str()))
             {
@@ -64,17 +64,17 @@ impl ViewColumnLineage {
         columns: &'a [ColumnDefinition],
         aliases: &[String],
     ) -> Result<Option<&'a ColumnDefinition>, AnalysisError> {
-        if !ast.target.modifiers.is_empty() {
+        if !ast.target().modifiers().is_empty() {
             return Ok(None);
         }
         let Some(column) =
-            Self::column_from_ast_expression(&ast.argument, context, columns, aliases)?
+            Self::column_from_ast_expression(ast.argument(), context, columns, aliases)?
         else {
             return Ok(None);
         };
         let target = TypeReference::concrete_type_ref(
-            &FullName::from_ast_name(&ast.target.name)?,
-            !ast.target.array_bounds.is_empty(),
+            &FullName::from_ast_name(ast.target().name())?,
+            !ast.target().array_bounds().is_empty(),
         );
         if let Some(source) = column.get_type()
             && let Some(source) = context.canonicalize_type_ref(source)
@@ -106,7 +106,7 @@ impl ViewColumnLineage {
         source: &FullName,
         projections: &mut [(ColumnDefinition, Option<ColumnName>)],
     ) -> Result<(), AnalysisError> {
-        let AstQueryBody::Select(select) = &ast.body else {
+        let AstQueryBody::Select(select) = &ast.body() else {
             return Ok(());
         };
         let columns = if let Some(table) = context.get_table(&TableName::from(source.clone())) {
@@ -123,17 +123,17 @@ impl ViewColumnLineage {
         } else {
             return Ok(());
         };
-        let aliases = match select.from.first() {
+        let aliases = match select.from().first() {
             Some(AstFromItem::Relation(relation)) => relation
-                .alias
+                .alias()
                 .as_ref()
-                .map(|alias| alias.columns.as_slice())
+                .map(|alias| alias.columns().as_slice())
                 .unwrap_or_default(),
             _ => &[],
         };
         let mut index = 0;
-        for target in &select.targets {
-            if matches!(&target.expression, AstExpr::Star(_)) {
+        for target in select.targets() {
+            if matches!(target.expression(), AstExpr::Star(_)) {
                 index += columns.len();
                 continue;
             }
@@ -141,7 +141,7 @@ impl ViewColumnLineage {
                 && lineage.is_none()
             {
                 *lineage = if let Some(column) = Self::column_from_ast_expression(
-                    &target.expression,
+                    target.expression(),
                     context,
                     &columns,
                     aliases,
@@ -160,10 +160,10 @@ impl ViewColumnLineage {
         ast: &AstQuery,
         context: &impl ParseContext,
     ) -> Result<Option<FullName>, AnalysisError> {
-        if !ast.with.entries.is_empty() || ast.limit.is_some() || ast.offset.is_some() {
+        if !ast.with().entries().is_empty() || ast.limit().is_some() || ast.offset().is_some() {
             return Ok(None);
         }
-        Self::source_from_ast_query_body(&ast.body, context)
+        Self::source_from_ast_query_body(ast.body(), context)
     }
 
     pub(crate) fn source_from_ast_query_body(
@@ -173,15 +173,15 @@ impl ViewColumnLineage {
         let AstQueryBody::Select(select) = ast else {
             return Ok(None);
         };
-        if select.distinct.is_some()
-            || !select.group.is_empty()
-            || select.having.is_some()
-            || !select.windows.is_empty()
-            || select.from.len() != 1
+        if select.distinct().is_some()
+            || !select.group().is_empty()
+            || select.having().is_some()
+            || !select.windows().is_empty()
+            || select.from().len() != 1
         {
             return Ok(None);
         }
-        Self::source_from_ast_from_item(&select.from[0], context)
+        Self::source_from_ast_from_item(&select.from()[0], context)
     }
 
     pub(crate) fn source_from_ast_from_item(
@@ -191,7 +191,7 @@ impl ViewColumnLineage {
         let AstFromItem::Relation(relation) = ast else {
             return Ok(None);
         };
-        let requested = FullName::from_ast_name(&relation.name)?;
+        let requested = FullName::from_ast_name(relation.name())?;
         Ok(context.resolve_relation_name(&requested))
     }
 }

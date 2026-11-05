@@ -292,7 +292,7 @@ impl TryFrom<&syn::CreateTrigStmt> for TriggerFunction {
         Ok(Self {
             name: Name::try_from(value.get_funcname())?,
             // Trigger arguments are strings in the raw parse tree, not evaluated Exprs.
-            arguments: Self::arguments(value.get_args())?,
+            arguments: Self::parse_arguments(value.get_args())?,
         })
     }
 }
@@ -426,7 +426,7 @@ impl TriggerEvent {
 }
 
 impl TriggerFunction {
-    fn arguments(value: syn::NodeListOpt) -> Result<Vec<String>, AnalysisError> {
+    fn parse_arguments(value: syn::NodeListOpt) -> Result<Vec<String>, AnalysisError> {
         let mut arguments = Vec::new();
         for node in value.as_inner().unwrap_or_default() {
             arguments.push(required(node.as_string().get_sval(), "trigger argument")?);

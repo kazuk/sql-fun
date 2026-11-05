@@ -16,7 +16,7 @@ use crate::{
 impl ColumnAttributeAction {
     pub(crate) fn phase_from_ast_command(ast: &AstAlterCommand) -> Option<u8> {
         if let AstAlterCommand::Postgres(command) = ast {
-            Self::phase_from_ast_operation(&command.operation)
+            Self::phase_from_ast_operation(&command.operation())
         } else {
             None
         }
@@ -172,19 +172,19 @@ impl ColumnAttributeOption {
     }
 
     pub(crate) fn from_ast(ast: &AstSyntaxOption) -> Result<Self, AnalysisError> {
-        let name = if let Some(namespace) = &ast.namespace {
-            format!("{namespace}.{}", ast.name)
+        let name = if let Some(namespace) = &ast.namespace() {
+            format!("{namespace}.{}", ast.name())
         } else {
-            ast.name.clone()
+            ast.name().clone()
         };
-        let value = ast.value.as_ref().map(Self::value_from_ast).transpose()?;
+        let value = ast.value().as_ref().map(Self::value_from_ast).transpose()?;
         Ok(Self::new(&name, value.as_deref()))
     }
 
     pub(crate) fn value_from_ast(ast: &AstSyntaxValue) -> Result<String, AnalysisError> {
         match ast {
             AstSyntaxValue::Expression(value) => Self::value_from_ast_expression(value),
-            AstSyntaxValue::Type(value) => Ok(FullName::from_ast_name(&value.name)?.to_string()),
+            AstSyntaxValue::Type(value) => Ok(FullName::from_ast_name(value.name())?.to_string()),
         }
     }
 }

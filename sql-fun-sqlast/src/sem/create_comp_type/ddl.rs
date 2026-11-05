@@ -16,10 +16,10 @@ impl CreateCompositeType {
         ast: &AstCompositeType,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let name = FullName::from_ast_name(&ast.name)?;
+        let name = FullName::from_ast_name(ast.name())?;
         let table = TableName::from(name.clone());
         let mut fields = CompositeFieldCollection::default();
-        for field in &ast.fields {
+        for field in ast.fields() {
             fields.push(CompositeFieldDefinition::from_ast(field, context, &table)?);
         }
         Ok(Self::new(&name, &fields))
@@ -44,24 +44,24 @@ impl CompositeFieldDefinition {
         context: &mut impl ParseContext,
         composite: &TableName,
     ) -> Result<Self, AnalysisError> {
-        let requested = TypeReference::from_ast(&ast.type_name)?;
+        let requested = TypeReference::from_ast(ast.type_name())?;
         let type_ref = context.canonicalize_type_ref(&requested);
         if type_ref.is_none() {
             context.report_analysis_problem(AnalysisProblem::column_type_not_found(
                 composite,
-                &ColumnName::from(ast.name.as_str()),
+                &ColumnName::from(ast.name().as_str()),
                 requested
                     .full_name()
                     .expect("SQL type syntax constructs a concrete reference"),
             ))?;
         }
-        let mut field = Self::new(&ast.name, &type_ref, &Some(ast.is_not_null));
+        let mut field = Self::new(ast.name(), &type_ref, &Some(ast.is_not_null()));
         field.retain_requested_type(&WithTypmod::<TypeReference>::from_ast_declaration(
-            &ast.type_name,
+            ast.type_name(),
             type_ref.as_ref(),
         )?);
         let lookup = ast
-            .collation
+            .collation()
             .as_ref()
             .map(FullName::from_ast_name)
             .transpose()?
@@ -99,7 +99,7 @@ mod test_composite_field_resolution {
         let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
         let field = CompositeFieldDefinition::from_ast(
-            &composite.fields[0],
+            &composite.fields()[0],
             &mut context,
             &TableName::from(FullName::with_schema("public", "array_value")),
         )

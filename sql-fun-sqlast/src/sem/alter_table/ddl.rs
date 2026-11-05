@@ -220,7 +220,7 @@ impl AlterObjSubCommand {
         ast: &AstPostgresAlterCommand,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        if let Some(legacy) = &ast.legacy {
+        if let Some(legacy) = &ast.legacy() {
             Self::from_ast_owner(legacy, context)
         } else {
             todo!()
@@ -232,10 +232,10 @@ impl AlterObjSubCommand {
         context: &mut impl ParseContext,
         table: &TableName,
     ) -> Result<Self, AnalysisError> {
-        if ColumnAttributeAction::phase_from_ast_operation(&ast.operation).is_some() {
+        if ColumnAttributeAction::phase_from_ast_operation(&ast.operation()).is_some() {
             return Self::from_ast_single_column_attribute(ast, context, table);
         }
-        if let Some(legacy) = &ast.legacy {
+        if let Some(legacy) = &ast.legacy() {
             Self::from_ast(legacy, context, table)
         } else {
             todo!()
@@ -248,7 +248,7 @@ impl AlterView {
         ast: &AstAlterRelation,
         context: &mut impl ParseContext,
     ) -> Result<Option<Self>, ResolutionFailure> {
-        let requested = FullName::from_ast_name(&ast.name)?;
+        let requested = FullName::from_ast_name(ast.name())?;
         let Some(name) = expand_relation_search_path(context, &requested, |key| {
             context
                 .get_view_impl(key)
@@ -258,7 +258,7 @@ impl AlterView {
             return Ok(None);
         };
         let mut actions = Vec::new();
-        for command in &ast.commands {
+        for command in ast.commands() {
             let Some(action) = AlterObjSubCommand::from_ast_view_default_action(command, context)?
             else {
                 return Ok(None);
@@ -297,7 +297,7 @@ impl AlterObjSubCommand {
         ast: &AstPostgresAlterCommand,
         context: &mut impl ParseContext,
     ) -> Result<Option<Self>, ResolutionFailure> {
-        match ast.operation {
+        match ast.operation() {
             AstAlterOperation::ColumnDefault => {
                 Self::from_ast_postgres_view_column_default(ast, context)
             }
@@ -323,8 +323,8 @@ impl AlterObjSubCommand {
         ast: &AstPostgresAlterCommand,
         context: &mut impl ParseContext,
     ) -> Result<Option<Self>, ResolutionFailure> {
-        let value = SemScalarExpr::from_ast_view_default_definition(&ast.definition, context)?;
-        let column = ColumnName::from(ast.name.as_str());
+        let value = SemScalarExpr::from_ast_view_default_definition(ast.definition(), context)?;
+        let column = ColumnName::from(ast.name().as_str());
         let action = match value {
             Some(value) => Self::column_default(&column, &value),
             None => Self::drop_column_default(&column),
@@ -407,11 +407,11 @@ impl AlterObjSubCommand {
         staged: &mut Option<CreateTable>,
         if_exists: bool,
     ) -> Result<Self, AnalysisError> {
-        let column = ColumnName::from(ast.name.as_str());
+        let column = ColumnName::from(ast.name().as_str());
         let action = ColumnAttributeAction::from_ast_operation(
-            &ast.operation,
-            &ast.definition,
-            ast.missing_ok,
+            &ast.operation(),
+            ast.definition(),
+            ast.missing_ok(),
         )?;
         let mut problems = Vec::new();
         let binding = match staged.as_ref() {
@@ -430,7 +430,7 @@ impl AlterObjSubCommand {
             },
         };
         if let Some(definition) = binding.definition() {
-            if ColumnAttributeAction::ast_operation_drops_not_null(&ast.operation) {
+            if ColumnAttributeAction::ast_operation_drops_not_null(&ast.operation()) {
                 if definition.has_inline_primary_key()
                     || staged
                         .as_ref()
@@ -442,19 +442,19 @@ impl AlterObjSubCommand {
                     problems.push(AlterColumnProblem::identity());
                 }
             }
-            if ColumnAttributeAction::ast_operation_drops_expression(&ast.operation) {
+            if ColumnAttributeAction::ast_operation_drops_expression(&ast.operation()) {
                 if definition.has_virtual_generation() {
                     problems.push(AlterColumnProblem::virtual_generated());
-                } else if !definition.has_stored_generation() && !ast.missing_ok {
+                } else if !definition.has_stored_generation() && !ast.missing_ok() {
                     problems.push(AlterColumnProblem::not_stored_generated());
                 }
             }
-            if ColumnAttributeAction::ast_operation_sets_statistics(&ast.operation) {
+            if ColumnAttributeAction::ast_operation_sets_statistics(&ast.operation()) {
                 if definition.has_virtual_generation() {
                     problems.push(AlterColumnProblem::virtual_generated());
                 }
                 ColumnAttributeAction::validate_ast_statistics(
-                    &ast.definition,
+                    ast.definition(),
                     context,
                     &mut problems,
                 )?;

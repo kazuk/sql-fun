@@ -1,6 +1,6 @@
 use crate::{
     ast::{
-        DerivedTable, Expr, FromItem, Name, Query, StatementNode, Target, TypeName,
+        DerivedTable, Expr, FromItem, Name, Query, Statement, Target, TypeName,
         projection::{ProjectionScope, ProjectionScopes, ScopedSource, ScopedSourceEdit},
     },
     sem::{
@@ -33,10 +33,7 @@ impl SourcePlans {
         self.edits
             .push(SourceEdit::new(source.scope(), alias, transform));
     }
-    pub(super) fn stage(
-        &mut self,
-        statement: &mut StatementNode,
-    ) -> Result<(), WildcardRewriteError> {
+    pub(super) fn stage(&mut self, statement: &mut Statement) -> Result<(), WildcardRewriteError> {
         statement.apply_source_edits(self);
         if let Some(error) = self.failure.take() {
             Err(error)

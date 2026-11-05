@@ -24,7 +24,7 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let (alias, column) = match ast.0.as_slice() {
+        let (alias, column) = match ast.parts() {
             [column] => (None, column),
             [alias, column] => (Some(AliasName::from(alias.as_str())), column),
             [schema, table, column] => {
@@ -146,7 +146,7 @@ impl SemScalarExpr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         match ast {
-            Expr::Parameter(parameter) => Ok(context.parameter(parameter.position)),
+            Expr::Parameter(parameter) => Ok(context.parameter(parameter.position())),
             Expr::Literal(value) => Ok(Self::from_ast_literal(value)),
             Expr::Column(name) => Self::from_ast_column(name, context, scope),
             Expr::Star(name) if context.dialect() == Dialect::postgres() && !name.is_empty() => {
@@ -340,8 +340,8 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let value = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
-        Ok(Self::named_argument(&ast.name, &value, &ast.location))
+        let value = Self::from_ast_scalar_in(ast.argument(), context, scope)?;
+        Ok(Self::named_argument(ast.name(), &value, ast.location()))
     }
 }
 
@@ -380,8 +380,8 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
-        Self::from_ast_boolean_operator(&ast.operator, &arguments)
+        let arguments = Self::from_ast_scalar_list(ast.arguments(), context, scope)?;
+        Self::from_ast_boolean_operator(&ast.operator(), &arguments)
     }
 }
 
@@ -391,8 +391,8 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let argument = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
-        let value = TruthTestExpr::resolve(context, &argument, ast.value, ast.negated)?;
+        let argument = Self::from_ast_scalar_in(ast.argument(), context, scope)?;
+        let value = TruthTestExpr::resolve(context, &argument, ast.value(), ast.negated())?;
         Ok(Self::truth_test(&value))
     }
 }
@@ -403,8 +403,8 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let argument = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
-        Ok(Self::null_test(&argument, ast.negated))
+        let argument = Self::from_ast_scalar_in(ast.argument(), context, scope)?;
+        Ok(Self::null_test(&argument, ast.negated()))
     }
 }
 
@@ -436,24 +436,24 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        if context.dialect() == Dialect::sqlite() && ast.left.is_none() {
-            if ast.name.0.as_slice() == ["+"] {
+        if context.dialect() == Dialect::sqlite() && ast.left().is_none() {
+            if ast.name().parts() == ["+"] {
                 return Self::from_ast_scalar_in(
-                    ast.right.as_ref().expect("unary argument"),
+                    ast.right().as_ref().expect("unary argument"),
                     context,
                     scope,
                 );
             }
-            if ast.name.0.as_slice() == ["-"]
-                && let Some(right) = ast.right.as_ref()
+            if ast.name().parts() == ["-"]
+                && let Some(right) = ast.right().as_ref()
                 && let Some(value) = Self::negated_ast_literal(right)
             {
                 return Ok(value);
             }
         }
-        let left = Self::from_ast_optional(&ast.left, context, scope)?;
-        let right = Self::from_ast_optional(&ast.right, context, scope)?;
-        if let Some(negated) = ArithExpr::ast_membership_negated(&ast.kind, &ast.name) {
+        let left = Self::from_ast_optional(ast.left(), context, scope)?;
+        let right = Self::from_ast_optional(ast.right(), context, scope)?;
+        if let Some(negated) = ArithExpr::ast_membership_negated(&ast.kind(), ast.name()) {
             let left = left.expect("IN left operand");
             let values = right.expect("IN right operand").into_list_values()?;
             return Ok(Self::membership(MembershipExpr::list(
@@ -468,7 +468,7 @@ impl SemScalarExpr {
                 context, left, right, negated,
             )?));
         }
-        if context.dialect() == Dialect::sqlite() && ArithExpr::ast_is_pattern(&ast.kind) {
+        if context.dialect() == Dialect::sqlite() && ArithExpr::ast_is_pattern(&ast.kind()) {
             return Self::from_ast_sqlite_pattern(ast, context, scope, left, right);
         }
         Self::from_ast_operator_operands(ast, context, left, right)
@@ -482,8 +482,8 @@ impl SemScalarExpr {
         left: Option<Self>,
         right: Option<Self>,
     ) -> Result<Self, AnalysisError> {
-        let name = if ArithExpr::ast_has_named_operator(&ast.kind) {
-            match OperatorName::from_ast_name(&ast.name) {
+        let name = if ArithExpr::ast_has_named_operator(&ast.kind()) {
+            match OperatorName::from_ast_name(ast.name()) {
                 Ok(name) => name,
                 Err(problem) => {
                     problem.report_problem_to(context)?;
@@ -498,7 +498,7 @@ impl SemScalarExpr {
             OperatorName::invalid()
         };
         if context.dialect() == Dialect::sqlite()
-            && !ArithExpr::ast_without_catalog_operator(&ast.kind)
+            && !ArithExpr::ast_without_catalog_operator(&ast.kind())
         {
             if left
                 .as_ref()
@@ -512,14 +512,14 @@ impl SemScalarExpr {
             todo!("SQLite operator semantics");
         }
         let binding = ResolvedOperator::from_ast_operator_name(
-            &ast.kind,
+            &ast.kind(),
             context,
             &name,
             left.is_some(),
             right.is_some(),
         );
         let mut expression =
-            ArithExpr::from_ast_operator_kind(&ast.kind, context, &name, left, right)?;
+            ArithExpr::from_ast_operator_kind(&ast.kind(), context, &name, left, right)?;
         if let Some(binding) = binding {
             expression.set_operator_binding(binding);
         }
@@ -612,18 +612,18 @@ impl SemScalarExpr {
         left: Option<Self>,
         right: Option<Self>,
     ) -> Result<Self, AnalysisError> {
-        match ast.name.0.as_slice() {
+        match ast.name().parts() {
             [name] if name == "like" => {
                 let (Some(left), Some(right)) = (left, right) else {
                     return AnalysisError::raise_unexpected_input("LIKE operands");
                 };
-                let escape = Self::from_ast_optional(&ast.escape, context, scope)?;
+                let escape = Self::from_ast_optional(ast.escape(), context, scope)?;
                 ArithExpr::sqlite_like(
                     context,
                     &left,
                     &right,
                     escape.as_ref(),
-                    ArithExpr::ast_is_not_like(&ast.kind),
+                    ArithExpr::ast_is_not_like(&ast.kind()),
                 )
             }
             [name] if name == "glob" => todo!("SQLite GLOB semantics (#907)"),
@@ -674,11 +674,11 @@ impl SemScalarExpr {
         ast: &OperatorExpr,
         context: &impl ParseContext,
     ) -> Option<bool> {
-        if let Some(negated) = ArithExpr::ast_operator_distinctness(&ast.kind) {
+        if let Some(negated) = ArithExpr::ast_operator_distinctness(&ast.kind()) {
             return Some(negated);
         }
         if context.dialect() == Dialect::sqlite() {
-            return match ast.name.0.as_slice() {
+            return match ast.name().parts() {
                 [name] if name == "is" => Some(true),
                 [name] if name == "is not" => Some(false),
                 _ => None,
@@ -694,7 +694,7 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let target = TypeReference::from_ast(&ast.target)?;
+        let target = TypeReference::from_ast(ast.target())?;
         let mut resolution = QueryNameResolution::affinity(&target.to_string());
         let target = if context.dialect() == Dialect::postgres() {
             if let Some(canonical) = context.canonicalize_type_ref(&target) {
@@ -715,9 +715,9 @@ impl SemScalarExpr {
             && resolution.is_resolved()
             && expected.is_array() == Some(true)
         {
-            Self::from_ast_array_target(&ast.argument, context, scope, Some(&expected))?
+            Self::from_ast_array_target(ast.argument(), context, scope, Some(&expected))?
         } else {
-            Self::from_ast_scalar_in(&ast.argument, context, scope)?
+            Self::from_ast_scalar_in(ast.argument(), context, scope)?
         };
         if context.dialect() == Dialect::postgres()
             && let Some(source) = argument.get_type()
@@ -748,9 +748,9 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let aggregate = if Self::ast_is_ordinary(&ast.kind) && ast.over.is_none() {
+        let aggregate = if Self::ast_is_ordinary(&ast.kind()) && ast.over().is_none() {
             let name = context
-                .resolve_function_name_with_search_path(&FullName::from_ast_name(&ast.name)?);
+                .resolve_function_name_with_search_path(&FullName::from_ast_name(ast.name())?);
             context.is_aggregate_impl(&name)
         } else {
             false
@@ -769,13 +769,13 @@ impl SemScalarExpr {
         } else {
             scope
         };
-        let mut expression = Self::from_ast_call_kind(&ast.kind, ast, context, argument_scope)?;
+        let mut expression = Self::from_ast_call_kind(&ast.kind(), ast, context, argument_scope)?;
         let modifiers = FunctionModifiers::from_ast_modifiers(ast, context, argument_scope)?;
         if let Some(capture) = &capture {
             let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
             SamplingInput::validate_aggregate_placement(context, &placement)?;
             scope.grouping_scope().aggregate(owner, levels_up);
-        } else if ast.over.is_some() {
+        } else if ast.over().is_some() {
             scope.grouping_scope().window();
         }
         expression.set_function_modifiers(modifiers);
@@ -797,7 +797,9 @@ impl SemScalarExpr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         if context.dialect() == Dialect::sqlite() {
-            if call.name.0.len() == 1 && call.name.0[0].eq_ignore_ascii_case("coalesce") {
+            if call.name().parts().len() == 1
+                && call.name().parts()[0].eq_ignore_ascii_case("coalesce")
+            {
                 return Self::from_ast_coalesce_call(call, context, scope);
             }
             todo!("SQLite function affinity and overload semantics");
@@ -812,7 +814,7 @@ impl SemScalarExpr {
 
 impl SemScalarExpr {
     pub(crate) fn ast_uses_supplied_binding(ast: &Call) -> bool {
-        ast.variadic || ast.arguments.iter().any(Self::ast_is_named_argument)
+        ast.variadic() || ast.arguments().iter().any(Self::ast_is_named_argument)
     }
 }
 
@@ -822,10 +824,10 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
+        let arguments = Self::from_ast_scalar_list(ast.arguments(), context, scope)?;
         MinMaxExpr::resolve(
             context,
-            FullName::from_ast_name(&ast.name)?.name().as_str(),
+            FullName::from_ast_name(ast.name())?.name().as_str(),
             &arguments,
         )
     }
@@ -837,7 +839,7 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
+        let arguments = Self::from_ast_scalar_list(ast.arguments(), context, scope)?;
         CoalesceExpr::resolve(context, &arguments)
     }
 }
@@ -848,7 +850,7 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let arguments = Self::from_ast_scalar_list(&ast.arguments, context, scope)?;
+        let arguments = Self::from_ast_scalar_list(ast.arguments(), context, scope)?;
         if Self::ast_uses_supplied_binding(ast) {
             return Ok(Self::function_call(&FuncCallExpr::from_ast_supplied_call(
                 ast, context, &arguments,
@@ -856,9 +858,9 @@ impl SemScalarExpr {
         }
         FuncCallExpr::resolve_common(
             context,
-            &FullName::from_ast_name(&ast.name)?,
+            &FullName::from_ast_name(ast.name())?,
             &arguments,
-            &ast.location.unwrap_or_else(|| StringSpan::new(0, 0)),
+            &ast.location().unwrap_or_else(|| StringSpan::new(0, 0)),
         )
     }
 }
@@ -869,17 +871,17 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let argument = Self::from_ast_optional(&ast.argument, context, scope)?;
+        let argument = Self::from_ast_optional(ast.argument(), context, scope)?;
         if let Some(value) = &argument {
             value.validate_scalar_value(context)?;
         }
         let mut arms = Vec::new();
-        for arm in &ast.arms {
-            let condition = Self::from_ast_scalar_in(&arm.condition, context, scope)?;
-            let result = Self::from_ast_scalar_in(&arm.result, context, scope)?;
+        for arm in ast.arms() {
+            let condition = Self::from_ast_scalar_in(arm.condition(), context, scope)?;
+            let result = Self::from_ast_scalar_in(arm.result(), context, scope)?;
             arms.push((condition, result));
         }
-        let otherwise = Self::from_ast_optional(&ast.otherwise, context, scope)?;
+        let otherwise = Self::from_ast_optional(ast.otherwise(), context, scope)?;
         if let Some(value) = &otherwise {
             value.validate_scalar_value(context)?;
         }
@@ -905,29 +907,32 @@ impl SemScalarExpr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         if let Some(identity) = scope.rule_identity()
-            && let Some(detail) = Self::ast_pending_rule_semantics(&ast.kind)
+            && let Some(detail) = Self::ast_pending_rule_semantics(&ast.kind())
         {
             context.report_analysis_problem(AnalysisProblem::rule(&RuleProblem::definition(
                 identity, detail,
             )))?;
         }
-        if Self::ast_is_membership(&ast.kind, &ast.operator) {
-            let test =
-                Self::from_ast_in(ast.test.as_ref().expect("IN test operand"), context, scope)?;
-            let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
+        if Self::ast_is_membership(&ast.kind(), ast.operator()) {
+            let test = Self::from_ast_in(
+                ast.test().as_ref().expect("IN test operand"),
+                context,
+                scope,
+            )?;
+            let query = SelectStatement::from_ast_in(ast.query(), context, Some(scope))?;
             return Ok(Self::membership(MembershipExpr::query(
                 context, &test, &query,
             )?));
         }
-        let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
-        Self::from_ast_subquery_kind(&ast.kind, context, &query)
+        let query = SelectStatement::from_ast_in(ast.query(), context, Some(scope))?;
+        Self::from_ast_subquery_kind(&ast.kind(), context, &query)
     }
 }
 
 impl SemScalarExpr {
     pub(crate) fn ast_is_membership(ast: &SubqueryKind, operator: &Name) -> bool {
         matches!(ast, SubqueryKind::Any)
-            && (operator.0.is_empty() || operator.0.as_slice() == ["="])
+            && (operator.parts().is_empty() || operator.parts() == ["="])
     }
 }
 
@@ -947,7 +952,7 @@ impl SemScalarExpr {
 
 impl SemScalarExpr {
     pub(crate) fn from_ast_sql_value(ast: &SqlValue) -> Result<Self, AnalysisError> {
-        SqlValueExpr::from_common(&ast.name, ast.precision)
+        SqlValueExpr::from_common(ast.name(), ast.precision())
     }
 }
 
@@ -957,10 +962,10 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<Self>, AnalysisError> {
-        let Some((Access::Star, preceding)) = ast.items.split_last() else {
+        let Some((Access::Star, preceding)) = ast.items().split_last() else {
             return Ok(None);
         };
-        let base = Self::from_ast_in(&ast.argument, context, scope)?;
+        let base = Self::from_ast_in(ast.argument(), context, scope)?;
         Ok(Some(IndirectionExpr::from_ast_sequence(
             preceding, context, scope, base,
         )?))
@@ -973,8 +978,8 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let value = Self::from_ast_in(&ast.argument, context, scope)?;
-        IndirectionExpr::from_ast_sequence(&ast.items, context, scope, value)
+        let value = Self::from_ast_in(ast.argument(), context, scope)?;
+        IndirectionExpr::from_ast_sequence(ast.items(), context, scope, value)
     }
 }
 
@@ -1030,12 +1035,12 @@ impl SemScalarExpr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let argument = Self::from_ast_scalar_in(&ast.argument, context, scope)?;
+        let argument = Self::from_ast_scalar_in(ast.argument(), context, scope)?;
         let value = CollateExpr::resolve(
             context,
             &argument,
-            &FullName::from_ast_name(&ast.name)?,
-            &ast.location,
+            &FullName::from_ast_name(ast.name())?,
+            ast.location(),
         )?;
         Ok(Self::collate(value))
     }
@@ -1063,7 +1068,7 @@ impl SemScalarExpr {
     ) -> Result<Self, ResolutionFailure> {
         match ast {
             Expr::Collate(collate) => {
-                Self::from_ast_insert_inference(&collate.argument, context, scope)
+                Self::from_ast_insert_inference(collate.argument(), context, scope)
             }
             Expr::Parenthesized(items) => {
                 Self::from_ast_parenthesized_insert_inference(ast, items, context, scope)
@@ -1107,7 +1112,7 @@ impl SemScalarExpr {
             Expr::Call(_) | Expr::SqlValue(_) | Expr::Cast(_) => {
                 Self::from_ast_in(ast, context, scope)
             }
-            Expr::Operator(operator) if ArithExpr::ast_is_null_if(&operator.kind) => {
+            Expr::Operator(operator) if ArithExpr::ast_is_null_if(&operator.kind()) => {
                 Self::from_ast_in(ast, context, scope)
             }
             _ => AnalysisError::raise_unexpected_input("ROWS FROM expression"),
@@ -1175,7 +1180,7 @@ impl SemScalarExpr {
         index: usize,
         width: usize,
     ) -> Result<UpdateValue, ResolutionFailure> {
-        let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
+        let query = SelectStatement::from_ast_in(ast.query(), context, Some(scope))?;
         if !query.has_width(width) {
             return Err(
                 AnalysisError::unexpected_input_error("row subquery width mismatch").into(),

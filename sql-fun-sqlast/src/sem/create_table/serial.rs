@@ -114,23 +114,23 @@ impl SerialSequences {
         if context.dialect() != AstDialect::postgres() {
             return None;
         }
-        Self::integer_for_ast_type(ast.type_name.as_ref()?)
+        Self::integer_for_ast_type(ast.type_name().as_ref()?)
     }
 
     pub(crate) fn validate_ast_column(
         ast: &AstColumn,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        let syntax = ast.type_name.as_ref().expect("serial declaration type");
+        let syntax = ast.type_name().as_ref().expect("serial declaration type");
         let mut problems = Vec::new();
-        if !syntax.array_bounds.is_empty() {
+        if !syntax.array_bounds().is_empty() {
             problems.push(SerialProblem::array());
         }
-        if !syntax.modifiers.is_empty() {
+        if !syntax.modifiers().is_empty() {
             problems.push(SerialProblem::modifier());
         }
-        for constraint in &ast.constraints {
-            if let Some(problem) = Self::conflict_from_ast_constraint(&constraint.constraint) {
+        for constraint in ast.constraints() {
+            if let Some(problem) = Self::conflict_from_ast_constraint(constraint.constraint()) {
                 problems.push(problem);
             }
         }
@@ -144,10 +144,10 @@ impl SerialSequences {
 
 impl SerialSequences {
     pub(crate) fn integer_for_ast_type(ast: &AstTypeName) -> Option<&'static str> {
-        if ast.percent_type || ast.set_of {
+        if ast.percent_type() || ast.set_of() {
             return None;
         }
-        let [name] = ast.name.0.as_slice() else {
+        let [name] = ast.name().parts() else {
             return None;
         };
         match name.as_str() {

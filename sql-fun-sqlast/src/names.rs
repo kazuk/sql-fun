@@ -51,7 +51,7 @@ impl AliasName {
 
 impl AliasName {
     pub(crate) fn from_ast_star_qualifier(ast: &Name) -> Result<Option<Self>, AnalysisError> {
-        match ast.0.as_slice() {
+        match ast.parts() {
             [] => Ok(None),
             [alias] => Ok(Some(Self::from(alias.as_str()))),
             _ => AnalysisError::raise_unexpected_input("star qualification"),

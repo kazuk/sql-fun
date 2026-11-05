@@ -8,10 +8,10 @@ use crate::{
         TableConstraint as AstTableConstraint, TableExtras, TryCollectFromWithTokens, TryFromOpt,
         TryFromWithTokens, TryFromWithTokensOpt, TypeName, VariableSet,
         ddl::{
-            AlterColumnType, AlterConstraintFlags, AlterIdentity, AlterOperation, AlterPartition,
-            CompositeField, Function, FunctionBody, FunctionBodyStatement, FunctionOption,
-            FunctionParameter, GenericAction, GenericOption, ParameterMode, PostgresAlterCommand,
-            ReplicaIdentity, Schema,
+            AlterColumnType, AlterIdentity, AlterOperation, AlterPartition, CompositeField,
+            Function, FunctionBody, FunctionBodyStatement, FunctionOption, FunctionParameter,
+            GenericAction, GenericOption, ParameterMode, PostgresAlterCommand, ReplicaIdentity,
+            Schema,
         },
         postgres::{nonempty, required},
     },
@@ -760,30 +760,6 @@ impl TryFromWithTokens<&syn::ColumnDef> for AlterColumnType {
             collation.as_ref(),
             Expr::try_from_with_tokens_opt(value.get_raw_default(), tokens)?.as_ref(),
         ))
-    }
-}
-
-impl TryFrom<&syn::AtAlterConstraint> for AlterConstraintFlags {
-    type Error = AnalysisError;
-    fn try_from(value: &syn::AtAlterConstraint) -> Result<Self, Self::Error> {
-        Ok(Self {
-            name: value.get_conname(),
-            deferrability: if value.get_alter_deferrability() {
-                Some((value.get_deferrable(), value.get_initdeferred()))
-            } else {
-                None
-            },
-            enforced: if value.get_alter_enforceability() {
-                Some(value.get_is_enforced())
-            } else {
-                None
-            },
-            no_inherit: if value.get_alter_inheritability() {
-                Some(value.get_noinherit())
-            } else {
-                None
-            },
-        })
     }
 }
 

@@ -130,7 +130,7 @@ impl OperatorName {
 
 impl OperatorName {
     pub(crate) fn from_ast_name(ast: &Name) -> Result<Self, ProblemLikeError> {
-        ValidOperatorName::try_from_components(&ast.0).map(|name| Self::from_valid(&name))
+        ValidOperatorName::try_from_components(ast.parts()).map(|name| Self::from_valid(&name))
     }
 }
 

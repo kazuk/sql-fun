@@ -15,10 +15,10 @@ impl CreateSequence {
     pub(crate) fn owned_table_from_ast_option(
         ast: &AstSyntaxOption,
     ) -> Result<Option<TableName>, AnalysisError> {
-        if ast.name != "owned_by" {
+        if ast.name() != "owned_by" {
             return Ok(None);
         }
-        let Some(AstSyntaxValue::Expression(expression)) = &ast.value else {
+        let Some(AstSyntaxValue::Expression(expression)) = &ast.value() else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY target");
         };
         Self::owned_table_from_ast_expression(expression)
@@ -57,10 +57,10 @@ impl CreateSequence {
     pub(crate) fn owned_table_from_ast_name(
         ast: &AstName,
     ) -> Result<Option<TableName>, AnalysisError> {
-        if ast.0.len() == 1 && ast.0[0].eq_ignore_ascii_case("none") {
+        if ast.parts().len() == 1 && ast.parts()[0].eq_ignore_ascii_case("none") {
             return Ok(None);
         }
-        let Some((_, table)) = ast.0.split_last() else {
+        let Some((_, table)) = ast.parts().split_last() else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY column");
         };
         Ok(Some(TableName::from(FullName::from_ast_name(
@@ -98,10 +98,10 @@ impl CreateSequence {
     where
         TContext: ParseContext,
     {
-        let mut sequence = Self::new(&FullName::from_ast_name(&ast.name)?)
-            .with_if_not_exists(ast.if_not_exists)
-            .with_temporary(ast.temporary);
-        for option in &ast.options {
+        let mut sequence = Self::new(&FullName::from_ast_name(ast.name())?)
+            .with_if_not_exists(ast.if_not_exists())
+            .with_temporary(ast.temporary());
+        for option in ast.options() {
             if let Some(table) = Self::owned_table_from_ast_option(option)? {
                 let Some(resolved) = context.resolve_table_name(&table) else {
                     context.report_analysis_problem(AnalysisProblem::table_not_found(&table))?;

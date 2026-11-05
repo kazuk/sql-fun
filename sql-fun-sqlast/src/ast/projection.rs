@@ -2,8 +2,8 @@
 
 use crate::{
     ast::{
-        Alias, DerivedTable, FromGroup, FromItem, Join, Relation, StatementNode, TableFunction,
-        TableFunctions, TableSample, Target,
+        Alias, DerivedTable, FromGroup, FromItem, Join, Relation, Statement, StatementNode,
+        TableFunction, TableFunctions, TableSample, Target,
         traversal::{AstVisitorMut, WalkSqlMut},
     },
     stack::with_stack,
@@ -226,13 +226,13 @@ impl ProjectionReplacements {
     }
     pub(crate) fn validate_wildcards(
         &self,
-        statement: &mut StatementNode,
+        statement: &mut Statement,
     ) -> Result<(), ProjectionError> {
         let mut visitor = ReplacementValidation::new(self);
         statement.walk_sql_mut(&mut visitor);
         visitor.validate()
     }
-    pub(crate) fn apply(&mut self, statement: &mut StatementNode) {
+    pub(crate) fn apply(&mut self, statement: &mut Statement) {
         statement.walk_sql_mut(self);
     }
 }
@@ -399,7 +399,7 @@ pub(crate) struct ProjectionScopes {
     stack: Vec<usize>,
 }
 impl ProjectionScopes {
-    pub(crate) fn capture(statement: &mut StatementNode) -> Self {
+    pub(crate) fn capture(statement: &mut Statement) -> Self {
         let mut scopes = Self {
             records: Vec::new(),
             stack: Vec::new(),

@@ -40,7 +40,7 @@ mod test_from_ast {
     };
     mod cursors {
         use crate::{
-            ast::{Dialect, Expr, StatementNode},
+            ast::{Dialect, StatementNode},
             context::ParseContext,
             names::{FullName, TableName},
             parse_statements,
@@ -208,23 +208,20 @@ mod test_from_ast {
         #[test]
         fn retains_unsupported_procedural_cursor_parameter() {
             let mut context = catalog(Dialect::postgres());
-            let mut statement = parse_statements(
+            let mut node = parse_statements(
                 "DELETE FROM items WHERE CURRENT OF portal",
                 Dialect::postgres(),
             )
             .next()
             .unwrap()
-            .unwrap();
-            let StatementNode::Delete(delete) = &mut statement.node else {
+            .unwrap()
+            .into_test_node();
+            let StatementNode::Delete(delete) = &mut node else {
                 panic!("DELETE")
             };
-            let Some(Expr::CurrentOf(cursor)) = &mut delete.predicate else {
-                panic!("CURRENT OF")
-            };
-            cursor.parameter = 3;
+            delete.set_current_of_parameter(3);
             let result =
-                SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context())
-                    .unwrap();
+                SemAst::from_ast_node(&node, &mut context, &mut create_cache_context()).unwrap();
             assert_eq!(
                 result
                     .as_delete()
@@ -453,11 +450,11 @@ mod test_from_ast {
         ) {
             let mut context = catalog(Dialect::postgres());
             let view_query = SemAst::from_ast_node(
-                &parse_statements("SELECT id,label FROM items", Dialect::postgres())
+                parse_statements("SELECT id,label FROM items", Dialect::postgres())
                     .next()
                     .unwrap()
                     .unwrap()
-                    .node,
+                    .node(),
                 &mut context,
                 &mut create_cache_context(),
             )
@@ -474,11 +471,11 @@ mod test_from_ast {
             };
             context.set_view_delete_support(&name, &support);
             let result = SemAst::from_ast_node(
-                &parse_statements(sql, Dialect::postgres())
+                parse_statements(sql, Dialect::postgres())
                     .next()
                     .unwrap()
                     .unwrap()
-                    .node,
+                    .node(),
                 &mut context,
                 &mut create_cache_context(),
             );
@@ -939,7 +936,7 @@ mod test_from_ast {
         .unwrap();
         assert!(
             SemAst::from_ast_node(
-                &statement.node,
+                statement.node(),
                 &mut context,
                 &mut crate::test_helpers::create_cache_context()
             )
@@ -964,7 +961,7 @@ impl DeleteStatement {
         } else {
             None
         };
-        let name = FullName::from_ast_name(&ast.relation.name)?;
+        let name = FullName::from_ast_name(ast.relation().name())?;
         let name = if let Some(scope) = outer {
             scope.trigger_relation_name(context, &name)?
         } else {
@@ -978,10 +975,10 @@ impl DeleteStatement {
             outer.is_some_and(ScalarAnalysisContext::in_rule_definition),
         )?;
         Self::validate_ast_index_hint(ast, context, &table)?;
-        let with = WithClause::from_ast(&ast.with, context, outer)?;
+        let with = WithClause::from_ast(ast.with(), context, outer)?;
         let alias = ast
-            .relation
-            .alias
+            .relation()
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
@@ -996,16 +993,16 @@ impl DeleteStatement {
         let mut delete = Self::new(
             table.name(),
             table.found(),
-            &WithClause::ast_local_definitions(&ast.with, with),
+            &WithClause::ast_local_definitions(ast.with(), with),
             &from,
             &predicate,
             &returning,
         );
         delete.set_modifiers(
             table.view_support(),
-            &ast.relation.indexed,
-            ast.relation.not_indexed,
-            ast.relation.inherit,
+            ast.relation().indexed(),
+            ast.relation().not_indexed(),
+            ast.relation().inherit(),
         );
         Ok(delete)
     }
@@ -1032,7 +1029,7 @@ impl DeleteStatement {
                 DeleteProblemKind::read_only_target(),
             ))?;
         }
-        if !ast.returning.is_empty()
+        if !ast.returning().is_empty()
             && table
                 .view_support()
                 .is_some_and(|s| !s.supports_returning())
@@ -1051,7 +1048,7 @@ impl DeleteStatement {
         context: &mut impl ParseContext,
         table: &DeleteDestination,
     ) -> Result<(), AnalysisError> {
-        if let Some(index) = &ast.relation.indexed {
+        if let Some(index) = ast.relation().indexed() {
             let name = FullName::with_schema(
                 table
                     .name()
@@ -1085,7 +1082,7 @@ impl DeleteStatement {
     ) -> Result<FromClause, AnalysisError> {
         // USING subqueries cannot implicitly see the DELETE target. WHERE and
         // RETURNING subqueries use the complete scope assembled below.
-        let mut from = DataSource::from_ast_list_in(&ast.using, context, with, outer)?;
+        let mut from = DataSource::from_ast_list_in(ast.using(), context, with, outer)?;
         let source = DataSource::resolve_relation(
             context,
             table.name().full_name(),
@@ -1105,13 +1102,13 @@ impl DeleteStatement {
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<DeletePredicate>, AnalysisError> {
-        if let Some(expression) = &ast.predicate
+        if let Some(expression) = &ast.predicate()
             && let Some(cursor) =
                 DeleteCursor::from_ast_delete_current_of(expression, context, target)?
         {
             return Ok(Some(DeletePredicate::current_of(&cursor)));
         }
-        let predicate = SemScalarExpr::from_ast_optional(&ast.predicate, context, scope)?;
+        let predicate = SemScalarExpr::from_ast_optional(ast.predicate(), context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -1153,7 +1150,7 @@ impl DeleteStatement {
             let mut scope = ScalarAnalysisContext::nested(with, &returning_from, None);
             scope.set_delete_returning_target(returning_alias.name(), context);
             ResultColumnCollection::resolve_for_delete(
-                &ast.returning,
+                ast.returning(),
                 context,
                 &returning_from,
                 &scope,
@@ -1161,7 +1158,7 @@ impl DeleteStatement {
         } else {
             let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             scope.set_delete_returning_target(alias.name(), context);
-            ResultColumnCollection::resolve_for_delete(&ast.returning, context, from, &scope)
+            ResultColumnCollection::resolve_for_delete(ast.returning(), context, from, &scope)
         }
     }
 }
@@ -1195,10 +1192,10 @@ impl DeleteStatement {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemAst, ResolutionFailure> {
-        DataSource::validate_ast_trigger_command(&ast.relation)?;
-        if !ast.returning.is_empty() {
+        DataSource::validate_ast_trigger_command(ast.relation())?;
+        if !ast.returning().is_empty() {
             return SemCreateTrigger::ast_invalid(
-                &FullName::from_ast_name(&ast.relation.name)?,
+                &FullName::from_ast_name(ast.relation().name())?,
                 "SQLite trigger DELETE does not support RETURNING",
             );
         }

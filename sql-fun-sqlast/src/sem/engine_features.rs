@@ -27,7 +27,7 @@ impl EngineFeatureValidation {
     ) -> Result<bool, AnalysisError> {
         match ast {
             AstAlterCommand::Postgres(command) => {
-                Self::alter_definition(&command.definition, context)
+                Self::alter_definition(command.definition(), context)
             }
             AstAlterCommand::Constraint(constraint) => {
                 Self::table_constraint(constraint, context, false)
@@ -58,13 +58,13 @@ impl EngineFeatureValidation {
     ) -> Result<bool, AnalysisError> {
         use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
         let mut valid = true;
-        if ast.enforced.is_some() {
+        if ast.enforced().is_some() {
             valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
         }
-        if ast.no_inherit.is_some() {
+        if ast.no_inherit().is_some() {
             valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintInheritance)?;
         }
-        if valid && (ast.enforced.is_some() || ast.no_inherit.is_some()) {
+        if valid && (ast.enforced().is_some() || ast.no_inherit().is_some()) {
             todo!("ALTER CONSTRAINT enforcement/inheritance (#887)");
         }
         Ok(valid)
@@ -75,12 +75,12 @@ impl EngineFeatureValidation {
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for constraint in &ast.constraints {
+        for constraint in ast.constraints() {
             valid &= Self::table_constraint(constraint, context, true)?;
         }
         if valid
-            && ast.constraints.iter().any(|constraint| {
-                matches!(constraint.constraint, AstColumnConstraint::Enforcement(_))
+            && ast.constraints().iter().any(|constraint| {
+                matches!(constraint.constraint(), AstColumnConstraint::Enforcement(_))
             })
         {
             todo!("domain constraint analysis (#548)");
@@ -159,7 +159,7 @@ mod utility_version_tests {
             .unwrap();
         let mut context = TestParseContext::default().with_postgres_version(version);
         assert_eq!(
-            EngineFeatureValidation::statement(&statement.node, &mut context).unwrap(),
+            EngineFeatureValidation::statement(statement.node(), &mut context).unwrap(),
             !requires_18 || version == "18"
         );
         assert_eq!(
@@ -231,7 +231,7 @@ mod unimplemented_analysis_tests {
             .next()
             .unwrap()
             .unwrap();
-        let _ = EngineFeatureValidation::statement(&statement.node, &mut context);
+        let _ = EngineFeatureValidation::statement(statement.node(), &mut context);
     }
 }
 
@@ -241,8 +241,8 @@ impl EngineFeatureValidation {
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for entry in &ast.entries {
-            valid &= Self::cte_body(&entry.body, context)?;
+        for entry in ast.entries() {
+            valid &= Self::cte_body(entry.body(), context)?;
         }
         Ok(valid)
     }
@@ -264,7 +264,7 @@ impl EngineFeatureValidation {
         ast: &AstQuery,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        Self::with_clause(&ast.with, context)
+        Self::with_clause(ast.with(), context)
     }
 
     pub(crate) fn table_constraint(
@@ -276,10 +276,10 @@ impl EngineFeatureValidation {
             return Ok(true);
         }
         let mut valid = Self::temporal_constraint(ast, context)?;
-        if let Some(enforced) = ast.extras.enforced {
+        if let Some(enforced) = ast.extras().enforced() {
             valid &= Self::enforcement(context, enforced)?;
         }
-        valid &= Self::column_constraint(&ast.constraint, context, &ast.extras, column)?;
+        valid &= Self::column_constraint(ast.constraint(), context, ast.extras(), column)?;
         Ok(valid)
     }
 
@@ -287,7 +287,9 @@ impl EngineFeatureValidation {
         ast: &AstTableConstraint,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        if !ast.extras.without_overlaps && !ast.extras.fk_with_period && !ast.extras.pk_with_period
+        if !ast.extras().without_overlaps()
+            && !ast.extras().fk_with_period()
+            && !ast.extras().pk_with_period()
         {
             return Ok(true);
         }
@@ -311,7 +313,7 @@ impl EngineFeatureValidation {
                 context.postgres18_syntax_used(Postgres18Syntax::VirtualGeneratedColumn)
             }
             AstColumnConstraint::Nullability(true, _, _)
-                if !column || extras.no_inherit || extras.skip_validation =>
+                if !column || extras.no_inherit() || extras.skip_validation() =>
             {
                 Self::not_null(context)
             }
@@ -344,7 +346,7 @@ impl EngineFeatureValidation {
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for constraint in &ast.constraints {
+        for constraint in ast.constraints() {
             valid &= Self::table_constraint(constraint, context, true)?;
         }
         Ok(valid)
@@ -355,10 +357,10 @@ impl EngineFeatureValidation {
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for column in &ast.columns {
+        for column in ast.columns() {
             valid &= Self::column(column, context)?;
         }
-        for constraint in &ast.constraints {
+        for constraint in ast.constraints() {
             valid &= Self::table_constraint(constraint, context, false)?;
         }
         Ok(valid)
@@ -398,7 +400,7 @@ impl EngineFeatureValidation {
             return Ok(true);
         }
         let mut valid = true;
-        for command in &ast.commands {
+        for command in ast.commands() {
             valid &= Self::alter_command(command, context)?;
         }
         Ok(valid)
@@ -434,28 +436,28 @@ impl EngineFeatureValidation {
         ast: &AstInsert,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &ast.with, &ast.returning_options)
+        check_dml_features(context, ast.with(), ast.returning_options())
     }
 
     pub(crate) fn update(
         ast: &AstUpdate,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &ast.with, &ast.returning_options)
+        check_dml_features(context, ast.with(), ast.returning_options())
     }
 
     pub(crate) fn delete(
         ast: &AstDelete,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &ast.with, &ast.returning_options)
+        check_dml_features(context, ast.with(), ast.returning_options())
     }
 
     pub(crate) fn merge(
         ast: &AstMerge,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        check_dml_features(context, &ast.with_clause, &ast.returning_options)
+        check_dml_features(context, ast.with_clause(), ast.returning_options())
     }
 }
 

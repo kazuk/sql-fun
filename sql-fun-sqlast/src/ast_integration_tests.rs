@@ -147,9 +147,9 @@ fn sqlite_table_retains_named_constraints_order_and_options() -> testresult::Tes
     let StatementNode::Table(table) = StatementNode::try_from(&parsed)? else {
         panic!("table syntax");
     };
-    assert_eq!(table.constraints[0].name.as_deref(), Some("pk"));
-    assert_eq!(table.constraints[0].order[0].descending, Some(true));
-    assert_eq!(table.options.len(), 2);
+    assert_eq!(table.constraints()[0].name().as_deref(), Some("pk"));
+    assert_eq!(table.constraints()[0].order()[0].descending(), Some(true));
+    assert_eq!(table.options().len(), 2);
     Ok(())
 }
 
@@ -536,9 +536,9 @@ fn sqlite_upgrade_preserves_complete_parameter_names(#[case] name: &str) -> test
     let Expr::Parameter(parameter) = Expr::try_from(&parsed)? else {
         panic!("parameter");
     };
-    assert_eq!(parameter.name.as_deref(), Some(name));
-    assert_eq!(parameter.position, 1);
-    assert!(parameter.type_name.is_none());
+    assert_eq!(parameter.name().as_deref(), Some(name));
+    assert_eq!(parameter.position(), 1);
+    assert!(parameter.type_name().is_none());
     Ok(())
 }
 
@@ -554,16 +554,16 @@ fn sqlite_upgrade_preserves_parameter_reuse() -> testresult::TestResult {
     let Expr::Operator(operator) = Expr::try_from(&parsed)? else {
         panic!("addition");
     };
-    let Expr::Parameter(left) = operator.left.as_ref().unwrap() else {
+    let Expr::Parameter(left) = operator.left().as_ref().unwrap() else {
         panic!("left parameter");
     };
-    let Expr::Parameter(right) = operator.right.as_ref().unwrap() else {
+    let Expr::Parameter(right) = operator.right().as_ref().unwrap() else {
         panic!("right parameter");
     };
-    assert_eq!(left.name.as_deref(), Some("$ns::name(element)"));
-    assert_eq!(right.name, left.name);
-    assert_eq!(left.position, 1);
-    assert_eq!(right.position, left.position);
+    assert_eq!(left.name().as_deref(), Some("$ns::name(element)"));
+    assert_eq!(right.name(), left.name());
+    assert_eq!(left.position(), 1);
+    assert_eq!(right.position(), left.position());
     Ok(())
 }
 
@@ -580,27 +580,27 @@ fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
     let Expr::Subquery(query) = Expr::try_from(&parsed)? else {
         panic!("membership subquery");
     };
-    assert!(matches!(query.kind, SubqueryKind::Any));
+    assert!(matches!(query.kind(), SubqueryKind::Any));
     assert!(matches!(
-        query.test,
+        query.test(),
         Some(Expr::Literal(Literal::Integer(1)))
     ));
     assert_eq!(
-        FullName::from_ast_name(&query.operator)?.name().as_str(),
+        FullName::from_ast_name(query.operator())?.name().as_str(),
         "="
     );
     let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 NOT IN {rhs}"));
     let Expr::Boolean(negation) = Expr::try_from(&parsed)? else {
         panic!("negated membership");
     };
-    assert!(matches!(negation.operator, BooleanOperator::Not));
-    assert_eq!(negation.arguments.len(), 1);
-    let Expr::Subquery(query) = &negation.arguments[0] else {
+    assert!(matches!(negation.operator(), BooleanOperator::Not));
+    assert_eq!(negation.arguments().len(), 1);
+    let Expr::Subquery(query) = &negation.arguments()[0] else {
         panic!("membership subquery");
     };
-    assert!(matches!(query.kind, SubqueryKind::Any));
+    assert!(matches!(query.kind(), SubqueryKind::Any));
     assert!(matches!(
-        query.test,
+        query.test(),
         Some(Expr::Literal(Literal::Integer(1)))
     ));
     Ok(())
@@ -617,8 +617,8 @@ fn sqlite_scalar_subquery_keeps_scalar_semantics() -> testresult::TestResult {
     let Expr::Subquery(query) = Expr::try_from(&parsed)? else {
         panic!("scalar subquery");
     };
-    assert!(matches!(query.kind, SubqueryKind::Scalar));
-    assert!(query.test.is_none());
+    assert!(matches!(query.kind(), SubqueryKind::Scalar));
+    assert!(query.test().is_none());
     Ok(())
 }
 

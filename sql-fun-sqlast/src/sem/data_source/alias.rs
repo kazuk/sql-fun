@@ -184,6 +184,6 @@ impl AliasSpec {
 
 impl AliasSpec {
     pub(crate) fn from_ast(ast: &AstAlias) -> Self {
-        Self::from_names(&ast.name, &ast.columns)
+        Self::from_names(ast.name(), ast.columns())
     }
 }

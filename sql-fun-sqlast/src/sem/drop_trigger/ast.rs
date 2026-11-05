@@ -45,7 +45,7 @@ mod test_from_ast {
         let parent = heavy::catalog()?;
         let mut child = test_helpers::layer(&parent);
         let statement = SemAst::from_ast_node(
-            &test_helpers::statement(sql).node,
+            test_helpers::statement(sql).node(),
             &mut child,
             &mut test_helpers_create_cache_context(),
         )?;
@@ -119,7 +119,7 @@ mod test_from_ast {
         let mut child = test_helpers::layer(&parent);
         assert!(
             SemAst::from_ast_node(
-                &test_helpers::statement(sql).node,
+                test_helpers::statement(sql).node(),
                 &mut child,
                 &mut crate::test_helpers::create_cache_context()
             )
@@ -245,7 +245,7 @@ mod test_from_ast {
             let mut context = test_helpers::layer(&parent);
             assert!(
                 SemAst::from_ast_node(
-                    &test_helpers::statement("DROP TRIGGER absent").node,
+                    test_helpers::statement("DROP TRIGGER absent").node(),
                     &mut context,
                     &mut crate::test_helpers::create_cache_context()
                 )
@@ -353,7 +353,7 @@ impl SemDropTrigger {
         ast: &DropTrigger,
         context: &impl ParseContext,
     ) -> Result<Self, ResolutionFailure> {
-        let requested = FullName::from_ast_name(&ast.name)?;
+        let requested = FullName::from_ast_name(ast.name())?;
         let identity = if requested.schema().is_some() {
             let identity = TriggerIdentity::sqlite(&requested);
             if let Some(definition) = context.trigger(&identity) {
@@ -361,7 +361,7 @@ impl SemDropTrigger {
                     &requested,
                     Some(&identity),
                     Some(definition.target()),
-                    ast.if_exists,
+                    ast.if_exists(),
                 ));
             }
             Some(identity)
@@ -385,13 +385,13 @@ impl SemDropTrigger {
                         &requested,
                         Some(&identity),
                         Some(definition.target()),
-                        ast.if_exists,
+                        ast.if_exists(),
                     ));
                 }
             }
             None
         };
-        if !ast.if_exists {
+        if !ast.if_exists() {
             return Err(ResolutionFailure::trigger(&TriggerProblem::missing_name(
                 &requested,
             )));
@@ -405,14 +405,14 @@ impl SemDropTrigger {
         ast: &DropTrigger,
         context: &impl ParseContext,
     ) -> Result<Self, ResolutionFailure> {
-        let requested = FullName::from_ast_name(&ast.name)?;
+        let requested = FullName::from_ast_name(ast.name())?;
         let requested_target =
-            FullName::from_ast_name(ast.relation.as_ref().expect("PostgreSQL ON relation"))?;
+            FullName::from_ast_name(ast.relation().as_ref().expect("PostgreSQL ON relation"))?;
         let behavior = DropDependencyBehavior::from_ast(
-            &ast.behavior.expect("PostgreSQL dependency behavior"),
+            &ast.behavior().expect("PostgreSQL dependency behavior"),
         );
         let Some(target) = context.resolve_relation_name(&requested_target) else {
-            if ast.if_exists {
+            if ast.if_exists() {
                 return Ok(Self::new(
                     &requested,
                     &requested_target,
@@ -453,7 +453,7 @@ impl SemDropTrigger {
         );
         let identity = TriggerIdentity::postgres(target, &name);
         let found = context.trigger(&identity).is_some();
-        if !found && !ast.if_exists {
+        if !found && !ast.if_exists() {
             return Err(ResolutionFailure::trigger(&TriggerProblem::missing(
                 &identity,
             )));
@@ -463,7 +463,7 @@ impl SemDropTrigger {
             requested_target,
             Some(&identity),
             found,
-            ast.if_exists,
+            ast.if_exists(),
             behavior,
         ))
     }

@@ -444,12 +444,12 @@ mod implementation {
         ) -> Result<Self, AnalysisError> {
             Self::resolve_supplied(
                 context,
-                &FullName::from_ast_name(&ast.name)?,
+                &FullName::from_ast_name(ast.name())?,
                 arguments,
-                &ast.argument_locations,
-                &ast.location,
-                ast.variadic,
-                ast.over.is_some(),
+                ast.argument_locations(),
+                ast.location(),
+                ast.variadic(),
+                ast.over().is_some(),
             )
         }
     }

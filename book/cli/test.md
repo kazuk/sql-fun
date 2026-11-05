@@ -5,7 +5,7 @@ See the [diagnostic reference](../diagnostics/README.md) for code meanings and
 suggested corrections.
 
 It supports both SQLAST regressions and application query-interface tests without
-executing queries or connecting to a live database. It uses the same explicit
+executing queries or connecting to a live database. It uses the same
 datasource selection, schema levels, and server prerequisites as
 [`sql-fun analyze`](analyze.md), and never creates or validates Rust query lockfiles.
 Its legacy SQL-source form also uses the same input syntax as `analyze`.

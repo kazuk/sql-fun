@@ -9,6 +9,60 @@ use self::test_helpers::{
 };
 
 #[rstest::rstest]
+#[case::analyze_default(&["analyze", "--sql-file", "queries.json#$.queries"], None, None, "default")]
+#[case::test_default(&["test", "cases.json"], None, None, "default")]
+#[case::environment(&["analyze", "--sql-file", "queries.json#$.queries"], None, Some("products"), "products")]
+#[case::cli_override(&["test", "cases.json"], Some("products"), Some("default"), "products")]
+#[tokio::test]
+async fn direct_sql_selects_the_requested_datasource(
+    #[case] options: &[&str],
+    #[case] cli_datasource: Option<&str>,
+    #[case] env_datasource: Option<&str>,
+    #[case] expected: &str,
+) -> ::testresult::TestResult {
+    let (output, _, initialization) = test_helpers::request_peer::run_selection(
+        options,
+        cli_datasource,
+        env_datasource,
+        Some(true),
+    )
+    .await?;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let initialization = initialization.expect("schema initialization request");
+    assert_eq!(initialization["datasource"], expected);
+    assert_eq!(
+        initialization["environments"]["SQL_FUN_DATASOURCE"],
+        expected
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::analyze_missing(&["analyze", "--sql-file", "queries.json#$.queries"], None)]
+#[case::test_missing(&["test", "cases.json"], None)]
+#[case::analyze_invalid(&["analyze", "--sql-file", "queries.json#$.queries"], Some(false))]
+#[case::test_invalid(&["test", "cases.json"], Some(false))]
+#[tokio::test]
+async fn invalid_default_datasource_is_reported(
+    #[case] options: &[&str],
+    #[case] valid_default: Option<bool>,
+) -> ::testresult::TestResult {
+    let (output, _, _) =
+        test_helpers::request_peer::run_selection(options, None, None, valid_default).await?;
+    assert!(!output.status.success());
+    let output = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.contains("schema setup") && output.contains("default"),
+        "{output}"
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
 #[case::analyze(vec!["analyze", "--sql-file", "queries.json#$.queries"], true)]
 #[case::opt_out(vec!["analyze", "--sql-file", "queries.json#$.queries", "--no-column-access"], false)]
 #[case::named_test(vec!["test", "cases.json"], false)]

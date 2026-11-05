@@ -190,7 +190,17 @@ search_path = ["public"]
 
         pub(super) fn expand_tools(executable: bool) -> ::tempfile::TempDir {
             let tools = ::tempfile::tempdir().unwrap();
-            std::fs::write(tools.path().join("Cargo.toml"), "[package.metadata]\n").unwrap();
+            std::fs::write(
+                tools.path().join("Cargo.toml"),
+                r#"[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+connector = "tokio-postgres"
+"#,
+            )
+            .unwrap();
+            std::fs::write(tools.path().join("sqlfun.develop.sql"), "-- schema\n").unwrap();
             for name in ["cargo", "cargo-expand"] {
                 let path = tools.path().join(name);
                 std::fs::write(&path, "#!/bin/sh\nexit 17\n").unwrap();

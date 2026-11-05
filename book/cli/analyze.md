@@ -4,10 +4,13 @@
 or creating query lockfiles. It uses `sql-fun-server` and an installed builtin
 catalog; it does not execute the SQL or require a live database or `cargo-expand`.
 
-Select the datasource explicitly using `--datasource` or `SQL_FUN_DATASOURCE`.
-This selection authorizes reading that datasource's project metadata. You can
-select the metadata file with `--metadata-file`; otherwise the common metadata
-configuration applies. The command does not choose an available datasource for you.
+The datasource is selected by the global `--datasource` option, then by
+`SQL_FUN_DATASOURCE`, or otherwise by the name `default`. Configuring a
+datasource named `default` selects it for use when no other name is supplied.
+The selected datasource must exist and have valid metadata. The command reads
+its project metadata; use `--metadata-file` to select that file, or the common
+metadata configuration and discovery apply. Place global options before
+`analyze`.
 
 ```sh
 sql-fun --metadata-file Cargo.toml --datasource app analyze 'SELECT 1 AS result'

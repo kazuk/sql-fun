@@ -23,6 +23,12 @@ with its resolved CTE dependencies to `sql-fun-server`. It reuses schema context
 for queries from the same datasource. Server initialization currently supports
 PostgreSQL; SQLite-enabled builds do not imply SQLite initialization support.
 
+Before extraction, `check` forwards the common datasource configuration to
+`cargo expand`. The global `--datasource` option takes precedence over
+`SQL_FUN_DATASOURCE`; otherwise `default` is used. This selected datasource
+must exist and have valid metadata even when extracted queries name other
+datasources.
+
 For each referenced datasource, a completed check regenerates the entire
 `<datasource>.<schema>.lock` file, ordered by Rust query function name. Only
 eligible functions analyzed in that invocation are included. Old entries absent

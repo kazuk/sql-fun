@@ -10,11 +10,23 @@ use ::tokio::{
 /// Capture requests from the actual CLI without starting a service or parsing a catalog.
 /// The registration, metadata, and SQL inputs are all owned by this fixture.
 pub(crate) async fn run(options: &[&str]) -> ::testresult::TestResult<(Output, Vec<Value>)> {
+    let (output, queries, _) = run_selection(options, Some("products"), None, Some(true)).await?;
+    Ok((output, queries))
+}
+
+/// Run direct SQL with controlled datasource inputs and capture its initialization request.
+pub(crate) async fn run_selection(
+    options: &[&str],
+    cli_datasource: Option<&str>,
+    env_datasource: Option<&str>,
+    valid_default: Option<bool>,
+) -> ::testresult::TestResult<(Output, Vec<Value>, Option<Value>)> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
-    let directory = prepare_inputs(listener.local_addr()?.port())?;
+    let directory = prepare_inputs(listener.local_addr()?.port(), valid_default)?;
     let root = directory.path();
     let peer = ::tokio::spawn(capture_requests(listener));
-    let output = ::tokio::process::Command::new(cli_executable())
+    let mut command = ::tokio::process::Command::new(cli_executable());
+    command
         .current_dir(root)
         .env("USER", root.file_name().unwrap())
         .env("SQL_FUN_SERVER", root.join("unused-server"))
@@ -22,23 +34,31 @@ pub(crate) async fn run(options: &[&str]) -> ::testresult::TestResult<(Output, V
         .env_remove("SQL_FUN_METADATA_FILE")
         .env_remove("SQL_FUN_DATASOURCE")
         .env_remove("RUST_LOG")
-        .args([
-            "--term-color",
-            "never",
-            "--metadata-file",
-            "metadata.toml",
-            "--datasource",
-            "products",
-        ])
+        .args(["--term-color", "never", "--metadata-file", "metadata.toml"]);
+    if let Some(name) = cli_datasource {
+        command.args(["--datasource", name]);
+    }
+    if let Some(name) = env_datasource {
+        command.env("SQL_FUN_DATASOURCE", name);
+    }
+    let output = command
         .args(options)
         .args(["--schema-level", "builtin"])
         .kill_on_drop(true)
         .output()
         .await?;
-    Ok((output, peer.await?))
+    if !output.status.success() {
+        peer.abort();
+        return Ok((output, Vec::new(), None));
+    }
+    let (queries, initialization) = peer.await?;
+    Ok((output, queries, initialization))
 }
 
-fn prepare_inputs(port: u16) -> ::testresult::TestResult<::tempfile::TempDir> {
+fn prepare_inputs(
+    port: u16,
+    valid_default: Option<bool>,
+) -> ::testresult::TestResult<::tempfile::TempDir> {
     let directory = ::tempfile::Builder::new()
         .prefix("sql-fun-request-")
         .tempdir_in("/tmp")?;
@@ -51,12 +71,30 @@ fn prepare_inputs(port: u16) -> ::testresult::TestResult<::tempfile::TempDir> {
     )?;
     std::fs::write(
         root.join("metadata.toml"),
-        r#"[package.metadata.database.products]
+        format!(
+            r#"[package.metadata.database.products]
 engine = "PostgreSQL"
 dialect = "postgres"
 version = "17"
 connector = "products-connector"
+{}
 "#,
+            match valid_default {
+                Some(true) =>
+                    r#"[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+connector = "default-connector""#,
+                Some(false) =>
+                    r#"[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = 42
+version = "17"
+connector = "default-connector""#,
+                None => "",
+            }
+        ),
     )?;
     std::fs::write(
         root.join("queries.json"),
@@ -69,10 +107,11 @@ connector = "products-connector"
     Ok(directory)
 }
 
-async fn capture_requests(listener: TcpListener) -> Vec<Value> {
+async fn capture_requests(listener: TcpListener) -> (Vec<Value>, Option<Value>) {
     let (stream, _) = listener.accept().await.unwrap();
     let mut stream = BufReader::new(stream);
     let mut requests = Vec::new();
+    let mut initialization = None;
     loop {
         let mut line = String::new();
         if stream.read_line(&mut line).await.unwrap() == 0 {
@@ -81,9 +120,12 @@ async fn capture_requests(listener: TcpListener) -> Vec<Value> {
         let request: Value = ::serde_json::from_str(&line).unwrap();
         let result = match request["method"].as_str().unwrap() {
             "initialize" => ::serde_json::json!("OK"),
-            "initialize_schema_context" => ::serde_json::json!({
-                "context_handle":"test", "schema_dump_hash":null, "problems":page(&[])
-            }),
+            "initialize_schema_context" => {
+                initialization = Some(request["params"].clone());
+                ::serde_json::json!({
+                    "context_handle":"test", "schema_dump_hash":null, "problems":page(&[])
+                })
+            }
             "analyze_query" => {
                 let item = ::serde_json::json!({
                     "query_span":null, "query_kind":"Select", "execute_sql":null,
@@ -102,7 +144,7 @@ async fn capture_requests(listener: TcpListener) -> Vec<Value> {
             .await
             .unwrap();
     }
-    requests
+    (requests, initialization)
 }
 
 fn page(items: &[Value]) -> Value {

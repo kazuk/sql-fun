@@ -107,8 +107,8 @@ pub struct SqlFunArgs {
     #[builder(default)]
     no_builtin_tables: bool,
 
-    /// datasource name
-    #[clap(long, env = Self::SQL_FUN_DATASOURCE)]
+    /// Datasource name (default: the datasource named `default`)
+    #[clap(long, env = Self::SQL_FUN_DATASOURCE, default_value = "default")]
     #[builder(default)]
     datasource: Option<String>,
 

@@ -329,6 +329,7 @@ ownership of the schema itself.
 > `sql-fun` focuses on code generation, not schema evolution.
 
 `sql-fun analyze` and `sql-fun test` use the same installed server and builtin
-catalogs as the API. They require an explicitly selected datasource, but do not
-require `cargo-expand` or a live database. See [analyze](cli/analyze.md) and
-[test](cli/test.md) for input selection, schema levels, and query contracts.
+catalogs as the API. They use the selected datasource (or the configured
+`default` datasource), but do not require `cargo-expand` or a live database.
+See [analyze](cli/analyze.md) and [test](cli/test.md) for input selection,
+schema levels, and query contracts.

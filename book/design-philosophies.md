@@ -68,6 +68,10 @@ It’s because it wants to be **just a tool** —
 like a saw or a hammer, it should do nothing on its own.  
 It does only what you ask, and nothing more.
 
+A choice can also be expressed in configuration: naming a datasource `default`
+selects it for commands that use the common datasource when no other datasource
+name is supplied. An explicit CLI or environment selection takes precedence.
+
 This principle governs core policies such as:
 
 - Refusing to assume a default `connector` or `engine`, even if only one exists,

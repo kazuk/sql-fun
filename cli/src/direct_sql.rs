@@ -140,7 +140,8 @@ async fn execute(
         let datasource = args.datasource().context(
             "analyze/test require an explicitly selected --datasource (or SQL_FUN_DATASOURCE)",
         )?;
-        let request = initialization(args, datasource, level)?;
+        let request = initialization(args, datasource, level)
+            .with_context(|| format!("cannot set up datasource {datasource:?}"))?;
         let renderer = DiagnosticRenderer::from_args(args)?;
         let mut client = ApiArgs::from_environment()?.connect().await?;
         let initialized = initialize(&mut client, &request, &renderer).await;

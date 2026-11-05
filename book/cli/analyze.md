@@ -1,4 +1,4 @@
-# Analyze SQL files
+# Analyze SQL
 
 `sql-fun analyze` statically analyzes SQL without extracting queries from Rust
 or creating query lockfiles. It uses `sql-fun-server` and an installed builtin
@@ -10,11 +10,18 @@ select the metadata file with `--metadata-file`; otherwise the common metadata
 configuration applies. The command does not choose an available datasource for you.
 
 ```sh
-sql-fun --metadata-file Cargo.toml --datasource app analyze queries.sql
-sql-fun --metadata-file Cargo.toml --datasource app analyze 'queries.toml#$.queries'
+sql-fun --metadata-file Cargo.toml --datasource app analyze 'SELECT 1 AS result'
+sql-fun --metadata-file Cargo.toml --datasource app analyze --sql-file queries.sql
+sql-fun --metadata-file Cargo.toml --datasource app analyze --sql-file 'queries.toml#$.queries'
 ```
 
-Without `#`, the input is UTF-8 SQL text, regardless of filename extension.
+Supply exactly one input: the positional argument is literal SQL, while
+`--sql-file` explicitly selects a file. Quote SQL for your shell, and use `--`
+before positional SQL beginning with `-`. A positional filename is treated as
+SQL text; change existing file invocations to use `--sql-file`.
+
+For `--sql-file`, without `#`, the file is UTF-8 SQL text, regardless of
+filename extension.
 With `#`, the file must have a `.json`, `.toml`, or `.yaml` extension, and the
 suffix is a JSONPath selecting exactly one node. A selected string is one input;
 a selected string array is an ordered sequence of independent inputs. Zero or
@@ -62,7 +69,8 @@ vocabulary, SQL examples, and analysis boundaries.
 To avoid the additional server-side analysis and omit its display, use:
 
 ```sh
-sql-fun --metadata-file Cargo.toml --datasource app analyze queries.sql --no-column-access
+sql-fun --metadata-file Cargo.toml --datasource app analyze \
+  --sql-file queries.sql --no-column-access
 ```
 
 This option preserves ordinary diagnostics, parameters, and result columns.

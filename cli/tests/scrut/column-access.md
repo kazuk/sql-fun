@@ -20,7 +20,7 @@ $ echo 'CREATE TABLE events (id int4);' > "$SQL_FUN_API_FIXTURE/access-schema.sq
 > "$SQL_FUN_BIN" --term-color never \
 > --metadata-file "$SQL_FUN_API_FIXTURE/Cargo.toml" --datasource products \
 > --schema-file "$SQL_FUN_API_FIXTURE/access-schema.sql" \
-> analyze "$SQL_FUN_API_FIXTURE/access.yaml#$.queries" \
+> analyze --sql-file "$SQL_FUN_API_FIXTURE/access.yaml#$.queries" \
 > >"$SQL_FUN_API_FIXTURE/access.stdout" 2>"$SQL_FUN_API_FIXTURE/access.stderr"
 [1]
 ```
@@ -79,7 +79,8 @@ $ SQL_FUN_HOME="$SQL_FUN_API_FIXTURE/home" \
 > "$SQL_FUN_BIN" --term-color never \
 > --metadata-file "$SQL_FUN_API_FIXTURE/Cargo.toml" --datasource products \
 > --schema-file "$SQL_FUN_API_FIXTURE/access-schema.sql" \
-> analyze "$SQL_FUN_API_FIXTURE/access.yaml#$.queries" --no-column-access \
+> analyze --sql-file "$SQL_FUN_API_FIXTURE/access.yaml#$.queries" \
+> --no-column-access \
 > >"$SQL_FUN_API_FIXTURE/access-disabled.stdout" 2>"$SQL_FUN_API_FIXTURE/access-disabled.stderr"
 [1]
 ```

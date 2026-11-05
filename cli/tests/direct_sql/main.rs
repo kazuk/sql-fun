@@ -9,8 +9,8 @@ use self::test_helpers::{
 };
 
 #[rstest::rstest]
-#[case::analyze(vec!["analyze", "queries.json#$.queries"], true)]
-#[case::opt_out(vec!["analyze", "queries.json#$.queries", "--no-column-access"], false)]
+#[case::analyze(vec!["analyze", "--sql-file", "queries.json#$.queries"], true)]
+#[case::opt_out(vec!["analyze", "--sql-file", "queries.json#$.queries", "--no-column-access"], false)]
 #[case::named_test(vec!["test", "cases.json"], false)]
 #[case::legacy_test(vec!["test", "queries.json#$.queries", "--expect", "queries.json#$.expected"], false)]
 #[tokio::test]
@@ -174,6 +174,7 @@ async fn analyze_reports_all_statements_and_continues_after_diagnostics() -> ::t
     )?;
     let output = server
         .sql_command(&schema, "analyze")
+        .arg("--sql-file")
         .arg(suite.selection())
         .output()
         .await?;
@@ -294,6 +295,7 @@ async fn analyze_displays_statement_results_and_accesses() -> ::testresult::Test
     )?;
     let output = server
         .sql_command(&schema, "analyze")
+        .arg("--sql-file")
         .arg(suite.selection())
         .output()
         .await?;
@@ -336,6 +338,7 @@ async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::test
     let suite = Suite::new(&["SELECT ("], &::serde_json::json!([]))?;
     let output = server
         .sql_command(&schema, "analyze")
+        .arg("--sql-file")
         .arg(suite.selection())
         .output()
         .await?;

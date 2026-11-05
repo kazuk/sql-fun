@@ -44,7 +44,7 @@ $ cat > "$SQL_FUN_API_FIXTURE/bindings.json" <<'JSON'
 > SQL_FUN_HOME="$SQL_FUN_API_FIXTURE/home" \
 > "$SQL_FUN_BIN" --term-color never \
 > --metadata-file "$SQL_FUN_API_FIXTURE/Cargo.toml" --datasource products \
-> analyze "$SQL_FUN_API_FIXTURE/bindings.json#$.queries" \
+> analyze --sql-file "$SQL_FUN_API_FIXTURE/bindings.json#$.queries" \
 > --schema-level builtin >"$SQL_FUN_API_FIXTURE/bindings.stdout" \
 > 2>"$SQL_FUN_API_FIXTURE/bindings.stderr"
 [1]

@@ -10,6 +10,14 @@ pub(super) struct SqlInputs {
     names: Vec<String>,
 }
 impl SqlInputs {
+    pub(super) fn inline(sql: &str) -> Self {
+        Self {
+            source: "<inline SQL>".to_owned(),
+            queries: vec![sql.to_owned()],
+            array: false,
+            names: Vec::new(),
+        }
+    }
     pub(super) fn load(reference: &str) -> Result<Self, ::anyhow::Error> {
         let (queries, array) = if reference.contains('#') {
             Self::selected_queries(&load_value(reference)?)?

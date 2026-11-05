@@ -224,7 +224,7 @@ module that owns the conversion; no separate catch-all test module remains.
 | `ast_conversion/update/tests.rs` | `sem/update_statement/ast.rs` | `UpdateStatement::from_ast` |
 
 Three common-AST syntax synchronization tests remain inline under
-`ast/public.rs` and `ast/wildcard.rs`; semantic wildcard-projection behavior
+`ast/public/wildcard.rs`; semantic wildcard-projection behavior
 is implemented in `sem/scalar_expr/**/wildcard_projection.rs`. The six focused
 placement checks put operator-name, operator-resolution, SQLite-pattern,
 PostgreSQL-pattern, ordering-operator, and name-resolution-phase tests beside
@@ -337,10 +337,10 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast/utility.rs` | 2 / 0 / 8 | Syntax-only AST utility operations remain at the same path. |
 | `ast/validation.rs` | 1 / 4 / 1 | Structural AST validation remains; stack handling calls the crate stack directly. |
 | `ast/view_definition.rs` | 0 / 0 / 0 | View lineage and semantic conversion → `semantic view-owner module (physical map above)`; source file removed. |
-| `ast/wildcard.rs` | 0 / 0 / 0 | Syntax projection operations remain here; semantic expansion consumer → `sem/wildcard_expansion/rewrite.rs`. |
+| `ast/wildcard.rs` | 0 / 0 / 0 | Syntax synchronization → `ast/public/wildcard.rs`; semantic expansion consumer → `sem/wildcard_expansion/rewrite.rs`. |
 | `ast/wildcard/rows_source.rs` | 4 / 6 / 13 | Rewrite consumer and tests → `sem/wildcard_expansion/rewrite/rows_source.rs`. |
 | `ast/wildcard/source.rs` | 0 / 0 / 0 | Rewrite consumer and tests → `sem/wildcard_expansion/rewrite/source.rs`. |
-| `ast/wildcard/tests.rs` | 16 / 46 / 44 | Rewrite consumer and tests → `sem/wildcard_expansion/rewrite/tests.rs`. |
+| `ast/wildcard/tests.rs` | 16 / 46 / 44 | Inline rewrite tests → `sem/wildcard_expansion/rewrite.rs`; syntax synchronization tests → `ast/public/wildcard.rs`. |
 
 ## Compiled-case preservation status
 
@@ -364,7 +364,7 @@ Both round-two standard flows passed. Default passed 4,381 `sql-fun-sqlast`
 tests, 5,475 workspace tests with 63 existing ignored tests, and 3,064 SQL
 regression inputs. All-features passed 5,108 `sql-fun-sqlast` tests, 6,254
 workspace tests with 63 existing ignored tests, and 3,064 SQL regression inputs
-in 166 groups. No SLOW timeout occurred in the default flow.
+in 166 groups. Neither flow reported SLOW warnings or timeouts.
 
 ### Source assertion and case-count evidence
 
@@ -489,7 +489,7 @@ The current conversion index and physical maps reflect these corrections:
 - Semantic wildcard-projection expression implementations are in the
   `sem/scalar_expr/**/wildcard_projection.rs` descendants. `WildcardExpansion`
   continues to own staged statement rewriting. Three syntax synchronization
-  tests remain inline under `ast/public.rs` and `ast/wildcard.rs`.
+  tests remain inline under `ast/public/wildcard.rs`.
 - `ast/sqlite.rs` remains the AST-side SQLite syntax adapter. Semantic analysis
   now resides only with the relevant semantic owner types.
 
@@ -500,9 +500,12 @@ artifacts; the repository's 20 GiB minimum baseline was satisfied.
 Both post-correction compiled reconciliations and standard flows are complete
 as recorded above. Independent source ownership, module-placement, model, and
 AST-options export audits passed; the `check-test-flow` helper update is
-complete and no CI job definitions changed. Packaging, SemVer, and
-installed-distribution checks remain pending. Source counts and identity maps
-alone cannot establish semantic behavior or ownership.
+complete and no CI job definitions changed. Packaging and SemVer checks passed
+for implementation commit `3381e042`. Package layout, metadata, checksums, and
+executable identity were validated. Executables extracted from the generated tar
+archive passed all 3,064 SQL regression cases in 166 groups. Existing
+release-intent declarations and package versions were unchanged. Source counts
+and identity maps alone cannot establish semantic behavior or ownership.
 
 ## Final semantic entry-point index
 

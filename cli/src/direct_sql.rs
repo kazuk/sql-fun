@@ -7,7 +7,9 @@ mod test_input;
 use crate::{DiagnosticRenderer, api::ApiArgs};
 
 use self::{expectation::Expectation, input::SqlInputs, report::Case, test_input::TestInputs};
-use crate::analysis::{initialization, prepare_diagnostics, prepare_tokens, request_typed};
+use crate::analysis::{
+    PreparedDiagnostics, initialization, prepare_diagnostics, prepare_tokens, request_typed,
+};
 use crate::diagnostic::terminal_color;
 use std::{io::IsTerminal, path::PathBuf, process::ExitCode, time::Instant};
 
@@ -47,10 +49,19 @@ pub struct TestArgs {
     /// optionally followed by `#JSONPath`.
     #[arg(long)]
     expect: Option<String>,
+    /// Continue after schema diagnostics up to this severity; diagnostics are still displayed.
+    #[arg(long, value_enum)]
+    ignore_schema_diagnostics: Option<SchemaDiagnosticThreshold>,
     /// Write one `JUnit` testcase per selected SQL input to this file.
     #[arg(long)]
     junit_xml: Option<PathBuf>,
 }
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum SchemaDiagnosticThreshold {
+    Warning,
+    Error,
+}
+
 #[derive(Debug, Clone, clap::Args)]
 struct InputArgs {
     /// Input filename or structured selection (`filename#JSONPath`).
@@ -75,6 +86,7 @@ impl AnalyzeArgs {
             None,
             !self.no_column_access,
             self.diagnostics_to_stderr,
+            None,
         )
         .await;
         finish(
@@ -95,9 +107,15 @@ impl TestArgs {
             Some(inputs.expectations()),
             false,
             false,
+            self.ignore_schema_diagnostics,
         )
         .await;
-        finish(&cases, self.junit_xml.as_deref(), true, false)
+        finish(
+            &cases,
+            self.junit_xml.as_deref(),
+            true,
+            terminal_color(args.term_color(), std::io::stdout().is_terminal()),
+        )
     }
 }
 fn finish(
@@ -110,7 +128,7 @@ fn finish(
     let console = (|| {
         for case in cases {
             if testing {
-                case.print()?;
+                case.print(color)?;
             } else {
                 case.print_analysis(color)?;
             }
@@ -146,6 +164,7 @@ async fn execute(
     expectations: Option<&[Expectation]>,
     analyze_access: bool,
     diagnostics_to_stderr: bool,
+    schema_threshold: Option<SchemaDiagnosticThreshold>,
 ) -> Vec<Case> {
     let mut cases: Vec<_> = inputs
         .queries()
@@ -165,16 +184,12 @@ async fn execute(
         let request = initialization(args, datasource, level)
             .with_context(|| format!("cannot set up datasource {datasource:?}"))?;
         let renderer = DiagnosticRenderer::from_args(args)?;
-        let stdout_renderer = if expectations.is_none() {
-            Some(DiagnosticRenderer::for_terminal(
-                args,
-                std::io::stdout().is_terminal(),
-            )?)
-        } else {
-            None
-        };
+        let stdout_renderer = Some(DiagnosticRenderer::for_terminal(
+            args,
+            std::io::stdout().is_terminal(),
+        )?);
         let mut client = ApiArgs::from_environment()?.connect().await?;
-        let initialized = initialize(&mut client, &request, &renderer).await;
+        let initialized = initialize(&mut client, &request, &renderer, schema_threshold).await;
         let initialized = match initialized {
             Ok(context) => context,
             Err(error) => {
@@ -242,21 +257,18 @@ async fn execute_session(
                 request_typed(&mut client, "analyze_query", &request).await?;
             let prepared = prepare_tokens(&mut client, &response).await;
             if let Some(expectations) = expectations {
-                for (statement, item) in response.queries().items().iter().enumerate() {
-                    for diagnostic in item.probrems().items() {
-                        use std::io::Write;
-                        writeln!(
-                            std::io::stderr().lock(),
-                            "{} (statement {statement})\n{}",
-                            inputs.diagnostic_identity(index),
-                            prepared.render(diagnostic, &renderers.stderr)?
-                        )?;
-                    }
-                }
-                if let Some(error) = prepared.error() {
-                    ::anyhow::bail!("cannot tokenize SQL diagnostics: {error}");
-                }
-                Ok(expectations[index].differences(&response)?)
+                let output_renderer = renderers
+                    .stdout
+                    .as_ref()
+                    .context("missing stdout renderer")?;
+                compare_test_case(
+                    &expectations[index],
+                    &response,
+                    &prepared,
+                    output_renderer,
+                    &mut cases[index],
+                    index,
+                )
             } else {
                 let report = cases[index]
                     .analysis_mut()
@@ -295,6 +307,37 @@ async fn execute_session(
     }
 
     cases
+}
+
+fn compare_test_case(
+    expectation: &Expectation,
+    response: &AnalyzeQueryResponse,
+    prepared: &PreparedDiagnostics,
+    renderer: &DiagnosticRenderer,
+    case: &mut Case,
+    case_index: usize,
+) -> Result<Vec<expectation::Difference>, ::anyhow::Error> {
+    let differences = expectation.differences(response)?;
+    let mut diagnostic_context = Vec::new();
+    for (statement, item) in response.queries().items().iter().enumerate() {
+        for diagnostic in item.probrems().items() {
+            // Rendering errors remain execution errors even on a passing case.
+            let report_text = prepared.render(diagnostic, renderer)?;
+            if differences
+                .iter()
+                .any(|difference| difference.includes_diagnostic(diagnostic.code()))
+            {
+                diagnostic_context.push(format!(
+                    "Case {case_index}, statement {statement}\n{report_text}"
+                ));
+            }
+        }
+    }
+    if let Some(error) = prepared.error() {
+        ::anyhow::bail!("cannot tokenize SQL diagnostics: {error}");
+    }
+    case.set_diagnostic_context(diagnostic_context);
+    Ok(differences)
 }
 
 #[cfg(test)]
@@ -363,7 +406,7 @@ mod test_execute_session {
             test_helpers::context(),
             SessionRenderers {
                 stderr: renderer,
-                stdout: None,
+                stdout: Some(test_helpers::renderer()?),
                 duplicate: false,
             },
             &inputs,
@@ -383,6 +426,7 @@ async fn initialize(
     client: &mut TcpJsonRpcClientAsync,
     request: &::sql_fun_client::payloads::InitializeSchemaArgs,
     renderer: &DiagnosticRenderer,
+    threshold: Option<SchemaDiagnosticThreshold>,
 ) -> Result<SchemaContext, ::anyhow::Error> {
     let context: SchemaContext =
         request_typed(client, "initialize_schema_context", request).await?;
@@ -399,12 +443,13 @@ async fn initialize(
         ::anyhow::bail!("cannot tokenize schema diagnostics: {error}");
     }
     ::anyhow::ensure!(
-        !context
-            .problems()
-            .items()
-            .iter()
-            .any(|diagnostic| *diagnostic.severity()
-                == ::sql_fun_client::payloads::DiagnosticSeverity::error()),
+        matches!(threshold, Some(SchemaDiagnosticThreshold::Error))
+            || !context
+                .problems()
+                .items()
+                .iter()
+                .any(|diagnostic| *diagnostic.severity()
+                    == ::sql_fun_client::payloads::DiagnosticSeverity::error()),
         "schema initialization has error-level diagnostics"
     );
     ::anyhow::ensure!(

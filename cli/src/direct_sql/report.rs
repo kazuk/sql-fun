@@ -1,4 +1,4 @@
-use crate::direct_sql::results::AnalysisReport;
+use crate::direct_sql::{expectation::Difference, results::AnalysisReport};
 use std::{io::Write, path::Path, time::Duration};
 
 use ::quick_xml::{
@@ -9,7 +9,8 @@ use ::quick_xml::{
 pub(super) struct Case {
     name: String,
     duration: Duration,
-    failures: Vec<String>,
+    failures: Vec<Difference>,
+    diagnostic_context: Vec<String>,
     error: Option<String>,
     analysis: Option<AnalysisReport>,
 }
@@ -19,6 +20,7 @@ impl Case {
             name: name.to_owned(),
             duration: Duration::ZERO,
             failures: Vec::new(),
+            diagnostic_context: Vec::new(),
             error: None,
             analysis: None,
         }
@@ -44,8 +46,11 @@ impl Case {
     pub(super) const fn set_duration(&mut self, duration: Duration) {
         self.duration = duration;
     }
-    pub(super) fn set_failures(&mut self, failures: Vec<String>) {
+    pub(super) fn set_failures(&mut self, failures: Vec<Difference>) {
         self.failures = failures;
+    }
+    pub(super) fn set_diagnostic_context(&mut self, context: Vec<String>) {
+        self.diagnostic_context = context;
     }
     pub(super) fn set_error(&mut self, error: &str) {
         self.error = Some(error.to_owned());
@@ -66,10 +71,10 @@ impl Case {
             && self.failures.is_empty()
             && self.analysis.as_ref().is_none_or(AnalysisReport::passed)
     }
-    pub(super) fn print(&self) -> std::io::Result<()> {
-        self.write_console(&mut std::io::stdout().lock())
+    pub(super) fn print(&self, color: bool) -> std::io::Result<()> {
+        self.write_console(&mut std::io::stdout().lock(), color)
     }
-    fn write_console(&self, output: &mut impl Write) -> std::io::Result<()> {
+    fn write_console(&self, output: &mut impl Write, color: bool) -> std::io::Result<()> {
         let status = if self.error.is_some() {
             "ERROR"
         } else if self.failures.is_empty() {
@@ -78,7 +83,13 @@ impl Case {
             "FAIL"
         };
         writeln!(output, "{status} {}", self.name)?;
-        for message in self.error.iter().chain(self.failures.iter()) {
+        for message in self
+            .error
+            .iter()
+            .cloned()
+            .chain(self.failures.iter().map(|failure| failure.format(color)))
+            .chain(self.diagnostic_context.iter().cloned())
+        {
             for line in message.lines() {
                 writeln!(output, "  {line}")?;
             }
@@ -92,22 +103,27 @@ impl Case {
 
 #[cfg(test)]
 mod test_console {
-    use crate::direct_sql::report::Case;
+    use crate::direct_sql::{expectation::Difference, report::Case};
 
     #[test]
     fn indents_each_detail_line_and_separates_failure_cases() -> ::testresult::TestResult {
         let mut failed = Case::new("query[0]");
-        failed.set_failures(vec!["column 0:\n  expected:\n    name: \"id\"".into()]);
+        failed.set_failures(vec![Difference::ColumnField {
+            index: 0,
+            field: "name",
+            expected: "id".into(),
+            actual: "other".into(),
+        }]);
         let mut error = Case::new("query[1]");
         error.set_error("transport failure\nconnection closed");
         let mut output = Vec::new();
-        failed.write_console(&mut output)?;
-        error.write_console(&mut output)?;
-        Case::new("query[2]").write_console(&mut output)?;
+        failed.write_console(&mut output, false)?;
+        error.write_console(&mut output, false)?;
+        Case::new("query[2]").write_console(&mut output, false)?;
         assert_eq!(
             String::from_utf8(output)?,
             concat!(
-                "FAIL query[0]\n  column 0:\n    expected:\n      name: \"id\"\n\n",
+                "FAIL query[0]\n  Column 0 · name\n    Expected: id\n    Actual:   other\n\n",
                 "ERROR query[1]\n  transport failure\n  connection closed\n\n",
                 "PASS query[2]\n",
             )
@@ -160,13 +176,27 @@ pub(super) fn write_report(path: &Path, cases: &[Case]) -> Result<(), ::anyhow::
             let details = if case.failures.is_empty() {
                 error.clone()
             } else {
-                format!("{error}\n{}", case.failures.join("\n"))
+                format!(
+                    "{error}\n{}",
+                    case.failures
+                        .iter()
+                        .map(|failure| failure.format(false))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
             };
             Some(("error", details))
         } else if case.failures.is_empty() {
             None
         } else {
-            Some(("failure", case.failures.join("\n")))
+            Some((
+                "failure",
+                case.failures
+                    .iter()
+                    .map(|failure| failure.format(false))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ))
         };
         if let Some((kind, message)) = problem {
             writer.write_event(Event::Start(BytesStart::new(kind)))?;
@@ -189,13 +219,21 @@ pub(super) fn write_report(path: &Path, cases: &[Case]) -> Result<(), ::anyhow::
 
 #[cfg(test)]
 mod tests {
-    use crate::direct_sql::report::{Case, write_report};
+    use crate::direct_sql::{
+        expectation::Difference,
+        report::{Case, write_report},
+    };
     #[test]
     fn report_is_parseable_with_pass_failure_error_and_special_text() -> ::testresult::TestResult {
         let directory = ::tempfile::tempdir()?;
         let path = directory.path().join("nested/junit.xml");
         let mut failed = Case::new("source<&\"[1]");
-        failed.set_failures(vec!["expected <id> & actual \"名前\"\0".into()]);
+        failed.set_failures(vec![Difference::ColumnField {
+            index: 0,
+            field: "name",
+            expected: "<id> &".into(),
+            actual: "名前\0".into(),
+        }]);
         let mut error = Case::new("source[2]");
         error.set_error("transport failure");
         write_report(&path, &[Case::new("source[0]"), failed, error])?;

@@ -55,8 +55,8 @@ reordering cases. Names preserve original Rust case identities and must be
 nonempty and unique within the fixture. The runner validates manifest case
 counts and passes fixture files directly to `sql-fun test`. The CLI validates
 case objects and names before analysis.
-Console/JUnit identities include the fixture path and case name; SQL diagnostic
-context also includes the array index.
+Console/JUnit identities include the fixture path and case name; failure diagnostic
+context also includes the array and statement indices.
 Expectations use the existing `sql-fun test` contract: complete diagnostic sets
 and exact ordered columns, including absent types and unknown nullability.
 

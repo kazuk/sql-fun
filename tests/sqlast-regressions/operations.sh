@@ -80,7 +80,7 @@ run_controls() {
     done
     for evidence in "FAIL $runtime/negative-cases.json::$(jq -r '.[0].name' "$runtime/negative-cases.json")" \
       "FAIL $runtime/negative-cases.json::$(jq -r '.[1].name' "$runtime/negative-cases.json")" "PASS $runtime/negative-cases.json::independent-later-pass" \
-      '  column 0:' '    expected:' '    actual:' '    missing:' '    unexpected:' \
+      '  Column 0 · name' '    Expected: "intentionally_wrong"' '  Diagnostics:' '    Missing:' '    Unexpected:' \
       '3 cases: 1 passed, 2 failed or errored'; do
       grep -Fx "$evidence" "$control.log" >/dev/null
     done
@@ -98,6 +98,37 @@ run_controls() {
     if grep -q '^PASS ' "$reports/controls/datasource-$version.log"; then
       echo 'Unconfigured datasource unexpectedly analyzed a passing query' >&2; exit 1
     fi
+    # A recoverable schema error leaves a usable context, but only explicit
+    # permission to ignore errors may run queries against it.
+    cat >"$runtime/schema-diagnostics.sql" <<'SQL'
+CREATE TABLE measured (id int4);
+ALTER TABLE measured ALTER COLUMN id SET STATISTICS 10001;
+ALTER TABLE measured ALTER COLUMN id SET STATISTICS -2;
+SQL
+    jq '.[0:1] | .[0].name = "loaded-schema" | .[0].sql = "SELECT id FROM measured" |
+      .[0].expected.columns[0].name = "id" | .[0].expected.columns[0].nullability = "nullable"' \
+      "$suite/pilot.json" >"$runtime/schema-cases.json"
+    for threshold in default warning error; do
+      threshold_args=()
+      if [[ "$threshold" != default ]]; then threshold_args=(--ignore-schema-diagnostics "$threshold"); fi
+      control="$reports/controls/schema-$version-$threshold"
+      status=0
+      "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
+        --datasource regression --schema-file "$runtime/schema-diagnostics.sql" \
+        test "$runtime/schema-cases.json" --schema-level project \
+        "${threshold_args[@]}" --junit-xml "$control.xml" >"$control.log" 2>&1 || status=$?
+      grep -F 'alter_column_statistics_reduced' "$control.log" >/dev/null
+      grep -F 'alter_column_statistics_too_low' "$control.log" >/dev/null
+      if [[ "$threshold" == error ]]; then
+        [[ "$status" == 0 ]] || { cat "$control.log"; exit 1; }
+        grep -F 'tests="1" failures="0" errors="0"' "$control.xml" >/dev/null
+        grep -F 'PASS ' "$control.log" >/dev/null
+      else
+        [[ "$status" == 1 ]] || { cat "$control.log"; exit 1; }
+        grep -F 'tests="1" failures="0" errors="1"' "$control.xml" >/dev/null
+        grep -F 'ERROR ' "$control.log" >/dev/null
+      fi
+    done
     echo "PostgreSQL $version: negative controls verified (3 executed, 2 intentional failures, 1 pass; invalid selector and missing datasource rejected)"
   done
 }

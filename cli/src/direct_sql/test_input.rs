@@ -112,10 +112,6 @@ mod tests {
         )?;
         assert_eq!(inputs.sql().queries(), ["", "SELECT 1"]);
         assert_eq!(inputs.sql().identity(1), "cases.json#$.tests::Same");
-        assert_eq!(
-            inputs.sql().diagnostic_identity(1),
-            "cases.json#$.tests[1]::Same"
-        );
         assert_eq!(inputs.expectations().len(), 2);
         Ok(())
     }

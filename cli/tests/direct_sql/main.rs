@@ -9,6 +9,178 @@ use self::test_helpers::{
 };
 
 #[rstest::rstest]
+#[case::default_warning(vec![], vec!["warning"], true)]
+#[case::warning_warning(vec!["--ignore-schema-diagnostics", "warning"], vec!["warning"], true)]
+#[case::default_error(vec![], vec!["warning", "error"], false)]
+#[case::warning_error(vec!["--ignore-schema-diagnostics", "warning"], vec!["warning", "error"], false)]
+#[case::error_error(vec!["--ignore-schema-diagnostics", "error"], vec!["warning", "error"], true)]
+#[tokio::test]
+async fn schema_diagnostics_remain_visible_and_only_gate_when_requested(
+    #[case] args: Vec<&str>,
+    #[case] severities: Vec<&str>,
+    #[case] continues: bool,
+) -> ::testresult::TestResult {
+    let mut options = vec!["test", "cases.json"];
+    options.extend(args);
+    let (output, queries, report) =
+        test_helpers::request_peer::run_schema(&options, &severities, "never").await?;
+    assert_eq!(output.status.success(), continues);
+    assert_eq!(queries.len(), if continues { 2 } else { 0 });
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_eq!(
+        stderr.matches("schema initialization").count(),
+        severities.len(),
+        "{stderr}"
+    );
+    if continues {
+        assert!(
+            report.contains("tests=\"2\" failures=\"0\" errors=\"0\""),
+            "{report}"
+        );
+    } else {
+        assert!(
+            report.contains("tests=\"2\" failures=\"0\" errors=\"2\""),
+            "{report}"
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn matching_query_diagnostics_are_quiet_and_failures_precede_context()
+-> ::testresult::TestResult {
+    let (output, queries, report) = test_helpers::request_peer::run_schema(
+        &["test", "diagnostic-cases.json"],
+        &["warning"],
+        "never",
+    )
+    .await?;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(queries.len(), 4);
+    let stdout = String::from_utf8(output.stdout)?;
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(
+        stdout.starts_with(
+            "PASS diagnostic-cases.json::expected\nPASS diagnostic-cases.json::expected-error\nFAIL diagnostic-cases.json::unexpected\n"
+        ),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("Unexpected:\n      \"parameter_constraint\""),
+        "{stdout}"
+    );
+    assert!(stdout.contains("Case 2, statement 0"), "{stdout}");
+    assert!(
+        stdout.contains("PASS diagnostic-cases.json::later"),
+        "{stdout}"
+    );
+    assert_eq!(stderr.matches("schema initialization").count(), 1);
+    assert!(!stdout.contains('\x1b'));
+    assert!(
+        report.contains("tests=\"4\" failures=\"1\" errors=\"0\""),
+        "{report}"
+    );
+    assert!(!report.contains('\x1b'));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::invalid(vec!["test", "cases.json", "--ignore-schema-diagnostics", "advice"])]
+#[case::missing(vec!["test", "cases.json", "--ignore-schema-diagnostics"])]
+#[case::analyze(vec!["analyze", "SELECT 1", "--ignore-schema-diagnostics", "error"])]
+#[test]
+fn schema_threshold_rejects_invalid_options(#[case] args: Vec<&str>) -> ::testresult::TestResult {
+    let output = std::process::Command::new(api_helpers::executable::cli_executable())
+        .args(args)
+        .output()?;
+    assert_eq!(output.status.code(), Some(2));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::auto("auto", false)]
+#[case::never("never", false)]
+#[case::ansi("ansi", true)]
+#[tokio::test]
+async fn case_difference_color_obeys_terminal_setting(
+    #[case] color: &str,
+    #[case] ansi: bool,
+) -> ::testresult::TestResult {
+    let (output, _, report) =
+        test_helpers::request_peer::run_schema(&["test", "diagnostic-cases.json"], &[], color)
+            .await?;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.stdout.contains(&0x1b), ansi);
+    assert!(!report.contains('\x1b'));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::missing_context(vec!["error", "no_handle"])]
+#[case::fatal_rpc(vec!["fatal"])]
+#[tokio::test]
+async fn ignored_schema_errors_do_not_override_initialization_failures(
+    #[case] severities: Vec<&str>,
+) -> ::testresult::TestResult {
+    let (output, queries, report) = test_helpers::request_peer::run_schema(
+        &["test", "cases.json", "--ignore-schema-diagnostics", "error"],
+        &severities,
+        "never",
+    )
+    .await?;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(queries.len(), 0);
+    assert!(
+        report.contains("tests=\"2\" failures=\"0\" errors=\"2\""),
+        "{report}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn schema_diagnostics_remain_visible_on_query_execution_error() -> ::testresult::TestResult {
+    let (output, queries, report) = test_helpers::request_peer::run_schema(
+        &["test", "error-cases.json"],
+        &["warning"],
+        "never",
+    )
+    .await?;
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(queries.len(), 1);
+    assert!(String::from_utf8(output.stderr)?.contains("schema initialization"));
+    assert!(String::from_utf8(output.stdout)?.starts_with("ERROR error-cases.json::rpc-error"));
+    assert!(
+        report.contains("tests=\"1\" failures=\"0\" errors=\"1\""),
+        "{report}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn multiple_statement_failure_retains_diagnostic_positions() -> ::testresult::TestResult {
+    let (output, _, report) =
+        test_helpers::request_peer::run_schema(&["test", "multiple-cases.json"], &[], "never")
+            .await?;
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.starts_with("FAIL multiple-cases.json::multiple"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("expected exactly one statement result, actual 2"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("Case 0, statement 0"), "{stdout}");
+    assert!(stdout.contains("Case 0, statement 1"), "{stdout}");
+    assert!(
+        report.contains("tests=\"1\" failures=\"1\" errors=\"0\""),
+        "{report}"
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
 #[case::analyze_default(&["analyze", "--sql-file", "queries.json#$.queries"], None, None, "default")]
 #[case::test_default(&["test", "cases.json"], None, None, "default")]
 #[case::environment(&["analyze", "--sql-file", "queries.json#$.queries"], None, Some("products"), "products")]
@@ -199,7 +371,7 @@ async fn mixed_results_continue_and_parse_diagnostics_are_assertions() -> ::test
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("1 passed"));
     assert!(
-        stdout.contains("diagnostics:\n    missing:\n      \"unexpected_expected_code\""),
+        stdout.contains("Diagnostics:\n    Missing:\n      \"unexpected_expected_code\""),
         "{stdout}"
     );
     assert!(
@@ -450,16 +622,12 @@ async fn column_differences_are_readable_in_console_and_junit() -> ::testresult:
     assert_eq!(output.status.code(), Some(1));
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("column 0:\n    expected:\n      name: \"renamed\""),
+        stdout.contains("Column 0 · name\n    Expected: \"renamed\"\n    Actual:   \"id\""),
         "{stdout}"
     );
+    assert!(stdout.contains("Column 0 · type\n    Expected: \"app\".\"identifier\"[]\n    Actual:   \"pg_catalog\".\"int4\""), "{stdout}");
     assert!(
-        stdout.contains("type: \"app\".\"identifier\"[]\n      nullability: nullable"),
-        "{stdout}"
-    );
-    assert!(stdout.contains("actual:\n      name: \"id\""), "{stdout}");
-    assert!(
-        stdout.contains("type: \"pg_catalog\".\"int4\"\n      nullability: not_null"),
+        stdout.contains("Column 0 · nullability\n    Expected: nullable\n    Actual:   not_null"),
         "{stdout}"
     );
     let report = suite.report_text()?;
@@ -477,9 +645,9 @@ async fn column_differences_are_readable_in_console_and_junit() -> ::testresult:
         }
     };
     assert!(
-        failure.contains("column 0:\n  expected:\n    name:"),
+        failure.contains("Column 0 · name\n  Expected:"),
         "{failure}"
     );
-    assert!(failure.contains("\n  actual:\n    name:"), "{failure}");
+    assert!(failure.contains("\n  Actual:"), "{failure}");
     Ok(())
 }

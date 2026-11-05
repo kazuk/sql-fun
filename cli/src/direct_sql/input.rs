@@ -83,13 +83,6 @@ impl SqlInputs {
             self.source.clone()
         }
     }
-    pub(super) fn diagnostic_identity(&self, index: usize) -> String {
-        if let Some(name) = self.names.get(index) {
-            format!("{}[{index}]::{name}", self.source)
-        } else {
-            self.identity(index)
-        }
-    }
 }
 
 #[cfg(test)]

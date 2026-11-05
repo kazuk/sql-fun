@@ -17,11 +17,18 @@ use ::sql_fun_client::{
 };
 use ::sql_fun_core::{SchemaLevel, SqlFunArgs};
 
-/// Analyze explicit SQL files or structured SQL selections.
+/// Analyze inline SQL or an explicit SQL file or structured selection.
 #[derive(Debug, Clone, clap::Args)]
 pub struct AnalyzeArgs {
-    #[command(flatten)]
-    input: InputArgs,
+    /// Literal SQL to analyze.
+    #[arg(required_unless_present = "sql_file", conflicts_with = "sql_file")]
+    sql: Option<String>,
+    /// SQL filename, optionally followed by `#JSONPath`.
+    #[arg(long, value_name = "FILE[#JSONPath]", required_unless_present = "sql")]
+    sql_file: Option<String>,
+    /// Cumulative schema prefix to load. Excluded SQL files are never accessed.
+    #[arg(long, value_enum, default_value = "project")]
+    schema_level: SchemaLevel,
     /// Disable relation/column access analysis and its output.
     #[arg(long)]
     no_column_access: bool,
@@ -50,10 +57,16 @@ struct InputArgs {
 }
 impl AnalyzeArgs {
     pub(crate) async fn execute(&self, args: &SqlFunArgs) -> Result<ExitCode, ::anyhow::Error> {
-        let inputs = SqlInputs::load(&self.input.input)?;
+        let inputs = if let Some(sql) = &self.sql {
+            SqlInputs::inline(sql)
+        } else if let Some(file) = &self.sql_file {
+            SqlInputs::load(file)?
+        } else {
+            ::anyhow::bail!("SQL input is required")
+        };
         let cases = execute(
             args,
-            self.input.schema_level,
+            self.schema_level,
             &inputs,
             None,
             !self.no_column_access,

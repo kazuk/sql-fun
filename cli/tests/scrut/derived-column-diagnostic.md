@@ -9,7 +9,8 @@ $ echo 'SELECT s.second FROM (SELECT 1) AS s(first, second);' > "$SQL_FUN_API_FI
 > SQL_FUN_HOME="$SQL_FUN_API_FIXTURE/home" \
 > "$SQL_FUN_BIN" --term-color never \
 > --metadata-file "$SQL_FUN_API_FIXTURE/Cargo.toml" --datasource products \
-> analyze "$SQL_FUN_API_FIXTURE/derived-alias.sql" --schema-level builtin \
+> analyze --sql-file "$SQL_FUN_API_FIXTURE/derived-alias.sql" \
+> --schema-level builtin \
 > --no-column-access \
 > >"$SQL_FUN_API_FIXTURE/derived-alias.stdout" 2>"$SQL_FUN_API_FIXTURE/derived-alias.stderr"
 [1]

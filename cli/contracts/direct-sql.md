@@ -39,7 +39,7 @@ error: invalid value 'invalid' for '--schema-level <SCHEMA_LEVEL>'
 
 ```scrut
 $ echo '{"queries":[]}' > "$TMPDIR/empty.json" && \
-> sql-fun analyze "$TMPDIR/empty.json#$.queries" 2>&1
+> sql-fun analyze --sql-file "$TMPDIR/empty.json#$.queries" 2>&1
 Error: SQL input array must not be empty
 [1]
 ```

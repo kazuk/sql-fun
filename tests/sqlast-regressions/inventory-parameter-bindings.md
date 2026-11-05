@@ -34,7 +34,7 @@ Each probe explicitly selected a metadata datasource with that version,
 sql-fun --term-color never --metadata-file metadata-17.toml \
   --datasource regression \
   --schema-file tests/sqlast-regressions/schema-table-functions.sql \
-  analyze selected-query.sql --schema-level project
+  analyze --sql-file selected-query.sql --schema-level project
 ```
 
 Repeat with metadata selecting version 18. The `parameter-bindings` fixture

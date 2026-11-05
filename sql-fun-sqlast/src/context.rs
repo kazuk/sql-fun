@@ -545,6 +545,196 @@ where
 }
 
 #[cfg(test)]
+mod test_subsequent_analysis_replaces_context_constraints {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        parse_statements,
+        sem::SemAst,
+        test_helpers::{create_cache_context, public_analysis::analyze},
+    };
+
+    #[test]
+    fn subsequent_analysis_replaces_context_constraints() {
+        let mut cache_context = create_cache_context();
+        let first = analyze("select $7 + 1 as n", Dialect::postgres()).unwrap();
+        assert!(
+            first
+                .context()
+                .parameter_constraints()
+                .parameter(7)
+                .is_some()
+        );
+        let second = SemAst::from_ast(
+            &parse_statements("select 1 as n", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            first.into_context(),
+            &mut cache_context,
+        )
+        .unwrap();
+        assert!(
+            second
+                .context()
+                .parameter_constraints()
+                .parameter(7)
+                .is_none()
+        );
+        assert!(
+            second
+                .context()
+                .parameter_constraints()
+                .result_column(0)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn parameter_state_restarts_after_parameter_free_analysis() {
+        let mut cache_context = create_cache_context();
+        let first = analyze("select $7 + 1", Dialect::postgres()).unwrap();
+        let plain = SemAst::from_ast(
+            &parse_statements("select 1", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            first.into_context(),
+            &mut cache_context,
+        )
+        .unwrap();
+        let third = SemAst::from_ast(
+            &parse_statements("select $2 + 1", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            plain.into_context(),
+            &mut cache_context,
+        )
+        .unwrap();
+        assert!(
+            third
+                .context()
+                .parameter_constraints()
+                .parameter(7)
+                .is_none()
+        );
+        assert!(
+            third
+                .context()
+                .parameter_constraints()
+                .parameter(2)
+                .is_some()
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_diagnostic_sink_failure_still_aborts_parameter_analysis {
+    use crate::{
+        ast::Dialect,
+        parse_statements,
+        sem::SemAst,
+        test_helpers::{create_cache_context, public_analysis::context},
+    };
+
+    #[test]
+    fn diagnostic_sink_failure_still_aborts_parameter_analysis() {
+        let mut cache_context = create_cache_context();
+        let mut context = context();
+        context.reject_diagnostics_after(0);
+        let error = SemAst::from_ast(
+            &parse_statements("select $1 + 1, lower($1)", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .err()
+        .expect("diagnostic reporting must fail");
+        assert_eq!(error.to_string(), "diagnostic sink rejected a problem");
+    }
+}
+
+#[cfg(test)]
+mod test_rejected_serial_does_not_publish_objects {
+    use crate::{
+        context::{SequenceInfoRead, TableInfoRead},
+        names::FullName,
+        test_helpers::{ownership::apply_ownership_sql, serial},
+    };
+
+    #[rstest::rstest]
+    #[case::nullable("serial NULL", "serial_nullable")]
+    #[case::default("serial DEFAULT 1", "serial_default_conflict")]
+    #[case::identity("serial GENERATED ALWAYS AS IDENTITY", "serial_identity_conflict")]
+    #[case::array("serial[]", "serial_array")]
+    #[case::modifier("serial(3)", "serial_modifier")]
+    fn rejected_serial_does_not_publish_objects(
+        #[case] declaration: &str,
+        #[case] expected_code: &str,
+    ) -> testresult::TestResult {
+        let pair = apply_ownership_sql(
+            serial::context(),
+            &format!("CREATE TABLE users(id {declaration})"),
+        )?;
+        assert!(
+            !pair
+                .ast()
+                .as_create_table()
+                .unwrap()
+                .declarations_can_apply()
+        );
+        let context = pair.into_context();
+        assert!(
+            context
+                .get_table_impl(&FullName::with_schema("public", "users"))
+                .is_none()
+        );
+        assert!(
+            context
+                .get_sequence_impl(&FullName::with_schema("public", "users_id_seq"))
+                .is_none()
+        );
+        assert!(context.problems().iter().any(|p| p.code() == expected_code));
+        let context = apply_ownership_sql(context, "CREATE TABLE good(id integer)")?.into_context();
+        assert!(
+            context
+                .get_table_impl(&FullName::with_schema("public", "good"))
+                .is_some()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn index_conflict_leaves_no_serial_sequence() -> testresult::TestResult {
+        let pair = apply_ownership_sql(
+            serial::context(),
+            "CREATE TABLE users(id serial CONSTRAINT users_id_seq PRIMARY KEY)",
+        )?;
+        let context = pair.into_context();
+        assert!(
+            context
+                .get_table_impl(&FullName::with_schema("public", "users"))
+                .is_none()
+        );
+        assert!(
+            context
+                .get_sequence_impl(&FullName::with_schema("public", "users_id_seq"))
+                .is_none()
+        );
+        assert!(
+            context
+                .problems()
+                .iter()
+                .any(|p| p.code() == "conflicting_creation")
+        );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
 mod test_parameter_hint_initialization {
 
     use crate::{

@@ -79,6 +79,35 @@ impl DeferredTableFunction {
         }
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod test_deferred_out_columns_receive_argument_types {
+    use crate::{
+        sem::TypeReference,
+        test_helpers::{call_arguments::resolve, query::expression},
+    };
+
+    #[test]
+    fn deferred_out_columns_receive_argument_types() {
+        let (query, context) = resolve(
+            "SELECT t.* FROM polyout(value=>$1) AS t, bytes(value=>$1) AS other",
+            true,
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            expression(&query).get_type(),
+            Some(TypeReference::from_master_type_name("bytea"))
+        );
+    }
+}
+
+impl DeferredTableFunction {
     pub(super) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         if let Some(name) = self.call.name_resolution().function_identity() {
             visitor.function_binding(name, &self.alias, &self.output.names());
@@ -131,6 +160,9 @@ impl DeferredTableFunction {
         }
         Ok(())
     }
+}
+
+impl DeferredTableFunction {
     pub(super) fn column_names(&self) -> Vec<ColumnName> {
         self.output.names()
     }

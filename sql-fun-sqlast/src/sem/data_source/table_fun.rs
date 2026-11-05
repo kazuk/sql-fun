@@ -123,6 +123,9 @@ impl TableFunctionDataSource {
         self.output.replace_definition(output);
         self.output.apply(context, &self.function, &self.alias)
     }
+}
+
+impl TableFunctionDataSource {
     pub(super) fn column_names(&self) -> Vec<ColumnName> {
         self.output.names()
     }

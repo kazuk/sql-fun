@@ -236,7 +236,9 @@ impl OverloadVariant {
         }
         ColumnCollection::scalar_function_output(scalar_name, ty)
     }
+}
 
+impl OverloadVariant {
     pub(crate) fn requires_record_definition(&self) -> bool {
         self.returns_record() && self.returning_table().is_empty()
     }

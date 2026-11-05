@@ -47,6 +47,44 @@ impl WithClause {
     }
 }
 
+#[cfg(test)]
+mod test_ctes_are_owned_once_in_declaration_order {
+    use crate::{
+        ast::Dialect,
+        sem::{AnalysisError, PgBuiltInType, SemScalarExpr},
+        test_helpers::query::{output_type, resolve},
+    };
+
+    #[test]
+    fn ctes_are_owned_once_in_declaration_order() {
+        let (mut query, context) = resolve(
+            "WITH a AS (SELECT $1 + 1 AS n), b AS (SELECT n FROM a) SELECT n FROM b ORDER BY n",
+            Dialect::postgres(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        let [first, second] = query.query_clauses().unwrap().with() else {
+            panic!("two local CTE declarations");
+        };
+        assert_eq!(first.name(), "a");
+        assert_eq!(second.name(), "b");
+        struct Parameters(usize);
+        impl crate::sem::traversal::SemanticVisitorMut for Parameters {
+            fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+                if matches!(expression, SemScalarExpr::Param(_)) {
+                    self.0 += 1;
+                }
+                Ok(())
+            }
+        }
+        let mut parameters = Parameters(0);
+        query.walk(&mut parameters).unwrap();
+        assert_eq!(parameters.0, 1);
+        assert_eq!(output_type(&query, "n"), Some(PgBuiltInType::int4()));
+    }
+}
+
 impl WithClause {
     pub(crate) fn from_ast(
         ast: &With,

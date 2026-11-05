@@ -112,7 +112,9 @@ impl<'a> QualifiedSource<'a> {
             self.is_table_dependent(context),
         ))
     }
+}
 
+impl<'a> QualifiedSource<'a> {
     pub(crate) fn projection_columns(
         &self,
         context: &impl ParseContext,
@@ -164,6 +166,41 @@ impl<'a> QualifiedSource<'a> {
         } else {
             value
         })
+    }
+}
+
+#[cfg(test)]
+mod test_selected_occurrence_keeps_join_nullability {
+
+    use crate::{
+        names::FullName, sem::PgBuiltInType, test_helpers::query::source_namespace_statement,
+    };
+
+    #[rstest::rstest]
+    #[case::left("SELECT t.* FROM a.u LEFT JOIN b.t ON true", false)]
+    #[case::right("SELECT t.* FROM b.t RIGHT JOIN a.u ON true", false)]
+    #[case::inner("SELECT t.* FROM a.u CROSS JOIN b.t", true)]
+    #[case::unique("SELECT only_b FROM a.t LEFT JOIN b.t ON true", false)]
+    fn selected_occurrence_keeps_join_nullability(#[case] sql: &str, #[case] not_null: bool) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        let column = query.result_columns().get_column_at(0).unwrap();
+        assert_eq!(column.col_type(), &Some(PgBuiltInType::int8()));
+        assert_eq!(column.is_not_null(), &Some(not_null));
+        assert_eq!(
+            column
+                .expression()
+                .unwrap()
+                .table_column_reference()
+                .unwrap()
+                .relation(),
+            &FullName::with_schema("b", "t")
+        );
     }
 }
 
@@ -281,6 +318,137 @@ impl QualifiedSource<'_> {
     }
 }
 
+#[cfg(test)]
+mod test_resolves_nominal_arguments {
+    use crate::{
+        names::FullName,
+        sem::{PgBuiltInType, TypeReference},
+        test_helpers::{
+            query::expression, query_whole_rows as test_helpers, query_whole_rows::catalog_query,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::positional(
+        "SELECT accept_rows(a.*, t.*) FROM pg_catalog.pg_attribute a CROSS JOIN pg_catalog.pg_type t"
+    )]
+    #[case::parenthesized(
+        "SELECT accept_rows((a.*), (t.*)) FROM pg_catalog.pg_attribute a CROSS JOIN pg_catalog.pg_type t"
+    )]
+    fn resolves_nominal_arguments(#[case] sql: &str) {
+        let (query, context) = catalog_query(sql);
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let call = expression(&query).as_function_call().unwrap();
+        assert!(call.overload().is_some());
+        assert_eq!(
+            expression(&query).get_type(),
+            Some(TypeReference::from_master_type_name("oid"))
+        );
+        for (index, (alias, relation)) in [("a", "pg_attribute"), ("t", "pg_type")]
+            .into_iter()
+            .enumerate()
+        {
+            let argument = &call.args()[index];
+            let row = argument.value().as_whole_row().unwrap();
+            assert_eq!(row.alias().unwrap().as_str(), alias);
+            assert_eq!(
+                row.relation(),
+                Some(&FullName::with_schema("pg_catalog", relation))
+            );
+            assert_eq!(row.levels_up(), Some(0));
+            assert!(row.failure_code().is_none());
+            assert_eq!(
+                argument.value().get_type(),
+                Some(TypeReference::concrete_type_ref(
+                    &FullName::with_schema("pg_catalog", relation),
+                    false
+                ))
+            );
+            assert!(argument.arg_definition().is_some());
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::aliased("SELECT type_arg(t.*) FROM pg_catalog.pg_type t", false)]
+    #[case::qualified("SELECT type_arg(pg_catalog.pg_type.*) FROM pg_catalog.pg_type", false)]
+    #[case::outer(
+        "SELECT type_arg(t.*) FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_type t ON false",
+        true
+    )]
+    fn retains_relation_and_source_nullability(#[case] sql: &str, #[case] nullable: bool) {
+        let (query, context) = catalog_query(sql);
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let value = expression(&query).as_function_call().unwrap().args()[0].value();
+        assert_eq!(
+            value.get_type(),
+            Some(TypeReference::concrete_type_ref(
+                &FullName::with_schema("pg_catalog", "pg_type"),
+                false
+            ))
+        );
+        assert_eq!(value.is_not_null(), Some(!nullable));
+    }
+
+    #[test]
+    fn derived_whole_row_retains_field_names_and_parameter_types() {
+        let (query, context) = catalog_query("SELECT (x.*).n FROM (SELECT $1::integer AS n) x");
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(test_helpers::row_levels(query), vec![0]);
+    }
+
+    #[rstest::rstest]
+    #[case::members("SELECT (a.*).x, (b.*).y, (v.*).n FROM v AS a(x), v AS b(y), v")]
+    #[case::stars("SELECT (a.*).*, (b.*).*, (v.*).* FROM v AS a(x), v AS b(y), v")]
+    fn occurrence_aliases_do_not_modify_other_occurrences(#[case] sql: &str) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        for index in 0..3 {
+            let column = query.result_columns().get_column_at(index).unwrap();
+            // Names of star outputs are covered separately; this checks each
+            // occurrence's retained source binding and selected field type.
+            assert_eq!(column.col_type(), &Some(PgBuiltInType::int4()));
+        }
+        test_helpers::assert_catalog_view_field(&context);
+        assert_eq!(test_helpers::row_levels(query), vec![0, 0, 0]);
+    }
+
+    #[rstest::rstest]
+    #[case::view("SELECT (r.*).* FROM w AS r(x)")]
+    #[case::derived("SELECT (r.*).* FROM (SELECT 1 AS n, 'a'::text AS label) AS r(x)")]
+    fn partial_alias_list_preserves_field_order_and_types(#[case] sql: &str) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        for (index, (name, ty)) in [
+            ("x", PgBuiltInType::int4()),
+            ("label", PgBuiltInType::text()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let column = query.result_columns().get_column_at(index).unwrap();
+            assert_eq!(column.column_name().as_ref().unwrap().as_str(), name);
+            assert_eq!(column.col_type(), &Some(ty));
+        }
+        assert!(query.result_columns().get_column_at(2).is_none());
+    }
+}
+
 impl DataSource {
     const fn whole_row_is_missing(&self) -> bool {
         matches!(self, Self::Unknown(..) | Self::UndefinedTableFunc(_))
@@ -306,7 +474,39 @@ impl DataSource {
         }
         None
     }
+}
 
+#[cfg(test)]
+mod test_scalar_function_source_keeps_its_scalar_type {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::{query::expression, query_whole_rows::catalog_query},
+    };
+
+    #[test]
+    fn scalar_function_source_keeps_its_scalar_type() {
+        let (query, context) = catalog_query("SELECT identity(x.*) FROM identity(1) x");
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let call = expression(&query).as_function_call().unwrap();
+        assert!(call.overload().is_some());
+        assert_eq!(
+            call.args()[0].value().get_type(),
+            Some(PgBuiltInType::int4())
+        );
+        let (column_query, _) = catalog_query("SELECT x FROM identity(1) x");
+        assert_eq!(
+            call.args()[0].value().is_not_null(),
+            expression(&column_query).is_not_null()
+        );
+    }
+}
+
+impl DataSource {
     const fn whole_row_relation(&self) -> Option<&FullName> {
         match self {
             Self::RangeTableSample(sample) => sample.source().whole_row_relation(),

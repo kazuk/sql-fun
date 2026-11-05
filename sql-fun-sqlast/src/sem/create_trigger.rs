@@ -552,6 +552,57 @@ impl CreateTrigger {
         self.source = context.get_source_path_with_span().cloned();
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod test_retains_resolved_old_new_bindings_and_body_dependencies {
+    #[cfg(feature = "sqlite")]
+    use crate::{ast::Dialect, names::FullName, test_helpers::trigger as test_helpers};
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn retains_resolved_old_new_bindings_and_body_dependencies() -> testresult::TestResult {
+        let mut context = test_helpers::catalog(Dialect::sqlite());
+        let statement = test_helpers::resolve(
+            "CREATE TRIGGER audit AFTER UPDATE ON items BEGIN SELECT OLD.id, NEW.id; INSERT INTO other(id) VALUES(NEW.id); END",
+            &mut context,
+        )?;
+        let trigger = statement.trigger().unwrap();
+        let commands = trigger.body().statements();
+        let query = commands[0].clone().into_select_statemtnt().unwrap();
+        for (index, alias) in ["old", "new"].into_iter().enumerate() {
+            let expression = query
+                .result_columns()
+                .get_column_at(index)
+                .unwrap()
+                .expression()
+                .unwrap();
+            let binding = expression.table_column_reference().unwrap();
+            assert_eq!(binding.relation(), &FullName::with_schema("main", "items"));
+            assert_eq!(binding.alias().as_str(), alias);
+            assert_eq!(
+                expression.get_type(),
+                Some(crate::sem::PgBuiltInType::int4())
+            );
+        }
+        assert!(
+            trigger
+                .dependencies()
+                .relations()
+                .contains(&FullName::with_schema("main", "other"))
+        );
+        assert!(
+            trigger.dependencies().types().contains(
+                crate::sem::PgBuiltInType::int4()
+                    .full_name()
+                    .expect("builtin identity")
+            )
+        );
+        Ok(())
+    }
+}
+
+impl CreateTrigger {
     /// Resolved dependencies retained without re-running lookup.
     pub const fn dependencies(&self) -> &TriggerDependencies {
         &self.dependencies
@@ -629,6 +680,198 @@ impl CreateTrigger {
         // DDL determines the association; storage only performs the supplied update.
         let context = context.associate_trigger(&self.target, self.identity.name())?;
         context.register_trigger(self)
+    }
+}
+
+#[cfg(test)]
+mod test_named_lookup_and_target_links_agree_across_layers {
+    #[cfg(feature = "sqlite")]
+    use crate::context::ViewInfoRead as ContextViewInfoRead;
+
+    use crate::{
+        ast::Dialect,
+        context::{ParseContext, TableInfoRead, TriggerInfoRead},
+        names::FullName,
+        sem::TriggerIdentity,
+        test_helpers::trigger as test_helpers,
+    };
+
+    #[test]
+    fn named_lookup_and_target_links_agree_across_layers() -> testresult::TestResult {
+        let root = test_helpers::catalog(Dialect::postgres()).freeze();
+        let parent = test_helpers::layer(&root);
+        let parent = test_helpers::apply(
+            "CREATE TRIGGER audit AFTER UPDATE ON items EXECUTE FUNCTION audit_fn()",
+            parent,
+        )?
+        .into_context();
+        let parent = parent.freeze();
+        let sibling = test_helpers::layer(&parent);
+        let child = test_helpers::apply(
+            "CREATE TRIGGER second BEFORE UPDATE ON items EXECUTE FUNCTION audit_fn()",
+            test_helpers::layer(&parent),
+        )?
+        .into_context();
+        let target = FullName::with_schema("public", "items");
+        let names = child.get_table_impl(&target).unwrap().triggers();
+        assert_eq!(names.names().len(), 2);
+        let definitions = names.resolve(&child, &target);
+        assert_eq!(definitions.len(), 2);
+        for definition in definitions {
+            assert!(std::ptr::eq(
+                definition,
+                child.trigger(definition.identity()).unwrap()
+            ));
+        }
+        assert_eq!(
+            parent
+                .get_table_impl(&target)
+                .unwrap()
+                .triggers()
+                .names()
+                .len(),
+            1
+        );
+        assert_eq!(
+            sibling
+                .get_table_impl(&target)
+                .unwrap()
+                .triggers()
+                .names()
+                .len(),
+            1
+        );
+        let child = test_helpers::apply("CREATE OR REPLACE TRIGGER audit BEFORE UPDATE ON items EXECUTE FUNCTION audit_fn('changed')", child)?.into_context();
+        assert_eq!(
+            child
+                .get_table_impl(&target)
+                .unwrap()
+                .triggers()
+                .names()
+                .len(),
+            2
+        );
+        let identity =
+            TriggerIdentity::postgres(&target, &FullName::with_schema("public", "audit"));
+        assert_eq!(
+            child
+                .trigger(&identity)
+                .unwrap()
+                .body()
+                .function_reference()
+                .unwrap()
+                .arguments(),
+            &["changed"]
+        );
+        assert!(
+            parent
+                .trigger(&identity)
+                .unwrap()
+                .body()
+                .function_reference()
+                .unwrap()
+                .arguments()
+                .is_empty()
+        );
+        let descendant = test_helpers::layer(&child.freeze());
+        assert_eq!(
+            descendant
+                .get_table_impl(&target)
+                .unwrap()
+                .triggers()
+                .resolve(&descendant, &target)
+                .len(),
+            2
+        );
+        assert!(
+            test_helpers::apply(
+                "CREATE TRIGGER audit BEFORE UPDATE ON items EXECUTE FUNCTION audit_fn()",
+                sibling
+            )
+            .is_ok_and(|pair| matches!(
+                pair.ast(),
+                crate::sem::SemAst::UnresolvedStatement
+            ) && !pair.context().problems().is_empty())
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_duplicate_namespace_and_if_not_exists() -> testresult::TestResult {
+        let root = test_helpers::catalog(Dialect::sqlite()).freeze();
+        let context = test_helpers::apply(
+            "CREATE TRIGGER Audit AFTER UPDATE ON items BEGIN SELECT NEW.id; END",
+            test_helpers::layer(&root),
+        )?
+        .into_context();
+        let key = TriggerIdentity::sqlite(&FullName::with_schema("main", "audit"));
+        assert!(context.trigger(&key).is_some());
+        let frozen = context.freeze();
+        assert!(
+            test_helpers::apply(
+                "CREATE TRIGGER AUDIT AFTER UPDATE ON other BEGIN SELECT NEW.id; END",
+                test_helpers::layer(&frozen)
+            )
+            .is_ok_and(|pair| matches!(
+                pair.ast(),
+                crate::sem::SemAst::UnresolvedStatement
+            ) && !pair.context().problems().is_empty())
+        );
+        let context = test_helpers::apply(
+            "CREATE TRIGGER IF NOT EXISTS AUDIT AFTER UPDATE ON other BEGIN SELECT NEW.id; END",
+            test_helpers::layer(&frozen),
+        )?
+        .into_context();
+        assert_eq!(
+            context.trigger(&key).unwrap().target(),
+            &FullName::with_schema("main", "items")
+        );
+        assert!(
+            context
+                .get_table_impl(&FullName::with_schema("main", "other"))
+                .unwrap()
+                .triggers()
+                .names()
+                .is_empty()
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::postgres(
+        Dialect::postgres(),
+        "CREATE TRIGGER audit INSTEAD OF UPDATE ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()"
+    )]
+    #[case::sqlite(
+        Dialect::sqlite(),
+        "CREATE TRIGGER audit INSTEAD OF UPDATE ON item_view BEGIN SELECT NEW.id; END"
+    )]
+    fn associates_trigger_names_with_views(
+        #[case] dialect: Dialect,
+        #[case] sql: &str,
+    ) -> testresult::TestResult {
+        let root = test_helpers::catalog(dialect).freeze();
+        let target = if dialect == Dialect::sqlite() {
+            FullName::with_schema("main", "item_view")
+        } else {
+            FullName::with_schema("public", "item_view")
+        };
+        let context = test_helpers::apply(sql, test_helpers::layer(&root))?.into_context();
+        let view = ContextViewInfoRead::get_view_impl(&context, &target).unwrap();
+        let references = view.triggers().unwrap();
+        assert_eq!(references.names().len(), 1);
+        assert_eq!(references.resolve(&context, &target)[0].target(), &target);
+        assert!(
+            crate::context::ViewInfoRead::get_view_impl(&root, &target)
+                .unwrap()
+                .triggers()
+                .unwrap()
+                .names()
+                .is_empty()
+        );
+        Ok(())
     }
 }
 

@@ -17,3 +17,44 @@ pub(crate) fn setup_context() -> TestParseContext {
     ));
     context
 }
+
+#[cfg(feature = "sqlite")]
+use crate::{SqliteDialect, SqliteToken, syn::sqlite::CreateTableStatement};
+#[cfg(feature = "sqlite")]
+use ::sql_fun_core::IVec;
+
+#[cfg(feature = "sqlite")]
+#[rstest::fixture]
+pub(crate) fn create_table_statement<'a>() -> (CreateTableStatement, IVec<SqliteToken<'a>>) {
+    let sql = r#"
+                create table users (
+                    id integer primary key not null unique,
+                    name text default ('guest') collate nocase,
+                    active integer check (true and true),
+                    created_at text default current_timestamp)
+            "#;
+    let cmd = SqliteDialect::parse(sql)
+        .expect("sqlite parse should succeed")
+        .expect("statement should exist");
+    let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
+    let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
+    let Some(create_table) = stmt.into_create_table() else {
+        panic!("expected create table statement")
+    };
+    (create_table, tokens)
+}
+
+#[cfg(feature = "sqlite")]
+pub(crate) fn parse_create_table<'a>(
+    sql: &'a str,
+) -> (CreateTableStatement, IVec<SqliteToken<'a>>) {
+    let cmd = SqliteDialect::parse(sql)
+        .expect("sqlite parse should succeed")
+        .expect("statement should exist");
+    let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
+    let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
+    let Some(create_table) = stmt.into_create_table() else {
+        panic!("expected create table statement")
+    };
+    (create_table, tokens)
+}

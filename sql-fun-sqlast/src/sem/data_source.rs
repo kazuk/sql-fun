@@ -1,7 +1,6 @@
 mod ast;
 
 mod alias;
-mod analyze;
 mod column_candidates;
 mod cte;
 mod deferred_fun;
@@ -453,5 +452,30 @@ impl DataSource {
             Self::DeferredTableFunc(source) => source.known_column_names(),
             _ => None,
         }
+    }
+}
+
+use crate::{
+    ast::{FromItem, TryFromWithTokens},
+    sem::FromClause,
+    syn::{Node as SynNode, ScanToken},
+};
+use ::sql_fun_core::IVec;
+
+impl DataSource {
+    /// semantic analyze from clause items
+    pub fn analyze_from_clause_node<TParseContext>(
+        mut context: TParseContext,
+        with_clause: &WithClause,
+        from_clause: &FromClause,
+        node: SynNode,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<(Self, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let syntax = FromItem::try_from_with_tokens(&node, tokens)?;
+        let result = Self::from_ast_source(&syntax, &mut context, with_clause, from_clause);
+        Ok((result?, context))
     }
 }

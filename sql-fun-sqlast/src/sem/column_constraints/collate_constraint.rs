@@ -118,3 +118,45 @@ impl CollateColumnConstraint {
         Ok(Self::new(table, column, name))
     }
 }
+
+#[cfg(all(test, feature = "sqlite"))]
+#[cfg(test)]
+mod test_analyze_sqlite_column_definition_reports_unknown_collation {
+    use crate::test_helpers::column_definition::parse_create_table;
+
+    use crate::{
+        names::TableName,
+        sem::{ColumnConstraint, ColumnDefinition},
+        syn::sqlite::CreateTableBody,
+        test_helpers::column_definition::setup_context,
+    };
+
+    #[test]
+    fn analyze_sqlite_column_definition_reports_unknown_collation() {
+        let sql = "create table users (name text collate custom)";
+        let (create_table, tokens) = parse_create_table(sql);
+        let body = match create_table.body() {
+            CreateTableBody::ColumnsAndConstraint(body) => body,
+            _ => panic!("expected column-based create table body"),
+        };
+        let table_name = TableName::try_from(create_table.table_name())
+            .expect("table name should convert into semantic table name");
+
+        let (column_def, context) = ColumnDefinition::analyze_column_definition(
+            setup_context(),
+            &table_name,
+            &body.columns()[0],
+            &tokens,
+        )
+        .expect("column definition should analyze");
+
+        assert_eq!(column_def.constraints().len(), 1);
+        match &column_def.constraints()[0] {
+            ColumnConstraint::Collate(collate) => {
+                assert_eq!(collate.collation_name(), "custom")
+            }
+            _ => panic!("expected collate constraint"),
+        }
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+}

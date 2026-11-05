@@ -403,6 +403,59 @@ impl QueryWindow {
     }
 }
 
+#[cfg(test)]
+mod test_missing_window_inheritance_is_an_explicit_failed_lookup {
+    #[cfg(feature = "sqlite")]
+    use crate::sem::{ColumnReferenceExpr, SemScalarExpr};
+
+    use crate::{ast::Dialect, sem::QueryNameResolution, test_helpers::query::resolve};
+
+    #[test]
+    fn missing_window_inheritance_is_an_explicit_failed_lookup() {
+        let (query, context) = resolve(
+            "SELECT sum(1) OVER w WINDOW w AS (missing)",
+            Dialect::postgres(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count(), 1);
+        let window = &query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .select_clauses()
+            .unwrap()
+            .windows()[0];
+        assert_matches::assert_matches!(
+            window.reference().unwrap().resolution(),
+            QueryNameResolution::NotFound
+        );
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn sqlite_window_definitions_do_not_bind_projection_aliases() {
+        let (query, context) = resolve(
+            "SELECT 1 AS n WINDOW w AS (ORDER BY n)",
+            Dialect::sqlite(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count(), 1);
+        let windows = query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .select_clauses()
+            .unwrap()
+            .windows();
+        assert_matches::assert_matches!(
+            windows[0].order()[0].expression(),
+            SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedColumn(_))
+        );
+    }
+}
+
 impl QueryWindow {
     pub(crate) fn from_ast_definitions(
         values: &[Window],
@@ -429,6 +482,39 @@ impl QueryWindow {
             result.push(Self::from_ast(window, context, &definition_scope)?);
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod test_sqlite_window_inheritance_records_dialect_binding {
+    #[cfg(feature = "sqlite")]
+    use crate::{ast::Dialect, sem::QueryNameResolution, test_helpers::query::resolve};
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::forward(
+        "SELECT 1 WINDOW w AS (later), later AS ()",
+        QueryNameResolution::WindowAlias(1)
+    )]
+    #[case::missing_base("SELECT 1 WINDOW w AS (missing)", QueryNameResolution::NotFound)]
+    fn sqlite_window_inheritance_records_dialect_binding(
+        #[case] sql: &str,
+        #[case] expected: QueryNameResolution,
+    ) {
+        let connection = ::rusqlite::Connection::open_in_memory().unwrap();
+        connection.prepare(sql).unwrap();
+        let (query, context) = resolve(sql, Dialect::sqlite(), false).unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        let clauses = query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .select_clauses()
+            .unwrap();
+        assert_eq!(
+            clauses.windows()[0].reference().unwrap().resolution(),
+            &expected
+        );
     }
 }
 
@@ -574,6 +660,38 @@ impl QueryOrder {
             QueryBody::Set(set) => Self::match_ast_set_order(set.as_ref(), expression),
             QueryBody::Values(rows) => Self::match_ast_values_order(rows, expression),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_sqlite_binds_ordering_to_its_output {
+    #[cfg(feature = "sqlite")]
+    use crate::{
+        ast::Dialect,
+        test_helpers::query::{output_index, resolve},
+    };
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::right_alias("SELECT 1 AS n UNION ALL SELECT 2 AS m ORDER BY m")]
+    #[case::right_expression(
+        "SELECT CAST(1 AS TEXT) UNION ALL SELECT CAST(2 AS TEXT) ORDER BY CAST(2 AS TEXT)"
+    )]
+    #[case::duplicate_alias("SELECT 1 AS n, 2 AS n ORDER BY n")]
+    fn sqlite_binds_ordering_to_its_output(#[case] sql: &str) {
+        let connection = ::rusqlite::Connection::open_in_memory().unwrap();
+        connection.prepare(sql).unwrap();
+        let (query, context) = resolve(sql, Dialect::sqlite(), false).unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            output_index(query.query_clauses().unwrap().order()[0].expression()),
+            Some(0)
+        );
     }
 }
 

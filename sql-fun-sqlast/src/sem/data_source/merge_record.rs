@@ -175,7 +175,49 @@ impl MergeRecordDataSource {
             .map(|column| column.with_merge(self.role, self.nullable))
             .collect())
     }
+}
 
+#[cfg(test)]
+mod test_merge_projection_keeps_source_role_and_join_alias {
+
+    use crate::test_helpers::query::source_namespace_statement;
+
+    #[test]
+    fn merge_projection_keeps_source_role_and_join_alias() {
+        let analyzed = source_namespace_statement(
+            "MERGE INTO a.u AS d USING (a.t CROSS JOIN b.t) j(x,y,z,w) ON true WHEN MATCHED THEN DELETE RETURNING j.*",
+        );
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let columns = analyzed.ast().as_merge().unwrap().result_columns();
+        assert_eq!(columns.len(), 4);
+        for (index, name) in ["x", "y", "z", "w"].into_iter().enumerate() {
+            let column = columns.get_column_at(index).unwrap();
+            assert_eq!(column.column_name().as_ref().unwrap().to_string(), name);
+            assert_eq!(column.expression().unwrap().get_column_name(), name);
+            let record = column
+                .expression()
+                .unwrap()
+                .merge_record_reference()
+                .unwrap();
+            assert_eq!(record.role(), crate::sem::MergeRecordRole::source());
+            assert_eq!(
+                record
+                    .source()
+                    .table_column_reference()
+                    .unwrap()
+                    .alias()
+                    .as_str(),
+                "j"
+            );
+        }
+    }
+}
+
+impl MergeRecordDataSource {
     pub(super) fn column_names(
         &self,
         context: &impl ParseContext,

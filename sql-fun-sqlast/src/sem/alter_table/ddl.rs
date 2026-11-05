@@ -45,7 +45,26 @@ impl AlterObjSubCommand {
             _ => todo!(),
         }
     }
+}
 
+#[cfg(test)]
+mod test_analyze_alter_obj_change_owner {
+    use crate::{
+        sem::alter_table::analyze_alter_obj_change_owner,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_alter_obj_change_owner(test_context: TestParseContext) -> TestResult {
+        let alter_table_cmd = SynBuilder::new().alter_table_cmd_change_owner("test");
+        let _result = analyze_alter_obj_change_owner(&test_context, alter_table_cmd)?;
+        Ok(())
+    }
+}
+
+impl AlterObjSubCommand {
     pub(crate) fn check_ast_missing_column(
         context: &mut impl ParseContext,
         table: &TableName,
@@ -60,7 +79,38 @@ impl AlterObjSubCommand {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_analyze_sqlite_alter_table_reports_drop_missing_column {
+    #[cfg(feature = "sqlite")]
+    use crate::{
+        AstAndContextPair,
+        sem::{AlterTable, SourcePathWithSpan},
+        test_helpers::{
+            alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
+            source_span,
+        },
+    };
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_drop_missing_column(
+        source_span: SourcePathWithSpan,
+    ) {
+        let (alter_table, tokens) =
+            parse_sqlite_alter_table("alter table users drop column missing");
+        let mut context = sqlite_context();
+        context.setup_table("users", &[make_column("name")], &source_span);
+
+        let AstAndContextPair(_, context) =
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+                .expect("sqlite alter table should analyze");
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+}
+
+impl AlterObjSubCommand {
     pub(crate) fn check_ast_existing_column(
         context: &mut impl ParseContext,
         table: &TableName,
@@ -74,7 +124,36 @@ impl AlterObjSubCommand {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_analyze_sqlite_alter_table_reports_existing_column {
+    #[cfg(feature = "sqlite")]
+    use crate::{
+        AstAndContextPair,
+        sem::{AlterTable, SourcePathWithSpan},
+        test_helpers::{
+            alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
+            source_span,
+        },
+    };
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_existing_column(source_span: SourcePathWithSpan) {
+        let (alter_table, tokens) =
+            parse_sqlite_alter_table("alter table users add column name text");
+        let mut context = sqlite_context();
+        context.setup_table("users", &[make_column("name")], &source_span);
+
+        let AstAndContextPair(_, context) =
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
+                .expect("sqlite alter table should analyze");
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+}
+
+impl AlterObjSubCommand {
     pub(crate) fn from_ast(
         ast: &AstAlterCommand,
         context: &mut impl ParseContext,
@@ -118,7 +197,70 @@ impl AlterObjSubCommand {
         Self::check_ast_missing_column(context, table, &name)?;
         Ok(Self::column_default(&name, &expr))
     }
+}
 
+#[cfg(test)]
+mod test_analyze_alter_obj_column_default {
+    use crate::{
+        names::{ColumnName, FullName, TableName},
+        sem::{
+            ColumnDefinition, ScalarConstExpr, SemScalarExpr, SourcePathWithSpan,
+            alter_table::AlterObjSubCommand,
+        },
+        syn::NodeInner,
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+    };
+
+    use sql_fun_core::IVec;
+
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_alter_obj_column_default(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
+        // alter table ...
+        //   alter column value set default(0)
+        test_context.setup_table(
+            "table1",
+            &[ColumnDefinition::new(
+                &Some(ColumnName::from("value")),
+                None,
+                None,
+                &[],
+            )],
+            &source_span,
+        );
+
+        let builder = SynBuilder::new();
+        let value = builder.const_int4(0);
+        let cmd =
+            builder.alter_table_cmd_set_column_default("value", NodeInner::AConst(value).into());
+        let tokens = IVec::default();
+        let table_name = TableName::from(FullName::with_schema("public", "table1"));
+
+        let (res, test_context) = AlterObjSubCommand::analyze_alter_obj_column_default(
+            test_context,
+            &table_name,
+            cmd,
+            &tokens,
+        )?;
+        let AlterObjSubCommand::SetColumnDefault(col_name, expr) = res else {
+            panic!("unexpected response {res:#?}");
+        };
+        assert_eq!(col_name.as_str(), "value");
+        let SemScalarExpr::Const(ScalarConstExpr::Integer(val)) = *expr else {
+            panic!("unexpected expr {expr:#?}");
+        };
+        assert_eq!(val, 0);
+        assert_eq!(test_context.reported_problem_count(), 0);
+
+        Ok(())
+    }
+}
+
+impl AlterObjSubCommand {
     pub(crate) fn from_ast_constraint(
         context: &mut impl ParseContext,
         table: &TableName,
@@ -470,5 +612,45 @@ impl AlterObjSubCommand {
             change.apply(staged);
         }
         Ok(Self::column_attributes(&change))
+    }
+}
+
+#[cfg(test)]
+mod test_standalone_semantic_command_api_resolves_column_attributes {
+    use crate::{
+        sem::AlterObjSubCommand,
+        syn::{ListOpt, Opt},
+        test_helpers::{SynBuilder, column_attributes as test_helpers},
+    };
+
+    #[test]
+    fn standalone_semantic_command_api_resolves_column_attributes() -> testresult::TestResult {
+        let context = test_helpers::seed("CREATE TABLE t(a integer)", "17")?;
+        let node = SynBuilder::new().parse("ALTER TABLE t ALTER a SET STATISTICS 42");
+        let statement = node.as_alter_table_stmt().as_inner().unwrap();
+        let commands = statement.get_cmds().as_inner().unwrap();
+        let command = commands[0].as_alter_table_cmd().as_inner().unwrap();
+        let subtype = command.get_subtype().as_inner().unwrap();
+        let (command, context) = AlterObjSubCommand::analyze_alter_table_cmd(
+            context,
+            &test_helpers::table_name(),
+            command,
+            subtype,
+            &::sql_fun_core::IVec::default(),
+        )?;
+        let change = command.column_attribute_change().unwrap();
+        assert!(change.can_apply());
+        assert_eq!(
+            change.action().statistics_target().unwrap().effective(),
+            Some(42)
+        );
+        assert!(change.binding().definition().is_some());
+        assert!(context.problems().is_empty());
+        // Command analysis returns semantics without applying the enclosing DDL.
+        assert_eq!(
+            test_helpers::column(&context, "a").statistics_target(),
+            None
+        );
+        Ok(())
     }
 }

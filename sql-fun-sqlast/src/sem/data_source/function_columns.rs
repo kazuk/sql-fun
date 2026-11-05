@@ -106,7 +106,101 @@ impl TableFunctionOutput {
         });
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_typed_record_parameter_is_warning_free_in_the_controlled_context {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::query::{output_type, table_function_query},
+    };
+
+    #[test]
+    fn typed_record_parameter_is_warning_free_in_the_controlled_context() {
+        for infer in [false, true] {
+            let (_, context) = table_function_query(
+                "SELECT a,b FROM record_fun($1::text) AS r(a int,b text)",
+                infer,
+            );
+            assert_eq!(
+                context.reported_problem_count(),
+                0,
+                "infer={infer}: {:?}",
+                context.reported_problems()
+            );
+        }
+    }
+
+    #[test]
+    fn keeps_schema_qualified_and_array_field_types() {
+        let (query, context) = table_function_query(
+            "SELECT r.a, r.b FROM record_fun('') r(a pg_catalog.int4,b text[])",
+            true,
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(output_type(&query, "a"), Some(PgBuiltInType::int4()));
+        assert_eq!(
+            output_type(&query, "b"),
+            Some(PgBuiltInType::text().array_type())
+        );
+    }
+
+    #[test]
+    fn keeps_selected_overload_separate_from_output_definitions() {
+        use crate::{
+            context::BaseParseContext,
+            names::{AliasName, ColumnName, FullName},
+            sem::DataSource,
+        };
+        let (query, context) =
+            table_function_query("SELECT r.a FROM overloaded_record(1) AS r(a text)", false);
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let source = query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .source_scope()
+            .unwrap()
+            .resolve_alias(&AliasName::from("r"))
+            .unwrap()
+            .0;
+        let DataSource::CallTableFunc(function) = source else {
+            panic!("resolved function");
+        };
+        assert_eq!(
+            function.function().get_arg_def_at(0).unwrap().get_type(),
+            Some(&PgBuiltInType::int4())
+        );
+        assert_eq!(
+            function
+                .output_columns()
+                .get_column_def(&ColumnName::from("a"))
+                .unwrap()
+                .get_type_cloned(),
+            Some(PgBuiltInType::text())
+        );
+        let catalog = context
+            .get_function_by_name(&FullName::from_local_name("overloaded_record"))
+            .unwrap();
+        assert_eq!(catalog.len(), 2);
+        assert_eq!(catalog.record_definition_requirement(), Some(true));
+        let restored: DataSource =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+    }
+}
+
+impl TableFunctionOutput {
     fn report(
         &mut self,
         context: &mut impl ParseContext,
@@ -209,7 +303,57 @@ impl TableFunctionOutput {
     pub(crate) fn candidates(&self, column: &ColumnName, alias: &AliasSpec) -> Vec<AliasSpec> {
         OutputColumnNames::from(self.names()).candidates(column, alias)
     }
+}
 
+#[cfg(test)]
+mod test_retains_failed_or_ambiguous_binding {
+    use crate::{
+        sem::{AnalysisError, ColumnReferenceExpr, SemScalarExpr},
+        test_helpers::query::table_function_query,
+    };
+
+    #[rstest::rstest]
+    #[case::missing("SELECT r.missing FROM record_fun('') r(a int)", false)]
+    #[case::rows_missing("SELECT r.missing FROM ROWS FROM(record_fun('') AS(a int)) r", false)]
+    #[case::hidden_original("SELECT a FROM ROWS FROM(record_fun('') AS(a int)) r(x)", false)]
+    #[case::rows_duplicate(
+        "SELECT a FROM ROWS FROM(record_fun('') AS(a int),record_fun('') AS(a int)) r",
+        true
+    )]
+    #[case::rows_qualified_duplicate(
+        "SELECT r.a FROM ROWS FROM(record_fun('') AS(a int),record_fun('') AS(a int)) r",
+        true
+    )]
+    fn retains_failed_or_ambiguous_binding(#[case] sql: &str, #[case] ambiguous: bool) {
+        let (mut query, context) = table_function_query(sql, false);
+        assert!(context.reported_problem_count() > 0);
+        struct BindingFailure {
+            ambiguous: bool,
+            found: bool,
+        }
+        impl crate::sem::traversal::SemanticVisitorMut for BindingFailure {
+            fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+                if let SemScalarExpr::ColumnRef(reference) = value {
+                    if self.ambiguous {
+                        self.found |=
+                            matches!(reference, ColumnReferenceExpr::AmbiguousColumnRef(_));
+                    } else {
+                        self.found |= value.get_type().is_none();
+                    }
+                }
+                Ok(())
+            }
+        }
+        let mut failure = BindingFailure {
+            ambiguous,
+            found: false,
+        };
+        query.walk(&mut failure).unwrap();
+        assert!(failure.found, "{query:?}");
+    }
+}
+
+impl TableFunctionOutput {
     pub(crate) fn column(
         &self,
         column: &ColumnName,

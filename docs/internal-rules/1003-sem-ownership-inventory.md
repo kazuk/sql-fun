@@ -110,7 +110,7 @@ resolver family has 42 files and 15,511 lines.
   their analysis branches remain the documented TODOs #955 and #956 in sem
   dispatch. No SQL support was added by this ownership move.
 
-## Physical implementation and test-placement map
+## Physical implementation and historical test-suite map
 
 The physical maps were established at correction baseline
 `0d4fe0edfdf04eaed0f9ecbaab43b8e113386df5` and reaudited after round-three
@@ -310,12 +310,15 @@ it is not counted as an absorption. At review planning, the worktree filesystem
 had 78 GiB available, against an estimated 20 GiB of additional build/test use
 and the repository 20 GiB minimum baseline. Capacity met the baseline.
 
-### Relocated semantic test suites
+### Historical relocated resolver-suite paths
 
-The 11 former resolver test suites below are inline in the implementation
-module that owns the conversion; no separate catch-all test module remains.
+The 11 former resolver test suites below record their relocated suite paths
+and representative conversion entrypoints. This is a historical source map;
+it does not establish that every test targets that entrypoint's implementation
+or meets behavior-based placement requirements. It describes an earlier
+checkpoint; round-five destinations are inventoried below.
 
-| Previous suite | Current implementation module | Owner / operation |
+| Previous suite | Earlier checkpoint location | Representative entrypoint |
 | --- | --- | --- |
 | `ast_conversion/delete/tests.rs` | `sem/delete_statement/ast.rs` | `DeleteStatement::from_ast` |
 | `ast_conversion/drop_rule/tests.rs` | `sem/drop_rule_ast.rs` | `DropRule::from_ast` |
@@ -334,19 +337,83 @@ The utility edit tests from the historical `ast/utility.rs` are now in
 were in `ast/deparse.rs` are now in `ast/public.rs::test_deparse_errors`;
 lower-level emission tests remain with the `ast/deparse` implementation.
 
+The earlier round-two placement check compared test-module positions with the
+previous Rust item. It reported mechanical adjacency, not a per-test mapping
+from assertions to the implementation that provides the behavior. The six
+focused groups listed in that report (operator names and resolution, SQLite
+and PostgreSQL patterns, ordering operators, and name-resolution phase) were
+not yet audited for behavior placement at that checkpoint.
+
 Three common-AST syntax synchronization tests remain inline under
-`ast/public/wildcard.rs`. Semantic wildcard-projection implementations are in
-`sem/scalar_expr.rs`, `sem/scalar_expr/cast_expr.rs`,
-`sem/scalar_expr/coalesce.rs`, and `sem/scalar_expr/column_ref.rs`. The six
-focused placement checks put operator-name, operator-resolution, SQLite-pattern,
-PostgreSQL-pattern, ordering-operator, and name-resolution-phase tests beside
-their owning conversion methods.
-The source paths and baseline test counts below retain the names of all 106 old
-Rust files.
+`ast/public/wildcard.rs`. The historical placement report lists six focused
+groups next to conversion entrypoints, but it does not assign their asserted
+behavior to those entrypoints.
+
+### Round-five behavior-based test destinations
+
+The frozen round-five map starts from `5486ee63`. It relocates 416 test
+functions from 67 previous source groups into 241 focused test modules. The
+map classifies 361 functions as unit tests and 55 as integration tests. Each
+entry records the previous/current test identity, asserted behavior, owning
+implementation type and method, destination, and source hashes. An independent
+behavior and adjacency review checked all 416 tests across all 241 destination
+modules.
+
+The destinations follow the behavior owners below. Counts are grouped by
+owner-module family or explicit integration destination; method names are
+exact examples from the per-test map.
+
+- **Scalar expressions (92):** `sem/scalar_expr/**`, including
+  `ScalarAnalysisContext::resolve_column`, `FuncCallExpr::collect_constraints`,
+  `PatternExpr::collect_constraints`, and `GroupingExpr::complete`.
+- **Data sources and projection (69):** `sem/data_source/**`, including
+  `WildcardProjection::append_results`, `QualifiedSource::bind_whole_row`,
+  and `SourceNamespace::resolve_column`.
+- **Query, CTE, parameters, and types (43):** query, CTE, parameter-resolution,
+  typmod, and function-parameter owner modules. Examples include
+  `ParameterResolution::infer_query`, `ParameterResolution::infer_update`,
+  `QueryWindow::from_ast`, and `WithTypmod::interpret_postgres`.
+- **DML and ALTER statements (77):** insert, update, delete, merge, relation
+  alteration, and ALTER owner modules. Examples include
+  `InsertStatement::from_ast_definition`, `DeleteCursor::from_ast`,
+  `UpdateCursor::from_ast`, and `MergeStatement::from_ast_in`.
+- **SELECT and result columns (26):** `sem/select_statement/**`, including
+  `SelectStatement::analyze_ast_query`,
+  `ResultColumnCollection::append_composite_star`, and
+  `ResultColumnCollection::resolve_for_merge`.
+- **DDL, rules, triggers, and catalog ownership (59):** create/drop, rule,
+  trigger, ownership, and catalog owner modules. Examples include
+  `CreateRule::apply`, `SemCreateTrigger::from_ast_identity`,
+  `SchemaFileContext::change_dependent_sequence_owners`, and
+  `CreateTable::from_ast_and_apply_at`.
+- **Cross-owner integration destination (50):** `ast_integration_tests.rs`
+  contains cases whose contracts span independent validators, parser and
+  analysis paths, or catalog transitions.
+
+The map classifies 55 tests as integrations. Fifty are in
+`ast_integration_tests.rs`; the other five stay beside an explicit lifecycle
+owner. Their reasons include ownership binding plus catalog mutation, rule or
+trigger validation plus catalog transitions, pattern-operator constraints
+plus escape-function inference, and the public MERGE parse/deparse/analyze
+round trip. These tests verify cross-owner behavior rather than a generic
+entrypoint.
+
+The source reconciliation matches 1,358 test functions before and after this
+relocation: 416 moved and 942 retained their prior identity. It reports 985
+mapped case attributes and no unmatched functions or preservation errors. Two
+existing field reads now call the owning type's `commands()` getter. The token
+comparison normalizes only function-parameter trailing commas and whitespace
+after escaped Rust string line continuations. The independent production/test
+audits passed at the final formatted source snapshot. Both round-five full
+standard flows and compiled-case reconciliations passed, as recorded below.
+
+The source paths and baseline test counts below retain the names of all 106
+old Rust files. Their responsibility column reflects the earlier physical-map
+checkpoint; round-five test destinations are summarized above.
 `case attrs` is the sum of textual case-row definitions and parameter markers;
 assertion counts are direct assertion macros inside test-attributed functions.
 
-| Baseline source file | Test funcs / case attrs / assertions | Responsibility in current tree |
+| Baseline source file | Test funcs / case attrs / assertions | Responsibility at earlier checkpoint |
 | --- | ---: | --- |
 | `ast.rs` | 0 / 0 / 0 | AST node definitions remain; analysis dispatch is in `sem/sem_ast_analysis.rs` and raw parser entry points in `sem/top_level_statement.rs`. |
 | `ast/ddl.rs` | 6 / 23 / 22 | AST syntax declarations remain here; semantic DDL conversion → `owner-specific semantic DDL module (physical map above)`. |
@@ -570,10 +637,12 @@ after-consolidation tree:
   differences were reviewed as equivalent after relocation and formatting.
   Round three has a separate exact test-identity map, summarized above.
 - The round-two placement audit found all 37 relocated test modules inline
-  beside an implementation/function or in focused modules testing
-  `SemAst::from_ast`; none lacked an inline destination. The 11 resolver suites
-  above are part of that historical set. Two upstream SQLite parser files are
-  outside the migration's test-source set.
+  after a Rust item or grouped with focused modules around `SemAst::from_ast`.
+  This was a previous-item adjacency check; it did not identify the behavior
+  each test asserts or verify placement after the implementation of that
+  behavior. It therefore does not establish correct test placement. The 11
+  resolver suites above are in that historical set. Two upstream SQLite parser
+  files are outside the migration's test-source set.
 - A model audit matched all 988 struct, enum, and union definitions plus their
   adjacent attributes, including derive and serde attributes; it found no
   changed, removed, or added definitions. Global imports were normalized in
@@ -641,10 +710,9 @@ The current conversion index and physical maps reflect these corrections:
 - Shared `AnalysisError` remains in root `src/error.rs`, including the
   syntax-level dialect check. Semantic error helpers are colocated with
   `CreateCompositeType` and `TypeReference` in their owner files.
-- Semantic wildcard-projection implementations now live in their owner files:
-  `sem/scalar_expr.rs`, `sem/scalar_expr/cast_expr.rs`,
-  `sem/scalar_expr/coalesce.rs`, and `sem/scalar_expr/column_ref.rs`.
-  `WildcardExpansion` continues to own staged statement rewriting. Three syntax
+- Wildcard expression rewrite methods remain with scalar-expression owners.
+  Result-column projection is owned by `sem/data_source/projection.rs`, while
+  `WildcardExpansion` owns staged statement rewriting. Three syntax
   synchronization tests remain inline under `ast/public/wildcard.rs`.
 - `ast/sqlite.rs` remains the AST-side SQLite syntax adapter. Semantic analysis
   now resides only with the relevant semantic owner types.
@@ -887,6 +955,10 @@ already selected that semantic operation.
 
 ## Encapsulation review follow-up
 
+This section records round-four evidence against earlier source snapshots.
+Its compiled flows and package results do not validate the round-five source
+changes described below.
+
 The review against `87500d3a` audited every Rust struct field changed by this
 PR, including moved definitions. All 600 widened fields occur in AST owners:
 394 in `ast.rs`, 67 in `ast/ddl.rs`, 133 in `ast/document.rs`, and six in
@@ -921,29 +993,78 @@ were reviewed. Eight test functions changed namespace. Assertions, SQL and
 expected literals, cases, parameter attributes, and effective cfg gates are
 preserved. One setup panic moved from the cursor test into its owning fixture
 operation; its semantic assertions are unchanged. Import attributes, physical
-ownership, focused inline test placement, the AST-to-sem dependency boundary,
-and the small-module consolidation rule pass the independent audit.
+ownership, the AST-to-sem dependency boundary, and the small-module
+consolidation rule passed the round-four independent audit. The round-four
+test-location check established module destinations and mechanical adjacency
+only. It did not map assertions to behavior implementations; the round-five
+map and independent review below address that gap.
 
-Both full standard flows passed. Default passed 4,381 SQLAST and 5,475
+The round-four full standard flows passed. Default passed 4,381 SQLAST and 5,475
 workspace tests; all features passed 5,108 SQLAST and 6,254 workspace tests.
 Both retained 63 existing ignored workspace cases and passed all 3,064 SQL
 regression cases in 166 groups. Feature boundaries, Clippy, formatting, imports,
 Markdown, documentation, doctests, and all other standard steps passed. No
 SLOW warning or timeout occurred.
 
-Compiled-case reconciliation against `87500d3a` finds 4,373 unchanged and
-eight relocated default cases, and 5,100 unchanged and eight relocated
-all-feature cases. Both contain 28 suites, with no missing/extra cases,
-collisions, or metadata changes. Their normalized identity SHA-256 values are
-respectively
+Round-four compiled-case reconciliation against `87500d3a` found 4,373
+unchanged and eight relocated default cases, and 5,100 unchanged with eight
+relocated all-feature cases. Both contain 28 suites, with no missing or extra
+cases, collisions, or metadata changes. Their normalized identity SHA-256
+values are respectively
 `41e0aa28523a7699b4aa097afb99981ec3a6b67ef666aca3517579a030d199e0` and
 `34b0d935101c074620dd59db9957888f0d270ec0926ebf81768b17a7298f8808`.
-Packaging and SemVer/release-intent checks passed for implementation commit
-`50167cc7039aeab39acf2689445038a5e6b7f94f`. Package layout, metadata, checksums,
-and identical executables were verified. Executables extracted from that
-commit's generated archive passed all 3,064 SQL regression cases in 166 groups.
-The subsequent documentation-only commit records these results; the tested
-Rust sources are unchanged.
-At planning, available capacity was 78 GiB against an estimated additional
-20 GiB, meeting the repository baseline. Contributor commands, maintained
-execution paths, package versions, and release intents remain unchanged.
+Earlier packaging and SemVer/release-intent checks passed for implementation
+commit `50167cc7039aeab39acf2689445038a5e6b7f94f`. Package layout, metadata,
+checksums, and identical executables were verified. Executables extracted from
+that commit's generated archive passed all 3,064 SQL regression cases in 166
+groups.
+The subsequent documentation-only commit recorded those results; the Rust
+sources at that checkpoint were unchanged. At round-four planning, 78 GiB was
+available against an estimated additional 20 GiB; the baseline was 20 GiB.
+Contributor commands, maintained execution paths, package versions, and
+release intents remain unchanged.
+
+### Round-five placement and source audit
+
+The independent behavior and adjacency review passed all 416 relocated tests
+and all 241 focused destination modules at the frozen source snapshot. The
+production audit reports 7,448 functions, 988 model declarations, and all 600
+required private fields preserved. It found no widened fields, new raw mutable
+accessors, or new production signatures. The recursive scan includes 1,358
+test functions, including 30 unchanged vendored SQLite tests outside the
+ordinary module graph. The graph-based semantic audit covers the other 1,328
+tests: 1,324 bodies match
+exactly, two formatting differences are equivalent, and two getter
+adaptations use the existing `commands()` accessor.
+
+Twenty helpers moved within the existing crate-root `test_helpers` hierarchy;
+14 moved directly into its root module and six into existing child modules.
+The independent audit confirms all test and helper feature gates match their
+baseline. It found no new cross-owner implementation blocks or tiny source
+fragments.
+
+SQLite-only imports in 20 focused test scopes retain explicit feature guards.
+The final post-format audit passes with source SHA-256
+`ba299467b3227f2ebeef926290f4d80282d9877dbe0504db555bba86fc7637ab`.
+
+Both full standard flows passed on the final Rust sources. Default passed
+4,381 SQLAST and 5,475 workspace tests; all features passed 5,108 SQLAST and
+6,254 workspace tests. Both retained 63 existing ignored workspace cases and
+passed all 3,064 SQL regression cases in 166 groups. Feature boundaries,
+Clippy, formatting, import lint, Markdown, documentation, doctests, and all
+other standard steps passed. There were no test timeouts or SLOW warnings.
+
+Compiled inventories reconcile against `5486ee63`, across 28 suites in each
+configuration. Default has 3,217 unchanged and 1,164 relocated cases;
+all features has 3,794 unchanged and 1,314 relocated cases. Neither inventory
+has missing/extra cases, collisions, or metadata changes. Their normalized
+identity SHA-256 values are respectively
+`18d1168c2dc1242a3ad89de656ba1e12927a62239feac20011cabac8e2d4ab56` and
+`ea36d018fa1d573be5d226c57e80be535e67632e4ba17d78a8da999af7837358`.
+Only existing maintained test execution paths are used. Available capacity
+was 77 GiB against an estimated 20 GiB additional use, satisfying the
+repository baseline.
+
+The package layout, installed-archive, and SemVer evidence above applies only
+to implementation commit `50167cc7`. It is historical for round five; no
+round-five packaging or SemVer result is asserted here.

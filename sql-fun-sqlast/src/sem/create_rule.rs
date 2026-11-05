@@ -283,6 +283,65 @@ impl CreateRule {
         self.dependencies = dependencies;
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod test_retains_bound_actions_and_dependencies {
+    use crate::{
+        names::FullName,
+        test_helpers::{rule as test_helpers, statements},
+    };
+
+    #[test]
+    fn retains_bound_actions_and_dependencies() -> testresult::TestResult {
+        let mut context = test_helpers::catalog();
+        let statement = statements::resolve_postgres(
+            "CREATE RULE r AS ON UPDATE TO items DO (SELECT OLD.id; INSERT INTO sink VALUES(NEW.id))",
+            &mut context,
+        )?;
+        let rule = statement.rule().unwrap();
+        let query = rule.actions()[0].select_statement().unwrap();
+        let reference = query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .table_column_reference()
+            .unwrap();
+        assert_eq!(
+            reference.relation(),
+            &FullName::with_schema("public", "items")
+        );
+        assert_eq!(reference.alias().as_str(), "old");
+        assert!(
+            rule.dependencies()
+                .relations()
+                .contains(&FullName::with_schema("public", "sink"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retains_nested_cte_write_dependencies() -> testresult::TestResult {
+        let mut context = test_helpers::catalog();
+        let statement = statements::resolve_postgres(
+            "CREATE RULE r AS ON UPDATE TO items DO WITH x AS (INSERT INTO sink VALUES(1) RETURNING id) SELECT id FROM x",
+            &mut context,
+        )?;
+        assert!(
+            statement
+                .rule()
+                .unwrap()
+                .dependencies()
+                .relations()
+                .contains(&FullName::with_schema("public", "sink"))
+        );
+        Ok(())
+    }
+}
+
+impl CreateRule {
     pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,
         visitor: &mut V,
@@ -336,6 +395,88 @@ impl CreateRule {
             context
         };
         context.register_rule(self)
+    }
+}
+
+#[cfg(test)]
+mod test_replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_parent {
+    use crate::{
+        context::{BaseParseContext, ParseContext, RuleInfoRead},
+        names::{FullName, ViewName as NamesViewName},
+        sem::RuleIdentity,
+        test_helpers::{rule as test_helpers, statements},
+    };
+
+    #[test]
+    fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_parent()
+    -> testresult::TestResult {
+        let root = test_helpers::catalog().freeze();
+        let parent = test_helpers::apply(
+            "CREATE RULE r AS ON INSERT TO item_view DO INSTEAD NOTHING",
+            test_helpers::layer(&root),
+        )?
+        .freeze();
+        let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "r");
+        let mut child = test_helpers::layer(&parent);
+        assert!(
+            statements::resolve_postgres(
+                "CREATE OR REPLACE RULE r AS ON INSERT TO item_view DO SELECT OLD.id",
+                &mut child
+            )
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
+        );
+        assert!(child.rule(&identity).unwrap().instead());
+        assert!(
+            test_helpers::apply(
+                "CREATE RULE r AS ON INSERT TO item_view DO NOTHING",
+                test_helpers::layer(&parent)
+            )
+            .is_ok_and(|context| !context.problems().is_empty())
+        );
+        let child = test_helpers::apply(
+            "CREATE OR REPLACE RULE r AS ON INSERT TO item_view DO SELECT NEW.id",
+            test_helpers::layer(&parent),
+        )?;
+        let view = child
+            .get_view(&NamesViewName::from_full_name(identity.target()))
+            .unwrap();
+        let active = view.rules().unwrap().resolve(&child);
+        assert_eq!(active.len(), 1);
+        assert!(!active[0].instead());
+        assert!(std::ptr::eq(active[0], child.rule(&identity).unwrap()));
+        assert!(parent.rule(&identity).unwrap().instead());
+        Ok(())
+    }
+
+    #[test]
+    fn select_rule_replacement_updates_the_target_query() -> testresult::TestResult {
+        let root = test_helpers::catalog().freeze();
+        let context = test_helpers::apply(
+            r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO item_view DO INSTEAD SELECT id FROM sink"#,
+            test_helpers::layer(&root),
+        )?;
+        let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "_RETURN");
+        assert_eq!(
+            context
+                .get_view(&crate::names::ViewName::from_full_name(identity.target()))
+                .unwrap()
+                .rules()
+                .unwrap()
+                .resolve(&context)
+                .len(),
+            1
+        );
+        assert!(
+            context
+                .rule(&identity)
+                .unwrap()
+                .dependencies()
+                .relations()
+                .contains(&FullName::with_schema("public", "sink")),
+            "{:?}",
+            context.rule(&identity).unwrap()
+        );
+        Ok(())
     }
 }
 

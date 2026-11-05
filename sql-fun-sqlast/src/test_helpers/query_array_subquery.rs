@@ -59,3 +59,14 @@ pub(crate) fn composite_query(sql: &str) -> AstAndContextPair<SchemaFileContext>
     )
     .unwrap()
 }
+
+use crate::sem::AnalysisProblem;
+
+pub(crate) fn reports_width_problem(problems: &[AnalysisProblem]) -> bool {
+    for problem in problems {
+        if problem.code() == "array_subquery_columns" {
+            return true;
+        }
+    }
+    false
+}

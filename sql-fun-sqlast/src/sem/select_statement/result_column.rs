@@ -247,7 +247,123 @@ impl ResultColumnCollection {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_composite_value_expansion_is_not_a_source_wildcard {
+    use crate::{context::ParseContext, test_helpers::query::table_function_query};
+
+    #[rstest::rstest]
+    #[case::direct("SELECT (pair_fun()).*")]
+    #[case::table_row("SELECT (row_fun()).*")]
+    fn composite_value_expansion_is_not_a_source_wildcard(#[case] sql: &str) {
+        let (_, context) = table_function_query(sql, true);
+        assert!(context.analysis_state().wildcard_expansions().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod test_expands_composite_expression_targets {
+    use crate::{
+        sem::{PgBuiltInType, SemScalarExpr},
+        test_helpers::query::table_function_query,
+    };
+
+    #[rstest::rstest]
+    #[case::named("SELECT (pair_fun()).*")]
+    #[case::table_row("SELECT (row_fun()).*")]
+    #[case::column("SELECT x.* FROM (SELECT pair_fun() AS x) s")]
+    #[case::qualified_column("SELECT (s.x).* FROM (SELECT pair_fun() AS x) s")]
+    #[case::anonymous("SELECT (ROW(1::integer, 'x'::text)).*")]
+    fn expands_composite_expression_targets(#[case] sql: &str) {
+        let (query, context) = table_function_query(sql, true);
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+        let columns = query.result_columns();
+        assert_eq!(
+            columns.get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+        let expression = columns.get_column_at(0).unwrap().expression().unwrap();
+        assert!(matches!(expression, SemScalarExpr::Indirection(_)));
+    }
+
+    #[test]
+    fn scalar_star_reports_a_structured_problem() {
+        let (query, context) = table_function_query("SELECT (1).*", true);
+        assert!(
+            context.reported_problems().iter().any(|problem| {
+                problem.code() == "query_star_projection_requires_composite_type"
+            })
+        );
+        assert_eq!(query.result_columns().len(), 1);
+        assert!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .column_name()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn anonymous_row_star_keeps_nullable_fields() {
+        let (query, context) = table_function_query("SELECT (ROW(1::integer, NULL)).*", true);
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+        let columns = query.result_columns();
+        assert_eq!(columns.len(), 2);
+        assert_eq!(columns.get_column_at(0).unwrap().is_not_null(), &Some(true));
+        assert_eq!(
+            columns.get_column_at(1).unwrap().is_not_null(),
+            &Some(false)
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_projection_star_keeps_its_column_expansion {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::{
+            query::expression, query_whole_rows as test_helpers, query_whole_rows::catalog_query,
+        },
+    };
+
+    #[test]
+    fn projection_star_keeps_its_column_expansion() {
+        let (query, context) = catalog_query("SELECT t.* FROM pg_catalog.pg_type t");
+        assert_eq!(context.reported_problem_count(), 0);
+        assert!(expression(&query).table_column_reference().is_some());
+        assert!(expression(&query).as_whole_row().is_none());
+    }
+
+    #[rstest::rstest]
+    #[case::view("SELECT (r.*).* FROM v AS r(x)", "x")]
+    #[case::table("SELECT (r.*).* FROM t AS r(x)", "x")]
+    #[case::derived("SELECT (r.*).* FROM (SELECT 1 AS n) AS r(x)", "x")]
+    #[case::function("SELECT (identity_v(r.*)).* FROM v AS r(x)", "n")]
+    #[case::nested("SELECT ((r.*).x).* FROM nested AS r(x)", "n")]
+    #[case::quoted(r#"SELECT (r.*).* FROM v AS r("X")"#, "X")]
+    fn occurrence_star_preserves_visible_names(#[case] sql: &str, #[case] name: &str) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let column = query.result_columns().get_column_at(0).unwrap();
+        assert_eq!(column.column_name().as_ref().unwrap().as_str(), name);
+        assert_eq!(column.col_type(), &Some(PgBuiltInType::int4()));
+        assert!(query.result_columns().get_column_at(1).is_none());
+        assert!(expression(&query).as_indirection().is_some());
+    }
+}
+
+impl ResultColumnCollection {
     pub(crate) fn push_pending_star(&mut self, base: SemScalarExpr) {
         let mut column = ResultColumn::new(&None, &None, &None);
         column.expression = Some(Box::new(base.clone()));
@@ -286,7 +402,72 @@ impl ResultColumnCollection {
         self.0 = expanded.0;
         Ok(changed)
     }
+}
 
+#[cfg(test)]
+mod test_unresolved_composite_star_retains_its_base_for_parameter_inference {
+    use crate::{
+        context::ParseContext, sem::PgBuiltInType, test_helpers::query::table_function_query,
+    };
+
+    #[test]
+    fn unresolved_composite_star_retains_its_base_for_parameter_inference() {
+        let (query, context) = table_function_query("SELECT ($1).*", true);
+        let output = query.result_columns().get_column_at(0).unwrap();
+        assert!(output.has_pending_star());
+        assert!(output.column_name().is_none());
+        assert!(output.expression().is_some());
+        let serialized = ::serde_json::to_value(output).unwrap();
+        assert!(serialized["star_expansion"]["Pending"].is_object());
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+    }
+
+    #[test]
+    fn inferred_composite_star_preserves_following_output_positions() {
+        let (query, context) = table_function_query("SELECT ($1).*, $2, $1::public.pair", true);
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+        let columns = query.result_columns();
+        assert_eq!(columns.len(), 4);
+        assert_eq!(
+            columns.get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+        assert_eq!(
+            columns.get_column_at(1).unwrap().col_type(),
+            &Some(PgBuiltInType::text())
+        );
+        let constraints = context.parameter_constraints();
+        assert!(
+            constraints
+                .result_column(0)
+                .unwrap()
+                .allows(&PgBuiltInType::int4())
+        );
+        assert!(
+            constraints
+                .result_column(1)
+                .unwrap()
+                .allows(&PgBuiltInType::text())
+        );
+        assert!(
+            constraints
+                .result_column(2)
+                .unwrap()
+                .allows(&PgBuiltInType::text())
+        );
+        assert!(constraints.result_column(3).is_some());
+    }
+}
+
+impl ResultColumnCollection {
     pub(crate) fn validate_grouping_target(
         &mut self,
         index: usize,

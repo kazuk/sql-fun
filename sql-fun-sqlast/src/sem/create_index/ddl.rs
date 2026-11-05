@@ -47,7 +47,81 @@ impl CreateIndex {
         }
         Ok(collection)
     }
+}
 
+#[cfg(test)]
+mod test_analyze_index_elem_collects_column_order_and_alias {
+    use crate::{
+        names::ColumnName,
+        sem::{
+            ScalarConstExpr, SemScalarExpr,
+            create_index::{CreateIndex, IndexElement, SortOrder},
+        },
+        syn::{Node, NodeInner, ScanToken, SortByDir},
+        test_helpers::{SynBuilder, TestParseContext},
+    };
+
+    use sql_fun_core::IVec;
+
+    #[test]
+    fn analyze_index_elem_collects_column_order_and_alias() {
+        let builder = SynBuilder::new();
+        let keys = vec![
+            builder.index_elem_column("id", SortByDir::SortbyDesc.into(), Some("id_alias")),
+            builder.index_elem_column("name", SortByDir::SortbyDefault.into(), None),
+        ];
+        let tokens: IVec<ScanToken> = IVec::default();
+        let context = TestParseContext::default();
+
+        let (collection, _context) =
+            CreateIndex::analyze_index_elem(context, keys, &tokens).expect("analyze index elem");
+
+        assert_eq!(collection.0.len(), 2);
+
+        let first = &collection.0[0];
+        assert!(matches!(first.order, SortOrder::Desc));
+        assert_eq!(first.col_name.as_deref(), Some("id_alias"));
+        match &first.element {
+            IndexElement::ColumnName(name) => assert_eq!(name, &ColumnName::from("id")),
+            _ => panic!("expected column name"),
+        }
+
+        let second = &collection.0[1];
+        assert!(matches!(second.order, SortOrder::Asc));
+        assert!(second.col_name.is_none());
+        match &second.element {
+            IndexElement::ColumnName(name) => assert_eq!(name, &ColumnName::from("name")),
+            _ => panic!("expected column name"),
+        }
+    }
+
+    #[test]
+    fn analyze_index_elem_collects_expression() {
+        let builder = SynBuilder::new();
+        let expr_node = Node::from(NodeInner::AConst(builder.const_int4(42)));
+        let keys = vec![builder.index_elem_expr(expr_node, SortByDir::SortbyDefault.into(), None)];
+        let tokens: IVec<ScanToken> = IVec::default();
+        let context = TestParseContext::default();
+
+        let (collection, _context) =
+            CreateIndex::analyze_index_elem(context, keys, &tokens).expect("analyze index elem");
+
+        assert_eq!(collection.0.len(), 1);
+        let item = &collection.0[0];
+        assert!(matches!(item.order, SortOrder::Asc));
+        match &item.element {
+            IndexElement::Expr(expr) => match expr.as_ref() {
+                SemScalarExpr::Const(ScalarConstExpr::Integer(value)) => {
+                    assert_eq!(*value, 42);
+                }
+                _ => panic!("expected integer const expr"),
+            },
+            _ => panic!("expected expression element"),
+        }
+    }
+}
+
+impl CreateIndex {
     pub(crate) fn from_ast(
         ast: &AstIndex,
         context: &mut impl ParseContext,
@@ -109,6 +183,88 @@ impl CreateIndex {
             SemAst::create_index(&index),
             context,
         ))
+    }
+}
+
+#[cfg(test)]
+mod test_analyze_index_stmt_collects_keys_including_order_and_includes {
+    use crate::{
+        names::{ColumnName, FullName},
+        sem::{
+            AstAndContextPair, SemAst,
+            create_index::{CreateIndex, IndexElement, SortOrder},
+        },
+        syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
+    };
+
+    use sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    fn analyze_index_stmt_collects_keys_including_order_and_includes(
+        mut test_context: TestParseContext,
+    ) {
+        test_context.setup_table("items", &[], &source_span());
+        let builder = SynBuilder::new();
+        let relation = RangeVarOpt::from(
+            builder.range_var(&FullName::with_schema("public", "items"), &AliasOpt::none()),
+        );
+        let index_params = builder.index_elem_list(vec![
+            builder.index_elem_column("id", SortByDir::SortbyDesc.into(), None),
+            builder.index_elem_column("name", SortByDir::SortbyDefault.into(), None),
+        ]);
+        let include_params = builder.index_elem_list(vec![builder.index_elem_column(
+            "metadata",
+            SortByDir::SortbyDefault.into(),
+            None,
+        )]);
+        let index_stmt =
+            builder.index_stmt("idx_items", relation, index_params, include_params, false);
+        let tokens: IVec<ScanToken> = IVec::default();
+
+        let AstAndContextPair(ast, context) =
+            CreateIndex::analyze_index_stmt(test_context, &None, index_stmt, &tokens)
+                .expect("analyze index");
+
+        let SemAst::CreateIndex(create_index) = ast else {
+            panic!("expected create index ast");
+        };
+
+        assert_eq!(
+            create_index.name,
+            FullName::with_schema("public", "idx_items")
+        );
+        assert!(matches!(
+            create_index.table.full_name().schema(),
+            Some(schema) if schema.as_str() == "public"
+        ));
+        assert!(!create_index.unique);
+        assert_eq!(create_index.key_columns.0.len(), 2);
+        assert_eq!(create_index.include_columns.0.len(), 1);
+
+        let first_key = &create_index.key_columns.0[0];
+        assert!(matches!(first_key.order, SortOrder::Desc));
+        match &first_key.element {
+            IndexElement::ColumnName(name) => assert_eq!(name, &ColumnName::from("id")),
+            _ => panic!("expected column name"),
+        }
+
+        let second_key = &create_index.key_columns.0[1];
+        assert!(matches!(second_key.order, SortOrder::Asc));
+        match &second_key.element {
+            IndexElement::ColumnName(name) => assert_eq!(name, &ColumnName::from("name")),
+            _ => panic!("expected column name"),
+        }
+
+        let include_key = &create_index.include_columns.0[0];
+        match &include_key.element {
+            IndexElement::ColumnName(name) => assert_eq!(name, &ColumnName::from("metadata")),
+            _ => panic!("expected column name"),
+        }
+
+        assert_eq!(context.create_indexes_len(), 1);
+        let applied = context.last_create_index().expect("applied create index");
+        assert_eq!(applied.name, create_index.name);
     }
 }
 

@@ -131,7 +131,148 @@ impl WithTypmod<TypeReference> {
         }
         self.interpretation = TypmodInterpretation::from_result(self.builtin_typmod(&name));
     }
+}
 
+#[cfg(test)]
+mod test_retains_and_interprets_record_typmods {
+    use crate::{
+        sem::{AnalysisError, ColumnReferenceExpr, SemScalarExpr},
+        test_helpers::query::table_function_query,
+    };
+
+    #[rstest::rstest]
+    #[case::varchar("varchar(3)", 7)]
+    #[case::character("character(3)", 7)]
+    #[case::array("varchar(3)[]", 7)]
+    #[case::qualified("pg_catalog.varchar(3)", 7)]
+    #[case::numeric("numeric(12,3)", (12 << 16) + 3 + 4)]
+    #[case::negative_scale("numeric(2,-3)", (2 << 16) + 2045 + 4)]
+    #[case::larger_scale("numeric(2,4)", (2 << 16) + 4 + 4)]
+    #[case::string_precision("numeric('3')", (3 << 16) + 4)]
+    #[case::bit("bit(5)", 5)]
+    #[case::varbit("bit varying(5)", 5)]
+    #[case::timestamp("timestamp(3)", 3)]
+    #[case::timestamp_clamping("timestamp(9)", 6)]
+    #[case::timetz("time(2) with time zone", 2)]
+    #[case::interval("interval day to second(3)", (7176 << 16) + 3)]
+    #[case::interval_clamping("interval(9)", (32767 << 16) + 6)]
+    #[case::interval_range("interval year to month", (6 << 16) + 65535)]
+    #[case::quoted_interval("\"interval\"(32767,3)", (32767 << 16) + 3)]
+    fn retains_and_interprets_record_typmods(
+        #[case] declared: &str,
+        #[case] expected: i32,
+        #[values(false, true)] rows: bool,
+    ) {
+        use crate::{names::AliasName, sem::DataSource};
+        let sql = if rows {
+            format!("SELECT r.* FROM ROWS FROM(record_fun('') AS(a {declared})) r")
+        } else {
+            format!("SELECT r.a FROM record_fun('') r(a {declared})")
+        };
+        let (mut query, context) = table_function_query(&sql, false);
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let source = query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .source_scope()
+            .unwrap()
+            .resolve_alias(&AliasName::from("r"))
+            .unwrap()
+            .0;
+        let restored: DataSource =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+        struct Modifiers {
+            expected: i32,
+            found: bool,
+        }
+        impl crate::sem::traversal::SemanticVisitorMut for Modifiers {
+            fn expression(&mut self, value: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+                if let SemScalarExpr::ColumnRef(ColumnReferenceExpr::TableFuncColumn(column)) =
+                    value
+                {
+                    let declaration = column.type_declaration().unwrap();
+                    assert_eq!(declaration.typmod(), Some(self.expected));
+                    assert!(declaration.is_validated());
+                    assert!(!declaration.arguments().is_empty());
+                    self.found = true;
+                }
+                Ok(())
+            }
+        }
+        let mut modifiers = Modifiers {
+            expected,
+            found: false,
+        };
+        query.walk(&mut modifiers).unwrap();
+        assert!(modifiers.found);
+    }
+
+    #[rstest::rstest]
+    #[case::zero_numeric("numeric(0)")]
+    #[case::quoted_noninteger("numeric('''3''')")]
+    #[case::large_numeric("numeric(1001)")]
+    #[case::bad_scale("numeric(3,-1001)")]
+    #[case::zero_varchar("varchar(0)")]
+    #[case::large_varchar("varchar(10485761)")]
+    #[case::negative_timestamp("\"timestamp\"(-1)")]
+    #[case::zero_bit("bit varying(0)")]
+    #[case::no_modifier("pg_catalog.int4(3)")]
+    #[case::bad_interval_range("\"interval\"(1000)")]
+    fn diagnoses_invalid_record_typmods(#[case] declared: &str) {
+        let sql = format!("SELECT r.a FROM record_fun('') r(a {declared})");
+        let (_, context) = table_function_query(&sql, false);
+        assert!(
+            context.has_reported_problem("table_function_invalid_typmod"),
+            "{:?}",
+            context.reported_problems()
+        );
+    }
+
+    #[test]
+    fn retains_extension_typmods_without_applying_builtin_rules() {
+        use crate::{
+            names::{AliasName, ColumnName},
+            sem::DataSource,
+        };
+        let (query, context) = table_function_query(
+            "SELECT r.a FROM record_fun(src => '') r(a public.custom_type(Point,4326))",
+            false,
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let source = query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .source_scope()
+            .unwrap()
+            .resolve_alias(&AliasName::from("r"))
+            .unwrap()
+            .0;
+        let DataSource::DeferredTableFunc(source) = source else {
+            panic!("deferred invocation")
+        };
+        let declaration = source
+            .output_type_declaration(&ColumnName::from("a"))
+            .unwrap();
+        assert_eq!(declaration.arguments().len(), 2);
+        assert!(!declaration.is_validated());
+        assert!(declaration.validation_error().is_none());
+    }
+}
+
+impl WithTypmod<TypeReference> {
     fn builtin_typmod(&self, name: &str) -> Result<i32, &'static str> {
         // PostgreSQL's ArrayGetIntegerTypmods accepts string/identifier spellings
         // of integers too. Keep the SQL spelling separately from its value.

@@ -164,6 +164,118 @@ impl ColumnDefinition {
     }
 }
 
+#[cfg(all(test, feature = "sqlite"))]
+#[cfg(test)]
+mod test_analyze_sqlite_column_definition_collects_constraints {
+    use crate::test_helpers::column_definition::create_table_statement;
+
+    use crate::{
+        SqliteToken,
+        names::TableName,
+        sem::{
+            SemScalarExpr,
+            create_table::column_def::{ColumnConstraint, ColumnDefinition},
+        },
+        test_helpers::column_definition::setup_context,
+    };
+
+    #[cfg(feature = "sqlite")]
+    use crate::syn::sqlite::CreateTableStatement;
+
+    use assert_matches::assert_matches;
+
+    use sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    fn analyze_sqlite_column_definition_collects_constraints<'a>(
+        create_table_statement: (CreateTableStatement, IVec<SqliteToken<'a>>),
+    ) {
+        let (create_table, tokens) = create_table_statement;
+        let Some(body) = create_table.body().as_columns_and_constraint() else {
+            panic!("expected column-based create table body");
+        };
+
+        let table_name = TableName::try_from(create_table.table_name())
+            .expect("table name should convert into semantic table name");
+        let mut context = setup_context();
+
+        let (id_col, new_context) = ColumnDefinition::analyze_column_definition(
+            context,
+            &table_name,
+            &body.columns()[0],
+            &tokens,
+        )
+        .expect("id column should analyze");
+        context = new_context;
+        assert_eq!(id_col.constraints().len(), 3);
+        assert_matches!(id_col.constraints()[0], ColumnConstraint::PrimaryKey(_));
+        assert_matches!(id_col.constraints()[1], ColumnConstraint::Nullability(_));
+        assert_matches!(id_col.constraints()[2], ColumnConstraint::Unique(_));
+        assert_eq!(id_col.is_not_null(), Some(true));
+
+        let (name_col, new_context) = ColumnDefinition::analyze_column_definition(
+            context,
+            &table_name,
+            &body.columns()[1],
+            &tokens,
+        )
+        .expect("name column should analyze");
+        context = new_context;
+        assert_eq!(name_col.constraints().len(), 2);
+        let Some(default) = &name_col.constraints()[0].as_default() else {
+            panic!("expected string default constraint");
+        };
+        let Some(const_value) = default.expr().as_const() else {
+            panic!("expect const string")
+        };
+        let Some(value) = const_value.as_string() else {
+            panic!("expect const string")
+        };
+        assert_eq!(value, "guest");
+
+        let Some(collate) = &name_col.constraints()[1].as_collate() else {
+            panic!("expected collate constraint")
+        };
+        assert_eq!(collate.collation_name(), "nocase");
+
+        let (active_col, new_context) = ColumnDefinition::analyze_column_definition(
+            context,
+            &table_name,
+            &body.columns()[2],
+            &tokens,
+        )
+        .expect("active column should analyze");
+        context = new_context;
+        assert_eq!(active_col.constraints().len(), 1);
+
+        let Some(check_constraint) = &active_col.constraints()[0].as_check() else {
+            panic!("expected check constraint")
+        };
+        assert_matches!(check_constraint.expr(), SemScalarExpr::Boolean(_));
+
+        let (created_at_col, context) = ColumnDefinition::analyze_column_definition(
+            context,
+            &table_name,
+            &body.columns()[3],
+            &tokens,
+        )
+        .expect("created_at column should analyze");
+        assert_eq!(created_at_col.constraints().len(), 1);
+        let Some(default) = &created_at_col.constraints()[0].as_default() else {
+            panic!("default constraint")
+        };
+        let Some(sql_value) = default.expr().as_sql_value() else {
+            panic!("expected SqlValue")
+        };
+        let Ok(time_prec) = sql_value.as_current_timestamp() else {
+            panic!("expected current_timestamp")
+        };
+        assert!(time_prec.is_none());
+
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
 impl ColumnDefinition {
     pub(crate) fn from_ast_serial(
         ast: &AstColumn,
@@ -199,7 +311,7 @@ impl ColumnDefinition {
 #[cfg(test)]
 mod serial_catalog_tests {
     use crate::{
-        context::{ParseContext, SequenceInfoRead, TableInfoRead},
+        context::{ParseContext, SequenceInfoRead},
         names::{ColumnName, FullName, TableName},
         sem::{PgBuiltInType, TypeReference},
         test_helpers::{ownership::apply_ownership_sql, serial},
@@ -250,100 +362,6 @@ mod serial_catalog_tests {
         let identity = sequence.name().clone();
         let frozen = context.freeze();
         assert!(frozen.get_sequence_impl(&identity).is_some());
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    #[case::nullable("serial NULL", "serial_nullable")]
-    #[case::default("serial DEFAULT 1", "serial_default_conflict")]
-    #[case::identity("serial GENERATED ALWAYS AS IDENTITY", "serial_identity_conflict")]
-    #[case::array("serial[]", "serial_array")]
-    #[case::modifier("serial(3)", "serial_modifier")]
-    fn rejected_serial_does_not_publish_objects(
-        #[case] declaration: &str,
-        #[case] expected_code: &str,
-    ) -> testresult::TestResult {
-        let pair = apply_ownership_sql(
-            serial::context(),
-            &format!("CREATE TABLE users(id {declaration})"),
-        )?;
-        assert!(
-            !pair
-                .ast()
-                .as_create_table()
-                .unwrap()
-                .declarations_can_apply()
-        );
-        let context = pair.into_context();
-        assert!(
-            context
-                .get_table_impl(&FullName::with_schema("public", "users"))
-                .is_none()
-        );
-        assert!(
-            context
-                .get_sequence_impl(&FullName::with_schema("public", "users_id_seq"))
-                .is_none()
-        );
-        assert!(context.problems().iter().any(|p| p.code() == expected_code));
-        let context = apply_ownership_sql(context, "CREATE TABLE good(id integer)")?.into_context();
-        assert!(
-            context
-                .get_table_impl(&FullName::with_schema("public", "good"))
-                .is_some()
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn skipped_creation_and_name_collisions_preserve_sequences() -> testresult::TestResult {
-        let context = apply_ownership_sql(serial::context(), "CREATE TABLE users(id integer)")?
-            .into_context();
-        let context = apply_ownership_sql(context, "CREATE TABLE IF NOT EXISTS users(id serial)")?
-            .into_context();
-        assert!(
-            context
-                .get_sequence_impl(&FullName::with_schema("public", "users_id_seq"))
-                .is_none()
-        );
-        let context = apply_ownership_sql(context, "CREATE SEQUENCE other_id_seq")?.into_context();
-        let context = apply_ownership_sql(context, "CREATE TABLE other(id serial, second serial)")?
-            .into_context();
-        assert!(
-            context
-                .get_sequence_impl(&FullName::with_schema("public", "other_id_seq1"))
-                .is_some()
-        );
-        assert!(
-            context
-                .get_sequence_impl(&FullName::with_schema("public", "other_second_seq"))
-                .is_some()
-        );
-        Ok(())
-    }
-    #[test]
-    fn index_conflict_leaves_no_serial_sequence() -> testresult::TestResult {
-        let pair = apply_ownership_sql(
-            serial::context(),
-            "CREATE TABLE users(id serial CONSTRAINT users_id_seq PRIMARY KEY)",
-        )?;
-        let context = pair.into_context();
-        assert!(
-            context
-                .get_table_impl(&FullName::with_schema("public", "users"))
-                .is_none()
-        );
-        assert!(
-            context
-                .get_sequence_impl(&FullName::with_schema("public", "users_id_seq"))
-                .is_none()
-        );
-        assert!(
-            context
-                .problems()
-                .iter()
-                .any(|p| p.code() == "conflicting_creation")
-        );
         Ok(())
     }
 }

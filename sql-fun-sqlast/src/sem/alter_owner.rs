@@ -169,6 +169,50 @@ impl AlterOwner {
             None
         }
     }
+}
+
+#[cfg(test)]
+mod test_missing_owner_does_not_replace_previously_committed_ownership {
+    use crate::{
+        context::OwnershipInfoRead,
+        sem::Role,
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[test]
+    fn missing_owner_does_not_replace_previously_committed_ownership() -> testresult::TestResult {
+        let context = apply_ownership_sql(ownership_context(), "CREATE SCHEMA app")?.into_context();
+        let context =
+            apply_ownership_sql(context, "ALTER SCHEMA app OWNER TO alice")?.into_context();
+        let result = apply_ownership_sql(context, "ALTER SCHEMA app OWNER TO missing")?;
+        assert_eq!(
+            result
+                .context()
+                .schema_definition("app")
+                .unwrap()
+                .owner()
+                .unwrap()
+                .resolved_role()
+                .map(Role::name),
+            Some("alice")
+        );
+        let result = apply_ownership_sql(result.into_context(), "ALTER SCHEMA app OWNER TO bob")?;
+        assert_eq!(
+            result
+                .context()
+                .schema_definition("app")
+                .unwrap()
+                .owner()
+                .unwrap()
+                .resolved_role()
+                .map(Role::name),
+            Some("bob")
+        );
+        Ok(())
+    }
+}
+
+impl AlterOwner {
     /// Analyze and apply a PostgreSQL ALTER OWNER through the common AST.
     pub fn analyze_alter_owner<C: ParseContext>(
         context: C,

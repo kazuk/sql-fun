@@ -55,7 +55,24 @@ impl MemberRef {
             _ => None,
         }
     }
+}
 
+#[cfg(test)]
+mod test_occurrence_member_preserves_source_nullability {
+    use crate::test_helpers::{query::expression, query_whole_rows as test_helpers};
+
+    #[rstest::rstest]
+    #[case::direct("SELECT (r.*).x FROM t AS r(x)", true)]
+    #[case::outer("SELECT (r.*).x FROM t AS a LEFT JOIN t AS r(x) ON false", false)]
+    #[case::outer_star("SELECT (r.*).* FROM t AS a LEFT JOIN t AS r(x) ON false", false)]
+    fn occurrence_member_preserves_source_nullability(#[case] sql: &str, #[case] not_null: bool) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        assert_eq!(expression(&query).is_not_null(), Some(not_null));
+    }
+}
+
+impl MemberRef {
     pub(super) fn row_projection_name(&self) -> &str {
         if self.base.row_constructor().is_some()
             || self.base.constructor_projection_name() == Some("row")
@@ -128,6 +145,122 @@ impl MemberRef {
             member_type,
             member_not_null,
         ))))
+    }
+}
+
+#[cfg(test)]
+mod test_composite_member_nullability_survives_serialization {
+    use crate::{sem::SemScalarExpr, test_helpers::query::table_function_query};
+
+    #[rstest::rstest]
+    #[case::not_null("SELECT (ROW(1::integer)).*", Some(true))]
+    #[case::nullable("SELECT (ROW(NULL)).*", Some(false))]
+    fn composite_member_nullability_survives_serialization(
+        #[case] sql: &str,
+        #[case] expected: Option<bool>,
+    ) {
+        let (query, context) = table_function_query(sql, true);
+        assert!(context.reported_problems().is_empty());
+        let expression = query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap();
+        assert_eq!(expression.is_not_null(), expected);
+        let restored: SemScalarExpr =
+            ::serde_json::from_value(::serde_json::to_value(expression).unwrap()).unwrap();
+        assert_eq!(restored.is_not_null(), expected);
+    }
+}
+
+#[cfg(test)]
+mod test_view_whole_row_fields_remain_accessible {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::{
+            query::expression, query_whole_rows as test_helpers, query_whole_rows::catalog_query,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::member("SELECT (v.*).n FROM v")]
+    #[case::star("SELECT (v.*).* FROM v")]
+    fn view_whole_row_fields_remain_accessible(#[case] sql: &str) {
+        let (query, context) = test_helpers::view_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+        assert!(query.result_columns().get_column_at(1).is_none());
+    }
+
+    #[test]
+    fn view_whole_row_rejects_a_missing_field() {
+        let (query, context) = test_helpers::view_query("SELECT (v.*).missing FROM v");
+        assert_eq!(context.problems().len(), 1, "{:?}", context.problems());
+        assert_eq!(
+            context.problems()[0].code(),
+            "composite_type_field_not_found"
+        );
+        assert!(expression(&query).get_type().is_none());
+    }
+
+    #[rstest::rstest]
+    #[case::view("SELECT (r.*).x FROM v AS r(x)")]
+    #[case::table("SELECT (r.*).x FROM t AS r(x)")]
+    #[case::derived("SELECT (r.*).x FROM (SELECT 1 AS n) AS r(x)")]
+    #[case::quoted(r#"SELECT (r.*)."X" FROM v AS r("X")"#)]
+    #[case::function("SELECT (identity_v(r.*)).n FROM v AS r(x)")]
+    #[case::nested_member("SELECT ((r.*).x).n FROM nested AS r(x)")]
+    fn occurrence_aliases_expose_visible_fields(#[case] sql: &str) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+        assert!(query.result_columns().get_column_at(1).is_none());
+        assert!(expression(&query).as_indirection().is_some());
+    }
+
+    #[rstest::rstest]
+    #[case::view_original("SELECT (r.*).n FROM v AS r(x)")]
+    #[case::view_missing("SELECT (r.*).missing FROM v AS r(x)")]
+    #[case::table_original("SELECT (r.*).n FROM t AS r(x)")]
+    #[case::table_missing("SELECT (r.*).missing FROM t AS r(x)")]
+    #[case::derived_original("SELECT (r.*).n FROM (SELECT 1 AS n) AS r(x)")]
+    #[case::derived_missing("SELECT (r.*).missing FROM (SELECT 1 AS n) AS r(x)")]
+    #[case::nested_alias("SELECT ((r.*).x).x FROM nested AS r(x)")]
+    #[case::function_alias("SELECT (identity_v(r.*)).x FROM v AS r(x)")]
+    #[case::quoted_case(r#"SELECT (r.*).x FROM v AS r("X")"#)]
+    fn occurrence_aliases_reject_hidden_and_missing_fields(#[case] sql: &str) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert_eq!(context.problems().len(), 1, "{:?}", context.problems());
+        assert_eq!(
+            context.problems()[0].code(),
+            "composite_type_field_not_found"
+        );
+        assert!(expression(&query).as_indirection().is_some());
+        assert!(expression(&query).get_type().is_none());
+    }
+
+    #[rstest::rstest]
+    #[case::member(
+        "SELECT (r.*).x FROM identity(1) r(x)",
+        "member_access_requires_composite_type"
+    )]
+    #[case::star(
+        "SELECT (r.*).* FROM identity(1) r(x)",
+        "query_star_projection_requires_composite_type"
+    )]
+    fn scalar_source_fields_do_not_make_a_composite(#[case] sql: &str, #[case] code: &str) {
+        let (query, context) = catalog_query(sql);
+        assert_eq!(context.reported_problem_count(), 1);
+        test_helpers::assert_problem(&context, code);
+        assert!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type()
+                .is_none()
+        );
     }
 }
 

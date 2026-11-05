@@ -189,7 +189,117 @@ impl FromClause {
             ),
         )
     }
+}
 
+#[cfg(test)]
+mod test_source_nullability_is_retained_across_postgres_versions {
+    use crate::{
+        names::ColumnName,
+        sem::MergeRecordRole,
+        test_helpers::{
+            merge_assignments::strict_catalog, statements::resolve_postgres as resolve,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::postgres17(17)]
+    #[case::postgres18(18)]
+    fn source_nullability_is_retained_across_postgres_versions(#[case] version: u32) {
+        let mut context = strict_catalog(version);
+        let statement = resolve(
+            "MERGE INTO strict_items t USING (SELECT 1 AS sid) s ON t.id=s.sid WHEN MATCHED THEN UPDATE SET id=s.sid WHEN NOT MATCHED BY SOURCE THEN DELETE RETURNING s.sid,t.id",
+            &mut context,
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let columns = statement.as_merge().unwrap().result_columns();
+        let source = columns.get_column_at(0).unwrap();
+        let target = columns.get_column_at(1).unwrap();
+        assert_eq!(source.is_not_null(), &Some(false));
+        assert_eq!(target.is_not_null(), &Some(true));
+        assert_eq!(
+            source
+                .expression()
+                .unwrap()
+                .merge_record_reference()
+                .unwrap()
+                .role(),
+            MergeRecordRole::source()
+        );
+        assert_eq!(
+            target
+                .expression()
+                .unwrap()
+                .merge_record_reference()
+                .unwrap()
+                .role(),
+            MergeRecordRole::target()
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::update_only("WHEN MATCHED THEN UPDATE SET id=s.sid", Some(true), Some(true))]
+    #[case::insert_possible(
+        "WHEN NOT MATCHED THEN INSERT(id) VALUES(s.sid)",
+        Some(false),
+        Some(true)
+    )]
+    #[case::delete_possible("WHEN MATCHED THEN DELETE", Some(true), Some(false))]
+    fn postgres18_row_images_keep_action_nullability(
+        #[case] action: &str,
+        #[case] old_not_null: Option<bool>,
+        #[case] new_not_null: Option<bool>,
+    ) {
+        let mut context = strict_catalog(18);
+        let sql = format!(
+            "MERGE INTO strict_items t USING (SELECT 1 AS sid) s ON t.id=s.sid {action} RETURNING old.id,new.id"
+        );
+        let statement = resolve(&sql, &mut context).unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let columns = statement.as_merge().unwrap().result_columns();
+        let old = columns.get_column_at(0).unwrap();
+        let new = columns.get_column_at(1).unwrap();
+        assert_eq!(old.is_not_null(), &old_not_null);
+        assert_eq!(new.is_not_null(), &new_not_null);
+        assert_eq!(
+            old.expression()
+                .unwrap()
+                .merge_record_reference()
+                .unwrap()
+                .role(),
+            MergeRecordRole::old_row()
+        );
+        assert_eq!(
+            new.expression()
+                .unwrap()
+                .merge_record_reference()
+                .unwrap()
+                .role(),
+            MergeRecordRole::new_row()
+        );
+        assert_eq!(
+            old.expression()
+                .unwrap()
+                .merge_record_reference()
+                .unwrap()
+                .source()
+                .get_column_name(),
+            &ColumnName::from("id")
+        );
+    }
+}
+
+impl FromClause {
     fn merge_scope(target: &DataSource, source: &DataSource, config: MergeScopeConfig) -> Self {
         let mut sources = Vec::new();
         if config.include_source {

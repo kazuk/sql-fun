@@ -484,7 +484,54 @@ impl FunctionParam {
             &default,
         ))
     }
+}
 
+#[cfg(test)]
+mod test_function_parameter_modes {
+    use sql_fun_core::IVec;
+
+    use testresult::TestResult;
+
+    use crate::{
+        names::{FullName, LocalName, SchemaName},
+        sem::{FunctionParam, TypeDefinition},
+        syn::FunctionParameterMode,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    #[case(FunctionParameterMode::FuncParamIn)]
+    #[case(FunctionParameterMode::FuncParamOut)]
+    #[case(FunctionParameterMode::FuncParamInout)]
+    #[case(FunctionParameterMode::FuncParamVariadic)]
+    #[case(FunctionParameterMode::FuncParamTable)]
+    fn test_analyze(
+        mut test_context: TestParseContext,
+        #[case] mode: FunctionParameterMode,
+    ) -> TestResult {
+        test_context.set_get_search_path_result(&[
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let int4_name = FullName::new(
+            &None,
+            &Some(SchemaName::from("pg_catalog")),
+            &LocalName::from("int4"),
+        );
+        let int4_type = TypeDefinition::builtin(&int4_name, None);
+        test_context.set_get_type_impl_result(&int4_name, &int4_type);
+        let builder = SynBuilder::new();
+        let arg_type = builder.type_name(&["int4"]);
+
+        let func_param = builder.function_parameter("param", arg_type.into(), mode);
+        let tokens = IVec::default();
+
+        FunctionParam::analyze(test_context, func_param, &tokens)?;
+        Ok(())
+    }
+}
+
+impl FunctionParam {
     pub(crate) fn from_ast_mode(
         ast: &AstParameterMode,
         name: &Option<String>,

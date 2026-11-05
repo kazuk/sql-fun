@@ -22,30 +22,6 @@ impl CreateDomain {
     }
 }
 
-#[cfg(test)]
-mod domain_tests {
-    use crate::{
-        ast::{StatementNode, TryFromWithTokens},
-        sem::SemAst,
-        test_helpers::{SynBuilder, TestParseContext, create_cache_context},
-    };
-    use ::sql_fun_core::IVec;
-
-    #[test]
-    fn missing_base_type_is_diagnosed_only_during_resolution() -> testresult::TestResult {
-        let parser = SynBuilder::new();
-        let syntax = StatementNode::try_from_with_tokens(
-            &parser.parse("create domain email as absent"),
-            &IVec::default(),
-        )?;
-        let mut context = TestParseContext::default();
-        let domain = SemAst::from_ast_node(&syntax, &mut context, &mut create_cache_context())?;
-        assert!(matches!(domain, SemAst::CreateDomain(_)));
-        assert_eq!(context.reported_problem_count(), 1);
-        Ok(())
-    }
-}
-
 impl CreateDomain {
     pub(crate) fn from_ast_inner(
         ast: &AstDomain,
@@ -83,7 +59,34 @@ impl CreateDomain {
         domain.validate_collation(context, lookup.as_ref())?;
         Ok(domain)
     }
+}
 
+#[cfg(test)]
+mod test_missing_base_type_is_diagnosed_only_during_resolution {
+    use crate::{
+        ast::{StatementNode, TryFromWithTokens},
+        sem::SemAst,
+        test_helpers::{SynBuilder, TestParseContext, create_cache_context},
+    };
+
+    use ::sql_fun_core::IVec;
+
+    #[test]
+    fn missing_base_type_is_diagnosed_only_during_resolution() -> testresult::TestResult {
+        let parser = SynBuilder::new();
+        let syntax = StatementNode::try_from_with_tokens(
+            &parser.parse("create domain email as absent"),
+            &IVec::default(),
+        )?;
+        let mut context = TestParseContext::default();
+        let domain = SemAst::from_ast_node(&syntax, &mut context, &mut create_cache_context())?;
+        assert!(matches!(domain, SemAst::CreateDomain(_)));
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
+}
+
+impl CreateDomain {
     pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
         ast: &AstDomain,
         mut context: TContext,

@@ -333,3 +333,61 @@ pub(crate) fn context_args() -> ::sql_fun_core::SqlFunArgs {
     ])
     .unwrap()
 }
+
+use crate::syn::Constraint;
+
+pub(crate) fn constr_not_null() -> Constraint {
+    SynBuilder::new().constraint_not_null()
+}
+
+pub(crate) fn constr_null() -> Constraint {
+    SynBuilder::new().constraint_null()
+}
+
+pub(crate) fn constr_default() -> Constraint {
+    SynBuilder::new().constraint_default()
+}
+
+pub(crate) fn constr_identity() -> Constraint {
+    SynBuilder::new().constraint_identity("d")
+}
+
+pub(crate) fn constr_generated() -> Constraint {
+    SynBuilder::new().constraint_generated("s")
+}
+
+pub(crate) fn constr_check() -> Constraint {
+    SynBuilder::new().constraint_check()
+}
+
+pub(crate) fn constr_primary() -> Constraint {
+    SynBuilder::new().constraint_primary_key()
+}
+
+pub(crate) fn constr_unique() -> Constraint {
+    SynBuilder::new().constraint_unique()
+}
+
+pub(crate) fn constr_exclusion() -> Constraint {
+    SynBuilder::new().constraint_exclusion()
+}
+
+pub(crate) fn constr_foreign() -> Constraint {
+    SynBuilder::new().constraint_foreign()
+}
+
+pub(crate) fn constr_attr_deferrable() -> Constraint {
+    SynBuilder::new().constraint_attr_deferrable()
+}
+
+pub(crate) fn constr_attr_not_deferrable() -> Constraint {
+    SynBuilder::new().constraint_attr_not_deferrable()
+}
+
+pub(crate) fn constr_attr_deferred() -> Constraint {
+    SynBuilder::new().constraint_attr_deferred()
+}
+
+pub(crate) fn constr_attr_immediate() -> Constraint {
+    SynBuilder::new().constraint_attr_immediate()
+}

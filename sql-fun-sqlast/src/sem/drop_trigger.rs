@@ -101,6 +101,94 @@ impl DropTrigger {
             .dissociate_trigger(target, identity.name())
     }
 }
+
+#[cfg(test)]
+mod test_drop_masks_inherited_definition_and_recreation_replaces_the_tombstone {
+    use crate::{
+        context::{ParseContext, TriggerInfoRead},
+        test_helpers::{drop_trigger as test_helpers, heavy::drop_trigger as heavy},
+    };
+
+    #[test]
+    fn drop_masks_inherited_definition_and_recreation_replaces_the_tombstone()
+    -> testresult::TestResult {
+        let parent = heavy::catalog()?;
+        let child = test_helpers::apply(
+            test_helpers::layer(&parent),
+            "DROP TRIGGER audit ON item_view",
+        )?
+        .into_context()
+        .freeze();
+        assert!(child.trigger(&test_helpers::identity()).is_none());
+        assert!(
+            test_helpers::layer(&child)
+                .trigger(&test_helpers::identity())
+                .is_none()
+        );
+        assert!(parent.trigger(&test_helpers::identity()).is_some());
+        assert!(
+            test_helpers::layer(&parent)
+                .trigger(&test_helpers::identity())
+                .is_some()
+        );
+        assert_eq!(test_helpers::active_count(&parent), 2);
+        assert_eq!(test_helpers::active_count(&child), 1);
+        let grandchild =
+            test_helpers::apply(test_helpers::layer(&child), test_helpers::CREATE_AUDIT)?
+                .into_context()
+                .freeze();
+        assert!(grandchild.trigger(&test_helpers::identity()).is_some());
+        assert_eq!(test_helpers::active_count(&grandchild), 2);
+        assert!(child.trigger(&test_helpers::identity()).is_none());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "sqlite")]
+mod test_drop_masks_inherited_trigger_and_recreation_preserves_other_links {
+    use crate::{
+        context::{ParseContext, TriggerInfoRead},
+        names::FullName,
+        test_helpers::{drop_trigger_sqlite as test_helpers, heavy::drop_trigger_sqlite as heavy},
+    };
+
+    #[test]
+    fn drop_masks_inherited_trigger_and_recreation_preserves_other_links() -> testresult::TestResult
+    {
+        let parent = heavy::catalog()?;
+        let pair = test_helpers::apply(test_helpers::layer(&parent), "DROP TRIGGER AUDIT")?;
+        let drop = pair.ast().trigger_drop().unwrap();
+        assert_eq!(drop.identity(), Some(&test_helpers::identity()));
+        assert_eq!(
+            drop.target(),
+            Some(&FullName::with_schema("main", "item_view"))
+        );
+        assert!(drop.requested_target().is_none());
+        assert!(drop.behavior().is_none());
+        let child = pair.into_context().freeze();
+        assert!(child.trigger(&test_helpers::identity()).is_none());
+        assert!(
+            test_helpers::layer(&child)
+                .trigger(&test_helpers::identity())
+                .is_none()
+        );
+        assert_eq!(test_helpers::active_count(&child), 1);
+        assert_eq!(test_helpers::active_count(&parent), 2);
+        assert!(
+            test_helpers::layer(&parent)
+                .trigger(&test_helpers::identity())
+                .is_some()
+        );
+        let recreated =
+            test_helpers::apply(test_helpers::layer(&child), test_helpers::CREATE_AUDIT)?
+                .into_context()
+                .freeze();
+        assert_eq!(test_helpers::active_count(&recreated), 2);
+        assert!(recreated.trigger(&test_helpers::identity()).is_some());
+        Ok(())
+    }
+}
 impl SemAst {
     /// Retain a resolved DROP TRIGGER statement.
     pub fn drop_trigger(statement: &DropTrigger) -> Self {

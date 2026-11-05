@@ -940,6 +940,46 @@ impl DropRule {
             .dissociate_rule(target, identity)
     }
 }
+
+#[cfg(test)]
+mod test_drop_masks_inherited_definition_and_recreation_replaces_the_tombstone {
+    use crate::{
+        context::{ParseContext, RuleInfoRead},
+        test_helpers::{drop_rule as test_helpers, heavy::drop_rule as heavy},
+    };
+
+    #[test]
+    fn drop_masks_inherited_definition_and_recreation_replaces_the_tombstone()
+    -> testresult::TestResult {
+        let parent = heavy::catalog()?;
+        let child =
+            test_helpers::apply(test_helpers::layer(&parent), "DROP RULE audit ON item_view")?
+                .into_context()
+                .freeze();
+        assert!(child.rule(&test_helpers::identity()).is_none());
+        assert!(
+            test_helpers::layer(&child)
+                .rule(&test_helpers::identity())
+                .is_none()
+        );
+        assert!(parent.rule(&test_helpers::identity()).is_some());
+        assert!(
+            test_helpers::layer(&parent)
+                .rule(&test_helpers::identity())
+                .is_some()
+        );
+        assert_eq!(test_helpers::active_count(&parent), 2);
+        assert_eq!(test_helpers::active_count(&child), 1);
+        let grandchild =
+            test_helpers::apply(test_helpers::layer(&child), test_helpers::CREATE_AUDIT)?
+                .into_context()
+                .freeze();
+        assert!(grandchild.rule(&test_helpers::identity()).is_some());
+        assert_eq!(test_helpers::active_count(&grandchild), 2);
+        assert!(child.rule(&test_helpers::identity()).is_none());
+        Ok(())
+    }
+}
 impl SemAst {
     /// Retain a resolved DROP RULE statement.
     pub fn drop_rule(statement: &DropRule) -> Self {

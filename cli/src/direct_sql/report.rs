@@ -108,12 +108,7 @@ mod test_console {
     #[test]
     fn indents_each_detail_line_and_separates_failure_cases() -> ::testresult::TestResult {
         let mut failed = Case::new("query[0]");
-        failed.set_failures(vec![Difference::ColumnField {
-            index: 0,
-            field: "name",
-            expected: "id".into(),
-            actual: "other".into(),
-        }]);
+        failed.set_failures(vec![Difference::column_field(0, "name", "id", "other")]);
         let mut error = Case::new("query[1]");
         error.set_error("transport failure\nconnection closed");
         let mut output = Vec::new();
@@ -228,12 +223,9 @@ mod tests {
         let directory = ::tempfile::tempdir()?;
         let path = directory.path().join("nested/junit.xml");
         let mut failed = Case::new("source<&\"[1]");
-        failed.set_failures(vec![Difference::ColumnField {
-            index: 0,
-            field: "name",
-            expected: "<id> &".into(),
-            actual: "名前\0".into(),
-        }]);
+        failed.set_failures(vec![Difference::column_field(
+            0, "name", "<id> &", "名前\0",
+        )]);
         let mut error = Case::new("source[2]");
         error.set_error("transport failure");
         write_report(&path, &[Case::new("source[0]"), failed, error])?;

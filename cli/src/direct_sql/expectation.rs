@@ -85,35 +85,87 @@ fn code_list(codes: &[String]) -> String {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Difference {
     StatementCount(usize),
-    Diagnostics {
-        missing: Vec<String>,
-        unexpected: Vec<String>,
-    },
-    ColumnCount {
-        expected: usize,
-        actual: usize,
-    },
-    ColumnField {
-        index: usize,
-        field: &'static str,
-        expected: String,
-        actual: String,
-    },
-    MissingColumn {
-        index: usize,
-        column: String,
-    },
-    UnexpectedColumn {
-        index: usize,
-        column: String,
-    },
+    Diagnostics(DiagnosticDifference),
+    ColumnCount(ColumnCountDifference),
+    ColumnField(ColumnFieldDifference),
+    MissingColumn(ColumnDifference),
+    UnexpectedColumn(ColumnDifference),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct DiagnosticDifference {
+    missing: Vec<String>,
+    unexpected: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ColumnCountDifference {
+    expected: usize,
+    actual: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ColumnFieldDifference {
+    index: usize,
+    field: &'static str,
+    expected: String,
+    actual: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ColumnDifference {
+    index: usize,
+    column: String,
 }
 
 impl Difference {
+    const fn statement_count(actual: usize) -> Self {
+        Self::StatementCount(actual)
+    }
+
+    fn diagnostics(missing: &[String], unexpected: &[String]) -> Self {
+        Self::Diagnostics(DiagnosticDifference {
+            missing: missing.to_vec(),
+            unexpected: unexpected.to_vec(),
+        })
+    }
+
+    const fn column_count(expected: usize, actual: usize) -> Self {
+        Self::ColumnCount(ColumnCountDifference { expected, actual })
+    }
+
+    pub(super) fn column_field(
+        index: usize,
+        field: &'static str,
+        expected: &str,
+        actual: &str,
+    ) -> Self {
+        Self::ColumnField(ColumnFieldDifference {
+            index,
+            field,
+            expected: expected.to_owned(),
+            actual: actual.to_owned(),
+        })
+    }
+
+    fn missing_column(index: usize, column: &ExpectedColumn) -> Self {
+        Self::MissingColumn(ColumnDifference {
+            index,
+            column: column.to_string(),
+        })
+    }
+
+    fn unexpected_column(index: usize, column: &ExpectedColumn) -> Self {
+        Self::UnexpectedColumn(ColumnDifference {
+            index,
+            column: column.to_string(),
+        })
+    }
+
     pub(super) fn includes_diagnostic(&self, code: &str) -> bool {
         match self {
             Self::StatementCount(_) => true,
-            Self::Diagnostics { unexpected, .. } => unexpected.iter().any(|item| item == code),
+            Self::Diagnostics(difference) => difference.unexpected.iter().any(|item| item == code),
             _ => false,
         }
     }
@@ -138,34 +190,31 @@ impl Difference {
             Self::StatementCount(actual) => {
                 format!("expected exactly one statement result, actual {actual}")
             }
-            Self::Diagnostics {
-                missing,
-                unexpected,
-            } => format!(
+            Self::Diagnostics(difference) => format!(
                 "Diagnostics:\n  Missing:\n{}\n  Unexpected:\n{}",
-                expected_value(&code_list(missing)),
-                actual_value(&code_list(unexpected))
+                expected_value(&code_list(&difference.missing)),
+                actual_value(&code_list(&difference.unexpected))
             ),
-            Self::ColumnCount { expected, actual } => {
-                format!("Result column count: expected {expected}, actual {actual}")
-            }
-            Self::ColumnField {
-                index,
-                field,
-                expected,
-                actual,
-            } => format!(
-                "Column {index} · {field}\n  Expected: {}\n  Actual:   {}",
-                expected_value(expected),
-                actual_value(actual)
+            Self::ColumnCount(difference) => format!(
+                "Result column count: expected {}, actual {}",
+                difference.expected, difference.actual
             ),
-            Self::MissingColumn { index, column } => format!(
-                "Column {index} · missing\n  Expected:\n{}",
-                expected_value(column)
+            Self::ColumnField(difference) => format!(
+                "Column {} · {}\n  Expected: {}\n  Actual:   {}",
+                difference.index,
+                difference.field,
+                expected_value(&difference.expected),
+                actual_value(&difference.actual)
             ),
-            Self::UnexpectedColumn { index, column } => format!(
-                "Column {index} · unexpected\n  Actual:\n{}",
-                actual_value(column)
+            Self::MissingColumn(difference) => format!(
+                "Column {} · missing\n  Expected:\n{}",
+                difference.index,
+                expected_value(&difference.column)
+            ),
+            Self::UnexpectedColumn(difference) => format!(
+                "Column {} · unexpected\n  Actual:\n{}",
+                difference.index,
+                actual_value(&difference.column)
             ),
         }
     }
@@ -174,12 +223,12 @@ impl Difference {
 impl ExpectedColumn {
     fn add_differences(&self, actual: &Self, index: usize, differences: &mut Vec<Difference>) {
         if self.name != actual.name {
-            differences.push(Difference::ColumnField {
+            differences.push(Difference::column_field(
                 index,
-                field: "name",
-                expected: format!("{:?}", self.name),
-                actual: format!("{:?}", actual.name),
-            });
+                "name",
+                &format!("{:?}", self.name),
+                &format!("{:?}", actual.name),
+            ));
         }
         if self.column_type != actual.column_type {
             let display_type = |value: &Option<ExpectedType>| {
@@ -187,20 +236,20 @@ impl ExpectedColumn {
                     .as_ref()
                     .map_or_else(|| "absent".to_owned(), ToString::to_string)
             };
-            differences.push(Difference::ColumnField {
+            differences.push(Difference::column_field(
                 index,
-                field: "type",
-                expected: display_type(&self.column_type),
-                actual: display_type(&actual.column_type),
-            });
+                "type",
+                &display_type(&self.column_type),
+                &display_type(&actual.column_type),
+            ));
         }
         if self.nullability != actual.nullability {
-            differences.push(Difference::ColumnField {
+            differences.push(Difference::column_field(
                 index,
-                field: "nullability",
-                expected: self.nullability.to_string(),
-                actual: actual.nullability.to_string(),
-            });
+                "nullability",
+                &self.nullability.to_string(),
+                &actual.nullability.to_string(),
+            ));
         }
     }
 
@@ -250,7 +299,7 @@ impl Expectation {
     ) -> Result<Vec<Difference>, ::anyhow::Error> {
         let items = response.queries().items();
         if items.len() != 1 {
-            return Ok(vec![Difference::StatementCount(items.len())]);
+            return Ok(vec![Difference::statement_count(items.len())]);
         }
         let item = &items[0];
         let actual: BTreeSet<_> = item
@@ -263,10 +312,7 @@ impl Expectation {
         let missing: Vec<_> = self.diagnostics.difference(&actual).cloned().collect();
         let unexpected: Vec<_> = actual.difference(&self.diagnostics).cloned().collect();
         if !missing.is_empty() || !unexpected.is_empty() {
-            differences.push(Difference::Diagnostics {
-                missing,
-                unexpected,
-            });
+            differences.push(Difference::diagnostics(&missing, &unexpected));
         }
         let mut columns: Vec<_> = item.result_columns().items().iter().collect();
         columns.sort_by_key(|column| *column.ordinal());
@@ -275,25 +321,19 @@ impl Expectation {
             .map(ExpectedColumn::from_api)
             .collect::<Result<Vec<_>, _>>()?;
         if actual_columns.len() != self.columns.len() {
-            differences.push(Difference::ColumnCount {
-                expected: self.columns.len(),
-                actual: actual_columns.len(),
-            });
+            differences.push(Difference::column_count(
+                self.columns.len(),
+                actual_columns.len(),
+            ));
         }
         for (index, (expected, actual)) in self.columns.iter().zip(&actual_columns).enumerate() {
             expected.add_differences(actual, index, &mut differences);
         }
         for (index, column) in self.columns.iter().enumerate().skip(actual_columns.len()) {
-            differences.push(Difference::MissingColumn {
-                index,
-                column: column.to_string(),
-            });
+            differences.push(Difference::missing_column(index, column));
         }
         for (index, column) in actual_columns.iter().enumerate().skip(self.columns.len()) {
-            differences.push(Difference::UnexpectedColumn {
-                index,
-                column: column.to_string(),
-            });
+            differences.push(Difference::unexpected_column(index, column));
         }
         Ok(differences)
     }

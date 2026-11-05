@@ -108,29 +108,56 @@ use ::url::Url;
 - Use `#[path]` only when a deliberately non-standard module location is
   required; do not use it merely to restate the default path.
 
-### Module responsibilities
+### Module boundaries
 
-- Before creating a module, identify what it does: the responsibility it
-  owns and the operations or decisions that belong there. Its name and
-  module-level documentation SHOULD communicate that purpose. A description
-  that only lists the contained types or methods is insufficient to establish
-  a responsibility boundary. Use that stated purpose when deciding whether a
-  new item belongs in the module or whether the module should be consolidated.
+A module MUST establish a meaningful responsibility or encapsulation boundary.
+Grouping related code is not, by itself, sufficient justification for creating
+a module. The justification must explain the value of the boundary itself,
+such as hiding implementation details, limiting the exposed operations, or
+maintaining invariants across implementation elements. A function having a
+clear responsibility does not by itself establish the need for a module.
+
+- Do not create modules merely to split files, reduce line counts, group
+  similar operations, collect tests, or accommodate code that is difficult to
+  place.
+- A module may encapsulate a cohesive operation together with its
+  implementation and tests, provided the module boundary has a clear purpose.
+- Even a small module is justified when it hides implementation details or
+  provides a meaningful interface to its responsibility.
+- Modules containing 100 lines or fewer SHOULD be reviewed for unnecessary
+  boundaries. Line count is a review trigger, not a criterion for mandatory
+  consolidation.
+- When consolidating a module into its parent, move its items directly into
+  the parent and eliminate the original module boundary. Replacing a file
+  module with an inline module is not consolidation.
+
+Before creating a module, identify its purpose. Its name and module-level
+documentation SHOULD communicate that purpose. A description that only lists
+the contained types or methods is insufficient. Use the stated purpose when
+deciding whether a new item belongs in the module or whether the module
+should be consolidated.
+
+Focused local test modules immediately following the implementation under
+test, and integration-test modules verifying contracts between components,
+follow the separate test-placement rules.
+
+During review, ask:
+
+1. What responsibility does this module own?
+2. What implementation details does it hide, and what interface does it expose?
+3. What encapsulation or architectural clarity would be lost if the module
+   boundary were removed?
+
+An increase in source-file length alone is not sufficient justification for
+retaining a module boundary.
+
+### Implementation ownership
+
 - Place inherent implementations in the module defining the type or its
   descendant modules. Re-exporting a type does not transfer implementation
   ownership to the re-exporting module. When relocating code, verify the actual
   defining module, including inline modules, rather than relying only on file
   names or import paths.
-- Avoid creating modules that contain only a small number of closely related
-  items. A separate module should establish a meaningful responsibility
-  boundary, not merely distribute methods or reduce file size.
-- When consolidating a small module into its parent, move its items directly
-  into the parent module and eliminate the original module boundary. Replacing
-  a file module with an inline module does not constitute consolidation.
-- Modules containing 100 lines or fewer SHOULD generally be consolidated into
-  their parent unless they represent a distinct responsibility that justifies
-  their existence. Focused inline test modules required by the test-placement
-  rule are exempt.
 
 ### Test placement
 

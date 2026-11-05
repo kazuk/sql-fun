@@ -1,29 +1,17 @@
+mod ddl;
 use crate::{
-    names::TableName,
+    names::{ColumnName, FullName, TableName},
     sem::{
-        AnalysisProblem, ColumnRename, OwnerSpecification, ResultColumnCollection, RuleIdentity,
-        RuleReferences, SemScalarExpr, TriggerReferences, ViewCheckOption, ViewColumnLineage,
-        ViewOption,
+        AlterView, AnalysisError, AstAndContextPair, ColumnRename, OwnerSpecification,
+        ParseContext, ResultColumnCollection, RuleIdentity, RuleReferences, SelectStatement,
+        SemAst, SemScalarExpr, TriggerReferences, ViewCheckOption, ViewColumnLineage, ViewOption,
+        create_table::ColumnDefinition,
         problem::ViewProblem,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
     },
-    syn::ViewStmt,
+    syn::{Opt, ScanToken, ViewStmt},
 };
 use sql_fun_core::IVec;
-
-use crate::{
-    names::ColumnName,
-    sem::{
-        AlterView, AstAndContextPair, alter_table::AlterObjSubCommand,
-        create_table::ColumnDefinition,
-    },
-    syn::{Opt, ScanToken},
-};
-
-use crate::{
-    names::FullName,
-    sem::{AnalysisError, ParseContext, SelectStatement, SemAst},
-};
 
 /// analyzed [`crate::syn::ViewStmt`]
 #[derive(Debug, Clone)]
@@ -301,41 +289,5 @@ impl CreateView {
             SemAst::CreateView(create_view),
             context,
         ))
-    }
-}
-
-impl AlterObjSubCommand {
-    fn validate_for_view(
-        &self,
-        context: &mut impl ParseContext,
-        view: &CreateView,
-    ) -> Result<bool, AnalysisError> {
-        let name = match self {
-            Self::SetColumnDefault(name, _) | Self::DropColumnDefault(name) => name,
-            _ => return Ok(true),
-        };
-        if view.has_column(name) {
-            return Ok(true);
-        }
-        context.report_analysis_problem(AnalysisProblem::view(
-            &ViewProblem::unknown_default_column(&view.name, name.as_str()),
-        ))?;
-        Ok(false)
-    }
-    fn apply_to_view(&self, view: &mut CreateView) {
-        match self {
-            Self::ChangeOwner(owner) => {
-                if owner.can_apply() {
-                    view.change_owner(owner);
-                }
-            }
-            Self::SetColumnDefault(name, value) => view
-                .change_column_default(name, Some(value))
-                .expect("validated default column"),
-            Self::DropColumnDefault(name) => view
-                .change_column_default(name, None)
-                .expect("validated default column"),
-            _ => todo!(),
-        }
     }
 }

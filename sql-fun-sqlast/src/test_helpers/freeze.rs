@@ -1,14 +1,14 @@
-use crate::context::{
-    FrozenBaseContext, ParseContext as _, SchemaFileContext, SourceAccessService,
+use crate::{
+    ast::CreateTableMode,
+    context::{FrozenBaseContext, ParseContext as _, SchemaFileContext, SourceAccessService},
+    names::{ColumnName, FullName, SchemaName, TableName},
+    sem::{
+        AlterObjSubCommand, AlterTable, ColumnDefinition, Constraint, CreateTable, PgBuiltInType,
+        PrimaryKeyConstraint,
+    },
+    test_helpers::{TestParseContext, source_span},
 };
-use crate::names::{ColumnName, FullName, SchemaName, TableName};
-use crate::sem::{
-    AlterObjSubCommand, AlterTable, ColumnDefinition, Constraint, CreateTable, CreateTableMode,
-    PgBuiltInType, PrimaryKeyConstraint,
-};
-use crate::test_helpers::{TestParseContext, source_span};
-use std::rc::Rc;
-use std::rc::Weak;
+use std::rc::{Rc, Weak};
 
 pub(crate) fn empty_base() -> FrozenBaseContext {
     let mut context = TestParseContext::default();

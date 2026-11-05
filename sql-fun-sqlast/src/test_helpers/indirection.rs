@@ -1,16 +1,16 @@
-use crate::StringSpan;
-use crate::ast::Dialect;
-use crate::context::{BaseParseContext as _, MutSourcePathWithSpan as _, ParseContext as _};
-use crate::sem::SemAst;
-use crate::test_helpers::scalar_catalog::schema_from_base;
-
-use crate::context::SchemaFileContext;
-use crate::names::SchemaName;
-use crate::parse_statements;
-use crate::sem::{CastContext, CastDefinition, InputTypeConstraint};
-
-use crate::sem::{PgBuiltInType, SourcePathWithSpan};
-use crate::test_helpers::{TestParseContext, create_cache_context};
+use crate::{
+    StringSpan,
+    ast::Dialect,
+    context::{
+        BaseParseContext as _, MutSourcePathWithSpan as _, ParseContext as _, SchemaFileContext,
+    },
+    names::SchemaName,
+    parse_statements,
+    sem::{
+        CastContext, CastDefinition, InputTypeConstraint, PgBuiltInType, SemAst, SourcePathWithSpan,
+    },
+    test_helpers::{TestParseContext, create_cache_context, scalar_catalog::schema_from_base},
+};
 
 /// An in-memory base with four scalar types, one assignment cast, and integer
 /// addition. No builtin catalog or function/operator metadata is loaded.

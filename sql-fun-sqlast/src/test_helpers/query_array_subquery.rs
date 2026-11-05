@@ -1,14 +1,12 @@
-use crate::AstAndContextPair;
-use crate::ast::Dialect;
-use crate::context::{BaseParseContext as _, ParseContext as _};
-use crate::sem::SemAst;
-use crate::test_helpers::query::catalog;
-
-use crate::context::SchemaFileContext;
-use crate::names::FullName;
-use crate::parse_statements;
-use crate::sem::{CastContext, CastDefinition, OverloadVariant, PgBuiltInType, TypeReference};
-use crate::test_helpers::create_cache_context;
+use crate::{
+    AstAndContextPair,
+    ast::Dialect,
+    context::{BaseParseContext as _, ParseContext as _, SchemaFileContext},
+    names::FullName,
+    parse_statements,
+    sem::{CastContext, CastDefinition, OverloadVariant, PgBuiltInType, SemAst, TypeReference},
+    test_helpers::{create_cache_context, query::catalog},
+};
 
 /// Explicit small composite fixtures; no builtin catalog or live database.
 pub(crate) fn composite_query(sql: &str) -> AstAndContextPair<SchemaFileContext> {

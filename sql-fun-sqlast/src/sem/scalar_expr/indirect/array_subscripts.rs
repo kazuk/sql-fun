@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::sem::{
     AnalysisError, ParseContext, SemScalarExpr, TypeReference,
     parameter_resolution::ParameterResolution,

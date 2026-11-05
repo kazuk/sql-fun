@@ -1,28 +1,18 @@
+mod ddl;
 use crate::{
     CacheContext,
-    ast::TableAs,
-    names::{ColumnName, TableName},
+    ast::{TableAs, TryFromWithTokens},
+    names::{ColumnName, FullName, TableName},
     sem::{
-        ColumnRename, OwnerSpecification, ResultColumnCollection,
+        AlterView, AnalysisError, AstAndContextPair, ColumnRename, OwnerSpecification,
+        ParseContext, ResultColumnCollection, SemAst, SourcePathWithSpan,
+        alter_table::AlterObjSubCommand,
+        create_table::ColumnDefinition,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut},
     },
-    syn::CreateTableAsStmt,
+    syn::{CreateTableAsStmt, ObjectType, ScanToken},
 };
 use sql_fun_core::IVec;
-
-use crate::{
-    ast::TryFromWithTokens,
-    sem::{
-        AstAndContextPair, SourcePathWithSpan, alter_table::AlterObjSubCommand,
-        create_table::ColumnDefinition,
-    },
-    syn::{ObjectType, ScanToken},
-};
-
-use crate::{
-    names::FullName,
-    sem::{AlterView, AnalysisError, ParseContext, SemAst},
-};
 
 /// analyzed [`crate::syn::CreateTableAsStmt`]
 #[derive(Debug, Clone)]

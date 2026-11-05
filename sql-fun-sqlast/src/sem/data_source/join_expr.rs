@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     ast::Dialect,
     context::ParseContext,

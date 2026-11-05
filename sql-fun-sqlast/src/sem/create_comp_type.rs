@@ -1,17 +1,14 @@
+mod ddl;
+mod registration_error;
 use crate::{
     ast::{CompositeType, postgres::required},
     context::ParseContext,
-    names::{ColumnName, TableName},
+    names::{ColumnName, FullName, TableName},
     sem::{
-        AstAndContextPair, CatalogNameLookup, ColumnDefinition, DeclarationCollation, Nullable,
-        OwnerSpecification, WithTypmod,
+        AnalysisError, AstAndContextPair, CatalogNameLookup, ColumnCollection, ColumnDefinition,
+        DeclarationCollation, Nullable, OwnerSpecification, TypeReference, WithTypmod,
     },
     syn::{ColumnDef, CompositeTypeStmt, ListOpt, Opt},
-};
-
-use crate::{
-    names::FullName,
-    sem::{AnalysisError, ColumnCollection, TypeReference},
 };
 
 /// collection for composite type field

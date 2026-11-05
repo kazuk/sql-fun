@@ -2,12 +2,12 @@ use crate::test_helpers::create_cache_context;
 
 use ::clap::Parser;
 use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
-use ::sql_fun_sqlast::context::ParseContext;
 use ::sql_fun_sqlast::{
     ParsedSchemaDump, PostgresDialect,
-    context::{BaseContext, FrozenBaseContext, SchemaFileContext},
+    context::{BaseContext, FrozenBaseContext, ParseContext, SchemaFileContext},
     sem::SemAst,
 };
+
 use std::path::Path;
 
 pub struct ViewSchema {

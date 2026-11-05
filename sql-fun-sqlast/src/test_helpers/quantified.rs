@@ -1,9 +1,8 @@
-use crate::context::SchemaFileContext;
-use crate::sem::SemAst;
 use crate::{
     ast::Dialect,
+    context::SchemaFileContext,
     names::SchemaName,
-    sem::{CreateDomain, PgBuiltInType, TypeDefinition, TypeReference},
+    sem::{CreateDomain, PgBuiltInType, SemAst, TypeDefinition, TypeReference},
     test_helpers::TestParseContext,
 };
 

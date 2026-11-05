@@ -45,7 +45,7 @@ conversation after the plan and maintainer correction were recorded.
 | 129–131: DROP TABLE does not free a name | Shared policy and `statements/drop-table.md`: retain current metadata-only boundary. | `tests/schema_context_chain.rs` DROP TABLE followed by SELECT, and schema application dispatch. |
 | 226–241: SQLite parser depth, UPDATE/DELETE limits, Turso distinction | `book/sql-analysis.md#sqlite-parser-limitations`: retain every caveat and stable anchor. | `src/sqlite_parser/upstream/parser.rs` MAX_EXPR_DEPTH = 100 and grammar; `src/sqlite.rs::test_expression_depth`; SQLite dependency parser is distinct from database build options. |
 | 243–259: SQLite support summary and incomplete checks | Landing page and SELECT, clause, name, conditional and parameter pages: split; narrow stale blanket naming caveat to paths actually incomplete. | Actual query/column/CTE resolvers and maintained dialect tests, detailed in author records below. SQLAST feature availability does not establish server initialization availability. |
-| 471–481: global unsupported cases and PostgreSQL 18 boundaries | `book/sql-analysis.md#analysis-boundaries` and relevant clause/statement leaves: retain and clarify parsing versus semantics. | `ast/engine_features.rs` compatible-target panic tests for unfinished PostgreSQL 18 features; `ast/ddl.rs` deferrable unique-key `todo!`; current WITH binding and statement dispatch. Ordinary star analysis is distinguished from opt-in executable rewrite. |
+| 471–481: global unsupported cases and PostgreSQL 18 boundaries | `book/sql-analysis.md#analysis-boundaries` and relevant clause/statement leaves: retain and clarify parsing versus semantics. | `sem/engine_features.rs` compatible-target panic tests for unfinished PostgreSQL 18 features; `ast/ddl.rs` deferrable unique-key `todo!`; current WITH binding and statement dispatch. Ordinary star analysis is distinguished from opt-in executable rewrite. |
 
 Unless another crate is explicitly named, source evidence paths in author
 records
@@ -129,74 +129,75 @@ All destination paths below are relative to `book/sql-analysis/`.
 
 ### Evidence groups
 
-- **S74**, source L74–L110: implementation `sem/ast_conversion/query.rs`,
+- **S74**, source L74–L110: implementation `sem/select_statement/ast.rs`,
   `sem/select_statement/result_column.rs`, `ast/document/projection_walk.rs`;
-  maintained tests `sem/ast_conversion/query/tests/source_namespace.rs`,
+  maintained tests `sem/select_statement/ast.rs::test_from_ast::source_namespace`,
   `tests/sqlast-regressions/schema-qualified.json`.
-- **S133**, source L133–L167: implementation `ast/ddl/column_attributes.rs`,
+- **S133**, source L133–L167: implementation `sem/relation_alteration.rs`,
   `sem/alter_table.rs`, `context/schema_file_context/table_info.rs`; maintained
-  tests `ast/ddl/column_attributes.rs::test_applicability`,
+  tests `sem/relation_alteration.rs::test_applicability`,
   `context/schema_file_context/column_attribute_tests.rs`.
-- **S261**, source L261–L318: implementation `sem/ast_conversion/insert.rs`,
+- **S261**, source L261–L318: implementation `sem/insert_statement/ast.rs`,
   `context/conflict_masters.rs`, `sem/insert_statement/arbiter.rs`; maintained
-  tests `sem/ast_conversion/insert/tests.rs`,
+  tests `sem/insert_statement/ast.rs::test_from_ast`,
   `context/conflict_masters/tests.rs`.
 - **S319**, source L319–L372: implementation `sem/view_write.rs`,
-  `sem/view_conversion.rs`, `context/schema_file_context/view_info.rs`;
+  `sem/create_view/ddl.rs`, `context/schema_file_context/view_info.rs`;
   maintained tests `tests/writable_views.rs`,
   `tests/sqlast-regressions/schema-views-automatic.json`,
   `tests/sqlast-regressions/schema-views-mechanisms.json`.
-- **S373**, source L373–L420: implementation `sem/ast_conversion/rule.rs`,
-  `sem/ast_conversion/drop_rule.rs`, `context/rule_info.rs`; maintained tests
-  `sem/ast_conversion/rule/tests.rs`, `tests/create_rule_ast.rs`,
+- **S373**, source L373–L420: implementation `sem/create_rule/ast.rs`,
+  `sem/drop_rule/ast.rs`, `context/rule_info.rs`; maintained tests
+  `sem/create_rule/ast.rs::test_from_ast`, `tests/create_rule_ast.rs`,
   `tests/drop_rule_ast.rs`.
-- **S421**, source L421–L470: implementation `sem/ast_conversion/trigger.rs`,
-  `sem/ast_conversion/drop_trigger.rs`, `context/trigger_info.rs`; maintained
+- **S421**, source L421–L470: implementation `sem/create_trigger/ast.rs`,
+  `sem/drop_trigger/ast.rs`, `context/trigger_info.rs`; maintained
   tests
-  `sem/ast_conversion/trigger/tests.rs`, `tests/create_trigger_ast.rs`,
+  `sem/create_trigger/ast.rs::test_from_ast`, `tests/create_trigger_ast.rs`,
   `tests/drop_trigger_ast.rs`.
-- **S715**, source L715–L755: implementation `sem/ast_conversion/delete.rs`,
-  `sem/delete_statement/view_support.rs`, `ast/engine_features.rs`; maintained
-  tests `sem/ast_conversion/delete/tests.rs`,
-  `sem/ast_conversion/delete/tests/versions.rs`,
+- **S715**, source L715–L755: implementation `sem/delete_statement/ast.rs`,
+  `sem/delete_statement/view_support.rs`, `sem/engine_features.rs`; maintained
+  tests `sem/delete_statement/ast.rs::test_from_ast`,
+  `sem/delete_statement/ast.rs::test_from_ast::versions`,
   `tests/sqlast-regressions/schema-delete.json`.
-- **S756**, source L756–L801: implementation `sem/ast_conversion/merge.rs`,
+- **S756**, source L756–L801: implementation `sem/merge_statement/ast.rs`,
   `sem/merge_statement.rs`, `sem/merge_statement/view_support.rs`; maintained
-  tests `sem/ast_conversion/merge/tests.rs`,
+  tests `sem/merge_statement/ast.rs::test_from_ast`,
   `tests/sqlast-regressions/schema-merge.json`.
-- **S802**, source L802–L826: implementation `ast/ddl/alter_index.rs`,
+- **S802**, source L802–L826: implementation `sem/alter_index/ddl.rs`,
   `sem/alter_index.rs`, `context/schema_file_context.rs`; maintained tests
   `sem/alter_index/tests.rs`.
-- **S890**, source L890–L908: implementation `ast/ddl/table_rename.rs`,
+- **S890**, source L890–L908: implementation `sem/alter_table/ddl.rs`,
   `context/schema_file_context/table_rename.rs`; maintained tests
   `context/schema_file_context/table_rename_tests.rs`.
-- **S909**, source L909–L939: implementation `ast/ddl/column_rename.rs`,
+- **S909**, source L909–L939: implementation `sem/column_rename/ddl.rs`,
   `context/schema_file_context/column_rename.rs`,
-  `ast/ddl.rs::Table::resolve_foreign_keys`; maintained tests
+  `sem/create_table/ddl.rs::CreateTable::resolve_ast_foreign_keys`; maintained tests
   `context/schema_file_context/column_rename_tests.rs`,
-  `ast/ddl.rs::test_create_table_foreign_keys`.
-- **S940**, source L940–L960: implementation `ast/ownership.rs`,
+  `sem/create_table/ddl.rs::test_create_table_foreign_keys`.
+- **S940**, source L940–L960: implementation `sem/alter_owner/ddl.rs`,
   `context/schema_file_context/ownership.rs`; maintained tests
-  `sem/ownership_conversion.rs`.
+  `sem/ownership/ddl.rs`.
 
 ### Explicit corrections and their reasons
 
 - Original L143–L148 claimed PostgreSQL 18 VIRTUAL declarations were not parsed.
-  `ast/engine_features.rs` now recognizes `GeneratedColumnMode::Virtual` and
+  `sem/engine_features.rs` now recognizes `GeneratedColumnMode::Virtual` and
   applies the PostgreSQL 18 gate. ALTER TABLE retains the actual DROP EXPRESSION
   inapplicability; remove the obsolete parser assertion.
 - Original L403–L410 included ARRAY subqueries among rule-specific pending
-  semantics. `SubqueryKind::pending_rule_semantics` in
-  `sem/ast_conversion/rule.rs`
-  explicitly allows Scalar and Array; `tests::array_query` verifies a CREATE
+  semantics. `SemScalarExpr::ast_pending_rule_semantics` in
+  `sem/scalar_expr/ast.rs`
+  explicitly allows Scalar and Array;
+  `sem/create_rule/ast.rs::test_from_ast::array_query` verifies a CREATE
   RULE containing ARRAY(SELECT...). Keep the still-pending EXISTS,
   quantified/row and multi-expression boundaries and the exact-typmod boundary.
 - Original L738–L743 claimed DELETE RETURNING image-alias syntax was rejected by
-  the parser. `ast/engine_features.rs` retains PostgreSQL 18 grammar and marks
+  the parser. `sem/engine_features.rs` retains PostgreSQL 18 grammar and marks
   renamed-image binding as unimplemented. Keep the binding limitation, correct
   the parser claim, and retain the implicit old/new version rule.
 - Original L932–L938 claimed table-level CREATE TABLE foreign-key retention was
-  missing (#858). `Table::resolve_foreign_keys` and
+  missing (#858). `CreateTable::resolve_ast_foreign_keys` and
 `test_create_table_foreign_keys::create_result_and_catalog_retain_composite_and_unnamed_foreign_keys`
   now retain named and unnamed composite foreign keys. The column-rename tests
   inspect table-level FK propagation and creation-time identities. Describe
@@ -212,17 +213,17 @@ complete syntax support. Statement dispatch alone was not used as proof.
 
 | Page | Implementation evidence and maintained checks | Documented support boundary |
 | --- | --- | --- |
-| `statements/select.md` | `sem/ast_conversion/query.rs`, `sem/select_statement/set_operation.rs` and adjacent set-operation tests; query clause/source tests | Ordered outputs, projections and set widths/common types; SQLite does not gain PostgreSQL coercions or full aggregate/window legality. |
-| `statements/update.md` | `sem/ast_conversion/update.rs` and tests; `tests/sqlast-regressions/schema-update.json` | Assignments, destinations, FROM/predicate/RETURNING, defaults/generated/identity, tuple sources and cursor facts; no runtime updates. |
-| `statements/create-table.md` | `ast/ddl.rs` Table/TableAs, `context/schema_file_context/table_info.rs`, inline FK tests; schema loading tests | Columns/constraints/FK bindings and PostgreSQL table-as metadata; SQLite query-backed table path and inheritance remain incomplete. |
-| `statements/create-view.md` | `sem/view_conversion.rs`, `context/schema_file_context/view_info.rs`, `sem/view_write.rs`; `tests/writable_views.rs`, schema-views fixtures | SELECT lineage/replacement/catalog and independently evaluated INSERT/UPDATE capabilities, not runtime CHECK OPTION or execution. |
-| `statements/alter-view.md` | `ast/ddl.rs::view_default_changes`, `sem/create_view.rs::apply_alter`, view defaults and writable-view tests | Set/drop existing-column defaults; unsupported ALTER forms are not inferred. |
-| `statements/create-index.md` | `ast/ddl.rs::Index`, `ast/ddl/alter_index.rs::initialize_index_storage`, schema conflict/index tests | Table-scoped keys/predicate and B-tree options; SQLite and runtime access-method validation are not established. |
-| `statements/create-type.md` | `ast.rs::EnumType`, `ast/ddl.rs::CompositeType/CompositeField`, adjacent array field tests; schema type/collation tests | Enum labels and composite declarations; not base/range-type grammar completeness. |
-| `statements/create-domain.md` | `ast/ddl.rs::Domain` and `domain_tests`, declaration-collation tests | Base identity/category/declaration collation, not complete domain constraints. |
-| `statements/create-function.md` | `ast/ddl.rs::Function/FunctionParameter`, strictness tests, schema routine creation tests | Signature/result/strictness metadata, not body validation; missing set-result reporter is todo!, not an emitted diagnostic. |
-| `statements/sequences.md` | `ast.rs::Sequence/AlterSequence`, `context/schema_file_context/sequence_info.rs`, sequence ownership/rename tests | Identity and OWNED BY metadata; numeric options/runtime allocation are not implemented effects. |
-| `statements/create-schema.md` | `ast/ddl.rs::Schema`, `context/schema_file_context.rs::apply_creation_group/apply_create_schema`, creation-conflict tests | Staged nested declaration group and explicit authorization, not arbitrary nested utility support. |
+| `statements/select.md` | `sem/select_statement/ast.rs`, `sem/select_statement/set_operation.rs` and adjacent set-operation tests; query clause/source tests | Ordered outputs, projections and set widths/common types; SQLite does not gain PostgreSQL coercions or full aggregate/window legality. |
+| `statements/update.md` | `sem/update_statement/ast.rs` and tests; `tests/sqlast-regressions/schema-update.json` | Assignments, destinations, FROM/predicate/RETURNING, defaults/generated/identity, tuple sources and cursor facts; no runtime updates. |
+| `statements/create-table.md` | `sem/create_table/ddl.rs` and `sem/create_table_as/ddl.rs`, `context/schema_file_context/table_info.rs`, inline FK tests; schema loading tests | Columns/constraints/FK bindings and PostgreSQL table-as metadata; SQLite query-backed table path and inheritance remain incomplete. |
+| `statements/create-view.md` | `sem/create_view/ddl.rs`, `context/schema_file_context/view_info.rs`, `sem/view_write.rs`; `tests/writable_views.rs`, schema-views fixtures | SELECT lineage/replacement/catalog and independently evaluated INSERT/UPDATE capabilities, not runtime CHECK OPTION or execution. |
+| `statements/alter-view.md` | `sem/alter_table/ddl.rs::AlterView::from_ast_defaults`, `sem/create_view.rs::apply_alter`, view defaults and writable-view tests | Set/drop existing-column defaults; unsupported ALTER forms are not inferred. |
+| `statements/create-index.md` | `sem/create_index/ddl.rs::CreateIndex::{from_ast,retain_ast_storage}`, schema conflict/index tests | Table-scoped keys/predicate and B-tree options; SQLite and runtime access-method validation are not established. |
+| `statements/create-type.md` | `sem/create_enum_type/ddl.rs` and `sem/create_comp_type/ddl.rs`, adjacent array field tests; schema type/collation tests | Enum labels and composite declarations; not base/range-type grammar completeness. |
+| `statements/create-domain.md` | `sem/create_domain/ddl.rs` and its inline `domain_tests`, declaration-collation tests | Base identity/category/declaration collation, not complete domain constraints. |
+| `statements/create-function.md` | `sem/create_function/ddl.rs` and `sem/type_system/func_params/ddl.rs`, strictness tests, schema routine creation tests | Signature/result/strictness metadata, not body validation; missing set-result reporter is todo!, not an emitted diagnostic. |
+| `statements/sequences.md` | `sem/create_seq/ddl.rs` and `sem/alter_seq/ddl.rs`, `context/schema_file_context/sequence_info.rs`, sequence ownership/rename tests | Identity and OWNED BY metadata; numeric options/runtime allocation are not implemented effects. |
+| `statements/create-schema.md` | `sem/create_schema/ddl.rs`, `context/schema_file_context.rs::apply_creation_group/apply_create_schema`, creation-conflict tests | Staged nested declaration group and explicit authorization, not arbitrary nested utility support. |
 | `statements/drop-table.md` | `ast.rs::DropTable`, `context/schema_file_context/table_info.rs::apply_drop_table` and adjacent tests; schema-context chain drop test | Drop metadata does not remove/free table names; IF EXISTS does not currently suppress missing-table findings. |
 | `statements/create-extension.md` | `ast.rs::Extension`, `context/schema_file_context.rs::apply_create_extension`, adjacent extension-record test | Records name without loading files/installing extension or applying all syntax options. |
 | `statements/set.md` | `ast.rs::VariableSet`, `context/schema_file_context.rs::apply_variable_set`; schema loading/context tests | Single expression recorded; broad RESET/default/session semantics not established. |
@@ -236,7 +237,7 @@ linked to their owner rather than duplicated in each statement inventory.
 ### Final emission and lookup review
 
 - ALTER TABLE table-rename destination conflicts are `conflicting_creation`,
-  through `ast/ddl/table_rename.rs` → `permits_relation_creation` → the shared
+  through `sem/alter_table/ddl.rs` → `permits_relation_creation` → the shared
   creation reporter. Do not list `relation_already_exists` for that rename path
   merely because another ALTER resolver calls that reporter.
 - SQLite `canonical_relation_column` applies case-insensitive normalization to
@@ -256,39 +257,42 @@ keys; this is topic/claim preservation, not preservation of stale wording.
 
 ### Evidence keys
 
-- **Q**: `sql-fun-sqlast/src/sem/ast_conversion/query.rs`:
-  Query::resolve_query_body,
-  Select::resolve_where/resolve_grouping/resolve_having, With::resolve,
-  CteBody::resolve, Insert/Update/Delete/Merge::resolve_cte_body,
-  Relation/DerivedTable/Join/FromGroup::resolve, Call::resolve_modifiers.
-  Tests: `sem/ast_conversion/query/tests.rs`, including
+- **Q**: `sem/select_statement/ast.rs`:
+  SelectStatement::analyze_ast_query/from_ast_where/from_ast_grouping/from_ast_having;
+  `sem/cte/ast.rs`: WithClause::from_ast and CteStatement::from_ast_cte_body;
+  the statement owners' `ast.rs` modules: InsertStatement/UpdateStatement/
+  DeleteStatement/MergeStatement::from_ast_cte_body;
+  `sem/data_source/ast.rs`: DataSource::from_ast_relation/from_ast_derived_table/
+  from_ast_join/from_ast_from_group; `sem/query/ast.rs`:
+  FunctionModifiers::from_ast_modifiers.
+  Tests: `sem/select_statement/ast.rs::test_from_ast`, including
   `infers_parameters_outside_projection`, `binds_aliases_and_ordinals`,
   `preserves_failed_column_resolution`,
   `ctes_are_owned_once_in_declaration_order`,
   `compound_boundary_owns_its_trailing_clauses`,
   `sqlite_retains_clause_parameters`.
-- **C**: `sem/ast_conversion/query/clauses.rs`: Expr::resolve_clause (reports
+- **C**: `sem/scalar_expr/ast.rs`: SemScalarExpr::from_ast_clause (reports
   QueryProblem::position_out_of_range and invalid_compound_order, plus column
-  binding failures); Order::checked_name
-  (QueryNameResolution::reference_problem),
-  Window::resolve_over/resolve/resolve_definitions
+  binding failures); `sem/query/ast.rs`: QueryOrder::ast_checked_name
+  (QueryNameResolution::reference_problem), and
+  QueryWindow::from_ast_over/from_ast/from_ast_definitions
   (duplicate_window_definition).
-  Tests: query/tests.rs `records_window_resolution`,
+  Tests: `sem/select_statement/ast.rs::test_from_ast` `records_window_resolution`,
   `sqlite_window_inheritance_records_dialect_binding`,
   `sqlite_window_definitions_do_not_bind_projection_aliases`,
   `sqlite_binds_ordering_to_its_output`, `reports_structured_query_problems`.
 - **P**: `sem/parameter_resolution.rs`, Collector's predicate, row_count,
   order_operator, frame_offset, window_definition; `sem/query.rs` visitation of
   HAVING/FILTER and `sem/select_statement.rs` visitation of WHERE.
-  Tests: query/tests.rs `uses_clause_specific_constraints`,
+  Tests: `sem/select_statement/ast.rs::test_from_ast` `uses_clause_specific_constraints`,
   `parameter_conflicts_across_clauses_produce_diagnostics` and clause cases
   above.
-- **F**: `sem/ast_conversion/query.rs` TableFunctions::resolve/resolve_calls;
+- **F**: `sem/data_source/ast.rs` DataSource::from_ast_table_functions/from_ast_rows_from;
   `sem/data_source/function_columns.rs` TableFunctionOutput declaration,
   requirement, placement and alias validation (reports TableFunctionProblem);
   `sem/data_source/resolved.rs` table_function_not_found and
   parameter_type_mismatch_for_table_function emitters. Tests:
-  `sem/ast_conversion/query/tests/table_functions.rs` includes
+  `sem/select_statement/ast.rs::test_from_ast::table_functions` includes
   `diagnoses_invalid_definitions`, `retains_failed_or_ambiguous_binding`,
   `composes_multiple_record_calls_in_written_order`,
   `preserves_ordinality_and_join_nullability`,
@@ -299,36 +303,38 @@ keys; this is topic/claim preservation, not preservation of stale wording.
   operand capability and undefined capability; invoked by F's declaration path.
   Missing type is checked before lookup validation. Query columns are still
   recorded with resolved type/nullability fields after failed validation.
-- **R**: `sem/ast_conversion/returning.rs`
+- **R**: `sem/select_statement/result_column/ast.rs`
   ResultColumnCollection::resolve_for_insert,
-  resolve_for_update, resolve_for_delete and Name::require_returning_star.
+  resolve_for_update, resolve_for_delete and require_ast_returning_star.
   These report statement-specific insert/update/delete semantics for invalid
   qualifiers. `sem/scalar_expr/context.rs` owns row-source scopes and
   `sem/data_source/merge_record.rs` merge record projection. Tests:
-  `sem/ast_conversion/delete/tests/versions.rs` configured-version, old/new
+  `sem/delete_statement/ast.rs::test_from_ast::versions` configured-version, old/new
   stars,
-  nested reference, explicit old alias; `sem/ast_conversion/merge/tests.rs` and
+  nested reference, explicit old alias;
+  `sem/merge_statement/ast.rs::test_from_ast` and
   its
   descendants cover MERGE scopes/results. Expression projection checks in
-  query.rs / expression resolution emit query-invalid-star-placement and
+  `sem/select_statement/result_column/ast.rs` and expression resolution emit
+  query-invalid-star-placement and
   query-star-requires-composite diagnostics; table_functions.rs has explicit
   scalar-star and scalar-argument-star cases.
-- **E18**: `ast/engine_features.rs` ReturningOption::check_features explicitly
+- **E18**: `sem/engine_features.rs` EngineFeatureValidation::returning_options explicitly
   retains SQL parse/edit/deparse aliases but terminates semantic binding at
   `todo!("RETURNING row-image aliases (#621)")`; tests cover
   insert/update/delete/
   merge and CTE syntax. This supersedes legacy assertion that DELETE aliases
   cannot parse.
 - **J**: `sem/data_source/join_expr.rs` and join projection implementation;
-  `sem/ast_conversion/query.rs` Join::resolve establishes condition/source
+  `sem/data_source/ast.rs` DataSource::from_ast_join establishes condition/source
   scope.
   Qualified projection/reference tests preserve merged FULL JOIN values and
   source nullability; shared source namespace code handles duplicates.
 - **G**: `sem/scalar_expr/grouping.rs` GroupingExpr::complete/reject_key and
-  `sem/ast_conversion` GROUPING resolution: QueryProblem
+  `sem/scalar_expr/ast.rs` GROUPING resolution: QueryProblem
   grouping_argument_not_grouped,
   invalid_grouping_placement, too_many_grouping_arguments. Tests:
-  `sem/ast_conversion/query/grouping_tests.rs`
+  `sem/select_statement/ast.rs::test_from_ast_grouping`
   keys/aliases/ordinals/ROLLUP/CUBE/SETS,
   correlated placement, limit, nested/aggregate/FILTER/frame errors and max
   args.
@@ -340,8 +346,8 @@ keys; this is topic/claim preservation, not preservation of stale wording.
   Maintained tests are adjacent in sample.rs; ordinary provider defaults to
   unavailable metadata. Existing per-code diagnostic pages confirm ordinary
   CLI/provider boundary and are linked individually.
-- **CTE**: `sem/ast_conversion/placement.rs`
-  CteBody::require_data_modifying_placement
+- **CTE**: `sem/cte/ast.rs`
+  CteStatement::ast_require_data_modifying_placement
   emits query_invalid_cte_placement; `sem/data_source/cte.rs` emits
   column_not_found_in_cte and missing-derived-column diagnostics.
   Query-body and DML CTE maintained tests cover alias/result and placement.
@@ -456,7 +462,7 @@ supporting their contracts. Diagnostic inventories on the destination pages were
 traced through actual report calls or shared problem dispatch on these paths;
 existing `book/diagnostics/<code>.md` supplies the canonical diagnostic links.
 
-- **R**: `src/sem/ast_conversion/query/tests/rows.rs`,
+- **R**: `src/sem/select_statement/ast.rs::test_from_ast::rows`,
   `src/sem/scalar_expr/whole_row.rs`, `tests/sqlast-regressions/rows.json` and
   `rows.sql`.
   Constructor field order/names, non-null row metadata, scalar-consumer
@@ -493,10 +499,11 @@ existing `book/diagnostics/<code>.md` supplies the canonical diagnostic links.
   SQLAST parameter tests plus server `src/session_rpc_tests/query_analysis.rs`
   cover finalization. The page preserves hint API details and the distinction
   between raw SQLAST alternatives, inspection, and the public binding contract.
-- **Q**: `src/sem/ast_conversion/query.rs`, `query/clauses.rs`, and
-  `query/tests.rs` (including SQLite clause parameter preservation). Clause
+- **Q**: `src/sem/select_statement/ast.rs`, `src/sem/query/ast.rs`, and
+  the inline `select_statement/ast.rs::test_from_ast` module (including SQLite
+  clause parameter preservation). Clause
   owners document source/output-name precedence, ordering and window boundaries.
-- **F**: `src/sem/scalar_expr/func_call.rs:360–510` emits supplied-argument,
+- **F**: `src/sem/scalar_expr/func_call/implementation/analysis.rs` emits supplied-argument,
   lookup, overload and conversion diagnostics; `src/sem/type_system/
   function_overload_collection.rs` ranks defaults/variadics/polymorphic
   variants.
@@ -525,8 +532,9 @@ existing `book/diagnostics/<code>.md` supplies the canonical diagnostic links.
   `src/sem/data_source/qualified.rs` and `resolved.rs`,
   `indirect/member_ref.rs`;
   `tests/qualified_columns.rs` includes `MAIN.T.ID` SQLite table matching, alias
-  hiding and explicit database scopes; `query/tests/column_scope.rs` and
-  `source_namespace.rs` plus indirection tests cover source and composite
+  hiding and explicit database scopes;
+  `select_statement/ast.rs::test_from_ast::{column_scope,source_namespace}` plus
+  indirection tests cover source and composite
   fields.
   `sem/cte.rs::resolve_name` matches SQLite CTE relation names without ASCII
   case distinctions. `data_source/sub_query.rs` and
@@ -535,7 +543,7 @@ existing `book/diagnostics/<code>.md` supplies the canonical diagnostic links.
   derived-query/CTE output-column names; window lookup
   in `scalar_expr/context.rs` compares names exactly. Thus old broad incomplete
   case-insensitivity wording is narrowed rather than globally asserted/fixed.
-- **J**: `src/sem/ast_conversion/query/tests/source_namespace.rs` and
+- **J**: `src/sem/select_statement/ast.rs::test_from_ast::source_namespace` and
   `src/sem/scalar_expr/coalesce.rs::resolve_join_key` cover FULL JOIN merged
   keys
   and dialect column position/type/nullability differences. Canonical owner is
@@ -553,7 +561,7 @@ existing `book/diagnostics/<code>.md` supplies the canonical diagnostic links.
   scalar/row/list/subquery inputs, validate shape and comparison result types,
   and report through `MembershipProblem`; no runtime emptiness/match claim.
 - **S**: `src/sem/scalar_expr/arith_expr/{pattern,sqlite_like}.rs`,
-  `src/sem/ast_conversion.rs`, and maintained `patterns.json`. SQLite LIKE's
+  `src/sem/scalar_expr/ast.rs`, and maintained `patterns.json`. SQLite LIKE's
   explicit
   no-return-contract assumption keeps nullability unknown despite operand
   metadata; omitted ESCAPE versus NULL and PostgreSQL catalog operators remain
@@ -631,9 +639,10 @@ tests or recurring checks were added.
 
 - `types-and-casts.md`: explicit versus implicit/assignment conversion purpose,
   search-path target resolution, row casts and client-hint/declaration-modifier
-  distinction. `src/sem/ast_conversion.rs:925–979` emits unresolved-target
+  distinction. `src/sem/scalar_expr/ast.rs::SemScalarExpr::from_ast_cast` emits
+  unresolved-target
   `parameter_constraint` and missing `explicit_cast_not_defined`; shared
-  `src/sem/scalar_expr.rs:1094` emits `implicit_cast_not_found`.
+  `src/sem/scalar_expr.rs::SemScalarExpr::implicit_cast_resolved` emits `implicit_cast_not_found`.
 - `function-calls.md`: argument order/names/defaults/variadics and polymorphic
   ranking, based on evidence F. Existing code/test evidence replaces legacy
   blanket support omissions; unsupported ranges and unresolved candidate-space
@@ -690,7 +699,8 @@ The remaining reference links and original anchors are validated separately.
 ### Additional statement review
 
 Independent review of small statement families corrected CREATE INDEX wording:
-`ast/ddl.rs::Index::resolve_elements_in` resolves expression elements but
+`sem/create_index/ddl.rs::CreateIndex::elements_from_ast_in` resolves expression
+elements but
 retains
 plain key/INCLUDE names directly as `ColumnName`. The page distinguishes that
 retention from column-existence validation. Other inspected small-family pages
@@ -752,8 +762,8 @@ statement dispatch, declaration resolvers and structured diagnostic adapters.
 The additions extend the existing handwritten mdBook pages and diagnostic page
 contract; no second documentation system or automated recurring check is added.
 Source inspection at the PR head includes `sem/top_level_statement.rs`,
-`sem/ast_conversion.rs`, `sem/ast_conversion/query.rs`,
-`sem/ast_conversion/document.rs`, `ast/ddl.rs`,
+`sem/scalar_expr/ast.rs`, `sem/select_statement/ast.rs`,
+`sem/data_source/ast.rs`, `ast/ddl.rs`,
 `sem/scalar_expr.rs`, `sem/create_view.rs`, `sem/query.rs` (VALUES),
 `sem/data_source/join_expr.rs`, core diagnostic constructors/render metadata,
 operator-name conversion, and the authenticated client response reader.
@@ -894,7 +904,7 @@ test
 execution paths were changed by this review revision.
 
 For #498, `sqlite_parser/upstream/parser.rs::parse_pragma_value` emits keyword
-values for ON/DELETE/DEFAULT and other PRAGMA keywords; `sem/ast_conversion.rs`
+values for ON/DELETE/DEFAULT and other PRAGMA keywords; `sem/scalar_expr/ast.rs`
 lacks
 keyword literal resolution. The syntax reference now uses PRAGMA examples
 rather than the internal `Literal::Keyword` representation and keeps the
@@ -910,7 +920,7 @@ and #956. Syntax inspection/editing APIs remain documented on their Rust types.
 
 Evidence: `ast/postgres.rs`, `ast/default_privileges.rs` and
 `ast/foreign_table.rs` perform common-AST conversion;
-`ast/engine_features.rs::utility_version_tests` and the three maintained cases
+`sem/engine_features.rs::utility_version_tests` and the three maintained cases
 in `tests/sqlast-regressions/postgres18-syntax-17.json` establish the version
 diagnostic before name resolution. `ast.rs` retains the explicit unimplemented
 semantic dispatch for these statements. Their syntax support therefore does not

@@ -1,13 +1,15 @@
-use crate::names::{ColumnName, FullName, TableName};
-use crate::sem::{
-    ColumnConstraint, ColumnDefinition, GeneratedColumnConstraint, GeneratedColumnMode,
-    IdentityColumnConstraint, IdentityColumnMode,
+use crate::{
+    ast::{GeneratedColumnMode, IdentityColumnMode},
+    names::{ColumnName, FullName, TableName},
+    sem::{
+        ColumnConstraint, ColumnDefinition, GeneratedColumnConstraint, IdentityColumnConstraint,
+        PgBuiltInType, ScalarConstExpr,
+    },
+    test_helpers::{
+        TestParseContext, document_merge::catalog, source_span,
+        statements::resolve_postgres as resolve,
+    },
 };
-use crate::test_helpers::document_merge::catalog;
-use crate::test_helpers::statements::resolve_postgres as resolve;
-
-use crate::sem::{PgBuiltInType, ScalarConstExpr};
-use crate::test_helpers::{TestParseContext, source_span};
 
 pub(crate) fn array_catalog() -> TestParseContext {
     let mut context = catalog(17);

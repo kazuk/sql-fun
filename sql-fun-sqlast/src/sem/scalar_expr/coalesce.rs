@@ -1,3 +1,4 @@
+mod wildcard_projection;
 use crate::{
     ast::Dialect,
     context::ParseContext,
@@ -103,15 +104,14 @@ impl CoalesceExpr {
 
 #[cfg(test)]
 mod test_resolve {
-    use crate::sem::SemAst;
+    use crate::{
+        ast::Dialect,
+        parse_statements,
+        sem::{ParseContext, SemAst},
+        test_helpers::{coalesce as test_helpers, create_cache_context},
+    };
 
     // Small-catalog semantic and failure-continuation contracts.
-
-    use crate::test_helpers::coalesce as test_helpers;
-
-    use crate::test_helpers::create_cache_context;
-
-    use crate::{ast::Dialect, parse_statements, sem::ParseContext};
 
     use std::collections::BTreeMap;
 
@@ -447,19 +447,14 @@ impl CoalesceExpr {
 
 #[cfg(test)]
 mod test_parameter_constraints {
-    use crate::sem::SemAst;
-
-    // Small-catalog semantic and failure-continuation contracts.
-
-    use crate::test_helpers::coalesce as test_helpers;
-
-    use crate::test_helpers::create_cache_context;
-
     use crate::{
         ast::Dialect,
         parse_statements,
-        sem::{ParseContext, PgBuiltInType},
+        sem::{ParseContext, PgBuiltInType, SemAst},
+        test_helpers::{coalesce as test_helpers, create_cache_context},
     };
+
+    // Small-catalog semantic and failure-continuation contracts.
 
     use std::collections::BTreeMap;
 

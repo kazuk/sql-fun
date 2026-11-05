@@ -1,15 +1,12 @@
 //! Context-free PostgreSQL rule syntax conversion, without writable-view analysis.
 
-use crate::ast::{DropBehavior, DropRule, postgres::required};
-
 use crate::{
     ast::{
-        CreateRule, Expr, Name, Relation, RuleEvent, StatementNode, TryFromWithTokens,
-        TryFromWithTokensOpt,
+        CreateRule, DropBehavior, DropRule, Expr, Name, Relation, RuleEvent, StatementNode,
+        TryFromWithTokens, TryFromWithTokensOpt, postgres::required,
     },
     error::AnalysisError,
-    syn,
-    syn::{ListOpt, Opt},
+    syn::{self, ListOpt, Opt},
 };
 
 use ::sql_fun_core::IVec;
@@ -36,14 +33,10 @@ impl TryFromWithTokens<&syn::RuleStmt> for CreateRule {
 
 #[cfg(test)]
 mod test_rule_conversion {
-    use crate::test_helpers::rule::postgres_rule_syntax;
-
-    use crate::test_helpers::rule::rule;
-
     use crate::{
         ast::{CreateRule, RuleEvent, TryFromWithTokens},
-        syn,
-        syn::Opt,
+        syn::{self, Opt},
+        test_helpers::rule::{postgres_rule_syntax, rule},
     };
 
     #[rstest::rstest]
@@ -223,15 +216,11 @@ impl TryFrom<&syn::DropStmt> for DropRule {
 
 #[cfg(test)]
 mod test_drop_rule_conversion {
-    use crate::ast::{Dialect, DropBehavior, DropRule};
-
-    use crate::syn;
-
-    use crate::syn::Opt;
-
-    use crate::test_helpers::drop_rule_syntax::drop_rule;
-
-    use crate::test_helpers::drop_syntax::postgres_drop_syntax;
+    use crate::{
+        ast::{Dialect, DropBehavior, DropRule},
+        syn::{self, Opt},
+        test_helpers::{drop_rule_syntax::drop_rule, drop_syntax::postgres_drop_syntax},
+    };
 
     #[rstest::rstest]
     #[case::bare("DROP RULE RuleName ON Items", &["items"], "rulename")]

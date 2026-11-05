@@ -1,4 +1,5 @@
 use crate::{
+    ast::ObjectKind,
     context::{
         OwnershipInfoRead, RoleInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
         ViewInfoRead,
@@ -6,7 +7,7 @@ use crate::{
     },
     names::{FullName, TableName},
     sem::{
-        AlterOwner, AnalysisError, CreateFunction, CreateSchema, ObjectKind, OwnedObjectDefinition,
+        AlterOwner, AnalysisError, CreateFunction, CreateSchema, OwnedObjectDefinition,
         OwnerSpecification, OwnershipIdentity, Role, ownership::model_definitions,
     },
 };

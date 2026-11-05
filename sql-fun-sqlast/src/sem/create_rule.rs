@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     context::BaseParseContext,
     names::{FullName, LocalName, TableName, ViewName},

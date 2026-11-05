@@ -8,13 +8,11 @@ mod postgres;
 #[path = "document_validation.rs"]
 mod validation;
 
-use crate::ast::ReturningOption;
-
 use crate::{
     StringSpan,
     ast::{
-        Alias, Assignment, Expr, FromItem, Name, Order, Query, Relation, Target, TypeName, Window,
-        With,
+        Alias, Assignment, Expr, FromItem, Name, Order, Query, Relation, ReturningOption, Target,
+        TypeName, Window, With,
     },
 };
 

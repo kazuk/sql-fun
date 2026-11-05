@@ -1,9 +1,7 @@
 mod resolve;
 
-use crate::context::type_hint::resolve::resolve_parameter_hint;
-
 use crate::{
-    context::ParseContext,
+    context::{ParseContext, type_hint::resolve::resolve_parameter_hint},
     sem::{AnalysisError, TypeReference},
 };
 

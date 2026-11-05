@@ -26,7 +26,6 @@ mod placeholdered_sql;
 mod schema_dump_file;
 mod sql_file;
 mod sql_tokens;
-mod syntax_options;
 
 #[cfg(feature = "sqlite")]
 mod sqlite;
@@ -48,16 +47,15 @@ pub use self::{
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 use crate::{
-    ast::Dialect, parse_statements::split_postgres_statements, sem::AnalysisError, syn::ScanToken,
+    ast::Dialect,
+    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
+    parse_statements::split_postgres_statements,
+    sem::{AnalysisError, SemAst},
+    syn::{ParseResult, ScanToken},
 };
 
 use sql_fun_core::IVec;
 
-use crate::{
-    context::{FrozenBaseContext, ParseContext, SchemaFileContext},
-    sem::SemAst,
-    syn::ParseResult,
-};
 use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 /// Semantic AST and parse context result
@@ -153,9 +151,13 @@ impl PostgresDialect {
 
 #[cfg(test)]
 mod test_schema_content_hash {
-    use crate::PostgresDialect;
-    use crate::test_helpers::schema_content_hash as test_helpers;
-    use crate::{ast::Dialect, context::BaseParseContext, test_helpers::TestParseContext};
+    use crate::{
+        PostgresDialect,
+        ast::Dialect,
+        context::BaseParseContext,
+        test_helpers::{TestParseContext, schema_content_hash as test_helpers},
+    };
+
     use ::sql_fun_core::Hasher;
 
     #[rstest::rstest]

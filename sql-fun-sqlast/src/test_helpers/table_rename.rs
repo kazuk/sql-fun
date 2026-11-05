@@ -1,22 +1,18 @@
 #[cfg(feature = "sqlite")]
-use crate::AstAndContextPair;
-#[cfg(feature = "sqlite")]
-use crate::ast::Dialect;
-use crate::context::{
-    BaseParseContext as _, FrozenBaseContext, MutSourcePathWithSpan as _, ParseContext as _,
-    SchemaFileContext,
+use crate::{
+    AstAndContextPair, ast::Dialect, parse_statements, sem::SemAst,
+    test_helpers::create_cache_context,
 };
-use crate::names::{FullName, SchemaName};
-#[cfg(feature = "sqlite")]
-use crate::parse_statements;
-#[cfg(feature = "sqlite")]
-use crate::sem::SemAst;
-use crate::sem::{AnalysisError, PgBuiltInType, TypeReference};
-use crate::test_helpers::TestParseContext;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::ownership::apply_ownership_sql;
-use crate::test_helpers::source_span;
+
+use crate::{
+    context::{
+        BaseParseContext as _, FrozenBaseContext, MutSourcePathWithSpan as _, ParseContext as _,
+        SchemaFileContext,
+    },
+    names::{FullName, SchemaName},
+    sem::{AnalysisError, PgBuiltInType, TypeReference},
+    test_helpers::{TestParseContext, ownership::apply_ownership_sql, source_span},
+};
 
 pub(crate) fn context() -> SchemaFileContext {
     let metadata = ::serde_json::from_value(::serde_json::json!({

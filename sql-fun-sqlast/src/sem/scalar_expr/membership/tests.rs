@@ -1,17 +1,17 @@
-use crate::ast::Dialect;
-use crate::parse_statements;
-use crate::sem::ParseContext;
-use crate::sem::PgBuiltInType;
-use crate::sem::SemAst;
-use crate::sem::SemScalarExpr;
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::membership::composite_schema;
-use crate::test_helpers::membership::context;
+use crate::{
+    ast::Dialect,
+    parse_statements,
+    sem::{ParseContext, PgBuiltInType, SemAst, SemScalarExpr},
+    test_helpers::{
+        create_cache_context,
+        membership::{composite_schema, context, expression, schema},
+        statements::query_in_context as query,
+    },
+};
+
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::membership::context_for;
-use crate::test_helpers::membership::expression;
-use crate::test_helpers::membership::schema;
-use crate::test_helpers::statements::query_in_context as query;
+
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

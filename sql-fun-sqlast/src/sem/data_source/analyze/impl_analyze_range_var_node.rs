@@ -26,9 +26,8 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_data_source_analyze_range_var_node {
-    use crate::sem::CreateTableMode;
-
     use crate::{
+        ast::CreateTableMode,
         names::{ColumnName, FullName, SchemaName, TableName},
         sem::{
             CreateTable, CreateView, FromClause, ScalarConstExpr, SelectStatement, SemScalarExpr,
@@ -38,7 +37,6 @@ mod test_data_source_analyze_range_var_node {
         },
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
-
     use ::testresult::TestResult;
 
     #[rstest::rstest]

@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::sem::TypeReference;
 
 /// A declaration-local modifier, separate from the wrapped value's identity.

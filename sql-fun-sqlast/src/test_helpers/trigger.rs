@@ -1,18 +1,16 @@
-use crate::AstAndContextPair;
-use crate::ast::{CreateTrigger, StatementKind, StatementNode};
-use crate::context::{BaseParseContext as _, ParseContext};
-use crate::parse_statements;
-use crate::sem::{CreateTableAs, CreateView, SelectStatement, SemAst, ViewLike};
-use crate::test_helpers::{create_cache_context, source_span};
-
-use crate::ast::Dialect;
-use crate::context::{FrozenBaseContext, SchemaFileContext};
-use crate::names::{ColumnName, FullName, SchemaName, TableName};
-use crate::sem::{
-    AnalysisError, ColumnDefinition, CreateTable, CreateTableMode, FunctionOverloadCollection,
-    OverloadVariant, PgBuiltInType, TypeReference,
+use crate::{
+    AstAndContextPair,
+    ast::{CreateTableMode, CreateTrigger, Dialect, StatementKind, StatementNode},
+    context::{BaseParseContext as _, FrozenBaseContext, ParseContext, SchemaFileContext},
+    names::{ColumnName, FullName, SchemaName, TableName},
+    parse_statements,
+    sem::{
+        AnalysisError, ColumnDefinition, CreateTable, CreateTableAs, CreateView,
+        FunctionOverloadCollection, OverloadVariant, PgBuiltInType, SelectStatement, SemAst,
+        TypeReference, ViewLike,
+    },
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
-use crate::test_helpers::TestParseContext;
 
 pub(crate) fn bound_sources(query: &mut SelectStatement) -> Result<Vec<String>, AnalysisError> {
     #[derive(Default)]

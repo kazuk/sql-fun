@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     ast::{Expr, TryFromWithTokens},
     context::ParseContext,
@@ -259,12 +261,10 @@ impl DataSourceRowsFromFunc {
 #[cfg(test)]
 mod test_expression_sources {
 
-    use crate::sem::DataSourceRowsFromFunc;
-
     use crate::{
         context::ParseContext,
         names::AliasName,
-        sem::{DataSourceRowFunctions, PgBuiltInType},
+        sem::{DataSourceRowFunctions, DataSourceRowsFromFunc, PgBuiltInType},
         test_helpers::{rows_from, sampling},
     };
 

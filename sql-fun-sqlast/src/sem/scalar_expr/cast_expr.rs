@@ -1,11 +1,7 @@
+mod wildcard_projection;
 #[cfg(feature = "sqlite")]
-use crate::SqliteToken;
-#[cfg(feature = "sqlite")]
-use crate::ast::Expr;
-#[cfg(feature = "sqlite")]
-use crate::sem::ScalarAnalysisContext;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprCast;
+use crate::{SqliteToken, ast::Expr, sem::ScalarAnalysisContext, syn::sqlite::ExprCast};
+
 use crate::{
     ast::Dialect,
     context::BaseParseContext,

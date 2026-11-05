@@ -1,12 +1,14 @@
 //! Query-bearing document and MERGE edges for CTE placement validation.
 
-use crate::ast::document::{
-    DocumentExpr, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
-    JsonBehavior, JsonColumn, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate,
-    JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonScalar, JsonSerialize, JsonTable,
-    JsonValue, Merge, MergeWhen, MultiAssignment, Xml, XmlColumn, XmlSerialize, XmlTable,
+use crate::ast::{
+    document::{
+        DocumentExpr, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
+        JsonBehavior, JsonColumn, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate,
+        JsonOutput, JsonParse, JsonPath, JsonPredicate, JsonScalar, JsonSerialize, JsonTable,
+        JsonValue, Merge, MergeWhen, MultiAssignment, Xml, XmlColumn, XmlSerialize, XmlTable,
+    },
+    validation::ContainsInvalidCteClause,
 };
-use crate::ast::validation::ContainsInvalidCteClause;
 
 macro_rules! walk_fields {
     ($($type:ty => $($field:ident),+;)+) => {
@@ -69,8 +71,10 @@ impl ContainsInvalidCteClause for DocumentExpr {
 
 #[cfg(test)]
 mod test_document_placement {
-    use crate::ast::{CteDefinition, Dialect};
-    use crate::parse_statements;
+    use crate::{
+        ast::{CteDefinition, Dialect},
+        parse_statements,
+    };
 
     #[rstest::rstest]
     #[case::json_array(

@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     names::{AliasName, ColumnName, FullName},
     sem::{AnalysisError, ParseContext},

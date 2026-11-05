@@ -1,9 +1,11 @@
-use crate::test_helpers::source_span;
-
-use crate::names::{ColumnName, FullName, TableName};
-use crate::sem::{
-    AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, Constraint, CreateTable,
-    CreateTableMode, PgBuiltInType, PrimaryKeyConstraint,
+use crate::{
+    ast::CreateTableMode,
+    names::{ColumnName, FullName, TableName},
+    sem::{
+        AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, Constraint, CreateTable,
+        PgBuiltInType, PrimaryKeyConstraint,
+    },
+    test_helpers::source_span,
 };
 
 pub(crate) fn table_with_primary_key() -> Result<CreateTable, AnalysisError> {

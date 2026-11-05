@@ -1,3 +1,5 @@
+mod ast;
+
 /// A logical SQL source alias.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AliasName(String);

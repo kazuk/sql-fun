@@ -133,18 +133,17 @@ impl MemberRef {
 
 #[cfg(test)]
 mod domain_member_tests {
-    use crate::sem::SemAst;
-
-    use crate::test_helpers::{column_rename::schema, create_cache_context, dynamic_types::record};
-
     use crate::{
         ast::Dialect,
         context::ParseContext,
         names::FullName,
         parse_statements,
-        sem::{AnalysisProblem, IndirectionExpr, PgBuiltInType, TypeReference},
-        test_helpers::composite_domains,
+        sem::{AnalysisProblem, IndirectionExpr, PgBuiltInType, SemAst, TypeReference},
+        test_helpers::{
+            column_rename::schema, composite_domains, create_cache_context, dynamic_types::record,
+        },
     };
+
     use std::collections::BTreeMap;
 
     #[rstest::rstest]

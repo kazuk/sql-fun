@@ -1,11 +1,10 @@
 //! Explicit catalog fixtures for ownership semantics.
 
-use crate::sem::SemAst;
 use crate::{
     ast::{StatementNode, TryFromWithTokens},
     context::{MutSourcePathWithSpan, ParseContext, SchemaFileContext},
     names::SchemaName,
-    sem::{AnalysisError, AstAndContextPair, OwnedObjectDefinition, PgBuiltInType, Role},
+    sem::{AnalysisError, AstAndContextPair, OwnedObjectDefinition, PgBuiltInType, Role, SemAst},
     test_helpers::{SynBuilder, TestParseContext, create_cache_context, schema_layer, source_span},
 };
 

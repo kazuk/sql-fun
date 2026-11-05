@@ -1,5 +1,3 @@
-use crate::error::AnalysisError;
-use crate::stack::with_stack;
 use crate::{
     ast::{
         Access, Alias, Assignment, CommitAction, Conflict, ConflictAction, Cte, CteBody, CteColumn,
@@ -12,8 +10,9 @@ use crate::{
         XmlTable,
         postgres::{nonempty, required},
     },
-    syn,
-    syn::{ListOpt, Opt, ScanToken},
+    error::AnalysisError,
+    stack::with_stack,
+    syn::{self, ListOpt, Opt, ScanToken},
 };
 
 use ::sql_fun_core::IVec;

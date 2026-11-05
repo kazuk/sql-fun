@@ -1,16 +1,20 @@
-use crate::ast::TryFromWithTokens;
-use crate::context::{BaseParseContext as _, MutSourcePathWithSpan as _};
-use crate::sem::SemAst;
-use crate::syn::Node;
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::ownership::{apply_ownership_sql, ownership_context};
-use crate::test_helpers::source_span;
+use crate::{
+    AstAndContextPair,
+    ast::{StatementNode, TryFromWithTokens},
+    context::{
+        BaseParseContext as _, FrozenBaseContext, IndexInfoRead, MutSourcePathWithSpan as _,
+        SchemaFileContext,
+    },
+    names::FullName,
+    sem::{AnalysisError, CreateIndex, SemAst},
+    syn::Node,
+    test_helpers::{
+        create_cache_context,
+        ownership::{apply_ownership_sql, ownership_context},
+        source_span,
+    },
+};
 
-use crate::AstAndContextPair;
-use crate::ast::StatementNode;
-use crate::context::{FrozenBaseContext, IndexInfoRead, SchemaFileContext};
-use crate::names::FullName;
-use crate::sem::{AnalysisError, CreateIndex};
 pub(crate) fn deduplicate(index: &CreateIndex) -> Option<bool> {
     match index.storage_parameter("deduplicate_items") {
         Some(value) => value.as_boolean(),

@@ -1,6 +1,4 @@
-use crate::ast::DropBehavior;
-use crate::error::AnalysisError;
-use crate::syn;
+use crate::{ast::DropBehavior, error::AnalysisError, syn};
 
 impl DropBehavior {
     pub(super) const fn cascade() -> Self {

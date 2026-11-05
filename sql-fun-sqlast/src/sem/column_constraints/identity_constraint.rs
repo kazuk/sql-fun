@@ -1,5 +1,6 @@
-pub use crate::syntax_options::IdentityColumnMode;
+mod ddl;
 use crate::{
+    ast::IdentityColumnMode,
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,

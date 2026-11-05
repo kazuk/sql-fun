@@ -1,12 +1,13 @@
-use crate::sem::RelationAlteration;
+mod ddl;
 use crate::{
     ast::{AlterRelation, TryFromWithTokens},
     names::{FullName, TableName},
-    sem::{AstAndContextPair, alter_table::AlterObjSubCommand},
+    sem::{
+        AnalysisError, AstAndContextPair, ParseContext, RelationAlteration, SemAst,
+        alter_table::AlterObjSubCommand,
+    },
     syn::{AlterSeqStmt, AlterTableStmt, Opt},
 };
-
-use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::AlterSeqStmt`]
 #[derive(Debug, Clone, derive_getters::Getters)]

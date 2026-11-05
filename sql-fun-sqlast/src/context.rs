@@ -60,27 +60,21 @@ pub(crate) use self::{
 };
 
 use crate::{
-    AstAndContextPair, CacheContext,
+    AstAndContextPair, CacheContext, StringSpan,
     ast::Dialect,
+    names::{FullName, SchemaName, TableName},
     sem::{
-        AnalysisState, InputTypeConstraint, ParameterConstraints, SamplingMethodLookup,
-        SelectStatement, parameter_resolution::ParameterResolution,
+        AliasSpec, AlterIndex, AlterOwner, AnalysisError, AnalysisState, Comment,
+        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
+        CreateIndex, CreateSchema, CreateTable, CursorInfo, DataSource, InputTypeConstraint, Kind,
+        OwnedObjectDefinition, ParameterConstraints, Role, SamplingMethodLookup, SelectStatement,
+        SemScalarExpr, VariableSet, parameter_resolution::ParameterResolution,
+        problem::CreationProblem, type_system::ArgumentBindingCollection,
     },
     syn::FuncCall,
 };
 
 use sql_fun_core::{IVec, analysis_problem::AnalysisProblem};
-
-use crate::{
-    StringSpan,
-    names::{FullName, SchemaName, TableName},
-    sem::{
-        AliasSpec, AlterIndex, AlterOwner, AnalysisError, Comment, CreateCompositeType,
-        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CursorInfo, DataSource, Kind, OwnedObjectDefinition, Role, SemScalarExpr,
-        VariableSet, problem::CreationProblem, type_system::ArgumentBindingCollection,
-    },
-};
 
 /// Common environment for SQL analysis and mutable schema loading.
 ///
@@ -377,7 +371,7 @@ where
         create_comp_type: &CreateCompositeType,
     ) -> Result<Self, AnalysisError> {
         let Some(name) = create_comp_type.name() else {
-            AnalysisError::raise_register_dynamic_type(create_comp_type)?;
+            create_comp_type.raise_registration_error()?;
             AnalysisError::never()
         };
         if self.dialect() == Dialect::postgres() && !create_comp_type.declarations_can_apply() {
@@ -553,11 +547,10 @@ where
 #[cfg(test)]
 mod test_parameter_hint_initialization {
 
-    use crate::test_helpers::type_hint::context;
-
     use crate::{
         context::{ParameterTypeHintWrite, ParseContext},
         sem::PgBuiltInType,
+        test_helpers::type_hint::context,
     };
 
     #[test]

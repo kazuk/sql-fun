@@ -1,25 +1,21 @@
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint;
-use crate::{
-    ast::{TableConstraint, TryFromWithTokens},
-    sem::{CheckConstraint, ColumnRename, traversal::SemanticVisitorMut},
-    syn::Constraint,
-};
-use sql_fun_core::IVec;
-
+mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::{
     SqliteToken,
     ast::{ColumnConstraint as AstColumnConstraint, Expr},
+    syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint,
 };
 use crate::{
+    ast::{TableConstraint, TryFromWithTokens},
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ParseContext,
-        SemScalarExpr,
+        AnalysisError, CheckConstraint, ColumnConstraint, ColumnConstraintKind,
+        ColumnConstraintTrait, ColumnRename, ParseContext, SemScalarExpr,
+        traversal::SemanticVisitorMut,
     },
-    syn::ScanToken,
+    syn::{Constraint, ScanToken},
 };
+use sql_fun_core::IVec;
 
 /// column value constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]

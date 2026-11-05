@@ -1,3 +1,5 @@
+mod ast;
+
 mod alias;
 mod analyze;
 mod column_candidates;
@@ -45,15 +47,15 @@ pub(crate) use self::{
     qualified::QualifiedSource,
 };
 
-use crate::sem::{
-    traversal::{SemanticVisitor, SemanticVisitorMut},
-    with_stack,
-};
-
 use crate::{
     context::ParseContext,
     names::{AliasName, ColumnName},
-    sem::{AnalysisError, SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr},
+    sem::{
+        AnalysisError, SemScalarExpr, WithClause,
+        scalar_expr::ColumnReferenceExpr,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+        with_stack,
+    },
 };
 
 /// source nullability type

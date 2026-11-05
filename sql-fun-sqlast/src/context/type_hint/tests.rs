@@ -1,17 +1,14 @@
-use crate::sem::SemAst;
 #[cfg(feature = "sqlite")]
-use crate::{names::FullName as NamesFullName, test_helpers::TestParseContext};
-use crate::{parse_statements, test_helpers::create_cache_context};
-
-#[cfg(feature = "sqlite")]
-use crate::ast::Dialect;
-use crate::test_helpers::type_hint::analyze;
-use crate::test_helpers::type_hint::context;
-use crate::test_helpers::type_hint::layer;
+use crate::{ast::Dialect, names::FullName as NamesFullName, test_helpers::TestParseContext};
 use crate::{
     context::{BaseParseContext, ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext},
     names::SchemaName,
-    sem::{PgBuiltInType, TypeReference},
+    parse_statements,
+    sem::{PgBuiltInType, SemAst, TypeReference},
+    test_helpers::{
+        create_cache_context,
+        type_hint::{analyze, context, layer},
+    },
 };
 
 #[rstest::rstest]

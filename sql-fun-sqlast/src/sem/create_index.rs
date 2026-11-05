@@ -1,4 +1,5 @@
 mod arbiter;
+mod ddl;
 mod settings;
 
 pub use self::settings::IndexStorageValue;
@@ -8,23 +9,17 @@ use crate::syn::IndexElem;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::SortOrder as SqliteSortOrder;
 use crate::{
-    ast::Index as AstIndex,
+    ast::{Index as AstIndex, TryFromWithTokens},
+    names::{ColumnName, FullName, TableName},
     sem::{
-        ColumnRename,
+        AnalysisError, AstAndContextPair, ColumnRename, ParseContext, SemScalarExpr,
         problem::IndexProblemKind,
         traversal::{ColumnRenamer, RelationRenamer, SemanticVisitorMut, optional},
     },
-    syn::IndexStmt,
+    syn::{IndexStmt, ScanToken},
 };
 
 use sql_fun_core::IVec;
-
-use crate::{
-    ast::TryFromWithTokens,
-    names::{ColumnName, FullName, TableName},
-    sem::{AnalysisError, AstAndContextPair, ParseContext, SemScalarExpr},
-    syn::ScanToken,
-};
 
 /// Index item sort order
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
@@ -538,8 +533,6 @@ impl CreateIndex {
 
 #[cfg(test)]
 mod analyze_index_stmt_tests {
-    use crate::test_helpers::source_span;
-
     use crate::{
         names::{ColumnName, FullName},
         sem::{
@@ -547,8 +540,9 @@ mod analyze_index_stmt_tests {
             create_index::{CreateIndex, IndexElement, SortOrder},
         },
         syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
+
     use sql_fun_core::IVec;
 
     #[rstest::rstest]

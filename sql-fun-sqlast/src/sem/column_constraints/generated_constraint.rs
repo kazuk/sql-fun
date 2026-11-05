@@ -1,22 +1,18 @@
+mod ddl;
 #[cfg(feature = "sqlite")]
-use crate::syn::sqlite::GeneratedColumnConstraint as SqliteGeneratedColumnConstraint;
-pub use crate::syntax_options::GeneratedColumnMode;
 use crate::{
-    sem::{ColumnRename, traversal::SemanticVisitorMut},
-    syn::Constraint,
+    SqliteToken, syn::sqlite::GeneratedColumnConstraint as SqliteGeneratedColumnConstraint,
 };
-use sql_fun_core::IVec;
-
-#[cfg(feature = "sqlite")]
-use crate::SqliteToken;
 use crate::{
+    ast::GeneratedColumnMode,
     names::{ColumnName, TableName},
     sem::{
-        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ParseContext,
-        ScalarAnalysisContext, SemScalarExpr,
+        AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
+        ParseContext, ScalarAnalysisContext, SemScalarExpr, traversal::SemanticVisitorMut,
     },
-    syn::{ConstrType, Opt, ScanToken},
+    syn::{ConstrType, Constraint, Opt, ScanToken},
 };
+use sql_fun_core::IVec;
 
 /// generated column / computed column constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]

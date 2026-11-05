@@ -1,17 +1,16 @@
 use crate::{
-    sem::WildcardRewriteError,
-    sem::wildcard_expansion::rewrite::{projection_name, rows_source::freeze},
-};
-// Stage resolved source transformations and commit them in lexical scope order.
-
-use crate::{
     ast::{
         DerivedTable, Expr, FromItem, Name, Query, StatementNode, Target, TypeName,
         projection::{ProjectionScope, ProjectionScopes, ScopedSource, ScopedSourceEdit},
     },
-    sem::{WildcardExpansion, WildcardRowsSource, WildcardSourceProjection, WildcardTypedRecord},
+    sem::{
+        WildcardExpansion, WildcardRewriteError, WildcardRowsSource, WildcardSourceProjection,
+        WildcardTypedRecord, wildcard_expansion::rewrite::rows_source::freeze,
+    },
     stack::with_stack,
 };
+// Stage resolved source transformations and commit them in lexical scope order.
+
 pub(super) struct SourcePlans {
     edits: Vec<SourceEdit>,
     failure: Option<WildcardRewriteError>,
@@ -187,7 +186,7 @@ impl WildcardSourceProjection {
     }
 }
 pub(super) fn typed_record_reference(record: &WildcardTypedRecord) -> Expr {
-    let target = TypeName::projection(&projection_name(record.relation()), false);
+    let target = TypeName::projection(&Name::from_full_name(record.relation()), false);
     let row = Expr::projection_source_row(record.alias());
     let cast = Expr::projection_cast(&row, &target);
     Expr::projection_field(&cast, record.column())

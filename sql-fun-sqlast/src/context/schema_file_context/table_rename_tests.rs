@@ -1,19 +1,12 @@
 //! Enduring SQL-to-catalog rename contracts with explicit metadata.
 
-use crate::test_helpers::table_rename as test_helpers;
-
 #[cfg(feature = "sqlite")]
-use crate::names::FullName as NamesFullName;
-use crate::{
-    names::SchemaName,
-    sem::{ColumnConstraint, QueryMetadata, SemAst},
-};
-
-#[cfg(feature = "sqlite")]
-use crate::context::ViewInfoRead;
+use crate::{context::ViewInfoRead, names::FullName as NamesFullName};
 use crate::{
     context::{GetSourcePathWithSpan, ObjectInfoRead, ParseContext, TableInfoRead, TypeInfoRead},
-    test_helpers::ownership::apply_ownership_sql,
+    names::SchemaName,
+    sem::{ColumnConstraint, QueryMetadata, SemAst},
+    test_helpers::{ownership::apply_ownership_sql, table_rename as test_helpers},
 };
 
 #[rstest::rstest]
@@ -434,7 +427,7 @@ fn trigger_and_rule_identities_follow_the_owning_table() -> testresult::TestResu
 
 #[test]
 fn ownership_follows_the_table_without_resurrecting_the_old_identity() -> testresult::TestResult {
-    use crate::{context::OwnershipInfoRead, sem::ObjectKind};
+    use crate::{ast::ObjectKind, context::OwnershipInfoRead};
     let context = apply_ownership_sql(
         test_helpers::table_layer(false)?,
         "ALTER TABLE before_name OWNER TO CURRENT_USER",

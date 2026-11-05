@@ -1,9 +1,11 @@
 //! Semantic identities and ownership of PostgreSQL catalog objects.
 
+mod ddl;
 use crate::{
+    ast::ObjectKind,
     context::BaseParseContext,
     names::{FullName, OperatorName, SchemaName},
-    sem::{ObjectKind, TypeReference},
+    sem::TypeReference,
 };
 
 /// A role supplied by the analysis environment, independent of SQL spelling.
@@ -185,7 +187,7 @@ impl OwnershipIdentity {
         value
     }
     pub(crate) fn matches(&self, definition: &Self) -> bool {
-        self.kind.accepts_owner_kind(definition.kind)
+        Self::accepts_owner_kind(self.kind, definition.kind)
             && self.name == definition.name
             && self.access_method == definition.access_method
             && (self.arguments.is_none() || self.arguments == definition.arguments)
@@ -194,7 +196,7 @@ impl OwnershipIdentity {
 
 impl std::fmt::Display for OwnershipIdentity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ", self.kind.owner_kind_label())?;
+        write!(f, "{} ", Self::owner_kind_label(self.kind))?;
         if self.kind == ObjectKind::OPERATOR {
             if let Some(catalog) = self.name.catalog() {
                 write!(
@@ -241,8 +243,9 @@ impl std::fmt::Display for OwnershipIdentity {
 #[cfg(test)]
 mod identity_display_tests {
     use crate::{
+        ast::ObjectKind,
         names::FullName,
-        sem::{ObjectKind, OwnershipIdentity, PgBuiltInType},
+        sem::{OwnershipIdentity, PgBuiltInType},
     };
 
     #[test]
@@ -327,99 +330,100 @@ impl OwnedObjectDefinition {
     }
 }
 
-impl ObjectKind {
-    const fn owner_kind_label(self) -> &'static str {
-        match self {
-            Self::AGGREGATE => "aggregate",
-            Self::COLLATION => "collation",
-            Self::CONVERSION => "conversion",
-            Self::DATABASE => "database",
-            Self::DOMAIN => "domain",
-            Self::EVENT_TRIGGER => "event trigger",
-            Self::FOREIGN_DATA_WRAPPER => "foreign data wrapper",
-            Self::FOREIGN_SERVER => "foreign server",
-            Self::FUNCTION => "function",
-            Self::LANGUAGE => "language",
-            Self::LARGE_OBJECT => "large object",
-            Self::MATERIALIZED_VIEW => "materialized view",
-            Self::OPERATOR_CLASS => "operator class",
-            Self::OPERATOR => "operator",
-            Self::OPERATOR_FAMILY => "operator family",
-            Self::PROCEDURE => "procedure",
-            Self::PUBLICATION => "publication",
-            Self::ROUTINE => "routine",
-            Self::SCHEMA => "schema",
-            Self::SEQUENCE => "sequence",
-            Self::SUBSCRIPTION => "subscription",
-            Self::STATISTICS => "statistics",
-            Self::TABLE => "table",
-            Self::TABLESPACE => "tablespace",
-            Self::TEXT_SEARCH_CONFIGURATION => "text search configuration",
-            Self::TEXT_SEARCH_DICTIONARY => "text search dictionary",
-            Self::TYPE => "type",
-            Self::VIEW => "view",
+impl OwnershipIdentity {
+    const fn owner_kind_label(kind: ObjectKind) -> &'static str {
+        match kind {
+            ObjectKind::AGGREGATE => "aggregate",
+            ObjectKind::COLLATION => "collation",
+            ObjectKind::CONVERSION => "conversion",
+            ObjectKind::DATABASE => "database",
+            ObjectKind::DOMAIN => "domain",
+            ObjectKind::EVENT_TRIGGER => "event trigger",
+            ObjectKind::FOREIGN_DATA_WRAPPER => "foreign data wrapper",
+            ObjectKind::FOREIGN_SERVER => "foreign server",
+            ObjectKind::FUNCTION => "function",
+            ObjectKind::LANGUAGE => "language",
+            ObjectKind::LARGE_OBJECT => "large object",
+            ObjectKind::MATERIALIZED_VIEW => "materialized view",
+            ObjectKind::OPERATOR_CLASS => "operator class",
+            ObjectKind::OPERATOR => "operator",
+            ObjectKind::OPERATOR_FAMILY => "operator family",
+            ObjectKind::PROCEDURE => "procedure",
+            ObjectKind::PUBLICATION => "publication",
+            ObjectKind::ROUTINE => "routine",
+            ObjectKind::SCHEMA => "schema",
+            ObjectKind::SEQUENCE => "sequence",
+            ObjectKind::SUBSCRIPTION => "subscription",
+            ObjectKind::STATISTICS => "statistics",
+            ObjectKind::TABLE => "table",
+            ObjectKind::TABLESPACE => "tablespace",
+            ObjectKind::TEXT_SEARCH_CONFIGURATION => "text search configuration",
+            ObjectKind::TEXT_SEARCH_DICTIONARY => "text search dictionary",
+            ObjectKind::TYPE => "type",
+            ObjectKind::VIEW => "view",
             _ => "object",
         }
     }
-    pub(crate) fn accepts_owner_kind(self, actual: Self) -> bool {
-        self == actual
-            || (self == Self::ROUTINE && matches!(actual, Self::FUNCTION | Self::PROCEDURE))
-            || (self == Self::TYPE && actual == Self::DOMAIN)
+    pub(crate) fn accepts_owner_kind(kind: ObjectKind, actual: ObjectKind) -> bool {
+        kind == actual
+            || (kind == ObjectKind::ROUTINE
+                && matches!(actual, ObjectKind::FUNCTION | ObjectKind::PROCEDURE))
+            || (kind == ObjectKind::TYPE && actual == ObjectKind::DOMAIN)
     }
-    pub(crate) const fn owner_schema_scoped(self) -> bool {
+    pub(crate) const fn owner_schema_scoped(kind: ObjectKind) -> bool {
         matches!(
-            self,
-            Self::AGGREGATE
-                | Self::COLLATION
-                | Self::CONVERSION
-                | Self::DOMAIN
-                | Self::FUNCTION
-                | Self::MATERIALIZED_VIEW
-                | Self::OPERATOR_CLASS
-                | Self::OPERATOR
-                | Self::OPERATOR_FAMILY
-                | Self::PROCEDURE
-                | Self::ROUTINE
-                | Self::SEQUENCE
-                | Self::STATISTICS
-                | Self::TABLE
-                | Self::TEXT_SEARCH_CONFIGURATION
-                | Self::TEXT_SEARCH_DICTIONARY
-                | Self::TYPE
-                | Self::VIEW
+            kind,
+            ObjectKind::AGGREGATE
+                | ObjectKind::COLLATION
+                | ObjectKind::CONVERSION
+                | ObjectKind::DOMAIN
+                | ObjectKind::FUNCTION
+                | ObjectKind::MATERIALIZED_VIEW
+                | ObjectKind::OPERATOR_CLASS
+                | ObjectKind::OPERATOR
+                | ObjectKind::OPERATOR_FAMILY
+                | ObjectKind::PROCEDURE
+                | ObjectKind::ROUTINE
+                | ObjectKind::SEQUENCE
+                | ObjectKind::STATISTICS
+                | ObjectKind::TABLE
+                | ObjectKind::TEXT_SEARCH_CONFIGURATION
+                | ObjectKind::TEXT_SEARCH_DICTIONARY
+                | ObjectKind::TYPE
+                | ObjectKind::VIEW
         )
     }
-    pub(crate) const fn valid_owner_kind(self) -> bool {
+    pub(crate) const fn valid_owner_kind(kind: ObjectKind) -> bool {
         matches!(
-            self,
-            Self::AGGREGATE
-                | Self::COLLATION
-                | Self::CONVERSION
-                | Self::DATABASE
-                | Self::DOMAIN
-                | Self::EVENT_TRIGGER
-                | Self::FOREIGN_DATA_WRAPPER
-                | Self::FOREIGN_SERVER
-                | Self::FUNCTION
-                | Self::LANGUAGE
-                | Self::LARGE_OBJECT
-                | Self::MATERIALIZED_VIEW
-                | Self::OPERATOR_CLASS
-                | Self::OPERATOR
-                | Self::OPERATOR_FAMILY
-                | Self::PROCEDURE
-                | Self::PUBLICATION
-                | Self::ROUTINE
-                | Self::SCHEMA
-                | Self::SEQUENCE
-                | Self::SUBSCRIPTION
-                | Self::STATISTICS
-                | Self::TABLE
-                | Self::TABLESPACE
-                | Self::TEXT_SEARCH_CONFIGURATION
-                | Self::TEXT_SEARCH_DICTIONARY
-                | Self::TYPE
-                | Self::VIEW
+            kind,
+            ObjectKind::AGGREGATE
+                | ObjectKind::COLLATION
+                | ObjectKind::CONVERSION
+                | ObjectKind::DATABASE
+                | ObjectKind::DOMAIN
+                | ObjectKind::EVENT_TRIGGER
+                | ObjectKind::FOREIGN_DATA_WRAPPER
+                | ObjectKind::FOREIGN_SERVER
+                | ObjectKind::FUNCTION
+                | ObjectKind::LANGUAGE
+                | ObjectKind::LARGE_OBJECT
+                | ObjectKind::MATERIALIZED_VIEW
+                | ObjectKind::OPERATOR_CLASS
+                | ObjectKind::OPERATOR
+                | ObjectKind::OPERATOR_FAMILY
+                | ObjectKind::PROCEDURE
+                | ObjectKind::PUBLICATION
+                | ObjectKind::ROUTINE
+                | ObjectKind::SCHEMA
+                | ObjectKind::SEQUENCE
+                | ObjectKind::SUBSCRIPTION
+                | ObjectKind::STATISTICS
+                | ObjectKind::TABLE
+                | ObjectKind::TABLESPACE
+                | ObjectKind::TEXT_SEARCH_CONFIGURATION
+                | ObjectKind::TEXT_SEARCH_DICTIONARY
+                | ObjectKind::TYPE
+                | ObjectKind::VIEW
         )
     }
 }
@@ -525,7 +529,7 @@ fn routine_definitions<C: BaseParseContext + ?Sized>(
     context
         .routine_definitions(name)
         .into_iter()
-        .filter(|definition| kind.accepts_owner_kind(definition.object_kind()))
+        .filter(|definition| OwnershipIdentity::accepts_owner_kind(kind, definition.object_kind()))
         .map(|definition| {
             OwnedObjectDefinition::new(&definition.ownership_identity(name), definition.owner())
         })

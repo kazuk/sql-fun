@@ -1,9 +1,11 @@
-use crate::{CacheContext, ast::Schema, sem::OwnerSpecification, syn::CreateSchemaStmt};
+mod ddl;
+use crate::{
+    CacheContext,
+    ast::{Schema, TryFromWithTokens},
+    sem::{AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst},
+    syn::{CreateSchemaStmt, ScanToken},
+};
 use sql_fun_core::IVec;
-
-use crate::{ast::TryFromWithTokens, sem::AstAndContextPair, syn::ScanToken};
-
-use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::CreateSchemaStmt`]
 #[derive(Debug, Clone)]

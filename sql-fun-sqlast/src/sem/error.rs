@@ -1,34 +1,6 @@
 pub use crate::error::AnalysisError;
-use crate::{ast::Dialect, sem::CreateCompositeType};
-use std::convert::Infallible;
 
-use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
-
-impl AnalysisError {
-    /// registering dynamic type to context
-    pub fn raise_register_dynamic_type(
-        _create_comp_type: &CreateCompositeType,
-    ) -> Result<Infallible, Self> {
-        Self::raise_unexpected_input("anonymous composite cannot be registered in the catalog")
-    }
-    /// inconsistent type reference
-    #[track_caller]
-    #[must_use]
-    pub fn type_canonicalize_failed(_expr_type: &TypeReference) -> Self {
-        todo!()
-    }
-    fn dialect_mismatch(parsed: Dialect, configured: Dialect) -> Self {
-        Self::UnexpectedInput(format!(
-            "statement dialect {parsed} does not match analysis metadata dialect {configured}"
-        ))
-    }
-    pub(crate) fn check_dialect(parsed: Dialect, configured: Dialect) -> Result<(), Self> {
-        if parsed != configured {
-            return Err(Self::dialect_mismatch(parsed, configured));
-        }
-        Ok(())
-    }
-}
+use crate::sem::{AnalysisProblem, ParseContext};
 
 /// problem like error, internal error for Analysis
 #[derive(Debug, thiserror::Error)]

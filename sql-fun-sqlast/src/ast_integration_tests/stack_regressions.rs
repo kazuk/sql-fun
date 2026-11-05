@@ -4,10 +4,13 @@
 #[cfg(feature = "sqlite")]
 use crate::test_helpers::ast_query::sqlite;
 
-use crate::ast::Dialect;
-use crate::test_helpers::ast_query::postgres;
-use crate::test_helpers::on_small_stack;
-use crate::test_helpers::small_stack_regression;
+use crate::{
+    ast::Dialect,
+    test_helpers::{
+        ast_query::postgres, on_small_stack, small_stack_regression,
+        stack_regressions as test_helpers,
+    },
+};
 
 #[rstest::rstest]
 #[case::left_joins("left_joins")]
@@ -49,5 +52,3 @@ fn sqlite_small_stack(
         test_helpers::assert_result(&syntax, Dialect::sqlite(), scenario);
     });
 }
-
-use crate::test_helpers::stack_regressions as test_helpers;

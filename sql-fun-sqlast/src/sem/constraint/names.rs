@@ -1,4 +1,5 @@
 //! The shared namespace for explicitly named relation constraints.
+mod ddl;
 use std::collections::HashMap;
 
 #[derive(Default)]

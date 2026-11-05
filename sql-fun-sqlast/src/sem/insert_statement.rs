@@ -1,8 +1,6 @@
-mod arbiter;
-mod destination;
-mod view_support;
+mod ast;
+mod cte;
 
-pub(crate) use self::destination::InsertDestination;
 pub use self::{
     arbiter::{
         InsertArbiter, InsertArbiterLookup, InsertConstraintKind, InsertConstraintLookup,
@@ -10,27 +8,24 @@ pub use self::{
     },
     view_support::ViewInsertSupport,
 };
-
+pub(crate) use self::{ast::InsertTargetBinding, destination::InsertDestination};
 use crate::{
     CacheContext,
-    ast::{Dialect, Insert, StatementNode},
+    ast::{ConflictClause, Dialect, Insert, StatementNode, TryFromWithTokens},
+    names::TableName,
     sem::{
-        AccessKind, CatalogNameLookup, ConflictClause,
+        AccessKind, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnDefinition,
+        ParseContext, QueryCte, ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr,
+        TypeReference,
         problem::InsertProblemKind,
-        traversal::{SemanticVisitor, optional, visit_optional},
+        traversal::{SemanticVisitor, SemanticVisitorMut, optional, visit_optional},
     },
     syn::InsertStmt,
 };
 
-use crate::{
-    ast::TryFromWithTokens,
-    names::TableName,
-    sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ParseContext, QueryCte,
-        ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
-        traversal::SemanticVisitorMut,
-    },
-};
+mod arbiter;
+mod destination;
+mod view_support;
 
 /// An analyzed INSERT with destination bindings, source and RETURNING metadata.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

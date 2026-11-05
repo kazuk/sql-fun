@@ -1,18 +1,16 @@
-use crate::sem::ColumnRename;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::CollateColumnConstraint as SqliteCollateColumnConstraint;
-#[cfg(feature = "sqlite")]
-use sql_fun_core::IVec;
-
+mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::{
     SqliteToken,
     sem::{AnalysisError, AnalysisProblem, ParseContext},
+    syn::sqlite::CollateColumnConstraint as SqliteCollateColumnConstraint,
 };
 use crate::{
     names::{ColumnName, TableName},
-    sem::{ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait},
+    sem::{ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename},
 };
+#[cfg(feature = "sqlite")]
+use sql_fun_core::IVec;
 
 /// collate constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]

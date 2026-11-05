@@ -1,25 +1,23 @@
+mod ast;
+mod cte;
+
 mod cursor;
 mod destination;
 mod view_support;
 
 pub use self::{cursor::UpdateCursor, view_support::ViewUpdateSupport};
 pub(crate) use self::{cursor::UpdatePredicate, destination::UpdateDestination};
-
 use crate::{
     CacheContext,
-    ast::{Dialect, StatementNode, Update},
-    sem::{AccessKind, ConflictClause, problem::UpdateProblemKind, traversal::SemanticVisitor},
-    syn::UpdateStmt,
-};
-
-use crate::{
-    ast::TryFromWithTokens,
+    ast::{ConflictClause, Dialect, StatementNode, TryFromWithTokens, Update},
     names::TableName,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext, QueryCte,
-        ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
-        traversal::SemanticVisitorMut,
+        AccessKind, AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext,
+        QueryCte, ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
+        problem::UpdateProblemKind,
+        traversal::{SemanticVisitor, SemanticVisitorMut},
     },
+    syn::UpdateStmt,
 };
 
 /// Resolved UPDATE assignments in SQL order.

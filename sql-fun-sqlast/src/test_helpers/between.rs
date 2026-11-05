@@ -1,4 +1,3 @@
-use crate::sem::SemAst;
 pub(crate) use crate::test_helpers::query::expression;
 use crate::{
     StringSpan,
@@ -7,8 +6,8 @@ use crate::{
     names::{OperatorName, SchemaName},
     parse_statements,
     sem::{
-        AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, SemScalarExpr,
-        SourcePathWithSpan, TypeCategory, TypeDefinition, TypeReference,
+        AnalysisError, BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, SemAst,
+        SemScalarExpr, SourcePathWithSpan, TypeCategory, TypeDefinition, TypeReference,
     },
     test_helpers::{TestParseContext, create_cache_context},
 };

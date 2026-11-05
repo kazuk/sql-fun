@@ -1,14 +1,14 @@
-use crate::context::{BaseParseContext as _, ParseContext as _};
-use crate::names::{SchemaName, TableName};
-use crate::parse_statements;
-use crate::sem::{CreateView, InsertArbiter, InsertInferenceModifiers};
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::insert::catalog;
-
-use crate::ast::Dialect;
-use crate::names::{ColumnName, FullName};
-use crate::sem::{AnalysisError, SemAst, ViewInsertSupport, ViewLike};
-use crate::test_helpers::TestParseContext;
+use crate::{
+    ast::Dialect,
+    context::{BaseParseContext as _, ParseContext as _},
+    names::{ColumnName, FullName, SchemaName, TableName},
+    parse_statements,
+    sem::{
+        AnalysisError, CreateView, InsertArbiter, InsertInferenceModifiers, SemAst,
+        ViewInsertSupport, ViewLike,
+    },
+    test_helpers::{TestParseContext, create_cache_context, insert::catalog},
+};
 
 #[cfg(feature = "sqlite")]
 pub(crate) fn sqlite_oracle() -> ::rusqlite::Connection {

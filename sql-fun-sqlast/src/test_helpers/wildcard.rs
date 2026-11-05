@@ -1,14 +1,15 @@
-use crate::ast::{Dialect, Statement};
-use crate::context::ParseContext as _;
-use crate::names::{ColumnName, FullName, OperatorName, SchemaName, TableName};
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::sem::{
-    BinaryOperatorDefinition, ColumnDefinition, FunctionOverloadCollection, FunctionParam,
-    OperatorDefinition, OverloadVariant, PgBuiltInType, ResultColumnCollection, TypeDefinition,
-    TypeReference, WildcardExpansion,
+use crate::{
+    ast::{Dialect, Statement},
+    context::ParseContext as _,
+    names::{ColumnName, FullName, OperatorName, SchemaName, TableName},
+    parse_statements,
+    sem::{
+        BinaryOperatorDefinition, ColumnDefinition, FunctionOverloadCollection, FunctionParam,
+        OperatorDefinition, OverloadVariant, PgBuiltInType, ResultColumnCollection, SemAst,
+        TypeDefinition, TypeReference, WildcardExpansion,
+    },
+    test_helpers::{TestParseContext, create_cache_context, source_span},
 };
-use crate::test_helpers::{TestParseContext, create_cache_context, source_span};
 
 pub(crate) fn statement(sql: &str) -> Statement {
     parse_statements(sql, Dialect::postgres())
@@ -41,22 +42,20 @@ pub(crate) fn catalog() -> TestParseContext {
         let columns = names
             .iter()
             .copied()
-            .map(ColumnDefinition::wildcard_int4_column)
+            .map(wildcard_int4_column)
             .collect::<Vec<_>>();
         context.setup_table(name, &columns, &source_span());
     }
     context
 }
 
-impl ColumnDefinition {
-    fn wildcard_int4_column(name: &str) -> Self {
-        Self::new(
-            &Some(ColumnName::from(name)),
-            Some(&PgBuiltInType::int4()),
-            Some(false),
-            &[],
-        )
-    }
+fn wildcard_int4_column(name: &str) -> ColumnDefinition {
+    ColumnDefinition::new(
+        &Some(ColumnName::from(name)),
+        Some(&PgBuiltInType::int4()),
+        Some(false),
+        &[],
+    )
 }
 
 pub(crate) fn expansions(statement: &Statement) -> Vec<WildcardExpansion> {

@@ -1,22 +1,24 @@
-use crate::context::{
-    BaseParseContext as _, FrozenBaseContext, MutSourcePathWithSpan as _, ParseContext as _,
-    SchemaFileContext,
-};
-use crate::names::{ColumnName, FullName, SchemaName, TableName};
-use crate::sem::{AnalysisError, ColumnDefinition, PgBuiltInType as SemPgBuiltInType};
-use crate::test_helpers::TestParseContext;
 pub(crate) use crate::test_helpers::ownership::apply_ownership_sql as apply;
-use crate::test_helpers::source_span;
+use crate::{
+    context::{
+        BaseParseContext as _, FrozenBaseContext, MutSourcePathWithSpan as _, ParseContext as _,
+        SchemaFileContext,
+    },
+    names::{ColumnName, FullName, SchemaName, TableName},
+    sem::{AnalysisError, ColumnDefinition, PgBuiltInType as SemPgBuiltInType},
+    test_helpers::{TestParseContext, source_span},
+};
 
 // pg_query 6 uses PostgreSQL 17 grammar. Seed the supported semantic catalog
 // mode directly so PostgreSQL 18 virtual-column restrictions are exercised.
 
 pub(crate) fn virtual_column_context() -> SchemaFileContext {
     use crate::{
+        ast::{CreateTableMode, GeneratedColumnMode},
         context::TableInfoWrite,
         sem::{
-            ColumnConstraint, CreateTable, CreateTableMode, GeneratedColumnConstraint,
-            GeneratedColumnMode, PgBuiltInType, ScalarConstExpr, SemScalarExpr,
+            ColumnConstraint, CreateTable, GeneratedColumnConstraint, PgBuiltInType,
+            ScalarConstExpr, SemScalarExpr,
         },
     };
     let mut context = context("18");

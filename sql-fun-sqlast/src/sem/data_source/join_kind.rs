@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     sem::{AnalysisError, Nullable},
     syn::{JoinType, JoinTypeOpt, Opt},

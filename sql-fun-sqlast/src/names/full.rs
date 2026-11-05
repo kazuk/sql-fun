@@ -1,10 +1,13 @@
+mod ast;
+
 mod parse;
 
-use crate::ast::{DeparseError, Dialect as AstDialect, render_full_name};
+use crate::{
+    ast::{DeparseError, Dialect as AstDialect, render_full_name},
+    names::{CatalogName, LocalName, SchemaName},
+};
 
 use std::fmt::Display;
-
-use crate::names::{CatalogName, LocalName, SchemaName};
 
 /// A logical SQL name with one, two, or three components.
 ///

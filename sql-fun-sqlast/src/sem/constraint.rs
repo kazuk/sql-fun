@@ -1,30 +1,23 @@
+mod ddl;
 pub(crate) use self::names::ConstraintNames;
+pub use self::{
+    check::CheckConstraint, foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint,
+    unique::UniqueConstraint,
+};
+use crate::{
+    names::{ColumnName, TableName},
+    sem::{
+        AnalysisError, ColumnRename, ImplicitChange, ParseContext, alter_table::AlterObjSubCommand,
+        traversal::SemanticVisitorMut,
+    },
+    syn::{AlterTableCmd, ConstrType, Constraint as SynConstraint, Opt},
+};
 
 mod check;
 mod foreign;
 mod names;
 mod primary;
 mod unique;
-
-pub use self::{
-    check::CheckConstraint, foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint,
-    unique::UniqueConstraint,
-};
-
-use crate::{
-    names::ColumnName,
-    sem::ColumnRename,
-    sem::traversal::SemanticVisitorMut,
-    syn::{AlterTableCmd, Constraint as SynConstraint},
-};
-
-use crate::{
-    names::TableName,
-    sem::{AnalysisError, ParseContext, alter_table::AlterObjSubCommand},
-    syn::{ConstrType, Opt},
-};
-
-use crate::sem::ImplicitChange;
 
 /// analyze [`crate::syn::Constraint`] variants
 pub trait AnalyzeConstraint<TParseContext>
@@ -213,15 +206,13 @@ impl Constraint {
 
 #[cfg(test)]
 mod test_analyze_alter_obj_add_constraint {
-    use crate::sem::CreateTableMode;
-
-    use testresult::TestResult;
-
     use crate::{
+        ast::CreateTableMode,
         names::{FullName, TableName},
         sem::{Constraint, CreateTable, SourcePathWithSpan},
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
+    use testresult::TestResult;
 
     #[rstest::rstest]
     fn test_analyze_alter_obj_add_constraint(

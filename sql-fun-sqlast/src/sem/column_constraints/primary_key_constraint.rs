@@ -1,10 +1,12 @@
+mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::PrimaryKeyColumnConstraint as SqlitePrimaryKeyColumnConstraint;
 use crate::{
+    ast::{ConflictClause, Deferrable},
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ConflictClause, Deferrable, ParseContext,
+        ParseContext,
     },
     syn::{ConstrType, Constraint, Opt},
 };

@@ -1,27 +1,16 @@
 #![doc = include_str!("sem.md")]
 
-mod ast_conversion;
-mod ddl_conversion;
-mod engine_features;
-mod ownership_conversion;
-mod statement_conversion;
-mod view_conversion;
-pub(crate) use self::ddl_conversion::RelationAlteration;
-pub(crate) use self::engine_features::EngineFeatureValidation;
-
-pub(crate) use self::constraint::ConstraintNames;
 mod alter_column;
 mod alter_index;
 mod alter_owner;
 mod alter_seq;
 mod alter_table;
-mod column_rename;
-mod source_flag;
-
 mod analysis_state;
+mod ast;
 mod cast;
 mod client_type;
 mod column_constraints;
+mod column_rename;
 mod comment;
 pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
@@ -48,6 +37,7 @@ mod delete_statement;
 mod drop_dependency_behavior;
 mod drop_rule;
 mod drop_trigger;
+mod engine_features;
 mod error;
 mod foreign_key_target;
 mod from_clause;
@@ -66,11 +56,14 @@ pub mod problem;
 mod query;
 mod query_access;
 mod query_metadata;
+mod relation_alteration;
 mod resolution;
 mod sampling_method;
 mod scalar_expr;
 pub(crate) mod search_path;
 mod select_statement;
+mod sem_ast_analysis;
+mod source_flag;
 mod top_level_statement;
 pub(crate) mod traversal;
 pub(crate) mod type_system;
@@ -82,15 +75,8 @@ pub(crate) mod view_write;
 mod wildcard_expansion;
 mod with_typmod;
 
-pub use self::column_rename::ColumnRename;
 #[cfg(test)]
 pub(crate) use self::conflict_info::infer_from_catalog;
-pub use self::cursor_info::CursorInfo;
-pub use self::merge_statement::{
-    MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
-    ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
-};
-pub(crate) use self::parameter_constraints::ConstraintMemo;
 #[expect(deprecated)]
 pub use self::{
     alter_column::{
@@ -111,13 +97,11 @@ pub use self::{
         AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
         AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
         ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnNullabilityConstraint,
-        ConflictClause, DefaultColumnConstraint, Deferrability, Deferrable,
-        ExclusionColumnConstraint, ForeignKeyAction, ForeignKeyColumnConstraint,
-        ForeignKeyMatchType, GeneratedColumnConstraint, GeneratedColumnMode,
-        IdentityColumnConstraint, IdentityColumnMode, PrimaryKeyColumnConstraint,
-        UniqueColumnConstraint, Validity,
+        DefaultColumnConstraint, ExclusionColumnConstraint, ForeignKeyColumnConstraint,
+        GeneratedColumnConstraint, IdentityColumnConstraint, PrimaryKeyColumnConstraint,
+        UniqueColumnConstraint,
     },
-    comment::{Comment, ObjectKind},
+    comment::Comment,
     conflict_info::{CatalogNameLookup, ConflictArbiterInference},
     conflict_masters::{
         CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
@@ -134,7 +118,7 @@ pub use self::{
     },
     create_schema::CreateSchema,
     create_seq::CreateSequence,
-    create_table::{ColumnCollection, ColumnDefinition, CreateTable, CreateTableMode, DropTable},
+    create_table::{ColumnCollection, ColumnDefinition, CreateTable, DropTable},
     create_table_as::CreateTableAs,
     create_view::CreateView,
     cte::{CteStatement, WithClause},
@@ -194,71 +178,72 @@ pub use self::{
 };
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,
-    constraint::{ForeignKeyConstraint, UniqueConstraint},
+    constraint::{ConstraintNames, ForeignKeyConstraint, UniqueConstraint},
     create_comp_type::CompositeFieldDefinition,
     create_index::IndexElementCollection,
-    data_source::JoinUsingClause,
+    data_source::{JoinUsingClause, ProjectionColumn, TableFunctionOutput, WildcardProjection},
     delete_statement::{DeleteDestination, DeletePredicate},
+    engine_features::EngineFeatureValidation,
     error::ProblemLikeError,
-    parameter_constraints::{ConstraintGraph, SignatureAlternative, array_cast_ranks},
+    foreign_key_target::ForeignKeyTarget,
+    insert_statement::{
+        InsertClauseSemantics, InsertClauseValues, InsertDestination, InsertTargetCollection,
+        InsertValueCollection,
+    },
+    merge_statement::{MergeDestination, MergeWhenCollection},
+    overload_rank::OverloadRank,
+    parameter_constraints::{
+        ConstraintGraph, ConstraintMemo, SignatureAlternative, array_cast_ranks,
+    },
+    relation_alteration::RelationAlteration,
+    resolution::ResolutionFailure,
     scalar_expr::{SqliteCaseBuilder, WholeRowFields, grouping::ReferenceCapture},
     select_statement::{ResultColumn, SelectStatementNode},
-    update_statement::{UpdateDestination, UpdatePredicate},
-};
-pub use self::{
-    create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
-    create_trigger::{
-        CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
-        TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity,
-        TriggerReferences, TriggerTiming, TriggerTransition,
-    },
-    drop_rule::DropRule,
-    view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption},
-    view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport},
-};
-pub(crate) use self::{
-    data_source::{ProjectionColumn, WildcardProjection},
-    foreign_key_target::ForeignKeyTarget,
-    overload_rank::OverloadRank,
+    update_statement::{UpdateAssignmentCollection, UpdateDestination, UpdatePredicate},
     wildcard_expansion::{
         WildcardQualifier, WildcardQualifiers, WildcardRowsFunction, WildcardRowsProjection,
         WildcardRowsSource, WildcardRowsSources, WildcardSourceProjection, WildcardTypedRecord,
     },
 };
 pub use self::{
+    column_rename::ColumnRename,
+    create_rule::{CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences},
+    create_trigger::{
+        CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
+        TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity,
+        TriggerReferences, TriggerTiming, TriggerTransition,
+    },
+    cursor_info::CursorInfo,
     declaration_collation::DeclarationCollation,
+    drop_dependency_behavior::DropDependencyBehavior,
+    drop_rule::DropRule,
+    drop_trigger::DropTrigger,
+    merge_statement::{
+        MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
+        ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
+    },
     query_access::{AccessObjectKind, AccessRecord, QueryAccess},
     query_metadata::QueryMetadata,
+    view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption},
+    view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport},
     with_typmod::WithTypmod,
 };
-pub use self::{drop_dependency_behavior::DropDependencyBehavior, drop_trigger::DropTrigger};
-pub(crate) use self::{
-    insert_statement::InsertDestination,
-    merge_statement::{MergeDestination, MergeWhenCollection},
-};
-pub(crate) use self::{
-    insert_statement::{
-        InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
-    },
-    resolution::ResolutionFailure,
-    update_statement::UpdateAssignmentCollection,
-};
 pub use crate::AstAndContextPair;
-pub use ::sql_fun_core::AccessKind;
-
-use crate::sem::traversal::{SemanticVisitor, SemanticVisitorMut};
-
+pub(crate) use crate::stack::with_stack;
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::Cmd};
-use crate::{StringSpan, context::ParseContext};
-
+use crate::{
+    StringSpan,
+    context::ParseContext,
+    sem::traversal::{SemanticVisitor, SemanticVisitorMut},
+};
+pub use ::sql_fun_core::AccessKind;
+#[cfg(feature = "sqlite")]
+use ::sql_fun_core::IVec;
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
 };
-
-#[cfg(feature = "sqlite")]
-use ::sql_fun_core::IVec;
 
 /// source path and span pair
 #[derive(Debug, Clone)]
@@ -668,7 +653,3 @@ impl SemAst {
         Self::semantic_analysis_sqlite_stmt(context, syn.into_statement(), tokens)
     }
 }
-
-pub(crate) use self::data_source::TableFunctionOutput;
-
-pub(crate) use crate::stack::with_stack;

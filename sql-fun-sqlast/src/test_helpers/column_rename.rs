@@ -1,15 +1,11 @@
 //! Lightweight schema-chain fixtures for column rename contracts.
 
 #[cfg(feature = "sqlite")]
-use crate::AstAndContextPair;
-#[cfg(feature = "sqlite")]
-use crate::ast::Dialect;
-#[cfg(feature = "sqlite")]
-use crate::parse_statements;
-#[cfg(feature = "sqlite")]
-use crate::sem::SemAst;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::create_cache_context;
+use crate::{
+    AstAndContextPair, ast::Dialect, parse_statements, sem::SemAst,
+    test_helpers::create_cache_context,
+};
+
 use crate::{
     context::{
         BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, ParseContext, SchemaFileContext,

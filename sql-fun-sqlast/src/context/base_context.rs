@@ -6,19 +6,23 @@ mod builtin_ope;
 pub use self::{
     builtin_casts::PgBuiltinCasts, builtin_fun::PgBuiltInFunctions, builtin_ope::PgBuiltinOperators,
 };
-
 use crate::{
-    ast::Dialect,
+    TrieMap,
+    ast::{Dialect, ObjectKind},
     context::{
-        ConflictMasters, base_context::aggregate_info::builtin_aggregate,
+        BaseParseContext, ConflictMasters, FunctionInfoRead, GetSourcePathWithSpanOpt,
+        IndexInfoRead, OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead,
+        TypeInfoRead, ViewInfoRead, base_context::aggregate_info::builtin_aggregate,
         ownership::ConfiguredRoles,
     },
-    names::TableName,
+    names::{FullName, OperatorName, SchemaName, TableName},
     sem::{
-        CatalogNameLookup, CollationDefinition, ConflictArbiterInference, CreateFunction,
-        CreateTrigger, DatabaseCollation, InsertConflict, Kind, ObjectKind,
-        OperatorClassDefinition, OverloadVariant, OwnedObjectDefinition, Role, TriggerIdentity,
-        TypeCategory as SemTypeCategory, ViewDeleteSupport, ViewInsertSupport, ViewMergeSupport,
+        AnalysisError, CastDefinition, CatalogNameLookup, CollationDefinition,
+        ConflictArbiterInference, CreateFunction, CreateIndex, CreateSequence, CreateTable,
+        CreateTrigger, DatabaseCollation, FunctionOverloadCollection, InsertConflict, Kind,
+        OperatorClassDefinition, OperatorDefinition, OverloadVariant, OwnedObjectDefinition, Role,
+        SourcePathWithSpan, TriggerIdentity, TypeCategory as SemTypeCategory, TypeDefinition,
+        TypeReference, ViewDeleteSupport, ViewInsertSupport, ViewLike, ViewMergeSupport,
         ViewUpdateSupport,
         conflict_info::infer_from_catalog,
         conflict_masters::{
@@ -28,25 +32,9 @@ use crate::{
         ownership::model_definitions,
     },
 };
-
-use std::{fs::File, io::BufReader, path::Path};
-
-use crate::{
-    TrieMap,
-    context::{
-        BaseParseContext, FunctionInfoRead, GetSourcePathWithSpanOpt, IndexInfoRead,
-        OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
-        ViewInfoRead,
-    },
-    names::{FullName, OperatorName, SchemaName},
-    sem::{
-        AnalysisError, CastDefinition, CreateIndex, CreateSequence, CreateTable,
-        FunctionOverloadCollection, OperatorDefinition, SourcePathWithSpan, TypeDefinition,
-        TypeReference, ViewLike,
-    },
-};
 use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
 use serde::de::DeserializeOwned;
+use std::{fs::File, io::BufReader, path::Path};
 
 /// Builtin schema information initialized from the selected metadata.
 #[derive(Debug)]
@@ -311,11 +299,12 @@ impl BaseContext {
 
 #[cfg(test)]
 mod read_builtin_types_tests {
-    use crate::context::base_context::BaseContext;
-    use crate::names::FullName;
-    use crate::sem::TypeReference;
-    use crate::test_helpers::TestParseContext;
-    use crate::test_helpers::type_catalog as test_helpers;
+    use crate::{
+        context::base_context::BaseContext,
+        names::FullName,
+        sem::TypeReference,
+        test_helpers::{TestParseContext, type_catalog as test_helpers},
+    };
 
     #[rstest::rstest]
     #[case::empty_schema(r#"[{"schema":"","name":"text","collatable":true}]"#)]

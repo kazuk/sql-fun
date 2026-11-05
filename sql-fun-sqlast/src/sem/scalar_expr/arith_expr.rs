@@ -1,3 +1,5 @@
+mod ast;
+
 mod between;
 mod binary;
 mod call_sites;
@@ -22,13 +24,12 @@ use crate::{
     ast::Dialect,
     names::OperatorName,
     sem::{
-        AnalysisError, ParseContext, PgBuiltInType, ResolvedOperator,
+        AnalysisError, ParseContext, PgBuiltInType, ResolvedOperator, SemScalarExpr, TypeReference,
         parameter_resolution::ParameterResolution,
+        scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
-
-use crate::sem::{SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
 
 /// arith expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

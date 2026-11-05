@@ -87,10 +87,10 @@ impl From<BaseContext> for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_frozen_root {
-    use crate::test_helpers::heavy::selected_root as heavy;
     use crate::{
         context::{BaseParseContext, FrozenBaseContext, GetSourcePathWithSpanOpt, SearchPathRead},
         names::FullName,
+        test_helpers::heavy::selected_root as heavy,
     };
 
     #[test]
@@ -155,7 +155,7 @@ macro_rules! forward_catalog_reads {
 
             fn ownership_definitions(
                 &self,
-                kind: crate::sem::ObjectKind,
+                kind: crate::ast::ObjectKind,
                 name: &crate::names::FullName,
             ) -> Vec<crate::sem::OwnedObjectDefinition> {
                 crate::context::OwnershipInfoRead::ownership_definitions(
@@ -480,6 +480,9 @@ macro_rules! forward_catalog_reads {
     };
 }
 
+#[cfg(test)]
+pub(crate) use forward_catalog_reads;
+
 forward_catalog_reads!(FrozenBaseContext, catalog);
 forward_catalog_reads!(crate::context::SchemaFileContext, catalog);
 forward_catalog_reads!(crate::ParsedSchemaDump, base_context);
@@ -504,11 +507,10 @@ impl crate::context::TypeInfoRead for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_type_lookup_cost {
-    use crate::test_helpers::counted_root as test_helpers;
-    use crate::test_helpers::schema_layer;
     use crate::{
         context::{BaseParseContext, ParseContext},
         names::FullName,
+        test_helpers::{counted_root as test_helpers, schema_layer},
     };
     use std::{path::Path, sync::atomic::Ordering};
 
@@ -530,6 +532,3 @@ mod test_type_lookup_cost {
         assert_eq!(probes.load(Ordering::Relaxed), 1);
     }
 }
-
-#[cfg(test)]
-pub(crate) use forward_catalog_reads;

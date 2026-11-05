@@ -1,3 +1,6 @@
+mod ast;
+mod canonicalize_error;
+
 use crate::{
     ast::Dialect,
     context::{BaseParseContext, ParseContext},
@@ -5,13 +8,13 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, CastContext as SemCastContext,
         ColumnCollection as SemColumnCollection,
+        pg_type::{
+            TypeDefinition, concrete_type::ConcreteTypeReference,
+            dynamic_type::DynamicTypeReference,
+        },
     },
 };
 use std::collections::HashSet;
-
-use crate::sem::pg_type::{
-    TypeDefinition, concrete_type::ConcreteTypeReference, dynamic_type::DynamicTypeReference,
-};
 
 /// A concrete named type (optionally an array), or an inferred dynamic type.
 ///
@@ -306,9 +309,10 @@ impl TypeReference {
 #[cfg(test)]
 mod test_array_identity {
 
-    use crate::sem::{PgBuiltInType, pg_type::type_ref::TypeReference};
-
-    use crate::test_helpers::dynamic_types::record;
+    use crate::{
+        sem::{PgBuiltInType, pg_type::type_ref::TypeReference},
+        test_helpers::dynamic_types::record,
+    };
 
     #[test]
     fn dynamic_array_preserves_element_identity_and_serialization() -> testresult::TestResult {
@@ -457,15 +461,14 @@ impl TypeReference {
 
 #[cfg(test)]
 mod test_dynamic_matching {
-    use crate::test_helpers::TestParseContext;
-
-    use crate::sem::{
-        CreateCompositeType, PgBuiltInType, TypeDefinition,
-        create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
-        pg_type::type_ref::TypeReference,
+    use crate::{
+        sem::{
+            CreateCompositeType, PgBuiltInType, TypeDefinition,
+            create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+            pg_type::type_ref::TypeReference,
+        },
+        test_helpers::{TestParseContext, dynamic_types::record},
     };
-
-    use crate::test_helpers::dynamic_types::record;
 
     #[test]
     fn anonymous_record_accepts_generic_record_without_cast_master() {
@@ -980,9 +983,10 @@ impl TypeReference {
 #[cfg(test)]
 mod test_structural_substitution {
 
-    use crate::sem::{PgBuiltInType, pg_type::type_ref::TypeReference};
-
-    use crate::test_helpers::dynamic_types::record;
+    use crate::{
+        sem::{PgBuiltInType, pg_type::type_ref::TypeReference},
+        test_helpers::dynamic_types::record,
+    };
 
     #[rstest::rstest]
     #[case::element("anyelement", false, false)]

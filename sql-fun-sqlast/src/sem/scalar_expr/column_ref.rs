@@ -8,6 +8,7 @@ mod system_column_ref;
 mod table_column_ref;
 mod table_func_col_ref;
 mod view_column_ref;
+mod wildcard_projection;
 
 pub use self::{
     cte_column_ref::CteColumnRef,
@@ -25,19 +26,12 @@ pub use self::{
 };
 
 use crate::{
-    names::{AliasName, CteName, FullName, TableName},
-    sem::{
-        ColumnRename, DeleteRowColumn, DeleteRowVersion, data_source::MergeRecordRole,
-        query_access::AccessColumn as QueryAccessAccessColumn,
-    },
-};
-
-use crate::{
     context::ParseContext,
-    names::ColumnName,
+    names::{AliasName, ColumnName, CteName, FullName, TableName},
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, SemScalarExpr, TypeReference,
-        scalar_expr::SemScalarExprNode,
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename, DeleteRowColumn,
+        DeleteRowVersion, SemScalarExpr, TypeReference, data_source::MergeRecordRole,
+        query_access::AccessColumn as QueryAccessAccessColumn, scalar_expr::SemScalarExprNode,
     },
 };
 

@@ -2,27 +2,15 @@
 mod impl_analyze_range_var_node;
 
 #[cfg(test)]
-use crate::ast::DerivedTable;
-#[cfg(test)]
-use crate::ast::Join;
-#[cfg(test)]
-use crate::ast::TableFunctions;
-#[cfg(test)]
-use crate::ast::XmlTable;
-#[cfg(test)]
-use crate::syn::JoinExpr;
-#[cfg(test)]
-use crate::syn::RangeFunction;
-#[cfg(test)]
-use crate::syn::RangeSubselect;
-#[cfg(test)]
-use crate::syn::RangeTableFunc;
-use crate::{ast::FromItem, syn::Node as SynNode};
+use crate::{
+    ast::{DerivedTable, Join, TableFunctions, XmlTable},
+    syn::{JoinExpr, RangeFunction, RangeSubselect, RangeTableFunc},
+};
 
 use crate::{
-    ast::TryFromWithTokens,
+    ast::{FromItem, TryFromWithTokens},
     sem::{AnalysisError, FromClause, ParseContext, WithClause, data_source::DataSource},
-    syn::ScanToken,
+    syn::{Node as SynNode, ScanToken},
 };
 
 use ::sql_fun_core::IVec;
@@ -51,12 +39,10 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_analyze_range_subselect {
-    use crate::{sem::data_source::analyze::DataSource, syn::NodeInner};
-
     use crate::{
         context::MutSourcePathWithSpan,
-        sem::SourcePathWithSpan,
-        syn::{Node, NodeList, WithClauseOpt},
+        sem::{SourcePathWithSpan, data_source::analyze::DataSource},
+        syn::{Node, NodeInner, NodeList, WithClauseOpt},
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
@@ -107,11 +93,12 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_analyze_join_expr {
-    use crate::sem::data_source::analyze::DataSource;
-
     use crate::{
         names::{ColumnName, FullName, SchemaName},
-        sem::{ColumnDefinition, FromClause, SourcePathWithSpan, TypeReference, WithClause},
+        sem::{
+            ColumnDefinition, FromClause, SourcePathWithSpan, TypeReference, WithClause,
+            data_source::analyze::DataSource,
+        },
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
@@ -193,11 +180,12 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_data_source_analyze_range_table_func {
-    use crate::sem::data_source::analyze::{DataSource as AnalyzeDataSource, FromClause};
-
     use crate::{
         names::SchemaName,
-        sem::{DataSource, WithClause},
+        sem::{
+            DataSource, WithClause,
+            data_source::analyze::{DataSource as AnalyzeDataSource, FromClause},
+        },
         test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
     };
 
@@ -260,13 +248,11 @@ impl DataSource {
 #[cfg(test)]
 mod test_data_source_analyze_range_func_rows_from {
     use crate::{
-        names::FullName,
-        sem::data_source::analyze::{DataSource as AnalyzeDataSource, FromClause},
-    };
-
-    use crate::{
-        names::SchemaName,
-        sem::{AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, WithClause},
+        names::{FullName, SchemaName},
+        sem::{
+            AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, WithClause,
+            data_source::analyze::{DataSource as AnalyzeDataSource, FromClause},
+        },
         test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
     };
 
@@ -335,11 +321,12 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_data_source_analyze_range_functions {
-    use crate::sem::data_source::analyze::{DataSource as AnalyzeDataSource, FromClause};
-
     use crate::{
         names::SchemaName,
-        sem::{DataSource, WithClause},
+        sem::{
+            DataSource, WithClause,
+            data_source::analyze::{DataSource as AnalyzeDataSource, FromClause},
+        },
         test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
     };
 

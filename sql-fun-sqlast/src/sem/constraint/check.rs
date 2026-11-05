@@ -1,3 +1,4 @@
+mod ddl;
 use crate::{
     ast::Dialect,
     names::TableName,

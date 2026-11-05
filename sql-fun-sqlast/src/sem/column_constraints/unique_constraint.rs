@@ -1,10 +1,12 @@
+mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::UniqueColumnConstraint as SqliteUniqueColumnConstraint;
 use crate::{
+    ast::ConflictClause,
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
-        ConflictClause, ParseContext,
+        ParseContext,
     },
     syn::{ConstrType, Constraint, Opt},
 };

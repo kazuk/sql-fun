@@ -1,3 +1,4 @@
+mod ast;
 use crate::{
     ast::{Dialect, TryFromWithTokens, With},
     context::ParseContext,
@@ -156,91 +157,6 @@ impl CteStatement {
             Self::Merge(merge) => MergeStatement::resolved_column(column, index, skip, merge),
             Self::Delete(delete) => DeleteStatement::resolved_column(column, index, skip, delete),
         }
-    }
-}
-
-impl DeleteStatement {
-    fn resolved_column(
-        column: &ColumnName,
-        index: Option<usize>,
-        skip: usize,
-        delete: &Self,
-    ) -> Option<ColumnDefinition> {
-        let columns = delete.result_columns();
-        let result = if let Some(index) = index {
-            columns.get_column_at(index)
-        } else {
-            columns.get_column_with_skip_count(column, skip)
-        };
-        result.map(|column| column.create_column_definition())
-    }
-}
-
-impl MergeStatement {
-    fn resolved_column(
-        column: &ColumnName,
-        index: Option<usize>,
-        skip: usize,
-        merge: &Self,
-    ) -> Option<ColumnDefinition> {
-        let columns = merge.result_columns();
-        let result = if let Some(index) = index {
-            columns.get_column_at(index)
-        } else {
-            columns.get_column_with_skip_count(column, skip)
-        };
-        result.map(|column| column.create_column_definition())
-    }
-}
-
-impl UpdateStatement {
-    fn resolved_column(
-        column: &ColumnName,
-        index: Option<usize>,
-        skip: usize,
-        update: &Self,
-    ) -> Option<ColumnDefinition> {
-        let columns = update.result_columns();
-        let result = if let Some(index) = index {
-            columns.get_column_at(index)
-        } else {
-            columns.get_column_with_skip_count(column, skip)
-        };
-        result.map(|column| column.create_column_definition())
-    }
-}
-
-impl InsertStatement {
-    fn resolved_column(
-        column: &ColumnName,
-        index: Option<usize>,
-        skip: usize,
-        insert: &Self,
-    ) -> Option<ColumnDefinition> {
-        let columns = insert.result_columns();
-        let result = if let Some(index) = index {
-            columns.get_column_at(index)
-        } else {
-            columns.get_column_with_skip_count(column, skip)
-        };
-        result.map(|column| column.create_column_definition())
-    }
-}
-
-impl SelectStatement {
-    fn resolved_column(
-        column: &ColumnName,
-        index: Option<usize>,
-        skip: usize,
-        query: &Self,
-    ) -> Option<ColumnDefinition> {
-        let columns = query.result_columns();
-        let result = if let Some(index) = index {
-            columns.get_column_at(index)
-        } else {
-            columns.get_column_with_skip_count(column, skip)
-        };
-        result.map(|column| column.create_column_definition())
     }
 }
 

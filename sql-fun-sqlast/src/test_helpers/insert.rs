@@ -1,16 +1,15 @@
-use crate::names::{FullName as NamesFullName, TableName};
-use crate::parse_statements;
-use crate::sem::{
-    CatalogNameLookup as SemCatalogNameLookup, ColumnConstraint, IdentityColumnConstraint,
-    IdentityColumnMode,
+use crate::{
+    ast::{Dialect, IdentityColumnMode},
+    names::{ColumnName, FullName as NamesFullName, TableName},
+    parse_statements,
+    sem::{
+        CatalogNameLookup as SemCatalogNameLookup, ColumnConstraint, ColumnDefinition,
+        IdentityColumnConstraint, PgBuiltInType, SemAst,
+    },
+    test_helpers::{
+        TestParseContext, create_cache_context, scalar_catalog::items_catalog, source_span,
+    },
 };
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::scalar_catalog::items_catalog;
-
-use crate::ast::Dialect;
-use crate::names::ColumnName;
-use crate::sem::{ColumnDefinition, PgBuiltInType, SemAst};
-use crate::test_helpers::{TestParseContext, source_span};
 
 pub(crate) fn catalog(dialect: Dialect) -> TestParseContext {
     let mut context = items_catalog(dialect, Some(true));

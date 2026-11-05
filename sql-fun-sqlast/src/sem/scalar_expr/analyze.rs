@@ -1,21 +1,12 @@
 #[cfg(feature = "sqlite")]
-use crate::SqliteToken;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::Expr as SqliteExpr;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprBetween;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprBinary;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprCollate;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprIsNull;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprNotNull;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::ExprUnary;
-#[cfg(feature = "sqlite")]
-use crate::syn::sqlite::Parenthesized;
+use crate::{
+    SqliteToken,
+    syn::sqlite::{
+        Expr as SqliteExpr, ExprBetween, ExprBinary, ExprCollate, ExprIsNull, ExprNotNull,
+        ExprUnary, Parenthesized,
+    },
+};
+
 use crate::{
     ast::{Expr, TryFromWithTokens},
     sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr},
@@ -44,8 +35,6 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_func_call_expr_analyze_scalar_expr {
-    use crate::test_helpers::function_syntax::func_name_tokens;
-
     use crate::{
         names::SchemaName,
         sem::{
@@ -53,7 +42,9 @@ mod test_func_call_expr_analyze_scalar_expr {
             SemScalarExpr, WithClause,
         },
         syn::{Node, NodeInner, NodeList},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{
+            SynBuilder, TestParseContext, function_syntax::func_name_tokens, test_context,
+        },
     };
 
     use ::testresult::TestResult;
@@ -318,9 +309,8 @@ impl SemScalarExpr {
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_sqlite_scalar_expr {
-    use crate::ast::Dialect;
-
     use crate::{
+        ast::Dialect,
         sem::{
             ArithExpr, ScalarAnalysisContext,
             ScalarConstExpr::*,

@@ -1,19 +1,17 @@
-use crate::ast::{CreateRule, StatementKind, StatementNode};
-use crate::context::{BaseParseContext as _, MutSourcePathWithSpan};
-use crate::names::OperatorName;
-use crate::parse_statements;
-use crate::sem::SemAst;
-use crate::sem::{
-    BinaryOperatorDefinition, CastContext, CastDefinition, CreateView, OperatorDefinition, ViewLike,
+use crate::{
+    ast::{CreateRule, CreateTableMode, Dialect, StatementKind, StatementNode},
+    context::{BaseParseContext as _, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext},
+    names::{ColumnName, FullName, OperatorName, SchemaName, TableName},
+    parse_statements,
+    sem::{
+        AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition,
+        CreateTable, CreateView, OperatorDefinition, PgBuiltInType, SemAst, ViewLike,
+    },
+    test_helpers::{
+        TestParseContext, create_cache_context, source_span,
+        statements::resolve_postgres as resolve,
+    },
 };
-use crate::test_helpers::statements::resolve_postgres as resolve;
-use crate::test_helpers::{create_cache_context, source_span};
-
-use crate::ast::Dialect;
-use crate::context::{FrozenBaseContext, SchemaFileContext};
-use crate::names::{ColumnName, FullName, SchemaName, TableName};
-use crate::sem::{AnalysisError, ColumnDefinition, CreateTable, CreateTableMode, PgBuiltInType};
-use crate::test_helpers::TestParseContext;
 
 pub(crate) fn catalog_version(version: &str) -> TestParseContext {
     let metadata = ::serde_json::from_value(::serde_json::json!({

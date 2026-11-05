@@ -1,9 +1,13 @@
 //! Common construction of explicit query projections and their source records.
 
-use crate::ast::{
-    Access, Alias, Call, CallKind, Cast, DerivedTable, Expr, FromItem, Indirection, Name, Query,
-    QueryBody, Select, Target, TypeName, With,
+use crate::{
+    ast::{
+        Access, Alias, Call, CallKind, Cast, DerivedTable, Expr, FromItem, Indirection, Name,
+        Query, QueryBody, Select, Target, TypeName, With,
+    },
+    names::FullName,
 };
+
 impl Select {
     pub(crate) fn projection(targets: &[Target], from: &[FromItem]) -> Self {
         Self {
@@ -165,5 +169,19 @@ impl Expr {
             Self::Star(name) => Some(name),
             _ => None,
         }
+    }
+}
+
+impl Name {
+    pub(crate) fn from_full_name(name: &FullName) -> Self {
+        let mut parts = Vec::new();
+        if let Some(catalog) = name.catalog() {
+            parts.push(catalog.to_string());
+        }
+        if let Some(schema) = name.schema() {
+            parts.push(schema.to_string());
+        }
+        parts.push(name.local_name());
+        Self::from_parts(&parts)
     }
 }

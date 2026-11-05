@@ -1,15 +1,12 @@
 //! CASE contracts at the public analysis boundary with a small explicit catalog.
 
-use crate::sem::SemAst;
-use crate::test_helpers::case_parameters as test_helpers;
-
-use crate::{sem::TypeReference, test_helpers::create_cache_context};
-
 use crate::{
     ast::Dialect,
     parse_statements,
-    sem::{ParseContext, PgBuiltInType},
+    sem::{ParseContext, PgBuiltInType, SemAst, TypeReference},
+    test_helpers::{case_parameters as test_helpers, create_cache_context},
 };
+
 use std::collections::BTreeMap;
 
 #[rstest::rstest]

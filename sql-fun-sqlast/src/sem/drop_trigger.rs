@@ -1,3 +1,5 @@
+mod ast;
+
 use crate::{
     names::FullName,
     sem::{AnalysisError, DropDependencyBehavior, ParseContext, SemAst, TriggerIdentity},

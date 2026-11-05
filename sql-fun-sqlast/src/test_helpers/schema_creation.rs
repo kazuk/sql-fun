@@ -1,23 +1,18 @@
 #[cfg(feature = "sqlite")]
-use crate::ast::Dialect;
-use crate::ast::StatementNode;
-use crate::context::MutSourcePathWithSpan as _;
-#[cfg(feature = "sqlite")]
-use crate::context::ParseContext as _;
-#[cfg(feature = "sqlite")]
-use crate::names::SchemaName;
-use crate::sem::SemAst;
-use crate::syn::Node;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::SqliteSynBuilder;
-#[cfg(feature = "sqlite")]
-use crate::test_helpers::TestParseContext;
-use crate::test_helpers::create_cache_context;
-use crate::test_helpers::ownership::ownership_context;
-use crate::test_helpers::source_span;
+use crate::{
+    ast::Dialect,
+    context::ParseContext as _,
+    names::SchemaName,
+    test_helpers::{SqliteSynBuilder, TestParseContext},
+};
+use crate::{
+    ast::StatementNode,
+    context::{FrozenBaseContext, MutSourcePathWithSpan as _, SchemaFileContext},
+    sem::{AnalysisError, SemAst},
+    syn::Node,
+    test_helpers::{create_cache_context, ownership::ownership_context, source_span},
+};
 
-use crate::context::{FrozenBaseContext, SchemaFileContext};
-use crate::sem::AnalysisError;
 pub(crate) fn child(parent: FrozenBaseContext) -> SchemaFileContext {
     use crate::context::BaseParseContext;
     let mut context = SchemaFileContext::new(

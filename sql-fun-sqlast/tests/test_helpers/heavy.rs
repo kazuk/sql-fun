@@ -1,4 +1,10 @@
-use ::sql_fun_sqlast::sem::SemAst;
+use ::sql_fun_sqlast::{
+    AstAndContextPair, PostgresDialect, SqlFunArgs,
+    ast::Dialect,
+    context::{BaseContext, FrozenBaseContext, SchemaFileContext},
+    parse_statements,
+    sem::SemAst,
+};
 pub(crate) mod domain_casts;
 pub(crate) mod extracted_artifacts;
 pub(crate) mod parameter_resolution;
@@ -11,12 +17,6 @@ pub(crate) mod writable_views;
 
 use crate::test_helpers::create_cache_context;
 
-use ::sql_fun_sqlast::{
-    AstAndContextPair, PostgresDialect, SqlFunArgs,
-    ast::Dialect,
-    context::{BaseContext, FrozenBaseContext, SchemaFileContext},
-    parse_statements,
-};
 use std::path::{Path, PathBuf};
 
 /// Loads shipped builtin JSON metadata and optional SQL definitions per call.

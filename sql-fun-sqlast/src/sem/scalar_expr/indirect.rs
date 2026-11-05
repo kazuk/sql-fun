@@ -1,3 +1,5 @@
+mod ast;
+
 mod array_index;
 mod array_slice;
 mod array_subscripts;
@@ -5,19 +7,18 @@ mod member_ref;
 
 pub use self::array_subscripts::{ArraySubscript, ArraySubscripts};
 
-use crate::sem::{
-    ColumnDefinition, ColumnRename, ParseContext as SemParseContext,
-    parameter_resolution::ParameterResolution,
-    scalar_expr::RowExpr,
-    traversal::{SemanticVisitor, SemanticVisitorMut},
+use crate::{
+    context::ParseContext,
+    sem::{
+        AnalysisError, ColumnDefinition, ColumnRename, ParseContext as SemParseContext,
+        SemScalarExpr, TypeReference,
+        parameter_resolution::ParameterResolution,
+        scalar_expr::{RowExpr, SemScalarExprNode},
+        traversal::{SemanticVisitor, SemanticVisitorMut},
+    },
 };
 
 use self::{array_index::ArrayIndex, array_slice::ArraySlice, member_ref::MemberRef};
-
-use crate::{
-    context::ParseContext,
-    sem::{AnalysisError, SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode},
-};
 
 /// Indirect expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

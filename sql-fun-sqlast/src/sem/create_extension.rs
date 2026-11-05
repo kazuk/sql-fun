@@ -1,6 +1,8 @@
-use crate::{sem::AstAndContextPair, syn::CreateExtensionStmt};
-
-use crate::sem::{AnalysisError, ParseContext, SemAst};
+mod ddl;
+use crate::{
+    sem::{AnalysisError, AstAndContextPair, ParseContext, SemAst},
+    syn::CreateExtensionStmt,
+};
 
 /// analyzed [`crate::syn::CreateExtensionStmt`]
 #[derive(Debug, Clone)]

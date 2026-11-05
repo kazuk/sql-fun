@@ -1,6 +1,5 @@
-mod ast;
-
 use crate::{
+    ast::JoinKind as AstJoinKind,
     sem::{AnalysisError, Nullable},
     syn::{JoinType, JoinTypeOpt, Opt},
 };
@@ -109,5 +108,16 @@ impl JoinKind {
 impl JoinKind {
     pub(super) const fn is_full(&self) -> bool {
         matches!(self, Self::Full)
+    }
+}
+
+impl JoinKind {
+    pub(crate) const fn from_ast(ast: &AstJoinKind) -> Self {
+        match ast {
+            AstJoinKind::Inner | AstJoinKind::Cross => Self::inner(),
+            AstJoinKind::Left => Self::left(),
+            AstJoinKind::Right => Self::right(),
+            AstJoinKind::Full => Self::full(),
+        }
     }
 }

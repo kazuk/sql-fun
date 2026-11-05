@@ -1,4 +1,3 @@
-mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::PrimaryKeyColumnConstraint as SqlitePrimaryKeyColumnConstraint;
 use crate::{
@@ -128,5 +127,19 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl PrimaryKeyColumnConstraint {
+    pub(in crate::sem::column_constraints) fn from_ast_parts(
+        _context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+        conflict: &Option<ConflictClause>,
+        deferrable: &Option<Deferrable>,
+    ) -> Self {
+        Self::new(table, column, conflict.clone(), deferrable.clone())
     }
 }

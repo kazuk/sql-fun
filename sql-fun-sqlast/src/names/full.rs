@@ -1,12 +1,10 @@
-mod ast;
-
 mod parse;
 
 use crate::{
-    ast::{DeparseError, Dialect as AstDialect, render_full_name},
+    ast::{DeparseError, Dialect as AstDialect, Name, render_full_name},
     names::{CatalogName, LocalName, SchemaName},
+    sem::AnalysisError,
 };
-
 use std::fmt::Display;
 
 /// A logical SQL name with one, two, or three components.
@@ -87,6 +85,7 @@ impl FullName {
 #[cfg(test)]
 mod construction_tests {
     use crate::names::{CatalogName, FullName, LocalName};
+
     #[test]
     #[should_panic(expected = "a catalog requires a schema")]
     fn constructor_prevents_catalog_only_names() {
@@ -149,6 +148,7 @@ impl FullName {
 #[cfg(test)]
 mod render_tests {
     use crate::{ast::Dialect, names::FullName};
+
     #[rstest::rstest]
     #[case::empty(FullName::from_local_name(""))]
     #[case::empty_schema(FullName::with_schema("", "x"))]
@@ -238,6 +238,7 @@ impl Display for FullName {
 #[cfg(test)]
 mod display_tests {
     use crate::names::FullName;
+
     #[rstest::rstest]
     #[case::plain("simple_name", "simple_name")]
     #[case::dot("a.b", r#""a.b""#)]
@@ -303,5 +304,36 @@ mod deserialize_tests {
         assert_eq!(encoded["name"], name.name().as_str());
         assert_eq!(serde_json::from_value::<FullName>(encoded)?, name);
         Ok(())
+    }
+}
+
+impl FullName {
+    pub(crate) fn from_optional_ast_name(ast: &Name) -> Result<Option<Self>, AnalysisError> {
+        if ast.0.is_empty() {
+            Ok(None)
+        } else {
+            Self::from_ast_name(ast).map(Some)
+        }
+    }
+}
+
+impl FullName {
+    pub(crate) fn from_ast_star_relation(ast: &Name) -> Result<Option<Self>, AnalysisError> {
+        if ast.0.len() < 2 {
+            Ok(None)
+        } else {
+            Self::from_ast_name(ast).map(Some)
+        }
+    }
+}
+
+impl FullName {
+    pub(crate) fn from_ast_name(ast: &Name) -> Result<Self, AnalysisError> {
+        match ast.0.as_slice() {
+            [local] => Ok(Self::from_local_name(local)),
+            [schema, local] => Ok(Self::with_schema(schema, local)),
+            [catalog, schema, local] => Ok(Self::with_catalog(catalog, schema, local)),
+            _ => AnalysisError::raise_unexpected_input("qualified name component count"),
+        }
     }
 }

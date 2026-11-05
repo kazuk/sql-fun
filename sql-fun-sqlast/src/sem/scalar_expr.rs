@@ -12,7 +12,6 @@ mod column_ref;
 mod const_expr;
 mod constrained;
 mod context;
-mod ddl;
 mod distinct;
 mod exists;
 mod func_call;
@@ -28,7 +27,6 @@ mod sql_value;
 mod sub_link;
 mod truth_test;
 mod whole_row;
-mod wildcard_projection;
 
 pub use self::{
     arith_expr::{ArithExpr, SqliteLikeExpr},
@@ -62,10 +60,9 @@ pub use self::{
     whole_row::WholeRowExpr,
 };
 pub(crate) use self::{case_expr::SqliteCaseBuilder, whole_row::WholeRowFields};
-
 use crate::{
     StringSpan,
-    ast::Dialect,
+    ast::{Dialect, Expr as AstExpr, Name, TypeName, ddl::AlterDefinition as AstAlterDefinition},
     context::{BaseParseContext, ParseContext as ContextParseContext},
     names::{
         AliasName as NamesAliasName, ColumnName, FullName as NamesFullName,
@@ -74,9 +71,11 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition,
         ColumnCollection as SemColumnCollection, ColumnRename, DeleteRowColumn, DeleteRowVersion,
-        FunctionModifiers, InputTypeConstraint, MergeRecordRole, MinMaxExpr as SemMinMaxExpr,
-        OverloadVariant, ParameterConstraints, ParseContext, PgBuiltInType, QueryNameResolution,
-        QueryProblem, ResolvedOperator, TypeDefinition as SemTypeDefinition, TypeReference,
+        FromClause, FunctionModifiers, InputTypeConstraint, MergeRecordRole,
+        MinMaxExpr as SemMinMaxExpr, OverloadVariant, ParameterConstraints, ParseContext,
+        PgBuiltInType, QueryNameResolution, QueryProblem, ResolutionFailure, ResolvedOperator,
+        TypeDefinition as SemTypeDefinition, TypeReference, WildcardQualifiers,
+        WildcardRewriteError, WithClause,
         create_table::ColumnDefinition,
         parameter_resolution::ParameterResolution,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -1833,5 +1832,77 @@ impl SemScalarExpr {
         } else {
             self.as_function_call().cloned()
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl SemScalarExpr {
+    pub(crate) fn from_ast_view_default_definition(
+        ast: &AstAlterDefinition,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        match ast {
+            AstAlterDefinition::None => Ok(None),
+            AstAlterDefinition::Expression(value) => {
+                Self::from_ast_view_default_expression(value, context)
+            }
+            _ => {
+                AnalysisError::raise_unexpected_input("view default expression").map_err(Into::into)
+            }
+        }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn from_ast_view_default_expression(
+        ast: &AstExpr,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        Self::from_ast(
+            ast,
+            context,
+            &ScalarAnalysisContext::new(&WithClause::default(), &FromClause::default()),
+        )
+        .map(Some)
+        .map_err(Into::into)
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn projection_expression(
+        &self,
+        bindings: &WildcardQualifiers,
+    ) -> Result<AstExpr, WildcardRewriteError> {
+        with_stack(|| match self {
+            Self::ColumnRef(value) => value.projection_expression(bindings),
+            Self::Coalesce(value) => value.projection_expression(bindings),
+            Self::ImplicitCast(value) => value.projection_expression(bindings),
+            Self::TypeCast(value) => value.projection_expression(bindings),
+            _ => Err(WildcardRewriteError::invalid(
+                "resolved wildcard expression has no executable projection representation",
+            )),
+        })
+    }
+    pub(crate) fn projection_cast(
+        &self,
+        target: &TypeReference,
+        bindings: &WildcardQualifiers,
+    ) -> Result<AstExpr, WildcardRewriteError> {
+        if target.type_definition().is_some() {
+            return Err(WildcardRewriteError::invalid(
+                "wildcard cast target has no SQL type name",
+            ));
+        }
+        let expression = self.projection_expression(bindings)?;
+        let target = TypeName::projection(
+            &Name::from_full_name(
+                target
+                    .full_name()
+                    .expect("owned cast targets rejected above"),
+            ),
+            target.is_array() == Some(true),
+        );
+        Ok(AstExpr::projection_cast(&expression, &target))
     }
 }

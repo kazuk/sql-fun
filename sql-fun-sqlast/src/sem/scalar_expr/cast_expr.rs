@@ -1,20 +1,17 @@
-mod wildcard_projection;
 #[cfg(feature = "sqlite")]
-use crate::{SqliteToken, ast::Expr, sem::ScalarAnalysisContext, syn::sqlite::ExprCast};
-
+use crate::{SqliteToken, sem::ScalarAnalysisContext, syn::sqlite::ExprCast};
 use crate::{
-    ast::Dialect,
+    ast::{Dialect, Expr},
     context::BaseParseContext,
     names::TableName,
     sem::{
         AnalysisError, InputTypeConstraint, ParseContext, QueryNameResolution, SemScalarExpr,
-        TypeReference,
+        TypeReference, WildcardQualifiers, WildcardRewriteError,
         parameter_resolution::ParameterResolution,
         scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
 };
-
 #[cfg(feature = "sqlite")]
 use ::sql_fun_core::IVec;
 
@@ -211,5 +208,25 @@ impl TypeCastExpr {
             &InputTypeConstraint::exact(&target),
             None,
         )))
+    }
+}
+
+impl ImplicitCastExpr {
+    pub(crate) fn projection_expression(
+        &self,
+        bindings: &WildcardQualifiers,
+    ) -> Result<Expr, WildcardRewriteError> {
+        let (argument, target) = self.projection_operand();
+        argument.projection_cast(target, bindings)
+    }
+}
+
+impl TypeCastExpr {
+    pub(crate) fn projection_expression(
+        &self,
+        bindings: &WildcardQualifiers,
+    ) -> Result<Expr, WildcardRewriteError> {
+        let (argument, target) = self.projection_operand();
+        argument.projection_cast(target, bindings)
     }
 }

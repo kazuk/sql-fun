@@ -1,7 +1,7 @@
-mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::DefaultColumnConstraint as SqliteDefaultColumnConstraint};
 use crate::{
+    ast::Expr as AstExpr,
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
@@ -145,5 +145,22 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl DefaultColumnConstraint {
+    pub(in crate::sem::column_constraints) fn from_ast_expression(
+        context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+        expression: &AstExpr,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::new(
+            table,
+            column,
+            SemScalarExpr::from_ast_in(expression, context, &ScalarAnalysisContext::default())?,
+        ))
     }
 }

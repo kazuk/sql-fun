@@ -1,8 +1,9 @@
 mod implementation {
     mod analysis;
-    mod ast;
+
     use crate::{
         StringSpan,
+        ast::Call,
         context::BaseParseContext,
         names::{FullName, TableName},
         sem::{
@@ -13,7 +14,6 @@ mod implementation {
             type_system::ArgumentBindingCollection,
         },
     };
-
     use ::sql_fun_core::IVec;
 
     /// function call expression
@@ -433,6 +433,24 @@ mod implementation {
             }
             *not_null = self.invocation(arguments).is_not_null();
             Ok(())
+        }
+    }
+
+    impl FuncCallExpr {
+        pub(crate) fn from_ast_supplied_call(
+            ast: &Call,
+            context: &mut impl ParseContext,
+            arguments: &[SemScalarExpr],
+        ) -> Result<Self, AnalysisError> {
+            Self::resolve_supplied(
+                context,
+                &FullName::from_ast_name(&ast.name)?,
+                arguments,
+                &ast.argument_locations,
+                &ast.location,
+                ast.variadic,
+                ast.over.is_some(),
+            )
         }
     }
 }

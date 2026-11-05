@@ -13,11 +13,9 @@ mod default_privileges;
 pub(crate) mod deparse;
 pub(crate) mod document;
 mod drop_behavior;
-mod engine_features;
 mod foreign_table;
 mod mutation;
 mod options;
-mod ownership;
 pub(crate) mod postgres;
 pub(crate) mod projection;
 mod public;
@@ -31,21 +29,20 @@ mod traversal;
 mod trigger;
 mod utility;
 pub(crate) mod validation;
-mod wildcard;
 
-pub use self::options::{
-    ConflictClause, CreateTableMode, Deferrability, Deferrable, ForeignKeyAction,
-    ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, ObjectKind, Validity,
+pub(crate) use self::{
+    ddl::{CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs},
+    deparse::render_full_name,
+    document::{
+        CmdType, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
+        JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp, JsonFormat,
+        JsonFormatType, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate, JsonOutput,
+        JsonParse, JsonPath, JsonPredicate, JsonQuotes, JsonReturning, JsonScalar, JsonSerialize,
+        JsonTable, JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, Merge,
+        MergeMatchKind, MergeWhen, MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp,
+        XmlOptionType, XmlSerialize, XmlTable,
+    },
 };
-
-// Syntax retention intentionally precedes semantic support for some SQL clauses.
-// Construction tests cover these fields even when resolution does not consume them.
-
-pub(crate) use self::ddl::{
-    CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
-};
-pub(crate) use self::deparse::render_full_name;
-pub(crate) use self::document::{JsonTable, Merge, XmlTable};
 pub use self::{
     default_privileges::{
         DefaultPrivilegeOption, DefaultPrivileges, PrivilegeGrantee, PrivilegeObject,
@@ -56,22 +53,21 @@ pub use self::{
         FdwOption, ForeignTable, ForeignTableElement, ForeignTableElementKind, TableLike,
     },
     mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
+    options::{
+        ConflictClause, CreateTableMode, Deferrability, Deferrable, ForeignKeyAction,
+        ForeignKeyMatchType, GeneratedColumnMode, IdentityColumnMode, ObjectKind, Validity,
+    },
     public::{CommonTableExpression, Statement, StatementKind, WithClause},
-    wildcard::TargetLocationError,
 };
-
-use crate::{StringSpan, syn::ScanToken};
-
+use crate::{
+    StringSpan,
+    ast::projection::ProjectionError,
+    syn::{self, Opt, ScanToken},
+};
 use sql_fun_core::IVec;
 
-pub(crate) use self::document::{
-    CmdType, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
-    JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp, JsonFormat,
-    JsonFormatType, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate, JsonOutput,
-    JsonParse, JsonPath, JsonPredicate, JsonQuotes, JsonReturning, JsonScalar, JsonSerialize,
-    JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, MergeMatchKind, MergeWhen,
-    MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize,
-};
+// Syntax retention intentionally precedes semantic support for some SQL clauses.
+// Construction tests cover these fields even when resolution does not consume them.
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct TableExtras {
@@ -1790,5 +1786,129 @@ impl TableConstraint {
             order: Vec::new(),
             auto_increment: false,
         }
+    }
+}
+
+impl ConstraintExtras {
+    pub(crate) fn explicit_enforcement(
+        value: &syn::Constraint,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Option<bool> {
+        if !matches!(
+            value.get_contype().as_inner(),
+            Some(syn::ConstrType::ConstrCheck | syn::ConstrType::ConstrForeign)
+        ) {
+            return None;
+        }
+        let mut depth = 0;
+        for token in tokens
+            .iter()
+            .filter(|token| token.get_start() >= value.get_location())
+        {
+            match token.get_token().as_inner() {
+                Some(syn::Token::Ascii40) => depth += 1,
+                Some(syn::Token::Ascii41) if depth == 0 => break,
+                Some(syn::Token::Ascii41) => depth -= 1,
+                Some(syn::Token::Ascii44) if depth == 0 => break,
+                Some(syn::Token::Enforced) if depth == 0 => return Some(value.get_is_enforced()),
+                _ => {}
+            }
+        }
+        None
+    }
+}
+
+impl ObjectArgument {
+    pub(crate) fn is_output_only(&self) -> bool {
+        self.mode.as_deref() == Some("OUT") || self.mode.as_deref() == Some("TABLE")
+    }
+}
+
+// Location synchronization for syntax-only projection edits.
+
+/// A rejected synchronization of syntax projection locations.
+/// The destination statement remains unchanged on failure.
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub struct TargetLocationError(TargetLocationProblem);
+
+#[derive(Debug, thiserror::Error)]
+enum TargetLocationProblem {
+    #[error("wildcard location was not found")]
+    NotFound,
+    #[error("wildcard location is ambiguous")]
+    Ambiguous,
+    #[error("{0}")]
+    InvalidExpression(String),
+}
+
+impl TargetLocationError {
+    pub(crate) fn invalid(message: &str) -> Self {
+        Self(TargetLocationProblem::invalid(message))
+    }
+    /// Whether the parser output has a target without a lexical location.
+    pub const fn is_not_found(&self) -> bool {
+        self.0.is_not_found()
+    }
+    /// Whether multiple parser targets share a lexical location.
+    pub const fn is_ambiguous(&self) -> bool {
+        self.0.is_ambiguous()
+    }
+    /// Whether the statements cannot be rendered or matched for synchronization.
+    pub const fn is_invalid_expression(&self) -> bool {
+        self.0.is_invalid_expression()
+    }
+}
+
+impl TargetLocationProblem {
+    const fn not_found() -> Self {
+        Self::NotFound
+    }
+    const fn ambiguous() -> Self {
+        Self::Ambiguous
+    }
+    fn invalid(message: &str) -> Self {
+        Self::InvalidExpression(message.to_owned())
+    }
+    const fn is_not_found(&self) -> bool {
+        matches!(self, Self::NotFound)
+    }
+    const fn is_ambiguous(&self) -> bool {
+        matches!(self, Self::Ambiguous)
+    }
+    const fn is_invalid_expression(&self) -> bool {
+        matches!(self, Self::InvalidExpression(_))
+    }
+}
+
+impl From<ProjectionError> for TargetLocationError {
+    fn from(error: ProjectionError) -> Self {
+        if error.is_missing() {
+            Self(TargetLocationProblem::not_found())
+        } else if error.is_ambiguous() {
+            Self(TargetLocationProblem::ambiguous())
+        } else {
+            Self::invalid("target collections differ after the parser round trip")
+        }
+    }
+}
+
+impl FromItem {
+    pub(crate) fn clear_projection_alias(&mut self) {
+        match self {
+            Self::Join(node) => node.clear_projection_alias(),
+            Self::Group(node) => node.clear_projection_alias(),
+            _ => {}
+        }
+    }
+}
+impl Join {
+    fn clear_projection_alias(&mut self) {
+        self.alias = None;
+    }
+}
+impl FromGroup {
+    fn clear_projection_alias(&mut self) {
+        self.alias = None;
     }
 }

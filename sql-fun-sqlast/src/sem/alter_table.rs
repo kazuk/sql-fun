@@ -1,5 +1,5 @@
 mod ddl;
-mod view;
+
 #[cfg(feature = "sqlite")]
 use crate::{
     SqliteToken,
@@ -10,13 +10,12 @@ use crate::{
     context::GetSourcePathWithSpan,
     names::{ColumnName, TableName, ViewName},
     sem::{
-        AlterColumnAttributes, AnalysisError, AstAndContextPair, ColumnDefinition, ColumnRename,
-        Constraint, ConstraintNames, CreateTable, OwnerSpecification, ParseContext,
-        RelationAlteration, SemScalarExpr, SourcePathWithSpan,
+        AlterColumnAttributes, AnalysisError, AnalysisProblem, AstAndContextPair, ColumnDefinition,
+        ColumnRename, Constraint, ConstraintNames, CreateTable, CreateView, OwnerSpecification,
+        ParseContext, RelationAlteration, SemScalarExpr, SourcePathWithSpan, problem::ViewProblem,
     },
     syn::{AlterTableCmd, AlterTableStmt, AlterTableType, ScanToken},
 };
-
 use sql_fun_core::IVec;
 
 /// analyzed alter table statement
@@ -222,12 +221,6 @@ impl AlterTable {
 
 #[cfg(test)]
 mod test_analyze_alter_table_statement {
-    #[cfg(feature = "sqlite")]
-    use crate::{
-        ast::Dialect,
-        test_helpers::alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
-    };
-
     use crate::{
         AstAndContextPair,
         names::FullName,
@@ -235,7 +228,11 @@ mod test_analyze_alter_table_statement {
         syn::{AliasOpt, NodeInner, ObjectType},
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
-
+    #[cfg(feature = "sqlite")]
+    use crate::{
+        ast::Dialect,
+        test_helpers::alter_table::{make_column, parse_sqlite_alter_table, sqlite_context},
+    };
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -580,7 +577,6 @@ mod test_analyze_alter_obj_column_default {
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
-
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -702,5 +698,41 @@ mod test_column_attribute_command {
             None
         );
         Ok(())
+    }
+}
+
+impl AlterObjSubCommand {
+    pub(crate) fn validate_for_view(
+        &self,
+        context: &mut impl ParseContext,
+        view: &CreateView,
+    ) -> Result<bool, AnalysisError> {
+        let name = match self {
+            Self::SetColumnDefault(name, _) | Self::DropColumnDefault(name) => name,
+            _ => return Ok(true),
+        };
+        if view.has_column(name) {
+            return Ok(true);
+        }
+        context.report_analysis_problem(AnalysisProblem::view(
+            &ViewProblem::unknown_default_column(view.name(), name.as_str()),
+        ))?;
+        Ok(false)
+    }
+    pub(crate) fn apply_to_view(&self, view: &mut CreateView) {
+        match self {
+            Self::ChangeOwner(owner) => {
+                if owner.can_apply() {
+                    view.change_owner(owner);
+                }
+            }
+            Self::SetColumnDefault(name, value) => view
+                .change_column_default(name, Some(value))
+                .expect("validated default column"),
+            Self::DropColumnDefault(name) => view
+                .change_column_default(name, None)
+                .expect("validated default column"),
+            _ => todo!(),
+        }
     }
 }

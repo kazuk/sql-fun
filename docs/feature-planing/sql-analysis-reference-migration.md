@@ -147,7 +147,7 @@ All destination paths below are relative to `book/sql-analysis/`.
   `tests/sqlast-regressions/schema-views-automatic.json`,
   `tests/sqlast-regressions/schema-views-mechanisms.json`.
 - **S373**, source L373–L420: implementation `sem/create_rule/ast.rs`,
-  `sem/drop_rule/ast.rs`, `context/rule_info.rs`; maintained tests
+  `sem/drop_rule_ast.rs`, `context/rule_info.rs`; maintained tests
   `sem/create_rule/ast.rs::test_from_ast`, `tests/create_rule_ast.rs`,
   `tests/drop_rule_ast.rs`.
 - **S421**, source L421–L470: implementation `sem/create_trigger/ast.rs`,
@@ -170,7 +170,7 @@ All destination paths below are relative to `book/sql-analysis/`.
 - **S890**, source L890–L908: implementation `sem/alter_table/ddl.rs`,
   `context/schema_file_context/table_rename.rs`; maintained tests
   `context/schema_file_context/table_rename_tests.rs`.
-- **S909**, source L909–L939: implementation `sem/column_rename/ddl.rs`,
+- **S909**, source L909–L939: implementation `sem/column_rename.rs`,
   `context/schema_file_context/column_rename.rs`,
   `sem/create_table/ddl.rs::CreateTable::resolve_ast_foreign_keys`; maintained tests
   `context/schema_file_context/column_rename_tests.rs`,
@@ -215,15 +215,15 @@ complete syntax support. Statement dispatch alone was not used as proof.
 | --- | --- | --- |
 | `statements/select.md` | `sem/select_statement/ast.rs`, `sem/select_statement/set_operation.rs` and adjacent set-operation tests; query clause/source tests | Ordered outputs, projections and set widths/common types; SQLite does not gain PostgreSQL coercions or full aggregate/window legality. |
 | `statements/update.md` | `sem/update_statement/ast.rs` and tests; `tests/sqlast-regressions/schema-update.json` | Assignments, destinations, FROM/predicate/RETURNING, defaults/generated/identity, tuple sources and cursor facts; no runtime updates. |
-| `statements/create-table.md` | `sem/create_table/ddl.rs` and `sem/create_table_as/ddl.rs`, `context/schema_file_context/table_info.rs`, inline FK tests; schema loading tests | Columns/constraints/FK bindings and PostgreSQL table-as metadata; SQLite query-backed table path and inheritance remain incomplete. |
+| `statements/create-table.md` | `sem/create_table/ddl.rs` and `sem/create_table_as.rs`, `context/schema_file_context/table_info.rs`, inline FK tests; schema loading tests | Columns/constraints/FK bindings and PostgreSQL table-as metadata; SQLite query-backed table path and inheritance remain incomplete. |
 | `statements/create-view.md` | `sem/create_view/ddl.rs`, `context/schema_file_context/view_info.rs`, `sem/view_write.rs`; `tests/writable_views.rs`, schema-views fixtures | SELECT lineage/replacement/catalog and independently evaluated INSERT/UPDATE capabilities, not runtime CHECK OPTION or execution. |
 | `statements/alter-view.md` | `sem/alter_table/ddl.rs::AlterView::from_ast_defaults`, `sem/create_view.rs::apply_alter`, view defaults and writable-view tests | Set/drop existing-column defaults; unsupported ALTER forms are not inferred. |
 | `statements/create-index.md` | `sem/create_index/ddl.rs::CreateIndex::{from_ast,retain_ast_storage}`, schema conflict/index tests | Table-scoped keys/predicate and B-tree options; SQLite and runtime access-method validation are not established. |
-| `statements/create-type.md` | `sem/create_enum_type/ddl.rs` and `sem/create_comp_type/ddl.rs`, adjacent array field tests; schema type/collation tests | Enum labels and composite declarations; not base/range-type grammar completeness. |
+| `statements/create-type.md` | `sem/create_enum_type.rs` and `sem/create_comp_type/ddl.rs`, adjacent array field tests; schema type/collation tests | Enum labels and composite declarations; not base/range-type grammar completeness. |
 | `statements/create-domain.md` | `sem/create_domain/ddl.rs` and its inline `domain_tests`, declaration-collation tests | Base identity/category/declaration collation, not complete domain constraints. |
-| `statements/create-function.md` | `sem/create_function/ddl.rs` and `sem/type_system/func_params/ddl.rs`, strictness tests, schema routine creation tests | Signature/result/strictness metadata, not body validation; missing set-result reporter is todo!, not an emitted diagnostic. |
-| `statements/sequences.md` | `sem/create_seq/ddl.rs` and `sem/alter_seq/ddl.rs`, `context/schema_file_context/sequence_info.rs`, sequence ownership/rename tests | Identity and OWNED BY metadata; numeric options/runtime allocation are not implemented effects. |
-| `statements/create-schema.md` | `sem/create_schema/ddl.rs`, `context/schema_file_context.rs::apply_creation_group/apply_create_schema`, creation-conflict tests | Staged nested declaration group and explicit authorization, not arbitrary nested utility support. |
+| `statements/create-function.md` | `sem/create_function/ddl.rs` and `sem/type_system/func_params.rs`, strictness tests, schema routine creation tests | Signature/result/strictness metadata, not body validation; missing set-result reporter is todo!, not an emitted diagnostic. |
+| `statements/sequences.md` | `sem/create_seq/ddl.rs` and `sem/alter_seq.rs`, `context/schema_file_context/sequence_info.rs`, sequence ownership/rename tests | Identity and OWNED BY metadata; numeric options/runtime allocation are not implemented effects. |
+| `statements/create-schema.md` | `sem/create_schema.rs`, `context/schema_file_context.rs::apply_creation_group/apply_create_schema`, creation-conflict tests | Staged nested declaration group and explicit authorization, not arbitrary nested utility support. |
 | `statements/drop-table.md` | `ast.rs::DropTable`, `context/schema_file_context/table_info.rs::apply_drop_table` and adjacent tests; schema-context chain drop test | Drop metadata does not remove/free table names; IF EXISTS does not currently suppress missing-table findings. |
 | `statements/create-extension.md` | `ast.rs::Extension`, `context/schema_file_context.rs::apply_create_extension`, adjacent extension-record test | Records name without loading files/installing extension or applying all syntax options. |
 | `statements/set.md` | `ast.rs::VariableSet`, `context/schema_file_context.rs::apply_variable_set`; schema loading/context tests | Single expression recorded; broad RESET/default/session semantics not established. |

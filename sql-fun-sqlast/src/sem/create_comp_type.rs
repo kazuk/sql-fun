@@ -1,5 +1,5 @@
 mod ddl;
-mod registration_error;
+
 use crate::{
     ast::{CompositeType, postgres::required},
     context::ParseContext,
@@ -10,6 +10,7 @@ use crate::{
     },
     syn::{ColumnDef, CompositeTypeStmt, ListOpt, Opt},
 };
+use std::convert::Infallible;
 
 /// collection for composite type field
 #[derive(Debug, Default, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -269,5 +270,14 @@ impl TryFrom<&CompositeTypeStmt> for CreateCompositeType {
             composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
         }
         Ok(Self::new(&FullName::try_from(typevar)?, &composite_fields))
+    }
+}
+
+impl CreateCompositeType {
+    /// Reject registration of an anonymous composite in the catalog.
+    pub fn raise_registration_error(&self) -> Result<Infallible, AnalysisError> {
+        AnalysisError::raise_unexpected_input(
+            "anonymous composite cannot be registered in the catalog",
+        )
     }
 }

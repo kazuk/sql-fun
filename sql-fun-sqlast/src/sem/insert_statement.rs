@@ -1,5 +1,4 @@
 mod ast;
-mod cte;
 
 pub use self::{
     arbiter::{
@@ -12,7 +11,7 @@ pub(crate) use self::{ast::InsertTargetBinding, destination::InsertDestination};
 use crate::{
     CacheContext,
     ast::{ConflictClause, Dialect, Insert, StatementNode, TryFromWithTokens},
-    names::TableName,
+    names::{ColumnName, TableName},
     sem::{
         AccessKind, AnalysisError, AnalysisProblem, CatalogNameLookup, ColumnDefinition,
         ParseContext, QueryCte, ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr,
@@ -728,4 +727,21 @@ where
         &mut CacheContext::new(),
     )?;
     Ok((statement, context))
+}
+
+impl InsertStatement {
+    pub(crate) fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        insert: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = insert.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
 }

@@ -1,11 +1,9 @@
-mod ast;
-
 use crate::{
+    ast::Alias as AstAlias,
     names::{AliasName, ColumnName, FullName},
     sem::{AnalysisError, ParseContext},
     syn::{Alias, ListOpt},
 };
-
 use ::itertools::Itertools;
 
 /// alias name in from clause
@@ -181,5 +179,11 @@ impl AliasSpec {
             .iter()
             .map(|name| name.as_str().to_owned())
             .collect()
+    }
+}
+
+impl AliasSpec {
+    pub(crate) fn from_ast(ast: &AstAlias) -> Self {
+        Self::from_names(&ast.name, &ast.columns)
     }
 }

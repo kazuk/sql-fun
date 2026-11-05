@@ -1,6 +1,4 @@
 mod ast;
-mod cte;
-
 mod cursor;
 mod destination;
 mod view_support;
@@ -10,7 +8,7 @@ pub(crate) use self::{cursor::UpdatePredicate, destination::UpdateDestination};
 use crate::{
     CacheContext,
     ast::{ConflictClause, Dialect, StatementNode, TryFromWithTokens, Update},
-    names::TableName,
+    names::{ColumnName, TableName},
     sem::{
         AccessKind, AnalysisError, AnalysisProblem, ColumnDefinition, FromClause, ParseContext,
         QueryCte, ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TypeReference,
@@ -426,4 +424,21 @@ pub fn analyze_update_statement<T: ParseContext>(
         &mut CacheContext::new(),
     )?;
     Ok((statement, context))
+}
+
+impl UpdateStatement {
+    pub(crate) fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        update: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = update.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
 }

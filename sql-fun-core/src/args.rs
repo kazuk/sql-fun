@@ -526,23 +526,25 @@ impl SqlFunArgs {
         self.datasource.as_ref().map(std::convert::AsRef::as_ref)
     }
 
-    /// Get child-process configuration, preserving common overrides even when no
-    /// datasource is selected. Datasource-derived values are resolved only for an
-    /// explicit selection.
+    /// Get child-process configuration, preserving common and explicit settings.
+    /// A selected datasource name is transferred even if its metadata is absent;
+    /// datasource-derived values are included only when its metadata exists.
     ///
     /// # Errors
     ///
-    /// Returns [`SqlFunArgsError`] if metadata fails to load or env generation
-    /// encounters an error.
+    /// Returns [`SqlFunArgsError`] if metadata fails to load or configured values
+    /// cannot be resolved.
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
         if let Some(datasource) = &self.datasource {
             let metadatas = SqlFunMetadataCollection::load_from(&self.metadata_file()?)?;
-            let Some(metadata) = metadatas.get(datasource) else {
-                return SqlFunArgsError::datasource_not_found(datasource);
-            };
-            self.metadata_args.get_envs(&mut result, metadata)?;
-            self.postgres_args.get_envs(&mut result, self, metadata)?;
+            if let Some(metadata) = metadatas.get(datasource) {
+                self.metadata_args.get_envs(&mut result, metadata)?;
+                self.postgres_args.get_envs(&mut result, self, metadata)?;
+            } else {
+                self.metadata_args.get_common_envs(&mut result)?;
+                self.postgres_args.get_explicit_envs(&mut result);
+            }
 
             result.insert(Self::SQL_FUN_DATASOURCE.to_string(), datasource.clone());
         } else {
@@ -558,7 +560,168 @@ impl SqlFunArgs {
 
         Ok(result)
     }
+}
 
+#[cfg(test)]
+mod test_environments {
+    use crate::{
+        PostgresEngineVersion, SchemaLevel, SqlFunArgs,
+        test_helpers::{TestMetadataEnvs, TestProjectDir, write_named_postgres_metadata_project},
+    };
+
+    #[rstest::rstest]
+    #[case::default("default")]
+    #[case::explicit("missing")]
+    fn absent_datasource_preserves_its_name_without_derived_values(#[case] datasource: &str) {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_named_postgres_metadata_project(&project, "configured");
+        let args = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_file(&fixture.metadata_file)
+                .into_map(),
+        )
+        .unwrap()
+        .datasource(Some(datasource.to_owned()))
+        .build()
+        .unwrap();
+
+        let environments = args.environments().unwrap();
+        assert_eq!(environments["SQL_FUN_DATASOURCE"], datasource);
+        for name in [
+            "SQL_FUN_DIALECT",
+            "SQL_FUN_CTE_CATALOG_DIR",
+            "SQL_FUN_SCHEMA_FILE",
+            "SQL_FUN_POSTGRES_VERSION",
+            "SQL_FUN_PG_SEARCH_PATH",
+            "SQL_FUN_EXTENSIONS",
+            "SQL_FUN_BUILTIN_SCHEMA",
+            "SQL_FUN_EXTENSIONS_DIR",
+        ] {
+            assert!(!environments.contains_key(name), "unexpected {name}");
+        }
+        let restored = SqlFunArgs::from_environments(&environments).unwrap();
+        assert_eq!(restored.datasource(), Some(datasource));
+        let error = restored
+            .analysis_environments(SchemaLevel::project())
+            .unwrap_err();
+        assert!(error.to_string().contains("selected datasource not found"));
+    }
+
+    #[test]
+    fn absent_datasource_still_transfers_explicit_overrides() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_named_postgres_metadata_project(&project, "configured");
+        let catalog = project.path().join("chosen-catalog");
+        let args = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_project(&fixture, "qa")
+                .with_cte_catalog_dir(&catalog)
+                .with_sql_dialect("postgresql")
+                .into_map(),
+        )
+        .unwrap()
+        .datasource(Some("default".to_owned()))
+        .postgres_version("17".parse::<PostgresEngineVersion>().unwrap())
+        .postgres_search_path(vec!["chosen".to_owned()])
+        .builtin_schema_dir(project.path().join("selected-builtins"))
+        .postgres_extensions_dir(project.path().join("selected-extensions"))
+        .build()
+        .unwrap();
+
+        let environments = args.environments().unwrap();
+        let restored = SqlFunArgs::from_environments(&environments).unwrap();
+        let configured = restored.selected_metadata("configured").unwrap();
+        assert_eq!(restored.datasource(), Some("default"));
+        assert_eq!(restored.schema(), "qa");
+        assert_eq!(restored.metadata_file().unwrap(), fixture.metadata_file);
+        assert_eq!(
+            restored.schema_file(&fixture.metadata_file).unwrap(),
+            fixture.schema_file
+        );
+        assert_eq!(
+            restored.cte_catalog_dir(&configured).unwrap(),
+            Some(catalog)
+        );
+        assert_eq!(
+            restored.sql_dialect(&configured).unwrap().to_string(),
+            "postgresql"
+        );
+        assert_eq!(
+            restored.postgres_version(&configured).unwrap().to_string(),
+            "17"
+        );
+        assert_eq!(
+            restored.postgres_search_path(&configured).unwrap(),
+            ["chosen"]
+        );
+        assert_eq!(
+            restored.builtin_info_dir(&configured).unwrap(),
+            project.path().join("selected-builtins")
+        );
+        assert_eq!(
+            restored.postgres_extensions_dir(&configured).unwrap(),
+            project.path().join("selected-extensions")
+        );
+        assert!(!environments.contains_key("SQL_FUN_EXTENSIONS"));
+    }
+
+    #[test]
+    fn selected_datasource_still_supplies_derived_values() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_named_postgres_metadata_project(&project, "configured");
+        let args = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_file(&fixture.metadata_file)
+                .with_schema("qa")
+                .into_map(),
+        )
+        .unwrap()
+        .datasource(Some("configured".to_owned()))
+        .build()
+        .unwrap();
+
+        let environments = args.environments().unwrap();
+        assert_eq!(environments["SQL_FUN_DATASOURCE"], "configured");
+        assert_eq!(environments["SQL_FUN_DIALECT"], "postgresql");
+        assert_eq!(environments["SQL_FUN_POSTGRES_VERSION"], "16");
+        assert_eq!(environments["SQL_FUN_PG_SEARCH_PATH"], "public");
+        assert_eq!(
+            environments["SQL_FUN_SCHEMA_FILE"],
+            fixture.schema_file.to_string_lossy()
+        );
+    }
+
+    #[test]
+    fn malformed_metadata_is_not_treated_as_an_absent_datasource() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_named_postgres_metadata_project(&project, "default");
+        let args = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_file(&fixture.metadata_file)
+                .into_map(),
+        )
+        .unwrap()
+        .datasource(Some("default".to_owned()))
+        .build()
+        .unwrap();
+
+        std::fs::write(&fixture.metadata_file, "not valid = [").unwrap();
+        assert!(args.environments().is_err());
+        std::fs::write(
+            &fixture.metadata_file,
+            "[package.metadata.database.default]\nengine = 12\n",
+        )
+        .unwrap();
+        assert!(args.environments().is_err());
+        assert!(args.analysis_environments(SchemaLevel::project()).is_err());
+    }
+}
+
+impl SqlFunArgs {
     /// Transfer explicitly selected analysis settings without resolving excluded schema files.
     ///
     /// # Errors

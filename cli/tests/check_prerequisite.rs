@@ -42,9 +42,31 @@ fn help_does_not_require_expand() {
 
 #[cfg(unix)]
 mod unix {
-    use crate::test_helpers::cli_executable;
+    use crate::test_helpers::{check::expanded_named_query, cli_executable};
 
     use std::process::Command;
+
+    #[test]
+    fn missing_default_reaches_query_extraction_for_named_datasource() {
+        let project = expanded_named_query();
+        let output = Command::new(cli_executable())
+            .env_clear()
+            .env("PATH", project.path())
+            .env("SQL_FUN_HOME", project.path())
+            .env("SQL_FUN_METADATA_FILE", project.path().join("Cargo.toml"))
+            .current_dir(project.path())
+            .args(["check", "--package", "fixture"])
+            .output()
+            .unwrap();
+
+        assert!(!output.status.success());
+        let error = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            error.contains("cannot load lockfile for datasource configured"),
+            "{error}"
+        );
+        assert!(!error.contains("no SQL queries found"), "{error}");
+    }
 
     #[test]
     fn non_executable_expand_is_reported_as_missing() {

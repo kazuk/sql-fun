@@ -70,6 +70,11 @@ resolver family has 42 files and 15,511 lines.
   CacheContext)`. It analyzes an already edited common AST without reparsing and
   keeps caller-owned cache reuse. `SemAst::semantic_analysis` remains the
   parser-input entrypoint. The server now calls `SemAst::from_ast` directly.
+- `Statement`'s public rendering, utility inspection/editing, and WITH-clause
+  APIs are implemented in `ast/public.rs`. `Statement::deparse_sql` moved from
+  `ast/deparse.rs`; the `DeparseError`, SQL writer, and node emission machinery
+  remain in `ast/deparse.rs` and its child modules. The former
+  `ast/utility.rs` accessors and tests were folded into `ast/public.rs`.
 - Wildcard rewriting belongs to the semantic expansion result:
   `WildcardExpansion::rewrite(&[Self], &mut Statement)` coordinates the
   syntax-only edits and owns the staged rewrite plan under
@@ -324,6 +329,11 @@ module that owns the conversion; no separate catch-all test module remains.
 | `ast_conversion/trigger/tests.rs` | `sem/create_trigger/ast.rs` | `CreateTrigger::from_ast` |
 | `ast_conversion/update/tests.rs` | `sem/update_statement/ast.rs` | `UpdateStatement::from_ast` |
 
+The utility edit tests from the historical `ast/utility.rs` are now in
+`ast/public.rs::utility_edit_tests`. `Statement::deparse_sql` error tests that
+were in `ast/deparse.rs` are now in `ast/public.rs::test_deparse_errors`;
+lower-level emission tests remain with the `ast/deparse` implementation.
+
 Three common-AST syntax synchronization tests remain inline under
 `ast/public/wildcard.rs`. Semantic wildcard-projection implementations are in
 `sem/scalar_expr.rs`, `sem/scalar_expr/cast_expr.rs`,
@@ -347,7 +357,7 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast/ddl/serial.rs` | 5 / 24 / 20 | Historical source path; pure syntax helper now lives in `ast/ddl.rs`; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
 | `ast/ddl/table_rename.rs` | 1 / 0 / 5 | Semantic conversion/tests → `owner-specific semantic DDL module (physical map above)`; syntax decoding is in the PostgreSQL AST adapter. |
 | `ast/default_privileges.rs` | 2 / 13 / 12 | Default-privileges syntax remains; interpretation stays explicitly unimplemented in `sem/sem_ast_analysis.rs` (#955). |
-| `ast/deparse.rs` | 5 / 0 / 15 | SQL deparse and its syntax tests remain at the same AST path. |
+| `ast/deparse.rs` | 5 / 0 / 15 | Renderer errors, writer, and node emission remain; the `Statement::deparse_sql` wrapper and its error tests now live in `ast/public.rs`. |
 | `ast/deparse/constraints.rs` | 14 / 26 / 18 | SQL deparse and its syntax tests remain at the same AST path. |
 | `ast/deparse/ddl.rs` | 5 / 73 / 9 | SQL deparse and its syntax tests remain at the same AST path. |
 | `ast/deparse/dml.rs` | 1 / 6 / 0 | SQL deparse and its syntax tests remain at the same AST path. |
@@ -378,7 +388,7 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast/postgres/document.rs` | 0 / 0 / 0 | PostgreSQL-to-common-AST syntax conversion remains; semantic processing is owned by the corresponding `owner-specific semantic AST module (physical map above)` family. |
 | `ast/postgres/query.rs` | 0 / 0 / 0 | PostgreSQL-to-common-AST syntax conversion remains; semantic processing → `owner-specific semantic AST module (physical map above)`. |
 | `ast/projection.rs` | 0 / 0 / 0 | Syntax-only projection editing remains; semantic wildcard rewrite uses it. |
-| `ast/public.rs` | 18 / 30 / 52 | AST inspection API remains; `Statement::analyze` and its tests moved to `SemAst::from_ast` in `sem/sem_ast_analysis.rs`. |
+| `ast/public.rs` | 18 / 30 / 52 | Statement inspection, rendering, utility editing, and WITH editing APIs live here; `Statement::analyze` and its tests moved to `SemAst::from_ast` in `sem/sem_ast_analysis.rs`. |
 | `ast/query_construction.rs` | 0 / 0 / 0 | Common-AST query construction remains at the same path. |
 | `ast/resolve.rs` | 11 / 46 / 41 | Semantic implementation and tests → `owner-specific semantic AST module (physical map above)`. |
 | `ast/resolve/delete.rs` | 0 / 0 / 0 | Semantic implementation and tests → `owner-specific semantic AST module (physical map above)`. |
@@ -437,7 +447,7 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast/traversal.rs` | 1 / 0 / 2 | Syntax-tree traversal remains at the same path. |
 | `ast/trigger.rs` | 16 / 50 / 54 | Trigger syntax construction remains; semantic conversion → `owner-specific semantic AST module (physical map above)`. |
 | `ast/trigger/tests.rs` | 3 / 5 / 33 | Dialect-syntax conversion tests remain with their AST implementation. |
-| `ast/utility.rs` | 2 / 0 / 8 | Syntax-only AST utility operations remain at the same path. |
+| `ast/utility.rs` | 2 / 0 / 8 | Historical source path, now removed. Its Statement utility accessors and tests are in `ast/public.rs`; test identities and baseline counts refer to this old file. |
 | `ast/validation.rs` | 1 / 4 / 1 | Structural AST validation remains; stack handling calls the crate stack directly. |
 | `ast/view_definition.rs` | 0 / 0 / 0 | View lineage and semantic conversion → `semantic view-owner module (physical map above)`; source file removed. |
 | `ast/wildcard.rs` | 0 / 0 / 0 | Historical source path; AST wildcard helper merged into `ast.rs`; syntax synchronization tests remain in `ast/public/wildcard.rs` and semantic expansion is in `sem/wildcard_expansion/rewrite.rs`. |
@@ -874,3 +884,62 @@ unchanged.
 list directly; no borrowed `TypedColumns` adapter remains. The NULLIF
 output-name helper is a constant and accepts no AST node because its caller
 already selected that semantic operation.
+
+## Encapsulation review follow-up
+
+The review against `87500d3a` audited every Rust struct field changed by this
+PR, including moved definitions. All 600 widened fields occur in AST owners:
+394 in `ast.rs`, 67 in `ast/ddl.rs`, 133 in `ast/document.rs`, and six in
+`ast/public.rs`. Of these, 588 were originally private and 12 were originally
+`pub(super)`. All 600 are now private, including the 12 parent-visible fields
+as explicitly requested. No widened fields were found elsewhere in the
+workspace.
+
+Read access uses existing methods or selective `derive_getters::Getters`
+from the already resolved 0.5.0 dependency. Non-Copy values are borrowed;
+Copy values use copy getters. Of the 600 fields, 355 have consumed read
+accessors and 245 omit getters.
+`Name::parts` replaces direct access to its tuple storage. Public AST wrappers
+use restricted accessors for their internal representations.
+
+Operations needing private storage stay with the owning type. Statement
+rendering, utility inspection/editing, and WITH-clause editing now live in
+`ast/public.rs`, together with their focused tests. `ast/utility.rs` is removed.
+Raw WITH-node helpers and editor construction remain private; sibling modules
+request complete checked editor operations. CTE copying uses owner-local
+construction. Projection rewriting accepts `Statement` through the existing
+mutable AST visitor protocol and complete source-edit operation, rather than
+exposing mutable node references. The synthetic cursor test uses the existing
+owned test-node extraction and a test-only `Delete::set_current_of_parameter`
+operation. No new raw mutable getter or general setter is added.
+
+The final source audit confirms all 600 fields are private and all 988 model
+shapes and original derive/serde attributes are preserved. Getter-generation
+annotations are the only added model attributes. All 1,328 source tests are
+mapped: 1,294 bodies match exactly and 34 accessor/owned-operation adaptations
+were reviewed. Eight test functions changed namespace. Assertions, SQL and
+expected literals, cases, parameter attributes, and effective cfg gates are
+preserved. One setup panic moved from the cursor test into its owning fixture
+operation; its semantic assertions are unchanged. Import attributes, physical
+ownership, focused inline test placement, the AST-to-sem dependency boundary,
+and the small-module consolidation rule pass the independent audit.
+
+Both full standard flows passed. Default passed 4,381 SQLAST and 5,475
+workspace tests; all features passed 5,108 SQLAST and 6,254 workspace tests.
+Both retained 63 existing ignored workspace cases and passed all 3,064 SQL
+regression cases in 166 groups. Feature boundaries, Clippy, formatting, imports,
+Markdown, documentation, doctests, and all other standard steps passed. No
+SLOW warning or timeout occurred.
+
+Compiled-case reconciliation against `87500d3a` finds 4,373 unchanged and
+eight relocated default cases, and 5,100 unchanged and eight relocated
+all-feature cases. Both contain 28 suites, with no missing/extra cases,
+collisions, or metadata changes. Their normalized identity SHA-256 values are
+respectively
+`41e0aa28523a7699b4aa097afb99981ec3a6b67ef666aca3517579a030d199e0` and
+`34b0d935101c074620dd59db9957888f0d270ec0926ebf81768b17a7298f8808`.
+Packaging, SemVer, and installed-distribution checks are pending for the
+implementation commit.
+At planning, available capacity was 78 GiB against an estimated additional
+20 GiB, meeting the repository baseline. Contributor commands, maintained
+execution paths, package versions, and release intents remain unchanged.

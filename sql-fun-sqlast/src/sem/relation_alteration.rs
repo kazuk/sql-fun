@@ -70,22 +70,22 @@ impl RelationAlteration {
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
-        if ast.kind.supports_table_column_attributes() && Self::has_ast_column_rename(ast) {
+        if ast.kind().supports_table_column_attributes() && Self::has_ast_column_rename(ast) {
             return Self::from_ast_column_rename(ast, context, source);
         }
-        if ast.kind.supports_table_column_attributes() && Self::has_ast_table_rename(ast) {
+        if ast.kind().supports_table_column_attributes() && Self::has_ast_table_rename(ast) {
             return Self::from_ast_table_rename(ast, context, source);
         }
-        if ast.kind.supports_table_column_attributes() && Self::has_ast_column_attributes(ast) {
+        if ast.kind().supports_table_column_attributes() && Self::has_ast_column_attributes(ast) {
             return Self::from_ast_column_attributes(ast, context, source);
         }
         Self::from_ast_kind(
-            &ast.kind,
+            &ast.kind(),
             context,
-            &FullName::from_ast_name(&ast.name)?,
-            &ast.commands,
+            &FullName::from_ast_name(ast.name())?,
+            ast.commands(),
             source,
-            ast.if_exists,
+            ast.if_exists(),
         )
     }
 
@@ -194,7 +194,7 @@ impl RelationAlteration {
 
 impl RelationAlteration {
     pub(crate) fn has_ast_table_rename(ast: &AstAlterRelation) -> bool {
-        ast.commands.iter().any(AlterTable::is_ast_table_rename)
+        ast.commands().iter().any(AlterTable::is_ast_table_rename)
     }
 
     pub(crate) fn from_ast_table_rename(
@@ -205,10 +205,10 @@ impl RelationAlteration {
         let Some(source) = source else {
             return AnalysisError::raise_unexpected_none("table rename source");
         };
-        let [command] = ast.commands.as_slice() else {
+        let [command] = ast.commands().as_slice() else {
             return AnalysisError::raise_unexpected_input("table rename must stand alone");
         };
-        let requested = TableName::from(FullName::from_ast_name(&ast.name)?);
+        let requested = TableName::from(FullName::from_ast_name(ast.name())?);
         let target = context.resolve_table_name(&requested).map(|target| {
             if context.dialect() == AstDialect::sqlite() {
                 TableName::from(target.full_name().sqlite_identity())
@@ -218,7 +218,7 @@ impl RelationAlteration {
         });
         if target.is_none() {
             let existing = context.resolve_relation_name(requested.full_name());
-            if !ast.if_exists || existing.is_some() {
+            if !ast.if_exists() || existing.is_some() {
                 context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
             }
         }
@@ -302,7 +302,7 @@ mod test_table_rename_applicability {
 
 impl RelationAlteration {
     pub(crate) fn has_ast_column_rename(ast: &AstAlterRelation) -> bool {
-        ast.commands.iter().any(ColumnRename::is_ast_command)
+        ast.commands().iter().any(ColumnRename::is_ast_command)
     }
 
     pub(crate) fn from_ast_column_rename(
@@ -313,13 +313,13 @@ impl RelationAlteration {
         let Some(source) = source else {
             return AnalysisError::raise_unexpected_none("column rename source");
         };
-        let [command] = ast.commands.as_slice() else {
+        let [command] = ast.commands().as_slice() else {
             return AnalysisError::raise_unexpected_input("column rename must stand alone");
         };
         let (from, to) = ColumnRename::names_from_ast(command)?;
-        let requested = TableName::from(FullName::from_ast_name(&ast.name)?);
+        let requested = TableName::from(FullName::from_ast_name(ast.name())?);
         let (target, rename) =
-            ColumnRename::resolve(context, &requested, &from, &to, ast.if_exists)?;
+            ColumnRename::resolve(context, &requested, &from, &to, ast.if_exists())?;
         Ok(SemAst::alter_table(&AlterTable::column_rename(
             &requested,
             target.as_ref(),
@@ -373,7 +373,7 @@ mod test_column_rename_applicability {
 
 impl RelationAlteration {
     pub(crate) fn has_ast_column_attributes(ast: &AstAlterRelation) -> bool {
-        ast.commands
+        ast.commands()
             .iter()
             .any(|command| ColumnAttributeAction::phase_from_ast_command(command).is_some())
     }
@@ -384,11 +384,11 @@ impl RelationAlteration {
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
         // Other relation kinds retain their own dispatch boundary.
-        if !ast.kind.supports_table_column_attributes() {
+        if !ast.kind().supports_table_column_attributes() {
             todo!("column attributes on non-table relations");
         }
         if !ast
-            .commands
+            .commands()
             .iter()
             .all(|command| ColumnAttributeAction::phase_from_ast_command(command).is_some())
         {
@@ -397,7 +397,7 @@ impl RelationAlteration {
         let Some(source) = source else {
             return AnalysisError::raise_unexpected_none("ALTER COLUMN source");
         };
-        let requested = TableName::from(FullName::from_ast_name(&ast.name)?);
+        let requested = TableName::from(FullName::from_ast_name(ast.name())?);
         let target = context.resolve_table_name(&requested);
         let mut staged = if let Some(name) = &target {
             context.get_table_impl(name.full_name()).cloned()
@@ -405,7 +405,7 @@ impl RelationAlteration {
             None
         };
         let table = target.as_ref().unwrap_or(&requested);
-        let mut ordered: Vec<_> = ast.commands.iter().collect();
+        let mut ordered: Vec<_> = ast.commands().iter().collect();
         // PostgreSQL AT_PASS_DROP, AT_PASS_COL_ATTRS, AT_PASS_MISC. Stable sort
         // preserves the supplied order within a pass, including repeated changes.
         ordered.sort_by_key(|command| ColumnAttributeAction::phase_from_ast_command(command));
@@ -418,7 +418,7 @@ impl RelationAlteration {
         {
             todo!("column attributes on materialized views and indexes");
         }
-        let skip_missing = ast.if_exists && existing_relation.is_none() && target.is_none();
+        let skip_missing = ast.if_exists() && existing_relation.is_none() && target.is_none();
         let mut commands = Vec::new();
         for command in ordered {
             commands.push(AlterObjSubCommand::from_ast_column_attribute(

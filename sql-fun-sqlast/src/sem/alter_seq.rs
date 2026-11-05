@@ -101,9 +101,9 @@ impl AlterSequence {
         TContext: ParseContext,
     {
         let mut context = context;
-        let mut alter_sequence = Self::new(&FullName::from_ast_name(&ast.name)?, &[]);
-        for option in &ast.options {
-            if option.name == "owned_by" {
+        let mut alter_sequence = Self::new(&FullName::from_ast_name(ast.name())?, &[]);
+        for option in ast.options() {
+            if option.name() == "owned_by" {
                 let relation =
                     if let Some(requested) = CreateSequence::owned_table_from_ast_option(option)? {
                         if let Some(relation) = context.resolve_table_name(&requested) {

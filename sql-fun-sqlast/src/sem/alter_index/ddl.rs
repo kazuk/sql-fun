@@ -28,7 +28,7 @@ impl IndexAlteration {
         ast: &AstPostgresAlterCommand,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        Self::from_ast_operation(&ast.operation, context, ast.number, &ast.definition)
+        Self::from_ast_operation(&ast.operation(), context, ast.number(), ast.definition())
     }
 
     pub(crate) fn from_ast_operation(
@@ -106,13 +106,13 @@ impl TryFrom<&AstSyntaxOption> for IndexStorageParameter {
     type Error = AnalysisError;
     fn try_from(option: &AstSyntaxOption) -> Result<Self, Self::Error> {
         let value = option
-            .value
+            .value()
             .as_ref()
             .map(Self::value_from_ast_syntaxvalue)
             .transpose()?;
         Ok(Self::new(
-            option.namespace.as_deref(),
-            &option.name,
+            option.namespace().as_deref(),
+            option.name(),
             value.as_deref(),
         ))
     }
@@ -169,14 +169,14 @@ impl IndexAlteration {
 
 impl IndexStorageParameter {
     pub(crate) fn word_from_ast_typename(ast: &AstTypeName) -> String {
-        let mut word = Self::word_from_ast_name(&ast.name);
-        for _ in &ast.array_bounds {
+        let mut word = Self::word_from_ast_name(ast.name());
+        for _ in ast.array_bounds() {
             word.push_str("[]");
         }
         word
     }
 
     pub(crate) fn word_from_ast_name(ast: &AstName) -> String {
-        ast.0.join(".")
+        ast.parts().join(".")
     }
 }

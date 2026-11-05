@@ -15,10 +15,10 @@ impl OwnershipIdentity {
         ast: &AstTypeName,
         context: &mut impl ParseContext,
     ) -> Result<Option<TypeReference>, AnalysisError> {
-        let requested = FullName::from_ast_name(&ast.name)?;
+        let requested = FullName::from_ast_name(ast.name())?;
         Ok(context
             .resolve_type_name(&requested)
-            .map(|name| TypeReference::concrete_type_ref(&name, !ast.array_bounds.is_empty())))
+            .map(|name| TypeReference::concrete_type_ref(&name, !ast.array_bounds().is_empty())))
     }
 }
 
@@ -27,7 +27,7 @@ impl OwnerSpecification {
         ast: &AstRole,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        match ast.kind {
+        match ast.kind() {
             1 => Self::from_ast_named_role(ast, context),
             2 => Ok(Self::current_role()),
             3 => Ok(Self::current_user()),
@@ -40,12 +40,12 @@ impl OwnerSpecification {
         ast: &AstRole,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        if let Some(role) = context.role_by_name(&ast.name) {
+        if let Some(role) = context.role_by_name(ast.name()) {
             Ok(Self::role(role))
         } else {
             context
-                .report_analysis_problem(AnalysisProblem::ownership_role_not_found(&ast.name))?;
-            Ok(Self::named(&ast.name))
+                .report_analysis_problem(AnalysisProblem::ownership_role_not_found(ast.name()))?;
+            Ok(Self::named(ast.name()))
         }
     }
 }

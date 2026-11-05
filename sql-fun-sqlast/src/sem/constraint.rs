@@ -360,11 +360,11 @@ impl ConstraintNames {
         context: &impl ParseContext,
         names: &mut Self,
     ) {
-        for definition in &ast.constraints {
+        for definition in ast.constraints() {
             if !definition.is_check()
-                && Self::ast_constraint_has_catalog_name(&definition.constraint, context)
+                && Self::ast_constraint_has_catalog_name(definition.constraint(), context)
             {
-                names.reserve(definition.name.as_deref().unwrap_or_default());
+                names.reserve(definition.name().as_deref().unwrap_or_default());
             }
         }
     }

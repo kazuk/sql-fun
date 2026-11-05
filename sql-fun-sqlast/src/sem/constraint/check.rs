@@ -241,25 +241,25 @@ impl CheckConstraint {
         scope: &ScalarAnalysisContext<'_>,
         alter: bool,
     ) -> Result<Self, AnalysisError> {
-        let AstColumnConstraint::Check(syntax) = &ast.constraint else {
+        let AstColumnConstraint::Check(syntax) = &ast.constraint() else {
             return AnalysisError::raise_unexpected_input("expected CHECK");
         };
         let expression = SemScalarExpr::from_ast_in(syntax, context, scope)?;
         let mut check = Self::analyze(
             context,
             target,
-            ast.name.as_deref().unwrap_or_default(),
+            ast.name().as_deref().unwrap_or_default(),
             &expression,
         )?;
         check.retain_options(
-            ast.extras.no_inherit,
-            ast.extras.skip_validation,
-            ast.extras.enforced,
+            ast.extras().no_inherit(),
+            ast.extras().skip_validation(),
+            ast.extras().enforced(),
         );
-        if ast.extras.deferrable || ast.extras.initially_deferred {
+        if ast.extras().deferrable() || ast.extras().initially_deferred() {
             check.reject(context, CheckProblem::Deferrability)?;
         }
-        check.set_validated(!alter || !ast.extras.skip_validation);
+        check.set_validated(!alter || !ast.extras().skip_validation());
         Ok(check)
     }
 

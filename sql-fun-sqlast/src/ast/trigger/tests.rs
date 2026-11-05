@@ -1,7 +1,9 @@
 #[cfg(feature = "sqlite")]
 use crate::ast::QueryBody;
-use crate::ast::{Dialect, Expr, StatementNode, TriggerBody, TriggerEvent};
-use crate::test_helpers::trigger::trigger;
+use crate::{
+    ast::{Dialect, Expr, StatementNode, TriggerBody, TriggerEvent},
+    test_helpers::trigger::trigger,
+};
 
 #[cfg(feature = "sqlite")]
 #[rstest::rstest]

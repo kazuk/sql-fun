@@ -21,10 +21,10 @@ impl DataSource {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         Self::from_ast_table_call(
-            &ast.rowexpr,
+            ast.rowexpr(),
             context,
             scope,
-            ast.alias.as_ref().map(AliasSpec::from_ast).as_ref(),
+            ast.alias().as_ref().map(AliasSpec::from_ast).as_ref(),
         )
     }
 }
@@ -88,24 +88,24 @@ impl DataSource {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        if ast.rows_from {
+        if ast.rows_from() {
             return Self::from_ast_rows_from(ast, context, scope);
         }
-        let [function] = ast.calls.as_slice() else {
+        let [function] = ast.calls().as_slice() else {
             return AnalysisError::raise_unexpected_input("table function count");
         };
-        let mut output = TableFunctionOutput::from_ast_typed_columns(&ast.columns, context)?;
-        if ast.ordinality && !ast.columns.is_empty() {
+        let mut output = TableFunctionOutput::from_ast_typed_columns(ast.columns(), context)?;
+        if ast.ordinality() && !ast.columns().is_empty() {
             output.reject_placement(context)?;
         }
         let mut source = Self::from_ast_table_call(
-            &function.expression,
+            function.expression(),
             context,
             scope,
-            ast.alias.as_ref().map(AliasSpec::from_ast).as_ref(),
+            ast.alias().as_ref().map(AliasSpec::from_ast).as_ref(),
         )?;
         source.apply_function_output(context, &output)?;
-        if ast.ordinality {
+        if ast.ordinality() {
             source.append_function_ordinality();
         }
         source.validate_function_aliases(context)?;
@@ -119,30 +119,30 @@ impl DataSource {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let mut outer_output = TableFunctionOutput::from_ast_typed_columns(&ast.columns, context)?;
+        let mut outer_output = TableFunctionOutput::from_ast_typed_columns(ast.columns(), context)?;
         let outer_allowed =
-            ast.calls.len() == 1 && !ast.ordinality && ast.calls[0].columns.is_empty();
-        if !ast.columns.is_empty() && !outer_allowed {
+            ast.calls().len() == 1 && !ast.ordinality() && ast.calls()[0].columns().is_empty();
+        if !ast.columns().is_empty() && !outer_allowed {
             outer_output.reject_placement(context)?;
         }
-        let invocation_alias = if ast.calls.len() == 1 {
-            ast.alias
+        let invocation_alias = if ast.calls().len() == 1 {
+            ast.alias()
                 .as_ref()
-                .map(|value| AliasSpec::from_names(&value.name, &[]))
+                .map(|value| AliasSpec::from_names(value.name(), &[]))
         } else {
             None
         };
         let mut functions = Vec::new();
-        for function in &ast.calls {
+        for function in ast.calls() {
             let local_output =
-                TableFunctionOutput::from_ast_typed_columns(&function.columns, context)?;
-            let output = if outer_allowed && !ast.columns.is_empty() {
+                TableFunctionOutput::from_ast_typed_columns(function.columns(), context)?;
+            let output = if outer_allowed && !ast.columns().is_empty() {
                 &outer_output
             } else {
                 &local_output
             };
             let mut function = DataSourceRowsFromFunc::from_ast_call(
-                &function.expression,
+                function.expression(),
                 context,
                 scope,
                 invocation_alias.as_ref(),
@@ -151,7 +151,7 @@ impl DataSource {
             functions.push(function);
         }
         let alias = ast
-            .alias
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| {
@@ -164,7 +164,7 @@ impl DataSource {
             });
         let mut source = Self::resolved_rows(&functions, &alias);
         source.retain_rows_definition(&outer_output);
-        if ast.ordinality {
+        if ast.ordinality() {
             source.append_function_ordinality();
         }
         source.validate_function_aliases(context)?;
@@ -195,7 +195,7 @@ impl DataSource {
         alias: Option<&AliasSpec>,
     ) -> Result<Self, AnalysisError> {
         match ast {
-            Expr::Call(call) if SemScalarExpr::ast_is_ordinary(&call.kind) => {
+            Expr::Call(call) if SemScalarExpr::ast_is_ordinary(&call.kind()) => {
                 Self::from_ast_table(call.as_ref(), context, scope, alias)
             }
             _ => Self::from_ast_expression_table(ast, context, scope, alias),
@@ -213,12 +213,12 @@ impl DataSource {
         if context.dialect() == Dialect::sqlite() {
             todo!("SQLite table function affinity and overload semantics");
         }
-        let mut arguments = SemScalarExpr::from_ast_list(&ast.arguments, context, scope)?;
+        let mut arguments = SemScalarExpr::from_ast_list(ast.arguments(), context, scope)?;
         let mut invalid_arguments = false;
         for argument in &mut arguments {
             invalid_arguments |= DataSourceRowsFromFunc::validate_argument(context, argument)?;
         }
-        let name = FullName::from_ast_name(&ast.name)?;
+        let name = FullName::from_ast_name(ast.name())?;
         let alias = alias
             .cloned()
             .unwrap_or_else(|| AliasSpec::from_local_name(&name.local_name()));
@@ -299,14 +299,14 @@ impl DataSource {
         with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let name = FullName::from_ast_name(&ast.name)?;
+        let name = FullName::from_ast_name(ast.name())?;
         let name = if with.resolve_name(context, &name).is_none() {
             scope.trigger_relation_name(context, &name)?
         } else {
             name
         };
         let alias = ast
-            .alias
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(&name.local_name()));
@@ -322,15 +322,15 @@ impl DataSource {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         let non_lateral_scope;
-        let scope = if ast.lateral {
+        let scope = if ast.lateral() {
             scope
         } else {
             non_lateral_scope = scope.with_from_clause(&FromClause::default());
             &non_lateral_scope
         };
-        let query = SelectStatement::from_ast_in(&ast.query, context, Some(scope))?;
+        let query = SelectStatement::from_ast_in(ast.query(), context, Some(scope))?;
         let alias = ast
-            .alias
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(""));
@@ -345,26 +345,26 @@ impl DataSource {
         with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let left = Self::from_ast_in_scope(&ast.left, context, with, scope)?;
+        let left = Self::from_ast_in_scope(ast.left(), context, with, scope)?;
         let visible = scope.with_added_source(&left);
-        let right = Self::from_ast_in_scope(&ast.right, context, with, &visible)?;
+        let right = Self::from_ast_in_scope(ast.right(), context, with, &visible)?;
         right
             .namespace()
             .validate_against(&left.namespace(), context)?;
         let scope = visible.with_added_source(&right);
         let condition = SemScalarExpr::from_ast_optional(
-            &ast.condition,
+            ast.condition(),
             context,
             &scope.with_grouping_placement("JOIN condition"),
         )?;
         Ok(Self::resolved_join(
             &left,
             &right,
-            &SemanticJoinKind::from_ast(&ast.kind),
+            &SemanticJoinKind::from_ast(&ast.kind()),
             &condition,
-            &ast.alias.as_ref().map(AliasSpec::from_ast),
+            &ast.alias().as_ref().map(AliasSpec::from_ast),
             &JoinUsingClause::ast_using_clause(ast),
-            ast.natural,
+            ast.natural(),
         ))
     }
 }
@@ -376,7 +376,7 @@ impl DataSource {
         with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let Some((first, items)) = ast.items.split_first() else {
+        let Some((first, items)) = ast.items().split_first() else {
             return AnalysisError::raise_unexpected_input("empty FROM group");
         };
         let mut source = Self::from_ast_in_scope(first, context, with, scope)?;
@@ -392,7 +392,7 @@ impl DataSource {
                 false,
             );
         }
-        if let Some(alias) = &ast.alias
+        if let Some(alias) = &ast.alias()
             && Dialect::from(context.metadata()) == Dialect::sqlite()
         {
             source = source.with_group_alias(&AliasSpec::from_ast(alias));
@@ -408,22 +408,22 @@ impl DataSource {
         with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let source = Self::from_ast_in_scope(&ast.relation, context, with, scope)?;
+        let source = Self::from_ast_in_scope(ast.relation(), context, with, scope)?;
         let expression_scope = scope.with_from_clause(&FromClause::default());
         let arguments = SemScalarExpr::from_ast_list(
-            &ast.arguments,
+            ast.arguments(),
             context,
             &expression_scope.with_grouping_placement("TABLESAMPLE"),
         )?;
         let repeatable = SemScalarExpr::from_ast_optional(
-            &ast.repeatable,
+            ast.repeatable(),
             context,
             &expression_scope.with_grouping_placement("REPEATABLE"),
         )?;
         let sample = TableSampleSource::resolve(
             context,
             &source,
-            &FullName::from_ast_name(&ast.method)?,
+            &FullName::from_ast_name(ast.method())?,
             &arguments,
             &repeatable,
         )?;
@@ -433,9 +433,9 @@ impl DataSource {
 
 impl DataSource {
     pub(crate) fn validate_ast_trigger_command(ast: &Relation) -> Result<(), ResolutionFailure> {
-        if ast.name.0.len() != 1 || ast.indexed.is_some() || ast.not_indexed {
+        if ast.name().parts().len() != 1 || ast.indexed().is_some() || ast.not_indexed() {
             return SemCreateTrigger::ast_invalid(
-                &FullName::from_ast_name(&ast.name)?,
+                &FullName::from_ast_name(ast.name())?,
                 "SQLite trigger DML requires an unqualified target without an index hint",
             );
         }

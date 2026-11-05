@@ -27,7 +27,6 @@ mod rule;
 mod sqlite;
 mod traversal;
 mod trigger;
-mod utility;
 pub(crate) mod validation;
 
 pub(crate) use self::{
@@ -71,29 +70,29 @@ use sql_fun_core::IVec;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct TableExtras {
-    pub(crate) unlogged: bool,
-    pub(crate) inherits: Vec<Name>,
-    pub(crate) of_type: Option<TypeName>,
-    pub(crate) on_commit: Option<CommitAction>,
-    pub(crate) tablespace: Option<String>,
-    pub(crate) access_method: Option<String>,
-    pub(crate) partition_spec: Option<PartitionSpec>,
-    pub(crate) partition_bound: Option<PartitionBound>,
+    unlogged: bool,
+    inherits: Vec<Name>,
+    of_type: Option<TypeName>,
+    on_commit: Option<CommitAction>,
+    tablespace: Option<String>,
+    access_method: Option<String>,
+    partition_spec: Option<PartitionSpec>,
+    partition_bound: Option<PartitionBound>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct PartitionSpec {
-    pub(crate) strategy: String,
-    pub(crate) keys: Vec<IndexExpression>,
+    strategy: String,
+    keys: Vec<IndexExpression>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct PartitionBound {
-    pub(crate) strategy: String,
-    pub(crate) is_default: bool,
-    pub(crate) modulus: i32,
-    pub(crate) remainder: i32,
-    pub(crate) list: Vec<Expr>,
-    pub(crate) lower: Vec<PartitionDatum>,
-    pub(crate) upper: Vec<PartitionDatum>,
+    strategy: String,
+    is_default: bool,
+    modulus: i32,
+    remainder: i32,
+    list: Vec<Expr>,
+    lower: Vec<PartitionDatum>,
+    upper: Vec<PartitionDatum>,
 }
 #[derive(Clone, Debug)]
 pub(crate) enum PartitionDatum {
@@ -101,64 +100,95 @@ pub(crate) enum PartitionDatum {
     Max,
     Value(Expr),
 }
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, derive_getters::Getters)]
 pub(crate) struct ConstraintExtras {
-    pub(crate) enforced: Option<bool>,
-    pub(crate) without_overlaps: bool,
-    pub(crate) fk_with_period: bool,
-    pub(crate) pk_with_period: bool,
-    pub(crate) deferrable: bool,
-    pub(crate) initially_deferred: bool,
-    pub(crate) skip_validation: bool,
-    pub(crate) no_inherit: bool,
-    pub(crate) nulls_not_distinct: bool,
-    pub(crate) include: Vec<String>,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) index_name: Option<String>,
-    pub(crate) tablespace: Option<String>,
-    pub(crate) access_method: Option<String>,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) exclusions: Vec<ExclusionElement>,
-    pub(crate) delete_columns: Vec<String>,
+    #[getter(copy)]
+    enforced: Option<bool>,
+
+    #[getter(copy)]
+    without_overlaps: bool,
+
+    #[getter(copy)]
+    fk_with_period: bool,
+
+    #[getter(copy)]
+    pk_with_period: bool,
+
+    #[getter(copy)]
+    deferrable: bool,
+
+    #[getter(copy)]
+    initially_deferred: bool,
+    #[getter(copy)]
+    skip_validation: bool,
+    #[getter(copy)]
+    no_inherit: bool,
+    #[getter(skip)]
+    nulls_not_distinct: bool,
+    #[getter(skip)]
+    include: Vec<String>,
+    #[getter(skip)]
+    options: Vec<SyntaxOption>,
+    #[getter(skip)]
+    index_name: Option<String>,
+    #[getter(skip)]
+    tablespace: Option<String>,
+    #[getter(skip)]
+    access_method: Option<String>,
+    #[getter(skip)]
+    predicate: Option<Expr>,
+    #[getter(skip)]
+    exclusions: Vec<ExclusionElement>,
+
+    delete_columns: Vec<String>,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct ExclusionElement {
-    pub(crate) expression: IndexExpression,
-    pub(crate) operator: Name,
+    expression: IndexExpression,
+    operator: Name,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Table {
-    pub(crate) extras: TableExtras,
-    pub(crate) name: Name,
-    pub(crate) columns: Vec<Column>,
-    pub(crate) constraints: Vec<TableConstraint>,
-    pub(crate) temporary: bool,
-    pub(crate) mode: CreateTableMode,
-    pub(crate) query: Option<Query>,
-    pub(crate) options: Vec<SyntaxOption>,
+    #[getter(skip)]
+    extras: TableExtras,
+    name: Name,
+    columns: Vec<Column>,
+    constraints: Vec<TableConstraint>,
+    #[getter(copy)]
+    temporary: bool,
+    #[getter(copy)]
+    mode: CreateTableMode,
+    query: Option<Query>,
+    options: Vec<SyntaxOption>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Column {
-    pub(crate) collation: Name,
-    pub(crate) compression: Option<String>,
-    pub(crate) storage: Option<String>,
-    pub(crate) name: String,
-    pub(crate) type_name: Option<TypeName>,
-    pub(crate) type_mod: Option<i32>,
-    pub(crate) constraints: Vec<TableConstraint>,
-    pub(crate) not_null: Option<bool>,
+    collation: Name,
+    #[getter(skip)]
+    compression: Option<String>,
+    #[getter(skip)]
+    storage: Option<String>,
+    name: String,
+    type_name: Option<TypeName>,
+    #[getter(skip)]
+    type_mod: Option<i32>,
+    constraints: Vec<TableConstraint>,
+    #[getter(copy)]
+    not_null: Option<bool>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TableConstraint {
-    pub(crate) extras: ConstraintExtras,
-    pub(crate) name: Option<String>,
-    pub(crate) keys: Vec<String>,
-    pub(crate) constraint: ColumnConstraint,
-    pub(crate) order: Vec<Order>,
-    pub(crate) auto_increment: bool,
+    extras: ConstraintExtras,
+    name: Option<String>,
+    keys: Vec<String>,
+    constraint: ColumnConstraint,
+
+    order: Vec<Order>,
+    #[getter(skip)]
+    auto_increment: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -179,25 +209,28 @@ pub(crate) enum ColumnConstraint {
     Collate(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct ForeignReference {
-    pub(crate) table: Name,
-    pub(crate) columns: Vec<String>,
-    pub(crate) match_type: Option<ForeignKeyMatchType>,
-    pub(crate) delete_action: Option<ForeignKeyAction>,
-    pub(crate) update_action: Option<ForeignKeyAction>,
-    pub(crate) deferrability: Option<Deferrability>,
-    pub(crate) validity: Option<Validity>,
-    pub(crate) ignored_matches: Vec<String>,
+    table: Name,
+    columns: Vec<String>,
+    match_type: Option<ForeignKeyMatchType>,
+    delete_action: Option<ForeignKeyAction>,
+    update_action: Option<ForeignKeyAction>,
+    deferrability: Option<Deferrability>,
+    validity: Option<Validity>,
+    ignored_matches: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterRelation {
-    pub(crate) name: Name,
-    pub(crate) kind: AlterRelationKind,
-    pub(crate) commands: Vec<AlterCommand>,
-    pub(crate) if_exists: bool,
-    pub(crate) only: bool,
+    name: Name,
+    #[getter(copy)]
+    kind: AlterRelationKind,
+    commands: Vec<AlterCommand>,
+    #[getter(copy)]
+    if_exists: bool,
+    #[getter(skip)]
+    only: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -373,55 +406,62 @@ impl StatementNode {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterOwner {
-    pub(crate) object_kind: Option<ObjectKind>,
-    pub(crate) relation: Option<Name>,
-    pub(crate) object: Option<ObjectTarget>,
-    pub(crate) owner: Role,
+    #[getter(copy)]
+    object_kind: Option<ObjectKind>,
+    relation: Option<Name>,
+    object: Option<ObjectTarget>,
+    owner: Role,
 }
 
 /// A named database object, optionally identified by its argument type list.
 /// `None` distinguishes an unspecified signature from an explicitly empty `()`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct ObjectTarget {
-    pub(crate) name: Vec<String>,
-    pub(crate) argument_types: Option<Vec<ObjectArgument>>,
-    pub(crate) cast: Option<CastTarget>,
-    pub(crate) type_name: Option<TypeName>,
-    pub(crate) domain_constraint: Option<DomainConstraintTarget>,
-    pub(crate) transform: Option<TransformTarget>,
+    name: Vec<String>,
+    argument_types: Option<Vec<ObjectArgument>>,
+    #[getter(skip)]
+    cast: Option<CastTarget>,
+    type_name: Option<TypeName>,
+    #[getter(skip)]
+    domain_constraint: Option<DomainConstraintTarget>,
+    #[getter(skip)]
+    transform: Option<TransformTarget>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CastTarget {
-    pub(crate) source: TypeName,
-    pub(crate) target: TypeName,
+    source: TypeName,
+    target: TypeName,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct DomainConstraintTarget {
-    pub(crate) domain: TypeName,
-    pub(crate) constraint: String,
+    domain: TypeName,
+    constraint: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct TransformTarget {
-    pub(crate) type_name: TypeName,
-    pub(crate) language: String,
+    type_name: TypeName,
+    language: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct ObjectArgument {
-    pub(crate) mode: Option<String>,
-    pub(crate) name: Option<String>,
-    pub(crate) type_name: Option<TypeName>,
+    #[getter(skip)]
+    mode: Option<String>,
+    #[getter(skip)]
+    name: Option<String>,
+    type_name: Option<TypeName>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Role {
-    pub(crate) kind: u32,
-    pub(crate) name: String,
+    #[getter(copy)]
+    kind: u32,
+    name: String,
 }
 
 impl AlterOwner {
@@ -449,11 +489,13 @@ impl Role {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Comment {
-    pub(crate) target: ObjectTarget,
-    pub(crate) object_kind: ObjectKind,
-    pub(crate) text: String,
+    #[getter(skip)]
+    target: ObjectTarget,
+    #[getter(copy)]
+    object_kind: ObjectKind,
+    text: String,
 }
 
 impl Comment {
@@ -466,12 +508,14 @@ impl Comment {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterSequence {
-    pub(crate) name: Name,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) for_identity: bool,
-    pub(crate) missing_ok: bool,
+    name: Name,
+    options: Vec<SyntaxOption>,
+    #[getter(skip)]
+    for_identity: bool,
+    #[getter(skip)]
+    missing_ok: bool,
 }
 
 impl AlterSequence {
@@ -490,12 +534,15 @@ impl AlterSequence {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct DropTable {
-    pub(crate) names: Vec<Name>,
-    pub(crate) if_exists: bool,
-    pub(crate) cascade: bool,
-    pub(crate) concurrent: bool,
+    names: Vec<Name>,
+    #[getter(copy)]
+    if_exists: bool,
+    #[getter(copy)]
+    cascade: bool,
+    #[getter(skip)]
+    concurrent: bool,
 }
 
 impl DropTable {
@@ -509,14 +556,18 @@ impl DropTable {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Sequence {
-    pub(crate) temporary: bool,
-    pub(crate) name: Name,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) owner_id: u32,
-    pub(crate) for_identity: bool,
-    pub(crate) if_not_exists: bool,
+    #[getter(copy)]
+    temporary: bool,
+    name: Name,
+    options: Vec<SyntaxOption>,
+    #[getter(skip)]
+    owner_id: u32,
+    #[getter(skip)]
+    for_identity: bool,
+    #[getter(copy)]
+    if_not_exists: bool,
 }
 
 impl Sequence {
@@ -542,10 +593,10 @@ impl Sequence {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct EnumType {
-    pub(crate) name: Name,
-    pub(crate) values: Vec<String>,
+    name: Name,
+    values: Vec<String>,
 }
 
 impl EnumType {
@@ -554,13 +605,16 @@ impl EnumType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct VariableSet {
-    pub(crate) kind: VariableSetKind,
-    pub(crate) is_local: bool,
-    pub(crate) name: String,
-    pub(crate) arguments: Vec<Expr>,
-    pub(crate) transaction_options: Option<Vec<SyntaxOption>>,
+    #[getter(skip)]
+    kind: VariableSetKind,
+    #[getter(skip)]
+    is_local: bool,
+    name: String,
+    arguments: Vec<Expr>,
+    #[getter(skip)]
+    transaction_options: Option<Vec<SyntaxOption>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -585,11 +639,13 @@ impl VariableSet {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Extension {
-    pub(crate) if_not_exists: bool,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) name: String,
+    #[getter(copy)]
+    if_not_exists: bool,
+    #[getter(skip)]
+    options: Vec<SyntaxOption>,
+    name: String,
 }
 
 impl Extension {
@@ -602,17 +658,22 @@ impl Extension {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct View {
-    pub(crate) name: Name,
-    pub(crate) aliases: Vec<String>,
-    pub(crate) query: Query,
-    pub(crate) replace: bool,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) check_option: ViewCheckOption,
-    pub(crate) temporary: bool,
-    pub(crate) if_not_exists: bool,
-    pub(crate) materialized: bool,
+    name: Name,
+    aliases: Vec<String>,
+    query: Query,
+    #[getter(copy)]
+    replace: bool,
+    options: Vec<SyntaxOption>,
+    #[getter(copy)]
+    check_option: ViewCheckOption,
+    #[getter(copy)]
+    temporary: bool,
+    #[getter(copy)]
+    if_not_exists: bool,
+    #[getter(copy)]
+    materialized: bool,
 }
 
 impl View {
@@ -776,9 +837,13 @@ impl From<&::sql_fun_core::SqlFunMetadata> for Dialect {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct Name(pub(crate) Vec<String>);
+pub(crate) struct Name(Vec<String>);
 
 impl Name {
+    pub(crate) fn parts(&self) -> &[String] {
+        &self.0
+    }
+
     pub(crate) fn from_parts(parts: &[String]) -> Self {
         Self(parts.to_vec())
     }
@@ -788,39 +853,45 @@ impl Name {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TypeName {
-    pub(crate) name: Name,
-    pub(crate) modifiers: Vec<Expr>,
-    pub(crate) array_bounds: Vec<Option<i32>>,
-    pub(crate) set_of: bool,
-    pub(crate) percent_type: bool,
-    pub(crate) sqlite_name_snapshot: Option<Name>,
-    pub(crate) sqlite_parts: Vec<SqliteTypeNamePart>,
-    pub(crate) sqlite_modifiers: Option<SqliteTypeModifiers>,
-    pub(crate) location: Option<StringSpan>,
+    name: Name,
+    modifiers: Vec<Expr>,
+    array_bounds: Vec<Option<i32>>,
+    #[getter(copy)]
+    set_of: bool,
+    #[getter(copy)]
+    percent_type: bool,
+    #[getter(skip)]
+    sqlite_name_snapshot: Option<Name>,
+    #[getter(skip)]
+    sqlite_parts: Vec<SqliteTypeNamePart>,
+    #[getter(skip)]
+    sqlite_modifiers: Option<SqliteTypeModifiers>,
+    #[getter(skip)]
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqliteTypeNamePart {
-    pub(crate) name: String,
-    pub(crate) quote: Option<char>,
-    pub(crate) leading_trivia: Vec<SqliteTypeNameTrivia>,
-    pub(crate) trailing_trivia: Vec<SqliteTypeNameTrivia>,
+    name: String,
+    quote: Option<char>,
+    leading_trivia: Vec<SqliteTypeNameTrivia>,
+    trailing_trivia: Vec<SqliteTypeNameTrivia>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqliteTypeModifiers {
-    pub(crate) values: Vec<SqliteTypeModifier>,
-    pub(crate) ast_spellings: Vec<String>,
-    pub(crate) trailing_trivia: Vec<SqliteTypeNameTrivia>,
+    values: Vec<SqliteTypeModifier>,
+    ast_spellings: Vec<String>,
+    trailing_trivia: Vec<SqliteTypeNameTrivia>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct SqliteTypeModifier {
-    pub(crate) leading_trivia: Vec<SqliteTypeNameTrivia>,
-    pub(crate) spelling: String,
-    pub(crate) trailing_trivia: Vec<SqliteTypeNameTrivia>,
+    leading_trivia: Vec<SqliteTypeNameTrivia>,
+    spelling: String,
+    trailing_trivia: Vec<SqliteTypeNameTrivia>,
 }
 
 #[derive(Clone, Debug)]
@@ -885,34 +956,37 @@ impl Expr {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CurrentOf {
-    pub(crate) name: String,
-    pub(crate) parameter: i32,
+    name: String,
+    #[getter(copy)]
+    parameter: i32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Parameter {
-    pub(crate) position: u32,
-    pub(crate) name: Option<String>,
-    pub(crate) type_name: Option<String>,
+    #[getter(copy)]
+    position: u32,
+    name: Option<String>,
+    type_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct InTable {
-    pub(crate) argument: Expr,
-    pub(crate) negated: bool,
-    pub(crate) table: Name,
-    pub(crate) arguments: Vec<Expr>,
+    argument: Expr,
+    negated: bool,
+    table: Name,
+    arguments: Vec<Expr>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct OperatorExpr {
-    pub(crate) name: Name,
-    pub(crate) kind: OperatorKind,
-    pub(crate) left: Option<Expr>,
-    pub(crate) right: Option<Expr>,
-    pub(crate) escape: Option<Expr>,
+    name: Name,
+    #[getter(copy)]
+    kind: OperatorKind,
+    left: Option<Expr>,
+    right: Option<Expr>,
+    escape: Option<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -935,10 +1009,11 @@ pub(crate) enum OperatorKind {
     NotBetweenSymmetric,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct BooleanExpr {
-    pub(crate) operator: BooleanOperator,
-    pub(crate) arguments: Vec<Expr>,
+    #[getter(copy)]
+    operator: BooleanOperator,
+    arguments: Vec<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -948,49 +1023,59 @@ pub(crate) enum BooleanOperator {
     Not,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct NullTest {
-    pub(crate) argument: Expr,
-    pub(crate) negated: bool,
-    pub(crate) row: bool,
+    argument: Expr,
+    #[getter(copy)]
+    negated: bool,
+    #[getter(skip)]
+    row: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TruthTest {
-    pub(crate) argument: Expr,
-    pub(crate) value: Option<bool>,
-    pub(crate) negated: bool,
+    argument: Expr,
+    #[getter(copy)]
+    value: Option<bool>,
+    #[getter(copy)]
+    negated: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Cast {
-    pub(crate) argument: Expr,
-    pub(crate) target: TypeName,
+    argument: Expr,
+    target: TypeName,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Collate {
-    pub(crate) argument: Expr,
-    pub(crate) name: Name,
-    pub(crate) location: Option<StringSpan>,
+    argument: Expr,
+    name: Name,
+    location: Option<StringSpan>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Call {
-    pub(crate) sql_syntax: bool,
-    pub(crate) kind: CallKind,
-    pub(crate) name: Name,
-    pub(crate) arguments: Vec<Expr>,
-    pub(crate) argument_locations: Vec<Option<StringSpan>>,
-    pub(crate) star: bool,
-    pub(crate) distinct: bool,
-    pub(crate) variadic: bool,
-    pub(crate) within_group: bool,
-    pub(crate) within_order: Vec<Order>,
-    pub(crate) order: Vec<Order>,
-    pub(crate) filter: Option<Expr>,
-    pub(crate) over: Option<Window>,
-    pub(crate) location: Option<StringSpan>,
+    #[getter(skip)]
+    sql_syntax: bool,
+    #[getter(copy)]
+    kind: CallKind,
+    name: Name,
+    arguments: Vec<Expr>,
+    argument_locations: Vec<Option<StringSpan>>,
+    #[getter(copy)]
+    star: bool,
+    #[getter(copy)]
+    distinct: bool,
+    #[getter(copy)]
+    variadic: bool,
+    #[getter(copy)]
+    within_group: bool,
+    within_order: Vec<Order>,
+    order: Vec<Order>,
+    filter: Option<Expr>,
+    over: Option<Window>,
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1013,25 +1098,26 @@ impl CallKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Case {
-    pub(crate) argument: Option<Expr>,
-    pub(crate) arms: Vec<CaseArm>,
-    pub(crate) otherwise: Option<Expr>,
+    argument: Option<Expr>,
+    arms: Vec<CaseArm>,
+    otherwise: Option<Expr>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CaseArm {
-    pub(crate) condition: Expr,
-    pub(crate) result: Expr,
+    condition: Expr,
+    result: Expr,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Subquery {
-    pub(crate) query: Query,
-    pub(crate) kind: SubqueryKind,
-    pub(crate) test: Option<Expr>,
-    pub(crate) operator: Name,
+    query: Query,
+    #[getter(copy)]
+    kind: SubqueryKind,
+    test: Option<Expr>,
+    operator: Name,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1045,10 +1131,10 @@ pub(crate) enum SubqueryKind {
     MultiExpression,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Indirection {
-    pub(crate) argument: Expr,
-    pub(crate) items: Vec<Access>,
+    argument: Expr,
+    items: Vec<Access>,
 }
 
 #[derive(Clone, Debug)]
@@ -1059,29 +1145,30 @@ pub(crate) enum Access {
     Slice(Slice),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Slice {
-    pub(crate) lower: Option<Expr>,
-    pub(crate) upper: Option<Expr>,
+    lower: Option<Expr>,
+    upper: Option<Expr>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct NamedArgument {
-    pub(crate) name: String,
-    pub(crate) argument: Expr,
-    pub(crate) location: Option<StringSpan>,
+    name: String,
+    argument: Expr,
+    location: Option<StringSpan>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct SqlValue {
-    pub(crate) name: String,
-    pub(crate) precision: Option<i32>,
+    name: String,
+    #[getter(copy)]
+    precision: Option<i32>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Raise {
-    pub(crate) action: RaiseAction,
-    pub(crate) message: Option<Expr>,
+    action: RaiseAction,
+    message: Option<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1093,15 +1180,16 @@ pub(crate) enum RaiseAction {
     Replace,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Query {
-    pub(crate) with: With,
-    pub(crate) body: QueryBody,
-    pub(crate) order: Vec<Order>,
-    pub(crate) limit: Option<Expr>,
-    pub(crate) offset: Option<Expr>,
-    pub(crate) with_ties: bool,
-    pub(crate) locks: Vec<Lock>,
+    with: With,
+    body: QueryBody,
+    order: Vec<Order>,
+    limit: Option<Expr>,
+    offset: Option<Expr>,
+    #[getter(copy)]
+    with_ties: bool,
+    locks: Vec<Lock>,
 }
 
 #[derive(Clone, Debug)]
@@ -1111,12 +1199,14 @@ pub(crate) enum QueryBody {
     Set(Box<SetQuery>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct SetQuery {
-    pub(crate) operation: SetOperation,
-    pub(crate) all: bool,
-    pub(crate) left: Query,
-    pub(crate) right: Query,
+    #[getter(copy)]
+    operation: SetOperation,
+    #[getter(copy)]
+    all: bool,
+    left: Query,
+    right: Query,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1126,25 +1216,28 @@ pub(crate) enum SetOperation {
     Except,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Select {
-    pub(crate) into: Option<Into>,
-    pub(crate) distinct: Option<Vec<Expr>>,
-    pub(crate) targets: Vec<Target>,
-    pub(crate) from: Vec<FromItem>,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) group: Vec<Grouping>,
-    pub(crate) group_distinct: bool,
-    pub(crate) having: Option<Expr>,
-    pub(crate) windows: Vec<Window>,
+    into: Option<Into>,
+    distinct: Option<Vec<Expr>>,
+    targets: Vec<Target>,
+    from: Vec<FromItem>,
+    predicate: Option<Expr>,
+    group: Vec<Grouping>,
+    #[getter(copy)]
+    group_distinct: bool,
+    having: Option<Expr>,
+    windows: Vec<Window>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Target {
-    pub(crate) implicit_alias: bool,
-    pub(crate) location: Option<usize>,
-    pub(crate) expression: Expr,
-    pub(crate) alias: Option<String>,
+    #[getter(copy)]
+    implicit_alias: bool,
+    #[getter(copy)]
+    location: Option<usize>,
+    expression: Expr,
+    alias: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1157,35 +1250,42 @@ pub(crate) enum Grouping {
     Simple(Vec<Self>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Order {
-    pub(crate) expression: Expr,
-    pub(crate) descending: Option<bool>,
-    pub(crate) nulls_first: Option<bool>,
-    pub(crate) using: Option<Name>,
+    expression: Expr,
+    #[getter(copy)]
+    descending: Option<bool>,
+    #[getter(copy)]
+    nulls_first: Option<bool>,
+    using: Option<Name>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, derive_getters::Getters)]
 pub(crate) struct With {
-    pub(crate) recursive: bool,
-    pub(crate) entries: Vec<Cte>,
+    #[getter(copy)]
+    recursive: bool,
+    entries: Vec<Cte>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Cte {
-    pub(crate) name: String,
-    pub(crate) columns: Vec<CteColumn>,
-    pub(crate) materialized: Option<bool>,
-    pub(crate) body: CteBody,
-    pub(crate) search: Option<Search>,
-    pub(crate) cycle: Option<Cycle>,
+    name: String,
+    #[getter(skip)]
+    columns: Vec<CteColumn>,
+    #[getter(copy)]
+    materialized: Option<bool>,
+    body: CteBody,
+    #[getter(skip)]
+    search: Option<Search>,
+    #[getter(skip)]
+    cycle: Option<Cycle>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CteColumn {
-    pub(crate) name: String,
-    pub(crate) collation: Option<String>,
-    pub(crate) descending: Option<bool>,
+    name: String,
+    collation: Option<String>,
+    descending: Option<bool>,
 }
 
 impl Cte {
@@ -1244,24 +1344,24 @@ impl CteBody {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Search {
-    pub(crate) columns: Vec<String>,
-    pub(crate) breadth_first: bool,
-    pub(crate) sequence: String,
+    columns: Vec<String>,
+    breadth_first: bool,
+    sequence: String,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Cycle {
-    pub(crate) columns: Vec<String>,
-    pub(crate) mark: String,
-    pub(crate) value: Option<Expr>,
-    pub(crate) default: Option<Expr>,
-    pub(crate) path: String,
+    columns: Vec<String>,
+    mark: String,
+    value: Option<Expr>,
+    default: Option<Expr>,
+    path: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Alias {
-    pub(crate) name: String,
-    pub(crate) columns: Vec<String>,
+    name: String,
+    columns: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1310,39 +1410,46 @@ impl FromItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Relation {
-    pub(crate) name: Name,
-    pub(crate) alias: Option<Alias>,
-    pub(crate) inherit: bool,
-    pub(crate) persistence: String,
-    pub(crate) indexed: Option<String>,
-    pub(crate) not_indexed: bool,
+    name: Name,
+    alias: Option<Alias>,
+
+    #[getter(copy)]
+    inherit: bool,
+
+    persistence: String,
+    indexed: Option<String>,
+    #[getter(copy)]
+    not_indexed: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct DerivedTable {
-    pub(crate) query: Query,
-    pub(crate) alias: Option<Alias>,
-    pub(crate) lateral: bool,
+    query: Query,
+    alias: Option<Alias>,
+    #[getter(copy)]
+    lateral: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct FromGroup {
-    pub(crate) items: Vec<FromItem>,
-    pub(crate) alias: Option<Alias>,
+    items: Vec<FromItem>,
+    alias: Option<Alias>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Join {
-    pub(crate) left: FromItem,
-    pub(crate) right: FromItem,
-    pub(crate) kind: JoinKind,
-    pub(crate) natural: bool,
-    pub(crate) condition: Option<Expr>,
-    pub(crate) using: Vec<String>,
-    pub(crate) using_alias: Option<Alias>,
-    pub(crate) alias: Option<Alias>,
+    left: FromItem,
+    right: FromItem,
+    #[getter(copy)]
+    kind: JoinKind,
+    #[getter(copy)]
+    natural: bool,
+    condition: Option<Expr>,
+    using: Vec<String>,
+    using_alias: Option<Alias>,
+    alias: Option<Alias>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1354,20 +1461,23 @@ pub(crate) enum JoinKind {
     Cross,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TableFunctions {
-    pub(crate) calls: Vec<TableFunction>,
-    pub(crate) alias: Option<Alias>,
-    pub(crate) lateral: bool,
-    pub(crate) ordinality: bool,
-    pub(crate) rows_from: bool,
-    pub(crate) columns: Vec<TypedColumn>,
+    calls: Vec<TableFunction>,
+    alias: Option<Alias>,
+    #[getter(skip)]
+    lateral: bool,
+    #[getter(copy)]
+    ordinality: bool,
+    #[getter(copy)]
+    rows_from: bool,
+    columns: Vec<TypedColumn>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TableFunction {
-    pub(crate) expression: Expr,
-    pub(crate) columns: Vec<TypedColumn>,
+    expression: Expr,
+    columns: Vec<TypedColumn>,
 }
 
 impl TableFunctions {
@@ -1383,37 +1493,40 @@ impl TableFunctions {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TypedColumn {
-    pub(crate) name: String,
-    pub(crate) type_name: TypeName,
-    pub(crate) collation: Option<Name>,
+    name: String,
+    type_name: TypeName,
+    collation: Option<Name>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TableSample {
-    pub(crate) relation: FromItem,
-    pub(crate) method: Name,
-    pub(crate) arguments: Vec<Expr>,
-    pub(crate) repeatable: Option<Expr>,
+    relation: FromItem,
+    method: Name,
+    arguments: Vec<Expr>,
+    repeatable: Option<Expr>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Window {
-    pub(crate) reference_only: bool,
-    pub(crate) name: Option<String>,
-    pub(crate) reference: Option<String>,
-    pub(crate) partition: Vec<Expr>,
-    pub(crate) order: Vec<Order>,
-    pub(crate) frame: Option<Frame>,
+    #[getter(copy)]
+    reference_only: bool,
+    name: Option<String>,
+    reference: Option<String>,
+    partition: Vec<Expr>,
+    order: Vec<Order>,
+    frame: Option<Frame>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Frame {
-    pub(crate) mode: FrameMode,
-    pub(crate) start: FrameBound,
-    pub(crate) end: Option<FrameBound>,
-    pub(crate) exclusion: Option<FrameExclusion>,
+    #[getter(copy)]
+    mode: FrameMode,
+    start: FrameBound,
+    end: Option<FrameBound>,
+    #[getter(copy)]
+    exclusion: Option<FrameExclusion>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1440,79 +1553,95 @@ pub(crate) enum FrameExclusion {
     NoOthers,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Lock {
-    pub(crate) relations: Vec<Name>,
-    pub(crate) strength: Option<LockStrength>,
-    pub(crate) wait: Option<LockWait>,
+    relations: Vec<Name>,
+    #[getter(copy)]
+    strength: Option<LockStrength>,
+    #[getter(copy)]
+    wait: Option<LockWait>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Assignment {
-    pub(crate) name: String,
-    pub(crate) indirection: Vec<Access>,
-    pub(crate) value: Option<Expr>,
+    name: String,
+    indirection: Vec<Access>,
+    value: Option<Expr>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ReturningOption {
-    pub(crate) old: bool,
-    pub(crate) alias: String,
+    old: bool,
+    alias: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Insert {
-    pub(crate) with: With,
-    pub(crate) relation: Relation,
-    pub(crate) columns: Vec<Assignment>,
-    pub(crate) source: Option<Query>,
-    pub(crate) overriding: Option<OverridingKind>,
-    pub(crate) conflict: Option<Conflict>,
-    pub(crate) or_conflict: Option<ConflictClause>,
-    pub(crate) returning: Vec<Target>,
-    pub(crate) returning_options: Vec<ReturningOption>,
+    with: With,
+    relation: Relation,
+    columns: Vec<Assignment>,
+    source: Option<Query>,
+    #[getter(copy)]
+    overriding: Option<OverridingKind>,
+    conflict: Option<Conflict>,
+    or_conflict: Option<ConflictClause>,
+    returning: Vec<Target>,
+    returning_options: Vec<ReturningOption>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Conflict {
-    pub(crate) action: Option<ConflictAction>,
-    pub(crate) inference: Vec<IndexExpression>,
-    pub(crate) inference_predicate: Option<Expr>,
-    pub(crate) constraint: Option<String>,
-    pub(crate) assignments: Vec<Assignment>,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) next: Option<Box<Self>>,
+    #[getter(copy)]
+    action: Option<ConflictAction>,
+    inference: Vec<IndexExpression>,
+    inference_predicate: Option<Expr>,
+    constraint: Option<String>,
+    #[getter(skip)]
+    assignments: Vec<Assignment>,
+    #[getter(skip)]
+    predicate: Option<Expr>,
+    next: Option<Box<Self>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct IndexExpression {
-    pub(crate) name: Option<String>,
-    pub(crate) alias: Option<String>,
-    pub(crate) expression: Option<Expr>,
-    pub(crate) collation: Name,
-    pub(crate) operator_class: Name,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) descending: Option<bool>,
-    pub(crate) using_order: bool,
-    pub(crate) nulls_first: Option<bool>,
+    name: Option<String>,
+    alias: Option<String>,
+    expression: Option<Expr>,
+    collation: Name,
+    operator_class: Name,
+    #[getter(skip)]
+    options: Vec<SyntaxOption>,
+    #[getter(copy)]
+    descending: Option<bool>,
+    #[getter(copy)]
+    using_order: bool,
+    #[getter(skip)]
+    nulls_first: Option<bool>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Into {
-    pub(crate) relation: Relation,
-    pub(crate) columns: Vec<String>,
-    pub(crate) access_method: Option<String>,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) on_commit: Option<CommitAction>,
-    pub(crate) tablespace: Option<String>,
-    pub(crate) skip_data: bool,
+    relation: Relation,
+
+    columns: Vec<String>,
+    #[getter(skip)]
+    access_method: Option<String>,
+    #[getter(skip)]
+    options: Vec<SyntaxOption>,
+    #[getter(skip)]
+    on_commit: Option<CommitAction>,
+    #[getter(skip)]
+    tablespace: Option<String>,
+    #[getter(skip)]
+    skip_data: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct SyntaxOption {
-    pub(crate) namespace: Option<String>,
-    pub(crate) name: String,
-    pub(crate) value: Option<SyntaxValue>,
+    namespace: Option<String>,
+    name: String,
+    value: Option<SyntaxValue>,
 }
 
 #[derive(Clone, Debug)]
@@ -1521,26 +1650,36 @@ pub(crate) enum SyntaxValue {
     Type(TypeName),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Update {
-    pub(crate) with: With,
-    pub(crate) relation: Relation,
-    pub(crate) assignments: Vec<Assignment>,
-    pub(crate) from: Vec<FromItem>,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) returning: Vec<Target>,
-    pub(crate) returning_options: Vec<ReturningOption>,
-    pub(crate) or_conflict: Option<ConflictClause>,
+    with: With,
+    relation: Relation,
+    assignments: Vec<Assignment>,
+    from: Vec<FromItem>,
+    predicate: Option<Expr>,
+    returning: Vec<Target>,
+    returning_options: Vec<ReturningOption>,
+    or_conflict: Option<ConflictClause>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Delete {
-    pub(crate) with: With,
-    pub(crate) relation: Relation,
-    pub(crate) using: Vec<FromItem>,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) returning: Vec<Target>,
-    pub(crate) returning_options: Vec<ReturningOption>,
+    with: With,
+    relation: Relation,
+    using: Vec<FromItem>,
+    predicate: Option<Expr>,
+    returning: Vec<Target>,
+    returning_options: Vec<ReturningOption>,
+}
+
+#[cfg(test)]
+impl Delete {
+    pub(crate) fn set_current_of_parameter(&mut self, parameter: i32) {
+        let Some(Expr::CurrentOf(cursor)) = &mut self.predicate else {
+            panic!("CURRENT OF predicate required");
+        };
+        cursor.parameter = parameter;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1623,15 +1762,18 @@ impl SubqueryKind {
 }
 
 // Unresolved PostgreSQL rule syntax; no catalog or writable-view assumptions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CreateRule {
-    pub(crate) name: Name,
-    pub(crate) relation: Relation,
-    pub(crate) replace: bool,
-    pub(crate) event: RuleEvent,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) instead: bool,
-    pub(crate) actions: Vec<StatementNode>,
+    name: Name,
+    relation: Relation,
+    #[getter(copy)]
+    replace: bool,
+    #[getter(copy)]
+    event: RuleEvent,
+    predicate: Option<Expr>,
+    #[getter(copy)]
+    instead: bool,
+    actions: Vec<StatementNode>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1643,21 +1785,25 @@ pub(crate) enum RuleEvent {
 }
 
 // Unresolved PostgreSQL DROP RULE syntax; the ON relation is always explicit.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct DropRule {
-    pub(crate) name: Name,
-    pub(crate) relation: Name,
-    pub(crate) if_exists: bool,
-    pub(crate) behavior: DropBehavior,
+    name: Name,
+    relation: Name,
+    #[getter(copy)]
+    if_exists: bool,
+    #[getter(copy)]
+    behavior: DropBehavior,
 }
 
 // DROP TRIGGER retains only syntax; SQLite has no ON relation or drop behavior.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct DropTrigger {
-    pub(crate) name: Name,
-    pub(crate) relation: Option<Name>,
-    pub(crate) if_exists: bool,
-    pub(crate) behavior: Option<DropBehavior>,
+    name: Name,
+    relation: Option<Name>,
+    #[getter(copy)]
+    if_exists: bool,
+    #[getter(copy)]
+    behavior: Option<DropBehavior>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1667,20 +1813,25 @@ pub(crate) enum DropBehavior {
 }
 
 // Unresolved trigger syntax; interpretation belongs to statement-specific analyzers.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CreateTrigger {
-    pub(crate) name: Name,
-    pub(crate) relation: Relation,
-    pub(crate) replace: bool,
-    pub(crate) if_not_exists: bool,
-    pub(crate) temporary: bool,
-    pub(crate) timing: Option<TriggerTiming>,
-    pub(crate) events: Vec<TriggerEvent>,
-    pub(crate) granularity: Option<TriggerGranularity>,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) constraint: Option<TriggerConstraint>,
-    pub(crate) transitions: Vec<TriggerTransition>,
-    pub(crate) body: TriggerBody,
+    name: Name,
+    relation: Relation,
+    #[getter(copy)]
+    replace: bool,
+    #[getter(copy)]
+    if_not_exists: bool,
+    #[getter(copy)]
+    temporary: bool,
+    #[getter(copy)]
+    timing: Option<TriggerTiming>,
+    events: Vec<TriggerEvent>,
+    #[getter(copy)]
+    granularity: Option<TriggerGranularity>,
+    predicate: Option<Expr>,
+    constraint: Option<TriggerConstraint>,
+    transitions: Vec<TriggerTransition>,
+    body: TriggerBody,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1704,18 +1855,28 @@ pub(crate) enum TriggerEvent {
     Truncate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TriggerConstraint {
-    pub(crate) relation: Option<Relation>,
-    pub(crate) deferrable: bool,
-    pub(crate) initially_deferred: bool,
+    relation: Option<Relation>,
+    #[getter(copy)]
+    deferrable: bool,
+    #[getter(copy)]
+    initially_deferred: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TriggerTransition {
-    pub(crate) name: String,
-    pub(crate) new: bool,
-    pub(crate) table: bool,
+    name: String,
+    #[getter(skip)]
+    new: bool,
+    #[getter(copy)]
+    table: bool,
+}
+
+impl TriggerTransition {
+    pub(crate) const fn is_new(&self) -> bool {
+        self.new
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1724,10 +1885,10 @@ pub(crate) enum TriggerBody {
     Commands(Vec<StatementNode>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TriggerFunction {
-    pub(crate) name: Name,
-    pub(crate) arguments: Vec<String>,
+    name: Name,
+    arguments: Vec<String>,
 }
 
 #[cfg(test)]

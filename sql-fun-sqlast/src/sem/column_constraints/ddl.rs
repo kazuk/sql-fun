@@ -98,10 +98,10 @@ impl ColumnConstraint {
         table: &TableName,
         column: &ColumnName,
     ) -> Result<Self, AnalysisError> {
-        let target = TableName::from(FullName::from_ast_name(&ast.table)?);
+        let target = TableName::from(FullName::from_ast_name(ast.table())?);
         #[cfg(feature = "sqlite")]
         Constraint::report_ast_ignored_matches(ast, context, table, column)?;
-        let [target_column] = ast.columns.as_slice() else {
+        let [target_column] = ast.columns().as_slice() else {
             return AnalysisError::raise_unexpected_input("foreign key target column count != 1");
         };
         let target_column = ColumnName::from(target_column.as_str());
@@ -113,11 +113,11 @@ impl ColumnConstraint {
             binding.relation(),
             &target_column,
             target_type.as_ref(),
-            ast.match_type.as_ref(),
-            ast.delete_action.clone(),
-            ast.update_action.clone(),
-            ast.deferrability.clone(),
-            ast.validity.clone(),
+            ast.match_type().as_ref(),
+            ast.delete_action().clone(),
+            ast.update_action().clone(),
+            ast.deferrability().clone(),
+            ast.validity().clone(),
         )))
     }
 }

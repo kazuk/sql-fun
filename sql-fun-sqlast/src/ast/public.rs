@@ -6,7 +6,13 @@ mod wildcard;
 
 use crate::{
     StringSpan,
-    ast::{Cte, CteBody, Dialect, StatementNode, With},
+    ast::{
+        Cte, CteBody, DefaultPrivileges, Dialect, ForeignTable, StatementNode, With,
+        deparse::{DeparseError, FailureKind, SqlEmit, SqlWriter},
+        mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut},
+        projection::ScopedSourceEdit,
+        traversal::{AstVisitorMut, WalkSqlMut},
+    },
 };
 
 /// An owned, unresolved statement in an explicitly selected SQL dialect.
@@ -15,12 +21,16 @@ use crate::{
 /// nodes retain additional syntax even where no inspection method is exposed yet.
 #[derive(Clone, Debug)]
 pub struct Statement {
-    pub(crate) node: StatementNode,
-    pub(crate) dialect: Dialect,
+    node: StatementNode,
+    dialect: Dialect,
     span: StringSpan,
 }
 
 impl Statement {
+    pub(crate) const fn node(&self) -> &StatementNode {
+        &self.node
+    }
+
     #[cfg(test)]
     pub(crate) fn into_test_node(self) -> StatementNode {
         self.node
@@ -406,11 +416,15 @@ impl StatementNode {
 /// A read-only view of a WITH clause and its ordered CTE collection.
 #[derive(Clone, Copy, Debug)]
 pub struct WithClause<'a> {
-    pub(crate) node: &'a With,
-    pub(crate) dialect: Dialect,
+    node: &'a With,
+    dialect: Dialect,
 }
 
 impl<'a> WithClause<'a> {
+    pub(in crate::ast) const fn from_node(node: &'a With, dialect: Dialect) -> Self {
+        Self { node, dialect }
+    }
+
     pub(super) const fn existing(node: &'a With, dialect: Dialect) -> Option<Self> {
         if node.entries.is_empty() {
             None
@@ -479,11 +493,15 @@ impl Dialect {
 /// A read-only CTE, retaining its declaration attributes and body.
 #[derive(Clone, Copy, Debug)]
 pub struct CommonTableExpression<'a> {
-    pub(crate) node: &'a Cte,
-    pub(crate) dialect: Dialect,
+    node: &'a Cte,
+    dialect: Dialect,
 }
 
 impl<'a> CommonTableExpression<'a> {
+    pub(in crate::ast) const fn from_node(node: &'a Cte, dialect: Dialect) -> Self {
+        Self { node, dialect }
+    }
+
     /// Parsed CTE identifier spelling.
     pub fn name(&self) -> &'a str {
         &self.node.name
@@ -539,5 +557,316 @@ impl CteBody {
             Self::Delete(node) => &node.with,
             Self::Merge(node) => node.with_node(),
         }
+    }
+}
+
+impl Statement {
+    /// Render the complete current syntax tree as one deterministic SQL statement.
+    ///
+    /// The output has no trailing semicolon. Ordinary comments and formatting are
+    /// not retained; SQLite type trivia that affects declared types is preserved. The dialect must match the explicit parsing choice; this is
+    /// not a dialect translation operation. Numbered parameter indices are never
+    /// reassigned, including repeated indices and gaps. SQLite named and anonymous
+    /// parameters use their stored numbered slots; bind the output by those slots.
+    /// No schema is inspected.
+    ///
+    /// # Errors
+    /// Returns [`DeparseError`] for a dialect mismatch, unavailable feature,
+    /// invalid syntax/placement, or an unsupported represented node. The statement
+    /// remains unchanged and partial output is never returned.
+    pub fn deparse_sql(&self, dialect: Dialect) -> Result<String, DeparseError> {
+        if dialect != self.dialect {
+            return Err(DeparseError::new(
+                dialect,
+                "statement",
+                "output dialect differs from the parsed statement",
+                FailureKind::DialectMismatch,
+            ));
+        }
+        #[cfg(not(feature = "sqlite"))]
+        if dialect == Dialect::sqlite() {
+            return Err(DeparseError::new(
+                dialect,
+                "statement",
+                "enable the sqlite Cargo feature",
+                FailureKind::UnavailableDialect,
+            ));
+        }
+        let mut writer = SqlWriter::new(dialect);
+        self.node.emit(&mut writer)?;
+        Ok(writer.into_sql())
+    }
+}
+
+#[cfg(test)]
+mod test_deparse_errors {
+    use crate::{
+        ast::{
+            ColumnConstraint, Dialect, Expr as AstExpr, ForeignKeyAction, Literal as AstLiteral,
+            QueryBody, StatementNode,
+        },
+        parse_statements,
+        test_helpers::deparse::statement,
+    };
+
+    #[test]
+    fn reports_dialect_mismatch_without_modifying_statement() {
+        let value = statement("select 1", Dialect::postgres());
+        let original = value.deparse_sql(Dialect::postgres()).unwrap();
+        let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
+        assert!(error.is_dialect_mismatch());
+        assert_eq!(error.dialect(), Dialect::sqlite());
+        assert_eq!(original, value.deparse_sql(Dialect::postgres()).unwrap());
+    }
+
+    #[test]
+    fn unsupported_node_is_structured_and_does_not_return_partial_sql() {
+        let mut value = statement("alter table t add column x int", Dialect::postgres());
+        let StatementNode::AlterRelation(relation) = &mut value.node else {
+            panic!("alter fixture");
+        };
+        relation.commands = vec![crate::ast::AlterCommand::Unsupported(
+            "future command".to_owned(),
+        )];
+        let before = format!("{value:?}");
+        let error = value.deparse_sql(Dialect::postgres()).unwrap_err();
+        assert!(error.is_unsupported());
+        assert!(!error.is_invalid_syntax());
+        assert!(error.node().contains("future command"));
+        assert!(!error.message().is_empty());
+        assert_eq!(format!("{value:?}"), before);
+    }
+
+    #[test]
+    fn rejects_invalid_retained_literal_without_a_panic() {
+        let mut value = statement("select 'valid'", Dialect::postgres());
+        let StatementNode::Query(query) = &mut value.node else {
+            panic!("query fixture");
+        };
+        let QueryBody::Select(select) = &mut query.body else {
+            panic!("select fixture");
+        };
+        select.targets[0].expression = AstExpr::Literal(AstLiteral::String("\0".to_owned()));
+        let error = value.deparse_sql(Dialect::postgres()).unwrap_err();
+        assert!(error.is_invalid_syntax());
+        assert!(!error.is_unsupported());
+        assert!(error.node().contains("literal"));
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn rejects_turso_array_extension_as_invalid_sqlite_syntax() {
+        let mut value = statement("select 1", Dialect::sqlite());
+        let StatementNode::Query(query) = &mut value.node else {
+            panic!("query fixture");
+        };
+        let QueryBody::Select(select) = &mut query.body else {
+            panic!("select fixture");
+        };
+        select.targets[0].expression = AstExpr::Array(vec![crate::ast::Expr::Literal(
+            crate::ast::Literal::Integer(1),
+        )]);
+        let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
+        assert!(error.is_invalid_syntax());
+        assert_eq!(error.dialect(), Dialect::sqlite());
+    }
+
+    #[cfg(not(feature = "sqlite"))]
+    #[test]
+    fn unavailable_dialect_has_its_own_classification() {
+        let mut value = statement("select 1", Dialect::postgres());
+        value.dialect = Dialect::sqlite();
+        let error = value.deparse_sql(Dialect::sqlite()).unwrap_err();
+        assert!(error.is_unavailable_dialect());
+        assert!(!error.is_dialect_mismatch());
+    }
+
+    #[rstest::rstest]
+    #[case::cascade(Some(ForeignKeyAction::Cascade))]
+    #[case::missing_action(None)]
+    fn rejects_on_delete_column_lists_with_other_actions_as_invalid_syntax(
+        #[case] action: Option<ForeignKeyAction>,
+    ) {
+        let mut statement = parse_statements(
+            "CREATE TABLE child (parent_id integer, FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE SET DEFAULT (parent_id))",
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()
+        .unwrap();
+        let StatementNode::Table(table) = &mut statement.node else {
+            panic!("table fixture");
+        };
+        let ColumnConstraint::ForeignKey(reference) = &mut table.constraints[0].constraint else {
+            panic!("foreign key fixture");
+        };
+        reference.delete_action = action;
+
+        let error = statement.deparse_sql(Dialect::postgres()).unwrap_err();
+        assert!(error.is_invalid_syntax(), "{error}");
+        assert_eq!(
+            error.node(),
+            "CREATE TABLE/ON DELETE column list",
+            "{error}"
+        );
+    }
+}
+
+impl StatementNode {
+    /// Inspect ALTER DEFAULT PRIVILEGES syntax without analysis.
+    const fn default_privileges_node(&self) -> Option<&DefaultPrivileges> {
+        if let Self::DefaultPrivileges(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Edit ALTER DEFAULT PRIVILEGES syntax. Each successful edit applies immediately.
+    const fn default_privileges_mut(&mut self) -> Option<&mut DefaultPrivileges> {
+        if let Self::DefaultPrivileges(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Inspect a foreign-table definition without analysis or LIKE expansion.
+    const fn foreign_table_node(&self) -> Option<&ForeignTable> {
+        if let Self::ForeignTable(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Edit foreign-table syntax. Borrowing or dropping this view makes no change.
+    const fn foreign_table_mut(&mut self) -> Option<&mut ForeignTable> {
+        if let Self::ForeignTable(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+impl Statement {
+    /// Inspect ALTER DEFAULT PRIVILEGES syntax without analysis.
+    pub const fn default_privileges(&self) -> Option<&DefaultPrivileges> {
+        self.node.default_privileges_node()
+    }
+    /// Edit ALTER DEFAULT PRIVILEGES syntax; successful edits apply immediately.
+    pub const fn default_privileges_mut(&mut self) -> Option<&mut DefaultPrivileges> {
+        self.node.default_privileges_mut()
+    }
+    /// Inspect a foreign-table definition without analysis or LIKE expansion.
+    pub const fn foreign_table(&self) -> Option<&ForeignTable> {
+        self.node.foreign_table_node()
+    }
+    /// Edit foreign-table syntax. Borrowing or dropping this view makes no change.
+    pub const fn foreign_table_mut(&mut self) -> Option<&mut ForeignTable> {
+        self.node.foreign_table_mut()
+    }
+}
+
+#[cfg(test)]
+mod utility_edit_tests {
+    use crate::{
+        ast::{Dialect, PrivilegeObject},
+        parse_statements,
+        test_helpers::assert_postgres_structure,
+    };
+
+    #[test]
+    fn server_edits_preserve_the_owner_after_failure_abandonment_and_retry() {
+        let original = r#"CREATE FOREIGN TABLE f (LIKE missing INCLUDING ALL EXCLUDING INDEXES, x int OPTIONS (remote 'x') DEFAULT 7) SERVER old OPTIONS (remote 'f')"#;
+        let mut statement = parse_statements(original, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let before = statement.deparse_sql(Dialect::postgres()).unwrap();
+        {
+            let _view = statement.foreign_table_mut().unwrap();
+        }
+        assert_eq!(statement.deparse_sql(Dialect::postgres()).unwrap(), before);
+        assert!(
+            statement
+                .foreign_table_mut()
+                .unwrap()
+                .set_server("")
+                .unwrap_err()
+                .is_invalid_identifier()
+        );
+        assert_eq!(statement.deparse_sql(Dialect::postgres()).unwrap(), before);
+        statement
+            .foreign_table_mut()
+            .unwrap()
+            .set_server("Changed Server")
+            .unwrap();
+        let changed = statement.deparse_sql(Dialect::postgres()).unwrap();
+        assert_eq!(changed, before.replace("\"old\"", "\"Changed Server\""));
+        assert!(
+            statement
+                .foreign_table_mut()
+                .unwrap()
+                .set_server("bad\0name")
+                .is_err()
+        );
+        assert_eq!(
+            statement.foreign_table().unwrap().server(),
+            "Changed Server"
+        );
+        assert_postgres_structure(&changed);
+    }
+
+    #[test]
+    fn privilege_edits_preserve_role_and_schema_clauses_and_revoke_behavior() {
+        let mut statement = parse_statements("ALTER DEFAULT PRIVILEGES FOR ROLE owner IN SCHEMA missing REVOKE SELECT ON TABLES FROM reader, PUBLIC CASCADE", Dialect::postgres()).next().unwrap().unwrap();
+        let before = statement.deparse_sql(Dialect::postgres()).unwrap();
+        {
+            let value = statement.default_privileges_mut().unwrap();
+            value.set_object(PrivilegeObject::large_objects());
+            value.set_grant_option(true);
+        }
+        let after = statement.deparse_sql(Dialect::postgres()).unwrap();
+        assert_eq!(
+            after,
+            before
+                .replace("REVOKE ", "REVOKE GRANT OPTION FOR ")
+                .replace("ON TABLES", "ON LARGE OBJECTS")
+        );
+        assert_postgres_structure(&after);
+        assert!(statement.default_privileges().unwrap().cascade());
+    }
+}
+
+impl HaveWithClause for Statement {
+    fn with_clause(&self) -> Option<WithClause<'_>> {
+        Self::with_clause(self)
+    }
+    fn with_clause_mut(&mut self) -> Option<WithClauseMut<'_>> {
+        self.node.existing_with_editor(self.dialect)
+    }
+    fn ensure_with_clause(&mut self) -> Result<WithClauseMut<'_>, AstMutationError> {
+        self.node.ensure_with_editor(self.dialect)
+    }
+}
+
+impl WalkSqlMut for Statement {
+    fn walk_sql_mut(&mut self, visitor: &mut impl AstVisitorMut) {
+        self.node.walk_sql_mut(visitor);
+    }
+}
+
+impl Statement {
+    pub(crate) fn apply_source_edits(&mut self, edits: &mut impl ScopedSourceEdit) {
+        self.node.apply_source_edits(edits);
+    }
+}
+
+impl CommonTableExpression<'_> {
+    /// Copy this declaration, preserving its body and all declaration attributes.
+    ///
+    /// Insertion rechecks dialect and placement constraints, including when the
+    /// source was parsed without semantic analysis.
+    pub fn to_owned(&self) -> CteDefinition {
+        CteDefinition::copy_declaration(self.node, self.dialect)
     }
 }

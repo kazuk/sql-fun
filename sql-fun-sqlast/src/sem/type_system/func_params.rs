@@ -465,19 +465,24 @@ impl FunctionParam {
         ast: &AstFunctionParameter,
         context: &mut impl ParseContext,
     ) -> Result<Self, AnalysisError> {
-        let name = Some(ast.name.clone());
-        let type_name = FullName::from_ast_name(&ast.type_name.name)?;
+        let name = Some(ast.name().clone());
+        let type_name = FullName::from_ast_name(ast.type_name().name())?;
         let param_type = context.resolve_type_name(&type_name).map(|name| {
-            TypeReference::concrete_type_ref(&name, !ast.type_name.array_bounds.is_empty())
+            TypeReference::concrete_type_ref(&name, !ast.type_name().array_bounds().is_empty())
         });
         let default = ast
-            .default
+            .default()
             .as_ref()
             .map(|expr| {
                 SemScalarExpr::from_ast_in(expr, context, &ScalarAnalysisContext::default())
             })
             .transpose()?;
-        Ok(Self::from_ast_mode(&ast.mode, &name, &param_type, &default))
+        Ok(Self::from_ast_mode(
+            &ast.mode(),
+            &name,
+            &param_type,
+            &default,
+        ))
     }
 
     pub(crate) fn from_ast_mode(

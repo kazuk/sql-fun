@@ -47,7 +47,7 @@ mod test_from_ast {
         let parent = heavy::catalog()?;
         let mut child = test_helpers::layer(&parent);
         let statement = SemAst::from_ast_node(
-            &test_helpers::statement(sql).node,
+            test_helpers::statement(sql).node(),
             &mut child,
             &mut test_helpers_create_cache_context(),
         )?;
@@ -119,7 +119,7 @@ mod test_from_ast {
         let mut child = test_helpers::layer(&parent);
         assert!(
             SemAst::from_ast_node(
-                &test_helpers::statement(sql).node,
+                test_helpers::statement(sql).node(),
                 &mut child,
                 &mut crate::test_helpers::create_cache_context()
             )
@@ -196,10 +196,10 @@ mod test_from_ast {
         };
         let mut child = test_helpers::layer(&context);
         let result = SemAst::from_ast_node(
-            &test_helpers::statement(&format!(
+            test_helpers::statement(&format!(
                 "DROP RULE \"_RETURN\" ON public.item_view {behavior}"
             ))
-            .node,
+            .node(),
             &mut child,
             &mut test_helpers_create_cache_context(),
         );
@@ -227,14 +227,14 @@ impl SemDropRule {
         ast: &DropRule,
         context: &impl ParseContext,
     ) -> Result<Self, ResolutionFailure> {
-        let requested = FullName::from_ast_name(&ast.name)?;
-        let requested_target = FullName::from_ast_name(&ast.relation)?;
-        let behavior = match ast.behavior {
+        let requested = FullName::from_ast_name(ast.name())?;
+        let requested_target = FullName::from_ast_name(ast.relation())?;
+        let behavior = match ast.behavior() {
             DropBehavior::Cascade => DropDependencyBehavior::cascade(),
             DropBehavior::Restrict => DropDependencyBehavior::restrict(),
         };
         let Some(target) = context.resolve_relation_name(&requested_target) else {
-            if ast.if_exists {
+            if ast.if_exists() {
                 return Ok(Self::new(
                     &requested,
                     &requested_target,
@@ -280,7 +280,7 @@ impl SemDropRule {
                 "the View requires its SELECT rule; drop the View instead",
             )));
         }
-        if !found && !ast.if_exists {
+        if !found && !ast.if_exists() {
             return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
         }
         Ok(Self::new(
@@ -288,7 +288,7 @@ impl SemDropRule {
             requested_target,
             Some(&identity),
             found,
-            ast.if_exists,
+            ast.if_exists(),
             behavior,
         ))
     }

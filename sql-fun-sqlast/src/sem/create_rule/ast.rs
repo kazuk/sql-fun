@@ -689,7 +689,7 @@ impl SemCreateRule {
         context: &mut impl ParseContext,
     ) -> Result<Self, ResolutionFailure> {
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-        let requested = FullName::from_ast_name(&ast.relation.name)?;
+        let requested = FullName::from_ast_name(ast.relation().name())?;
         let target = context
             .resolve_relation_name(&requested)
             .ok_or_else(|| ResolutionFailure::rule(&RuleProblem::target(&requested)))?;
@@ -699,10 +699,10 @@ impl SemCreateRule {
         {
             return Err(ResolutionFailure::rule(&RuleProblem::target(&target)));
         }
-        let name = FullName::from_ast_name(&ast.name)?;
+        let name = FullName::from_ast_name(ast.name())?;
         let identity = RuleIdentity::new(&target, name.name().as_str());
         Self::validate_ast_shape(ast, context, &identity)?;
-        let event = SemRuleEvent::ast_semantic(&ast.event);
+        let event = SemRuleEvent::ast_semantic(&ast.event());
         let with = WithClause::default();
         let mut rows = FromClause::default();
         for alias in ["old", "new"] {
@@ -716,13 +716,13 @@ impl SemCreateRule {
         let predicate_scope = ScalarAnalysisContext::rule(&with, &rows, &identity, event, true);
         let predicate = Self::from_ast_rule_predicate(ast, context, &predicate_scope, &identity)?;
         let scope = ScalarAnalysisContext::rule(&with, &rows, &identity, event, false);
-        if ast.event == RuleEvent::Select {
-            for action in &ast.actions {
+        if ast.event() == RuleEvent::Select {
+            for action in ast.actions() {
                 SemAst::validate_ast_select_rule_ctes(action, &identity)?;
             }
         }
         let mut actions = Vec::new();
-        for action in &ast.actions {
+        for action in ast.actions() {
             actions.push(SemAst::from_ast_rule_action(
                 action, context, &scope, &identity,
             )?);
@@ -730,15 +730,16 @@ impl SemCreateRule {
         let mut definition = Self::new(
             &identity,
             event,
-            ast.replace,
-            ast.instead,
+            ast.replace(),
+            ast.instead(),
             &predicate,
             &actions,
             context,
         )?;
         Self::validate_ast_results(ast, context, &definition)?;
-        if ast.event == RuleEvent::Select {
-            let syntax = SemAst::ast_rule_query(&ast.actions[0]).expect("validated SELECT action");
+        if ast.event() == RuleEvent::Select {
+            let syntax =
+                SemAst::ast_rule_query(&ast.actions()[0]).expect("validated SELECT action");
             let query = definition.actions()[0]
                 .select_statement()
                 .expect("resolved SELECT action");
@@ -766,23 +767,24 @@ impl SemCreateRule {
         context: &impl ParseContext,
         identity: &RuleIdentity,
     ) -> Result<(), ResolutionFailure> {
-        if !ast.replace && context.rule(identity).is_some() {
+        if !ast.replace() && context.rule(identity).is_some() {
             return Err(ResolutionFailure::rule(&RuleProblem::duplicate(identity)));
         }
-        if ast.event == RuleEvent::Select {
+        if ast.event() == RuleEvent::Select {
             if context
                 .get_view(&ViewName::from_full_name(identity.target()))
                 .is_none()
             {
                 return Self::ast_invalid(identity, "ON SELECT requires an ordinary view");
             }
-            if !ast.replace {
+            if !ast.replace() {
                 return Err(ResolutionFailure::rule(&RuleProblem::duplicate(identity)));
             }
             if identity.name().name().as_str() != "_RETURN"
-                || !ast.instead
-                || ast.predicate.is_some()
-                || !(ast.actions.len() == 1 && SemAst::ast_rule_query(&ast.actions[0]).is_some())
+                || !ast.instead()
+                || ast.predicate().is_some()
+                || !(ast.actions().len() == 1
+                    && SemAst::ast_rule_query(&ast.actions()[0]).is_some())
             {
                 return Self::ast_invalid(
                     identity,
@@ -803,7 +805,7 @@ impl SemCreateRule {
         scope: &ScalarAnalysisContext<'_>,
         identity: &RuleIdentity,
     ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
-        let Some(syntax) = &ast.predicate else {
+        let Some(syntax) = &ast.predicate() else {
             return Ok(None);
         };
         let mut predicate = SemScalarExpr::from_ast_in(syntax, context, scope)?;
@@ -838,7 +840,7 @@ impl SemCreateRule {
             if let Some(columns) = action.rule_returning()
                 && !columns.is_empty()
             {
-                if returning || !ast.instead || ast.predicate.is_some() {
+                if returning || !ast.instead() || ast.predicate().is_some() {
                     return Self::ast_invalid(
                         definition.identity(),
                         "RETURNING requires an unconditional INSTEAD rule and at most one returning action",
@@ -847,7 +849,7 @@ impl SemCreateRule {
                 returning = true;
                 Self::ast_check_columns(context, definition.identity(), columns, false)?;
             }
-            if ast.event == RuleEvent::Select
+            if ast.event() == RuleEvent::Select
                 && let Some(columns) = action.query_result_columns()
             {
                 Self::ast_check_columns(context, definition.identity(), columns, true)?;

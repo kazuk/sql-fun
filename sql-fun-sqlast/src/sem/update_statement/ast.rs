@@ -43,10 +43,10 @@ impl UpdateStatement {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemAst, ResolutionFailure> {
-        DataSource::validate_ast_trigger_command(&ast.relation)?;
-        if !ast.returning.is_empty() {
+        DataSource::validate_ast_trigger_command(ast.relation())?;
+        if !ast.returning().is_empty() {
             return SemCreateTrigger::ast_invalid(
-                &FullName::from_ast_name(&ast.relation.name)?,
+                &FullName::from_ast_name(ast.relation().name())?,
                 "SQLite trigger UPDATE does not support RETURNING",
             );
         }
@@ -109,11 +109,11 @@ mod test_from_ast {
         fn synthetic_array_parameters_retain_assignment_compatibility() {
             let mut context = test_helpers::catalog();
             let result = SemAst::from_ast_node(
-                &parse_statements("UPDATE arrays SET a[$1]=$2", Dialect::postgres())
+                parse_statements("UPDATE arrays SET a[$1]=$2", Dialect::postgres())
                     .next()
                     .unwrap()
                     .unwrap()
-                    .node,
+                    .node(),
                 &mut context,
                 &mut create_cache_context(),
             );
@@ -301,11 +301,11 @@ mod test_from_ast {
         ) {
             let mut context = catalog(Dialect::postgres());
             let view_query = SemAst::from_ast_node(
-                &parse_statements("SELECT id,label FROM items", Dialect::postgres())
+                parse_statements("SELECT id,label FROM items", Dialect::postgres())
                     .next()
                     .unwrap()
                     .unwrap()
-                    .node,
+                    .node(),
                 &mut context,
                 &mut create_cache_context(),
             )
@@ -325,11 +325,11 @@ mod test_from_ast {
             };
             context.set_view_update_support(&name, &support);
             let result = SemAst::from_ast_node(
-                &parse_statements(sql, Dialect::postgres())
+                parse_statements(sql, Dialect::postgres())
                     .next()
                     .unwrap()
                     .unwrap()
-                    .node,
+                    .node(),
                 &mut context,
                 &mut create_cache_context(),
             );
@@ -409,7 +409,7 @@ mod test_from_ast {
             .unwrap()
             .unwrap();
         let result =
-            SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context());
+            SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context());
         if fatal {
             assert!(result.is_err());
         } else {
@@ -430,7 +430,7 @@ mod test_from_ast {
                 .unwrap()
                 .unwrap();
             let result =
-                SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context())
+                SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context())
                     .unwrap();
             if sql.ends_with("DEFAULT") {
                 assert!(
@@ -547,7 +547,7 @@ mod test_from_ast {
         .unwrap()
         .unwrap();
         let before = parameter_resolution_inference_runs();
-        SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context()).unwrap();
+        SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context()).unwrap();
         assert_eq!(
             crate::sem::parameter_resolution::inference_runs(),
             before + 1
@@ -647,9 +647,9 @@ impl UpdateStatement {
     ) -> Result<(), ResolutionFailure> {
         if let Some(support) = table.view_support() {
             let columns: Vec<_> = ast
-                .assignments
+                .assignments()
                 .iter()
-                .map(|assignment| ColumnName::from(assignment.name.as_str()))
+                .map(|assignment| ColumnName::from(assignment.name().as_str()))
                 .collect();
             if !support.accepts_assignments(&columns) {
                 context.report_analysis_problem(AnalysisProblem::update(
@@ -685,7 +685,7 @@ impl UpdateStatement {
         } else {
             None
         };
-        let name = FullName::from_ast_name(&ast.relation.name)?;
+        let name = FullName::from_ast_name(ast.relation().name())?;
         let name = if let Some(scope) = outer {
             scope.trigger_relation_name(context, &name)?
         } else {
@@ -700,10 +700,10 @@ impl UpdateStatement {
         )?;
         Self::validate_ast_index_hint(ast, context, &table)?;
         Self::validate_ast_view_trigger(ast, context, &table)?;
-        let with = WithClause::from_ast(&ast.with, context, outer)?;
+        let with = WithClause::from_ast(ast.with(), context, outer)?;
         let alias = ast
-            .relation
-            .alias
+            .relation()
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
@@ -722,7 +722,7 @@ impl UpdateStatement {
         let target_scope = ScalarAnalysisContext::nested(&with, &target_from, None);
         let assignments = UpdateAssignmentCollection::resolve(
             context,
-            &ast.assignments,
+            ast.assignments(),
             &table,
             &alias,
             &target_scope,
@@ -733,17 +733,17 @@ impl UpdateStatement {
         let mut update = Self::new(
             table.name(),
             &assignments,
-            &WithClause::ast_local_definitions(&ast.with, with),
+            &WithClause::ast_local_definitions(ast.with(), with),
             &from,
             &predicate,
             &returning,
         );
         update.set_modifiers(
             table.view_support(),
-            &ast.or_conflict,
-            &ast.relation.indexed,
-            ast.relation.not_indexed,
-            ast.relation.inherit,
+            ast.or_conflict(),
+            ast.relation().indexed(),
+            ast.relation().not_indexed(),
+            ast.relation().inherit(),
         );
         update.validate_assignments(context)?;
         Ok(update)
@@ -778,7 +778,7 @@ impl UpdateStatement {
             ))?;
             return Err(ResolutionFailure::reported());
         }
-        if !ast.returning.is_empty()
+        if !ast.returning().is_empty()
             && table
                 .view_support()
                 .is_some_and(|s| !s.supports_returning())
@@ -798,7 +798,7 @@ impl UpdateStatement {
         context: &mut impl ParseContext,
         table: &UpdateDestination,
     ) -> Result<(), ResolutionFailure> {
-        if let Some(index) = &ast.relation.indexed {
+        if let Some(index) = &ast.relation().indexed() {
             let name = FullName::with_schema(
                 table
                     .name()
@@ -833,7 +833,7 @@ impl UpdateStatement {
     ) -> Result<FromClause, ResolutionFailure> {
         // FROM subqueries cannot implicitly see the UPDATE target. Correlation
         // within RHS expressions uses the complete scope assembled below.
-        let mut from = DataSource::from_ast_list_in(&ast.from, context, with, outer)?;
+        let mut from = DataSource::from_ast_list_in(ast.from(), context, with, outer)?;
         let source = DataSource::resolve_relation(
             context,
             table.name().full_name(),
@@ -853,12 +853,12 @@ impl UpdateStatement {
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<UpdatePredicate>, ResolutionFailure> {
-        if let Some(expression) = &ast.predicate
+        if let Some(expression) = &ast.predicate()
             && let Some(cursor) = UpdateCursor::from_ast_current_of(expression, context, target)?
         {
             return Ok(Some(UpdatePredicate::current_of(&cursor)));
         }
-        let predicate = SemScalarExpr::from_ast_optional(&ast.predicate, context, scope)?;
+        let predicate = SemScalarExpr::from_ast_optional(ast.predicate(), context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -900,7 +900,7 @@ impl UpdateStatement {
             )?);
             let scope = ScalarAnalysisContext::nested(with, &returning_from, None);
             ResultColumnCollection::resolve_for_update(
-                &ast.returning,
+                ast.returning(),
                 context,
                 &returning_from,
                 &scope,
@@ -909,7 +909,7 @@ impl UpdateStatement {
         } else {
             let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             scope.set_postgres_returning(context);
-            ResultColumnCollection::resolve_for_update(&ast.returning, context, from, &scope)
+            ResultColumnCollection::resolve_for_update(ast.returning(), context, from, &scope)
                 .map_err(Into::into)
         }
     }
@@ -943,7 +943,7 @@ impl UpdateAssignmentCollection {
                 ))?;
             }
             seen.push(assignment);
-            let column_name = ColumnName::from(assignment.name.as_str());
+            let column_name = ColumnName::from(assignment.name().as_str());
             let Some(column) = table.column(&column_name) else {
                 context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     table.name(),
@@ -961,7 +961,7 @@ impl UpdateAssignmentCollection {
                 .resolve_column(context, Some(alias.name()), &column_name)?
                 .0;
             let destination = IndirectionExpr::from_ast_sequence(
-                &assignment.indirection,
+                assignment.indirection(),
                 context,
                 rhs_scope,
                 destination,
@@ -991,7 +991,7 @@ impl UpdateValue {
         column: &ColumnDefinition,
         value: &Self,
     ) -> Result<(), ResolutionFailure> {
-        if value.is_default() && !ast.indirection.is_empty() {
+        if value.is_default() && !ast.indirection().is_empty() {
             context.report_analysis_problem(AnalysisProblem::update(
                 UpdateProblemKind::default_target(),
                 "DEFAULT requires a whole-column destination",
@@ -1027,7 +1027,7 @@ impl UpdateValue {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, ResolutionFailure> {
-        let Some(value) = &ast.value else {
+        let Some(value) = &ast.value() else {
             return AnalysisError::raise_unexpected_input("missing UPDATE RHS").map_err(Into::into);
         };
         if let Some((source, position, width)) = value.multi_assignment_data() {

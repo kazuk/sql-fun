@@ -171,9 +171,9 @@ impl CreateTableAs {
         cache: &mut CacheContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let mut query = SelectStatement::from_ast(&ast.query, &mut context, cache)?;
-        let name = FullName::from_ast_name(&ast.into.relation.name)?;
-        if ast.into.columns.len() > query.result_columns().len() {
+        let mut query = SelectStatement::from_ast(ast.query(), &mut context, cache)?;
+        let name = FullName::from_ast_name(ast.into().relation().name())?;
+        if ast.into().columns().len() > query.result_columns().len() {
             context.report_problem(AnalysisProblem::creation(CreationProblem::named(
                 &name,
                 "too many output column names",
@@ -184,7 +184,7 @@ impl CreateTableAs {
                 context,
             ));
         }
-        query.rename_columns(&ast.into.columns);
+        query.rename_columns(ast.into().columns());
         let columns = query.result_columns().column_definitions()?;
         let mut names = Vec::new();
         for column in &columns {
@@ -204,13 +204,13 @@ impl CreateTableAs {
         let table = CreateTable::new(
             &TableName::from(name.clone()),
             columns,
-            CreateTableMode::from_if_not_exists(ast.if_not_exists),
-            ast.into.relation.persistence == "t",
+            CreateTableMode::from_if_not_exists(ast.if_not_exists()),
+            ast.into().relation().persistence() == "t",
             source,
         );
-        let table_as = Self::new(&name, &SemAst::select(&query), ast.materialized)
-            .with_if_not_exists(ast.if_not_exists);
-        let context = if ast.materialized {
+        let table_as = Self::new(&name, &SemAst::select(&query), ast.materialized())
+            .with_if_not_exists(ast.if_not_exists());
+        let context = if ast.materialized() {
             context.apply_create_table_as(&table_as)?
         } else {
             context.apply_create_table(&table)?

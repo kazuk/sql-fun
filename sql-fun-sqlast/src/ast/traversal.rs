@@ -7,14 +7,12 @@ use crate::{
         ExclusionElement, Expr, Frame, FrameBound, FromGroup, FromItem, Grouping, InTable,
         IndexExpression, Indirection, Insert, Into, Join, NamedArgument, NullTest, OperatorExpr,
         Order, PartitionBound, PartitionDatum, Query, QueryBody, Raise, Select, SetQuery, Slice,
-        Subquery, SyntaxOption, SyntaxValue, TableConstraint, TableFunction, TableFunctions,
-        TableSample, Target, TruthTest, TypeName, TypedColumn, Update, Window, With,
-        projection::ProjectionScope,
+        StatementNode, Subquery, SyntaxOption, SyntaxValue, TableConstraint, TableFunction,
+        TableFunctions, TableSample, Target, TruthTest, TypeName, TypedColumn, Update, Window,
+        With, projection::ProjectionScope,
     },
     stack::with_stack as stack_with_stack,
 };
-
-use crate::ast::StatementNode;
 
 pub(in crate::ast) trait AstVisitorMut {
     fn enter_query(&mut self, _query: &mut Query) {}
@@ -222,7 +220,7 @@ mod foreign_table_traversal_tests {
         let mut statement = parse_statements("CREATE FOREIGN TABLE f (LIKE missing, x int DEFAULT (SELECT 1), CHECK ((SELECT true)), y int GENERATED ALWAYS AS ((SELECT 2)) STORED) SERVER absent", Dialect::postgres()).next().unwrap().unwrap();
         let before = statement.deparse_sql(Dialect::postgres()).unwrap();
         let mut counter = QueryCounter::default();
-        statement.node.walk_sql_mut(&mut counter);
+        statement.walk_sql_mut(&mut counter);
         assert_eq!(counter.0, 3);
         assert_eq!(statement.deparse_sql(Dialect::postgres()).unwrap(), before);
     }

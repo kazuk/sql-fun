@@ -122,7 +122,7 @@ impl CreateEnum {
     where
         TContext: ParseContext,
     {
-        let enum_type = Self::new(&FullName::from_ast_name(&ast.name)?, &ast.values);
+        let enum_type = Self::new(&FullName::from_ast_name(ast.name())?, ast.values());
         let context = context.apply_create_enum(&enum_type)?;
         Ok(AstAndContextPair::new(
             SemAst::from_create_enum(&enum_type),

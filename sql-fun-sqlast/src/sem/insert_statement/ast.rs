@@ -30,7 +30,7 @@ impl InsertStatement {
                 return Ok(None);
             };
             let implicit_targets =
-                ast.columns.is_empty() && context.dialect() == Dialect::postgres();
+                ast.columns().is_empty() && context.dialect() == Dialect::postgres();
             let expanded = if context.parameter_inference_needed() {
                 let (constraints, changed) = ParameterResolution::infer_insert(
                     &mut statement,
@@ -436,7 +436,7 @@ mod test_from_ast {
             .into_context();
         let statement = parse_statements(sql, dialect).next().unwrap().unwrap();
         let result = SemAst::from_ast_node(
-            &statement.node,
+            statement.node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         )
@@ -577,7 +577,7 @@ mod test_from_ast {
             .unwrap();
         let mut context = test_helpers::catalog(Dialect::postgres());
         let result = SemAst::from_ast_node(
-            &statement.node,
+            statement.node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         );
@@ -662,7 +662,7 @@ mod test_from_ast {
             .unwrap()
             .unwrap();
         SemAst::from_ast_node(
-            &statement.node,
+            statement.node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         )
@@ -785,7 +785,7 @@ mod test_from_ast {
         let sql = format!("INSERT INTO items(id) VALUES(1) ON CONFLICT {target} DO NOTHING");
         let statement = parse_statements(&sql, dialect).next().unwrap().unwrap();
         let result = SemAst::from_ast_node(
-            &statement.node,
+            statement.node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         )
@@ -957,14 +957,14 @@ mod test_from_ast {
                 "public", "both",
             ))],
         );
-        let result = SemAst::from_ast_node(&parse_statements(
+        let result = SemAst::from_ast_node(parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT(id, label COLLATE "C" text_ops) DO NOTHING"#,
         dialect,
     )
     .next()
     .unwrap()
     .unwrap()
-    .node, &mut context, &mut test_helpers_create_cache_context())
+    .node(), &mut context, &mut test_helpers_create_cache_context())
     .unwrap();
         assert_eq!(context.reported_problem_count(), 0);
         assert_eq!(
@@ -987,10 +987,10 @@ mod test_from_ast {
         context.set_collation_lookup(&outer, &outer_lookup);
         // Any attempt to infer an arbiter from these failed bindings is a bug.
         context.expect_conflict_modifiers(&[], &[]);
-        let result = SemAst::from_ast_node(&parse_statements(
+        let result = SemAst::from_ast_node(parse_statements(
         r#"INSERT INTO items VALUES(1,'x') ON CONFLICT ((label COLLATE absent579) COLLATE "C") DO NOTHING"#,
         dialect,
-    ).next().unwrap().unwrap().node, &mut context, &mut test_helpers_create_cache_context()).unwrap();
+    ).next().unwrap().unwrap().node(), &mut context, &mut test_helpers_create_cache_context()).unwrap();
         let conflict = &result.as_insert().unwrap().conflicts()[0];
         assert_eq!(
             conflict.modifiers()[0].collation_references(),
@@ -1054,7 +1054,7 @@ mod test_from_ast {
         .unwrap()
         .unwrap();
         let result = SemAst::from_ast_node(
-            &statement.node,
+            statement.node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         )
@@ -1073,11 +1073,11 @@ mod test_from_ast {
         assert_eq!(lookup.name(), "key473");
         assert_eq!(lookup.table().to_string(), "public.keyed");
         let returning = SemAst::from_ast_node(
-            &parse_statements("INSERT INTO keyed VALUES(2) RETURNING id", dialect)
+            parse_statements("INSERT INTO keyed VALUES(2) RETURNING id", dialect)
                 .next()
                 .unwrap()
                 .unwrap()
-                .node,
+                .node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         )
@@ -1140,7 +1140,7 @@ mod test_from_ast {
         .unwrap()
         .unwrap();
         let result = SemAst::from_ast_node(
-            &statement.node,
+            statement.node(),
             &mut context,
             &mut test_helpers_create_cache_context(),
         )
@@ -1168,7 +1168,7 @@ mod test_from_ast {
         let statement = parse_statements("SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s", Dialect::postgres()).next().unwrap().unwrap();
         assert!(
             SemAst::from_ast_node(
-                &statement.node,
+                statement.node(),
                 &mut context,
                 &mut crate::test_helpers::create_cache_context()
             )
@@ -1194,7 +1194,7 @@ impl InsertStatement {
             target.validate_value(
                 context,
                 defaults_only,
-                ast.overriding
+                ast.overriding()
                     .as_ref()
                     .is_some_and(InsertClauseSemantics::ast_overrides_identity),
             )?;
@@ -1209,7 +1209,7 @@ impl InsertStatement {
                 ))?;
             }
         }
-        if ast.columns.is_empty()
+        if ast.columns().is_empty()
             && context.dialect() == Dialect::postgres()
             && let Some(support) = statement.view_support()
         {
@@ -1247,10 +1247,10 @@ impl InsertStatement {
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<Self, ResolutionFailure> {
-        if let Some(conflict) = &ast.conflict {
+        if let Some(conflict) = &ast.conflict() {
             InsertConflict::require_ast_conflict_action(conflict);
         }
-        let name = FullName::from_ast_name(&ast.relation.name)?;
+        let name = FullName::from_ast_name(ast.relation().name())?;
         let name = if let Some(scope) = outer {
             scope.trigger_relation_name(context, &name)?
         } else {
@@ -1279,14 +1279,14 @@ impl InsertStatement {
             return Err(ResolutionFailure::reported());
         }
         if let Some(support) = table.view_support() {
-            if !ast.returning.is_empty() && !support.supports_returning() {
+            if !ast.returning().is_empty() && !support.supports_returning() {
                 context.report_analysis_problem(AnalysisProblem::insert(
                     InsertProblemKind::view_operation(),
                     "destination view does not support INSERT RETURNING",
                 ))?;
                 return Err(ResolutionFailure::reported());
             }
-            if ast.conflict.is_some() && !support.supports_on_conflict() {
+            if ast.conflict().is_some() && !support.supports_on_conflict() {
                 context.report_analysis_problem(AnalysisProblem::insert(
                     InsertProblemKind::view_operation(),
                     "destination view does not support ON CONFLICT",
@@ -1295,23 +1295,23 @@ impl InsertStatement {
             }
         }
         let name = table.name().clone();
-        let with = WithClause::from_ast(&ast.with, context, outer)?;
+        let with = WithClause::from_ast(ast.with(), context, outer)?;
         let empty = FromClause::default();
         let source_scope = ScalarAnalysisContext::rule_action_source(&with, &empty, outer);
         let source = ast
-            .source
+            .source()
             .as_ref()
             .map(|query| InsertSource::from_ast(query, context, &source_scope))
             .transpose()?
             .unwrap_or_else(InsertSource::default_values);
         let alias = ast
-            .relation
-            .alias
+            .relation()
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| {
                 AliasSpec::from_local_name(
-                    &FullName::from_ast_name(&ast.relation.name)
+                    &FullName::from_ast_name(ast.relation().name())
                         .expect("target name")
                         .local_name(),
                 )
@@ -1328,7 +1328,7 @@ impl InsertStatement {
         }
         let scope = ScalarAnalysisContext::nested(&with, &from, outer);
         let implicit_width = if context.dialect() == Dialect::postgres() {
-            if ast.source.is_some() {
+            if ast.source().is_some() {
                 if source
                     .as_query()
                     .is_some_and(SelectStatement::has_pending_stars)
@@ -1348,19 +1348,21 @@ impl InsertStatement {
             .is_some_and(SelectStatement::has_pending_stars);
         let columns = InsertTargetCollection::resolve(
             context,
-            &ast.columns,
+            ast.columns(),
             &InsertTargetBinding::new(&table, &alias, &scope),
             &scope,
-            InsertTargetMode::new(ast.source.is_some(), implicit_width, pending_source),
+            InsertTargetMode::new(ast.source().is_some(), implicit_width, pending_source),
         )?;
         columns.validate_source(
             context,
             &source,
-            ast.source.is_some(),
-            ast.overriding.as_ref(),
+            ast.source().is_some(),
+            ast.overriding().as_ref(),
         )?;
         let returning_alias = if context.dialect() == Dialect::sqlite() {
-            AliasSpec::from_local_name(&FullName::from_ast_name(&ast.relation.name)?.local_name())
+            AliasSpec::from_local_name(
+                &FullName::from_ast_name(ast.relation().name())?.local_name(),
+            )
         } else {
             alias.clone()
         };
@@ -1380,14 +1382,14 @@ impl InsertStatement {
             ScalarAnalysisContext::nested(&with, &returning_from, rule_returning.as_ref());
         returning_scope.set_postgres_returning(context);
         let returning = ResultColumnCollection::resolve_for_insert(
-            &ast.returning,
+            ast.returning(),
             context,
             &returning_scope,
             &table,
             &returning_alias,
         )?;
         let conflicts = ast
-            .conflict
+            .conflict()
             .as_ref()
             .map(|conflict| {
                 InsertConflict::from_ast_insert(conflict, context, &scope, &table, &name)
@@ -1398,16 +1400,16 @@ impl InsertStatement {
             &name,
             &columns,
             &source,
-            &WithClause::ast_local_definitions(&ast.with, with),
+            &WithClause::ast_local_definitions(ast.with(), with),
             &returning,
         );
-        let overriding = if let Some(mode) = &ast.overriding {
+        let overriding = if let Some(mode) = &ast.overriding() {
             InsertClauseSemantics::ast_insert_mode(mode)
         } else {
             None
         };
         insert.set_view_support(table.view_support());
-        insert.set_modifiers(conflicts, overriding, ast.or_conflict.clone());
+        insert.set_modifiers(conflicts, overriding, ast.or_conflict().clone());
         if !insert.source_has_pending_stars() {
             insert.validate_assignments(context)?;
         }
@@ -1566,11 +1568,11 @@ impl InsertTargetCollection {
                 {
                     context.report_analysis_problem(AnalysisProblem::insert(
                         InsertProblemKind::duplicate_target(),
-                        &format!("column {} is assigned more than once", assignment.name),
+                        &format!("column {} is assigned more than once", assignment.name()),
                     ))?;
                 }
                 seen.push(assignment);
-                let column_name = ColumnName::from(assignment.name.as_str());
+                let column_name = ColumnName::from(assignment.name().as_str());
                 let Some(column) = table.get_column_def(&column_name) else {
                     context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                         table.name(),
@@ -1582,7 +1584,7 @@ impl InsertTargetCollection {
                     .resolve_column(context, Some(alias.name()), &column_name)?
                     .0;
                 let destination = IndirectionExpr::from_ast_sequence(
-                    &assignment.indirection,
+                    assignment.indirection(),
                     context,
                     expression_scope,
                     destination,
@@ -1765,12 +1767,12 @@ impl InsertSource {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, ResolutionFailure> {
-        if let QueryBody::Values(rows) = &ast.body
-            && ast.with.entries.is_empty()
-            && ast.order.is_empty()
-            && ast.limit.is_none()
-            && ast.offset.is_none()
-            && ast.locks.is_empty()
+        if let QueryBody::Values(rows) = &ast.body()
+            && ast.with().entries().is_empty()
+            && ast.order().is_empty()
+            && ast.limit().is_none()
+            && ast.offset().is_none()
+            && ast.locks().is_empty()
         {
             let mut source = Self::empty_values();
             for row in rows {
@@ -1808,9 +1810,9 @@ impl InsertTargetCollection {
         other: &Assignment,
         map: impl Fn(&ColumnName) -> ColumnName,
     ) -> bool {
-        let same = map(&ColumnName::from(ast.name.as_str()))
-            == map(&ColumnName::from(other.name.as_str()));
-        same && (ast.indirection.is_empty() || other.indirection.is_empty())
+        let same = map(&ColumnName::from(ast.name().as_str()))
+            == map(&ColumnName::from(other.name().as_str()));
+        same && (ast.indirection().is_empty() || other.indirection().is_empty())
     }
 }
 
@@ -1824,10 +1826,10 @@ impl InsertConflict {
 
 impl InsertConflict {
     pub(crate) fn require_ast_conflict_action(ast: &Conflict) {
-        if let Some(action) = &ast.action {
+        if let Some(action) = &ast.action() {
             Self::require_ast_action(action);
         }
-        if let Some(next) = &ast.next {
+        if let Some(next) = &ast.next() {
             Self::require_ast_conflict_action(next.as_ref());
         }
     }
@@ -1841,7 +1843,9 @@ impl InsertConflict {
         table: &InsertDestination,
         name: &TableName,
     ) -> Result<Vec<Self>, ResolutionFailure> {
-        if context.dialect() == Dialect::sqlite() && ast.next.is_some() && ast.inference.is_empty()
+        if context.dialect() == Dialect::sqlite()
+            && ast.next().is_some()
+            && ast.inference().is_empty()
         {
             context.report_analysis_problem(AnalysisProblem::insert(
                 InsertProblemKind::conflict_chain(),
@@ -1849,8 +1853,8 @@ impl InsertConflict {
             ))?;
         }
         let mut inference = Vec::new();
-        for item in &ast.inference {
-            if let Some(name) = &item.name {
+        for item in ast.inference() {
+            if let Some(name) = item.name() {
                 inference.push(
                     scope
                         .resolve_column(context, None, &ColumnName::from(name.as_str()))?
@@ -1858,13 +1862,14 @@ impl InsertConflict {
                         .mark_unqualified_column(),
                 );
             }
-            if let Some(expression) = &item.expression {
+            if let Some(expression) = item.expression() {
                 inference.push(SemScalarExpr::from_ast_insert_inference(
                     expression, context, scope,
                 )?);
             }
         }
-        let predicate = SemScalarExpr::from_ast_optional(&ast.inference_predicate, context, scope)?;
+        let predicate =
+            SemScalarExpr::from_ast_optional(ast.inference_predicate(), context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -1882,15 +1887,15 @@ impl InsertConflict {
             ))?;
         }
 
-        let mut conflict = Self::new(inference, predicate, ast.constraint.as_deref());
+        let mut conflict = Self::new(inference, predicate, ast.constraint().as_deref());
         let mut modifiers = Vec::new();
-        for item in &ast.inference {
+        for item in ast.inference() {
             modifiers.push(InsertInferenceModifiers::from_ast_insert_modifiers(
                 item, context,
             )?);
         }
         conflict.set_modifiers(modifiers);
-        if let Some(constraint) = &ast.constraint {
+        if let Some(constraint) = &ast.constraint() {
             let lookup =
                 InsertConstraintLookup::new(name, constraint, table.constraint(constraint));
             if !lookup.is_usable() {
@@ -1901,7 +1906,7 @@ impl InsertConflict {
             }
             conflict.set_arbiter(InsertArbiterLookup::named(&lookup));
         }
-        if !ast.inference.is_empty() {
+        if !ast.inference().is_empty() {
             let arbiters = if conflict.modifiers_are_bound() {
                 match if context
                     .get_view(&ViewName::from_full_name(name.full_name()))
@@ -1933,7 +1938,7 @@ impl InsertConflict {
             }
         }
         let mut conflicts = vec![conflict];
-        if let Some(next) = &ast.next {
+        if let Some(next) = &ast.next() {
             conflicts.extend(Self::from_ast_insert(
                 next.as_ref(),
                 context,
@@ -1968,11 +1973,11 @@ impl InsertInferenceModifiers {
         context: &mut impl ParseContext,
     ) -> Result<Self, ResolutionFailure> {
         let mut names = Vec::new();
-        if let Some(expression) = &ast.expression {
+        if let Some(expression) = &ast.expression() {
             Self::collect_ast_collations(expression, &mut names);
         }
-        if !ast.collation.0.is_empty() {
-            names.push(&ast.collation);
+        if !ast.collation().parts().is_empty() {
+            names.push(ast.collation());
         }
         let mut collations = Vec::new();
         for name in names {
@@ -1980,11 +1985,11 @@ impl InsertInferenceModifiers {
             lookup.report_insert_problem(context)?;
             collations.push(lookup);
         }
-        let operator_class = if ast.operator_class.0.is_empty() {
+        let operator_class = if ast.operator_class().parts().is_empty() {
             None
         } else {
             let lookup = context
-                .lookup_operator_class(&FullName::from_ast_name(&ast.operator_class)?, "btree");
+                .lookup_operator_class(&FullName::from_ast_name(ast.operator_class())?, "btree");
             lookup.report_insert_problem(context)?;
             Some(lookup)
         };
@@ -2015,8 +2020,8 @@ impl InsertInferenceModifiers {
 
 impl InsertInferenceModifiers {
     fn collect_ast_collate_names<'ast>(ast: &'ast Collate, names: &mut Vec<&'ast Name>) {
-        Self::collect_ast_collations(&ast.argument, names);
-        names.push(&ast.name);
+        Self::collect_ast_collations(ast.argument(), names);
+        names.push(ast.name());
     }
 }
 
@@ -2060,10 +2065,10 @@ impl InsertStatement {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemAst, ResolutionFailure> {
-        DataSource::validate_ast_trigger_command(&ast.relation)?;
-        if !ast.returning.is_empty() || ast.source.is_none() {
+        DataSource::validate_ast_trigger_command(ast.relation())?;
+        if !ast.returning().is_empty() || ast.source().is_none() {
             return SemCreateTrigger::ast_invalid(
-                &FullName::from_ast_name(&ast.relation.name)?,
+                &FullName::from_ast_name(ast.relation().name())?,
                 "SQLite trigger INSERT does not support RETURNING or DEFAULT VALUES",
             );
         }

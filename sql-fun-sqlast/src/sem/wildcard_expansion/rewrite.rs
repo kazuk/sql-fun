@@ -406,7 +406,7 @@ impl<'a> WildcardRewritePlan<'a> {
         }
     }
     fn prepare(&mut self, statement: &mut Statement) -> Result<(), WildcardRewriteError> {
-        let scopes = ProjectionScopes::capture(&mut statement.node);
+        let scopes = ProjectionScopes::capture(statement);
         for expansion in self.expansions {
             if !expansion.is_table_dependent() {
                 continue;
@@ -421,13 +421,13 @@ impl<'a> WildcardRewritePlan<'a> {
                 .map_err(WildcardRewriteError::from)?;
         }
         self.targets
-            .validate_wildcards(&mut statement.node)
+            .validate_wildcards(statement)
             .map_err(WildcardRewriteError::from)
     }
     fn apply(&mut self, statement: &mut Statement) -> Result<usize, WildcardRewriteError> {
         let count = self.targets.len();
-        self.sources.stage(&mut statement.node)?;
-        self.targets.apply(&mut statement.node);
+        self.sources.stage(statement)?;
+        self.targets.apply(statement);
         Ok(count)
     }
 }

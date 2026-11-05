@@ -308,15 +308,15 @@ impl TableFunctionOutput {
         let mut output = Self::default();
         for column in columns {
             let collation = column
-                .collation
+                .collation()
                 .as_ref()
                 .map(FullName::from_ast_name)
                 .transpose()?;
             output.declare(
                 context,
-                &column.name,
-                &TypeReference::from_ast(&column.type_name)?,
-                &WithTypmod::<TypeReference>::ast_modifier_arguments(&column.type_name)?,
+                column.name(),
+                &TypeReference::from_ast(column.type_name())?,
+                &WithTypmod::<TypeReference>::ast_modifier_arguments(column.type_name())?,
                 collation.as_ref(),
             )?;
         }
@@ -333,7 +333,7 @@ impl TableFunctionOutput {
             Expr::Call(call) => Self::ast_call_name(call.as_ref()),
             Expr::SqlValue(value) => Ok(Self::ast_sql_value_name(value)),
             Expr::Column(name) => Self::ast_relation_name(name),
-            Expr::Operator(operator) if ArithExpr::ast_is_null_if(&operator.kind) => {
+            Expr::Operator(operator) if ArithExpr::ast_is_null_if(&operator.kind()) => {
                 Ok(Self::nullif_output_name())
             }
             Expr::Cast(cast) => Self::ast_cast_name(cast.as_ref(), value),
@@ -348,11 +348,11 @@ impl TableFunctionOutput {
         value: &SemScalarExpr,
     ) -> Result<String, AnalysisError> {
         let name = Self::ast_expression_name(
-            &ast.argument,
+            ast.argument(),
             value.explicit_cast_operand().unwrap_or(value),
         )?;
         if name.is_empty() {
-            Ok(TypeReference::from_ast(&ast.target)?
+            Ok(TypeReference::from_ast(ast.target())?
                 .full_name()
                 .expect("SQL type syntax constructs a concrete reference")
                 .local_name())
@@ -364,7 +364,7 @@ impl TableFunctionOutput {
 
 impl TableFunctionOutput {
     pub(crate) fn ast_call_name(ast: &Call) -> Result<String, AnalysisError> {
-        Self::ast_relation_name(&ast.name)
+        Self::ast_relation_name(ast.name())
     }
 }
 
@@ -376,7 +376,7 @@ impl TableFunctionOutput {
 
 impl TableFunctionOutput {
     pub(crate) fn ast_sql_value_name(ast: &SqlValue) -> String {
-        ast.name.clone()
+        ast.name().clone()
     }
 }
 

@@ -13,7 +13,9 @@ use crate::{
         Query, Relation as AstRelation, Role as AstRole, StatementNode, SyntaxOption,
         TableConstraint, TypeName, VariableSet,
     },
+    error::AnalysisError,
     names::FullName,
+    syn,
 };
 
 impl From<&FullName> for Name {
@@ -55,15 +57,19 @@ impl super::AlterRelationKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct PostgresAlterCommand {
-    pub(crate) operation: AlterOperation,
-    pub(crate) name: String,
-    pub(crate) number: i32,
-    pub(crate) definition: AlterDefinition,
-    pub(crate) missing_ok: bool,
-    pub(crate) cascade: bool,
-    pub(crate) legacy: Option<Box<AlterCommand>>,
+    #[getter(copy)]
+    operation: AlterOperation,
+    name: String,
+    #[getter(copy)]
+    number: i32,
+    definition: AlterDefinition,
+    #[getter(copy)]
+    missing_ok: bool,
+    #[getter(skip)]
+    cascade: bool,
+    legacy: Option<Box<AlterCommand>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -209,22 +215,50 @@ impl AlterDefinition {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlterColumnType {
-    pub(crate) type_name: TypeName,
-    pub(crate) collation: Option<Name>,
-    pub(crate) using: Option<Expr>,
+    type_name: TypeName,
+    collation: Option<Name>,
+    using: Option<Expr>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct AlterConstraintFlags {
-    pub(crate) name: String,
-    pub(crate) deferrability: Option<(bool, bool)>,
-    pub(crate) enforced: Option<bool>,
-    pub(crate) no_inherit: Option<bool>,
+    #[getter(skip)]
+    name: String,
+    #[getter(skip)]
+    deferrability: Option<(bool, bool)>,
+    #[getter(copy)]
+    enforced: Option<bool>,
+    #[getter(copy)]
+    no_inherit: Option<bool>,
 }
+impl TryFrom<&syn::AtAlterConstraint> for AlterConstraintFlags {
+    type Error = AnalysisError;
+    fn try_from(value: &syn::AtAlterConstraint) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: value.get_conname(),
+            deferrability: if value.get_alter_deferrability() {
+                Some((value.get_deferrable(), value.get_initdeferred()))
+            } else {
+                None
+            },
+            enforced: if value.get_alter_enforceability() {
+                Some(value.get_is_enforced())
+            } else {
+                None
+            },
+            no_inherit: if value.get_alter_inheritability() {
+                Some(value.get_noinherit())
+            } else {
+                None
+            },
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct GenericOption {
-    pub(crate) action: GenericAction,
-    pub(crate) name: String,
-    pub(crate) value: Option<String>,
+    action: GenericAction,
+    name: String,
+    value: Option<String>,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum GenericAction {
@@ -235,19 +269,19 @@ pub(crate) enum GenericAction {
 }
 #[derive(Clone, Debug)]
 pub(crate) struct ReplicaIdentity {
-    pub(crate) kind: String,
-    pub(crate) index: String,
+    kind: String,
+    index: String,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct AlterPartition {
-    pub(crate) relation: Name,
-    pub(crate) bound: Option<PartitionBound>,
-    pub(crate) concurrent: bool,
+    relation: Name,
+    bound: Option<PartitionBound>,
+    concurrent: bool,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct AlterIdentity {
-    pub(crate) mode: String,
-    pub(crate) options: Vec<SyntaxOption>,
+    mode: String,
+    options: Vec<SyntaxOption>,
 }
 
 impl PostgresAlterCommand {
@@ -341,13 +375,16 @@ impl super::Table {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct TableAs {
-    pub(crate) into: AstInto,
-    pub(crate) query: Query,
-    pub(crate) materialized: bool,
-    pub(crate) if_not_exists: bool,
-    pub(crate) skip_data: bool,
+    into: AstInto,
+    query: Query,
+    #[getter(copy)]
+    materialized: bool,
+    #[getter(copy)]
+    if_not_exists: bool,
+    #[getter(skip)]
+    skip_data: bool,
 }
 
 impl TableAs {
@@ -372,20 +409,25 @@ impl TableAs {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Index {
-    pub(crate) name: String,
-    pub(crate) relation: AstRelation,
-    pub(crate) keys: Vec<IndexExpression>,
-    pub(crate) includes: Vec<IndexExpression>,
-    pub(crate) unique: bool,
-    pub(crate) predicate: Option<Expr>,
-    pub(crate) options: Vec<SyntaxOption>,
-    pub(crate) access_method: String,
-    pub(crate) concurrent: bool,
-    pub(crate) if_not_exists: bool,
-    pub(crate) nulls_not_distinct: bool,
-    pub(crate) tablespace: String,
+    name: String,
+    relation: AstRelation,
+    keys: Vec<IndexExpression>,
+    includes: Vec<IndexExpression>,
+    #[getter(copy)]
+    unique: bool,
+    predicate: Option<Expr>,
+    options: Vec<SyntaxOption>,
+    access_method: String,
+    #[getter(skip)]
+    concurrent: bool,
+    #[getter(copy)]
+    if_not_exists: bool,
+    #[getter(skip)]
+    nulls_not_distinct: bool,
+    #[getter(skip)]
+    tablespace: String,
 }
 
 impl Index {
@@ -431,12 +473,13 @@ impl Index {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Schema {
-    pub(crate) name: String,
-    pub(crate) elements: Vec<StatementNode>,
-    pub(crate) if_not_exists: bool,
-    pub(crate) authorization: Option<AstRole>,
+    name: String,
+    elements: Vec<StatementNode>,
+    #[getter(copy)]
+    if_not_exists: bool,
+    authorization: Option<AstRole>,
 }
 
 impl Schema {
@@ -455,15 +498,18 @@ impl Schema {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Function {
-    pub(crate) name: Name,
-    pub(crate) parameters: Vec<FunctionParameter>,
-    pub(crate) result_type: Option<TypeName>,
-    pub(crate) options: Vec<FunctionOption>,
-    pub(crate) replace: bool,
-    pub(crate) procedure: bool,
-    pub(crate) body: Option<FunctionBody>,
+    name: Name,
+    parameters: Vec<FunctionParameter>,
+    result_type: Option<TypeName>,
+    options: Vec<FunctionOption>,
+    #[getter(copy)]
+    replace: bool,
+    #[getter(copy)]
+    procedure: bool,
+    #[getter(skip)]
+    body: Option<FunctionBody>,
 }
 
 #[derive(Clone, Debug)]
@@ -511,12 +557,13 @@ impl FunctionBodyStatement {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct FunctionParameter {
-    pub(crate) name: String,
-    pub(crate) type_name: TypeName,
-    pub(crate) mode: ParameterMode,
-    pub(crate) default: Option<Expr>,
+    name: String,
+    type_name: TypeName,
+    #[getter(copy)]
+    mode: ParameterMode,
+    default: Option<Expr>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -576,27 +623,28 @@ impl Function {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct Domain {
-    pub(crate) name: Name,
-    pub(crate) base: TypeName,
-    pub(crate) base_span: StringSpan,
-    pub(crate) constraints: Vec<TableConstraint>,
-    pub(crate) collation: Name,
+    name: Name,
+    base: TypeName,
+    base_span: StringSpan,
+    constraints: Vec<TableConstraint>,
+    collation: Name,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CompositeType {
-    pub(crate) name: Name,
-    pub(crate) fields: Vec<CompositeField>,
+    name: Name,
+    fields: Vec<CompositeField>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub(crate) struct CompositeField {
-    pub(crate) name: String,
-    pub(crate) type_name: TypeName,
-    pub(crate) collation: Option<Name>,
-    pub(crate) is_not_null: bool,
+    name: String,
+    type_name: TypeName,
+    collation: Option<Name>,
+    #[getter(copy)]
+    is_not_null: bool,
 }
 
 impl CompositeType {

@@ -62,19 +62,19 @@ impl ResultColumnCollection {
         if let Some(name) = ast.source_star_name() {
             return Self::ast_append_source_star(ast, name, context, with, from, scope, results);
         }
-        if let Some(base) = SemScalarExpr::ast_projection_base(&ast.expression, context, scope)? {
+        if let Some(base) = SemScalarExpr::ast_projection_base(ast.expression(), context, scope)? {
             return results.append_composite_star(context, base);
         }
-        let expression = SemScalarExpr::from_ast_in(&ast.expression, context, scope)?;
+        let expression = SemScalarExpr::from_ast_in(ast.expression(), context, scope)?;
         expression.validate_scalar_value(context)?;
         let name = ast
-            .alias
+            .alias()
             .clone()
             .unwrap_or_else(|| expression.get_column_name());
         results.push_projection(
             &ColumnName::from(name.as_str()),
             expression,
-            ast.alias.is_some() && !ast.implicit_alias,
+            ast.alias().is_some() && !ast.implicit_alias(),
         );
         Ok(())
     }
@@ -114,7 +114,7 @@ impl ResultColumnCollection {
             ))?;
         }
         let start = results.len();
-        projection.append_results(context, scope, results, ast.location, None)?;
+        projection.append_results(context, scope, results, ast.location(), None)?;
         if relation.is_none() && qualifier.is_none() {
             results.mark_join_sensitive_star_since(start);
         }
@@ -800,9 +800,9 @@ impl ResultColumnCollection {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<(), AnalysisError> {
-        let value = SemScalarExpr::from_ast_in(&target.expression, context, scope)?;
+        let value = SemScalarExpr::from_ast_in(target.expression(), context, scope)?;
         let name = target
-            .alias
+            .alias()
             .clone()
             .unwrap_or_else(|| value.get_column_name());
         self.push_expression(&ColumnName::from(name.as_str()), value);
@@ -870,13 +870,13 @@ impl ResultColumnCollection {
         context: &mut impl ParseContext,
         alias: &AliasSpec,
     ) -> Result<(), AnalysisError> {
-        if !ast.0.is_empty() && ast.0.as_slice() != [alias.name().as_str()] {
+        if !ast.parts().is_empty() && ast.parts() != [alias.name().as_str()] {
             context.report_analysis_problem(AnalysisProblem::insert(
                 InsertProblemKind::returning_qualifier(),
                 "RETURNING star qualifier does not identify the destination",
             ))?;
         }
-        if !ast.0.is_empty() && context.dialect() == Dialect::sqlite() {
+        if !ast.parts().is_empty() && context.dialect() == Dialect::sqlite() {
             context.report_analysis_problem(AnalysisProblem::insert(
                 InsertProblemKind::returning_qualifier(),
                 "SQLite RETURNING does not permit qualified stars",

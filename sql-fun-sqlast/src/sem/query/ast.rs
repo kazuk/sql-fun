@@ -46,32 +46,42 @@ impl FunctionModifiers {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         let columns = ResultColumnCollection::default();
-        let order =
-            QueryOrder::from_ast_list(&ast.order, context, scope, &columns, ClauseBinding::Source)?;
+        let order = QueryOrder::from_ast_list(
+            ast.order(),
+            context,
+            scope,
+            &columns,
+            ClauseBinding::Source,
+        )?;
         let within_order = QueryOrder::from_ast_list(
-            &ast.within_order,
+            ast.within_order(),
             context,
             scope,
             &columns,
             ClauseBinding::Source,
         )?;
         let filter = SemScalarExpr::from_ast_optional(
-            &ast.filter,
+            ast.filter(),
             context,
             &scope.with_grouping_placement("aggregate FILTER"),
         )?;
         let over = ast
-            .over
+            .over()
             .as_ref()
             .map(|window| QueryWindow::from_ast_over(window, context, scope))
             .transpose()?;
-        let (within_order, order) = if ast.within_group && within_order.is_empty() {
+        let (within_order, order) = if ast.within_group() && within_order.is_empty() {
             (order, Vec::new())
         } else {
             (within_order, order)
         };
         let mut modifiers = Self::new(within_order, order, filter, over);
-        modifiers.set_flags(ast.distinct, ast.star, ast.variadic, ast.within_group);
+        modifiers.set_flags(
+            ast.distinct(),
+            ast.star(),
+            ast.variadic(),
+            ast.within_group(),
+        );
         Ok(modifiers)
     }
 }
@@ -79,8 +89,8 @@ impl FunctionModifiers {
 impl SelectDestination {
     pub(crate) fn from_ast_destination(ast: &Into) -> Result<Self, AnalysisError> {
         Ok(Self::new(
-            &FullName::from_ast_name(&ast.relation.name)?,
-            &ast.relation.persistence,
+            &FullName::from_ast_name(ast.relation().name())?,
+            ast.relation().persistence(),
         ))
     }
 }
@@ -126,7 +136,7 @@ impl QueryOrder {
 
 impl QueryOrder {
     pub(crate) fn ast_unqualified_name(ast: &Name) -> Option<&str> {
-        match ast.0.as_slice() {
+        match ast.parts() {
             [name] => Some(name),
             _ => None,
         }
@@ -146,15 +156,15 @@ impl QueryOrder {
         for order in values {
             if context.dialect() == Dialect::sqlite()
                 && binding.compound()
-                && let Some(index) = Self::match_ast_compound_order(body, &order.expression)
+                && let Some(index) = Self::match_ast_compound_order(body, order.expression())
             {
                 let expression = columns
                     .output_reference(index)
                     .expect("compound output position");
                 orders.push(Self::new(
                     expression,
-                    order.descending,
-                    order.nulls_first,
+                    order.descending(),
+                    order.nulls_first(),
                     None,
                 ));
             } else {
@@ -190,12 +200,12 @@ impl QueryOrder {
         binding: ClauseBinding,
     ) -> Result<Self, AnalysisError> {
         let expression =
-            SemScalarExpr::from_ast_clause(&ast.expression, context, scope, columns, binding)?;
+            SemScalarExpr::from_ast_clause(ast.expression(), context, scope, columns, binding)?;
         let using = Self::from_ast_using_operator(ast, context)?;
         Ok(Self::new(
             expression,
-            ast.descending,
-            ast.nulls_first,
+            ast.descending(),
+            ast.nulls_first(),
             using,
         ))
     }
@@ -206,13 +216,17 @@ impl QueryOrder {
         ast: &Order,
         context: &mut impl ParseContext,
     ) -> Result<Option<ResolvedOperator>, AnalysisError> {
-        let Some(name) = &ast.using else {
+        let Some(name) = &ast.using() else {
             return Ok(None);
         };
         let binding = match OperatorName::from_ast_name(name) {
             Ok(operator_name) => {
                 let binding = ResolvedOperator::resolve(context, &operator_name, true, true);
-                Self::ast_checked_name(context, &name.0.join("."), binding.resolution().clone())?;
+                Self::ast_checked_name(
+                    context,
+                    &name.parts().join("."),
+                    binding.resolution().clone(),
+                )?;
                 binding
             }
             Err(problem) => {
@@ -333,7 +347,7 @@ impl QueryWindow {
     ) -> Result<Self, AnalysisError> {
         // pg_query stores OVER name in WindowDef.name; WINDOW declarations
         // use the same parser field for a definition. Classify at this boundary.
-        if let Some(name) = &ast.name {
+        if let Some(name) = &ast.name() {
             let reference =
                 QueryOrder::ast_checked_name(context, name, scope.resolve_window(name, context))?;
             return Ok(Self::new(
@@ -355,9 +369,9 @@ impl QueryWindow {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let reference = if let Some(name) = &ast.reference {
+        let reference = if let Some(name) = &ast.reference() {
             let outcome = scope.resolve_window(name, context);
-            if context.dialect() == Dialect::postgres() || ast.reference_only {
+            if context.dialect() == Dialect::postgres() || ast.reference_only() {
                 Some(QueryOrder::ast_checked_name(context, name, outcome)?)
             } else {
                 Some(QueryName::new(name, outcome))
@@ -365,23 +379,23 @@ impl QueryWindow {
         } else {
             None
         };
-        let partition = SemScalarExpr::from_ast_list(&ast.partition, context, scope)?;
+        let partition = SemScalarExpr::from_ast_list(ast.partition(), context, scope)?;
         let order = QueryOrder::from_ast_list(
-            &ast.order,
+            ast.order(),
             context,
             scope,
             &ResultColumnCollection::default(),
             ClauseBinding::Source,
         )?;
         let frame = ast
-            .frame
+            .frame()
             .as_ref()
             .map(|frame| QueryFrame::from_ast(frame, context, scope))
             .transpose()?;
         Ok(Self::new(
-            ast.name.clone(),
+            ast.name().clone(),
             reference,
-            ast.reference_only,
+            ast.reference_only(),
             partition,
             order,
             frame,
@@ -403,7 +417,7 @@ impl QueryWindow {
             } else {
                 scope.with_window_names(names.clone())
             };
-            if let Some(name) = &window.name {
+            if let Some(name) = &window.name() {
                 if context.dialect() == Dialect::postgres() && names.contains(name) {
                     context.report_analysis_problem(AnalysisProblem::query(
                         QueryProblem::duplicate_window_definition(name),
@@ -422,7 +436,7 @@ impl QueryWindow {
     pub(crate) fn ast_names(values: &[Window]) -> Vec<String> {
         values
             .iter()
-            .filter_map(|window| window.name.clone())
+            .filter_map(|window| window.name().clone())
             .collect()
     }
 }
@@ -435,13 +449,13 @@ impl QueryFrame {
     ) -> Result<Self, AnalysisError> {
         let frame_scope = scope.with_grouping_placement("window frame offset");
         Ok(Self::new(
-            Self::ast_mode_name(&ast.mode),
-            QueryFrameBound::from_ast(&ast.start, context, &frame_scope)?,
-            ast.end
+            Self::ast_mode_name(&ast.mode()),
+            QueryFrameBound::from_ast(ast.start(), context, &frame_scope)?,
+            ast.end()
                 .as_ref()
                 .map(|end| QueryFrameBound::from_ast(end, context, &frame_scope))
                 .transpose()?,
-            ast.exclusion
+            ast.exclusion()
                 .map(|exclusion| Self::ast_exclusion_name(&exclusion).to_owned()),
         ))
     }
@@ -497,19 +511,20 @@ impl QueryLock {
         let mut result = Vec::new();
         for lock in values {
             let mut relations = Vec::new();
-            for name in &lock.relations {
-                let resolution = scope.resolve_lock(&name.0.join("."));
+            for name in lock.relations() {
+                let resolution = scope.resolve_lock(&name.parts().join("."));
                 relations.push(QueryOrder::ast_checked_name(
                     context,
-                    &name.0.join("."),
+                    &name.parts().join("."),
                     resolution,
                 )?);
             }
             result.push(Self::new(
                 relations,
-                lock.strength
+                lock.strength()
                     .map(|strength| Self::ast_strength_name(&strength).to_owned()),
-                lock.wait.map(|wait| Self::ast_wait_name(&wait).to_owned()),
+                lock.wait()
+                    .map(|wait| Self::ast_wait_name(&wait).to_owned()),
             ));
         }
         Ok(result)
@@ -573,10 +588,10 @@ impl QueryOrder {
 
 impl QueryOrder {
     fn match_ast_set_order(ast: &SetQuery, expression: &Expr) -> Option<usize> {
-        if let Some(index) = Self::match_ast_compound_order(&ast.left.body, expression) {
+        if let Some(index) = Self::match_ast_compound_order(ast.left().body(), expression) {
             Some(index)
         } else {
-            Self::match_ast_compound_order(&ast.right.body, expression)
+            Self::match_ast_compound_order(ast.right().body(), expression)
         }
     }
 }
@@ -584,10 +599,10 @@ impl QueryOrder {
 impl QueryOrder {
     pub(crate) fn match_ast_select_order(ast: &Select, expression: &Expr) -> Option<usize> {
         let key = Self::ast_sqlite_comparison_sql(expression)?;
-        ast.targets.iter().position(|target| {
-            Self::ast_sqlite_comparison_sql(&target.expression).as_ref() == Some(&key)
+        ast.targets().iter().position(|target| {
+            Self::ast_sqlite_comparison_sql(target.expression()).as_ref() == Some(&key)
                 || Self::ast_unqualified_column(expression)
-                    .is_some_and(|name| target.alias.as_deref() == Some(name))
+                    .is_some_and(|name| target.alias().as_deref() == Some(name))
         })
     }
 }

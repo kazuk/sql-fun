@@ -212,7 +212,7 @@ impl WithTypmod<TypeReference> {
     pub(crate) fn ast_modifier_arguments(ast: &TypeName) -> Result<Vec<String>, AnalysisError> {
         use crate::ast::deparse::{SqlEmit, SqlWriter};
         let mut arguments = Vec::new();
-        for modifier in &ast.modifiers {
+        for modifier in ast.modifiers() {
             let mut writer = SqlWriter::new(Dialect::postgres());
             modifier
                 .emit(&mut writer)

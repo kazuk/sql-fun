@@ -1,13 +1,11 @@
 //! End-to-end emission invariants, using the independent frontends and SQLite runtime.
 
-use crate::test_helpers::deparse::statement;
-
 use crate::{
     ast::{CteDefinition, Dialect, HaveWithClause},
-    test_helpers::{on_small_stack, small_stack_regression},
+    test_helpers::{
+        assert_postgres_structure, deparse::statement, on_small_stack, small_stack_regression,
+    },
 };
-
-use crate::test_helpers::assert_postgres_structure;
 
 #[rstest::rstest]
 #[case(

@@ -207,7 +207,7 @@ impl SemAst {
         cache_context: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         AnalysisError::check_dialect(statement.dialect(), context.dialect())?;
-        Self::apply_ast_node(&statement.node, context, cache_context)
+        Self::apply_ast_node(statement.node(), context, cache_context)
     }
 }
 

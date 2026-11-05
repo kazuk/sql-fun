@@ -230,8 +230,8 @@ impl ArraySubscript {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let lower = SemScalarExpr::from_ast_optional(&slice.lower, context, scope)?;
-        let upper = SemScalarExpr::from_ast_optional(&slice.upper, context, scope)?;
+        let lower = SemScalarExpr::from_ast_optional(slice.lower(), context, scope)?;
+        let upper = SemScalarExpr::from_ast_optional(slice.upper(), context, scope)?;
         Ok(Self::slice(lower.as_ref(), upper.as_ref()))
     }
 }

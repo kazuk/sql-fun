@@ -863,15 +863,15 @@ impl MergeStatement {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<Self, AnalysisError> {
         Self::ast_require_version(context, 15)?;
-        if ast.with_clause.recursive {
+        if ast.with_clause().recursive() {
             return Err(AnalysisError::unexpected_input_error(
                 "WITH RECURSIVE is not supported for MERGE",
             ));
         }
-        if !ast.returning_list.is_empty() {
+        if !ast.returning_list().is_empty() {
             Self::ast_require_version(context, 17)?;
         }
-        let requested = TableName::from(FullName::from_ast_name(&ast.relation.name)?);
+        let requested = TableName::from(FullName::from_ast_name(ast.relation().name())?);
         // MERGE eligibility is separate from the ordinary INSERT/UPDATE/DELETE
         // capabilities of a view. Never infer it from those flags.
         let Some(table) = MergeDestination::resolve(context, &requested)? else {
@@ -889,12 +889,12 @@ impl MergeStatement {
             Self::ast_require_version(context, 17)?;
         }
         let alias = ast
-            .relation
-            .alias
+            .relation()
+            .alias()
             .as_ref()
             .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
-        let with = WithClause::from_ast(&ast.with_clause, context, outer)?;
+        let with = WithClause::from_ast(ast.with_clause(), context, outer)?;
         let target = DataSource::resolve_relation(
             context,
             table.name().full_name(),
@@ -902,7 +902,7 @@ impl MergeStatement {
             &WithClause::default(),
         )?;
         let source = DataSource::from_ast(
-            &ast.source_relation,
+            ast.source_relation(),
             context,
             &with,
             &FromClause::default(),
@@ -912,7 +912,7 @@ impl MergeStatement {
             context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
         }
         let on_scope = ScalarAnalysisContext::for_merge_on(&with, &target, &source);
-        let on = SemScalarExpr::from_ast_merge_predicate(&ast.join_condition, context, &on_scope)?;
+        let on = SemScalarExpr::from_ast_merge_predicate(ast.join_condition(), context, &on_scope)?;
         let clauses =
             Self::from_ast_clauses(ast, context, &with, &target, &source, &table, &alias)?;
         if let Some(support) = table.view_support()
@@ -936,18 +936,18 @@ impl MergeStatement {
             clauses.permits_delete(),
         );
         let returning = ResultColumnCollection::resolve_for_merge(
-            &ast.returning_list,
+            ast.returning_list(),
             context,
             &returning_scope,
         )?;
         let mut statement = Self::new(
             table.name(),
-            &WithClause::ast_local_definitions(&ast.with_clause, with.clone()),
+            &WithClause::ast_local_definitions(ast.with_clause(), with.clone()),
             on_scope.sources(),
             &on,
             &clauses,
             &returning,
-            ast.relation.inherit,
+            ast.relation().inherit(),
         );
         statement.set_view_support(table.view_support());
         statement.validate_assignments(context)?;
@@ -968,18 +968,18 @@ impl MergeStatement {
         let target_scope = ScalarAnalysisContext::for_merge_on(with, target, source);
         let mut clauses = MergeWhenCollection::default();
         let mut terminal = [false; 3];
-        for clause in &ast.merge_when_clauses {
-            let index = SemMergeMatchKind::ast_index(&clause.match_kind);
+        for clause in ast.merge_when_clauses() {
+            let index = SemMergeMatchKind::ast_index(&clause.match_kind());
             if terminal[index] {
                 return Err(AnalysisError::unexpected_input_error(
                     "unreachable MERGE WHEN clause after unconditional action",
                 ));
             }
-            terminal[index] = clause.condition.is_none();
-            let kind = SemMergeMatchKind::from_ast_merge_match_kind(&clause.match_kind, context)?;
+            terminal[index] = clause.condition().is_none();
+            let kind = SemMergeMatchKind::from_ast_merge_match_kind(&clause.match_kind(), context)?;
             let scope = ScalarAnalysisContext::for_merge_when(with, target, source, kind);
             let condition = clause
-                .condition
+                .condition()
                 .as_ref()
                 .map(|expr| SemScalarExpr::from_ast_merge_predicate(expr, context, &scope))
                 .transpose()?;
@@ -1041,12 +1041,12 @@ impl MergeAction {
         target: &MergeDestination,
         alias: &AliasSpec,
     ) -> Result<Self, AnalysisError> {
-        if !SemMergeMatchKind::ast_permits(&ast.match_kind, ast.command_type) {
+        if !SemMergeMatchKind::ast_permits(&ast.match_kind(), ast.command_type()) {
             return Err(AnalysisError::unexpected_input_error(
                 "illegal MERGE action for WHEN match kind",
             ));
         }
-        match ast.command_type {
+        match ast.command_type() {
             CmdType::Update => {
                 Self::from_ast_update_action(ast, context, scope, target_scope, target, alias)
             }
@@ -1078,7 +1078,7 @@ impl MergeAction {
         }
         let result = UpdateAssignmentCollection::resolve(
             context,
-            &ast.target_list,
+            ast.target_list(),
             target.update(),
             alias,
             target_scope,
@@ -1105,23 +1105,23 @@ impl MergeAction {
                 "MERGE target does not accept INSERT assignments",
             ));
         }
-        let values = if ast.values.is_empty() {
+        let values = if ast.values().is_empty() {
             None
         } else {
-            Some(ast.values.as_slice())
+            Some(ast.values().as_slice())
         };
         let result = InsertClauseSemantics::resolve(
             context,
-            &ast.target_list,
+            ast.target_list(),
             &InsertTargetBinding::new(target.insert(), alias, target_scope),
             values,
             scope,
-            Some(&ast.overriding),
+            Some(&ast.overriding()),
         );
         let Some(clause) = ResolutionFailure::finish(result, context)? else {
             return Ok(Self::unresolved());
         };
-        let overriding = InsertClauseSemantics::ast_merge_override(&ast.overriding);
+        let overriding = InsertClauseSemantics::ast_merge_override(&ast.overriding());
         Ok(Self::insert(&clause, overriding.as_deref()))
     }
 }

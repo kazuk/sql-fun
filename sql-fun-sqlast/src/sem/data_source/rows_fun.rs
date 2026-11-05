@@ -717,7 +717,7 @@ impl DataSourceRowsFromFunc {
         alias: Option<&AliasSpec>,
     ) -> Result<Self, AnalysisError> {
         if let Expr::Call(call) = ast
-            && SemScalarExpr::ast_is_ordinary(&call.kind)
+            && SemScalarExpr::ast_is_ordinary(&call.kind())
         {
             return Ok(Self::invocation(&DataSource::from_ast_table(
                 call.as_ref(),

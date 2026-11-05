@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{ast::FunctionParameter as AstFunctionParameter, syn::FunctionParameter};
 use sql_fun_core::IVec;
 
@@ -23,8 +22,10 @@ impl FunctionParam {
     where
         TParseContext: ParseContext,
     {
-        convert(&AstFunctionParameter::try_from_with_tokens(&param, tokens)?)
-            .resolve_and_report(context)
+        Self::from_ast_and_report(
+            &AstFunctionParameter::try_from_with_tokens(&param, tokens)?,
+            context,
+        )
     }
 }
 

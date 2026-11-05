@@ -1,4 +1,4 @@
-use crate::sem::{AstConversion, convert};
+use crate::sem::SemScalarExpr;
 use crate::{
     ast::{Dialect, Name, Target},
     context::ParseContext,
@@ -21,10 +21,13 @@ impl ResultColumnCollection {
         let mut results = Self::default();
         for target in targets {
             if let Some(name) = target.source_star_name() {
-                if scope.check_returning_star(context, convert(name).star_qualifier()?.as_ref())? {
+                if scope.check_returning_star(
+                    context,
+                    AliasName::from_ast_star_qualifier(name)?.as_ref(),
+                )? {
                     continue;
                 }
-                convert(name).require_returning_star(context, alias)?;
+                Self::require_ast_returning_star(name, context, alias)?;
                 let first = results.len();
                 let mut index = 0;
                 while let Some(column) = table.get_column_at(index) {
@@ -69,7 +72,7 @@ impl ResultColumnCollection {
                     ))?;
                 }
                 // Unqualified RETURNING * expands only the modified relation.
-                let qualifier = convert(name).star_qualifier()?;
+                let qualifier = AliasName::from_ast_star_qualifier(name)?;
                 if scope.check_returning_star(context, qualifier.as_ref())? {
                     continue;
                 }
@@ -108,7 +111,7 @@ impl ResultColumnCollection {
                     ))?;
                 }
                 // Unqualified RETURNING * expands only the modified relation.
-                let qualifier = convert(name).star_qualifier()?;
+                let qualifier = AliasName::from_ast_star_qualifier(name)?;
                 if scope.check_returning_star(context, qualifier.as_ref())? {
                     continue;
                 }
@@ -146,7 +149,7 @@ impl ResultColumnCollection {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<(), AnalysisError> {
-        let value = convert(&target.expression).resolve_in(context, scope)?;
+        let value = SemScalarExpr::from_ast_in(&target.expression, context, scope)?;
         let name = target
             .alias
             .clone()
@@ -210,19 +213,19 @@ impl ResultColumnCollection {
     }
 }
 
-impl AstConversion<'_, Name> {
-    pub(crate) fn require_returning_star(
-        &self,
+impl ResultColumnCollection {
+    pub(crate) fn require_ast_returning_star(
+        ast: &Name,
         context: &mut impl ParseContext,
         alias: &AliasSpec,
     ) -> Result<(), AnalysisError> {
-        if !self.ast.0.is_empty() && self.ast.0.as_slice() != [alias.name().as_str()] {
+        if !ast.0.is_empty() && ast.0.as_slice() != [alias.name().as_str()] {
             context.report_analysis_problem(AnalysisProblem::insert(
                 InsertProblemKind::returning_qualifier(),
                 "RETURNING star qualifier does not identify the destination",
             ))?;
         }
-        if !self.ast.0.is_empty() && context.dialect() == Dialect::sqlite() {
+        if !ast.0.is_empty() && context.dialect() == Dialect::sqlite() {
             context.report_analysis_problem(AnalysisProblem::insert(
                 InsertProblemKind::returning_qualifier(),
                 "SQLite RETURNING does not permit qualified stars",

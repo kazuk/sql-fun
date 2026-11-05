@@ -1,7 +1,7 @@
 //! Resolve common ownership syntax against the semantic catalog.
 
 use crate::ast::{AlterOwner, Expr, Literal, ObjectTarget, Role, SyntaxOption, TypeName};
-use crate::sem::{AstConversion, convert};
+use crate::sem::CreateSequence;
 use crate::{
     ast::{Name, SyntaxValue},
     context::ParseContext,
@@ -12,12 +12,12 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, AlterOwner> {
-    pub(crate) fn resolve(
-        &self,
+impl SemAlterOwner {
+    pub(crate) fn from_ast(
+        ast: &AlterOwner,
         context: &mut impl ParseContext,
-    ) -> Result<SemAlterOwner, AnalysisError> {
-        let requested = self.target_identity(context)?;
+    ) -> Result<Self, AnalysisError> {
+        let requested = RequestedIdentity::from_ast_owner_target(ast, context)?;
         let target = if !requested.missing_types.is_empty() {
             OwnershipLookup::argument_type_not_found(&requested.identity, &requested.missing_types)
         } else {
@@ -26,37 +26,41 @@ impl AstConversion<'_, AlterOwner> {
         if target.identity().is_none() {
             context.report_analysis_problem(AnalysisProblem::ownership_target(&target))?;
         }
-        let owner = convert(&self.ast.owner).resolve_owner(context)?;
-        Ok(SemAlterOwner::new(&target, &owner))
+        let owner = OwnerSpecification::from_ast(&ast.owner, context)?;
+        Ok(Self::new(&target, &owner))
     }
-    pub(crate) fn resolve_and_apply<C: ParseContext>(
-        &self,
+
+    pub(crate) fn from_ast_and_apply<C: ParseContext>(
+        ast: &AlterOwner,
         mut context: C,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let alteration = self.resolve(&mut context)?;
+        let alteration = Self::from_ast(ast, &mut context)?;
         let context = context.apply_alter_owner(&alteration)?;
         Ok(AstAndContextPair::new(
             SemAst::alter_owner(&alteration),
             context,
         ))
     }
-    fn target_identity(
-        &self,
+}
+
+impl RequestedIdentity {
+    fn from_ast_owner_target(
+        ast: &AlterOwner,
         context: &mut impl ParseContext,
-    ) -> Result<RequestedIdentity, AnalysisError> {
-        let Some(kind) = self.ast.object_kind else {
+    ) -> Result<Self, AnalysisError> {
+        let Some(kind) = ast.object_kind else {
             return AnalysisError::raise_unexpected_none("alter_owner.object_kind");
         };
-        if let Some(relation) = &self.ast.relation {
-            return Ok(RequestedIdentity::new(
-                &OwnershipIdentity::named(kind, &convert(relation).full_name()?),
+        if let Some(relation) = &ast.relation {
+            return Ok(Self::new(
+                &OwnershipIdentity::named(kind, &FullName::from_ast_name(relation)?),
                 &[],
             ));
         }
-        let Some(object) = &self.ast.object else {
+        let Some(object) = &ast.object else {
             return AnalysisError::raise_unexpected_none("alter_owner.object");
         };
-        convert(object).ownership_identity(kind, context)
+        Self::from_ast_object_target(object, kind, context)
     }
 }
 
@@ -72,46 +76,41 @@ impl RequestedIdentity {
             missing_types: missing_types.to_vec(),
         }
     }
-}
 
-impl AstConversion<'_, ObjectTarget> {
-    fn ownership_identity(
-        &self,
+    fn from_ast_object_target(
+        ast: &ObjectTarget,
         kind: ObjectKind,
         context: &mut impl ParseContext,
-    ) -> Result<RequestedIdentity, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let (name, access_method) = if matches!(
             kind,
             ObjectKind::OPERATOR_CLASS | ObjectKind::OPERATOR_FAMILY
         ) {
-            let Some((method, name)) = self.ast.name.split_first() else {
+            let Some((method, name)) = ast.name.split_first() else {
                 return AnalysisError::raise_unexpected_input("operator class/family identity");
             };
             (
-                convert(&Name::from_parts(name)).full_name()?,
+                FullName::from_ast_name(&Name::from_parts(name))?,
                 Some(method.as_str()),
             )
-        } else if let Some(type_name) = &self.ast.type_name {
-            (convert(&type_name.name).full_name()?, None)
+        } else if let Some(type_name) = &ast.type_name {
+            (FullName::from_ast_name(&type_name.name)?, None)
         } else {
-            (
-                convert(&Name::from_parts(&self.ast.name)).full_name()?,
-                None,
-            )
+            (FullName::from_ast_name(&Name::from_parts(&ast.name))?, None)
         };
         let mut missing = Vec::new();
         let identity = if let Some(method) = access_method {
             OwnershipIdentity::with_access_method(kind, &name, method)
-        } else if let Some(arguments) = &self.ast.argument_types {
+        } else if let Some(arguments) = &ast.argument_types {
             let mut types = Vec::new();
             for argument in arguments {
                 if argument.is_output_only() {
                     continue;
                 }
                 if let Some(ty) = &argument.type_name {
-                    let reference = convert(ty).owner_argument_type(context)?;
+                    let reference = OwnershipIdentity::argument_type_from_ast(ty, context)?;
                     if reference.is_none() {
-                        missing.push(convert(&ty.name).full_name()?);
+                        missing.push(FullName::from_ast_name(&ty.name)?);
                     }
                     types.push(reference);
                 } else {
@@ -122,47 +121,46 @@ impl AstConversion<'_, ObjectTarget> {
         } else {
             OwnershipIdentity::named(kind, &name)
         };
-        Ok(RequestedIdentity::new(&identity, &missing))
+        Ok(Self::new(&identity, &missing))
     }
 }
 
-impl AstConversion<'_, TypeName> {
-    pub(crate) fn owner_argument_type(
-        &self,
+impl OwnershipIdentity {
+    pub(crate) fn argument_type_from_ast(
+        ast: &TypeName,
         context: &mut impl ParseContext,
     ) -> Result<Option<TypeReference>, AnalysisError> {
-        let requested = convert(&self.ast.name).full_name()?;
+        let requested = FullName::from_ast_name(&ast.name)?;
         Ok(context
             .resolve_type_name(&requested)
-            .map(|name| TypeReference::concrete_type_ref(&name, !self.ast.array_bounds.is_empty())))
+            .map(|name| TypeReference::concrete_type_ref(&name, !ast.array_bounds.is_empty())))
     }
 }
 
-impl AstConversion<'_, Role> {
-    pub(crate) fn resolve_owner(
-        &self,
+impl OwnerSpecification {
+    pub(crate) fn from_ast(
+        ast: &Role,
         context: &mut impl ParseContext,
-    ) -> Result<OwnerSpecification, AnalysisError> {
-        match self.ast.kind {
-            1 => self.resolve_named_owner(context),
-            2 => Ok(OwnerSpecification::current_role()),
-            3 => Ok(OwnerSpecification::current_user()),
-            4 => Ok(OwnerSpecification::session_user()),
+    ) -> Result<Self, AnalysisError> {
+        match ast.kind {
+            1 => Self::from_ast_named_role(ast, context),
+            2 => Ok(Self::current_role()),
+            3 => Ok(Self::current_user()),
+            4 => Ok(Self::session_user()),
             _ => AnalysisError::raise_unexpected_input("invalid ALTER OWNER role specification"),
         }
     }
 
-    fn resolve_named_owner(
-        &self,
+    fn from_ast_named_role(
+        ast: &Role,
         context: &mut impl ParseContext,
-    ) -> Result<OwnerSpecification, AnalysisError> {
-        if let Some(role) = context.role_by_name(&self.ast.name) {
-            Ok(OwnerSpecification::role(role))
+    ) -> Result<Self, AnalysisError> {
+        if let Some(role) = context.role_by_name(&ast.name) {
+            Ok(Self::role(role))
         } else {
-            context.report_analysis_problem(AnalysisProblem::ownership_role_not_found(
-                &self.ast.name,
-            ))?;
-            Ok(OwnerSpecification::named(&self.ast.name))
+            context
+                .report_analysis_problem(AnalysisProblem::ownership_role_not_found(&ast.name))?;
+            Ok(Self::named(&ast.name))
         }
     }
 }
@@ -303,7 +301,7 @@ impl OwnershipIdentity {
 
 #[cfg(test)]
 mod tests {
-    use crate::sem::convert;
+    use crate::sem::SemAst;
     use crate::{
         context::{
             BaseParseContext, MutSourcePathWithSpan, OwnershipInfoRead, ParseContext, RoleInfoRead,
@@ -575,7 +573,8 @@ mod tests {
         let mut context =
             apply_ownership_sql(ownership_context(), "CREATE SCHEMA app")?.into_context();
         let statement = ownership_statement("ALTER SCHEMA app OWNER TO alice")?;
-        let semantics = convert(&statement).resolve(&mut context, &mut create_cache_context())?;
+        let semantics =
+            SemAst::from_ast_node(&statement, &mut context, &mut create_cache_context())?;
         assert!(
             semantics
                 .ownership_change()
@@ -1035,8 +1034,11 @@ mod tests {
             Some(&OwnerSpecification::session_user()),
         ));
         context.reject_diagnostics_after(0);
-        let result = convert(&ownership_statement("ALTER SCHEMA app OWNER TO missing")?)
-            .resolve(&mut context, &mut create_cache_context());
+        let result = SemAst::from_ast_node(
+            &ownership_statement("ALTER SCHEMA app OWNER TO missing")?,
+            &mut context,
+            &mut create_cache_context(),
+        );
         assert!(result.is_err());
         assert_eq!(
             context.ownership_definitions(ObjectKind::from(37), identity.name())[0].owner(),
@@ -1269,61 +1271,67 @@ mod tests {
     }
 }
 
-impl AstConversion<'_, SyntaxOption> {
-    pub(crate) fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
-        if self.ast.name != "owned_by" {
+impl CreateSequence {
+    pub(crate) fn owned_table_from_ast_option(
+        ast: &SyntaxOption,
+    ) -> Result<Option<TableName>, AnalysisError> {
+        if ast.name != "owned_by" {
             return Ok(None);
         }
-        let Some(SyntaxValue::Expression(expression)) = &self.ast.value else {
+        let Some(SyntaxValue::Expression(expression)) = &ast.value else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY target");
         };
-        convert(expression).owned_relation()
+        Self::owned_table_from_ast_expression(expression)
     }
-}
 
-impl AstConversion<'_, Expr> {
-    pub(crate) fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
-        match self.ast {
-            Expr::List(parts) => Self::owned_relation_from_parts(parts),
-            Expr::Column(name) => convert(name).owned_relation(),
-            Expr::Literal(literal) => convert(literal).owned_relation(),
+    pub(crate) fn owned_table_from_ast_expression(
+        ast: &Expr,
+    ) -> Result<Option<TableName>, AnalysisError> {
+        match ast {
+            Expr::List(parts) => Self::owned_table_from_ast_parts(parts),
+            Expr::Column(name) => Self::owned_table_from_ast_name(name),
+            Expr::Literal(literal) => Self::owned_table_from_ast_literal(literal),
             _ => AnalysisError::raise_unexpected_input("sequence OWNED BY identity"),
         }
     }
-    pub(crate) fn owned_relation_from_parts(
+
+    pub(crate) fn owned_table_from_ast_parts(
         parts: &[Expr],
     ) -> Result<Option<TableName>, AnalysisError> {
         let mut names = Vec::new();
         for part in parts {
-            names.push(convert(part).owned_identifier()?);
+            names.push(Self::owned_identifier_from_ast_expression(part)?);
         }
-        convert(&Name::from_parts(&names)).owned_relation()
+        Self::owned_table_from_ast_name(&Name::from_parts(&names))
     }
-    pub(crate) fn owned_identifier(&self) -> Result<String, AnalysisError> {
-        match self.ast {
-            Expr::Literal(literal) => convert(literal).owned_identifier(),
+
+    pub(crate) fn owned_identifier_from_ast_expression(
+        ast: &Expr,
+    ) -> Result<String, AnalysisError> {
+        match ast {
+            Expr::Literal(literal) => Self::owned_identifier_from_ast_literal(literal),
             _ => AnalysisError::raise_unexpected_input("sequence OWNED BY identifier"),
         }
     }
-}
 
-impl AstConversion<'_, Name> {
-    pub(crate) fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
-        if self.ast.0.len() == 1 && self.ast.0[0].eq_ignore_ascii_case("none") {
+    pub(crate) fn owned_table_from_ast_name(
+        ast: &Name,
+    ) -> Result<Option<TableName>, AnalysisError> {
+        if ast.0.len() == 1 && ast.0[0].eq_ignore_ascii_case("none") {
             return Ok(None);
         }
-        let Some((_, table)) = self.ast.0.split_last() else {
+        let Some((_, table)) = ast.0.split_last() else {
             return AnalysisError::raise_unexpected_input("sequence OWNED BY column");
         };
-        Ok(Some(TableName::from(
-            convert(&Name::from_parts(table)).full_name()?,
-        )))
+        Ok(Some(TableName::from(FullName::from_ast_name(
+            &Name::from_parts(table),
+        )?)))
     }
-}
 
-impl AstConversion<'_, Literal> {
-    pub(crate) fn owned_relation(&self) -> Result<Option<TableName>, AnalysisError> {
-        if let Literal::Keyword(keyword) = self.ast
+    pub(crate) fn owned_table_from_ast_literal(
+        ast: &Literal,
+    ) -> Result<Option<TableName>, AnalysisError> {
+        if let Literal::Keyword(keyword) = ast
             && keyword.eq_ignore_ascii_case("none")
         {
             Ok(None)
@@ -1331,8 +1339,11 @@ impl AstConversion<'_, Literal> {
             AnalysisError::raise_unexpected_input("sequence OWNED BY identity")
         }
     }
-    pub(crate) fn owned_identifier(&self) -> Result<String, AnalysisError> {
-        match self.ast {
+
+    pub(crate) fn owned_identifier_from_ast_literal(
+        ast: &Literal,
+    ) -> Result<String, AnalysisError> {
+        match ast {
             Literal::String(name) => Ok(name.clone()),
             _ => AnalysisError::raise_unexpected_input("sequence OWNED BY identifier"),
         }

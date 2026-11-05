@@ -6,7 +6,8 @@ mod engine_features;
 mod ownership_conversion;
 mod statement_conversion;
 mod view_conversion;
-pub(crate) use self::ast_conversion::{AstConversion, convert};
+pub(crate) use self::ddl_conversion::RelationAlteration;
+pub(crate) use self::engine_features::EngineFeatureValidation;
 
 pub(crate) use self::constraint::ConstraintNames;
 mod alter_column;
@@ -189,7 +190,7 @@ pub use self::{
     },
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
-    wildcard_expansion::WildcardExpansion,
+    wildcard_expansion::{WildcardExpansion, WildcardRewriteError},
 };
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,

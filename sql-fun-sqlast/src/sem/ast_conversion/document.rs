@@ -1,24 +1,21 @@
-use crate::sem::{AstConversion, convert};
+use crate::sem::AliasSpec;
 use crate::{
     ast::XmlTable,
     context::ParseContext,
     sem::{AnalysisError, DataSource, ScalarAnalysisContext},
 };
 
-impl AstConversion<'_, XmlTable> {
-    pub(crate) fn resolve(
-        &self,
+impl DataSource {
+    pub(crate) fn from_ast_xml_table(
+        ast: &XmlTable,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<DataSource, AnalysisError> {
-        convert(&self.ast.rowexpr).resolve_table_call(
+    ) -> Result<Self, AnalysisError> {
+        Self::from_ast_table_call(
+            &ast.rowexpr,
             context,
             scope,
-            self.ast
-                .alias
-                .as_ref()
-                .map(|alias| convert(alias).resolve())
-                .as_ref(),
+            ast.alias.as_ref().map(AliasSpec::from_ast).as_ref(),
         )
     }
 }

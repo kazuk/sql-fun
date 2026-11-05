@@ -1,7 +1,7 @@
-use crate::sem::{AstConversion, convert};
+use crate::sem::SemScalarExpr;
 use crate::{
     CacheContext,
-    ast::{CurrentOf, Delete, Dialect, Expr, FromItem},
+    ast::{CurrentOf, Delete, Dialect, Expr},
     context::ParseContext,
     names::{FullName, TableName},
     sem::{
@@ -12,14 +12,14 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, Delete> {
-    pub(crate) fn resolve(
-        &self,
+impl DeleteStatement {
+    pub(crate) fn from_ast(
+        ast: &Delete,
         context: &mut impl ParseContext,
         cache: &mut CacheContext,
-    ) -> Result<DeleteStatement, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, None).and_then(|mut delete| {
+        let result = Self::from_ast_in(ast, context, None).and_then(|mut delete| {
             if context.parameter_inference_needed() {
                 let constraints = ParameterResolution::infer_delete(&mut delete, context, cache)?;
                 context.set_parameter_constraints(&constraints);
@@ -28,63 +28,69 @@ impl AstConversion<'_, Delete> {
         });
         context.finish_analysis(result)
     }
-    pub(crate) fn resolve_in(
-        &self,
+}
+
+impl DeleteStatement {
+    pub(crate) fn from_ast_in(
+        ast: &Delete,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<DeleteStatement, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let trigger_outer = if let Some(scope) = outer {
             scope.trigger_scope()
         } else {
             None
         };
-        let name = convert(&self.ast.relation.name).full_name()?;
+        let name = FullName::from_ast_name(&ast.relation.name)?;
         let name = if let Some(scope) = outer {
             scope.trigger_relation_name(context, &name)?
         } else {
             name
         };
         let requested = TableName::from(name);
-        let table = self.resolve_destination(
+        let table = Self::from_ast_destination(
+            ast,
             context,
             &requested,
             outer.is_some_and(ScalarAnalysisContext::in_rule_definition),
         )?;
-        self.validate_index_hint(context, &table)?;
-        let with = convert(&self.ast.with).resolve(context, outer)?;
-        let alias = self
-            .ast
+        Self::validate_ast_index_hint(ast, context, &table)?;
+        let with = WithClause::from_ast(&ast.with, context, outer)?;
+        let alias = ast
             .relation
             .alias
             .as_ref()
-            .map(|value| convert(value).resolve())
+            .map(AliasSpec::from_ast)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
-        let from = self.resolve_sources(context, &table, &alias, &with, trigger_outer)?;
+        let from = Self::from_ast_sources(ast, context, &table, &alias, &with, trigger_outer)?;
         if let Some(outer) = outer {
             outer.validate_rule_sources(context, &from)?;
         }
         let scope = ScalarAnalysisContext::nested(&with, &from, trigger_outer);
-        let predicate = self.resolve_predicate(context, table.name(), &scope)?;
+        let predicate = Self::from_ast_predicate(ast, context, table.name(), &scope)?;
         let returning =
-            self.resolve_returning_scope(context, &requested, &table, &alias, &scope)?;
-        let mut delete = DeleteStatement::new(
+            Self::from_ast_returning_scope(ast, context, &requested, &table, &alias, &scope)?;
+        let mut delete = Self::new(
             table.name(),
             table.found(),
-            &convert(&self.ast.with).local_definitions(with),
+            &WithClause::ast_local_definitions(&ast.with, with),
             &from,
             &predicate,
             &returning,
         );
         delete.set_modifiers(
             table.view_support(),
-            &self.ast.relation.indexed,
-            self.ast.relation.not_indexed,
-            self.ast.relation.inherit,
+            &ast.relation.indexed,
+            ast.relation.not_indexed,
+            ast.relation.inherit,
         );
         Ok(delete)
     }
-    pub(crate) fn resolve_destination(
-        &self,
+}
+
+impl DeleteStatement {
+    pub(crate) fn from_ast_destination(
+        ast: &Delete,
         context: &mut impl ParseContext,
         requested: &TableName,
         rule_definition: bool,
@@ -103,7 +109,7 @@ impl AstConversion<'_, Delete> {
                 DeleteProblemKind::read_only_target(),
             ))?;
         }
-        if !self.ast.returning.is_empty()
+        if !ast.returning.is_empty()
             && table
                 .view_support()
                 .is_some_and(|s| !s.supports_returning())
@@ -114,14 +120,18 @@ impl AstConversion<'_, Delete> {
         }
         Ok(table)
     }
-    pub(crate) fn validate_index_hint(
-        &self,
+}
+
+impl DeleteStatement {
+    pub(crate) fn validate_ast_index_hint(
+        ast: &Delete,
         context: &mut impl ParseContext,
         table: &DeleteDestination,
     ) -> Result<(), AnalysisError> {
-        if let Some(index) = &self.ast.relation.indexed {
+        if let Some(index) = &ast.relation.indexed {
             let name = FullName::with_schema(
-                convert(&table.name())
+                table
+                    .name()
                     .full_name()
                     .schema()
                     .map(|schema| schema.as_str())
@@ -139,8 +149,11 @@ impl AstConversion<'_, Delete> {
         }
         Ok(())
     }
-    pub(crate) fn resolve_sources(
-        &self,
+}
+
+impl DeleteStatement {
+    pub(crate) fn from_ast_sources(
+        ast: &Delete,
         context: &mut impl ParseContext,
         table: &DeleteDestination,
         alias: &AliasSpec,
@@ -149,11 +162,10 @@ impl AstConversion<'_, Delete> {
     ) -> Result<FromClause, AnalysisError> {
         // USING subqueries cannot implicitly see the DELETE target. WHERE and
         // RETURNING subqueries use the complete scope assembled below.
-        let mut from =
-            AstConversion::<FromItem>::resolve_list_in(&self.ast.using, context, with, outer)?;
+        let mut from = DataSource::from_ast_list_in(&ast.using, context, with, outer)?;
         let source = DataSource::resolve_relation(
             context,
-            convert(&table.name()).full_name(),
+            table.name().full_name(),
             alias,
             &WithClause::default(),
         )?;
@@ -161,19 +173,22 @@ impl AstConversion<'_, Delete> {
         from.push(source);
         Ok(from)
     }
-    pub(crate) fn resolve_predicate(
-        &self,
+}
+
+impl DeleteStatement {
+    pub(crate) fn from_ast_predicate(
+        ast: &Delete,
         context: &mut impl ParseContext,
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Option<DeletePredicate>, AnalysisError> {
-        if let Some(expression) = &self.ast.predicate
-            && let Some(cursor) = convert(expression).resolve_delete_current_of(context, target)?
+        if let Some(expression) = &ast.predicate
+            && let Some(cursor) =
+                DeleteCursor::from_ast_delete_current_of(expression, context, target)?
         {
             return Ok(Some(DeletePredicate::current_of(&cursor)));
         }
-        let predicate =
-            AstConversion::<Expr>::resolve_optional(&self.ast.predicate, context, scope)?;
+        let predicate = SemScalarExpr::from_ast_optional(&ast.predicate, context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -190,8 +205,11 @@ impl AstConversion<'_, Delete> {
         }
         Ok(predicate.as_ref().map(DeletePredicate::expression))
     }
-    pub(crate) fn resolve_returning_scope(
-        &self,
+}
+
+impl DeleteStatement {
+    pub(crate) fn from_ast_returning_scope(
+        ast: &Delete,
         context: &mut impl ParseContext,
         requested: &TableName,
         table: &DeleteDestination,
@@ -205,14 +223,14 @@ impl AstConversion<'_, Delete> {
             let mut returning_from = FromClause::default();
             returning_from.push(DataSource::resolve_relation(
                 context,
-                convert(&table.name()).full_name(),
+                table.name().full_name(),
                 &returning_alias,
                 &WithClause::default(),
             )?);
             let mut scope = ScalarAnalysisContext::nested(with, &returning_from, None);
             scope.set_delete_returning_target(returning_alias.name(), context);
             ResultColumnCollection::resolve_for_delete(
-                &self.ast.returning,
+                &ast.returning,
                 context,
                 &returning_from,
                 &scope,
@@ -220,49 +238,48 @@ impl AstConversion<'_, Delete> {
         } else {
             let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             scope.set_delete_returning_target(alias.name(), context);
-            ResultColumnCollection::resolve_for_delete(&self.ast.returning, context, from, &scope)
+            ResultColumnCollection::resolve_for_delete(&ast.returning, context, from, &scope)
         }
     }
 }
 
 #[cfg(test)]
 mod tests;
-impl AstConversion<'_, Expr> {
-    pub(crate) fn resolve_delete_current_of(
-        &self,
+impl DeleteCursor {
+    pub(crate) fn from_ast_delete_current_of(
+        ast: &Expr,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<Option<DeleteCursor>, AnalysisError> {
-        match self.ast {
-            Expr::CurrentOf(cursor) => convert(cursor).resolve_delete(context, target).map(Some),
+    ) -> Result<Option<Self>, AnalysisError> {
+        match ast {
+            Expr::CurrentOf(cursor) => Self::from_ast(cursor, context, target).map(Some),
             _ => Ok(None),
         }
     }
 }
-impl AstConversion<'_, CurrentOf> {
-    pub(crate) fn resolve_delete(
-        &self,
+
+impl DeleteCursor {
+    pub(crate) fn from_ast(
+        ast: &CurrentOf,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<DeleteCursor, AnalysisError> {
-        if self.ast.parameter != 0 {
+    ) -> Result<Self, AnalysisError> {
+        if ast.parameter != 0 {
             context.report_analysis_problem(AnalysisProblem::delete(
-                DeleteProblemKind::cursor_parameter(self.ast.parameter),
+                DeleteProblemKind::cursor_parameter(ast.parameter),
             ))?;
-            return Ok(DeleteCursor::parameter(self.ast.parameter));
+            return Ok(Self::parameter(ast.parameter));
         }
-        let cursor = DeleteCursor::new(&self.ast.name, context.resolve_cursor(&self.ast.name));
+        let cursor = Self::new(&ast.name, context.resolve_cursor(&ast.name));
         let problem = match cursor.binding() {
-            None => Some(DeleteProblemKind::missing_cursor(&self.ast.name)),
+            None => Some(DeleteProblemKind::missing_cursor(&ast.name)),
             Some(info) if info.updatable() == Some(false) => {
-                Some(DeleteProblemKind::non_updatable_cursor(&self.ast.name))
+                Some(DeleteProblemKind::non_updatable_cursor(&ast.name))
             }
             Some(info) => info
                 .target()
                 .filter(|relation| *relation != target)
-                .map(|actual| {
-                    DeleteProblemKind::cursor_target_mismatch(&self.ast.name, target, actual)
-                }),
+                .map(|actual| DeleteProblemKind::cursor_target_mismatch(&ast.name, target, actual)),
         };
         if let Some(kind) = problem {
             context.report_analysis_problem(AnalysisProblem::delete(kind))?;

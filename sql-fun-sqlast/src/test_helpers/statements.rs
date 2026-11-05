@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{
     AstAndContextPair,
     context::{FrozenBaseContext, MutSourcePathWithSpan},
@@ -20,14 +19,15 @@ pub(crate) fn resolve_postgres(
     sql: &str,
     context: &mut impl ParseContext,
 ) -> Result<SemAst, AnalysisError> {
-    convert(
+    SemAst::from_ast_node(
         &parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .into_test_node(),
+        context,
+        &mut create_cache_context(),
     )
-    .resolve(context, &mut create_cache_context())
 }
 
 pub(crate) fn resolve_cursor(sql: &str, context: &mut TestParseContext) -> SemAst {

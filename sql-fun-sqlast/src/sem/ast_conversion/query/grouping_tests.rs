@@ -1,6 +1,6 @@
 //! Public semantic outcomes, using the lightweight query catalog.
 
-use crate::sem::convert;
+use crate::sem::SelectStatement;
 
 use crate::sem::SemAst;
 use crate::test_helpers::grouping::groupings;
@@ -311,12 +311,12 @@ fn rejects_invalid_grouping_through_diagnostic_policy() {
     let mut context = catalog();
     context.reject_diagnostics_after(0);
     assert!(
-        convert(&query)
-            .resolve(
-                &mut context,
-                &mut crate::test_helpers::create_cache_context()
-            )
-            .is_err()
+        SelectStatement::from_ast(
+            &query,
+            &mut context,
+            &mut crate::test_helpers::create_cache_context()
+        )
+        .is_err()
     );
     assert_eq!(context.reported_problem_count(), 0);
 }

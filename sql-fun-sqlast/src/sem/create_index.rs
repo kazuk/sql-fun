@@ -4,9 +4,6 @@ mod settings;
 pub use self::settings::IndexStorageValue;
 
 #[cfg(test)]
-use crate::sem::AstConversion;
-use crate::sem::convert;
-#[cfg(test)]
 use crate::syn::IndexElem;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::SortOrder as SqliteSortOrder;
@@ -441,13 +438,13 @@ impl CreateIndex {
         keys: Vec<IndexElem>,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
-        use crate::ast::{Index, IndexExpression};
+        use crate::ast::IndexExpression;
         let keys = keys
             .iter()
             .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
             .collect::<Result<Vec<_>, _>>()?;
         context.begin_parameter_type_analysis();
-        let result = AstConversion::<Index>::resolve_elements(&keys, &mut context);
+        let result = Self::elements_from_ast(&keys, &mut context);
         let elements = context.finish_analysis(result)?;
         Ok((elements, context))
     }
@@ -535,7 +532,7 @@ impl CreateIndex {
     where
         TParseContext: ParseContext,
     {
-        convert(&AstIndex::try_from_with_tokens(&syn, tokens)?).resolve_and_apply(context)
+        Self::from_ast_and_apply(&AstIndex::try_from_with_tokens(&syn, tokens)?, context)
     }
 }
 

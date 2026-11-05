@@ -1,6 +1,10 @@
 //! End-to-end fixtures for the expression/query recursive component.
 
-use crate::sem::convert;
+#[cfg(feature = "sqlite")]
+use crate::names::FullName;
+use crate::sem::CreateTable;
+use crate::sem::SelectStatement;
+use crate::sem::SemAst;
 #[cfg(feature = "sqlite")]
 mod sqlite_from_groups;
 mod stack_regressions;
@@ -98,7 +102,7 @@ fn table_resolution_uses_common_context(source_span: SourcePathWithSpan) -> test
         panic!("table syntax");
     };
     let mut catalog = test_helpers::AnalysisFixture::context();
-    let table = convert(&table).resolve(&mut catalog, &source_span)?;
+    let table = CreateTable::from_ast(&table, &mut catalog, &source_span)?;
     let id = table.get_column_def(&ColumnName::from("id")).expect("id");
     assert_eq!(id.get_type(), Some(&crate::sem::PgBuiltInType::int4()));
     assert!(id.constraints()[0].as_default().is_some());
@@ -116,7 +120,7 @@ fn ddl_resolution_uses_common_context(#[case] sql: &str) -> testresult::TestResu
     let syntax =
         StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
     let mut catalog = test_helpers::AnalysisFixture::with_index_table();
-    convert(&syntax).resolve(&mut catalog, &mut create_cache_context())?;
+    SemAst::from_ast_node(&syntax, &mut catalog, &mut create_cache_context())?;
     assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
@@ -326,7 +330,8 @@ fn shared_resolution_preserves_result_metadata(
     #[case] not_null: bool,
 ) -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    let query = convert(&postgres(sql)?).resolve(&mut catalog, &mut create_cache_context())?;
+    let query =
+        SelectStatement::from_ast(&postgres(sql)?, &mut catalog, &mut create_cache_context())?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -340,10 +345,11 @@ fn shared_resolution_preserves_result_metadata(
 #[test]
 fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    let query = convert(&postgres(
-        "select (select outer_query.n) as result from (select 42 as n) outer_query",
-    )?)
-    .resolve(&mut catalog, &mut create_cache_context())?;
+    let query = SelectStatement::from_ast(
+        &postgres("select (select outer_query.n) as result from (select 42 as n) outer_query")?,
+        &mut catalog,
+        &mut create_cache_context(),
+    )?;
     assert!(
         query
             .result_columns()
@@ -359,8 +365,11 @@ fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
 #[test]
 fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::with_qualified_addition();
-    let query = convert(&postgres("select 1 operator(pg_catalog.+) 2 as n")?)
-        .resolve(&mut catalog, &mut create_cache_context())?;
+    let query = SelectStatement::from_ast(
+        &postgres("select 1 operator(pg_catalog.+) 2 as n")?,
+        &mut catalog,
+        &mut create_cache_context(),
+    )?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -375,10 +384,11 @@ fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult 
 #[test]
 fn non_lateral_query_does_not_see_sibling_from_item() -> testresult::TestResult {
     let mut catalog = test_helpers::AnalysisFixture::context();
-    convert(&postgres(
-        "select q.n as result from (select 42 as n) a, (select a.n) q",
-    )?)
-    .resolve(&mut catalog, &mut create_cache_context())?;
+    SelectStatement::from_ast(
+        &postgres("select q.n as result from (select 42 as n) a, (select a.n) q")?,
+        &mut catalog,
+        &mut create_cache_context(),
+    )?;
     assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }
@@ -395,7 +405,8 @@ fn context_free_dml_expression_syntax(#[case] sql: &str) -> testresult::TestResu
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    use crate::sem::convert;
+    use crate::sem::SelectStatement;
+    use crate::sem::SemScalarExpr;
 
     use crate::{
         AstAndContextPair, ast::Dialect, sem::ScalarAnalysisContext,
@@ -421,9 +432,11 @@ mod sqlite {
     fn sqlite_case_does_not_use_postgres_implicit_casts() -> testresult::TestResult {
         let sql = "select case when true then 1 else '2' end as n";
         let mut catalog = AnalysisFixture::with_integer_to_text_cast();
-        let pg = convert(&postgres(sql)?).resolve(&mut catalog, &mut create_cache_context())?;
+        let pg =
+            SelectStatement::from_ast(&postgres(sql)?, &mut catalog, &mut create_cache_context())?;
         catalog = catalog.with_dialect(Dialect::sqlite());
-        let sqlite = convert(&sqlite(sql)?).resolve(&mut catalog, &mut create_cache_context())?;
+        let sqlite =
+            SelectStatement::from_ast(&sqlite(sql)?, &mut catalog, &mut create_cache_context())?;
         let name = ColumnName::from("n");
         assert_eq!(
             pg.result_columns()
@@ -453,9 +466,11 @@ mod sqlite {
     #[case("select 1 as n union all select 2 as n union select 3 as n")]
     fn both_frontends_use_the_same_resolver(#[case] sql: &str) -> testresult::TestResult {
         let mut catalog = AnalysisFixture::context();
-        let pg = convert(&postgres(sql)?).resolve(&mut catalog, &mut create_cache_context())?;
+        let pg =
+            SelectStatement::from_ast(&postgres(sql)?, &mut catalog, &mut create_cache_context())?;
         catalog = catalog.with_dialect(Dialect::sqlite());
-        let sqlite = convert(&sqlite(sql)?).resolve(&mut catalog, &mut create_cache_context())?;
+        let sqlite =
+            SelectStatement::from_ast(&sqlite(sql)?, &mut catalog, &mut create_cache_context())?;
         assert_eq!(pg, sqlite);
         assert_eq!(catalog.reported_problem_count(), 0);
         Ok(())
@@ -511,7 +526,8 @@ mod sqlite {
     fn sqlite_unary_literal_does_not_use_postgres_operator_catalog() -> testresult::TestResult {
         let syntax = Expr::try_from(&SqliteSynBuilder.parse_expression("select -42"))?;
         let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
-        let result = convert(&syntax).resolve(&mut context, &ScalarAnalysisContext::default())?;
+        let result =
+            SemScalarExpr::from_ast(&syntax, &mut context, &ScalarAnalysisContext::default())?;
         assert_eq!(result.get_type(), Some(PgBuiltInType::int4()));
         assert_eq!(context.reported_problem_count(), 0);
         Ok(())
@@ -583,7 +599,10 @@ fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
         query.test,
         Some(Expr::Literal(Literal::Integer(1)))
     ));
-    assert_eq!(convert(&query.operator).full_name()?.name().as_str(), "=");
+    assert_eq!(
+        FullName::from_ast_name(&query.operator)?.name().as_str(),
+        "="
+    );
     let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 NOT IN {rhs}"));
     let Expr::Boolean(negation) = Expr::try_from(&parsed)? else {
         panic!("negated membership");
@@ -646,14 +665,13 @@ fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
         &IVec::default(),
     )?;
     let mut catalog = test_helpers::AnalysisFixture::context();
-    convert(&syntax).resolve(&mut catalog, &mut create_cache_context())?;
+    SemAst::from_ast_node(&syntax, &mut catalog, &mut create_cache_context())?;
     assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }
 
 #[cfg(test)]
 mod test_name_from_range_var {
-    use crate::sem::convert;
     use crate::{
         ast::{FromOpt, Name},
         names::{FullName, LocalName},
@@ -667,9 +685,9 @@ mod test_name_from_range_var {
     #[case(FullName::with_catalog("catalog", "app", "items"))]
     fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
         let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
-        assert_eq!(convert(&Name::from(&source)).full_name()?, expected);
+        assert_eq!(FullName::from_ast_name(&Name::from(&source))?, expected);
         let optional = Name::from_opt(Some(&source)).expect("present relation");
-        assert_eq!(convert(&optional).full_name()?, expected);
+        assert_eq!(FullName::from_ast_name(&optional)?, expected);
         Ok(())
     }
 

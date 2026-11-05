@@ -1,6 +1,12 @@
 //! PostgreSQL rule analysis over common syntax only.
 
-use crate::sem::{AstConversion, convert};
+use crate::names::FullName;
+use crate::sem::CteStatement;
+use crate::sem::DeleteStatement;
+use crate::sem::InsertStatement;
+use crate::sem::SelectStatement;
+use crate::sem::UpdateStatement;
+use crate::sem::ViewColumnLineage;
 
 use crate::{
     AstAndContextPair,
@@ -17,41 +23,46 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, CreateRule> {
-    pub(crate) fn resolve(
-        &self,
+impl SemCreateRule {
+    pub(crate) fn from_ast(
+        ast: &CreateRule,
         context: &mut impl ParseContext,
-    ) -> Result<Option<SemCreateRule>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self
-            .resolve_definition(context)
-            .and_then(|definition| Self::validate_resolved(context, definition));
+        let result = Self::from_ast_definition(ast, context)
+            .and_then(|definition| Self::validate_ast_resolved(context, definition));
         let result = ResolutionFailure::finish(result, context);
         context.finish_analysis(result)
     }
-    pub(crate) fn validate_resolved(
+}
+
+impl SemCreateRule {
+    pub(crate) fn validate_ast_resolved(
         context: &impl ParseContext,
-        definition: SemCreateRule,
-    ) -> Result<SemCreateRule, ResolutionFailure> {
+        definition: Self,
+    ) -> Result<Self, ResolutionFailure> {
         if context.parameter_inference_needed() {
-            return Self::invalid(
+            return Self::ast_invalid(
                 definition.identity(),
                 "rule definitions cannot contain bind parameters",
             );
         }
         if context.analysis_state().has_problems() {
-            return Self::invalid(
+            return Self::ast_invalid(
                 definition.identity(),
                 "rule contains unresolved or invalid constructs",
             );
         }
         Ok(definition)
     }
-    pub(crate) fn resolve_and_apply<C: ParseContext>(
-        &self,
+}
+
+impl SemCreateRule {
+    pub(crate) fn apply_ast<C: ParseContext>(
+        ast: &CreateRule,
         mut context: C,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let Some(definition) = self.resolve(&mut context)? else {
+        let Some(definition) = Self::from_ast(ast, &mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
@@ -63,12 +74,15 @@ impl AstConversion<'_, CreateRule> {
             context,
         ))
     }
-    pub(crate) fn resolve_definition(
-        &self,
+}
+
+impl SemCreateRule {
+    pub(crate) fn from_ast_definition(
+        ast: &CreateRule,
         context: &mut impl ParseContext,
-    ) -> Result<SemCreateRule, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
-        let requested = convert(&self.ast.relation.name).full_name()?;
+        let requested = FullName::from_ast_name(&ast.relation.name)?;
         let target = context
             .resolve_relation_name(&requested)
             .ok_or_else(|| ResolutionFailure::rule(&RuleProblem::target(&requested)))?;
@@ -78,10 +92,10 @@ impl AstConversion<'_, CreateRule> {
         {
             return Err(ResolutionFailure::rule(&RuleProblem::target(&target)));
         }
-        let name = convert(&self.ast.name).full_name()?;
+        let name = FullName::from_ast_name(&ast.name)?;
         let identity = RuleIdentity::new(&target, name.name().as_str());
-        self.validate_shape(context, &identity)?;
-        let event = convert(&self.ast.event).semantic();
+        Self::validate_ast_shape(ast, context, &identity)?;
+        let event = SemRuleEvent::ast_semantic(&ast.event);
         let with = WithClause::default();
         let mut rows = FromClause::default();
         for alias in ["old", "new"] {
@@ -93,40 +107,43 @@ impl AstConversion<'_, CreateRule> {
             )?);
         }
         let predicate_scope = ScalarAnalysisContext::rule(&with, &rows, &identity, event, true);
-        let predicate = self.resolve_rule_predicate(context, &predicate_scope, &identity)?;
+        let predicate = Self::from_ast_rule_predicate(ast, context, &predicate_scope, &identity)?;
         let scope = ScalarAnalysisContext::rule(&with, &rows, &identity, event, false);
-        if self.ast.event == RuleEvent::Select {
-            for action in &self.ast.actions {
-                convert(action).validate_select_rule_ctes(&identity)?;
+        if ast.event == RuleEvent::Select {
+            for action in &ast.actions {
+                SemAst::validate_ast_select_rule_ctes(action, &identity)?;
             }
         }
         let mut actions = Vec::new();
-        for action in &self.ast.actions {
-            actions.push(convert(action).resolve_rule_action(context, &scope, &identity)?);
+        for action in &ast.actions {
+            actions.push(SemAst::from_ast_rule_action(
+                action, context, &scope, &identity,
+            )?);
         }
-        let mut definition = SemCreateRule::new(
+        let mut definition = Self::new(
             &identity,
             event,
-            self.ast.replace,
-            self.ast.instead,
+            ast.replace,
+            ast.instead,
             &predicate,
             &actions,
             context,
         )?;
-        self.validate_results(context, &definition)?;
-        if self.ast.event == RuleEvent::Select {
-            let syntax = convert(&self.ast.actions[0])
-                .rule_query()
-                .expect("validated SELECT action");
+        Self::validate_ast_results(ast, context, &definition)?;
+        if ast.event == RuleEvent::Select {
+            let syntax = SemAst::ast_rule_query(&ast.actions[0]).expect("validated SELECT action");
             let query = definition.actions()[0]
                 .select_statement()
                 .expect("resolved SELECT action");
-            let lineage = convert(syntax).view_lineage(context, query)?;
+            let lineage = ViewColumnLineage::from_ast_query(syntax, context, query)?;
             definition.retain_select_lineage(&lineage);
         }
         Ok(definition)
     }
-    pub(crate) fn invalid<T>(
+}
+
+impl SemCreateRule {
+    pub(crate) fn ast_invalid<T>(
         identity: &RuleIdentity,
         detail: &str,
     ) -> Result<T, ResolutionFailure> {
@@ -134,96 +151,107 @@ impl AstConversion<'_, CreateRule> {
             identity, detail,
         )))
     }
-    pub(crate) fn validate_shape(
-        &self,
+}
+
+impl SemCreateRule {
+    pub(crate) fn validate_ast_shape(
+        ast: &CreateRule,
         context: &impl ParseContext,
         identity: &RuleIdentity,
     ) -> Result<(), ResolutionFailure> {
-        if !self.ast.replace && context.rule(identity).is_some() {
+        if !ast.replace && context.rule(identity).is_some() {
             return Err(ResolutionFailure::rule(&RuleProblem::duplicate(identity)));
         }
-        if self.ast.event == RuleEvent::Select {
+        if ast.event == RuleEvent::Select {
             if context
                 .get_view(&ViewName::from_full_name(identity.target()))
                 .is_none()
             {
-                return Self::invalid(identity, "ON SELECT requires an ordinary view");
+                return Self::ast_invalid(identity, "ON SELECT requires an ordinary view");
             }
-            if !self.ast.replace {
+            if !ast.replace {
                 return Err(ResolutionFailure::rule(&RuleProblem::duplicate(identity)));
             }
             if identity.name().name().as_str() != "_RETURN"
-                || !self.ast.instead
-                || self.ast.predicate.is_some()
-                || !(self.ast.actions.len() == 1
-                    && convert(&self.ast.actions[0]).rule_query().is_some())
+                || !ast.instead
+                || ast.predicate.is_some()
+                || !(ast.actions.len() == 1 && SemAst::ast_rule_query(&ast.actions[0]).is_some())
             {
-                return Self::invalid(
+                return Self::ast_invalid(
                     identity,
                     "ON SELECT requires an unconditional _RETURN INSTEAD single SELECT action",
                 );
             }
         } else if identity.name().name().as_str() == "_RETURN" {
-            return Self::invalid(identity, "_RETURN is reserved for ON SELECT");
+            return Self::ast_invalid(identity, "_RETURN is reserved for ON SELECT");
         }
         Ok(())
     }
-    pub(crate) fn resolve_rule_predicate(
-        &self,
+}
+
+impl SemCreateRule {
+    pub(crate) fn from_ast_rule_predicate(
+        ast: &CreateRule,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         identity: &RuleIdentity,
     ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
-        let Some(syntax) = &self.ast.predicate else {
+        let Some(syntax) = &ast.predicate else {
             return Ok(None);
         };
-        let mut predicate = convert(syntax).resolve_in(context, scope)?;
-        if convert(syntax).is_rule_boolean_literal() {
+        let mut predicate = SemScalarExpr::from_ast_in(syntax, context, scope)?;
+        if SemScalarExpr::ast_is_rule_boolean(syntax) {
             predicate = SemScalarExpr::wrap_implicit_cast(&PgBuiltInType::bool(), &predicate);
         } else {
             SemScalarExpr::implicit_cast_resolved(context, &PgBuiltInType::bool(), &mut predicate)?;
         }
         if predicate.get_type() != Some(PgBuiltInType::bool()) {
-            return Self::invalid(identity, "WHERE must have boolean type");
+            return Self::ast_invalid(identity, "WHERE must have boolean type");
         }
         let mut validator = PredicateValidator::new(context);
         predicate.walk(&mut validator)?;
         if validator.invalid {
-            return Self::invalid(
+            return Self::ast_invalid(
                 identity,
                 "rule WHERE cannot contain aggregates, windows or set-returning functions at its own level",
             );
         }
         Ok(Some(predicate))
     }
-    pub(crate) fn validate_results(
-        &self,
+}
+
+impl SemCreateRule {
+    pub(crate) fn validate_ast_results(
+        ast: &CreateRule,
         context: &impl ParseContext,
-        definition: &SemCreateRule,
+        definition: &Self,
     ) -> Result<(), ResolutionFailure> {
         let mut returning = false;
         for action in definition.actions() {
             if let Some(columns) = action.rule_returning()
                 && !columns.is_empty()
             {
-                if returning || !self.ast.instead || self.ast.predicate.is_some() {
-                    return Self::invalid(
+                if returning || !ast.instead || ast.predicate.is_some() {
+                    return Self::ast_invalid(
                         definition.identity(),
                         "RETURNING requires an unconditional INSTEAD rule and at most one returning action",
                     );
                 }
                 returning = true;
-                Self::check_columns(context, definition.identity(), columns, false)?;
+                Self::ast_check_columns(context, definition.identity(), columns, false)?;
             }
-            if self.ast.event == RuleEvent::Select
+            if ast.event == RuleEvent::Select
                 && let Some(columns) = action.query_result_columns()
             {
-                Self::check_columns(context, definition.identity(), columns, true)?;
+                Self::ast_check_columns(context, definition.identity(), columns, true)?;
             }
         }
         Ok(())
     }
-    pub(crate) fn check_columns(
+}
+
+impl SemCreateRule {
+    pub(crate) fn ast_check_columns(
         context: &impl ParseContext,
         identity: &RuleIdentity,
         columns: &ResultColumnCollection,
@@ -257,7 +285,7 @@ impl AstConversion<'_, CreateRule> {
             if expected_type.is_some_and(TypeReference::rule_shape_needs_modifiers)
                 || actual_type.is_some_and(TypeReference::rule_shape_needs_modifiers)
             {
-                return Self::invalid(
+                return Self::ast_invalid(
                     identity,
                     "exact result compatibility for modifier-capable types is pending #619",
                 );
@@ -268,7 +296,7 @@ impl AstConversion<'_, CreateRule> {
                     if expected.get_type() == actual.col_type().as_ref()
                         && (!names || expected.name() == actual.column_name()) => {}
                 _ => {
-                    return Self::invalid(
+                    return Self::ast_invalid(
                         identity,
                         "rule result must match target column count, order and types; ON SELECT also requires matching names",
                     );
@@ -282,96 +310,112 @@ impl AstConversion<'_, CreateRule> {
 #[cfg(test)]
 mod tests;
 
-impl AstConversion<'_, RuleEvent> {
-    pub(crate) const fn semantic(self) -> SemRuleEvent {
-        match self.ast {
-            RuleEvent::Select => SemRuleEvent::select(),
-            RuleEvent::Insert => SemRuleEvent::insert(),
-            RuleEvent::Update => SemRuleEvent::update(),
-            RuleEvent::Delete => SemRuleEvent::delete(),
+impl SemRuleEvent {
+    pub(crate) const fn ast_semantic(ast: &RuleEvent) -> Self {
+        match ast {
+            RuleEvent::Select => Self::select(),
+            RuleEvent::Insert => Self::insert(),
+            RuleEvent::Update => Self::update(),
+            RuleEvent::Delete => Self::delete(),
         }
     }
 }
-impl AstConversion<'_, CteBody> {
-    pub(crate) fn validate_select_rule_ctes(
-        &self,
+
+impl CteStatement {
+    pub(crate) fn validate_ast_select_rule_ctes(
+        ast: &CteBody,
         identity: &RuleIdentity,
     ) -> Result<(), ResolutionFailure> {
-        match self.ast {
-            CteBody::Query(query) => convert(query.as_ref()).validate_select_rule_ctes(identity),
-            _ => AstConversion::<CreateRule>::invalid(
+        match ast {
+            CteBody::Query(query) => {
+                SelectStatement::validate_ast_select_rule_ctes(query.as_ref(), identity)
+            }
+            _ => SemCreateRule::ast_invalid(
                 identity,
                 "ON SELECT rule cannot contain data-modifying CTEs",
             ),
         }
     }
 }
-impl AstConversion<'_, Query> {
-    pub(crate) fn validate_select_rule_ctes(
-        &self,
+
+impl SelectStatement {
+    pub(crate) fn validate_ast_select_rule_ctes(
+        ast: &Query,
         identity: &RuleIdentity,
     ) -> Result<(), ResolutionFailure> {
-        for entry in &self.ast.with.entries {
-            convert(&entry.body).validate_select_rule_ctes(identity)?;
+        for entry in &ast.with.entries {
+            CteStatement::validate_ast_select_rule_ctes(&entry.body, identity)?;
         }
         Ok(())
     }
 }
-impl<'ast> AstConversion<'ast, StatementNode> {
-    pub(crate) const fn rule_query(&self) -> Option<&'ast Query> {
-        if let StatementNode::Query(query) = self.ast {
+
+impl SemAst {
+    pub(crate) const fn ast_rule_query(ast: &StatementNode) -> Option<&Query> {
+        if let StatementNode::Query(query) = ast {
             Some(query)
         } else {
             None
         }
     }
-    pub(crate) fn validate_select_rule_ctes(
-        &self,
+}
+
+impl SemAst {
+    pub(crate) fn validate_ast_select_rule_ctes(
+        ast: &StatementNode,
         identity: &RuleIdentity,
     ) -> Result<(), ResolutionFailure> {
-        if let StatementNode::Query(query) = self.ast {
-            convert(query).validate_select_rule_ctes(identity)?;
+        if let StatementNode::Query(query) = ast {
+            SelectStatement::validate_ast_select_rule_ctes(query, identity)?;
         }
         Ok(())
     }
-    pub(crate) fn resolve_rule_action(
-        &self,
+}
+
+impl SemAst {
+    pub(crate) fn from_ast_rule_action(
+        ast: &StatementNode,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         identity: &RuleIdentity,
-    ) -> Result<SemAst, ResolutionFailure> {
-        match self.ast {
-            StatementNode::Query(query) => convert(query)
-                .resolve_in(context, Some(scope))
-                .map(|query| SemAst::select(&query))
-                .map_err(Into::into),
-            StatementNode::Insert(insert) => convert(insert)
-                .resolve_in(context, Some(scope))
-                .map(|value| {
-                    value
-                        .as_ref()
-                        .map_or_else(SemAst::unresolved_statement, SemAst::insert)
-                })
-                .map_err(Into::into),
-            StatementNode::Update(update) => convert(update)
-                .resolve_in(context, Some(scope))
-                .map(|value| {
-                    value
-                        .as_ref()
-                        .map_or_else(SemAst::unresolved_statement, SemAst::update)
-                })
-                .map_err(Into::into),
-            StatementNode::Delete(delete) => convert(delete)
-                .resolve_in(context, Some(scope))
-                .map(|delete| SemAst::delete(&delete))
-                .map_err(Into::into),
-            _ => AstConversion::<CreateRule>::invalid(
+    ) -> Result<Self, ResolutionFailure> {
+        match ast {
+            StatementNode::Query(query) => {
+                SelectStatement::from_ast_in(query, context, Some(scope))
+                    .map(|query| Self::select(&query))
+                    .map_err(Into::into)
+            }
+            StatementNode::Insert(insert) => {
+                InsertStatement::from_ast_in(insert, context, Some(scope))
+                    .map(|value| {
+                        value
+                            .as_ref()
+                            .map_or_else(Self::unresolved_statement, Self::insert)
+                    })
+                    .map_err(Into::into)
+            }
+            StatementNode::Update(update) => {
+                UpdateStatement::from_ast_in(update, context, Some(scope))
+                    .map(|value| {
+                        value
+                            .as_ref()
+                            .map_or_else(Self::unresolved_statement, Self::update)
+                    })
+                    .map_err(Into::into)
+            }
+            StatementNode::Delete(delete) => {
+                DeleteStatement::from_ast_in(delete, context, Some(scope))
+                    .map(|delete| Self::delete(&delete))
+                    .map_err(Into::into)
+            }
+            _ => SemCreateRule::ast_invalid(
                 identity,
                 "unsupported rule action; expected a common query or INSERT/UPDATE/DELETE statement",
             ),
         }
     }
 }
+
 struct PredicateValidator<'a, C> {
     context: &'a C,
     depth: usize,
@@ -401,9 +445,9 @@ impl<C: ParseContext> SemanticVisitorMut for PredicateValidator<'_, C> {
     }
 }
 
-impl AstConversion<'_, SubqueryKind> {
-    pub(crate) const fn pending_rule_semantics(self) -> Option<&'static str> {
-        match self.ast {
+impl SemScalarExpr {
+    pub(crate) const fn ast_pending_rule_semantics(ast: &SubqueryKind) -> Option<&'static str> {
+        match ast {
             SubqueryKind::Scalar | SubqueryKind::Array => None,
             SubqueryKind::Exists => Some("EXISTS subquery semantics are pending #570"),
             SubqueryKind::Any | SubqueryKind::All | SubqueryKind::Row => {
@@ -442,17 +486,18 @@ impl TypeReference {
     }
 }
 
-impl AstConversion<'_, Expr> {
-    pub(crate) const fn is_rule_boolean_literal(&self) -> bool {
-        if let Expr::Literal(literal) = self.ast {
-            convert(literal).is_rule_boolean_literal()
+impl SemScalarExpr {
+    pub(crate) const fn ast_is_rule_boolean(ast: &Expr) -> bool {
+        if let Expr::Literal(literal) = ast {
+            Self::ast_literal_is_rule_boolean(literal)
         } else {
             false
         }
     }
 }
-impl AstConversion<'_, Literal> {
-    pub(crate) const fn is_rule_boolean_literal(&self) -> bool {
-        matches!(self.ast, Literal::Null | Literal::String(_))
+
+impl SemScalarExpr {
+    pub(crate) const fn ast_literal_is_rule_boolean(ast: &Literal) -> bool {
+        matches!(ast, Literal::Null | Literal::String(_))
     }
 }

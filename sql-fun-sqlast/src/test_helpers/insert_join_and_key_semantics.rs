@@ -1,6 +1,5 @@
 use crate::parse_statements;
 use crate::sem::SemAst;
-use crate::sem::convert;
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::insert::catalog;
 
@@ -21,7 +20,7 @@ pub(crate) fn analyze_keyed(definition: &str, returning: &str) -> (SemAst, TestP
     )
     .unwrap()
     .into_context();
-    let statement = convert(
+    let statement = SemAst::from_ast_node(
         &parse_statements(
             &format!(
                 "INSERT INTO review579 VALUES(1) ON CONFLICT(id) DO NOTHING RETURNING {returning}"
@@ -32,8 +31,9 @@ pub(crate) fn analyze_keyed(definition: &str, returning: &str) -> (SemAst, TestP
         .unwrap()
         .unwrap()
         .into_test_node(),
+        &mut context,
+        &mut create_cache_context(),
     )
-    .resolve(&mut context, &mut create_cache_context())
     .unwrap();
     (statement, context)
 }

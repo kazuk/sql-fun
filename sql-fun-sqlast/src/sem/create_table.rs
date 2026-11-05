@@ -3,7 +3,6 @@ mod column_def;
 
 pub use self::column_def::ColumnDefinition;
 
-use crate::sem::convert;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::ColumnsAndConstraint;
 #[cfg(feature = "sqlite")]
@@ -848,8 +847,11 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        convert(&Table::try_from_with_tokens(&create, tokens)?)
-            .resolve_and_apply_at(context, source_span)
+        Self::from_ast_and_apply_at(
+            &Table::try_from_with_tokens(&create, tokens)?,
+            context,
+            source_span,
+        )
     }
 
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
@@ -875,7 +877,7 @@ impl CreateTable {
         TParseContext: ParseContext,
     {
         let syntax = Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
-        let table = convert(&syntax).resolve(&mut context, source_span)?;
+        let table = Self::from_ast(&syntax, &mut context, source_span)?;
         Ok((table, context))
     }
 }
@@ -948,8 +950,11 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        convert(&Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary))
-            .resolve_and_apply_at(context, source_span)
+        Self::from_ast_and_apply_at(
+            &Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary),
+            context,
+            source_span,
+        )
     }
 }
 
@@ -967,7 +972,7 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        convert(&Table::try_from(&syn)?).resolve_and_apply_at(context, source_span)
+        Self::from_ast_and_apply_at(&Table::try_from(&syn)?, context, source_span)
     }
 }
 

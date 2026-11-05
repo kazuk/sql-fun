@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{
     ast::Function,
     names::TableName,
@@ -120,7 +119,7 @@ impl CreateFunction {
     where
         TParseContext: ParseContext,
     {
-        convert(&Function::try_from_with_tokens(&syn, tokens)?).resolve_and_apply(context)
+        Self::from_ast_and_apply(&Function::try_from_with_tokens(&syn, tokens)?, context)
     }
 }
 

@@ -1,4 +1,3 @@
-use crate::sem::{AstConversion, convert};
 use crate::{
     ast::{
         Dialect, Expr, Frame, FrameBound, FrameExclusion, FrameMode, Grouping, Literal, Lock,
@@ -33,16 +32,16 @@ impl ClauseBinding {
         matches!(self, Self::Compound)
     }
 }
-impl<'ast> AstConversion<'ast, Expr> {
-    pub(crate) fn resolve_clause(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_clause(
+        ast: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
-    ) -> Result<SemScalarExpr, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         if binding.allows_output() {
-            if let Some(index) = self.ordinal() {
+            if let Some(index) = QueryOrder::ast_ordinal(ast) {
                 if let Ok(index) = usize::try_from(index - 1)
                     && let Some(reference) = columns.output_reference(index)
                 {
@@ -56,10 +55,10 @@ impl<'ast> AstConversion<'ast, Expr> {
                     &ColumnName::from(index.to_string().as_str()),
                 );
             }
-            if let Some(name) = self.unqualified_column() {
+            if let Some(name) = QueryOrder::ast_unqualified_column(ast) {
                 let column = ColumnName::from(name);
                 if binding.input_first() && scope.has_input_column(context, &column)? {
-                    return self.resolve_in(context, scope);
+                    return Self::from_ast_in(ast, context, scope);
                 }
                 match columns.resolve_output(&column, context) {
                     Ok(Some(index)) => {
@@ -80,100 +79,117 @@ impl<'ast> AstConversion<'ast, Expr> {
             ))?;
             // Resolve against the compound's empty source scope, never an operand's.
         }
-        self.resolve_in(context, scope)
+        Self::from_ast_in(ast, context, scope)
     }
-    pub(crate) fn ordinal(&self) -> Option<i64> {
-        match self.ast {
+}
+
+impl QueryOrder {
+    pub(crate) fn ast_ordinal(ast: &Expr) -> Option<i64> {
+        match ast {
             Expr::Literal(Literal::Integer(value)) => Some(i64::from(*value)),
             _ => None,
         }
     }
-    pub(crate) fn unqualified_column(&self) -> Option<&'ast str> {
-        match self.ast {
-            Expr::Column(name) => convert(name).unqualified(),
+}
+
+impl QueryOrder {
+    pub(crate) fn ast_unqualified_column(ast: &Expr) -> Option<&str> {
+        match ast {
+            Expr::Column(name) => Self::ast_unqualified_name(name),
             _ => None,
         }
     }
 }
-impl<'ast> AstConversion<'ast, Name> {
-    pub(crate) fn unqualified(&self) -> Option<&'ast str> {
-        match self.ast.0.as_slice() {
+
+impl QueryOrder {
+    pub(crate) fn ast_unqualified_name(ast: &Name) -> Option<&str> {
+        match ast.0.as_slice() {
             [name] => Some(name),
             _ => None,
         }
     }
 }
-impl AstConversion<'_, Order> {
-    pub(crate) fn resolve_for_query(
+
+impl QueryOrder {
+    pub(crate) fn from_ast_for_query(
         values: &[Order],
         body: &QueryBody,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
-    ) -> Result<Vec<QueryOrder>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut orders = Vec::new();
         for order in values {
             if context.dialect() == Dialect::sqlite()
                 && binding.compound()
-                && let Some(index) = convert(body).match_sqlite_order(&order.expression)
+                && let Some(index) = Self::match_ast_compound_order(body, &order.expression)
             {
                 let expression = columns
                     .output_reference(index)
                     .expect("compound output position");
-                orders.push(QueryOrder::new(
+                orders.push(Self::new(
                     expression,
                     order.descending,
                     order.nulls_first,
                     None,
                 ));
             } else {
-                orders.push(convert(order).resolve(context, scope, columns, binding)?);
+                orders.push(Self::from_ast(order, context, scope, columns, binding)?);
             }
         }
         Ok(orders)
     }
-    pub(crate) fn resolve_list(
+}
+
+impl QueryOrder {
+    pub(crate) fn from_ast_list(
         values: &[Order],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
-    ) -> Result<Vec<QueryOrder>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut result = Vec::new();
         for order in values {
-            result.push(convert(order).resolve(context, scope, columns, binding)?);
+            result.push(Self::from_ast(order, context, scope, columns, binding)?);
         }
         Ok(result)
     }
-    pub(crate) fn resolve(
-        &self,
+}
+
+impl QueryOrder {
+    pub(crate) fn from_ast(
+        ast: &Order,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
-    ) -> Result<QueryOrder, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let expression =
-            convert(&self.ast.expression).resolve_clause(context, scope, columns, binding)?;
-        let using = self.resolve_using_operator(context)?;
-        Ok(QueryOrder::new(
+            SemScalarExpr::from_ast_clause(&ast.expression, context, scope, columns, binding)?;
+        let using = Self::from_ast_using_operator(ast, context)?;
+        Ok(Self::new(
             expression,
-            self.ast.descending,
-            self.ast.nulls_first,
+            ast.descending,
+            ast.nulls_first,
             using,
         ))
     }
-    pub(crate) fn resolve_using_operator(
-        &self,
+}
+
+impl QueryOrder {
+    pub(crate) fn from_ast_using_operator(
+        ast: &Order,
         context: &mut impl ParseContext,
     ) -> Result<Option<ResolvedOperator>, AnalysisError> {
-        let Some(name) = &self.ast.using else {
+        let Some(name) = &ast.using else {
             return Ok(None);
         };
-        let binding = match convert(name).operator_name() {
+        let binding = match OperatorName::from_ast_name(name) {
             Ok(operator_name) => {
                 let binding = ResolvedOperator::resolve(context, &operator_name, true, true);
-                Self::checked_name(context, &name.0.join("."), binding.resolution().clone())?;
+                Self::ast_checked_name(context, &name.0.join("."), binding.resolution().clone())?;
                 binding
             }
             Err(problem) => {
@@ -182,16 +198,6 @@ impl AstConversion<'_, Order> {
             }
         };
         Ok(Some(binding))
-    }
-    pub(crate) fn checked_name(
-        context: &mut impl ParseContext,
-        name: &str,
-        resolution: QueryNameResolution,
-    ) -> Result<QueryName, AnalysisError> {
-        if let Some(problem) = resolution.reference_problem(name) {
-            context.report_analysis_problem(AnalysisProblem::query(problem))?;
-        }
-        Ok(QueryName::new(name, resolution))
     }
 }
 
@@ -221,72 +227,93 @@ mod ordering_operator_tests {
     }
 }
 
-impl AstConversion<'_, Grouping> {
-    pub(crate) fn resolve_list(
+impl QueryOrder {
+    pub(crate) fn ast_checked_name(
+        context: &mut impl ParseContext,
+        name: &str,
+        resolution: QueryNameResolution,
+    ) -> Result<QueryName, AnalysisError> {
+        if let Some(problem) = resolution.reference_problem(name) {
+            context.report_analysis_problem(AnalysisProblem::query(problem))?;
+        }
+        Ok(QueryName::new(name, resolution))
+    }
+}
+
+impl QueryGrouping {
+    pub(crate) fn from_ast_list(
         values: &[Grouping],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
-    ) -> Result<Vec<QueryGrouping>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut result = Vec::new();
         for group in values {
-            result.push(convert(group).resolve(context, scope, columns)?);
+            result.push(Self::from_ast(group, context, scope, columns)?);
         }
         Ok(result)
     }
-    pub(crate) fn resolve(
-        &self,
+}
+
+impl QueryGrouping {
+    pub(crate) fn from_ast(
+        ast: &Grouping,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
-    ) -> Result<QueryGrouping, AnalysisError> {
-        match self.ast {
+    ) -> Result<Self, AnalysisError> {
+        match ast {
             Grouping::Expression(expression) => {
-                Self::resolve_expression(expression, context, scope, columns)
+                Self::from_ast_expression(expression, context, scope, columns)
             }
-            Grouping::Empty => Ok(QueryGrouping::empty()),
-            Grouping::Rollup(groups) => Ok(QueryGrouping::rollup(Self::resolve_list(
+            Grouping::Empty => Ok(Self::empty()),
+            Grouping::Rollup(groups) => Ok(Self::rollup(Self::from_ast_list(
                 groups, context, scope, columns,
             )?)),
-            Grouping::Cube(groups) => Ok(QueryGrouping::cube(Self::resolve_list(
+            Grouping::Cube(groups) => Ok(Self::cube(Self::from_ast_list(
                 groups, context, scope, columns,
             )?)),
-            Grouping::Sets(groups) => Ok(QueryGrouping::sets(Self::resolve_list(
+            Grouping::Sets(groups) => Ok(Self::sets(Self::from_ast_list(
                 groups, context, scope, columns,
             )?)),
-            Grouping::Simple(groups) => Ok(QueryGrouping::simple(Self::resolve_list(
+            Grouping::Simple(groups) => Ok(Self::simple(Self::from_ast_list(
                 groups, context, scope, columns,
             )?)),
         }
     }
+}
 
-    pub(crate) fn resolve_expression(
+impl QueryGrouping {
+    pub(crate) fn from_ast_expression(
         expression: &Expr,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
-    ) -> Result<QueryGrouping, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let scope = scope.with_grouping_placement("GROUP BY");
-        let expression =
-            convert(expression).resolve_clause(context, &scope, columns, ClauseBinding::Group)?;
-        Ok(QueryGrouping::expression(expression))
+        let expression = SemScalarExpr::from_ast_clause(
+            expression,
+            context,
+            &scope,
+            columns,
+            ClauseBinding::Group,
+        )?;
+        Ok(Self::expression(expression))
     }
 }
-impl AstConversion<'_, Window> {
-    pub(crate) fn resolve_over(
-        &self,
+
+impl QueryWindow {
+    pub(crate) fn from_ast_over(
+        ast: &Window,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<QueryWindow, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         // pg_query stores OVER name in WindowDef.name; WINDOW declarations
         // use the same parser field for a definition. Classify at this boundary.
-        if let Some(name) = &self.ast.name {
-            let reference = AstConversion::<Order>::checked_name(
-                context,
-                name,
-                scope.resolve_window(name, context),
-            )?;
-            return Ok(QueryWindow::new(
+        if let Some(name) = &ast.name {
+            let reference =
+                QueryOrder::ast_checked_name(context, name, scope.resolve_window(name, context))?;
+            return Ok(Self::new(
                 None,
                 Some(reference),
                 true,
@@ -295,59 +322,61 @@ impl AstConversion<'_, Window> {
                 None,
             ));
         }
-        self.resolve(context, scope)
+        Self::from_ast(ast, context, scope)
     }
+}
 
-    pub(crate) fn resolve(
-        &self,
+impl QueryWindow {
+    pub(crate) fn from_ast(
+        ast: &Window,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<QueryWindow, AnalysisError> {
-        let reference = if let Some(name) = &self.ast.reference {
+    ) -> Result<Self, AnalysisError> {
+        let reference = if let Some(name) = &ast.reference {
             let outcome = scope.resolve_window(name, context);
-            if context.dialect() == Dialect::postgres() || self.ast.reference_only {
-                Some(AstConversion::<Order>::checked_name(
-                    context, name, outcome,
-                )?)
+            if context.dialect() == Dialect::postgres() || ast.reference_only {
+                Some(QueryOrder::ast_checked_name(context, name, outcome)?)
             } else {
                 Some(QueryName::new(name, outcome))
             }
         } else {
             None
         };
-        let partition = AstConversion::<Expr>::resolve_list(&self.ast.partition, context, scope)?;
-        let order = AstConversion::<Order>::resolve_list(
-            &self.ast.order,
+        let partition = SemScalarExpr::from_ast_list(&ast.partition, context, scope)?;
+        let order = QueryOrder::from_ast_list(
+            &ast.order,
             context,
             scope,
             &ResultColumnCollection::default(),
             ClauseBinding::Source,
         )?;
-        let frame = self
-            .ast
+        let frame = ast
             .frame
             .as_ref()
-            .map(|frame| convert(frame).resolve(context, scope))
+            .map(|frame| QueryFrame::from_ast(frame, context, scope))
             .transpose()?;
-        Ok(QueryWindow::new(
-            self.ast.name.clone(),
+        Ok(Self::new(
+            ast.name.clone(),
             reference,
-            self.ast.reference_only,
+            ast.reference_only,
             partition,
             order,
             frame,
         ))
     }
-    pub(crate) fn resolve_definitions(
+}
+
+impl QueryWindow {
+    pub(crate) fn from_ast_definitions(
         values: &[Window],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<QueryWindow>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut result = Vec::new();
         let mut names = Vec::new();
         for window in values {
             let definition_scope = if context.dialect() == Dialect::sqlite() {
-                scope.with_window_names(Self::names(values))
+                scope.with_window_names(Self::ast_names(values))
             } else {
                 scope.with_window_names(names.clone())
             };
@@ -360,50 +389,54 @@ impl AstConversion<'_, Window> {
                 names.push(name.clone());
             }
             // A definition can only inherit from preceding definitions.
-            result.push(convert(window).resolve(context, &definition_scope)?);
+            result.push(Self::from_ast(window, context, &definition_scope)?);
         }
         Ok(result)
     }
-    pub(crate) fn names(values: &[Window]) -> Vec<String> {
+}
+
+impl QueryWindow {
+    pub(crate) fn ast_names(values: &[Window]) -> Vec<String> {
         values
             .iter()
             .filter_map(|window| window.name.clone())
             .collect()
     }
 }
-impl AstConversion<'_, Frame> {
-    pub(crate) fn resolve(
-        &self,
+
+impl QueryFrame {
+    pub(crate) fn from_ast(
+        ast: &Frame,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<QueryFrame, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let frame_scope = scope.with_grouping_placement("window frame offset");
-        Ok(QueryFrame::new(
-            convert(&self.ast.mode).semantic_name(),
-            convert(&self.ast.start).resolve(context, &frame_scope)?,
-            self.ast
-                .end
+        Ok(Self::new(
+            Self::ast_mode_name(&ast.mode),
+            QueryFrameBound::from_ast(&ast.start, context, &frame_scope)?,
+            ast.end
                 .as_ref()
-                .map(|end| convert(end).resolve(context, &frame_scope))
+                .map(|end| QueryFrameBound::from_ast(end, context, &frame_scope))
                 .transpose()?,
-            self.ast
-                .exclusion
-                .map(|exclusion| convert(&exclusion).semantic_name().to_owned()),
+            ast.exclusion
+                .map(|exclusion| Self::ast_exclusion_name(&exclusion).to_owned()),
         ))
     }
 }
-impl AstConversion<'_, FrameMode> {
-    pub(crate) const fn semantic_name(self) -> &'static str {
-        match self.ast {
+
+impl QueryFrame {
+    pub(crate) const fn ast_mode_name(ast: &FrameMode) -> &'static str {
+        match ast {
             FrameMode::Rows => "ROWS",
             FrameMode::Range => "RANGE",
             FrameMode::Groups => "GROUPS",
         }
     }
 }
-impl AstConversion<'_, FrameExclusion> {
-    pub(crate) const fn semantic_name(self) -> &'static str {
-        match self.ast {
+
+impl QueryFrame {
+    pub(crate) const fn ast_exclusion_name(ast: &FrameExclusion) -> &'static str {
+        match ast {
             FrameExclusion::CurrentRow => "CURRENT ROW",
             FrameExclusion::Group => "GROUP",
             FrameExclusion::Ties => "TIES",
@@ -411,56 +444,58 @@ impl AstConversion<'_, FrameExclusion> {
         }
     }
 }
-impl AstConversion<'_, FrameBound> {
-    pub(crate) fn resolve(
-        &self,
+
+impl QueryFrameBound {
+    pub(crate) fn from_ast(
+        ast: &FrameBound,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<QueryFrameBound, AnalysisError> {
-        match self.ast {
-            FrameBound::UnboundedPreceding => Ok(QueryFrameBound::unbounded_preceding()),
-            FrameBound::Preceding(expression) => Ok(QueryFrameBound::preceding(
-                convert(expression).resolve_in(context, scope)?,
-            )),
-            FrameBound::CurrentRow => Ok(QueryFrameBound::current_row()),
-            FrameBound::Following(expression) => Ok(QueryFrameBound::following(
-                convert(expression).resolve_in(context, scope)?,
-            )),
-            FrameBound::UnboundedFollowing => Ok(QueryFrameBound::unbounded_following()),
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            FrameBound::UnboundedPreceding => Ok(Self::unbounded_preceding()),
+            FrameBound::Preceding(expression) => Ok(Self::preceding(SemScalarExpr::from_ast_in(
+                expression, context, scope,
+            )?)),
+            FrameBound::CurrentRow => Ok(Self::current_row()),
+            FrameBound::Following(expression) => Ok(Self::following(SemScalarExpr::from_ast_in(
+                expression, context, scope,
+            )?)),
+            FrameBound::UnboundedFollowing => Ok(Self::unbounded_following()),
         }
     }
 }
-impl AstConversion<'_, Lock> {
-    pub(crate) fn resolve_list(
+
+impl QueryLock {
+    pub(crate) fn from_ast_list(
         values: &[Lock],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<QueryLock>, AnalysisError> {
+    ) -> Result<Vec<Self>, AnalysisError> {
         let mut result = Vec::new();
         for lock in values {
             let mut relations = Vec::new();
             for name in &lock.relations {
                 let resolution = scope.resolve_lock(&name.0.join("."));
-                relations.push(AstConversion::<Order>::checked_name(
+                relations.push(QueryOrder::ast_checked_name(
                     context,
                     &name.0.join("."),
                     resolution,
                 )?);
             }
-            result.push(QueryLock::new(
+            result.push(Self::new(
                 relations,
                 lock.strength
-                    .map(|strength| convert(&strength).semantic_name().to_owned()),
-                lock.wait
-                    .map(|wait| convert(&wait).semantic_name().to_owned()),
+                    .map(|strength| Self::ast_strength_name(&strength).to_owned()),
+                lock.wait.map(|wait| Self::ast_wait_name(&wait).to_owned()),
             ));
         }
         Ok(result)
     }
 }
-impl AstConversion<'_, LockStrength> {
-    pub(crate) const fn semantic_name(self) -> &'static str {
-        match self.ast {
+
+impl QueryLock {
+    pub(crate) const fn ast_strength_name(ast: &LockStrength) -> &'static str {
+        match ast {
             LockStrength::None => "NONE",
             LockStrength::KeyShare => "KEY SHARE",
             LockStrength::Share => "SHARE",
@@ -469,9 +504,10 @@ impl AstConversion<'_, LockStrength> {
         }
     }
 }
-impl AstConversion<'_, LockWait> {
-    pub(crate) const fn semantic_name(self) -> &'static str {
-        match self.ast {
+
+impl QueryLock {
+    pub(crate) const fn ast_wait_name(ast: &LockWait) -> &'static str {
+        match ast {
             LockWait::Block => "BLOCK",
             LockWait::Skip => "SKIP",
             LockWait::Error => "ERROR",
@@ -479,54 +515,55 @@ impl AstConversion<'_, LockWait> {
     }
 }
 
-impl<'ast> AstConversion<'ast, Expr> {
-    pub(crate) fn sqlite_comparison_sql(&self) -> Option<String> {
+impl QueryOrder {
+    pub(crate) fn ast_sqlite_comparison_sql(ast: &Expr) -> Option<String> {
         use crate::ast::deparse::{SqlEmit, SqlWriter};
-        if let Expr::Parenthesized(values) = self.ast
+        if let Expr::Parenthesized(values) = ast
             && let [expression] = values.as_slice()
         {
-            return convert(expression).sqlite_comparison_sql();
+            return Self::ast_sqlite_comparison_sql(expression);
         }
         let mut writer = SqlWriter::new(Dialect::sqlite());
-        self.ast.emit(&mut writer).ok()?;
+        ast.emit(&mut writer).ok()?;
         Some(writer.into_sql())
     }
 }
-impl AstConversion<'_, QueryBody> {
-    pub(crate) fn match_sqlite_order(&self, expression: &Expr) -> Option<usize> {
-        match self.ast {
-            QueryBody::Select(select) => convert(select.as_ref()).match_sqlite_order(expression),
-            QueryBody::Set(set) => convert(set.as_ref()).match_sqlite_order(expression),
-            QueryBody::Values(rows) => Self::match_sqlite_values_order(rows, expression),
+
+impl QueryOrder {
+    pub(crate) fn match_ast_compound_order(ast: &QueryBody, expression: &Expr) -> Option<usize> {
+        match ast {
+            QueryBody::Select(select) => Self::match_ast_select_order(select.as_ref(), expression),
+            QueryBody::Set(set) => Self::match_ast_set_order(set.as_ref(), expression),
+            QueryBody::Values(rows) => Self::match_ast_values_order(rows, expression),
         }
     }
 }
-impl AstConversion<'_, QueryBody> {
-    fn match_sqlite_values_order(rows: &[Vec<Expr>], expression: &Expr) -> Option<usize> {
-        let key = convert(expression).sqlite_comparison_sql()?;
+
+impl QueryOrder {
+    fn match_ast_values_order(rows: &[Vec<Expr>], expression: &Expr) -> Option<usize> {
+        let key = Self::ast_sqlite_comparison_sql(expression)?;
         rows.first()?
             .iter()
-            .position(|value| convert(value).sqlite_comparison_sql().as_ref() == Some(&key))
+            .position(|value| Self::ast_sqlite_comparison_sql(value).as_ref() == Some(&key))
     }
 }
 
-impl AstConversion<'_, SetQuery> {
-    fn match_sqlite_order(&self, expression: &Expr) -> Option<usize> {
-        if let Some(index) = convert(&self.ast.left.body).match_sqlite_order(expression) {
+impl QueryOrder {
+    fn match_ast_set_order(ast: &SetQuery, expression: &Expr) -> Option<usize> {
+        if let Some(index) = Self::match_ast_compound_order(&ast.left.body, expression) {
             Some(index)
         } else {
-            convert(&self.ast.right.body).match_sqlite_order(expression)
+            Self::match_ast_compound_order(&ast.right.body, expression)
         }
     }
 }
 
-impl AstConversion<'_, Select> {
-    pub(crate) fn match_sqlite_order(&self, expression: &Expr) -> Option<usize> {
-        let key = convert(expression).sqlite_comparison_sql()?;
-        self.ast.targets.iter().position(|target| {
-            convert(&target.expression).sqlite_comparison_sql().as_ref() == Some(&key)
-                || convert(expression)
-                    .unqualified_column()
+impl QueryOrder {
+    pub(crate) fn match_ast_select_order(ast: &Select, expression: &Expr) -> Option<usize> {
+        let key = Self::ast_sqlite_comparison_sql(expression)?;
+        ast.targets.iter().position(|target| {
+            Self::ast_sqlite_comparison_sql(&target.expression).as_ref() == Some(&key)
+                || Self::ast_unqualified_column(expression)
                     .is_some_and(|name| target.alias.as_deref() == Some(name))
         })
     }

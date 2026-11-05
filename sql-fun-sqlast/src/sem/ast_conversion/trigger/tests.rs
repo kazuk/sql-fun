@@ -1,6 +1,5 @@
 #[cfg(feature = "sqlite")]
 use crate::context::ViewInfoRead as ContextViewInfoRead;
-use crate::sem::convert;
 use crate::{
     ast::Dialect,
     context::{ParseContext, TableInfoRead, TriggerInfoRead},
@@ -161,7 +160,7 @@ fn named_lookup_and_target_links_agree_across_layers() -> testresult::TestResult
     let target = FullName::with_schema("public", "items");
     let names = child.get_table_impl(&target).unwrap().triggers();
     assert_eq!(names.names().len(), 2);
-    let definitions = convert(&names).resolve(&child, &target);
+    let definitions = names.resolve(&child, &target);
     assert_eq!(definitions.len(), 2);
     for definition in definitions {
         assert!(std::ptr::eq(

@@ -4,7 +4,6 @@ use crate::context::{MutSourcePathWithSpan as _, ParseContext as _};
 use crate::names::{ColumnName, FullName, OperatorName, SchemaName, TableName};
 use crate::parse_statements;
 use crate::sem::SemAst;
-use crate::sem::convert;
 use crate::sem::{
     AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, CatalogNameLookup,
     CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, CreateView,
@@ -98,7 +97,7 @@ pub(crate) fn resolve(
     };
     let mut catalog = catalog().with_dialect(dialect);
     catalog.begin_parameter_type_analysis();
-    let query = convert(&query).resolve_test_in(&mut catalog, None);
+    let query = SelectStatement::from_ast_test_in(&query, &mut catalog, None);
     let query = if infer {
         catalog.infer_query_parameter_types(query, &mut create_cache_context())
     } else {
@@ -162,7 +161,7 @@ pub(crate) fn column_scope_query(
     let StatementNode::Query(query) = statement.into_test_node() else {
         panic!("query fixture");
     };
-    let query = convert(&query).resolve_test_in(&mut context, None).unwrap();
+    let query = SelectStatement::from_ast_test_in(&query, &mut context, None).unwrap();
     (query, context)
 }
 
@@ -229,14 +228,15 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
         ("a", "mixed_v", "a.mixed", "id, other"),
     ] {
         let sql = format!("SELECT {projection} FROM {source}");
-        let query = convert(
+        let query = SemAst::from_ast_node(
             &parse_statements(&sql, dialect)
                 .next()
                 .unwrap()
                 .unwrap()
                 .into_test_node(),
+            &mut context,
+            &mut create_cache_context(),
         )
-        .resolve(&mut context, &mut create_cache_context())
         .unwrap()
         .into_select_statemtnt()
         .unwrap();
@@ -365,7 +365,7 @@ pub(crate) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, 
         panic!("query fixture");
     };
     context.begin_parameter_type_analysis();
-    let query = convert(&query).resolve_test_in(&mut context, None);
+    let query = SelectStatement::from_ast_test_in(&query, &mut context, None);
     let query = if infer {
         context.infer_query_parameter_types(query, &mut create_cache_context())
     } else {

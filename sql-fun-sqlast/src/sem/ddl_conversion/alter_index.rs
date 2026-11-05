@@ -1,6 +1,5 @@
 use crate::ast::ddl::{AlterOperation, Index, PostgresAlterCommand};
 use crate::ast::{AlterCommand, Expr, Literal, Name, SyntaxValue, TypeName};
-use crate::sem::{AstConversion, convert};
 use crate::{
     ast::{SyntaxOption, ddl::AlterDefinition},
     context::ParseContext,
@@ -10,86 +9,86 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) fn resolve_index(
-        &self,
+impl IndexAlteration {
+    pub(crate) fn from_ast_command(
+        ast: &AlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<IndexAlteration, AnalysisError> {
-        match self.ast {
-            AlterCommand::Postgres(command) => {
-                convert::<PostgresAlterCommand>(command).resolve_index(context)
-            }
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            AlterCommand::Postgres(command) => Self::from_ast_postgres_command(command, context),
             _ => todo!("ALTER INDEX command"),
         }
     }
-}
 
-impl AstConversion<'_, PostgresAlterCommand> {
-    pub(crate) fn resolve_index(
-        &self,
+    pub(crate) fn from_ast_postgres_command(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<IndexAlteration, AnalysisError> {
-        convert(&self.ast.operation).resolve_index(context, self.ast.number, &self.ast.definition)
+    ) -> Result<Self, AnalysisError> {
+        Self::from_ast_operation(&ast.operation, context, ast.number, &ast.definition)
     }
-}
 
-impl AstConversion<'_, AlterOperation> {
-    pub(crate) fn resolve_index(
-        self,
+    pub(crate) fn from_ast_operation(
+        ast: &AlterOperation,
         _context: &mut impl ParseContext,
         number: i32,
         definition: &AlterDefinition,
-    ) -> Result<IndexAlteration, AnalysisError> {
-        match self.ast {
-            AlterOperation::SetRelOptions => convert(definition).resolve_index_storage(false),
-            AlterOperation::ResetRelOptions => convert(definition).resolve_index_storage(true),
-            AlterOperation::SetStatistics => convert(definition).resolve_index_statistics(number),
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            AlterOperation::SetRelOptions => Self::from_ast_storage_definition(definition, false),
+            AlterOperation::ResetRelOptions => Self::from_ast_storage_definition(definition, true),
+            AlterOperation::SetStatistics => {
+                Self::from_ast_statistics_definition(definition, number)
+            }
             _ => todo!("ALTER INDEX operation"),
         }
     }
-}
 
-impl AstConversion<'_, AlterDefinition> {
-    pub(crate) fn resolve_index_storage(
-        &self,
+    pub(crate) fn from_ast_storage_definition(
+        ast: &AlterDefinition,
         reset: bool,
-    ) -> Result<IndexAlteration, AnalysisError> {
-        let parameters = self.index_storage_parameters()?;
-        Ok(IndexAlteration::storage(reset, &parameters))
+    ) -> Result<Self, AnalysisError> {
+        let parameters = IndexStorageParameter::from_ast_definition_list(ast)?;
+        Ok(Self::storage(reset, &parameters))
     }
-    pub(crate) fn resolve_index_statistics(
-        &self,
+
+    pub(crate) fn from_ast_statistics_definition(
+        ast: &AlterDefinition,
         column: i32,
-    ) -> Result<IndexAlteration, AnalysisError> {
-        Ok(IndexAlteration::statistics(
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::statistics(
             column,
-            self.index_statistics_target()?,
+            Self::statistics_from_ast_definition(ast)?,
         ))
     }
+}
 
-    pub(crate) fn index_storage_parameters(
-        &self,
-    ) -> Result<Vec<IndexStorageParameter>, AnalysisError> {
-        let AlterDefinition::Options(options) = self.ast else {
+impl IndexStorageParameter {
+    pub(crate) fn from_ast_definition_list(
+        ast: &AlterDefinition,
+    ) -> Result<Vec<Self>, AnalysisError> {
+        let AlterDefinition::Options(options) = ast else {
             return AnalysisError::raise_unexpected_input("index storage options");
         };
-        AstConversion::<SyntaxOption>::index_storage_parameters(options)
-    }
-    pub(crate) fn index_statistics_target(&self) -> Result<i32, AnalysisError> {
-        let AlterDefinition::Expression(expression) = self.ast else {
-            return AnalysisError::raise_unexpected_input("index statistics target");
-        };
-        convert(expression).index_statistics_target()
+        Self::from_ast_list(options)
     }
 }
 
-impl AstConversion<'_, SyntaxOption> {
-    pub(crate) fn index_storage_parameters(
-        options: &[SyntaxOption],
-    ) -> Result<Vec<IndexStorageParameter>, AnalysisError> {
+impl IndexAlteration {
+    pub(crate) fn statistics_from_ast_definition(
+        ast: &AlterDefinition,
+    ) -> Result<i32, AnalysisError> {
+        let AlterDefinition::Expression(expression) = ast else {
+            return AnalysisError::raise_unexpected_input("index statistics target");
+        };
+        Self::statistics_from_ast_expr(expression)
+    }
+}
+
+impl IndexStorageParameter {
+    pub(crate) fn from_ast_list(options: &[SyntaxOption]) -> Result<Vec<Self>, AnalysisError> {
         let mut parameters = Vec::new();
         for option in options {
-            parameters.push(IndexStorageParameter::try_from(option)?);
+            parameters.push(Self::try_from(option)?);
         }
         Ok(parameters)
     }
@@ -101,7 +100,7 @@ impl TryFrom<&SyntaxOption> for IndexStorageParameter {
         let value = option
             .value
             .as_ref()
-            .map(|value| convert(value).index_option_value())
+            .map(Self::value_from_ast_syntaxvalue)
             .transpose()?;
         Ok(Self::new(
             option.namespace.as_deref(),
@@ -111,33 +110,34 @@ impl TryFrom<&SyntaxOption> for IndexStorageParameter {
     }
 }
 
-impl AstConversion<'_, SyntaxValue> {
-    pub(crate) fn index_option_value(&self) -> Result<String, AnalysisError> {
-        match self.ast {
-            SyntaxValue::Expression(expression) => convert(expression).index_option_value(),
-            SyntaxValue::Type(word) => Ok(convert(word).index_option_word()),
+impl IndexStorageParameter {
+    pub(crate) fn value_from_ast_syntaxvalue(ast: &SyntaxValue) -> Result<String, AnalysisError> {
+        match ast {
+            SyntaxValue::Expression(expression) => Self::value_from_ast_expr(expression),
+            SyntaxValue::Type(word) => Ok(Self::word_from_ast_typename(word)),
+        }
+    }
+
+    pub(crate) fn value_from_ast_expr(ast: &Expr) -> Result<String, AnalysisError> {
+        match ast {
+            Expr::Literal(literal) => Self::value_from_ast_literal(literal),
+            _ => AnalysisError::raise_unexpected_input("index option literal"),
         }
     }
 }
 
-impl AstConversion<'_, Expr> {
-    pub(crate) fn index_option_value(&self) -> Result<String, AnalysisError> {
-        match self.ast {
-            Expr::Literal(literal) => convert(literal).index_option_value(),
-            _ => AnalysisError::raise_unexpected_input("index option literal"),
-        }
-    }
-    pub(crate) fn index_statistics_target(&self) -> Result<i32, AnalysisError> {
-        match self.ast {
-            Expr::Literal(literal) => convert(literal).index_statistics_target(),
+impl IndexAlteration {
+    pub(crate) fn statistics_from_ast_expr(ast: &Expr) -> Result<i32, AnalysisError> {
+        match ast {
+            Expr::Literal(literal) => Self::statistics_from_ast_literal(literal),
             _ => AnalysisError::raise_unexpected_input("index statistics integer"),
         }
     }
 }
 
-impl AstConversion<'_, Literal> {
-    pub(crate) fn index_option_value(&self) -> Result<String, AnalysisError> {
-        match self.ast {
+impl IndexStorageParameter {
+    pub(crate) fn value_from_ast_literal(ast: &Literal) -> Result<String, AnalysisError> {
+        match ast {
             Literal::Integer(value) => Ok(value.to_string()),
             Literal::Boolean(value) => Ok(value.to_string()),
             Literal::Numeric(value) | Literal::String(value) | Literal::Keyword(value) => {
@@ -146,26 +146,28 @@ impl AstConversion<'_, Literal> {
             _ => AnalysisError::raise_unexpected_input("index option literal"),
         }
     }
-    pub(crate) fn index_statistics_target(&self) -> Result<i32, AnalysisError> {
-        match self.ast {
+}
+
+impl IndexAlteration {
+    pub(crate) fn statistics_from_ast_literal(ast: &Literal) -> Result<i32, AnalysisError> {
+        match ast {
             Literal::Integer(value) => Ok(*value),
             _ => AnalysisError::raise_unexpected_input("index statistics integer"),
         }
     }
 }
 
-impl AstConversion<'_, Index> {
-    pub(crate) fn initialize_index_storage(
-        &self,
+impl CreateIndex {
+    pub(crate) fn retain_ast_storage(
+        ast: &Index,
         context: &mut impl ParseContext,
-        index: &mut CreateIndex,
+        index: &mut Self,
     ) -> Result<bool, AnalysisError> {
-        index.set_access_method(&self.ast.access_method);
+        index.set_access_method(&ast.access_method);
         if index.access_method() != "btree" {
             return Ok(true);
         }
-        let parameters =
-            AstConversion::<SyntaxOption>::index_storage_parameters(&self.ast.options)?;
+        let parameters = IndexStorageParameter::from_ast_list(&ast.options)?;
         let problems = IndexStorageChange::new(false, &parameters).evaluate(index);
         let mut valid = true;
         for problem in problems {
@@ -178,18 +180,16 @@ impl AstConversion<'_, Index> {
     }
 }
 
-impl AstConversion<'_, TypeName> {
-    pub(crate) fn index_option_word(&self) -> String {
-        let mut word = convert(&self.ast.name).index_option_word();
-        for _ in &self.ast.array_bounds {
+impl IndexStorageParameter {
+    pub(crate) fn word_from_ast_typename(ast: &TypeName) -> String {
+        let mut word = Self::word_from_ast_name(&ast.name);
+        for _ in &ast.array_bounds {
             word.push_str("[]");
         }
         word
     }
-}
 
-impl AstConversion<'_, Name> {
-    pub(crate) fn index_option_word(&self) -> String {
-        self.ast.0.join(".")
+    pub(crate) fn word_from_ast_name(ast: &Name) -> String {
+        ast.0.join(".")
     }
 }

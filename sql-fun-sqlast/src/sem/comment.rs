@@ -1,4 +1,3 @@
-use crate::sem::convert;
 pub use crate::syntax_options::ObjectKind;
 use crate::{
     ast::{Comment as AstComment, TryFromWithTokens},
@@ -53,10 +52,9 @@ impl Comment {
     where
         TParseContext: ParseContext,
     {
-        convert(&AstComment::try_from_with_tokens(
-            &syn,
-            &::sql_fun_core::IVec::default(),
-        )?)
-        .apply(context)
+        Self::from_ast_and_apply(
+            &AstComment::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?,
+            context,
+        )
     }
 }

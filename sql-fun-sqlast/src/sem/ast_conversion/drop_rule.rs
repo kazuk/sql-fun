@@ -1,4 +1,3 @@
-use crate::sem::{AstConversion, convert};
 use crate::{
     AstAndContextPair,
     ast::{DropBehavior, DropRule},
@@ -10,27 +9,30 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, DropRule> {
-    pub(crate) fn resolve(
-        &self,
+impl SemDropRule {
+    pub(crate) fn from_ast(
+        ast: &DropRule,
         context: &mut impl ParseContext,
-    ) -> Result<Option<SemDropRule>, AnalysisError> {
-        let result = self.resolve_definition(context);
+    ) -> Result<Option<Self>, AnalysisError> {
+        let result = Self::from_ast_definition(ast, context);
         ResolutionFailure::finish(result, context)
     }
-    pub(crate) fn resolve_definition(
-        &self,
+}
+
+impl SemDropRule {
+    pub(crate) fn from_ast_definition(
+        ast: &DropRule,
         context: &impl ParseContext,
-    ) -> Result<SemDropRule, ResolutionFailure> {
-        let requested = convert(&self.ast.name).full_name()?;
-        let requested_target = convert(&self.ast.relation).full_name()?;
-        let behavior = match self.ast.behavior {
+    ) -> Result<Self, ResolutionFailure> {
+        let requested = FullName::from_ast_name(&ast.name)?;
+        let requested_target = FullName::from_ast_name(&ast.relation)?;
+        let behavior = match ast.behavior {
             DropBehavior::Cascade => DropDependencyBehavior::cascade(),
             DropBehavior::Restrict => DropDependencyBehavior::restrict(),
         };
         let Some(target) = context.resolve_relation_name(&requested_target) else {
-            if self.ast.if_exists {
-                return Ok(SemDropRule::new(
+            if ast.if_exists {
+                return Ok(Self::new(
                     &requested,
                     &requested_target,
                     None,
@@ -43,16 +45,26 @@ impl AstConversion<'_, DropRule> {
                 &requested_target,
             )));
         };
-        self.resolve_on(context, &requested, &requested_target, &target, behavior)
+        Self::from_ast_on(
+            ast,
+            context,
+            &requested,
+            &requested_target,
+            &target,
+            behavior,
+        )
     }
-    pub(crate) fn resolve_on(
-        &self,
+}
+
+impl SemDropRule {
+    pub(crate) fn from_ast_on(
+        ast: &DropRule,
         context: &impl ParseContext,
         requested: &FullName,
         requested_target: &FullName,
         target: &FullName,
         behavior: DropDependencyBehavior,
-    ) -> Result<SemDropRule, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         let identity = RuleIdentity::new(target, requested.name().as_str());
         let found = context.rule(&identity).is_some();
         if identity.name().name().as_str() == "_RETURN"
@@ -65,23 +77,26 @@ impl AstConversion<'_, DropRule> {
                 "the View requires its SELECT rule; drop the View instead",
             )));
         }
-        if !found && !self.ast.if_exists {
+        if !found && !ast.if_exists {
             return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
         }
-        Ok(SemDropRule::new(
+        Ok(Self::new(
             requested,
             requested_target,
             Some(&identity),
             found,
-            self.ast.if_exists,
+            ast.if_exists,
             behavior,
         ))
     }
-    pub(crate) fn resolve_and_apply<C: ParseContext>(
-        &self,
+}
+
+impl SemDropRule {
+    pub(crate) fn apply_ast<C: ParseContext>(
+        ast: &DropRule,
         mut context: C,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let Some(definition) = self.resolve(&mut context)? else {
+        let Some(definition) = Self::from_ast(ast, &mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,

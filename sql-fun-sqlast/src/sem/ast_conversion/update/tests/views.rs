@@ -3,9 +3,9 @@ use crate::names::ColumnName;
 use crate::names::FullName;
 use crate::parse_statements;
 use crate::sem::CreateView;
+use crate::sem::SemAst;
 use crate::sem::ViewLike;
 use crate::sem::ViewUpdateSupport;
-use crate::sem::convert;
 use crate::test_helpers::create_cache_context;
 use crate::test_helpers::update::catalog;
 
@@ -27,14 +27,15 @@ fn respects_update_capabilities(
     #[case] valid: bool,
 ) {
     let mut context = catalog(Dialect::postgres());
-    let view_query = convert(
+    let view_query = SemAst::from_ast_node(
         &parse_statements("SELECT id,label FROM items", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .node,
+        &mut context,
+        &mut create_cache_context(),
     )
-    .resolve(&mut context, &mut create_cache_context())
     .unwrap()
     .into_select_statemtnt()
     .unwrap();
@@ -50,14 +51,15 @@ fn respects_update_capabilities(
         ViewUpdateSupport::read_only()
     };
     context.set_view_update_support(&name, &support);
-    let result = convert(
+    let result = SemAst::from_ast_node(
         &parse_statements(sql, Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .node,
-    )
-    .resolve(&mut context, &mut create_cache_context());
+        &mut context,
+        &mut create_cache_context(),
+    );
     assert_eq!(
         context.reported_problem_count() == 0,
         valid,

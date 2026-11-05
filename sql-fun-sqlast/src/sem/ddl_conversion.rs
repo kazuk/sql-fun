@@ -8,6 +8,13 @@ mod column_rename;
 mod serial;
 mod table_rename;
 
+use self::serial::SerialSequences;
+use crate::sem::OwnerSpecification;
+use crate::sem::SelectStatement;
+use crate::sem::WithTypmod;
+use crate::sem::{CheckConstraint, ColumnAttributeAction};
+use crate::sem::{EngineFeatureValidation, IndexAlteration};
+
 use crate::ast::ddl::{
     AlterConstraintFlags, AlterDefinition, CompositeField, CompositeType, Domain, Function,
     FunctionParameter, Index, ParameterMode, Schema, TableAs,
@@ -17,7 +24,6 @@ use crate::ast::{
     AlterRelation, AlterRelationKind, ColumnConstraint as AstColumnConstraint, ForeignReference,
     Table,
 };
-use crate::sem::{AstConversion, convert};
 
 use crate::{
     CacheContext,
@@ -50,35 +56,38 @@ use crate::{
 
 use crate::ast::{Dialect, Expr, Name};
 
-impl AstConversion<'_, AlterRelation> {
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+/// Coordinates ALTER semantics and catalog application across relation kinds.
+pub(crate) struct RelationAlteration;
+
+impl RelationAlteration {
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &AlterRelation,
         context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let source = context.get_source_path_with_span().cloned();
-        self.resolve_and_apply_with_source(context, source.as_ref())
+        Self::from_ast_and_apply_with_source(ast, context, source.as_ref())
     }
 
-    pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply_at<TContext: ParseContext>(
+        ast: &AlterRelation,
         context: TContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        self.resolve_and_apply_with_source(context, Some(source))
+        Self::from_ast_and_apply_with_source(ast, context, Some(source))
     }
 
-    pub(crate) fn resolve_and_apply_with_source<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply_with_source<TContext: ParseContext>(
+        ast: &AlterRelation,
         mut context: TContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        if !self.check_engine_features(&mut context)? {
+        if !EngineFeatureValidation::alter_relation(ast, &mut context)? {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         }
-        let changes = self.view_default_changes(&mut context);
+        let changes = AlterView::from_ast_defaults(ast, &mut context);
         let Some(changes) = ResolutionFailure::finish(changes, &mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
@@ -90,60 +99,65 @@ impl AstConversion<'_, AlterRelation> {
             return Ok(AstAndContextPair::new(SemAst::alter_view(&change), context));
         }
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(&mut context, source);
+        let result = Self::from_ast_inner(ast, &mut context, source);
         let statement = context.finish_analysis(result)?;
         let context = statement.apply_relation_alter(context)?;
         Ok(AstAndContextPair::new(statement, context))
     }
 
-    pub(crate) fn resolve_in(
-        &self,
+    pub(crate) fn from_ast_inner(
+        ast: &AlterRelation,
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
-        if self.ast.kind.supports_table_column_attributes() && self.has_column_rename() {
-            return self.resolve_column_rename(context, source);
+        if ast.kind.supports_table_column_attributes() && Self::has_ast_column_rename(ast) {
+            return Self::from_ast_column_rename(ast, context, source);
         }
-        if self.ast.kind.supports_table_column_attributes() && self.has_table_rename() {
-            return self.resolve_table_rename(context, source);
+        if ast.kind.supports_table_column_attributes() && Self::has_ast_table_rename(ast) {
+            return Self::from_ast_table_rename(ast, context, source);
         }
-        if self.ast.kind.supports_table_column_attributes() && self.has_column_attributes() {
-            return self.resolve_column_attributes(context, source);
+        if ast.kind.supports_table_column_attributes() && Self::has_ast_column_attributes(ast) {
+            return Self::from_ast_column_attributes(ast, context, source);
         }
-        convert(&self.ast.kind).resolve(
+        Self::from_ast_kind(
+            &ast.kind,
             context,
-            &convert(&self.ast.name).full_name()?,
-            &self.ast.commands,
+            &FullName::from_ast_name(&ast.name)?,
+            &ast.commands,
             source,
-            self.ast.if_exists,
+            ast.if_exists,
         )
     }
-}
 
-impl AstConversion<'_, AlterRelationKind> {
-    pub(crate) fn resolve(
-        self,
+    pub(crate) fn from_ast_kind(
+        ast: &AlterRelationKind,
         context: &mut impl ParseContext,
         name: &FullName,
         syntax_commands: &[AlterCommand],
         source: Option<&SourcePathWithSpan>,
         if_exists: bool,
     ) -> Result<SemAst, AnalysisError> {
-        match self.ast {
-            AlterRelationKind::Table => Self::resolve_table(context, name, syntax_commands, source),
-            AlterRelationKind::View => Self::resolve_view(context, name, syntax_commands, false),
-            AlterRelationKind::MaterializedView => {
-                Self::resolve_view(context, name, syntax_commands, true)
+        match ast {
+            AlterRelationKind::Table => {
+                Self::table_from_ast_commands(context, name, syntax_commands, source)
             }
-            AlterRelationKind::Sequence => Self::resolve_sequence(context, name, syntax_commands),
+            AlterRelationKind::View => {
+                Self::view_from_ast_commands(context, name, syntax_commands, false)
+            }
+            AlterRelationKind::MaterializedView => {
+                Self::view_from_ast_commands(context, name, syntax_commands, true)
+            }
+            AlterRelationKind::Sequence => {
+                Self::sequence_from_ast_commands(context, name, syntax_commands)
+            }
             AlterRelationKind::Index => {
-                Self::resolve_index(context, name, syntax_commands, if_exists)
+                Self::index_from_ast_commands(context, name, syntax_commands, if_exists)
             }
             AlterRelationKind::ForeignTable | AlterRelationKind::CompositeType => todo!(),
         }
     }
 
-    pub(crate) fn resolve_index(
+    pub(crate) fn index_from_ast_commands(
         context: &mut impl ParseContext,
         name: &FullName,
         syntax_commands: &[AlterCommand],
@@ -151,13 +165,13 @@ impl AstConversion<'_, AlterRelationKind> {
     ) -> Result<SemAst, AnalysisError> {
         let mut operations = Vec::new();
         for command in syntax_commands {
-            operations.push(convert(command).resolve_index(context)?);
+            operations.push(IndexAlteration::from_ast_command(command, context)?);
         }
         let statement = AlterIndex::resolve(context, name, if_exists, &operations)?;
         Ok(SemAst::alter_index(&statement))
     }
 
-    pub(crate) fn resolve_table(
+    pub(crate) fn table_from_ast_commands(
         context: &mut impl ParseContext,
         name: &FullName,
         syntax_commands: &[AlterCommand],
@@ -172,14 +186,14 @@ impl AstConversion<'_, AlterRelationKind> {
         }
         let mut commands = Vec::new();
         for command in syntax_commands {
-            commands.push(convert(command).resolve(context, &table)?);
+            commands.push(AlterObjSubCommand::from_ast(command, context, &table)?);
         }
         let mut statement = AlterTable::new(&table, &commands, source);
         statement.validate_check_names(context)?;
         Ok(SemAst::alter_table(&statement))
     }
 
-    pub(crate) fn resolve_view(
+    pub(crate) fn view_from_ast_commands(
         context: &mut impl ParseContext,
         name: &FullName,
         syntax_commands: &[AlterCommand],
@@ -197,12 +211,12 @@ impl AstConversion<'_, AlterRelationKind> {
         }
         let commands = syntax_commands
             .iter()
-            .map(|command| convert(command).resolve_owner(context))
+            .map(|command| AlterObjSubCommand::from_ast_owner(command, context))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(SemAst::alter_view(&AlterView::new(&view, &commands)))
     }
 
-    pub(crate) fn resolve_sequence(
+    pub(crate) fn sequence_from_ast_commands(
         context: &mut impl ParseContext,
         name: &FullName,
         syntax_commands: &[AlterCommand],
@@ -212,39 +226,38 @@ impl AstConversion<'_, AlterRelationKind> {
         }
         let commands = syntax_commands
             .iter()
-            .map(|command| convert(command).resolve_owner(context))
+            .map(|command| AlterObjSubCommand::from_ast_owner(command, context))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(SemAst::alter_sequence(&AlterSequence::new(name, &commands)))
     }
 }
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) fn resolve_and_report<TContext: ParseContext>(
-        &self,
+impl AlterObjSubCommand {
+    pub(crate) fn from_ast_and_report<TContext: ParseContext>(
+        ast: &AlterCommand,
         mut context: TContext,
         table: &TableName,
-    ) -> Result<(AlterObjSubCommand, TContext), AnalysisError> {
+    ) -> Result<(Self, TContext), AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve(&mut context, table);
+        let result = Self::from_ast(ast, &mut context, table);
         let command = context.finish_analysis(result)?;
         Ok((command, context))
     }
-    pub(crate) fn resolve_owner(
-        &self,
+
+    pub(crate) fn from_ast_owner(
+        ast: &AlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        match self.ast {
-            AlterCommand::Postgres(command) => {
-                convert::<PostgresAlterCommand>(command).resolve_owner(context)
-            }
-            AlterCommand::Owner(owner) => Ok(AlterObjSubCommand::resolved_owner(
-                &convert(owner).resolve_owner(context)?,
-            )),
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            AlterCommand::Postgres(command) => Self::from_ast_postgres_owner(command, context),
+            AlterCommand::Owner(owner) => Ok(Self::resolved_owner(&OwnerSpecification::from_ast(
+                owner, context,
+            )?)),
             _ => todo!(),
         }
     }
 
-    pub(crate) fn missing_column(
+    pub(crate) fn check_ast_missing_column(
         context: &mut impl ParseContext,
         table: &TableName,
         column: &ColumnName,
@@ -259,7 +272,7 @@ impl AstConversion<'_, AlterCommand> {
         Ok(())
     }
 
-    pub(crate) fn existing_column(
+    pub(crate) fn check_ast_existing_column(
         context: &mut impl ParseContext,
         table: &TableName,
         column: &ColumnName,
@@ -273,70 +286,68 @@ impl AstConversion<'_, AlterCommand> {
         Ok(())
     }
 
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast(
+        ast: &AlterCommand,
         context: &mut impl ParseContext,
         table: &TableName,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        match self.ast {
-            AlterCommand::Postgres(command) => {
-                convert::<PostgresAlterCommand>(command).resolve(context, table)
-            }
-            AlterCommand::Owner(_) => self.resolve_owner(context),
-            AlterCommand::Default(name, expr) => Self::resolve_default(context, table, name, expr),
+    ) -> Result<Self, AnalysisError> {
+        match ast {
+            AlterCommand::Postgres(command) => Self::from_ast_postgres(command, context, table),
+            AlterCommand::Owner(_) => Self::from_ast_owner(ast, context),
+            AlterCommand::Default(name, expr) => Self::from_ast_default(context, table, name, expr),
             AlterCommand::Constraint(constraint) => {
-                Self::resolve_constraint(context, table, constraint)
+                Self::from_ast_constraint(context, table, constraint)
             }
-            AlterCommand::Cluster(name) => Self::resolve_cluster(context, table, name),
-            AlterCommand::Rename(name) => Self::resolve_rename(context, name),
-            AlterCommand::AddColumn(column) => Self::resolve_add_column(context, table, column),
+            AlterCommand::Cluster(name) => Self::from_ast_cluster(context, table, name),
+            AlterCommand::Rename(name) => Self::from_ast_rename(context, name),
+            AlterCommand::AddColumn(column) => Self::from_ast_add_column(context, table, column),
             AlterCommand::AlterColumn(name, column) if context.dialect() == Dialect::sqlite() => {
-                Self::resolve_alter_column(context, table, name, column)
+                Self::from_ast_alter_column(context, table, name, column)
             }
             AlterCommand::RenameColumn(from, to) => {
-                Self::resolve_rename_column(context, table, from, to)
+                Self::from_ast_rename_column(context, table, from, to)
             }
             AlterCommand::DropColumn(name) if context.dialect() == Dialect::sqlite() => {
-                Self::resolve_drop_column(context, table, name)
+                Self::from_ast_drop_column(context, table, name)
             }
             _ => todo!(),
         }
     }
 
-    pub(crate) fn resolve_default(
+    pub(crate) fn from_ast_default(
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
         expr: &Expr,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let name = ColumnName::from(name);
-        let expr = convert(expr).resolve_in(context, &ScalarAnalysisContext::default())?;
-        Self::missing_column(context, table, &name)?;
-        Ok(AlterObjSubCommand::column_default(&name, &expr))
+        let expr = SemScalarExpr::from_ast_in(expr, context, &ScalarAnalysisContext::default())?;
+        Self::check_ast_missing_column(context, table, &name)?;
+        Ok(Self::column_default(&name, &expr))
     }
 
-    pub(crate) fn resolve_constraint(
+    pub(crate) fn from_ast_constraint(
         context: &mut impl ParseContext,
         table: &TableName,
         constraint: &TableConstraint,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         // Constraint-created indexes need the matched key even when the stored
         // table declaration remains unqualified.
         let resolved_table = context.resolve_table_name(table);
         let table = resolved_table.as_ref().unwrap_or(table);
-        Ok(AlterObjSubCommand::add_constraint(
-            &convert(constraint).resolve(context, table)?,
-        ))
+        Ok(Self::add_constraint(&Constraint::from_ast_table(
+            constraint, context, table,
+        )?))
     }
 
-    pub(crate) fn resolve_cluster(
+    pub(crate) fn from_ast_cluster(
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let Some(resolved_table) = context.resolve_table_name(table) else {
             // The enclosing ALTER TABLE resolver already reports the absent table.
-            return Ok(AlterObjSubCommand::cluster_on(name));
+            return Ok(Self::cluster_on(name));
         };
         let index_name = FullName::new(
             &resolved_table.full_name().catalog().cloned(),
@@ -346,52 +357,52 @@ impl AstConversion<'_, AlterCommand> {
         if context.get_index(&index_name).is_none() {
             context.report_analysis_problem(AnalysisProblem::index_not_found(name))?;
         }
-        Ok(AlterObjSubCommand::cluster_on(name))
+        Ok(Self::cluster_on(name))
     }
 
-    pub(crate) fn resolve_rename(
+    pub(crate) fn from_ast_rename(
         context: &mut impl ParseContext,
         name: &Name,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let name = TableName::from(convert(name).full_name()?);
+    ) -> Result<Self, AnalysisError> {
+        let name = TableName::from(FullName::from_ast_name(name)?);
         if context.get_table(&name).is_some() {
             context.report_analysis_problem(AnalysisProblem::relation_already_exists(&name))?;
         }
-        Ok(AlterObjSubCommand::rename_to(&name))
+        Ok(Self::rename_to(&name))
     }
 
-    pub(crate) fn resolve_add_column(
+    pub(crate) fn from_ast_add_column(
         context: &mut impl ParseContext,
         table: &TableName,
         column: &AstColumn,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        let column = convert(column).resolve_standalone(context, table)?;
+    ) -> Result<Self, AnalysisError> {
+        let column = ColumnDefinition::from_ast_standalone(column, context, table)?;
         if let Some(name) = column.name() {
-            Self::existing_column(context, table, name)?;
+            Self::check_ast_existing_column(context, table, name)?;
         }
-        Ok(AlterObjSubCommand::add_column(&column))
+        Ok(Self::add_column(&column))
     }
 
-    pub(crate) fn resolve_alter_column(
+    pub(crate) fn from_ast_alter_column(
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
         column: &AstColumn,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let name = ColumnName::from(name);
-        Self::missing_column(context, table, &name)?;
-        Ok(AlterObjSubCommand::alter_column(
+        Self::check_ast_missing_column(context, table, &name)?;
+        Ok(Self::alter_column(
             &name,
-            &convert(column).resolve(context, table)?,
+            &ColumnDefinition::from_ast(column, context, table)?,
         ))
     }
 
-    pub(crate) fn resolve_rename_column(
+    pub(crate) fn from_ast_rename_column(
         context: &mut impl ParseContext,
         table: &TableName,
         from: &str,
         to: &str,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let (_, rename) = ColumnRename::resolve(
             context,
             table,
@@ -399,108 +410,110 @@ impl AstConversion<'_, AlterCommand> {
             &ColumnName::from(to),
             false,
         )?;
-        Ok(AlterObjSubCommand::analyzed_column_rename(&rename))
+        Ok(Self::analyzed_column_rename(&rename))
     }
 
-    pub(crate) fn resolve_drop_column(
+    pub(crate) fn from_ast_drop_column(
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let name = ColumnName::from(name);
-        Self::missing_column(context, table, &name)?;
-        Ok(AlterObjSubCommand::drop_column(&name))
+        Self::check_ast_missing_column(context, table, &name)?;
+        Ok(Self::drop_column(&name))
     }
-}
 
-impl AstConversion<'_, PostgresAlterCommand> {
-    pub(crate) fn resolve_owner(
-        &self,
+    pub(crate) fn from_ast_postgres_owner(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        if let Some(legacy) = &self.ast.legacy {
-            convert::<AlterCommand>(legacy).resolve_owner(context)
+    ) -> Result<Self, AnalysisError> {
+        if let Some(legacy) = &ast.legacy {
+            Self::from_ast_owner(legacy, context)
         } else {
             todo!()
         }
     }
-    pub(crate) fn resolve(
-        &self,
+
+    pub(crate) fn from_ast_postgres(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
         table: &TableName,
-    ) -> Result<AlterObjSubCommand, AnalysisError> {
-        if convert(&self.ast.operation)
-            .column_attribute_phase()
-            .is_some()
-        {
-            return self.resolve_single_column_attribute(context, table);
+    ) -> Result<Self, AnalysisError> {
+        if ColumnAttributeAction::phase_from_ast_operation(&ast.operation).is_some() {
+            return Self::from_ast_single_column_attribute(ast, context, table);
         }
-        if let Some(legacy) = &self.ast.legacy {
-            convert::<AlterCommand>(legacy).resolve(context, table)
+        if let Some(legacy) = &ast.legacy {
+            Self::from_ast(legacy, context, table)
         } else {
             todo!()
         }
     }
 }
 
-impl AstConversion<'_, TableConstraint> {
-    pub(crate) fn resolve_declared_key(
-        &self,
+impl Constraint {
+    pub(crate) fn from_ast_declared_key(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
         table: &CreateTable,
-    ) -> Result<Option<Constraint>, AnalysisError> {
-        if !self.ast.constraint.is_unique_key() {
+    ) -> Result<Option<Self>, AnalysisError> {
+        if !ast.constraint.is_unique_key() {
             return Ok(None);
         }
-        if self.ast.extras.deferrable {
+        if ast.extras.deferrable {
             todo!("deferrable unique-key catalog representation");
         }
-        let keys = self.column_names();
+        let keys = Self::columns_from_ast(ast);
         table.check_reference_columns(context, table.name(), &keys)?;
-        convert(&self.ast.constraint)
-            .resolve_table(
-                context,
-                table.name(),
-                self.ast.name.as_deref().unwrap_or_default(),
-                &keys,
-            )
-            .map(Some)
+        Self::from_ast_column_table(
+            &ast.constraint,
+            context,
+            table.name(),
+            ast.name.as_deref().unwrap_or_default(),
+            &keys,
+        )
+        .map(Some)
     }
-}
 
-impl AstConversion<'_, TableConstraint> {
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast_table(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
         table: &TableName,
-    ) -> Result<Constraint, AnalysisError> {
-        if self.is_check() {
+    ) -> Result<Self, AnalysisError> {
+        if ast.is_check() {
             let definition = context.get_table(table).cloned();
-            return self
-                .resolve_check(context, table, definition.as_ref(), true)
-                .map(Constraint::Check);
+            return CheckConstraint::from_ast_table_constraint(
+                ast,
+                context,
+                table,
+                definition.as_ref(),
+                true,
+            )
+            .map(Constraint::Check);
         }
-        let keys = self.column_names();
+        let keys = Self::columns_from_ast(ast);
         if context.get_table(table).is_none() {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(table))?;
         }
         for key in &keys {
-            AstConversion::<AlterCommand>::missing_column(context, table, key)?;
+            AlterObjSubCommand::check_ast_missing_column(context, table, key)?;
         }
-        if self.ast.constraint.is_unique_key() && self.ast.extras.deferrable {
+        if ast.constraint.is_unique_key() && ast.extras.deferrable {
             todo!("deferrable unique-key catalog representation");
         }
-        let name = self.ast.name.as_deref().unwrap_or_default();
+        let name = ast.name.as_deref().unwrap_or_default();
         let mut constraint =
-            convert(&self.ast.constraint).resolve_table(context, table, name, &keys)?;
-        constraint.set_foreign_key_delete_columns(&self.delete_column_names());
+            Self::from_ast_column_table(&ast.constraint, context, table, name, &keys)?;
+        constraint.set_foreign_key_delete_columns(&Self::delete_columns_from_ast(ast));
         Ok(constraint)
     }
 }
 
-impl AstConversion<'_, AstColumnConstraint> {
-    pub(crate) fn has_catalog_name(&self, context: &impl ParseContext) -> bool {
-        match self.ast {
+impl ConstraintNames {
+    pub(crate) fn ast_constraint_has_catalog_name(
+        ast: &AstColumnConstraint,
+        context: &impl ParseContext,
+    ) -> bool {
+        match ast {
             AstColumnConstraint::PrimaryKey(..)
             | AstColumnConstraint::Unique(_)
             | AstColumnConstraint::Check(_)
@@ -510,6 +523,7 @@ impl AstConversion<'_, AstColumnConstraint> {
             _ => false,
         }
     }
+
     fn supports_named_not_null(context: &impl ParseContext) -> bool {
         let Some(version) = context.metadata().engine_version() else {
             return false;
@@ -524,68 +538,62 @@ impl AstConversion<'_, AstColumnConstraint> {
     }
 }
 
-impl AstConversion<'_, AstColumnConstraint> {
-    pub(crate) fn resolve_table(
-        &self,
+impl Constraint {
+    pub(crate) fn from_ast_column_table(
+        ast: &AstColumnConstraint,
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
         keys: &[ColumnName],
-    ) -> Result<Constraint, AnalysisError> {
-        match self.ast {
+    ) -> Result<Self, AnalysisError> {
+        match ast {
             AstColumnConstraint::PrimaryKey(_, _) => {
-                Ok(Self::resolve_table_primary_key(table, name, keys))
+                Ok(Self::ast_table_primary_key(table, name, keys))
             }
-            AstColumnConstraint::Unique(_) => Ok(Self::resolve_table_unique(table, name, keys)),
+            AstColumnConstraint::Unique(_) => Ok(Self::ast_table_unique(table, name, keys)),
             AstColumnConstraint::ForeignKey(reference) => {
-                convert(reference).resolve_table(context, table, name, keys)
+                Self::from_ast_foreign_reference(reference, context, table, name, keys)
             }
             _ => todo!(),
         }
     }
 
-    pub(crate) fn resolve_table_primary_key(
+    pub(crate) fn ast_table_primary_key(
         table: &TableName,
         name: &str,
         keys: &[ColumnName],
-    ) -> Constraint {
-        Constraint::primary_key(&PrimaryKeyConstraint::new(name, table, keys))
+    ) -> Self {
+        Self::primary_key(&PrimaryKeyConstraint::new(name, table, keys))
     }
 
-    pub(crate) fn resolve_table_unique(
-        table: &TableName,
-        name: &str,
-        keys: &[ColumnName],
-    ) -> Constraint {
-        Constraint::unique(&UniqueConstraint::new(name, table, keys))
+    pub(crate) fn ast_table_unique(table: &TableName, name: &str, keys: &[ColumnName]) -> Self {
+        Self::unique(&UniqueConstraint::new(name, table, keys))
     }
-}
 
-impl AstConversion<'_, ForeignReference> {
-    pub(crate) fn resolve_table(
-        &self,
+    pub(crate) fn from_ast_foreign_reference(
+        ast: &ForeignReference,
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
         keys: &[ColumnName],
-    ) -> Result<Constraint, AnalysisError> {
-        self.resolve_table_in(context, table, name, keys, None)
+    ) -> Result<Self, AnalysisError> {
+        Self::from_ast_foreign_reference_in(ast, context, table, name, keys, None)
     }
 
-    pub(crate) fn resolve_table_in(
-        &self,
+    pub(crate) fn from_ast_foreign_reference_in(
+        ast: &ForeignReference,
         context: &mut impl ParseContext,
         table: &TableName,
         name: &str,
         keys: &[ColumnName],
         pending: Option<&CreateTable>,
-    ) -> Result<Constraint, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         #[cfg(feature = "sqlite")]
         for column in keys {
-            self.report_ignored_matches(context, table, column)?;
+            Self::report_ast_ignored_matches(ast, context, table, column)?;
         }
-        let requested = TableName::from(convert(&self.ast.table).full_name()?);
-        let explicit = self.referenced_columns();
+        let requested = TableName::from(FullName::from_ast_name(&ast.table)?);
+        let explicit = Self::referenced_columns_from_ast(ast);
         let (binding, target_columns, target_valid) = if let Some(pending) = pending {
             ForeignKeyTarget::resolve_declared_reference(
                 context,
@@ -607,24 +615,24 @@ impl AstConversion<'_, ForeignReference> {
         let mut constraint =
             ForeignKeyConstraint::new(name, Some(table), binding.relation(), keys, &target_columns)
                 .with_attributes(
-                    self.ast.match_type.as_ref(),
-                    self.ast.delete_action.as_ref(),
-                    self.ast.update_action.as_ref(),
-                    self.ast.deferrability.as_ref(),
-                    self.ast.validity.as_ref(),
+                    ast.match_type.as_ref(),
+                    ast.delete_action.as_ref(),
+                    ast.update_action.as_ref(),
+                    ast.deferrability.as_ref(),
+                    ast.validity.as_ref(),
                 );
         constraint.restrict_reference_application(source_valid && target_valid);
-        Ok(Constraint::foreign(&constraint))
+        Ok(Self::foreign(&constraint))
     }
 
     #[cfg(feature = "sqlite")]
-    pub(crate) fn report_ignored_matches(
-        &self,
+    pub(crate) fn report_ast_ignored_matches(
+        ast: &ForeignReference,
         context: &mut impl ParseContext,
         table: &TableName,
         column: &ColumnName,
     ) -> Result<(), AnalysisError> {
-        for name in &self.ast.ignored_matches {
+        for name in &ast.ignored_matches {
             context.report_analysis_problem(
                 AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(table, column, name),
             )?;
@@ -632,13 +640,12 @@ impl AstConversion<'_, ForeignReference> {
         Ok(())
     }
 
-    pub(crate) fn referenced_columns(&self) -> Option<Vec<ColumnName>> {
-        if self.ast.columns.is_empty() {
+    pub(crate) fn referenced_columns_from_ast(ast: &ForeignReference) -> Option<Vec<ColumnName>> {
+        if ast.columns.is_empty() {
             None
         } else {
             Some(
-                self.ast
-                    .columns
+                ast.columns
                     .iter()
                     .map(|key| ColumnName::from(key.as_str()))
                     .collect(),
@@ -647,46 +654,49 @@ impl AstConversion<'_, ForeignReference> {
     }
 }
 
-impl AstConversion<'_, Table> {
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+impl CreateTable {
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &Table,
         context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let Some(source) = context.get_source_path_with_span().cloned() else {
             return AnalysisError::raise_unexpected_none("source span");
         };
-        self.resolve_and_apply_at(context, &source)
+        Self::from_ast_and_apply_at(ast, context, &source)
     }
 
-    pub(crate) fn constraint_names(&self, context: &impl ParseContext) -> ConstraintNames {
+    pub(crate) fn constraint_names_from_ast(
+        ast: &Table,
+        context: &impl ParseContext,
+    ) -> ConstraintNames {
         let mut names = ConstraintNames::default();
-        for definition in &self.ast.constraints {
+        for definition in &ast.constraints {
             if !definition.is_check() {
                 names.reserve(definition.name.as_deref().unwrap_or_default());
             }
         }
-        for column in &self.ast.columns {
-            convert(column).reserve_constraint_names(context, &mut names);
+        for column in &ast.columns {
+            ConstraintNames::reserve_ast_column(column, context, &mut names);
         }
         names
     }
-    pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
-        &self,
+
+    pub(crate) fn from_ast_and_apply_at<TContext: ParseContext>(
+        ast: &Table,
         mut context: TContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        if !self.check_engine_features(&mut context)? {
+        if !EngineFeatureValidation::table(ast, &mut context)? {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         }
-        let name =
-            context.creation_name(&convert(&self.ast.name).full_name()?, self.ast.temporary)?;
+        let name = context.creation_name(&FullName::from_ast_name(&ast.name)?, ast.temporary)?;
         if !context.permits_relation_creation(
             &name,
             Kind::table(),
-            self.ast.mode.if_not_exists(),
+            ast.mode.if_not_exists(),
             false,
         )? {
             return Ok(AstAndContextPair::new(
@@ -694,7 +704,7 @@ impl AstConversion<'_, Table> {
                 context,
             ));
         }
-        let mut names = self.constraint_names(&context);
+        let mut names = Self::constraint_names_from_ast(ast, &context);
         if context.dialect() == Dialect::postgres()
             && let Some(constraint) = names.first_duplicate()
         {
@@ -708,7 +718,7 @@ impl AstConversion<'_, Table> {
                 context,
             ));
         }
-        let table = self.resolve_with_names(&mut context, source, &mut names)?;
+        let table = Self::from_ast_with_names(ast, &mut context, source, &mut names)?;
         let context = context.apply_create_table(&table)?;
         Ok(AstAndContextPair::new(
             SemAst::create_table(&table),
@@ -717,58 +727,62 @@ impl AstConversion<'_, Table> {
     }
 
     #[cfg(any(test, feature = "sqlite"))]
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast(
+        ast: &Table,
         context: &mut impl ParseContext,
         source: &SourcePathWithSpan,
-    ) -> Result<CreateTable, AnalysisError> {
-        let mut names = self.constraint_names(context);
-        self.resolve_with_names(context, source, &mut names)
+    ) -> Result<Self, AnalysisError> {
+        let mut names = Self::constraint_names_from_ast(ast, context);
+        Self::from_ast_with_names(ast, context, source, &mut names)
     }
 
-    pub(crate) fn resolve_with_names(
-        &self,
+    pub(crate) fn from_ast_with_names(
+        ast: &Table,
         context: &mut impl ParseContext,
         source: &SourcePathWithSpan,
         names: &mut ConstraintNames,
-    ) -> Result<CreateTable, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, source, names);
+        let result = Self::from_ast_inner(ast, context, source, names);
         context.finish_analysis(result)
     }
 
-    pub(crate) fn resolve_in(
-        &self,
+    pub(crate) fn from_ast_inner(
+        ast: &Table,
         context: &mut impl ParseContext,
         source: &SourcePathWithSpan,
         names: &mut ConstraintNames,
-    ) -> Result<CreateTable, AnalysisError> {
-        if self.ast.query.is_some() {
+    ) -> Result<Self, AnalysisError> {
+        if ast.query.is_some() {
             todo!()
         }
-        let name = TableName::from(convert(&self.ast.name).full_name()?);
+        let name = TableName::from(FullName::from_ast_name(&ast.name)?);
         let mut columns = Vec::new();
-        let mut serials = serial::SerialSequences::default();
-        for column in &self.ast.columns {
-            columns.push(convert(column).resolve_serial(
+        let mut serials = SerialSequences::default();
+        for column in &ast.columns {
+            columns.push(ColumnDefinition::from_ast_serial(
+                column,
                 context,
                 &name,
-                self.ast.temporary,
+                ast.temporary,
                 &mut serials,
             )?);
         }
-        let mut table = CreateTable::new(&name, columns, self.ast.mode, self.ast.temporary, source);
+        let mut table = Self::new(&name, columns, ast.mode, ast.temporary, source);
         table.retain_serial_sequences(serials.into_sequences());
-        for definition in &self.ast.constraints {
-            if let Some(constraint) = convert(definition).resolve_declared_key(context, &table)? {
+        for definition in &ast.constraints {
+            if let Some(constraint) =
+                Constraint::from_ast_declared_key(definition, context, &table)?
+            {
                 table.record_declared_constraint(&constraint)?;
             }
         }
-        for column in &self.ast.columns {
+        for column in &ast.columns {
             for definition in &column.constraints {
                 if definition.name.is_some() && definition.constraint.is_unique_key() {
                     let keys = [ColumnName::from(column.name.as_str())];
-                    let constraint = convert(&definition.constraint).resolve_table(
+                    let constraint = Constraint::from_ast_column_table(
+                        &definition.constraint,
                         context,
                         &name,
                         definition.name.as_deref().expect("named inline key"),
@@ -778,25 +792,23 @@ impl AstConversion<'_, Table> {
                 }
             }
         }
-        self.resolve_foreign_keys(context, &mut table)?;
+        Self::resolve_ast_foreign_keys(ast, context, &mut table)?;
         if context.dialect() == Dialect::postgres() {
             table.apply_primary_key_nullability();
         }
-        self.resolve_inline_checks(context, &mut table, names)?;
-        self.resolve_checks(context, &mut table, names)?;
+        Self::resolve_ast_inline_checks(ast, context, &mut table, names)?;
+        Self::resolve_ast_checks(ast, context, &mut table, names)?;
         Ok(table)
     }
-}
 
-impl AstConversion<'_, Table> {
-    pub(crate) fn resolve_foreign_keys(
-        &self,
+    pub(crate) fn resolve_ast_foreign_keys(
+        ast: &Table,
         context: &mut impl ParseContext,
-        table: &mut CreateTable,
+        table: &mut Self,
     ) -> Result<(), AnalysisError> {
-        for definition in &self.ast.constraints {
+        for definition in &ast.constraints {
             if let Some(constraint) =
-                convert(definition).resolve_declared_foreign_key(context, table)?
+                Constraint::from_ast_declared_foreign_key(definition, context, table)?
             {
                 table.record_declared_constraint(&constraint)?;
             }
@@ -938,20 +950,21 @@ mod test_create_table_foreign_keys {
     }
 }
 
-impl AstConversion<'_, TableConstraint> {
-    pub(crate) fn resolve_declared_foreign_key(
-        &self,
+impl Constraint {
+    pub(crate) fn from_ast_declared_foreign_key(
+        ast: &TableConstraint,
         context: &mut impl ParseContext,
         table: &CreateTable,
-    ) -> Result<Option<Constraint>, AnalysisError> {
-        let result = convert(&self.ast.constraint).resolve_declared_foreign_key(
+    ) -> Result<Option<Self>, AnalysisError> {
+        let result = Self::from_ast_column_foreign_key(
+            &ast.constraint,
             context,
             table,
-            self.ast.name.as_deref().unwrap_or_default(),
-            &self.column_names(),
+            ast.name.as_deref().unwrap_or_default(),
+            &Self::columns_from_ast(ast),
         )?;
         if let Some(mut constraint) = result {
-            let columns = self.delete_column_names();
+            let columns = Self::delete_columns_from_ast(ast);
             let valid = table.check_reference_columns(context, table.name(), &columns)?;
             constraint.restrict_reference_application(valid);
             constraint.set_foreign_key_delete_columns(&columns);
@@ -961,98 +974,96 @@ impl AstConversion<'_, TableConstraint> {
         }
     }
 
-    pub(crate) fn delete_column_names(&self) -> Vec<ColumnName> {
-        self.ast
-            .extras
+    pub(crate) fn delete_columns_from_ast(ast: &TableConstraint) -> Vec<ColumnName> {
+        ast.extras
             .delete_columns
             .iter()
             .map(|key| ColumnName::from(key.as_str()))
             .collect()
     }
 
-    pub(crate) fn column_names(&self) -> Vec<ColumnName> {
-        self.ast
-            .keys
+    pub(crate) fn columns_from_ast(ast: &TableConstraint) -> Vec<ColumnName> {
+        ast.keys
             .iter()
             .map(|key| ColumnName::from(key.as_str()))
             .collect()
     }
-}
 
-impl AstConversion<'_, AstColumnConstraint> {
-    pub(crate) fn resolve_declared_foreign_key(
-        &self,
+    pub(crate) fn from_ast_column_foreign_key(
+        ast: &AstColumnConstraint,
         context: &mut impl ParseContext,
         table: &CreateTable,
         name: &str,
         keys: &[ColumnName],
-    ) -> Result<Option<Constraint>, AnalysisError> {
-        let AstColumnConstraint::ForeignKey(reference) = self.ast else {
+    ) -> Result<Option<Self>, AnalysisError> {
+        let AstColumnConstraint::ForeignKey(reference) = ast else {
             return Ok(None);
         };
-        convert(reference)
-            .resolve_table_in(context, table.name(), name, keys, Some(table))
-            .map(Some)
+        Self::from_ast_foreign_reference_in(
+            reference,
+            context,
+            table.name(),
+            name,
+            keys,
+            Some(table),
+        )
+        .map(Some)
     }
 }
 
-impl AstConversion<'_, AstColumn> {
-    pub(crate) fn resolve_and_report<TContext: ParseContext>(
-        &self,
+impl ColumnDefinition {
+    pub(crate) fn from_ast_and_report<TContext: ParseContext>(
+        ast: &AstColumn,
         mut context: TContext,
         table: &TableName,
-    ) -> Result<(ColumnDefinition, TContext), AnalysisError> {
+    ) -> Result<(Self, TContext), AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_standalone(&mut context, table);
+        let result = Self::from_ast_standalone(ast, &mut context, table);
         let column = context.finish_analysis(result)?;
         Ok((column, context))
     }
-    pub(crate) fn resolve_standalone(
-        &self,
+
+    pub(crate) fn from_ast_standalone(
+        ast: &AstColumn,
         context: &mut impl ParseContext,
         table: &TableName,
-    ) -> Result<ColumnDefinition, AnalysisError> {
-        let mut column = self.resolve(context, table)?;
+    ) -> Result<Self, AnalysisError> {
+        let mut column = Self::from_ast(ast, context, table)?;
         let canonical = context
             .resolve_table_name(table)
             .unwrap_or_else(|| table.clone());
         let mut names = ConstraintNames::default();
-        self.reserve_constraint_names(context, &mut names);
-        self.resolve_inline_checks(context, &canonical, None, &mut names, &mut column)?;
+        ConstraintNames::reserve_ast_column(ast, context, &mut names);
+        Self::resolve_ast_inline_checks(ast, context, &canonical, None, &mut names, &mut column)?;
         Ok(column)
     }
 
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast(
+        ast: &AstColumn,
         context: &mut impl ParseContext,
         table: &TableName,
-    ) -> Result<ColumnDefinition, AnalysisError> {
-        let name = ColumnName::from(self.ast.name.as_str());
-        let type_ref = self.resolve_type(context, table, &name)?;
-        let mut column = ColumnDefinition::new(
-            &Some(name.clone()),
-            type_ref.as_ref(),
-            self.ast.not_null,
-            &[],
-        );
-        self.resolve_declaration(context, &mut column)?;
-        self.resolve_constraints(context, table, &name, &mut column)?;
+    ) -> Result<Self, AnalysisError> {
+        let name = ColumnName::from(ast.name.as_str());
+        let type_ref = Self::type_from_ast(ast, context, table, &name)?;
+        let mut column = Self::new(&Some(name.clone()), type_ref.as_ref(), ast.not_null, &[]);
+        Self::retain_ast_declaration(ast, context, &mut column)?;
+        Self::resolve_ast_constraints(ast, context, table, &name, &mut column)?;
         Ok(column)
     }
 
-    pub(crate) fn resolve_type(
-        &self,
+    pub(crate) fn type_from_ast(
+        ast: &AstColumn,
         context: &mut impl ParseContext,
         table: &TableName,
         name: &ColumnName,
     ) -> Result<Option<TypeReference>, AnalysisError> {
-        let type_ref = if let Some(ty) = &self.ast.type_name {
-            let type_name = convert(&ty.name).full_name()?;
+        let type_ref = if let Some(ty) = &ast.type_name {
+            let type_name = FullName::from_ast_name(&ty.name)?;
             if let Some(ty) = context.get_type(&type_name) {
                 if context.dialect() == Dialect::sqlite() {
                     Some(TypeReference::from_full_name(type_name))
                 } else if let Some(type_ref) = ty.type_reference() {
-                    let array = self
+                    let array = ast
                         .type_name
                         .as_ref()
                         .is_some_and(|syntax| !syntax.array_bounds.is_empty());
@@ -1079,33 +1090,33 @@ impl AstConversion<'_, AstColumn> {
         Ok(type_ref)
     }
 
-    pub(crate) fn resolve_declaration(
-        &self,
+    pub(crate) fn retain_ast_declaration(
+        ast: &AstColumn,
         context: &mut impl ParseContext,
-        column: &mut ColumnDefinition,
+        column: &mut Self,
     ) -> Result<(), AnalysisError> {
         if context.dialect() == Dialect::postgres() {
-            if let Some(type_name) = &self.ast.type_name {
-                column.retain_requested_type(
-                    &convert(type_name).declaration_type(column.get_type())?,
-                );
+            if let Some(type_name) = &ast.type_name {
+                column.retain_requested_type(&WithTypmod::<TypeReference>::from_ast_declaration(
+                    type_name,
+                    column.get_type(),
+                )?);
             }
-            let lookup = convert(&self.ast.collation)
-                .optional_full_name()?
+            let lookup = FullName::from_optional_ast_name(&ast.collation)?
                 .map(|name| context.lookup_collation(&name));
             column.validate_collation(context, lookup.as_ref())?;
         }
         Ok(())
     }
 
-    pub(crate) fn resolve_constraints(
-        &self,
+    pub(crate) fn resolve_ast_constraints(
+        ast: &AstColumn,
         context: &mut impl ParseContext,
         table: &TableName,
         name: &ColumnName,
-        column: &mut ColumnDefinition,
+        column: &mut Self,
     ) -> Result<(), AnalysisError> {
-        for constraint in &self.ast.constraints {
+        for constraint in &ast.constraints {
             // CHECK needs the complete row, which is declared before expression analysis.
             if constraint.is_check() {
                 continue;
@@ -1121,7 +1132,8 @@ impl AstConversion<'_, AstColumn> {
             if constraint.constraint.is_unique_key() && constraint.extras.deferrable {
                 todo!("deferrable unique-key catalog representation");
             }
-            let constraint = convert(&constraint.constraint).resolve(context, table, name)?;
+            let constraint =
+                ColumnConstraint::from_ast(&constraint.constraint, context, table, name)?;
             if let Some(nullability) = constraint.as_nullability() {
                 column.set_not_null(Some(nullability.is_not_null()));
             }
@@ -1152,132 +1164,129 @@ impl AstConversion<'_, AstColumn> {
     }
 }
 
-impl AstConversion<'_, AstColumnConstraint> {
+impl ColumnConstraint {
     #[cfg(any(test, feature = "sqlite"))]
-    pub(crate) fn resolve_and_report<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_report<TContext: ParseContext>(
+        ast: &AstColumnConstraint,
         mut context: TContext,
         table: &TableName,
         column: &ColumnName,
-    ) -> Result<(ColumnConstraint, TContext), AnalysisError> {
+    ) -> Result<(Self, TContext), AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve(&mut context, table, column);
+        let result = Self::from_ast(ast, &mut context, table, column);
         let constraint = context.finish_analysis(result)?;
         Ok((constraint, context))
     }
-    pub(crate) fn resolve(
-        &self,
+
+    pub(crate) fn from_ast(
+        ast: &AstColumnConstraint,
         context: &mut impl ParseContext,
         table: &TableName,
         column: &ColumnName,
-    ) -> Result<ColumnConstraint, AnalysisError> {
-        Ok(match self.ast {
+    ) -> Result<Self, AnalysisError> {
+        Ok(match ast {
             AstColumnConstraint::Enforcement(_) => {
                 unreachable!("versioned enforcement is checked before resolution")
             }
             AstColumnConstraint::Nullability(not_null, conflict, validity) => {
-                ColumnConstraint::nullability(ColumnNullabilityConstraint::from_ast_parts(
+                Self::nullability(ColumnNullabilityConstraint::from_ast_parts(
                     context, table, column, *not_null, conflict, validity,
                 ))
             }
-            AstColumnConstraint::Default(expression) => ColumnConstraint::default(
+            AstColumnConstraint::Default(expression) => Self::default(
                 DefaultColumnConstraint::from_ast_expression(context, table, column, expression)?,
             ),
             AstColumnConstraint::Check(_) => {
-                self.resolve_standalone_check(context, table, column)?
+                Self::from_ast_standalone_check(ast, context, table, column)?
             }
             AstColumnConstraint::PrimaryKey(conflict, deferrable) => {
-                ColumnConstraint::primary_key(PrimaryKeyColumnConstraint::from_ast_parts(
+                Self::primary_key(PrimaryKeyColumnConstraint::from_ast_parts(
                     context, table, column, conflict, deferrable,
                 ))
             }
-            AstColumnConstraint::Unique(conflict) => ColumnConstraint::unique(
+            AstColumnConstraint::Unique(conflict) => Self::unique(
                 UniqueColumnConstraint::from_ast_conflict(context, table, column, conflict),
             ),
-            AstColumnConstraint::Identity(mode) => ColumnConstraint::identity(
+            AstColumnConstraint::Identity(mode) => Self::identity(
                 IdentityColumnConstraint::from_ast_mode(context, table, column, mode),
             ),
             AstColumnConstraint::Generated(expression, mode) => {
-                ColumnConstraint::generated(GeneratedColumnConstraint::from_ast_expression(
+                Self::generated(GeneratedColumnConstraint::from_ast_expression(
                     context, table, column, expression, mode,
                 )?)
             }
             AstColumnConstraint::ForeignKey(reference) => {
-                convert(reference).resolve(context, table, column)?
+                Self::from_ast_foreign_reference(reference, context, table, column)?
             }
-            AstColumnConstraint::Exclusion => ColumnConstraint::exclusion(
+            AstColumnConstraint::Exclusion => Self::exclusion(
                 ExclusionColumnConstraint::from_ast_declaration(context, table, column),
             ),
-            AstColumnConstraint::Deferrability(value) => ColumnConstraint::attr_deferrability(
+            AstColumnConstraint::Deferrability(value) => Self::attr_deferrability(
                 AttrDeferrabilityColumnConstraint::from_ast_value(context, table, column, *value),
             ),
-            AstColumnConstraint::Deferred => ColumnConstraint::attr_deferred(
+            AstColumnConstraint::Deferred => Self::attr_deferred(
                 AttrDeferredColumnConstraint::from_ast_declaration(context, table, column),
             ),
-            AstColumnConstraint::Immediate => ColumnConstraint::attr_immediate(
+            AstColumnConstraint::Immediate => Self::attr_immediate(
                 AttrImmediateColumnConstraint::from_ast_declaration(context, table, column),
             ),
-            AstColumnConstraint::Collate(name) => ColumnConstraint::collate(
+            AstColumnConstraint::Collate(name) => Self::collate(
                 CollateColumnConstraint::from_ast_name(context, table, column, name)?,
             ),
         })
     }
-}
 
-impl AstConversion<'_, ForeignReference> {
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast_foreign_reference(
+        ast: &ForeignReference,
         context: &mut impl ParseContext,
         table: &TableName,
         column: &ColumnName,
-    ) -> Result<ColumnConstraint, AnalysisError> {
-        let target = TableName::from(convert(&self.ast.table).full_name()?);
+    ) -> Result<Self, AnalysisError> {
+        let target = TableName::from(FullName::from_ast_name(&ast.table)?);
         #[cfg(feature = "sqlite")]
-        self.report_ignored_matches(context, table, column)?;
-        let [target_column] = self.ast.columns.as_slice() else {
+        Constraint::report_ast_ignored_matches(ast, context, table, column)?;
+        let [target_column] = ast.columns.as_slice() else {
             return AnalysisError::raise_unexpected_input("foreign key target column count != 1");
         };
         let target_column = ColumnName::from(target_column.as_str());
         let (binding, target_type) =
             ForeignKeyTarget::resolve_column(context, &target, &target_column)?;
-        Ok(ColumnConstraint::foreign_key(
-            ForeignKeyColumnConstraint::new(
-                table,
-                column,
-                binding.relation(),
-                &target_column,
-                target_type.as_ref(),
-                self.ast.match_type.as_ref(),
-                self.ast.delete_action.clone(),
-                self.ast.update_action.clone(),
-                self.ast.deferrability.clone(),
-                self.ast.validity.clone(),
-            ),
-        ))
+        Ok(Self::foreign_key(ForeignKeyColumnConstraint::new(
+            table,
+            column,
+            binding.relation(),
+            &target_column,
+            target_type.as_ref(),
+            ast.match_type.as_ref(),
+            ast.delete_action.clone(),
+            ast.update_action.clone(),
+            ast.deferrability.clone(),
+            ast.validity.clone(),
+        )))
     }
 }
 
-impl AstConversion<'_, TableAs> {
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+impl CreateTableAs {
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &TableAs,
         context: TContext,
         cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let Some(source) = context.get_source_path_with_span().cloned() else {
             return AnalysisError::raise_unexpected_none("source span");
         };
-        self.resolve_and_apply_at(context, cache, &source)
+        Self::from_ast_and_apply_at(ast, context, cache, &source)
     }
 
-    pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply_at<TContext: ParseContext>(
+        ast: &TableAs,
         mut context: TContext,
         cache: &mut CacheContext,
         source: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let mut query = convert(&self.ast.query).resolve(&mut context, cache)?;
-        let name = convert(&self.ast.into.relation.name).full_name()?;
-        if self.ast.into.columns.len() > query.result_columns().len() {
+        let mut query = SelectStatement::from_ast(&ast.query, &mut context, cache)?;
+        let name = FullName::from_ast_name(&ast.into.relation.name)?;
+        if ast.into.columns.len() > query.result_columns().len() {
             context.report_problem(AnalysisProblem::creation(CreationProblem::named(
                 &name,
                 "too many output column names",
@@ -1288,7 +1297,7 @@ impl AstConversion<'_, TableAs> {
                 context,
             ));
         }
-        query.rename_columns(&self.ast.into.columns);
+        query.rename_columns(&ast.into.columns);
         let columns = query.result_columns().column_definitions()?;
         let mut names = Vec::new();
         for column in &columns {
@@ -1308,13 +1317,13 @@ impl AstConversion<'_, TableAs> {
         let table = CreateTable::new(
             &TableName::from(name.clone()),
             columns,
-            CreateTableMode::from_if_not_exists(self.ast.if_not_exists),
-            self.ast.into.relation.persistence == "t",
+            CreateTableMode::from_if_not_exists(ast.if_not_exists),
+            ast.into.relation.persistence == "t",
             source,
         );
-        let table_as = CreateTableAs::new(&name, &SemAst::select(&query), self.ast.materialized)
-            .with_if_not_exists(self.ast.if_not_exists);
-        let context = if self.ast.materialized {
+        let table_as = Self::new(&name, &SemAst::select(&query), ast.materialized)
+            .with_if_not_exists(ast.if_not_exists);
+        let context = if ast.materialized {
             context.apply_create_table_as(&table_as)?
         } else {
             context.apply_create_table(&table)?
@@ -1326,16 +1335,16 @@ impl AstConversion<'_, TableAs> {
     }
 }
 
-impl AstConversion<'_, Index> {
+impl CreateIndex {
     #[cfg(test)]
-    pub(crate) fn resolve_elements(
+    pub(crate) fn elements_from_ast(
         elements: &[IndexExpression],
         context: &mut impl ParseContext,
     ) -> Result<IndexElementCollection, AnalysisError> {
-        Self::resolve_elements_in(elements, context, &ScalarAnalysisContext::default())
+        Self::elements_from_ast_in(elements, context, &ScalarAnalysisContext::default())
     }
 
-    pub(crate) fn resolve_elements_in(
+    pub(crate) fn elements_from_ast_in(
         elements: &[IndexExpression],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
@@ -1346,7 +1355,7 @@ impl AstConversion<'_, Index> {
                 return AnalysisError::raise_unexpected_input("SortbyUsing in IndexElem");
             }
             let value = if let Some(expr) = &element.expression {
-                IndexElement::from(&convert(expr).resolve_in(context, scope)?)
+                IndexElement::from(&SemScalarExpr::from_ast_in(expr, context, scope)?)
             } else {
                 IndexElement::from(&ColumnName::from(
                     element.name.as_deref().unwrap_or_default(),
@@ -1362,20 +1371,20 @@ impl AstConversion<'_, Index> {
         Ok(collection)
     }
 
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast(
+        ast: &Index,
         context: &mut impl ParseContext,
-    ) -> Result<Option<CreateIndex>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context);
+        let result = Self::from_ast_inner(ast, context);
         context.finish_analysis(result)
     }
 
-    pub(crate) fn resolve_in(
-        &self,
+    pub(crate) fn from_ast_inner(
+        ast: &Index,
         context: &mut impl ParseContext,
-    ) -> Result<Option<CreateIndex>, AnalysisError> {
-        let requested_table = TableName::from(convert(&self.ast.relation.name).full_name()?);
+    ) -> Result<Option<Self>, AnalysisError> {
+        let requested_table = TableName::from(FullName::from_ast_name(&ast.relation.name)?);
         let Some(table) = context.resolve_table_name(&requested_table) else {
             context
                 .report_analysis_problem(AnalysisProblem::relation_not_found(&requested_table))?;
@@ -1384,7 +1393,7 @@ impl AstConversion<'_, Index> {
         let name = FullName::new(
             &table.full_name().catalog().cloned(),
             &table.full_name().schema().cloned(),
-            &LocalName::from(self.ast.name.as_str()),
+            &LocalName::from(ast.name.as_str()),
         );
         let alias = AliasSpec::from_local_name(&table.full_name().local_name());
         let with = WithClause::default();
@@ -1396,25 +1405,23 @@ impl AstConversion<'_, Index> {
             &with,
         )?);
         let scope = ScalarAnalysisContext::nested(&with, &from, None);
-        let keys = Self::resolve_elements_in(&self.ast.keys, context, &scope)?;
-        let includes = Self::resolve_elements_in(&self.ast.includes, context, &scope)?;
-        let predicate =
-            AstConversion::<Expr>::resolve_optional(&self.ast.predicate, context, &scope)?;
-        let mut index =
-            CreateIndex::from_resolved(&name, &table, &keys, &includes, self.ast.unique);
-        index = index.with_if_not_exists(self.ast.if_not_exists);
+        let keys = Self::elements_from_ast_in(&ast.keys, context, &scope)?;
+        let includes = Self::elements_from_ast_in(&ast.includes, context, &scope)?;
+        let predicate = SemScalarExpr::from_ast_optional(&ast.predicate, context, &scope)?;
+        let mut index = Self::from_resolved(&name, &table, &keys, &includes, ast.unique);
+        index = index.with_if_not_exists(ast.if_not_exists);
         index.set_predicate(predicate);
-        if !self.initialize_index_storage(context, &mut index)? {
+        if !Self::retain_ast_storage(ast, context, &mut index)? {
             return Ok(None);
         }
         Ok(Some(index))
     }
 
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &Index,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let Some(index) = self.resolve(&mut context)? else {
+        let Some(index) = Self::from_ast(ast, &mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
@@ -1428,35 +1435,35 @@ impl AstConversion<'_, Index> {
     }
 }
 
-impl AstConversion<'_, Schema> {
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+impl CreateSchema {
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &Schema,
         context: TContext,
         cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        context.apply_creation_group(|context| self.resolve_group(context, cache))
+        context.apply_creation_group(|context| Self::from_ast_group(ast, context, cache))
     }
-    pub(crate) fn resolve_group<TContext: ParseContext>(
-        &self,
+
+    pub(crate) fn from_ast_group<TContext: ParseContext>(
+        ast: &Schema,
         mut context: TContext,
         cache: &mut CacheContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        if context.schema_definition(&self.ast.name).is_some() {
-            let schema =
-                CreateSchema::new(&self.ast.name, &[]).with_if_not_exists(self.ast.if_not_exists);
+        if context.schema_definition(&ast.name).is_some() {
+            let schema = Self::new(&ast.name, &[]).with_if_not_exists(ast.if_not_exists);
             let context = context.apply_create_schema(&schema)?;
             return Ok(AstAndContextPair::new(
                 SemAst::create_schema(&schema),
                 context,
             ));
         }
-        let owner = if let Some(authorization) = &self.ast.authorization {
-            Some(convert(authorization).resolve_owner(&mut context)?)
+        let owner = if let Some(authorization) = &ast.authorization {
+            Some(OwnerSpecification::from_ast(authorization, &mut context)?)
         } else {
             None
         };
         let previous_path = context.get_search_path().to_vec();
-        let mut schema_path = vec![crate::names::SchemaName::from(self.ast.name.as_str())];
+        let mut schema_path = vec![crate::names::SchemaName::from(ast.name.as_str())];
         for schema in &previous_path {
             if !schema_path.contains(schema) {
                 schema_path.push(schema.clone());
@@ -1464,15 +1471,13 @@ impl AstConversion<'_, Schema> {
         }
         context.set_search_path(&schema_path);
         let mut elements = Vec::new();
-        for element in &self.ast.elements {
-            let AstAndContextPair(element, next) =
-                convert(element).resolve_and_apply(context, cache)?;
+        for element in &ast.elements {
+            let AstAndContextPair(element, next) = SemAst::apply_ast_node(element, context, cache)?;
             context = next;
             elements.push(element);
         }
         context.set_search_path(&previous_path);
-        let mut schema =
-            CreateSchema::new(&self.ast.name, &elements).with_if_not_exists(self.ast.if_not_exists);
+        let mut schema = Self::new(&ast.name, &elements).with_if_not_exists(ast.if_not_exists);
         if let Some(owner) = owner {
             schema.change_owner(&owner);
         }
@@ -1484,66 +1489,66 @@ impl AstConversion<'_, Schema> {
     }
 }
 
-impl AstConversion<'_, FunctionParameter> {
-    pub(crate) fn resolve_and_report<TContext: ParseContext>(
-        &self,
+impl FunctionParam {
+    pub(crate) fn from_ast_and_report<TContext: ParseContext>(
+        ast: &FunctionParameter,
         mut context: TContext,
-    ) -> Result<(FunctionParam, TContext), AnalysisError> {
+    ) -> Result<(Self, TContext), AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve(&mut context);
+        let result = Self::from_ast(ast, &mut context);
         let parameter = context.finish_analysis(result)?;
         Ok((parameter, context))
     }
 
-    pub(crate) fn resolve(
-        &self,
+    pub(crate) fn from_ast(
+        ast: &FunctionParameter,
         context: &mut impl ParseContext,
-    ) -> Result<FunctionParam, AnalysisError> {
-        let name = Some(self.ast.name.clone());
-        let type_name = convert(&self.ast.type_name.name).full_name()?;
+    ) -> Result<Self, AnalysisError> {
+        let name = Some(ast.name.clone());
+        let type_name = FullName::from_ast_name(&ast.type_name.name)?;
         let param_type = context.resolve_type_name(&type_name).map(|name| {
-            TypeReference::concrete_type_ref(&name, !self.ast.type_name.array_bounds.is_empty())
+            TypeReference::concrete_type_ref(&name, !ast.type_name.array_bounds.is_empty())
         });
-        let default = self
+        let default = ast
             .default
             .as_ref()
-            .map(|expr| convert(expr).resolve_in(context, &ScalarAnalysisContext::default()))
+            .map(|expr| {
+                SemScalarExpr::from_ast_in(expr, context, &ScalarAnalysisContext::default())
+            })
             .transpose()?;
-        Ok(convert(&self.ast.mode).resolve_parameter(&name, &param_type, &default))
+        Ok(Self::from_ast_mode(&ast.mode, &name, &param_type, &default))
     }
-}
 
-impl AstConversion<'_, ParameterMode> {
-    pub(crate) fn resolve_parameter(
-        self,
+    pub(crate) fn from_ast_mode(
+        ast: &ParameterMode,
         name: &Option<String>,
         param_type: &Option<TypeReference>,
         default: &Option<SemScalarExpr>,
-    ) -> FunctionParam {
-        match self.ast {
-            ParameterMode::In => FunctionParam::new_input_param(name, param_type, default),
-            ParameterMode::Out => FunctionParam::new_output_param(name, param_type),
-            ParameterMode::InOut => FunctionParam::new_in_out_param(name, param_type, default),
-            ParameterMode::Variadic => FunctionParam::new_variadig_param(name, param_type),
-            ParameterMode::Table => FunctionParam::new_table_param(name, param_type),
+    ) -> Self {
+        match ast {
+            ParameterMode::In => Self::new_input_param(name, param_type, default),
+            ParameterMode::Out => Self::new_output_param(name, param_type),
+            ParameterMode::InOut => Self::new_in_out_param(name, param_type, default),
+            ParameterMode::Variadic => Self::new_variadig_param(name, param_type),
+            ParameterMode::Table => Self::new_table_param(name, param_type),
         }
     }
 }
 
-impl AstConversion<'_, Function> {
-    pub(crate) fn resolve(
-        &self,
+impl CreateFunction {
+    pub(crate) fn from_ast(
+        ast: &Function,
         context: &mut impl ParseContext,
-    ) -> Result<CreateFunction, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context);
+        let result = Self::from_ast_inner(ast, context);
         context.finish_analysis(result)
     }
 }
 
 #[cfg(test)]
 mod test_function_null_input_semantics {
-    use crate::sem::convert;
+    use crate::sem::CreateFunction;
     use crate::{
         ast::{TryFromWithTokens, ddl::Function},
         syn::Opt,
@@ -1565,7 +1570,7 @@ mod test_function_null_input_semantics {
         )
         .unwrap();
         let mut context = TestParseContext::default();
-        let resolved = convert(&function).resolve(&mut context).unwrap();
+        let resolved = CreateFunction::from_ast(&function, &mut context).unwrap();
         assert_eq!(
             expected,
             resolved.overloads().get_at(0).unwrap().is_strict()
@@ -1573,23 +1578,23 @@ mod test_function_null_input_semantics {
     }
 }
 
-impl AstConversion<'_, Function> {
-    pub(crate) fn resolve_in(
-        &self,
+impl CreateFunction {
+    pub(crate) fn from_ast_inner(
+        ast: &Function,
         context: &mut impl ParseContext,
-    ) -> Result<CreateFunction, AnalysisError> {
-        let name = convert(&self.ast.name).full_name()?;
-        if self.ast.procedure || self.ast.result_type.is_none() {
+    ) -> Result<Self, AnalysisError> {
+        let name = FullName::from_ast_name(&ast.name)?;
+        if ast.procedure || ast.result_type.is_none() {
             let mut params = Vec::new();
             let mut outputs = Vec::new();
-            for param in &self.ast.parameters {
-                let resolved = convert(param).resolve(context)?;
+            for param in &ast.parameters {
+                let resolved = FunctionParam::from_ast(param, context)?;
                 if param.mode.is_output() {
                     outputs.push(resolved.get_type().cloned());
                 }
                 params.push(resolved);
             }
-            let ret_type = if self.ast.procedure {
+            let ret_type = if ast.procedure {
                 None
             } else if outputs.len() == 1 {
                 outputs.pop().flatten()
@@ -1601,27 +1606,25 @@ impl AstConversion<'_, Function> {
             } else {
                 return AnalysisError::raise_unexpected_none("create_function.return_type");
             };
-            let strict = self.ast.options.iter().any(FunctionOption::is_strict);
+            let strict = ast.options.iter().any(FunctionOption::is_strict);
             let overload = OverloadVariant::new(&ret_type, &params, strict, false);
-            return Ok(CreateFunction::new(
-                &name,
-                &FunctionOverloadCollection::new(&[overload]),
-                &None,
-            )
-            .with_procedure_kind(self.ast.procedure));
+            return Ok(
+                Self::new(&name, &FunctionOverloadCollection::new(&[overload]), &None)
+                    .with_procedure_kind(ast.procedure),
+            );
         }
-        let Some(result_type) = &self.ast.result_type else {
+        let Some(result_type) = &ast.result_type else {
             return AnalysisError::raise_unexpected_none("create_function.return_type");
         };
-        let ret_name = convert(&result_type.name).full_name()?;
+        let ret_name = FullName::from_ast_name(&result_type.name)?;
         let returning = if result_type.set_of {
             if ret_name.name().as_str() == "record" {
                 let mut columns = Vec::new();
-                for param in &self.ast.parameters {
+                for param in &ast.parameters {
                     if param.mode.is_output() {
-                        let ty = TypeReference::from_full_name(
-                            convert(&param.type_name.name).full_name()?,
-                        );
+                        let ty = TypeReference::from_full_name(FullName::from_ast_name(
+                            &param.type_name.name,
+                        )?);
                         columns.push(ColumnDefinition::new(
                             &Some(ColumnName::from(param.name.as_str())),
                             Some(&ty),
@@ -1654,33 +1657,30 @@ impl AstConversion<'_, Function> {
             None
         };
         let mut params = Vec::new();
-        for param in &self.ast.parameters {
-            params.push(convert(param).resolve(context)?);
+        for param in &ast.parameters {
+            params.push(FunctionParam::from_ast(param, context)?);
         }
         let ret_type = if let Some(ty) = context.get_type(&ret_name) {
             ty.type_reference().cloned()
         } else {
             None
         };
-        let strict = self.ast.options.iter().any(FunctionOption::is_strict);
+        let strict = ast.options.iter().any(FunctionOption::is_strict);
         let overload = OverloadVariant::new(&ret_type, &params, strict, false);
-        Ok(CreateFunction::new(
+        Ok(Self::new(
             &name,
             &FunctionOverloadCollection::new(&[overload]),
             &returning,
         ))
     }
 
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &Function,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let function = self.resolve(&mut context)?.with_replace(self.ast.replace);
-        let preserves_rows = self
-            .result_type
-            .as_ref()
-            .is_none_or(|result| !result.set_of)
-            && !self
+        let function = Self::from_ast(ast, &mut context)?.with_replace(ast.replace);
+        let preserves_rows = ast.result_type.as_ref().is_none_or(|result| !result.set_of)
+            && !ast
                 .options
                 .iter()
                 .any(|option| matches!(option, FunctionOption::Window));
@@ -1694,25 +1694,25 @@ impl AstConversion<'_, Function> {
     }
 }
 
-impl AstConversion<'_, CompositeType> {
-    pub(crate) fn resolve(
-        &self,
+impl CreateCompositeType {
+    pub(crate) fn from_ast(
+        ast: &CompositeType,
         context: &mut impl ParseContext,
-    ) -> Result<CreateCompositeType, AnalysisError> {
-        let name = convert(&self.ast.name).full_name()?;
+    ) -> Result<Self, AnalysisError> {
+        let name = FullName::from_ast_name(&ast.name)?;
         let table = TableName::from(name.clone());
         let mut fields = CompositeFieldCollection::default();
-        for field in &self.ast.fields {
-            fields.push(convert(field).resolve(context, &table)?);
+        for field in &ast.fields {
+            fields.push(CompositeFieldDefinition::from_ast(field, context, &table)?);
         }
-        Ok(CreateCompositeType::new(&name, &fields))
+        Ok(Self::new(&name, &fields))
     }
 
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &CompositeType,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let composite = self.resolve(&mut context)?;
+        let composite = Self::from_ast(ast, &mut context)?;
         let context = context.apply_create_comp_type(&composite)?;
         Ok(AstAndContextPair::new(
             SemAst::create_composite_type(&composite),
@@ -1721,32 +1721,32 @@ impl AstConversion<'_, CompositeType> {
     }
 }
 
-impl AstConversion<'_, CompositeField> {
-    pub(crate) fn resolve(
-        &self,
+impl CompositeFieldDefinition {
+    pub(crate) fn from_ast(
+        ast: &CompositeField,
         context: &mut impl ParseContext,
         composite: &TableName,
-    ) -> Result<CompositeFieldDefinition, AnalysisError> {
-        let requested = convert(&self.ast.type_name).reference()?;
+    ) -> Result<Self, AnalysisError> {
+        let requested = TypeReference::from_ast(&ast.type_name)?;
         let type_ref = context.canonicalize_type_ref(&requested);
         if type_ref.is_none() {
             context.report_analysis_problem(AnalysisProblem::column_type_not_found(
                 composite,
-                &ColumnName::from(self.ast.name.as_str()),
+                &ColumnName::from(ast.name.as_str()),
                 requested
                     .full_name()
                     .expect("SQL type syntax constructs a concrete reference"),
             ))?;
         }
-        let mut field =
-            CompositeFieldDefinition::new(&self.ast.name, &type_ref, &Some(self.ast.is_not_null));
-        field.retain_requested_type(
-            &convert(&self.ast.type_name).declaration_type(type_ref.as_ref())?,
-        );
-        let lookup = self
+        let mut field = Self::new(&ast.name, &type_ref, &Some(ast.is_not_null));
+        field.retain_requested_type(&WithTypmod::<TypeReference>::from_ast_declaration(
+            &ast.type_name,
+            type_ref.as_ref(),
+        )?);
+        let lookup = ast
             .collation
             .as_ref()
-            .map(|syntax| convert::<Name>(syntax).full_name())
+            .map(FullName::from_ast_name)
             .transpose()?
             .map(|name| context.lookup_collation(&name));
         field.validate_collation(context, lookup.as_ref())?;
@@ -1757,7 +1757,7 @@ impl AstConversion<'_, CompositeField> {
 #[cfg(test)]
 mod test_composite_field_resolution {
     use crate::names::{FullName, TableName};
-    use crate::sem::convert;
+    use crate::sem::CompositeFieldDefinition;
 
     use crate::{
         ast::{TryFromWithTokens, ddl::CompositeType},
@@ -1783,12 +1783,12 @@ mod test_composite_field_resolution {
         .unwrap();
         let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
-        let field = convert(&composite.fields[0])
-            .resolve(
-                &mut context,
-                &TableName::from(FullName::with_schema("public", "array_value")),
-            )
-            .unwrap();
+        let field = CompositeFieldDefinition::from_ast(
+            &composite.fields[0],
+            &mut context,
+            &TableName::from(FullName::with_schema("public", "array_value")),
+        )
+        .unwrap();
         assert_eq!(field.name(), "items");
         assert_eq!(
             field.get_type(),
@@ -1802,20 +1802,19 @@ mod test_composite_field_resolution {
     }
 }
 
-impl AstConversion<'_, Domain> {
-    pub(crate) fn resolve(
-        &self,
+impl CreateDomain {
+    pub(crate) fn from_ast(
+        ast: &Domain,
         context: &mut impl ParseContext,
-    ) -> Result<CreateDomain, AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context);
+        let result = Self::from_ast_inner(ast, context);
         context.finish_analysis(result)
     }
 }
 
 #[cfg(test)]
 mod domain_tests {
-    use crate::sem::convert;
     use crate::test_helpers::create_cache_context;
 
     use crate::{
@@ -1833,31 +1832,31 @@ mod domain_tests {
             &IVec::default(),
         )?;
         let mut context = TestParseContext::default();
-        let domain = convert(&syntax).resolve(&mut context, &mut create_cache_context())?;
+        let domain = SemAst::from_ast_node(&syntax, &mut context, &mut create_cache_context())?;
         assert!(matches!(domain, SemAst::CreateDomain(_)));
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())
     }
 }
 
-impl AstConversion<'_, Domain> {
-    pub(crate) fn resolve_in(
-        &self,
+impl CreateDomain {
+    pub(crate) fn from_ast_inner(
+        ast: &Domain,
         context: &mut impl ParseContext,
-    ) -> Result<CreateDomain, AnalysisError> {
-        let name = convert(&self.ast.name).full_name()?;
-        let base_name = convert(&self.ast.base.name).full_name()?;
-        let base = context.canonicalize_type_ref(&convert(&self.ast.base).reference()?);
+    ) -> Result<Self, AnalysisError> {
+        let name = FullName::from_ast_name(&ast.name)?;
+        let base_name = FullName::from_ast_name(&ast.base.name)?;
+        let base = context.canonicalize_type_ref(&TypeReference::from_ast(&ast.base)?);
         if base.is_none() {
             context.report_analysis_problem(AnalysisProblem::domain_base_type_not_found(
                 &name,
                 &base_name.to_string(),
-                &self.ast.base_span,
+                &ast.base_span,
             ))?;
         }
-        let mut domain = CreateDomain::new(&TypeReference::from_full_name(name), &base);
+        let mut domain = Self::new(&TypeReference::from_full_name(name), &base);
         let category = if let Some(base) = context.get_type(&base_name) {
-            if self.ast.base.array_bounds.is_empty() {
+            if ast.base.array_bounds.is_empty() {
                 base.category(context)
             } else if context.dialect() == Dialect::postgres() {
                 TypeCategory::try_from('A').ok()
@@ -1868,26 +1867,27 @@ impl AstConversion<'_, Domain> {
             None
         };
         domain.set_category(category);
-        domain
-            .retain_requested_type(&convert(&self.ast.base).declaration_type(domain.base_type())?);
-        let lookup = convert(&self.ast.collation)
-            .optional_full_name()?
+        domain.retain_requested_type(&WithTypmod::<TypeReference>::from_ast_declaration(
+            &ast.base,
+            domain.base_type(),
+        )?);
+        let lookup = FullName::from_optional_ast_name(&ast.collation)?
             .map(|name| context.lookup_collation(&name));
         domain.validate_collation(context, lookup.as_ref())?;
         Ok(domain)
     }
 
-    pub(crate) fn resolve_and_apply<TContext: ParseContext>(
-        &self,
+    pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
+        ast: &Domain,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        if !self.check_engine_features(&mut context)? {
+        if !EngineFeatureValidation::domain(ast, &mut context)? {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
             ));
         }
-        let domain = self.resolve(&mut context)?;
+        let domain = Self::from_ast(ast, &mut context)?;
         let context = context.apply_create_domain(&domain)?;
         Ok(AstAndContextPair::new(
             SemAst::create_domain(&domain),
@@ -1896,12 +1896,12 @@ impl AstConversion<'_, Domain> {
     }
 }
 
-impl AstConversion<'_, AlterRelation> {
-    pub(crate) fn view_default_changes(
-        &self,
+impl AlterView {
+    pub(crate) fn from_ast_defaults(
+        ast: &AlterRelation,
         context: &mut impl ParseContext,
-    ) -> Result<Option<AlterView>, ResolutionFailure> {
-        let requested = convert(&self.ast.name).full_name()?;
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        let requested = FullName::from_ast_name(&ast.name)?;
         let Some(name) = expand_relation_search_path(context, &requested, |key| {
             context
                 .get_view_impl(key)
@@ -1911,13 +1911,14 @@ impl AstConversion<'_, AlterRelation> {
             return Ok(None);
         };
         let mut actions = Vec::new();
-        for command in &self.ast.commands {
-            let Some(action) = convert(command).view_default_action(context)? else {
+        for command in &ast.commands {
+            let Some(action) = AlterObjSubCommand::from_ast_view_default_action(command, context)?
+            else {
                 return Ok(None);
             };
             actions.push(action);
         }
-        let change = AlterView::new(&ViewName::from_full_name(&name), &actions);
+        let change = Self::new(&ViewName::from_full_name(&name), &actions);
         let mut view = context
             .get_view_impl(&name)
             .expect("resolved ordinary View")
@@ -1929,30 +1930,30 @@ impl AstConversion<'_, AlterRelation> {
     }
 }
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) fn view_default_action(
-        &self,
+impl AlterObjSubCommand {
+    pub(crate) fn from_ast_view_default_action(
+        ast: &AlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<Option<AlterObjSubCommand>, ResolutionFailure> {
-        match self.ast {
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        match ast {
             AlterCommand::Postgres(command) => {
-                convert::<PostgresAlterCommand>(command).view_default_action(context)
+                Self::from_ast_postgres_view_default_action(command, context)
             }
             AlterCommand::Default(name, expression) => {
-                AlterObjSubCommand::from_ast_view_default(context, name, expression).map(Some)
+                Self::from_ast_view_default(context, name, expression).map(Some)
             }
             _ => Ok(None),
         }
     }
-}
 
-impl AstConversion<'_, PostgresAlterCommand> {
-    pub(crate) fn view_default_action(
-        &self,
+    pub(crate) fn from_ast_postgres_view_default_action(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<Option<AlterObjSubCommand>, ResolutionFailure> {
-        match self.ast.operation {
-            AlterOperation::ColumnDefault => self.view_column_default(context),
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        match ast.operation {
+            AlterOperation::ColumnDefault => {
+                Self::from_ast_postgres_view_column_default(ast, context)
+            }
             AlterOperation::EnableTrigger
             | AlterOperation::EnableAlwaysTrigger
             | AlterOperation::EnableTriggerAll
@@ -1971,28 +1972,30 @@ impl AstConversion<'_, PostgresAlterCommand> {
         }
     }
 
-    fn view_column_default(
-        &self,
+    fn from_ast_postgres_view_column_default(
+        ast: &PostgresAlterCommand,
         context: &mut impl ParseContext,
-    ) -> Result<Option<AlterObjSubCommand>, ResolutionFailure> {
-        let value = convert(&self.ast.definition).view_default(context)?;
-        let column = ColumnName::from(self.ast.name.as_str());
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        let value = SemScalarExpr::from_ast_view_default_definition(&ast.definition, context)?;
+        let column = ColumnName::from(ast.name.as_str());
         let action = match value {
-            Some(value) => AlterObjSubCommand::column_default(&column, &value),
-            None => AlterObjSubCommand::drop_column_default(&column),
+            Some(value) => Self::column_default(&column, &value),
+            None => Self::drop_column_default(&column),
         };
         Ok(Some(action))
     }
 }
 
-impl AstConversion<'_, AlterDefinition> {
-    pub(crate) fn view_default(
-        &self,
+impl SemScalarExpr {
+    pub(crate) fn from_ast_view_default_definition(
+        ast: &AlterDefinition,
         context: &mut impl ParseContext,
-    ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
-        match self.ast {
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        match ast {
             AlterDefinition::None => Ok(None),
-            AlterDefinition::Expression(value) => convert(value).resolved_view_default(context),
+            AlterDefinition::Expression(value) => {
+                Self::from_ast_view_default_expression(value, context)
+            }
             _ => {
                 AnalysisError::raise_unexpected_input("view default expression").map_err(Into::into)
             }
@@ -2006,7 +2009,8 @@ impl AlterObjSubCommand {
         name: &str,
         expression: &Expr,
     ) -> Result<Self, ResolutionFailure> {
-        let value = convert(expression).resolve(
+        let value = SemScalarExpr::from_ast(
+            expression,
             context,
             &ScalarAnalysisContext::new(&WithClause::default(), &FromClause::default()),
         )?;
@@ -2014,12 +2018,13 @@ impl AlterObjSubCommand {
     }
 }
 
-impl AstConversion<'_, Expr> {
-    fn resolved_view_default(
-        &self,
+impl SemScalarExpr {
+    fn from_ast_view_default_expression(
+        ast: &Expr,
         context: &mut impl ParseContext,
-    ) -> Result<Option<SemScalarExpr>, ResolutionFailure> {
-        self.resolve(
+    ) -> Result<Option<Self>, ResolutionFailure> {
+        Self::from_ast(
+            ast,
             context,
             &ScalarAnalysisContext::new(&WithClause::default(), &FromClause::default()),
         )
@@ -2028,72 +2033,62 @@ impl AstConversion<'_, Expr> {
     }
 }
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) fn check_engine_features(
-        &self,
+impl EngineFeatureValidation {
+    pub(crate) fn alter_command(
+        ast: &AlterCommand,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        match self.ast {
-            AlterCommand::Postgres(command) => {
-                convert(&command.definition).check_engine_features(context)
-            }
+        match ast {
+            AlterCommand::Postgres(command) => Self::alter_definition(&command.definition, context),
             AlterCommand::Constraint(constraint) => {
-                convert(constraint).check_engine_features(context, false)
+                Self::table_constraint(constraint, context, false)
             }
             _ => Ok(true),
         }
     }
-}
 
-impl AstConversion<'_, AlterDefinition> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn alter_definition(
+        ast: &AlterDefinition,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
-        match self.ast {
+        match ast {
             AlterDefinition::Constraint(constraint) => {
-                convert(constraint).check_engine_features(context, false)
+                Self::table_constraint(constraint, context, false)
             }
-            AlterDefinition::Column(column) => convert(column).check_engine_features(context),
-            AlterDefinition::ConstraintFlags(flags) => {
-                convert(flags).check_engine_features(context)
-            }
+            AlterDefinition::Column(column) => Self::column(column, context),
+            AlterDefinition::ConstraintFlags(flags) => Self::alter_constraint_flags(flags, context),
             _ => Ok(true),
         }
     }
-}
 
-impl AstConversion<'_, AlterConstraintFlags> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn alter_constraint_flags(
+        ast: &AlterConstraintFlags,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         use crate::engine_specific::{Postgres18Feature, Postgres18Syntax};
         let mut valid = true;
-        if self.ast.enforced.is_some() {
+        if ast.enforced.is_some() {
             valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintEnforcement)?;
         }
-        if self.ast.no_inherit.is_some() {
+        if ast.no_inherit.is_some() {
             valid &= context.postgres18_syntax_used(Postgres18Syntax::ConstraintInheritance)?;
         }
-        if valid && (self.ast.enforced.is_some() || self.ast.no_inherit.is_some()) {
+        if valid && (ast.enforced.is_some() || ast.no_inherit.is_some()) {
             todo!("ALTER CONSTRAINT enforcement/inheritance (#887)");
         }
         Ok(valid)
     }
-}
 
-impl AstConversion<'_, Domain> {
-    pub(crate) fn check_engine_features(
-        &self,
+    pub(crate) fn domain(
+        ast: &Domain,
         context: &mut impl ParseContext,
     ) -> Result<bool, AnalysisError> {
         let mut valid = true;
-        for constraint in &self.ast.constraints {
-            valid &= convert(constraint).check_engine_features(context, true)?;
+        for constraint in &ast.constraints {
+            valid &= Self::table_constraint(constraint, context, true)?;
         }
         if valid
-            && self.ast.constraints.iter().any(|constraint| {
+            && ast.constraints.iter().any(|constraint| {
                 matches!(constraint.constraint, AstColumnConstraint::Enforcement(_))
             })
         {

@@ -3,7 +3,6 @@ mod view_support;
 
 pub(crate) use self::destination::MergeDestination;
 pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
-use crate::sem::convert;
 
 use crate::{
     CacheContext,
@@ -414,7 +413,10 @@ pub fn analyze_merge_statement<T: ParseContext>(
     use crate::ast::TryFromWithTokens;
     AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
     let syntax = Merge::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement =
-        convert(&StatementNode::Merge(syntax)).resolve(&mut context, &mut CacheContext::new())?;
+    let statement = SemAst::from_ast_node(
+        &StatementNode::Merge(syntax),
+        &mut context,
+        &mut CacheContext::new(),
+    )?;
     Ok((statement, context))
 }

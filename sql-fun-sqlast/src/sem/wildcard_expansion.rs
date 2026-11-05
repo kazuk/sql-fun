@@ -1,5 +1,9 @@
 //! Wildcard projection groups captured during the existing semantic resolution.
 
+mod rewrite;
+
+pub use self::rewrite::WildcardRewriteError;
+
 use crate::{
     names::{AliasName, ColumnName, FullName, TableName, ViewName},
     sem::{OverloadVariant, ParseContext, ProjectionColumn, SemScalarExpr},

@@ -2,7 +2,6 @@
 
 use crate::ast::Dialect;
 use crate::parse_statements;
-use crate::rewrite_wildcards;
 use crate::sem::MergeRecordRole;
 use crate::sem::ResultColumn;
 use crate::sem::SemAst;
@@ -368,9 +367,9 @@ fn duplicate_named_row_alias_rewrites_using_physical_fields(#[case] sql: &str) {
         .unwrap();
     let analyzed =
         SemAst::from_ast(&statement, original.into_context(), &mut cache_context).unwrap();
-    rewrite_wildcards(
-        &mut statement,
+    WildcardExpansion::rewrite(
         analyzed.context().analysis_state().wildcard_expansions(),
+        &mut statement,
     )
     .unwrap();
     let output = statement.deparse_sql(Dialect::postgres()).unwrap();

@@ -1,4 +1,4 @@
-use crate::sem::convert;
+use crate::sem::SemAst;
 mod assignments;
 mod cursors;
 mod views;
@@ -74,7 +74,7 @@ fn rejects_invalid_structure(#[case] sql: &str, #[case] fatal: bool) {
         .next()
         .unwrap()
         .unwrap();
-    let result = convert(&statement.node).resolve(&mut context, &mut create_cache_context());
+    let result = SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context());
     if fatal {
         assert!(result.is_err());
     } else {
@@ -94,9 +94,9 @@ fn preserves_default_and_resets_parameters() {
             .next()
             .unwrap()
             .unwrap();
-        let result = convert(&statement.node)
-            .resolve(&mut context, &mut create_cache_context())
-            .unwrap();
+        let result =
+            SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context())
+                .unwrap();
         if sql.ends_with("DEFAULT") {
             assert!(
                 result.as_update().unwrap().assignments()[0]
@@ -214,9 +214,7 @@ fn unreferenced_update_cte_is_analyzed_in_one_inference_pass() {
     .unwrap()
     .unwrap();
     let before = parameter_resolution_inference_runs();
-    convert(&statement.node)
-        .resolve(&mut context, &mut create_cache_context())
-        .unwrap();
+    SemAst::from_ast_node(&statement.node, &mut context, &mut create_cache_context()).unwrap();
     assert_eq!(
         crate::sem::parameter_resolution::inference_runs(),
         before + 1

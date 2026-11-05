@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::test_helpers::statements;
 use crate::{
     context::{BaseParseContext, ParseContext, RuleInfoRead, RuleInfoWrite},
@@ -354,7 +353,7 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
     let view = child
         .get_view(&NamesViewName::from_full_name(identity.target()))
         .unwrap();
-    let active = convert(&view.rules().unwrap()).resolve(&child);
+    let active = view.rules().unwrap().resolve(&child);
     assert_eq!(active.len(), 1);
     assert!(!active[0].instead());
     assert!(std::ptr::eq(active[0], child.rule(&identity).unwrap()));
@@ -421,13 +420,11 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
         let identity = RuleIdentity::new(&target, name);
         let registered = context.rule(&identity).unwrap();
         assert_eq!(registered.target(), &target);
-        let linked = convert(
-            &context
-                .get_table(&NamesTableName::from(target.clone()))
-                .unwrap()
-                .rules(),
-        )
-        .resolve(&context);
+        let linked = context
+            .get_table(&NamesTableName::from(target.clone()))
+            .unwrap()
+            .rules()
+            .resolve(&context);
         assert_eq!(linked.len(), 1);
         assert!(std::ptr::eq(linked[0], registered));
     }

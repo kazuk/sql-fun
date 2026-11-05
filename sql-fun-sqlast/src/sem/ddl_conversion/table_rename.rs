@@ -1,5 +1,5 @@
 use crate::ast::AlterRelation;
-use crate::sem::{AstConversion, convert};
+use crate::sem::RelationAlteration;
 
 use crate::{
     ast::{AlterCommand, Dialect},
@@ -8,26 +8,23 @@ use crate::{
     sem::{AlterTable, AnalysisError, AnalysisProblem, Kind, SemAst, SourcePathWithSpan},
 };
 
-impl AstConversion<'_, AlterRelation> {
-    pub(crate) fn has_table_rename(&self) -> bool {
-        self.ast
-            .commands
-            .iter()
-            .any(|syntax| convert::<AlterCommand>(syntax).is_table_rename())
+impl RelationAlteration {
+    pub(crate) fn has_ast_table_rename(ast: &AlterRelation) -> bool {
+        ast.commands.iter().any(AlterTable::is_ast_table_rename)
     }
 
-    pub(crate) fn resolve_table_rename(
-        &self,
+    pub(crate) fn from_ast_table_rename(
+        ast: &AlterRelation,
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
         let Some(source) = source else {
             return AnalysisError::raise_unexpected_none("table rename source");
         };
-        let [command] = self.ast.commands.as_slice() else {
+        let [command] = ast.commands.as_slice() else {
             return AnalysisError::raise_unexpected_input("table rename must stand alone");
         };
-        let requested = TableName::from(convert(&self.ast.name).full_name()?);
+        let requested = TableName::from(FullName::from_ast_name(&ast.name)?);
         let target = context.resolve_table_name(&requested).map(|target| {
             if context.dialect() == Dialect::sqlite() {
                 TableName::from(target.full_name().sqlite_identity())
@@ -37,12 +34,12 @@ impl AstConversion<'_, AlterRelation> {
         });
         if target.is_none() {
             let existing = context.resolve_relation_name(requested.full_name());
-            if !self.ast.if_exists || existing.is_some() {
+            if !ast.if_exists || existing.is_some() {
                 context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
             }
         }
         let original = target.as_ref().unwrap_or(&requested).full_name();
-        let destination = convert(command).table_rename_destination(original)?;
+        let destination = AlterTable::rename_destination_from_ast(command, original)?;
         let destination = if context.dialect() == Dialect::sqlite() {
             TableName::from(destination.full_name().sqlite_identity())
         } else {
@@ -68,18 +65,19 @@ impl AstConversion<'_, AlterRelation> {
     }
 }
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) const fn is_table_rename(&self) -> bool {
-        matches!(self.ast, AlterCommand::Rename(_))
+impl AlterTable {
+    pub(crate) const fn is_ast_table_rename(ast: &AlterCommand) -> bool {
+        matches!(ast, AlterCommand::Rename(_))
     }
-    pub(crate) fn table_rename_destination(
-        &self,
+
+    pub(crate) fn rename_destination_from_ast(
+        ast: &AlterCommand,
         original: &FullName,
     ) -> Result<TableName, AnalysisError> {
-        let AlterCommand::Rename(name) = self.ast else {
+        let AlterCommand::Rename(name) = ast else {
             return AnalysisError::raise_unexpected_input("table rename command");
         };
-        let local = convert(name).full_name()?;
+        let local = FullName::from_ast_name(name)?;
         Ok(TableName::from(FullName::new(
             &original.catalog().cloned(),
             &original.schema().cloned(),
@@ -90,7 +88,8 @@ impl AstConversion<'_, AlterCommand> {
 
 #[cfg(test)]
 mod test_applicability {
-    use crate::sem::convert;
+    use crate::sem::RelationAlteration;
+
     use crate::{
         ast::StatementNode,
         test_helpers::{schema_layer, source_span},
@@ -115,7 +114,11 @@ mod test_applicability {
             panic!("ALTER TABLE syntax");
         };
         context.begin_parameter_type_analysis();
-        let ast = convert(&relation).resolve_table_rename(&mut context, Some(&source_span()))?;
+        let ast = RelationAlteration::from_ast_table_rename(
+            &relation,
+            &mut context,
+            Some(&source_span()),
+        )?;
         assert_eq!(context.problems().len(), 1);
         // Diagnostic delivery is independent of the retained applicability decision.
         let context = schema_layer(std::path::Path::new("rename.sql"), &context.freeze());

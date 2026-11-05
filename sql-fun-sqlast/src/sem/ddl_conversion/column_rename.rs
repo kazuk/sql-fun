@@ -1,5 +1,6 @@
 use crate::ast::AlterRelation;
-use crate::sem::{AstConversion, convert};
+use crate::names::FullName;
+use crate::sem::RelationAlteration;
 use crate::{
     ast::AlterCommand,
     context::ParseContext,
@@ -7,28 +8,26 @@ use crate::{
     sem::{AlterTable, AnalysisError, ColumnRename, SemAst, SourcePathWithSpan},
 };
 
-impl AstConversion<'_, AlterRelation> {
-    pub(crate) fn has_column_rename(&self) -> bool {
-        self.ast
-            .commands
-            .iter()
-            .any(|syntax| convert::<AlterCommand>(syntax).is_column_rename())
+impl RelationAlteration {
+    pub(crate) fn has_ast_column_rename(ast: &AlterRelation) -> bool {
+        ast.commands.iter().any(ColumnRename::is_ast_command)
     }
-    pub(crate) fn resolve_column_rename(
-        &self,
+
+    pub(crate) fn from_ast_column_rename(
+        ast: &AlterRelation,
         context: &mut impl ParseContext,
         source: Option<&SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
         let Some(source) = source else {
             return AnalysisError::raise_unexpected_none("column rename source");
         };
-        let [command] = self.ast.commands.as_slice() else {
+        let [command] = ast.commands.as_slice() else {
             return AnalysisError::raise_unexpected_input("column rename must stand alone");
         };
-        let (from, to) = convert(command).column_rename_names()?;
-        let requested = TableName::from(convert(&self.ast.name).full_name()?);
+        let (from, to) = ColumnRename::names_from_ast(command)?;
+        let requested = TableName::from(FullName::from_ast_name(&ast.name)?);
         let (target, rename) =
-            ColumnRename::resolve(context, &requested, &from, &to, self.ast.if_exists)?;
+            ColumnRename::resolve(context, &requested, &from, &to, ast.if_exists)?;
         Ok(SemAst::alter_table(&AlterTable::column_rename(
             &requested,
             target.as_ref(),
@@ -38,12 +37,15 @@ impl AstConversion<'_, AlterRelation> {
     }
 }
 
-impl AstConversion<'_, AlterCommand> {
-    pub(crate) const fn is_column_rename(&self) -> bool {
-        matches!(self.ast, AlterCommand::RenameColumn(_, _))
+impl ColumnRename {
+    pub(crate) const fn is_ast_command(ast: &AlterCommand) -> bool {
+        matches!(ast, AlterCommand::RenameColumn(_, _))
     }
-    pub(crate) fn column_rename_names(&self) -> Result<(ColumnName, ColumnName), AnalysisError> {
-        let AlterCommand::RenameColumn(from, to) = self.ast else {
+
+    pub(crate) fn names_from_ast(
+        ast: &AlterCommand,
+    ) -> Result<(ColumnName, ColumnName), AnalysisError> {
+        let AlterCommand::RenameColumn(from, to) = ast else {
             return AnalysisError::raise_unexpected_input("column rename command");
         };
         Ok((
@@ -55,8 +57,9 @@ impl AstConversion<'_, AlterCommand> {
 
 #[cfg(test)]
 mod applicability_tests {
+    use crate::sem::RelationAlteration;
+
     use crate::ast::StatementNode;
-    use crate::sem::convert;
 
     use crate::{
         ParseContext,
@@ -75,8 +78,11 @@ mod applicability_tests {
             panic!("ALTER TABLE");
         };
         context.begin_parameter_type_analysis();
-        let statement =
-            convert(&relation).resolve_column_rename(&mut context, Some(&source_span()))?;
+        let statement = RelationAlteration::from_ast_column_rename(
+            &relation,
+            &mut context,
+            Some(&source_span()),
+        )?;
         assert_eq!(context.analysis_state_mut().take_problems().len(), 1);
         assert!(!statement.alter_table_statement().unwrap().can_apply());
         let context = statement.apply_relation_alter(context)?;

@@ -1,4 +1,3 @@
-use crate::sem::{AstConversion, convert};
 use crate::{
     AstAndContextPair,
     ast::{Dialect, DropBehavior, DropTrigger},
@@ -10,31 +9,34 @@ use crate::{
     },
 };
 
-impl AstConversion<'_, DropTrigger> {
-    pub(crate) fn resolve(
-        &self,
+impl SemDropTrigger {
+    pub(crate) fn from_ast(
+        ast: &DropTrigger,
         context: &mut impl ParseContext,
-    ) -> Result<Option<SemDropTrigger>, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         let result = if context.dialect() == Dialect::sqlite() {
-            self.resolve_sqlite(context)
+            Self::from_ast_sqlite(ast, context)
         } else {
-            self.resolve_postgres(context)
+            Self::from_ast_postgres(ast, context)
         };
         ResolutionFailure::finish(result, context)
     }
-    pub(crate) fn resolve_sqlite(
-        &self,
+}
+
+impl SemDropTrigger {
+    pub(crate) fn from_ast_sqlite(
+        ast: &DropTrigger,
         context: &impl ParseContext,
-    ) -> Result<SemDropTrigger, ResolutionFailure> {
-        let requested = convert(&self.ast.name).full_name()?;
+    ) -> Result<Self, ResolutionFailure> {
+        let requested = FullName::from_ast_name(&ast.name)?;
         let identity = if requested.schema().is_some() {
             let identity = TriggerIdentity::sqlite(&requested);
             if let Some(definition) = context.trigger(&identity) {
-                return Ok(SemDropTrigger::sqlite(
+                return Ok(Self::sqlite(
                     &requested,
                     Some(&identity),
                     Some(definition.target()),
-                    self.ast.if_exists,
+                    ast.if_exists,
                 ));
             }
             Some(identity)
@@ -54,40 +56,39 @@ impl AstConversion<'_, DropTrigger> {
             for schema in schemas {
                 let identity = TriggerIdentity::sqlite(&requested.clone().set_schema(schema));
                 if let Some(definition) = context.trigger(&identity) {
-                    return Ok(SemDropTrigger::sqlite(
+                    return Ok(Self::sqlite(
                         &requested,
                         Some(&identity),
                         Some(definition.target()),
-                        self.ast.if_exists,
+                        ast.if_exists,
                     ));
                 }
             }
             None
         };
-        if !self.ast.if_exists {
+        if !ast.if_exists {
             return Err(ResolutionFailure::trigger(&TriggerProblem::missing_name(
                 &requested,
             )));
         }
-        Ok(SemDropTrigger::sqlite(
-            &requested,
-            identity.as_ref(),
-            None,
-            true,
-        ))
+        Ok(Self::sqlite(&requested, identity.as_ref(), None, true))
     }
-    pub(crate) fn resolve_postgres(
-        &self,
+}
+
+impl SemDropTrigger {
+    pub(crate) fn from_ast_postgres(
+        ast: &DropTrigger,
         context: &impl ParseContext,
-    ) -> Result<SemDropTrigger, ResolutionFailure> {
-        let requested = convert(&self.ast.name).full_name()?;
+    ) -> Result<Self, ResolutionFailure> {
+        let requested = FullName::from_ast_name(&ast.name)?;
         let requested_target =
-            convert(self.ast.relation.as_ref().expect("PostgreSQL ON relation")).full_name()?;
-        let behavior =
-            convert(&self.ast.behavior.expect("PostgreSQL dependency behavior")).semantic();
+            FullName::from_ast_name(ast.relation.as_ref().expect("PostgreSQL ON relation"))?;
+        let behavior = DropDependencyBehavior::from_ast(
+            &ast.behavior.expect("PostgreSQL dependency behavior"),
+        );
         let Some(target) = context.resolve_relation_name(&requested_target) else {
-            if self.ast.if_exists {
-                return Ok(SemDropTrigger::new(
+            if ast.if_exists {
+                return Ok(Self::new(
                     &requested,
                     &requested_target,
                     None,
@@ -100,16 +101,26 @@ impl AstConversion<'_, DropTrigger> {
                 &requested_target,
             )));
         };
-        self.resolve_on(context, &requested, &requested_target, &target, behavior)
+        Self::from_ast_on(
+            ast,
+            context,
+            &requested,
+            &requested_target,
+            &target,
+            behavior,
+        )
     }
-    pub(crate) fn resolve_on(
-        &self,
+}
+
+impl SemDropTrigger {
+    pub(crate) fn from_ast_on(
+        ast: &DropTrigger,
         context: &impl ParseContext,
         requested: &FullName,
         requested_target: &FullName,
         target: &FullName,
         behavior: DropDependencyBehavior,
-    ) -> Result<SemDropTrigger, ResolutionFailure> {
+    ) -> Result<Self, ResolutionFailure> {
         let name = FullName::new(
             &target.catalog().cloned(),
             &target.schema().cloned(),
@@ -117,25 +128,28 @@ impl AstConversion<'_, DropTrigger> {
         );
         let identity = TriggerIdentity::postgres(target, &name);
         let found = context.trigger(&identity).is_some();
-        if !found && !self.ast.if_exists {
+        if !found && !ast.if_exists {
             return Err(ResolutionFailure::trigger(&TriggerProblem::missing(
                 &identity,
             )));
         }
-        Ok(SemDropTrigger::new(
+        Ok(Self::new(
             requested,
             requested_target,
             Some(&identity),
             found,
-            self.ast.if_exists,
+            ast.if_exists,
             behavior,
         ))
     }
-    pub(crate) fn resolve_and_apply<C: ParseContext>(
-        &self,
+}
+
+impl SemDropTrigger {
+    pub(crate) fn apply_ast<C: ParseContext>(
+        ast: &DropTrigger,
         mut context: C,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let Some(definition) = self.resolve(&mut context)? else {
+        let Some(definition) = Self::from_ast(ast, &mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
@@ -148,14 +162,15 @@ impl AstConversion<'_, DropTrigger> {
         ))
     }
 }
+
 #[cfg(test)]
 mod tests;
 
-impl AstConversion<'_, DropBehavior> {
-    pub(crate) const fn semantic(self) -> DropDependencyBehavior {
-        match self.ast {
-            DropBehavior::Cascade => DropDependencyBehavior::cascade(),
-            DropBehavior::Restrict => DropDependencyBehavior::restrict(),
+impl DropDependencyBehavior {
+    pub(crate) const fn from_ast(ast: &DropBehavior) -> Self {
+        match ast {
+            DropBehavior::Cascade => Self::cascade(),
+            DropBehavior::Restrict => Self::restrict(),
         }
     }
 }

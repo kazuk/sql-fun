@@ -1,13 +1,12 @@
 use crate::{
-    wildcard_rewrite::{Rewrite, rewrite, rows_source::freeze},
-    wildcard_rewrite_error::WildcardRewriteError,
+    sem::WildcardRewriteError,
+    sem::wildcard_expansion::rewrite::{projection_name, rows_source::freeze},
 };
 // Stage resolved source transformations and commit them in lexical scope order.
 
 use crate::{
     ast::{
-        DerivedTable, Expr, FromGroup, FromItem, Join, Name, Query, StatementNode, Target,
-        TypeName,
+        DerivedTable, Expr, FromItem, Name, Query, StatementNode, Target, TypeName,
         projection::{ProjectionScope, ProjectionScopes, ScopedSource, ScopedSourceEdit},
     },
     sem::{WildcardExpansion, WildcardRowsSource, WildcardSourceProjection, WildcardTypedRecord},
@@ -99,12 +98,12 @@ impl SourceTransform {
     }
     fn apply(&self, source: &FromItem) -> Result<FromItem, WildcardRewriteError> {
         match self {
-            Self::Projection(projection) => rewrite(projection).freeze_source(source),
-            Self::Rows(rows) => rewrite(rows).freeze_rows_source(source),
+            Self::Projection(projection) => projection.freeze_source(source),
+            Self::Rows(rows) => rows.freeze_rows_source(source),
         }
     }
 }
-impl Rewrite<'_, WildcardExpansion> {
+impl WildcardExpansion {
     pub(super) fn prepare_sources(
         &self,
         scopes: &ProjectionScopes,
@@ -132,7 +131,7 @@ impl Rewrite<'_, WildcardExpansion> {
         Ok(())
     }
 }
-impl Rewrite<'_, WildcardSourceProjection> {
+impl WildcardSourceProjection {
     fn freeze_source(&self, source: &FromItem) -> Result<FromItem, WildcardRewriteError> {
         with_stack(|| {
             let mut from = source.clone();
@@ -141,14 +140,14 @@ impl Rewrite<'_, WildcardSourceProjection> {
                 let nested = from
                     .visible_source(rows.alias())
                     .map_err(WildcardRewriteError::from)?;
-                let replacement = rewrite(rows).freeze_rows_source(&nested)?;
+                let replacement = rows.freeze_rows_source(&nested)?;
                 from.replace_visible_source(rows.alias(), &replacement);
             }
             for projection in self.source_projections() {
                 let nested = from
                     .visible_source(projection.alias())
                     .map_err(WildcardRewriteError::from)?;
-                let replacement = rewrite(projection).freeze_source(&nested)?;
+                let replacement = projection.freeze_source(&nested)?;
                 from.replace_visible_source(projection.alias(), &replacement);
             }
             let targets = self.rewrite_targets()?;
@@ -175,7 +174,7 @@ impl Rewrite<'_, WildcardSourceProjection> {
                         "duplicate-label source has no resolved expression",
                     ));
                 };
-                rewrite(expression).projection_expression(bindings)?
+                expression.projection_expression(bindings)?
             };
             let Some(name) = column.column_name() else {
                 return Err(WildcardRewriteError::invalid(
@@ -188,7 +187,7 @@ impl Rewrite<'_, WildcardSourceProjection> {
     }
 }
 pub(super) fn typed_record_reference(record: &WildcardTypedRecord) -> Expr {
-    let target = TypeName::projection(&rewrite(record.relation()).projection_name(), false);
+    let target = TypeName::projection(&projection_name(record.relation()), false);
     let row = Expr::projection_source_row(record.alias());
     let cast = Expr::projection_cast(&row, &target);
     Expr::projection_field(&cast, record.column())
@@ -199,32 +198,13 @@ pub(super) fn ordinal_reference(alias: &str, ordinal: usize) -> Expr {
         &format!("f{}", ordinal + 1),
     )
 }
-impl Rewrite<'_, WildcardRowsSource> {
+impl WildcardRowsSource {
     fn freeze_rows_source(&self, source: &FromItem) -> Result<FromItem, WildcardRewriteError> {
         match source {
-            FromItem::Functions(functions) => freeze(self.value, functions.clone()),
+            FromItem::Functions(functions) => freeze(self, functions.clone()),
             _ => Err(WildcardRewriteError::invalid(
                 "ROWS FROM origin is not a function source",
             )),
         }
-    }
-}
-impl FromItem {
-    fn clear_projection_alias(&mut self) {
-        match self {
-            Self::Join(node) => node.clear_projection_alias(),
-            Self::Group(node) => node.clear_projection_alias(),
-            _ => {}
-        }
-    }
-}
-impl Join {
-    fn clear_projection_alias(&mut self) {
-        self.alias = None;
-    }
-}
-impl FromGroup {
-    fn clear_projection_alias(&mut self) {
-        self.alias = None;
     }
 }

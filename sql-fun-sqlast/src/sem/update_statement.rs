@@ -4,7 +4,6 @@ mod view_support;
 
 pub use self::{cursor::UpdateCursor, view_support::ViewUpdateSupport};
 pub(crate) use self::{cursor::UpdatePredicate, destination::UpdateDestination};
-use crate::sem::convert;
 
 use crate::{
     CacheContext,
@@ -423,7 +422,10 @@ pub fn analyze_update_statement<T: ParseContext>(
 ) -> Result<(SemAst, T), AnalysisError> {
     AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
     let syntax = Update::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement =
-        convert(&StatementNode::Update(syntax)).resolve(&mut context, &mut CacheContext::new())?;
+    let statement = SemAst::from_ast_node(
+        &StatementNode::Update(syntax),
+        &mut context,
+        &mut CacheContext::new(),
+    )?;
     Ok((statement, context))
 }

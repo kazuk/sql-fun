@@ -9,7 +9,6 @@ pub use self::{
     view_support::ViewDeleteSupport,
 };
 pub(crate) use self::{cursor::DeletePredicate, destination::DeleteDestination};
-use crate::sem::convert;
 
 use crate::{
     CacheContext,
@@ -192,7 +191,10 @@ pub fn analyze_delete_statement<T: ParseContext>(
 ) -> Result<(SemAst, T), AnalysisError> {
     AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
     let syntax = Delete::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
-    let statement =
-        convert(&StatementNode::Delete(syntax)).resolve(&mut context, &mut CacheContext::new())?;
+    let statement = SemAst::from_ast_node(
+        &StatementNode::Delete(syntax),
+        &mut context,
+        &mut CacheContext::new(),
+    )?;
     Ok((statement, context))
 }

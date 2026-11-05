@@ -1,4 +1,3 @@
-use crate::sem::convert;
 use crate::{
     AstAndContextPair, CacheContext,
     ast::{Dialect, StatementNode, TryFromWithTokens},
@@ -80,7 +79,7 @@ impl SemAst {
         };
 
         let syntax = StatementNode::try_from_with_tokens(&statement, tokens)?;
-        convert(&syntax).resolve_and_apply(context, &mut CacheContext::new())
+        Self::apply_ast_node(&syntax, context, &mut CacheContext::new())
     }
 
     /// analyze [`Stmt`]
@@ -147,7 +146,7 @@ impl SemAst {
         statement: &Stmt,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let syntax = StatementNode::try_from(statement)?;
-        convert(&syntax).resolve_and_apply(context, &mut CacheContext::new())
+        Self::apply_ast_node(&syntax, context, &mut CacheContext::new())
     }
 }
 

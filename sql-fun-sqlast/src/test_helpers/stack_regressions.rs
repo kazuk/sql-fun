@@ -1,5 +1,5 @@
 use crate::sem::PgBuiltInType;
-use crate::sem::convert;
+use crate::sem::SelectStatement;
 use crate::test_helpers::ast_query::AnalysisFixture;
 use crate::test_helpers::create_cache_context;
 
@@ -8,8 +8,7 @@ use crate::names::ColumnName;
 
 pub(crate) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
     let mut catalog = AnalysisFixture::context().with_dialect(dialect);
-    let result = convert(syntax)
-        .resolve(&mut catalog, &mut create_cache_context())
+    let result = SelectStatement::from_ast(syntax, &mut catalog, &mut create_cache_context())
         .expect("normal query analysis");
     let column = result
         .get_result_column_def(&ColumnName::from("n"))

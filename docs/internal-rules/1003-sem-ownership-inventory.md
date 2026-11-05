@@ -237,7 +237,11 @@ Both post-fix standard flows passed. Default passed 4,381 `sql-fun-sqlast`
 tests and 5,475 workspace tests with 63 existing ignored; all-features passed
 5,108 `sql-fun-sqlast` tests and 6,254 workspace tests with 63 existing
 ignored. Each configuration passed 3,064 SQL regression inputs in 166 groups.
-Packaging, SemVer, and installed-distribution checks remain pending.
+Packaging and SemVer checks also passed for implementation commit `7a047313`.
+The generated Debian/tar layout, metadata, checksums, and executable identity
+were validated. Executables extracted from the tar archive passed all 3,064
+SQL regression cases across 166 groups. Existing release-intent declarations
+and package versions were unchanged.
 
 ### Source assertion and case-count evidence
 
@@ -363,7 +367,10 @@ worktree's artifacts, above the repository's 20 GiB minimum baseline.
 
 Post-correction default and all-features compiled reconciliations and standard
 flows are complete as recorded above. Packaging, SemVer, and
-installed-distribution checks remain pending. Independent review found no
+installed-distribution checks also passed for
+implementation commit `7a047313`, including all 3,064 extracted-binary SQL
+regression cases.
+Independent review found no
 blocking ownership or correctness issue. It compared 373 changed test
 functions for identity, attributes, literal expectations and assertion order
 without differences, and checked conversion diagnostic literals and direct

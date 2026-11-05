@@ -6,7 +6,7 @@ Check the application embedded queries and prepare to build.
 
 - Scan a schema dump and enumerate schema objects.
 - Scan a application source code and enumerate queries.
-- Validate all queries syntax and semantics.
+- Validate the syntax and semantics of extracted queries.
 - Generate a CRUD/query inventory.
 - Prepare query information for `sql-fun` procidual macro
   - `sql-fun` procidual macro uses schema cache default
@@ -36,13 +36,21 @@ eligible functions analyzed in that invocation are included. Old entries absent
 from the selected targets disappear. A function whose analysis lacks executable
 SQL or required parameter/result metadata is omitted, including its old entry.
 SQL analysis failures make the command fail, but eligible entries are still
-saved. Connection, extraction, initialization, and RPC failures prevent saving
-partial lockfiles or CRUD/query inventories.
+saved. When `check` reports a connection, extraction, initialization, or RPC
+failure, it does not save partial lockfiles or CRUD/query inventories.
 
 If no SQL query functions are extracted, `check` warns and succeeds without
 opening an analysis session or reading or changing lockfiles or CRUD inventories.
 This also applies to `--validate-only`, even if a datasource was selected. It does
 not clean up old artifacts when all queries have been removed.
+
+Macro expansion can emit a compilation error without producing a query that
+`check` can extract, for example when the query's datasource is not configured.
+That query is not analyzed. `check` can report no SQL analysis errors and may
+exit successfully, including with the no-queries warning, despite the compilation
+error. A successful `check` covers only extracted queries and does not establish
+that the Rust application compiles. Run `cargo check` or `cargo build` as well;
+they fail if the underlying macro compilation error remains.
 
 A single-statement entry keeps its SQL, bindings, and result shape directly on
 `[[entries]]`. Multiple statements retain their order and independent metadata
@@ -119,9 +127,10 @@ produces identical bytes. No timestamp or server-session identity is stored.
 Inventory collection is independent of Rust generation eligibility. SQL
 diagnostics are still reported and the command retains its existing failure
 result when a lockfile entry cannot be produced; returned access facts remain in
-the inventory. Extraction, initialization, RPC or connection errors prevent
-inventory publication, leaving any previous file stale. Each inventory is
-replaced atomically after analysis/connection completion. Lockfiles and inventory
+the inventory. When `check` reports an extraction, initialization, RPC, or
+connection failure, it does not publish inventories, leaving previous files
+stale. Each inventory is replaced atomically after analysis/connection
+completion. Lockfiles and inventory
 files are not replaced as one transaction; inspect the command result before
 using generated artifacts.
 

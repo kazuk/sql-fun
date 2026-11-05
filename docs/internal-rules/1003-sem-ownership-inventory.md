@@ -449,9 +449,10 @@ assertion counts are direct assertion macros inside test-attributed functions.
 
 Round-two compiled comparisons and standard-flow results below are historical:
 they predate the round-three module consolidation and do not establish current
-worktree results. Round-three compiled comparisons and both full standard flows have now
-passed. Against `accb7d65`, the default comparison has 4,363 unchanged and
-18 relocated cases (4,381 total); all features has 5,090 unchanged and
+worktree results. Round-three compiled comparisons and both full standard
+flows have now passed. Against `accb7d65`, the default comparison has
+4,363 unchanged and 18 relocated cases (4,381 total); all features has 5,090
+unchanged and
 18 relocated cases (5,108 total). Both contain 28 suites, with no missing or
 extra cases, identity collisions, or metadata changes. Their normalized
 identity SHA-256 values are respectively
@@ -463,8 +464,11 @@ all-features flow passed 5,108 SQLAST and 6,254 workspace cases. Both retained
 63 existing ignored workspace cases and passed all 3,064 SQL regression cases
 in 166 groups. Feature boundaries, formatting, Clippy, import lint, Markdown,
 documentation, doctests, and the other standard checks passed. No SLOW warning
-or timeout occurred. Packaging, SemVer, and installed-distribution checks are
-pending for the implementation commit.
+or timeout occurred. Packaging and SemVer/release-intent checks passed for
+implementation commit `a9e828cb038da8ee1ffaf8253f922fa5e098ead0`. Package
+layout, metadata, checksums, and executable identity were verified. Executables
+extracted from that commit's generated archive passed all 3,064 SQL regression
+cases in 166 groups. Package versions and release intents are unchanged.
 
 The round-three source audit at `accb7d65` maps all 1,328 test functions to
 1,328 destinations with identical bodies, cases, attributes, parameter
@@ -480,7 +484,8 @@ namespace modules, and no remaining eligible small modules. The only new
 public path is `sem::ProblemLikeError`; its `pub` declaration keeps the
 existing public `ValidOperatorName::try_from` return type nameable after moving
 the type out of private `sem/error`. The method signature and error variants
-are unchanged. These source audits do not replace compiled-case or behavioral validation.
+are unchanged. These source audits do not replace compiled-case or behavioral
+validation.
 
 The earlier default/all-features comparisons and standard-flow results predate
 the current physical-module and syntax-import corrections. The round-two
@@ -602,9 +607,9 @@ contributor workflow change is intended.
 The current conversion index and physical maps reflect these corrections:
 
 - All 318 expression/query implementation blocks and 120 DDL items are in
-  the defining type module or a descendant. The former `ast_conversion` and `ddl_conversion`
-  catch-all modules are removed. The independent owner audit found zero
-  ownership violations after consolidation.
+  the defining type module or a descendant. The former `ast_conversion` and
+  `ddl_conversion` catch-all modules are removed. The independent owner audit
+  found zero ownership violations after consolidation.
 - Table-function output name rules are owned by `TableFunctionOutput`.
   `OperatorExpr::table_output_name(&self)` maps to the constant
   `TableFunctionOutput::nullif_output_name()` and takes no AST argument.
@@ -637,8 +642,11 @@ The current conversion index and physical maps reflect these corrections:
 Round-two compiled reconciliations, standard flows, packaging, SemVer, and
 installed-distribution checks are historical evidence only. Round-three compiled
 reconciliations and both full standard flows passed as recorded above.
-Packaging, SemVer, and installed checks remain pending at this snapshot. Source identity, model preservation,
-and ownership maps alone do not establish semantic behavior or current
+Packaging, SemVer, and installed checks also passed for `a9e828cb`, as
+recorded above. The final follow-up commit only records validation and wraps
+prose; the validated Rust sources are unchanged. Source identity, model
+preservation, and ownership maps alone do not establish semantic behavior or
+current
 validation.
 
 ## Final semantic entry-point index

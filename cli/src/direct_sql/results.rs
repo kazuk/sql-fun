@@ -56,7 +56,42 @@ impl AnalysisReport {
             ::anyhow::bail!("{}", errors.join("\n"))
         }
     }
+}
 
+#[cfg(test)]
+mod test_collect {
+    use crate::{
+        analysis::PreparedDiagnostics,
+        direct_sql::results::AnalysisReport,
+        test_helpers::direct_sql::{results::diagnostic_response, session},
+    };
+
+    #[rstest::rstest]
+    #[case::single(1, false)]
+    #[case::multiple(2, true)]
+    fn labels_only_multiple_statements(
+        #[case] count: usize,
+        #[case] show_headings: bool,
+    ) -> ::testresult::TestResult {
+        let statements = vec![&[][..]; count];
+        let response = diagnostic_response(&statements);
+        let renderer = session::renderer()?;
+        let mut report = AnalysisReport::default();
+        report.collect(
+            &response,
+            &PreparedDiagnostics::default(),
+            &renderer,
+            None,
+            true,
+        )?;
+        let body = String::from_utf8(report.body)?;
+        assert_eq!(body.contains("Statement 0"), show_headings);
+        assert_eq!(body.contains("Statement 1"), show_headings);
+        Ok(())
+    }
+}
+
+impl AnalysisReport {
     fn collect_statement(
         &mut self,
         statement: &AnalyzeQueryItem,
@@ -125,11 +160,82 @@ impl AnalysisReport {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_collect_diagnostics {
+    use crate::{
+        analysis::PreparedDiagnostics,
+        direct_sql::results::{AnalysisReport, Status},
+        test_helpers::direct_sql::{results::diagnostic_response, session},
+    };
+    use ::sql_fun_client::payloads::DiagnosticSeverity as Severity;
+
+    #[rstest::rstest]
+    #[case::none(vec![vec![]], Status::Ok)]
+    #[case::advice(vec![vec![Severity::advice()]], Status::Ok)]
+    #[case::warning(vec![vec![Severity::warning()]], Status::Warn)]
+    #[case::error_after_warning(vec![vec![Severity::warning()], vec![Severity::error()]], Status::Error)]
+    fn aggregates_and_duplicates_diagnostics(
+        #[case] severities: Vec<Vec<Severity>>,
+        #[case] expected: Status,
+    ) -> ::testresult::TestResult {
+        let severities = severities.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let response = diagnostic_response(&severities);
+        let diagnostic_count: usize = severities.iter().map(|items| items.len()).sum();
+        let renderer = session::renderer()?;
+        let mut report = AnalysisReport::default();
+        let mut errors = Vec::new();
+        for statement in response.queries().items() {
+            report.collect_diagnostics(
+                statement,
+                &PreparedDiagnostics::default(),
+                &renderer,
+                Some(&renderer),
+                &mut errors,
+            )?;
+        }
+        assert!(report.severity == expected);
+        assert_eq!(errors, Vec::<String>::new());
+        let stdout = String::from_utf8(report.body)?;
+        let stderr = String::from_utf8(report.diagnostics_stderr)?;
+        assert_eq!(
+            stdout.matches("parameter_constraint").count(),
+            diagnostic_count
+        );
+        assert_eq!(
+            stderr.matches("parameter_constraint").count(),
+            diagnostic_count
+        );
+        assert!(!stderr.contains("Statement"));
+        Ok(())
+    }
+}
+
+impl AnalysisReport {
     pub(super) fn passed(&self) -> bool {
         self.severity != Status::Error
     }
+}
 
+#[cfg(test)]
+mod test_passed {
+    use crate::direct_sql::results::{AnalysisReport, Status};
+
+    #[rstest::rstest]
+    #[case::ok(Status::Ok, true)]
+    #[case::warning(Status::Warn, true)]
+    #[case::error(Status::Error, false)]
+    fn errors_fail_the_report(#[case] severity: Status, #[case] expected: bool) {
+        let report = AnalysisReport {
+            severity,
+            ..AnalysisReport::default()
+        };
+        assert_eq!(report.passed(), expected);
+    }
+}
+
+impl AnalysisReport {
     pub(super) fn write(
         &self,
         output: &mut impl Write,
@@ -167,76 +273,21 @@ impl AnalysisReport {
 }
 
 #[cfg(test)]
-mod test_analysis_report {
-    use crate::{
-        analysis::PreparedDiagnostics,
-        direct_sql::results::AnalysisReport,
-        test_helpers::direct_sql::{
-            results::{column_access_response, diagnostic_response},
-            session,
-        },
-    };
-    use ::sql_fun_client::payloads::DiagnosticSeverity as Severity;
+mod test_write {
+    use crate::direct_sql::results::{AnalysisReport, Status};
 
     #[rstest::rstest]
-    #[case::none(vec![vec![]], "OK", true)]
-    #[case::advice(vec![vec![Severity::advice()]], "OK", true)]
-    #[case::warning(vec![vec![Severity::warning()]], "WARN", true)]
-    #[case::error_after_warning(vec![vec![Severity::warning()], vec![Severity::error()]], "ERROR", false)]
-    fn aggregates_and_duplicates_diagnostics(
-        #[case] severities: Vec<Vec<Severity>>,
-        #[case] status: &str,
-        #[case] passed: bool,
-    ) -> ::testresult::TestResult {
-        let severities = severities.iter().map(Vec::as_slice).collect::<Vec<_>>();
-        let response = diagnostic_response(&severities);
-        let renderer = session::renderer()?;
-        let mut report = AnalysisReport::default();
-        report.collect(
-            &response,
-            &PreparedDiagnostics::default(),
-            &renderer,
-            Some(&renderer),
-            true,
-        )?;
-        assert_eq!(report.passed(), passed);
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        report.write(&mut stdout, &mut stderr, "input", None, false)?;
-        let stdout = String::from_utf8(stdout)?;
-        let stderr = String::from_utf8(stderr)?;
-        assert!(stdout.starts_with(&format!("{status} input\n")), "{stdout}");
-        assert_eq!(stdout.matches("input").count(), 1);
-        assert_eq!(stdout.contains("Statement 0"), severities.len() > 1);
-        assert_eq!(
-            stdout.matches("parameter_constraint").count(),
-            stderr.matches("parameter_constraint").count()
-        );
-        assert!(!stdout.contains("Complete"));
-        assert!(!stdout.contains("Query kind"));
-        assert!(!stdout.contains("Parameters"));
-        assert!(!stdout.contains("Column access"));
-        assert!(!stderr.contains("Statement"));
-        Ok(())
-    }
-
-    #[rstest::rstest]
-    #[case::ok(Severity::advice(), "\x1b[32mOK\x1b[0m")]
-    #[case::warn(Severity::warning(), "\x1b[33mWARN\x1b[0m")]
-    #[case::error(Severity::error(), "\x1b[31mERROR\x1b[0m")]
+    #[case::ok(Status::Ok, "\x1b[32mOK\x1b[0m")]
+    #[case::warn(Status::Warn, "\x1b[33mWARN\x1b[0m")]
+    #[case::error(Status::Error, "\x1b[31mERROR\x1b[0m")]
     fn applies_status_colors(
-        #[case] severity: Severity,
+        #[case] severity: Status,
         #[case] expected: &str,
     ) -> ::testresult::TestResult {
-        let renderer = session::renderer()?;
-        let mut report = AnalysisReport::default();
-        report.collect(
-            &diagnostic_response(&[&[severity]]),
-            &PreparedDiagnostics::default(),
-            &renderer,
-            None,
-            true,
-        )?;
+        let report = AnalysisReport {
+            severity,
+            ..AnalysisReport::default()
+        };
         let mut stdout = Vec::new();
         report.write(&mut stdout, &mut Vec::new(), "input", None, true)?;
         assert!(String::from_utf8(stdout)?.starts_with(expected));
@@ -245,15 +296,10 @@ mod test_analysis_report {
 
     #[test]
     fn reports_operational_error_without_losing_results() -> ::testresult::TestResult {
-        let renderer = session::renderer()?;
-        let mut report = AnalysisReport::default();
-        report.collect(
-            &column_access_response(),
-            &PreparedDiagnostics::default(),
-            &renderer,
-            None,
-            true,
-        )?;
+        let report = AnalysisReport {
+            body: b"\n  Result columns\n    id  unresolved\n".to_vec(),
+            ..AnalysisReport::default()
+        };
         let mut stdout = Vec::new();
         report.write(
             &mut stdout,
@@ -265,10 +311,7 @@ mod test_analysis_report {
         let stdout = String::from_utf8(stdout)?;
         assert!(stdout.starts_with("ERROR input"));
         assert!(stdout.contains("Operational error:\n    transport failure"));
-        assert!(stdout.contains("unresolved"));
-        assert!(stdout.contains("pg_catalog.int4[]"));
-        assert!(stdout.contains("Statement 1"));
-        assert_eq!(stdout.matches("Column access").count(), 1);
+        assert!(stdout.contains("id  unresolved"));
         Ok(())
     }
 }

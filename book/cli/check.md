@@ -25,9 +25,10 @@ PostgreSQL; SQLite-enabled builds do not imply SQLite initialization support.
 
 Before extraction, `check` forwards the common datasource configuration to
 `cargo expand`. The global `--datasource` option takes precedence over
-`SQL_FUN_DATASOURCE`; otherwise `default` is used. This selected datasource
-must exist and have valid metadata even when extracted queries name other
-datasources.
+`SQL_FUN_DATASOURCE`; otherwise `default` is used. If the selected datasource
+has no metadata entry, its metadata-derived settings are omitted from the
+transferred configuration. Each datasource referenced by a query must have
+valid metadata, including `default` when a query uses it.
 
 For each referenced datasource, a completed check regenerates the entire
 `<datasource>.<schema>.lock` file, ordered by Rust query function name. Only

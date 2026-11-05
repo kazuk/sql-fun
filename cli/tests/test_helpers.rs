@@ -12,3 +12,8 @@ pub(crate) fn cli_executable() -> std::ffi::OsString {
 // Also loaded as api_helpers::executable via #[path], so resolve from this file.
 #[path = "test_helpers/initialization.rs"]
 pub(crate) mod initialization;
+
+#[cfg(unix)]
+#[allow(dead_code)]
+#[path = "test_helpers/check.rs"]
+pub(crate) mod check;

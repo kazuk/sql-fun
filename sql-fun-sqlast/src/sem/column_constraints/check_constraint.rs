@@ -1,4 +1,3 @@
-mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::{
     SqliteToken,
@@ -6,12 +5,12 @@ use crate::{
     syn::sqlite::CheckColumnConstraint as SqliteCheckColumnConstraint,
 };
 use crate::{
-    ast::{TableConstraint, TryFromWithTokens},
+    ast::{Column as AstColumn, TableConstraint, TryFromWithTokens},
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, CheckConstraint, ColumnConstraint, ColumnConstraintKind,
-        ColumnConstraintTrait, ColumnRename, ParseContext, SemScalarExpr,
-        traversal::SemanticVisitorMut,
+        ColumnConstraintTrait, ColumnRename, EngineFeatureValidation, ParseContext,
+        ScalarAnalysisContext, SemScalarExpr, traversal::SemanticVisitorMut,
     },
     syn::{Constraint, ScanToken},
 };
@@ -186,5 +185,41 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl CheckColumnConstraint {
+    pub(crate) fn from_ast_legacy_inline<TContext: ParseContext>(
+        ast: &TableConstraint,
+        mut context: TContext,
+        target: &TableName,
+        column: &ColumnName,
+    ) -> Result<(Self, TContext), AnalysisError> {
+        context.begin_parameter_type_analysis();
+        let canonical = context
+            .resolve_table_name(target)
+            .unwrap_or_else(|| target.clone());
+        let table = context.get_table(&canonical).cloned();
+        let scope = if let Some(table) = &table {
+            ScalarAnalysisContext::declared_table(table, &canonical)
+        } else {
+            ScalarAnalysisContext::default()
+        };
+        let valid = EngineFeatureValidation::table_constraint(ast, &mut context, true)?;
+        let result =
+            CheckConstraint::from_ast_expression(ast, &mut context, &canonical, &scope, false);
+        let mut check = context.finish_analysis(result)?;
+        if !valid {
+            check.disallow();
+        }
+        Ok((Self::from_analyzed(&canonical, column, &check), context))
+    }
+}
+
+impl CheckColumnConstraint {
+    pub(crate) fn has_ast_column_checks(ast: &AstColumn) -> bool {
+        ast.constraints.iter().any(TableConstraint::is_check)
     }
 }

@@ -1,4 +1,3 @@
-mod ddl;
 use crate::{
     ast::IdentityColumnMode,
     names::{ColumnName, TableName},
@@ -99,5 +98,18 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl IdentityColumnConstraint {
+    pub(in crate::sem::column_constraints) fn from_ast_mode(
+        _context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+        mode: &IdentityColumnMode,
+    ) -> Self {
+        Self::new(table, column, mode.clone())
     }
 }

@@ -2,20 +2,16 @@
 
 mod postgres_helpers;
 
-mod check;
-mod column_attributes;
-mod serial;
-
 #[path = "deparse/ddl.rs"]
 mod sql_emission;
 
 use crate::{
     StringSpan,
-    ast::CreateTableMode,
     ast::{
-        AlterCommand, AlterRelationKind, Column as AstColumn, Expr, IndexExpression,
-        Into as AstInto, Name, PartitionBound, Query, Relation as AstRelation, Role as AstRole,
-        StatementNode, SyntaxOption, TableConstraint, TypeName, VariableSet,
+        AlterCommand, AlterRelationKind, Call, CallKind, Column as AstColumn, ColumnConstraint,
+        CreateTableMode, Expr, IndexExpression, Into as AstInto, Literal, Name, PartitionBound,
+        Query, Relation as AstRelation, Role as AstRole, StatementNode, SyntaxOption,
+        TableConstraint, TypeName, VariableSet,
     },
     names::FullName,
 };
@@ -642,6 +638,99 @@ impl Domain {
             base_span,
             constraints,
             collation,
+        }
+    }
+}
+
+impl TableConstraint {
+    pub(crate) fn unnamed_check(constraint: &ColumnConstraint) -> Self {
+        Self {
+            extras: Default::default(),
+            name: None,
+            keys: Vec::new(),
+            constraint: constraint.clone(),
+            order: Vec::new(),
+            auto_increment: false,
+        }
+    }
+
+    pub(crate) const fn is_check(&self) -> bool {
+        matches!(self.constraint, ColumnConstraint::Check(_))
+    }
+}
+
+impl ColumnConstraint {
+    #[cfg(feature = "sqlite")]
+    pub(crate) fn check(expression: &Expr) -> Self {
+        Self::Check(expression.clone())
+    }
+}
+
+impl AlterRelationKind {
+    pub(crate) const fn supports_table_column_attributes(self) -> bool {
+        matches!(self, Self::Table)
+    }
+}
+
+impl AstColumn {
+    /// Expand the selected SERIAL spelling into ordinary integer declaration syntax.
+    /// The semantic consumer selects the integer type and stages catalog effects.
+    pub(crate) fn serial_expansion(&self, integer: &str) -> Self {
+        let mut expanded = self.clone();
+        let syntax = expanded
+            .type_name
+            .as_mut()
+            .expect("serial declaration type");
+        syntax.name = Name::from_parts(&["pg_catalog".to_owned(), integer.to_owned()]);
+        syntax.array_bounds.clear();
+        expanded
+    }
+}
+
+impl ColumnConstraint {
+    pub(crate) const fn serial_not_null() -> Self {
+        Self::Nullability(true, None, None)
+    }
+    pub(crate) fn serial_default(sequence: &FullName) -> Self {
+        Self::Default(Expr::serial_next_value(sequence))
+    }
+}
+
+impl Expr {
+    pub(crate) fn serial_next_value(sequence: &FullName) -> Self {
+        let literal = Self::Literal(Literal::sequence_reference(sequence));
+        let target = TypeName::projection(
+            &Name::from_parts(&["pg_catalog".to_owned(), "regclass".to_owned()]),
+            false,
+        );
+        let argument = Self::projection_cast(&literal, &target);
+        Self::projection_call(&Call::serial_next_value(&argument))
+    }
+}
+
+impl Literal {
+    pub(crate) fn sequence_reference(sequence: &FullName) -> Self {
+        Self::String(sequence.to_string())
+    }
+}
+
+impl Call {
+    pub(crate) fn serial_next_value(argument: &Expr) -> Self {
+        Self {
+            sql_syntax: false,
+            kind: CallKind::ordinary(),
+            name: Name::from_parts(&["pg_catalog".to_owned(), "nextval".to_owned()]),
+            arguments: vec![argument.clone()],
+            argument_locations: vec![None],
+            star: false,
+            distinct: false,
+            variadic: false,
+            within_group: false,
+            within_order: Vec::new(),
+            order: Vec::new(),
+            filter: None,
+            over: None,
+            location: None,
         }
     }
 }

@@ -1,5 +1,5 @@
-mod ddl;
 use crate::{
+    ast::VariableSet as AstVariableSet,
     context::ParseContext,
     sem::{AnalysisError, AstAndContextPair, ScalarAnalysisContext, SemAst, SemScalarExpr},
     syn::{ListOpt, ScanToken, VariableSetStmt},
@@ -86,4 +86,29 @@ where
     TParseContext: ParseContext,
 {
     VariableSet::analyze_variable_set(context, syn, tokens)
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl VariableSet {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &AstVariableSet,
+        mut context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        let [argument] = ast.arguments.as_slice() else {
+            return AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1");
+        };
+        let outcome =
+            SemScalarExpr::from_ast(argument, &mut context, &ScalarAnalysisContext::default());
+        let value = outcome?;
+        let variable_set = Self::new(&ast.name, &value);
+        let context = context.apply_variable_set(&variable_set)?;
+        Ok(AstAndContextPair::new(
+            SemAst::from_variable_set(&variable_set),
+            context,
+        ))
+    }
 }

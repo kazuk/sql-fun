@@ -1,5 +1,5 @@
-mod ddl;
 use crate::{
+    ast::EnumType as AstEnumType,
     names::FullName,
     sem::{
         AnalysisError, AstAndContextPair, OwnerSpecification, ParseContext, SemAst, TypeReference,
@@ -109,5 +109,24 @@ impl std::hash::Hash for CreateEnum {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::hash::Hash::hash(&self.type_ref, state);
         std::hash::Hash::hash(&self.values, state);
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl CreateEnum {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &AstEnumType,
+        context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        let enum_type = Self::new(&FullName::from_ast_name(&ast.name)?, &ast.values);
+        let context = context.apply_create_enum(&enum_type)?;
+        Ok(AstAndContextPair::new(
+            SemAst::from_create_enum(&enum_type),
+            context,
+        ))
     }
 }

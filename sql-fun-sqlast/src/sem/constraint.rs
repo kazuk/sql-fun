@@ -1,10 +1,11 @@
 mod ddl;
-pub(crate) use self::names::ConstraintNames;
+
 pub use self::{
     check::CheckConstraint, foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint,
     unique::UniqueConstraint,
 };
 use crate::{
+    ast::{Column as AstColumn, ColumnConstraint as AstColumnConstraint},
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnRename, ImplicitChange, ParseContext, alter_table::AlterObjSubCommand,
@@ -12,10 +13,10 @@ use crate::{
     },
     syn::{AlterTableCmd, ConstrType, Constraint as SynConstraint, Opt},
 };
+use std::collections::HashMap;
 
 mod check;
 mod foreign;
-mod names;
 mod primary;
 mod unique;
 
@@ -283,6 +284,88 @@ where
             }
             ConstrType::OptionNone => todo!(),
             ConstrType::Undefined => todo!(),
+        }
+    }
+}
+
+// The shared namespace for explicitly named relation constraints.
+
+#[derive(Default)]
+pub(crate) struct ConstraintNames {
+    occurrences: HashMap<String, usize>,
+    first_duplicate: Option<String>,
+}
+
+impl ConstraintNames {
+    /// Reserve a catalog name. Unnamed constraints never conflict.
+    pub(crate) fn reserve(&mut self, name: &str) -> bool {
+        if name.is_empty() {
+            return true;
+        }
+        let count = self.occurrences.entry(name.to_owned()).or_default();
+        *count += 1;
+        if *count > 1 {
+            if self.first_duplicate.is_none() {
+                self.first_duplicate = Some(name.to_owned());
+            }
+            return false;
+        }
+        true
+    }
+
+    pub(crate) fn is_duplicate(&self, name: &str) -> bool {
+        self.occurrences.get(name).is_some_and(|count| *count > 1)
+    }
+
+    pub(crate) fn first_duplicate(&self) -> Option<&str> {
+        self.first_duplicate.as_deref()
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl ConstraintNames {
+    pub(crate) fn ast_constraint_has_catalog_name(
+        ast: &AstColumnConstraint,
+        context: &impl ParseContext,
+    ) -> bool {
+        match ast {
+            AstColumnConstraint::PrimaryKey(..)
+            | AstColumnConstraint::Unique(_)
+            | AstColumnConstraint::Check(_)
+            | AstColumnConstraint::ForeignKey(_)
+            | AstColumnConstraint::Exclusion => true,
+            AstColumnConstraint::Nullability(true, ..) => Self::supports_named_not_null(context),
+            _ => false,
+        }
+    }
+
+    fn supports_named_not_null(context: &impl ParseContext) -> bool {
+        let Some(version) = context.metadata().engine_version() else {
+            return false;
+        };
+        let Ok(version) = version
+            .to_string()
+            .parse::<::sql_fun_core::PostgresVersion>()
+        else {
+            return false;
+        };
+        version.major() >= 18
+    }
+}
+
+impl ConstraintNames {
+    pub(crate) fn reserve_ast_column(
+        ast: &AstColumn,
+        context: &impl ParseContext,
+        names: &mut Self,
+    ) {
+        for definition in &ast.constraints {
+            if !definition.is_check()
+                && Self::ast_constraint_has_catalog_name(&definition.constraint, context)
+            {
+                names.reserve(definition.name.as_deref().unwrap_or_default());
+            }
         }
     }
 }

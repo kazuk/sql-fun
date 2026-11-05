@@ -1,10 +1,9 @@
 //! Completed column-rename analysis and exact dependency matching.
 
-mod ddl;
 mod sqlite;
 
 use crate::{
-    ast::Dialect,
+    ast::{AlterCommand as AstAlterCommand, Dialect},
     context::ParseContext,
     names::{ColumnName, FullName, TableName},
     sem::{AnalysisError, AnalysisProblem, ColumnDefinition},
@@ -149,5 +148,25 @@ impl ColumnRename {
         for name in names {
             self.rename_name(name);
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl ColumnRename {
+    pub(crate) const fn is_ast_command(ast: &AstAlterCommand) -> bool {
+        matches!(ast, AstAlterCommand::RenameColumn(_, _))
+    }
+
+    pub(crate) fn names_from_ast(
+        ast: &AstAlterCommand,
+    ) -> Result<(ColumnName, ColumnName), AnalysisError> {
+        let AstAlterCommand::RenameColumn(from, to) = ast else {
+            return AnalysisError::raise_unexpected_input("column rename command");
+        };
+        Ok((
+            ColumnName::from(from.as_str()),
+            ColumnName::from(to.as_str()),
+        ))
     }
 }

@@ -1,9 +1,10 @@
-mod ast;
-
 use crate::{
-    context::BaseParseContext,
+    context::{BaseParseContext, ParseContext},
     names::{FullName, TableName},
-    sem::{AnalysisError, AnalysisProblem, InsertArbiter, InsertConflict},
+    sem::{
+        AnalysisError, AnalysisProblem, InsertArbiter, InsertConflict, ResolutionFailure,
+        problem::InsertProblemKind,
+    },
 };
 
 /// A completed catalog name lookup, retaining the requested spelling separately
@@ -150,4 +151,29 @@ pub(crate) fn infer_from_catalog(
         todo!("catalog partial-index predicate implication service");
     }
     Ok(ConflictArbiterInference::complete(&arbiters))
+}
+
+impl CatalogNameLookup {
+    pub(crate) fn report_insert_problem(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), ResolutionFailure> {
+        let kind = if self.is_missing() {
+            Some(InsertProblemKind::conflict_name_missing())
+        } else if self.ambiguous_candidates().is_some() {
+            Some(InsertProblemKind::conflict_name_ambiguous())
+        } else {
+            None
+        };
+        if let Some(kind) = kind {
+            context.report_analysis_problem(AnalysisProblem::insert(
+                kind,
+                &format!(
+                    "conflict target catalog name {} has no unique binding",
+                    self.requested()
+                ),
+            ))?;
+        }
+        Ok(())
+    }
 }

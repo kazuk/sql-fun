@@ -1,11 +1,10 @@
-mod wildcard_projection;
 use crate::{
-    ast::Dialect,
+    ast::{Call, Dialect, Expr},
     context::ParseContext,
     names::ColumnName,
     sem::{
         AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, ParameterConstraints,
-        SemScalarExpr, TypeReference,
+        SemScalarExpr, TypeReference, WildcardQualifiers, WildcardRewriteError,
         parameter_resolution::ParameterResolution,
         scalar_expr::SemScalarExprNode,
         traversal::{SemanticVisitor, SemanticVisitorMut},
@@ -110,10 +109,9 @@ mod test_resolve {
         sem::{ParseContext, SemAst},
         test_helpers::{coalesce as test_helpers, create_cache_context},
     };
+    use std::collections::BTreeMap;
 
     // Small-catalog semantic and failure-continuation contracts.
-
-    use std::collections::BTreeMap;
 
     #[rstest::rstest]
     #[case::mixed("SELECT COALESCE($1,1,true)")]
@@ -453,10 +451,9 @@ mod test_parameter_constraints {
         sem::{ParseContext, PgBuiltInType, SemAst},
         test_helpers::{coalesce as test_helpers, create_cache_context},
     };
+    use std::collections::BTreeMap;
 
     // Small-catalog semantic and failure-continuation contracts.
-
-    use std::collections::BTreeMap;
 
     #[test]
     fn an_unreachable_parameter_still_constrains_the_result() -> testresult::TestResult {
@@ -506,5 +503,20 @@ impl CoalesceExpr {
         if let Some(target) = self.coalesce_type.clone() {
             self.coerce(&target);
         }
+    }
+}
+
+impl CoalesceExpr {
+    pub(crate) fn projection_expression(
+        &self,
+        bindings: &WildcardQualifiers,
+    ) -> Result<Expr, WildcardRewriteError> {
+        let mut arguments = Vec::new();
+        for argument in self.arguments() {
+            arguments.push(argument.projection_expression(bindings)?);
+        }
+        Ok(Expr::projection_call(&Call::coalesce_projection(
+            &arguments,
+        )))
     }
 }

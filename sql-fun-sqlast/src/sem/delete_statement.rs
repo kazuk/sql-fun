@@ -1,6 +1,4 @@
 mod ast;
-mod cte;
-
 mod cursor;
 mod destination;
 mod row;
@@ -12,14 +10,13 @@ pub use self::{
     view_support::ViewDeleteSupport,
 };
 pub(crate) use self::{cursor::DeletePredicate, destination::DeleteDestination};
-
 use crate::{
     CacheContext,
     ast::{Delete, Dialect, StatementNode, TryFromWithTokens},
-    names::TableName,
+    names::{ColumnName, TableName},
     sem::{
-        AccessKind, AnalysisError, FromClause, ParseContext, QueryCte, ResultColumnCollection,
-        SemAst, SemScalarExpr,
+        AccessKind, AnalysisError, ColumnDefinition, FromClause, ParseContext, QueryCte,
+        ResultColumnCollection, SemAst, SemScalarExpr,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
     syn::DeleteStmt,
@@ -196,4 +193,21 @@ pub fn analyze_delete_statement<T: ParseContext>(
         &mut CacheContext::new(),
     )?;
     Ok((statement, context))
+}
+
+impl DeleteStatement {
+    pub(crate) fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        delete: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = delete.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
 }

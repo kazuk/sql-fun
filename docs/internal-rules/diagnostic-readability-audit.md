@@ -123,7 +123,7 @@ producer and adapter path; the current worktree fixes the listed cases:
 | Constraint domain in `sem/parameter_constraints.rs` | `ConstraintGraph::conflict` to `parameter_constraint` | Uses readable domain formatting and omits the internal node dump |
 | Client type hint parse errors in `sem/client_type/{postgres,sqlite}.rs` and the hint name in `context/type_hint/resolve.rs` | `invalid_parameter_hint` | Reports the hint syntax/value without parser `Debug` output |
 | Dialect/kind in `ast/deparse.rs`, `ast/deparse/statement.rs`, and `ast/sqlite_retention.rs` | `query_deparse` or `unsupported_statement` | Uses display names; SQLite retention is an invariant-failure path |
-| Dialect and DROP object in `sem/error.rs` and `sem/top_level_statement.rs` | `query_analysis` | Uses descriptive names |
+| Dialect mismatch in `sql-fun-sqlast/src/error.rs`; DROP dispatch in `sem/top_level_statement.rs` | `query_analysis` | Uses descriptive names |
 | Rule and trigger problem enums in core metadata | `rule_invalid_definition` and `trigger_invalid_definition` | Uses explanatory messages instead of enum dumps |
 | SQL name/debug identities and expression/type facts in ownership, scalar, operator, CASE, and COALESCE diagnostics | Semantic codes in the ownership, overload, and expression families above | Current conversions use SQL-facing names and structured facts |
 

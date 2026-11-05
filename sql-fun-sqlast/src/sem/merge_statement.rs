@@ -1,20 +1,18 @@
 mod ast;
-mod cte;
-
 mod destination;
 mod view_support;
 
 pub(crate) use self::destination::MergeDestination;
 pub use self::view_support::{ViewMergeSupport, ViewMergeTriggers};
-
 use crate::{
     CacheContext,
     ast::{Dialect, Merge, StatementNode},
-    names::TableName,
+    names::{ColumnName, TableName},
     sem::{
-        AccessKind, AnalysisError, FromClause, InsertClauseSemantics, InsertTarget, InsertValue,
-        ParseContext, QueryCte, ResultColumnCollection, SemAst, SemScalarExpr, UpdateAssignment,
-        UpdateAssignmentCollection, ViewMergeSupport as SemViewMergeSupport,
+        AccessKind, AnalysisError, ColumnDefinition, FromClause, InsertClauseSemantics,
+        InsertTarget, InsertValue, ParseContext, QueryCte, ResultColumnCollection, SemAst,
+        SemScalarExpr, UpdateAssignment, UpdateAssignmentCollection,
+        ViewMergeSupport as SemViewMergeSupport,
         traversal::{SemanticVisitor, SemanticVisitorMut},
     },
     syn::MergeStmt,
@@ -417,4 +415,21 @@ pub fn analyze_merge_statement<T: ParseContext>(
         &mut CacheContext::new(),
     )?;
     Ok((statement, context))
+}
+
+impl MergeStatement {
+    pub(crate) fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        merge: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = merge.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
+    }
 }

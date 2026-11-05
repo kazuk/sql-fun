@@ -7,7 +7,7 @@ use crate::{
         CatalogName, ColumnName, FullName, LocalName, OperatorName, SchemaName, TableName,
         ValidOperatorName, ViewName,
     },
-    sem::{AnalysisError, ParseContext, error::ProblemLikeError},
+    sem::{AnalysisError, ParseContext, ProblemLikeError},
     syn::{ListOpt, Node, NodeListOpt, RangeVar, String as SynString, TypeName},
 };
 
@@ -138,9 +138,7 @@ impl TryFrom<NodeListOpt> for FullName {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_helpers::type_syntax::build_string_node_list_opt;
-
-    use crate::names::FullName;
+    use crate::{names::FullName, test_helpers::type_syntax::build_string_node_list_opt};
 
     #[test]
     fn test_try_from_nodelistopt_two_elements() {
@@ -191,9 +189,7 @@ impl TryFrom<RangeVar> for FullName {
 
 #[cfg(test)]
 mod range_var_tests {
-    use crate::syn::RangeVar;
-
-    use crate::names::FullName;
+    use crate::{names::FullName, syn::RangeVar};
 
     #[test]
     fn rejects_catalog_without_schema() {
@@ -236,6 +232,7 @@ impl std::str::FromStr for FullName {
 #[cfg(test)]
 mod canonical_parse_tests {
     use crate::names::FullName;
+
     #[test]
     fn canonical_spelling_is_injective_and_reversible() -> testresult::TestResult {
         // Enumerate valid qualification shapes over adversarial component values.
@@ -293,13 +290,10 @@ mod canonical_parse_tests {
 
 #[cfg(test)]
 mod sql_name_conversion_tests {
+    use crate::{ast::Dialect, names::FullName, test_helpers::SynBuilder};
     #[cfg(feature = "sqlite")]
-    use crate::syn::sqlite::Stmt;
-    #[cfg(feature = "sqlite")]
-    use crate::test_helpers::SqliteSynBuilder;
-    use crate::test_helpers::SynBuilder;
+    use crate::{syn::sqlite::Stmt, test_helpers::SqliteSynBuilder};
 
-    use crate::{ast::Dialect, names::FullName};
     #[rstest::rstest]
     #[case::dot(FullName::with_schema("a.b", "c"))]
     #[case::quote(FullName::with_schema("a", "b\"c"))]

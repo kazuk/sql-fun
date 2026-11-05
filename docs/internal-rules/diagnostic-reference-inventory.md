@@ -31,11 +31,12 @@ error with the same constructor name is a separate error type, not
 AnalysisProblem. The fourth constructor is `case_when_type_unknown`, so it must
 be audited by variant as well as code name.
 
-Excluded ownership `resolved`: `ast/ownership.rs:21` reports target problems
-only if `target.identity().is_none()`, while `sem/alter_owner.rs::identity`
-returns Some only for Resolved. All four failure outcomes have production lookup
-branches and flow through the reported ownership target adapter. Missing role is
-separately produced by `Role::resolve_owner`.
+Excluded ownership `resolved`: the baseline source witness `ast/ownership.rs:21`
+reported target problems only when `target.identity().is_none()`. That analysis
+now lives in `sem/alter_owner/ddl.rs`; `OwnershipLookup::identity` in
+`sem/alter_owner.rs` returns Some only for `Resolved`. All four failure outcomes
+have production lookup branches and flow through the ownership target adapter.
+Missing role is separately produced by `Role::resolve_owner`.
 
 Unimplemented TODO-returning helper constructors do not yield AnalysisProblem
 codes. Existing readability audit lists these; avoid creating pages for

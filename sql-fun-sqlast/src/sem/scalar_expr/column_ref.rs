@@ -8,7 +8,6 @@ mod system_column_ref;
 mod table_column_ref;
 mod table_func_col_ref;
 mod view_column_ref;
-mod wildcard_projection;
 
 pub use self::{
     cte_column_ref::CteColumnRef,
@@ -24,14 +23,15 @@ pub use self::{
     table_func_col_ref::TableFunctionColumnRef,
     view_column_ref::ViewColumnRef,
 };
-
 use crate::{
+    ast::{Expr, Name},
     context::ParseContext,
     names::{AliasName, ColumnName, CteName, FullName, TableName},
     sem::{
         AnalysisError, AnalysisProblem, ColumnDefinition, ColumnRename, DeleteRowColumn,
-        DeleteRowVersion, SemScalarExpr, TypeReference, data_source::MergeRecordRole,
-        query_access::AccessColumn as QueryAccessAccessColumn, scalar_expr::SemScalarExprNode,
+        DeleteRowVersion, SemScalarExpr, TypeReference, WildcardQualifiers, WildcardRewriteError,
+        data_source::MergeRecordRole, query_access::AccessColumn as QueryAccessAccessColumn,
+        scalar_expr::SemScalarExprNode,
     },
 };
 
@@ -529,5 +529,31 @@ impl ColumnReferenceExpr {
             Self::MergeRecord(value) => value.source().access_column(),
             _ => None,
         }
+    }
+}
+
+impl ColumnReferenceExpr {
+    pub(crate) fn projection_expression(
+        &self,
+        bindings: &WildcardQualifiers,
+    ) -> Result<Expr, WildcardRewriteError> {
+        if let Some(table) = self.table_column_reference()
+            && let Some(qualifier) = bindings.reference_for(table.relation(), table.alias())
+        {
+            let mut parts = qualifier.to_vec();
+            parts.push(self.get_column_name().to_string());
+            return Ok(Expr::projection_column(&Name::from_parts(&parts)));
+        }
+        let Some((alias, column)) = self.projection_reference() else {
+            return Err(WildcardRewriteError::invalid(
+                "wildcard column binding is unresolved",
+            ));
+        };
+        let parts = if alias.is_empty() {
+            vec![column.to_string()]
+        } else {
+            vec![alias.to_owned(), column.to_string()]
+        };
+        Ok(Expr::projection_column(&Name::from_parts(&parts)))
     }
 }

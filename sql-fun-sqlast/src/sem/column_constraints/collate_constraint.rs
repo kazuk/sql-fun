@@ -1,13 +1,11 @@
-mod ddl;
 #[cfg(feature = "sqlite")]
-use crate::{
-    SqliteToken,
-    sem::{AnalysisError, AnalysisProblem, ParseContext},
-    syn::sqlite::CollateColumnConstraint as SqliteCollateColumnConstraint,
-};
+use crate::{SqliteToken, syn::sqlite::CollateColumnConstraint as SqliteCollateColumnConstraint};
 use crate::{
     names::{ColumnName, TableName},
-    sem::{ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename},
+    sem::{
+        AnalysisError, AnalysisProblem, ColumnConstraint, ColumnConstraintKind,
+        ColumnConstraintTrait, ColumnRename, ParseContext,
+    },
 };
 #[cfg(feature = "sqlite")]
 use sql_fun_core::IVec;
@@ -102,5 +100,21 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl CollateColumnConstraint {
+    pub(in crate::sem::column_constraints) fn from_ast_name(
+        context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+        name: &str,
+    ) -> Result<Self, AnalysisError> {
+        if !Self::is_known_name(name) {
+            context.report_analysis_problem(AnalysisProblem::collation_name_not_found(name))?;
+        }
+        Ok(Self::new(table, column, name))
     }
 }

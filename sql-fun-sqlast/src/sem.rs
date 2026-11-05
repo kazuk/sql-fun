@@ -11,14 +11,12 @@ mod cast;
 mod client_type;
 mod column_constraints;
 mod column_rename;
-mod comment;
 pub(crate) mod conflict_info;
 pub(crate) mod conflict_masters;
 mod constraint;
 mod create_comp_type;
 mod create_domain;
 mod create_enum_type;
-mod create_extension;
 mod create_function;
 mod create_index;
 mod create_rule;
@@ -34,11 +32,9 @@ mod data_source;
 mod declaration_collation;
 mod def_elem;
 mod delete_statement;
-mod drop_dependency_behavior;
-mod drop_rule;
+mod drop_rule_ast;
 mod drop_trigger;
 mod engine_features;
-mod error;
 mod foreign_key_target;
 mod from_clause;
 mod insert_statement;
@@ -74,108 +70,8 @@ mod view_like;
 pub(crate) mod view_write;
 mod wildcard_expansion;
 mod with_typmod;
-
 #[cfg(test)]
 pub(crate) use self::conflict_info::infer_from_catalog;
-#[expect(deprecated)]
-pub use self::{
-    alter_column::{
-        AlterColumnAttributes, ColumnAttributeAction, ColumnAttributeBinding,
-        ColumnAttributeOption, ColumnStatisticsTarget,
-    },
-    alter_index::{
-        AlterIndex, IndexAlteration, IndexStatisticsChange, IndexStorageChange,
-        IndexStorageParameter, IndexTarget,
-    },
-    alter_owner::{AlterOwner, OwnershipArgumentFailure, OwnershipLookup},
-    alter_seq::{AlterSequence, SequenceDependency},
-    alter_table::{AlterTable, AlterView},
-    analysis_state::AnalysisState,
-    cast::{CastContext, CastDefinition},
-    client_type::parse_client_type,
-    column_constraints::{
-        AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
-        AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
-        ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnNullabilityConstraint,
-        DefaultColumnConstraint, ExclusionColumnConstraint, ForeignKeyColumnConstraint,
-        GeneratedColumnConstraint, IdentityColumnConstraint, PrimaryKeyColumnConstraint,
-        UniqueColumnConstraint,
-    },
-    comment::Comment,
-    conflict_info::{CatalogNameLookup, ConflictArbiterInference},
-    conflict_masters::{
-        CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
-        OperatorClassDefinition, OperatorFamilyIdentity,
-    },
-    constraint::{AnalyzeConstraint, CheckConstraint, Constraint, PrimaryKeyConstraint},
-    create_comp_type::{CompositeFieldCollection, CreateCompositeType},
-    create_domain::CreateDomain,
-    create_enum_type::CreateEnum,
-    create_extension::CreateExtension,
-    create_function::CreateFunction,
-    create_index::{
-        CreateIndex, IndexElement, IndexElementWithOrder, IndexStorageValue, SortOrder,
-    },
-    create_schema::CreateSchema,
-    create_seq::CreateSequence,
-    create_table::{ColumnCollection, ColumnDefinition, CreateTable, DropTable},
-    create_table_as::CreateTableAs,
-    create_view::CreateView,
-    cte::{CteStatement, WithClause},
-    data_source::{
-        AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc,
-        DeferredTableFunction, JoinKind, MergeRecordDataSource, MergeRecordRole, Nullable,
-        SamplingInput, TableSampleSource,
-    },
-    def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
-    delete_statement::{
-        DeleteCursor, DeleteRowColumn, DeleteRowVersion, DeleteStatement, ViewDeleteSupport,
-        analyze_delete_statement,
-    },
-    error::AnalysisError,
-    from_clause::FromClause,
-    insert_statement::{
-        InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
-        InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
-        InsertTarget, InsertValue, ViewInsertSupport, ViewSourceArbiter, analyze_insert_statement,
-    },
-    object_info::Kind,
-    operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
-    ownership::{OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, Role},
-    parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
-    pg_type::{
-        ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,
-        TypeReference,
-    },
-    problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem, TableFunctionProblem},
-    query::{
-        FunctionModifiers, QueryCte, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock,
-        QueryName, QueryNameResolution, QueryOrder, QueryWindow, ResolvedOperator, SelectClauses,
-        SelectDestination, SemanticQuery, SemanticValues,
-    },
-    sampling_method::{SamplingMethod, SamplingMethodLookup},
-    scalar_expr::{
-        ArithExpr, ArrayExpr, ArraySubqueryExpr, ArraySubscript, ArraySubscripts, BooleanExpr,
-        CaseExpr, CaseWhen, CoalesceExpr, CollateExpr, ColumnReferenceExpr, ConstrainedExpr,
-        CteColumnRef, DistinctExpr, ExistsExpr, FuncCallArgs, FuncCallExpr, FunctionBinding,
-        GroupingArgument, GroupingExpr, ImplicitCastExpr, IndirectionExpr, MembershipComparison,
-        MembershipExpr, MergeRecordColumnRef, MinMaxExpr, NamedArgExpr, NullTestExpr,
-        OutputColumnRef, ParamRef, QualifiedColumnFailure, ScalarAnalysisContext, ScalarConstExpr,
-        SemScalarExpr, SqlValueExpr, SqliteLikeExpr, SubLinkExpr, SubQueryColumnRef,
-        SystemColumnRef, TableColumnRef, TruthTestExpr, TypeCastExpr, WholeRowExpr,
-    },
-    select_statement::{
-        ResultColumnCollection, SelectStatement, SetOperationKind, SetOperationQuery,
-    },
-    type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult},
-    update_statement::{
-        UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
-        ViewUpdateSupport, analyze_update_statement,
-    },
-    variable_set::{VariableSet, analyze_variable_set},
-    view_like::ViewLike,
-    wildcard_expansion::{WildcardExpansion, WildcardRewriteError},
-};
 pub(crate) use self::{
     alter_table::AlterObjSubCommand,
     constraint::{ConstraintNames, ForeignKeyConstraint, UniqueConstraint},
@@ -184,7 +80,6 @@ pub(crate) use self::{
     data_source::{JoinUsingClause, ProjectionColumn, TableFunctionOutput, WildcardProjection},
     delete_statement::{DeleteDestination, DeletePredicate},
     engine_features::EngineFeatureValidation,
-    error::ProblemLikeError,
     foreign_key_target::ForeignKeyTarget,
     insert_statement::{
         InsertClauseSemantics, InsertClauseValues, InsertDestination, InsertTargetCollection,
@@ -215,8 +110,6 @@ pub use self::{
     },
     cursor_info::CursorInfo,
     declaration_collation::DeclarationCollation,
-    drop_dependency_behavior::DropDependencyBehavior,
-    drop_rule::DropRule,
     drop_trigger::DropTrigger,
     merge_statement::{
         MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
@@ -234,8 +127,14 @@ pub(crate) use crate::stack::with_stack;
 use crate::{SqliteToken, syn::sqlite::Cmd};
 use crate::{
     StringSpan,
+    ast::{
+        Comment as AstComment, DropBehavior, Extension as AstExtension, ObjectKind,
+        TryFromWithTokens,
+    },
     context::ParseContext,
+    names::FullName,
     sem::traversal::{SemanticVisitor, SemanticVisitorMut},
+    syn::{CommentStmt, CreateExtensionStmt},
 };
 pub use ::sql_fun_core::AccessKind;
 #[cfg(feature = "sqlite")]
@@ -243,6 +142,111 @@ use ::sql_fun_core::IVec;
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
+};
+#[expect(deprecated)]
+pub use {
+    self::{
+        alter_column::{
+            AlterColumnAttributes, ColumnAttributeAction, ColumnAttributeBinding,
+            ColumnAttributeOption, ColumnStatisticsTarget,
+        },
+        alter_index::{
+            AlterIndex, IndexAlteration, IndexStatisticsChange, IndexStorageChange,
+            IndexStorageParameter, IndexTarget,
+        },
+        alter_owner::{AlterOwner, OwnershipArgumentFailure, OwnershipLookup},
+        alter_seq::{AlterSequence, SequenceDependency},
+        alter_table::{AlterTable, AlterView},
+        analysis_state::AnalysisState,
+        cast::{CastContext, CastDefinition},
+        client_type::parse_client_type,
+        column_constraints::{
+            AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
+            AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
+            ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait,
+            ColumnNullabilityConstraint, DefaultColumnConstraint, ExclusionColumnConstraint,
+            ForeignKeyColumnConstraint, GeneratedColumnConstraint, IdentityColumnConstraint,
+            PrimaryKeyColumnConstraint, UniqueColumnConstraint,
+        },
+        conflict_info::{CatalogNameLookup, ConflictArbiterInference},
+        conflict_masters::{
+            CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
+            OperatorClassDefinition, OperatorFamilyIdentity,
+        },
+        constraint::{AnalyzeConstraint, CheckConstraint, Constraint, PrimaryKeyConstraint},
+        create_comp_type::{CompositeFieldCollection, CreateCompositeType},
+        create_domain::CreateDomain,
+        create_enum_type::CreateEnum,
+        create_function::CreateFunction,
+        create_index::{
+            CreateIndex, IndexElement, IndexElementWithOrder, IndexStorageValue, SortOrder,
+        },
+        create_schema::CreateSchema,
+        create_seq::CreateSequence,
+        create_table::{ColumnCollection, ColumnDefinition, CreateTable, DropTable},
+        create_table_as::CreateTableAs,
+        create_view::CreateView,
+        cte::{CteStatement, WithClause},
+        data_source::{
+            AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc,
+            DeferredTableFunction, JoinKind, MergeRecordDataSource, MergeRecordRole, Nullable,
+            SamplingInput, TableSampleSource,
+        },
+        def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
+        delete_statement::{
+            DeleteCursor, DeleteRowColumn, DeleteRowVersion, DeleteStatement, ViewDeleteSupport,
+            analyze_delete_statement,
+        },
+        from_clause::FromClause,
+        insert_statement::{
+            InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
+            InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
+            InsertTarget, InsertValue, ViewInsertSupport, ViewSourceArbiter,
+            analyze_insert_statement,
+        },
+        object_info::Kind,
+        operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
+        ownership::{OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, Role},
+        parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
+        pg_type::{
+            ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory,
+            TypeDefinition, TypeReference,
+        },
+        problem::{
+            AnalysisProblem, ParameterConstraintProblem, QueryProblem, TableFunctionProblem,
+        },
+        query::{
+            FunctionModifiers, QueryCte, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock,
+            QueryName, QueryNameResolution, QueryOrder, QueryWindow, ResolvedOperator,
+            SelectClauses, SelectDestination, SemanticQuery, SemanticValues,
+        },
+        sampling_method::{SamplingMethod, SamplingMethodLookup},
+        scalar_expr::{
+            ArithExpr, ArrayExpr, ArraySubqueryExpr, ArraySubscript, ArraySubscripts, BooleanExpr,
+            CaseExpr, CaseWhen, CoalesceExpr, CollateExpr, ColumnReferenceExpr, ConstrainedExpr,
+            CteColumnRef, DistinctExpr, ExistsExpr, FuncCallArgs, FuncCallExpr, FunctionBinding,
+            GroupingArgument, GroupingExpr, ImplicitCastExpr, IndirectionExpr,
+            MembershipComparison, MembershipExpr, MergeRecordColumnRef, MinMaxExpr, NamedArgExpr,
+            NullTestExpr, OutputColumnRef, ParamRef, QualifiedColumnFailure, ScalarAnalysisContext,
+            ScalarConstExpr, SemScalarExpr, SqlValueExpr, SqliteLikeExpr, SubLinkExpr,
+            SubQueryColumnRef, SystemColumnRef, TableColumnRef, TruthTestExpr, TypeCastExpr,
+            WholeRowExpr,
+        },
+        select_statement::{
+            ResultColumnCollection, SelectStatement, SetOperationKind, SetOperationQuery,
+        },
+        type_system::{
+            FunctionOverloadCollection, FunctionParam, OverloadVariant, SimpleInferResult,
+        },
+        update_statement::{
+            UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
+            ViewUpdateSupport, analyze_update_statement,
+        },
+        variable_set::{VariableSet, analyze_variable_set},
+        view_like::ViewLike,
+        wildcard_expansion::{WildcardExpansion, WildcardRewriteError},
+    },
+    crate::error::AnalysisError,
 };
 
 /// source path and span pair
@@ -651,5 +655,302 @@ impl SemAst {
         TContext: ParseContext,
     {
         Self::semantic_analysis_sqlite_stmt(context, syn.into_statement(), tokens)
+    }
+}
+
+/// analyzed [`crate::syn::CommentStmt`]
+#[derive(Debug, Clone)]
+pub struct Comment {
+    target: String,
+    object_type: ObjectKind,
+    comment: String,
+}
+
+impl Comment {
+    /// comment target
+    #[must_use]
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// get comment target object type
+    #[must_use]
+    pub const fn object_type(&self) -> &ObjectKind {
+        &self.object_type
+    }
+
+    /// get a comment text
+    #[must_use]
+    pub fn comment(&self) -> &str {
+        &self.comment
+    }
+
+    /// Create a `COMMENT` statement.
+    #[must_use]
+    pub fn new(target: &str, object_type: ObjectKind, comment: &str) -> Self {
+        Self {
+            target: target.to_owned(),
+            object_type,
+            comment: comment.to_owned(),
+        }
+    }
+
+    /// analyze [`crate::syn::CommentStmt`]
+    pub fn analyze_comment<TParseContext>(
+        context: TParseContext,
+        syn: CommentStmt,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        Self::from_ast_and_apply(
+            &AstComment::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?,
+            context,
+        )
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl Comment {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &AstComment,
+        context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        let target = ast
+            .canonical_target()
+            .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
+        let comment = Self::new(&target, ast.object_kind, &ast.text);
+        let context = context.apply_comment(&comment)?;
+        Ok(AstAndContextPair::new(
+            SemAst::from_comment(&comment),
+            context,
+        ))
+    }
+}
+
+/// problem like error, internal error for Analysis
+#[derive(Debug, thiserror::Error)]
+pub enum ProblemLikeError {
+    /// invalid operator name
+    #[error("invalid operator name {0:?}")]
+    InvalidOperatorName(Vec<String>),
+    /// Parser-accepted database qualification on an operator.
+    #[error("cross-database operator reference {0:?}")]
+    CrossDatabaseOperatorReference(Vec<String>),
+}
+
+impl ProblemLikeError {
+    /// Create a diagnostic for an invalid operator name.
+    pub const fn invalid_operator_name(value: Vec<String>) -> Self {
+        Self::InvalidOperatorName(value)
+    }
+
+    pub(crate) fn cross_database_operator_reference(parts: &[String]) -> Self {
+        Self::CrossDatabaseOperatorReference(parts.to_vec())
+    }
+
+    /// Convert this failure into its SQL analysis diagnostic.
+    pub fn into_problem(self) -> AnalysisProblem {
+        match self {
+            Self::InvalidOperatorName(v) => AnalysisProblem::operator_name_syntax(&v),
+            Self::CrossDatabaseOperatorReference(v) => {
+                AnalysisProblem::cross_database_operator_reference(&v)
+            }
+        }
+    }
+
+    /// Report this failure through the supplied analysis context.
+    pub fn report_problem_to<TContext>(self, context: &mut TContext) -> Result<(), AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        context.report_analysis_problem(self.into_problem())?;
+        Ok(())
+    }
+}
+
+/// analyzed [`crate::syn::CreateExtensionStmt`]
+#[derive(Debug, Clone)]
+pub struct CreateExtension {
+    if_not_exists: bool,
+
+    name: String,
+}
+
+impl CreateExtension {
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
+    pub(crate) fn from_name(name: &str) -> Self {
+        Self {
+            if_not_exists: false,
+            name: name.to_owned(),
+        }
+    }
+
+    /// get extension name
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// analyze [`crate::syn::CreateExtensionStmt`]
+    pub fn analyze_create_extension<TParseContext>(
+        context: TParseContext,
+        _parent_schema: &Option<String>,
+        syn: CreateExtensionStmt,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let extension =
+            Self::from_name(&syn.get_extname()).with_if_not_exists(syn.get_if_not_exists());
+        let result_context = context.apply_create_extension(&extension)?;
+        Ok(AstAndContextPair::new(
+            SemAst::CreateExtension(extension),
+            result_context,
+        ))
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl CreateExtension {
+    pub(crate) fn from_ast_and_apply<TContext>(
+        ast: &AstExtension,
+        context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        let extension = Self::from_name(&ast.name).with_if_not_exists(ast.if_not_exists);
+        let context = context.apply_create_extension(&extension)?;
+        Ok(AstAndContextPair::new(
+            SemAst::from_create_extension(&extension),
+            context,
+        ))
+    }
+}
+
+/// Requested dependency behavior for a resolved DROP statement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DropDependencyBehavior {
+    /// Remove dependent objects together with the explicitly selected object.
+    Cascade,
+    /// Reject removal if another object depends on the selected object.
+    Restrict,
+}
+impl DropDependencyBehavior {
+    /// CASCADE dependency behavior.
+    pub const fn cascade() -> Self {
+        Self::Cascade
+    }
+    /// RESTRICT dependency behavior, including PostgreSQL's omitted clause.
+    pub const fn restrict() -> Self {
+        Self::Restrict
+    }
+    /// Whether dependent objects are included in the requested removal.
+    pub const fn is_cascade(self) -> bool {
+        matches!(self, Self::Cascade)
+    }
+}
+
+impl DropDependencyBehavior {
+    pub(crate) const fn from_ast(ast: &DropBehavior) -> Self {
+        match ast {
+            DropBehavior::Cascade => Self::cascade(),
+            DropBehavior::Restrict => Self::restrict(),
+        }
+    }
+}
+
+/// Resolved DROP RULE and the completed lookup outcome.
+/// An IF EXISTS no-op retains the requested names and any resolved relation.
+#[derive(Debug, Clone)]
+pub struct DropRule {
+    requested: FullName,
+    requested_target: FullName,
+    identity: Option<RuleIdentity>,
+    found: bool,
+    if_exists: bool,
+    behavior: DropDependencyBehavior,
+}
+impl DropRule {
+    pub(crate) fn new(
+        requested: &FullName,
+        requested_target: &FullName,
+        identity: Option<&RuleIdentity>,
+        found: bool,
+        if_exists: bool,
+        behavior: DropDependencyBehavior,
+    ) -> Self {
+        Self {
+            requested: requested.clone(),
+            requested_target: requested_target.clone(),
+            identity: identity.cloned(),
+            found,
+            if_exists,
+            behavior,
+        }
+    }
+    /// Rule name supplied by the statement.
+    pub const fn requested_name(&self) -> &FullName {
+        &self.requested
+    }
+    /// ON relation name supplied by the statement.
+    pub const fn requested_target(&self) -> &FullName {
+        &self.requested_target
+    }
+    /// Relation-scoped identity, absent only if the ON relation was not found.
+    pub const fn identity(&self) -> Option<&RuleIdentity> {
+        self.identity.as_ref()
+    }
+    /// Whether the rule lookup found an effective definition.
+    pub const fn found(&self) -> bool {
+        self.found
+    }
+    /// Whether missing relations and rules are accepted as no-ops.
+    pub const fn if_exists(&self) -> bool {
+        self.if_exists
+    }
+    /// Requested dependency behavior.
+    pub const fn behavior(&self) -> DropDependencyBehavior {
+        self.behavior
+    }
+    pub(crate) fn apply<C: ParseContext>(&self, context: C) -> Result<C, AnalysisError> {
+        if !self.found {
+            return Ok(context);
+        }
+        let identity = self
+            .identity
+            .as_ref()
+            .expect("found rule has resolved identity");
+        let target = identity.target();
+        context
+            .cancel_rule(identity)?
+            .dissociate_rule(target, identity)
+    }
+}
+impl SemAst {
+    /// Retain a resolved DROP RULE statement.
+    pub fn drop_rule(statement: &DropRule) -> Self {
+        Self::DropRule(statement.clone())
+    }
+    /// Inspect DROP RULE semantics and completed lookup outcome.
+    pub const fn rule_drop(&self) -> Option<&DropRule> {
+        if let Self::DropRule(statement) = self {
+            Some(statement)
+        } else {
+            None
+        }
     }
 }

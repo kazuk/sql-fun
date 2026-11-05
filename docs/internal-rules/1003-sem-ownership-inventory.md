@@ -1,9 +1,10 @@
 # #1003 semantic ownership baseline and final source map
 
 This reviewer-facing ledger records the old AST source set at base revision
-`bf81afb3e31fc03b4bc10e792d66b79b4601f535` and its disposition in the current
-implementation worktree (2026-11-04). It uses the frozen source tree for
-baseline facts and the actual current files for destinations. The 106-row table
+`bf81afb3e31fc03b4bc10e792d66b79b4601f535` and its disposition in source
+snapshot `accb7d65` and round-three consolidation (2026-11-05). It uses the
+frozen source tree for baseline facts and current files for destinations. The
+106-row table
 contains the source paths, baseline test counts, and final destinations needed
 for later reconciliation.
 
@@ -77,22 +78,22 @@ resolver family has 42 files and 15,511 lines.
   lookups and expressions are validated before the staged clone is committed,
   preserving failure atomicity. Syntax-only location synchronization has its
   own `ast::TargetLocationError`, so its API has no semantic dependency.
-- `AnalysisError` remains defined in `src/error.rs`, and its syntax-level
-  dialect compatibility check remains there. `sem/error.rs` re-exports the
-  common type and owns semantic `ProblemLikeError`. Type-specific error helpers
-  live beside their semantic owners:
-  `CreateCompositeType::raise_registration_error` in
-  `sem/create_comp_type/registration_error.rs` and
-  `TypeReference::canonicalize_error` in
-  `sem/pg_type/type_ref/canonicalize_error.rs`. AST syntax conversions import
-  the root error type directly.
+- `AnalysisError` remains defined in `src/error.rs`, including its syntax-level
+  dialect compatibility check; `sem.rs` re-exports it. `ProblemLikeError` is
+  defined in `sem.rs`. Its public declaration keeps the existing
+  `ValidOperatorName::try_from` return type nameable after moving it out of the
+  private `sem/error` module; this adds the public path
+  `sem::ProblemLikeError` without changing that method signature or the error
+  variants. Type-specific error helpers live beside their owners in
+  `sem/create_comp_type.rs` and `sem/pg_type/type_ref.rs`. AST syntax
+  conversions import the root error type directly.
 - Syntax-valued option types are AST-owned in `ast/options.rs`, which contains
   their parser conversions, documentation, and inline tests. Option deparsing
   is in `ast/options/deparse.rs`. The former `syntax_options.rs` module is gone.
   The ten type paths formerly re-exported under `sem` are removed; consumers
   import `ast` directly. The AST type definitions and serialization stay the
   same, with no semantic aliases retained.
-- SERIAL keeps its pure AST helper in `ast/ddl/serial.rs`: it clones a column
+- SERIAL keeps its pure AST helper in `ast/ddl.rs`: it clones a column
   node and replaces the SERIAL spelling with its integer type.
   `sem/create_table/serial.rs` applies it to a temporary node, resolves that
   temporary into a semantic column, validates conflicts, and stages
@@ -106,103 +107,203 @@ resolver family has 42 files and 15,511 lines.
 
 ## Physical implementation and test-placement map
 
-The physical maps below were audited at correction baseline
-`0d4fe0edfdf04eaed0f9ecbaab43b8e113386df5`. They supersede the earlier
+The physical maps were established at correction baseline
+`0d4fe0edfdf04eaed0f9ecbaab43b8e113386df5` and reaudited after round-three
+consolidation at source snapshot `accb7d65`. They supersede the earlier
 `sem/ast_conversion`, `sem/ddl_conversion`, `sem/ownership_conversion`, and
 `sem/view_conversion` paths in the first-pass source ledger. The semantic
-owner index below identifies each old operation; these tables give the actual
-defining module or descendant containing its implementation.
+owner index below identifies each old operation; these tables give current
+defining files after recursive module absorption.
 
 ### Expression, query, and statement conversion implementations
 
-318 implementation blocks are placed in 33 owner-module descendants. The
-owner names and methods are indexed in the semantic entry-point table below.
+318 implementation blocks are placed in 33 current
+owner-specific files. The owner names and methods are indexed in the semantic
+entry-point table below.
 
 | Physical destination | Impl blocks | Owner types |
 | --- | ---: | --- |
-| `names/alias/ast.rs` | 1 | AliasName |
-| `names/full/ast.rs` | 3 | FullName |
-| `names/ope/ast.rs` | 1 | OperatorName |
+| `names.rs` | 1 | AliasName |
+| `names/full.rs` | 3 | FullName |
+| `names/ope.rs` | 1 | OperatorName |
 | `sem/ast.rs` | 4 | SemAst |
-| `sem/conflict_info/ast.rs` | 1 | CatalogNameLookup |
+| `sem/conflict_info.rs` | 1 | CatalogNameLookup |
 | `sem/create_rule/ast.rs` | 13 | CreateRule, PredicateValidator, RuleEvent |
 | `sem/create_trigger/ast.rs` | 31 | CreateTrigger, TriggerBody, TriggerConstraint, TriggerEvent, TriggerFunction, TriggerGranularity, TriggerTiming, WhenValidator |
 | `sem/cte/ast.rs` | 6 | CteStatement, WithClause |
-| `sem/data_source/alias/ast.rs` | 1 | AliasSpec |
+| `sem/data_source/alias.rs` | 1 | AliasSpec |
 | `sem/data_source/ast.rs` | 19 | DataSource |
-| `sem/data_source/function_columns/ast.rs` | 7 | TableFunctionOutput |
-| `sem/data_source/join_expr/ast.rs` | 1 | JoinUsingClause |
-| `sem/data_source/join_kind/ast.rs` | 1 | JoinKind |
-| `sem/data_source/rows_fun/ast.rs` | 2 | DataSourceRowsFromFunc |
+| `sem/data_source/function_columns.rs` | 7 | TableFunctionOutput |
+| `sem/data_source/join_expr.rs` | 1 | JoinUsingClause |
+| `sem/data_source/join_kind.rs` | 1 | JoinKind |
+| `sem/data_source/rows_fun.rs` | 2 | DataSourceRowsFromFunc |
 | `sem/delete_statement/ast.rs` | 9 | DeleteStatement |
-| `sem/delete_statement/cursor/ast.rs` | 2 | DeleteCursor |
-| `sem/drop_dependency_behavior/ast.rs` | 1 | DropDependencyBehavior |
-| `sem/drop_rule/ast.rs` | 4 | DropRule |
+| `sem/delete_statement/cursor.rs` | 2 | DeleteCursor |
+| `sem.rs` | 1 | DropDependencyBehavior |
+| `sem/drop_rule_ast.rs` | 4 | DropRule |
 | `sem/drop_trigger/ast.rs` | 5 | DropTrigger |
 | `sem/insert_statement/ast.rs` | 30 | InsertClauseSemantics, InsertConflict, InsertInferenceModifiers, InsertSource, InsertStatement, InsertTarget, InsertTargetBinding, InsertTargetCollection, InsertTargetMode, InsertValue, InsertValueCollection |
 | `sem/merge_statement/ast.rs` | 12 | MergeAction, MergeMatchKind, MergeStatement |
-| `sem/pg_type/type_ref/ast.rs` | 2 | TypeReference |
+| `sem/pg_type/type_ref.rs` | 2 | TypeReference |
 | `sem/query/ast.rs` | 33 | ClauseBinding, FunctionModifiers, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock, QueryOrder, QueryWindow, ResolvedOperator, SelectDestination |
 | `sem/scalar_expr/arith_expr/ast.rs` | 10 | ArithExpr |
 | `sem/scalar_expr/ast.rs` | 59 | SemScalarExpr |
-| `sem/scalar_expr/func_call/implementation/ast.rs` | 1 | FuncCallExpr |
-| `sem/scalar_expr/indirect/array_subscripts/ast.rs` | 2 | ArraySubscript |
-| `sem/scalar_expr/indirect/ast.rs` | 5 | IndirectionExpr |
+| `sem/scalar_expr/func_call.rs` | 1 | FuncCallExpr |
+| `sem/scalar_expr/indirect/array_subscripts.rs` | 2 | ArraySubscript |
+| `sem/scalar_expr/indirect.rs` | 5 | IndirectionExpr |
 | `sem/select_statement/ast.rs` | 26 | SelectStatement |
 | `sem/select_statement/result_column/ast.rs` | 5 | ResultColumnCollection |
 | `sem/update_statement/ast.rs` | 17 | UpdateAssignmentCollection, UpdateStatement, UpdateValue |
-| `sem/update_statement/cursor/ast.rs` | 2 | UpdateCursor |
-| `sem/with_typmod/ast.rs` | 2 | WithTypmod |
+| `sem/update_statement/cursor.rs` | 2 | UpdateCursor |
+| `sem/with_typmod.rs` | 2 | WithTypmod |
 
 ### DDL and semantic option implementations
 
-120 struct/implementation items map to 42 physical destinations. The rows
-include semantic definitions, conversions, and shared DDL helpers.
+120 struct/implementation items map to 41 current
+physical destinations. The rows include semantic definitions, conversions,
+and shared DDL helpers.
 
 | Physical destination | Items | Owner types |
 | --- | ---: | --- |
 | `sem/alter_column/ddl.rs` | 8 | ColumnAttributeAction, ColumnAttributeOption |
 | `sem/alter_index/ddl.rs` | 10 | IndexAlteration, IndexStorageParameter |
 | `sem/alter_owner/ddl.rs` | 4 | AlterOwner, RequestedIdentity |
-| `sem/alter_seq/ddl.rs` | 1 | AlterSequence |
+| `sem/alter_seq.rs` | 1 | AlterSequence |
 | `sem/alter_table/ddl.rs` | 7 | AlterObjSubCommand, AlterTable, AlterView |
-| `sem/column_constraints/attr_constraint/ddl.rs` | 3 | AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint, AttrImmediateColumnConstraint |
-| `sem/column_constraints/check_constraint/ddl.rs` | 2 | CheckColumnConstraint |
-| `sem/column_constraints/collate_constraint/ddl.rs` | 1 | CollateColumnConstraint |
+| `sem/column_constraints/attr_constraint.rs` | 3 | AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint, AttrImmediateColumnConstraint |
+| `sem/column_constraints/check_constraint.rs` | 2 | CheckColumnConstraint |
+| `sem/column_constraints/collate_constraint.rs` | 1 | CollateColumnConstraint |
 | `sem/column_constraints/ddl.rs` | 2 | ColumnConstraint |
-| `sem/column_constraints/default_constraint/ddl.rs` | 1 | DefaultColumnConstraint |
-| `sem/column_constraints/exclusion_constraint/ddl.rs` | 1 | ExclusionColumnConstraint |
-| `sem/column_constraints/generated_constraint/ddl.rs` | 1 | GeneratedColumnConstraint |
-| `sem/column_constraints/identity_constraint/ddl.rs` | 1 | IdentityColumnConstraint |
-| `sem/column_constraints/nullability_constraint/ddl.rs` | 1 | ColumnNullabilityConstraint |
-| `sem/column_constraints/primary_key_constraint/ddl.rs` | 1 | PrimaryKeyColumnConstraint |
-| `sem/column_constraints/unique_constraint/ddl.rs` | 1 | UniqueColumnConstraint |
-| `sem/column_rename/ddl.rs` | 1 | ColumnRename |
-| `sem/comment/ddl.rs` | 1 | Comment |
-| `sem/constraint/check/ddl.rs` | 1 | CheckConstraint |
+| `sem/column_constraints/default_constraint.rs` | 1 | DefaultColumnConstraint |
+| `sem/column_constraints/exclusion_constraint.rs` | 1 | ExclusionColumnConstraint |
+| `sem/column_constraints/generated_constraint.rs` | 1 | GeneratedColumnConstraint |
+| `sem/column_constraints/identity_constraint.rs` | 1 | IdentityColumnConstraint |
+| `sem/column_constraints/nullability_constraint.rs` | 1 | ColumnNullabilityConstraint |
+| `sem/column_constraints/primary_key_constraint.rs` | 1 | PrimaryKeyColumnConstraint |
+| `sem/column_constraints/unique_constraint.rs` | 1 | UniqueColumnConstraint |
+| `sem/column_rename.rs` | 1 | ColumnRename |
+| `sem.rs` | 2 | Comment, CreateExtension |
+| `sem/constraint/check.rs` | 1 | CheckConstraint |
 | `sem/constraint/ddl.rs` | 3 | Constraint |
-| `sem/constraint/names/ddl.rs` | 2 | ConstraintNames |
+| `sem/constraint.rs` | 2 | ConstraintNames |
 | `sem/create_comp_type/ddl.rs` | 3 | CompositeFieldDefinition, CreateCompositeType |
 | `sem/create_domain/ddl.rs` | 3 | CreateDomain |
-| `sem/create_enum_type/ddl.rs` | 1 | CreateEnum |
-| `sem/create_extension/ddl.rs` | 1 | CreateExtension |
+| `sem/create_enum_type.rs` | 1 | CreateEnum |
 | `sem/create_function/ddl.rs` | 3 | CreateFunction |
 | `sem/create_index/ddl.rs` | 2 | CreateIndex |
-| `sem/create_schema/ddl.rs` | 1 | CreateSchema |
+| `sem/create_schema.rs` | 1 | CreateSchema |
 | `sem/create_seq/ddl.rs` | 2 | CreateSequence |
 | `sem/create_table/column_def/ddl.rs` | 4 | ColumnDefinition |
 | `sem/create_table/ddl.rs` | 4 | CreateTable, DropTable |
 | `sem/create_table/serial.rs` | 6 | SerialSequences |
-| `sem/create_table_as/ddl.rs` | 1 | CreateTableAs |
+| `sem/create_table_as.rs` | 1 | CreateTableAs |
 | `sem/create_view/ddl.rs` | 2 | CreateView |
 | `sem/engine_features.rs` | 9 | EngineFeatureValidation |
 | `sem/ownership/ddl.rs` | 4 | OwnerSpecification, OwnershipIdentity |
 | `sem/relation_alteration.rs` | 8 | RelationAlteration |
-| `sem/scalar_expr/ddl.rs` | 2 | SemScalarExpr |
+| `sem/scalar_expr.rs` | 2 | SemScalarExpr |
 | `sem/sem_ast_analysis.rs` | 7 | SemAst |
-| `sem/type_system/func_params/ddl.rs` | 1 | FunctionParam |
-| `sem/variable_set/ddl.rs` | 1 | VariableSet |
+| `sem/type_system/func_params.rs` | 1 | FunctionParam |
+| `sem/variable_set.rs` | 1 | VariableSet |
 | `sem/view_definition/ddl.rs` | 2 | ViewCheckOption, ViewColumnLineage |
+
+### Small-module absorption review
+
+The frozen round-three review started from source snapshot `accb7d65` and
+classified 105 changed-module candidates. It absorbed all 51 introduced small
+fragments, eight extraction remainders, and five recursive parent modules: 64
+absorptions covering 2,399 lines at merge time. Of 11 fragmented
+existing parents, five were recursively absorbed and six remain as owner files
+after their child declarations moved. The six retained owners are all over 100
+lines: `sem/alter_seq.rs` (129),
+`sem/column_constraints/exclusion_constraint.rs` (101),
+`sem/create_schema.rs` (123), `sem/delete_statement/cursor.rs` (141),
+`sem/update_statement/cursor.rs` (138), and `sem/variable_set.rs` (114). No
+eligible in-scope module at or below 100 lines remains. The review excluded 33
+files changed only for imports, callers, or formatting, plus two pure
+relocations of existing integration-test modules. The frozen map records 18
+identifier adjustments, mostly to reuse existing imports or resolve name
+collisions. Its visibility adjustment moves
+`ProblemLikeError` into public `sem.rs` with its `pub` declaration intact, so
+the existing public method signature remains nameable. It introduced no
+namespace-wrapper facades or new abstractions.
+
+The table records every absorbed source module and its final owner file. Source
+paths here document the pre-absorption module layout; destination paths name
+current files. Line counts are the source-module sizes at absorption.
+
+| Module before absorption | Lines | Current owner file |
+| --- | ---: | --- |
+| `sem/scalar_expr/func_call/implementation/ast.rs` | 24 | `sem/scalar_expr/func_call.rs` |
+| `sem/scalar_expr/indirect/array_subscripts/ast.rs` | 40 | `sem/scalar_expr/indirect/array_subscripts.rs` |
+| `sem/column_constraints/attr_constraint/ddl.rs` | 41 | `sem/column_constraints/attr_constraint.rs` |
+| `sem/column_constraints/check_constraint/ddl.rs` | 45 | `sem/column_constraints/check_constraint.rs` |
+| `sem/column_constraints/collate_constraint/ddl.rs` | 21 | `sem/column_constraints/collate_constraint.rs` |
+| `sem/column_constraints/default_constraint/ddl.rs` | 23 | `sem/column_constraints/default_constraint.rs` |
+| `sem/column_constraints/exclusion_constraint/ddl.rs` | 17 | `sem/column_constraints/exclusion_constraint.rs` |
+| `sem/column_constraints/generated_constraint/ddl.rs` | 25 | `sem/column_constraints/generated_constraint.rs` |
+| `sem/column_constraints/identity_constraint/ddl.rs` | 19 | `sem/column_constraints/identity_constraint.rs` |
+| `sem/column_constraints/nullability_constraint/ddl.rs` | 21 | `sem/column_constraints/nullability_constraint.rs` |
+| `sem/column_constraints/primary_key_constraint/ddl.rs` | 20 | `sem/column_constraints/primary_key_constraint.rs` |
+| `sem/column_constraints/unique_constraint/ddl.rs` | 19 | `sem/column_constraints/unique_constraint.rs` |
+| `sem/constraint/check/ddl.rs` | 94 | `sem/constraint/check.rs` |
+| `sem/constraint/names/ddl.rs` | 53 | `sem/constraint.rs` |
+| `sem/data_source/alias/ast.rs` | 7 | `sem/data_source/alias.rs` |
+| `sem/data_source/function_columns/ast.rs` | 94 | `sem/data_source/function_columns.rs` |
+| `sem/data_source/join_expr/ast.rs` | 21 | `sem/data_source/join_expr.rs` |
+| `sem/data_source/join_kind/ast.rs` | 12 | `sem/data_source/join_kind.rs` |
+| `sem/data_source/rows_fun/ast.rs` | 50 | `sem/data_source/rows_fun.rs` |
+| `sem/delete_statement/cursor/ast.rs` | 49 | `sem/delete_statement/cursor.rs` |
+| `sem/pg_type/type_ref/ast.rs` | 40 | `sem/pg_type/type_ref.rs` |
+| `sem/pg_type/type_ref/canonicalize_error.rs` | 9 | `sem/pg_type/type_ref.rs` |
+| `sem/scalar_expr/cast_expr/wildcard_projection.rs` | 23 | `sem/scalar_expr/cast_expr.rs` |
+| `sem/scalar_expr/coalesce/wildcard_projection.rs` | 18 | `sem/scalar_expr/coalesce.rs` |
+| `sem/scalar_expr/column_ref/wildcard_projection.rs` | 29 | `sem/scalar_expr/column_ref.rs` |
+| `sem/scalar_expr/indirect/ast.rs` | 98 | `sem/scalar_expr/indirect.rs` |
+| `sem/type_system/func_params/ddl.rs` | 54 | `sem/type_system/func_params.rs` |
+| `sem/update_statement/cursor/ast.rs` | 62 | `sem/update_statement/cursor.rs` |
+| `names/alias/ast.rs` | 11 | `names.rs` |
+| `names/full/ast.rs` | 32 | `names/full.rs` |
+| `names/ope/ast.rs` | 31 | `names/ope.rs` |
+| `sem/alter_seq/ddl.rs` | 45 | `sem/alter_seq.rs` |
+| `sem/alter_table/view.rs` | 39 | `sem/alter_table.rs` |
+| `sem/column_rename/ddl.rs` | 25 | `sem/column_rename.rs` |
+| `sem/comment/ddl.rs` | 28 | `sem.rs` |
+| `sem/conflict_info/ast.rs` | 29 | `sem/conflict_info.rs` |
+| `sem/create_comp_type/registration_error.rs` | 10 | `sem/create_comp_type.rs` |
+| `sem/create_enum_type/ddl.rs` | 26 | `sem/create_enum_type.rs` |
+| `sem/create_extension/ddl.rs` | 25 | `sem.rs` |
+| `sem/create_schema/ddl.rs` | 62 | `sem/create_schema.rs` |
+| `sem/create_table_as/ddl.rs` | 81 | `sem/create_table_as.rs` |
+| `sem/delete_statement/cte.rs` | 20 | `sem/delete_statement.rs` |
+| `sem/drop_dependency_behavior/ast.rs` | 10 | `sem.rs` |
+| `sem/insert_statement/cte.rs` | 20 | `sem/insert_statement.rs` |
+| `sem/merge_statement/cte.rs` | 20 | `sem/merge_statement.rs` |
+| `sem/scalar_expr/ddl.rs` | 42 | `sem/scalar_expr.rs` |
+| `sem/scalar_expr/wildcard_projection.rs` | 42 | `sem/scalar_expr.rs` |
+| `sem/select_statement/cte.rs` | 20 | `sem/select_statement.rs` |
+| `sem/update_statement/cte.rs` | 20 | `sem/update_statement.rs` |
+| `sem/variable_set/ddl.rs` | 31 | `sem/variable_set.rs` |
+| `sem/with_typmod/ast.rs` | 35 | `sem/with_typmod.rs` |
+| `ast/ddl/check.rs` | 27 | `ast/ddl.rs` |
+| `ast/ddl/column_attributes.rs` | 7 | `ast/ddl.rs` |
+| `ast/ddl/serial.rs` | 67 | `ast/ddl.rs` |
+| `ast/engine_features.rs` | 34 | `ast.rs` |
+| `ast/ownership.rs` | 7 | `ast.rs` |
+| `ast/wildcard.rs` | 89 | `ast.rs` |
+| `sem/comment.rs` | 79 | `sem.rs` |
+| `sem/error.rs` | 41 | `sem.rs` |
+| `sem/constraint/names.rs` | 87 | `sem/constraint.rs` |
+| `names/alias.rs` | 34 | `names.rs` |
+| `sem/create_extension.rs` | 73 | `sem.rs` |
+| `sem/drop_dependency_behavior.rs` | 33 | `sem.rs` |
+| `sem/drop_rule.rs` | 89 | `sem.rs` |
+
+The separate large-module relocation moved `sem/drop_rule/ast.rs` to
+`sem/drop_rule_ast.rs`, keeping the implementation with the `DropRule` owner;
+it is not counted as an absorption. At review planning, the worktree filesystem
+had 78 GiB available, against an estimated 20 GiB of additional build/test use
+and the repository 20 GiB minimum baseline. Capacity met the baseline.
 
 ### Relocated semantic test suites
 
@@ -212,7 +313,7 @@ module that owns the conversion; no separate catch-all test module remains.
 | Previous suite | Current implementation module | Owner / operation |
 | --- | --- | --- |
 | `ast_conversion/delete/tests.rs` | `sem/delete_statement/ast.rs` | `DeleteStatement::from_ast` |
-| `ast_conversion/drop_rule/tests.rs` | `sem/drop_rule/ast.rs` | `DropRule::from_ast` |
+| `ast_conversion/drop_rule/tests.rs` | `sem/drop_rule_ast.rs` | `DropRule::from_ast` |
 | `ast_conversion/drop_trigger/tests.rs` | `sem/drop_trigger/ast.rs` | `DropTrigger::from_ast` |
 | `ast_conversion/insert/tests.rs` | `sem/insert_statement/ast.rs` | `InsertStatement::from_ast` |
 | `ast_conversion/merge/tests.rs` | `sem/merge_statement/ast.rs` | `MergeStatement::from_ast` |
@@ -224,12 +325,14 @@ module that owns the conversion; no separate catch-all test module remains.
 | `ast_conversion/update/tests.rs` | `sem/update_statement/ast.rs` | `UpdateStatement::from_ast` |
 
 Three common-AST syntax synchronization tests remain inline under
-`ast/public/wildcard.rs`; semantic wildcard-projection behavior
-is implemented in `sem/scalar_expr/**/wildcard_projection.rs`. The six focused
-placement checks put operator-name, operator-resolution, SQLite-pattern,
+`ast/public/wildcard.rs`. Semantic wildcard-projection implementations are in
+`sem/scalar_expr.rs`, `sem/scalar_expr/cast_expr.rs`,
+`sem/scalar_expr/coalesce.rs`, and `sem/scalar_expr/column_ref.rs`. The six
+focused placement checks put operator-name, operator-resolution, SQLite-pattern,
 PostgreSQL-pattern, ordering-operator, and name-resolution-phase tests beside
 their owning conversion methods.
-The source paths and baseline test counts below cover all 106 old Rust files.
+The source paths and baseline test counts below retain the names of all 106 old
+Rust files.
 `case attrs` is the sum of textual case-row definitions and parameter markers;
 assertion counts are direct assertion macros inside test-attributed functions.
 
@@ -238,10 +341,10 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast.rs` | 0 / 0 / 0 | AST node definitions remain; analysis dispatch is in `sem/sem_ast_analysis.rs` and raw parser entry points in `sem/top_level_statement.rs`. |
 | `ast/ddl.rs` | 6 / 23 / 22 | AST syntax declarations remain here; semantic DDL conversion → `owner-specific semantic DDL module (physical map above)`. |
 | `ast/ddl/alter_index.rs` | 0 / 0 / 0 | Semantic conversion/tests → `owner-specific semantic DDL module (physical map above)`; syntax decoding is in the PostgreSQL AST adapter. |
-| `ast/ddl/check.rs` | 0 / 0 / 0 | AST syntax helper remains here; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
-| `ast/ddl/column_attributes.rs` | 1 / 0 / 9 | AST syntax helper remains here; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
+| `ast/ddl/check.rs` | 0 / 0 / 0 | Historical source path; syntax helper now lives in `ast/ddl.rs`; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
+| `ast/ddl/column_attributes.rs` | 1 / 0 / 9 | Historical source path; syntax helper now lives in `ast/ddl.rs`; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
 | `ast/ddl/column_rename.rs` | 1 / 0 / 3 | Semantic conversion/tests → `owner-specific semantic DDL module (physical map above)`; syntax decoding is in the PostgreSQL AST adapter. |
-| `ast/ddl/serial.rs` | 5 / 24 / 20 | AST syntax helper remains here; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
+| `ast/ddl/serial.rs` | 5 / 24 / 20 | Historical source path; pure syntax helper now lives in `ast/ddl.rs`; semantic conversion → `owner-specific semantic DDL module (physical map above)`. |
 | `ast/ddl/table_rename.rs` | 1 / 0 / 5 | Semantic conversion/tests → `owner-specific semantic DDL module (physical map above)`; syntax decoding is in the PostgreSQL AST adapter. |
 | `ast/default_privileges.rs` | 2 / 13 / 12 | Default-privileges syntax remains; interpretation stays explicitly unimplemented in `sem/sem_ast_analysis.rs` (#955). |
 | `ast/deparse.rs` | 5 / 0 / 15 | SQL deparse and its syntax tests remain at the same AST path. |
@@ -265,10 +368,10 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast/document/projection_walk.rs` | 0 / 0 / 0 | Syntax-only projection traversal remains; semantic wildcard rewrite consumes it. |
 | `ast/document_validation.rs` | 2 / 4 / 2 | Structural AST validation remains at the same path. |
 | `ast/drop_behavior.rs` | 0 / 0 / 0 | Syntax-only conversion remains; shared error is now `crate::error::AnalysisError`. |
-| `ast/engine_features.rs` | 5 / 24 / 6 | Syntax markers remain here; semantic version/applicability checks → `sem/engine_features.rs`. |
+| `ast/engine_features.rs` | 5 / 24 / 6 | Historical source path; syntax markers now live in `ast.rs`; semantic version/applicability checks → `sem/engine_features.rs`. |
 | `ast/foreign_table.rs` | 2 / 12 / 12 | Foreign-table syntax remains; interpretation stays explicitly unimplemented in `sem/sem_ast_analysis.rs` (#956). |
 | `ast/mutation.rs` | 0 / 0 / 0 | Public common-AST mutation operations remain at the same path. |
-| `ast/ownership.rs` | 0 / 0 / 0 | Ownership syntax remains here; catalog lookup/application → `sem/ownership/ddl.rs`. |
+| `ast/ownership.rs` | 0 / 0 / 0 | Historical source path; ownership syntax declarations and the output-only helper now live in `ast.rs`; catalog lookup/application → `sem/ownership/ddl.rs`. |
 | `ast/ownership/tests.rs` | 27 / 96 / 91 | Colocated tests → `sem/ownership/ddl.rs` test module. |
 | `ast/postgres.rs` | 32 / 67 / 51 | PostgreSQL syntax conversion remains; four `test_name_from_range_var` cases → `ast_integration_tests`. |
 | `ast/postgres/ddl.rs` | 0 / 0 / 0 | PostgreSQL-to-common-AST syntax conversion remains; semantic processing → `owner-specific semantic DDL module (physical map above)`. |
@@ -337,12 +440,47 @@ assertion counts are direct assertion macros inside test-attributed functions.
 | `ast/utility.rs` | 2 / 0 / 8 | Syntax-only AST utility operations remain at the same path. |
 | `ast/validation.rs` | 1 / 4 / 1 | Structural AST validation remains; stack handling calls the crate stack directly. |
 | `ast/view_definition.rs` | 0 / 0 / 0 | View lineage and semantic conversion → `semantic view-owner module (physical map above)`; source file removed. |
-| `ast/wildcard.rs` | 0 / 0 / 0 | Syntax synchronization → `ast/public/wildcard.rs`; semantic expansion consumer → `sem/wildcard_expansion/rewrite.rs`. |
+| `ast/wildcard.rs` | 0 / 0 / 0 | Historical source path; AST wildcard helper merged into `ast.rs`; syntax synchronization tests remain in `ast/public/wildcard.rs` and semantic expansion is in `sem/wildcard_expansion/rewrite.rs`. |
 | `ast/wildcard/rows_source.rs` | 4 / 6 / 13 | Rewrite consumer and tests → `sem/wildcard_expansion/rewrite/rows_source.rs`. |
 | `ast/wildcard/source.rs` | 0 / 0 / 0 | Rewrite consumer and tests → `sem/wildcard_expansion/rewrite/source.rs`. |
 | `ast/wildcard/tests.rs` | 16 / 46 / 44 | Inline rewrite tests → `sem/wildcard_expansion/rewrite.rs`; syntax synchronization tests → `ast/public/wildcard.rs`. |
 
 ## Compiled-case preservation status
+
+Round-two compiled comparisons and standard-flow results below are historical:
+they predate the round-three module consolidation and do not establish current
+worktree results. Round-three compiled comparisons and both full standard flows have now
+passed. Against `accb7d65`, the default comparison has 4,363 unchanged and
+18 relocated cases (4,381 total); all features has 5,090 unchanged and
+18 relocated cases (5,108 total). Both contain 28 suites, with no missing or
+extra cases, identity collisions, or metadata changes. Their normalized
+identity SHA-256 values are respectively
+`3fd00dadea75573719a2e45a801aafa12fc1fb229f3d4c05248c6e0c42fd441e` and
+`1bdf40c74266b57206977cfe173d64aec1d994fd723c66ba8a245e0e0f9a2978`.
+
+The full default flow passed 4,381 SQLAST and 5,475 workspace cases; the full
+all-features flow passed 5,108 SQLAST and 6,254 workspace cases. Both retained
+63 existing ignored workspace cases and passed all 3,064 SQL regression cases
+in 166 groups. Feature boundaries, formatting, Clippy, import lint, Markdown,
+documentation, doctests, and the other standard checks passed. No SLOW warning
+or timeout occurred. Packaging, SemVer, and installed-distribution checks are
+pending for the implementation commit.
+
+The round-three source audit at `accb7d65` maps all 1,328 test functions to
+1,328 destinations with identical bodies, cases, attributes, parameter
+signatures, and effective cfg. It reports no unmapped or new tests, attribute
+or cfg differences, or missing module targets. Eight tests moved inside two
+focused inline modules; the two unattached files are upstream SQLite parser
+sources outside the migrated test set. The audit also found all 9,434
+production and test functions: 9,431 bodies/cfg matched exactly and three
+alias-only differences were reviewed. All 988 model declarations and adjacent
+attributes are preserved. Production and test cfg gates were audited. There are
+no unexplained import, cfg, allow, or expect changes, no new production inline
+namespace modules, and no remaining eligible small modules. The only new
+public path is `sem::ProblemLikeError`; its `pub` declaration keeps the
+existing public `ValidOperatorName::try_from` return type nameable after moving
+the type out of private `sem/error`. The method signature and error variants
+are unchanged. These source audits do not replace compiled-case or behavioral validation.
 
 The earlier default/all-features comparisons and standard-flow results predate
 the current physical-module and syntax-import corrections. The round-two
@@ -360,8 +498,9 @@ reconciles 5,108 cases across 28 suites: 3,794 identities are unchanged and
 changes; the normalized identity SHA-256 is
 `073515cc291b6d350fcaf32cd0ffcec5ab8f19c2a3772ec7568ee699bde15bd7`.
 
-Both round-two standard flows passed. Default passed 4,381 `sql-fun-sqlast`
-tests, 5,475 workspace tests with 63 existing ignored tests, and 3,064 SQL
+Both historical round-two standard flows passed. Default passed 4,381
+`sql-fun-sqlast` tests, 5,475 workspace tests with 63 existing ignored tests,
+and 3,064 SQL
 regression inputs. All-features passed 5,108 `sql-fun-sqlast` tests, 6,254
 workspace tests with 63 existing ignored tests, and 3,064 SQL regression inputs
 in 166 groups. Neither flow reported SLOW warnings or timeouts.
@@ -393,8 +532,9 @@ all-features compiled identities are summarized above.
 
 ## Physical relocation and source-preservation evidence
 
-The latest source comparison uses correction baseline
-`0d4fe0edfdf04eaed0f9ecbaab43b8e113386df5`:
+The round-two source comparison uses correction baseline
+`0d4fe0edfdf04eaed0f9ecbaab43b8e113386df5`; it is historical for the current
+after-consolidation tree:
 
 - The 47 expression/query source files retain 334 test functions, 1,166 case
   attributes, 16 value dimensions, 1,198 assertion-macro calls, 10 TODOs, and
@@ -409,18 +549,16 @@ The latest source comparison uses correction baseline
   gates match. Two identical SQLite-gated test imports were consolidated into
   one equally gated import group; test bodies and effective test gates are
   unchanged.
-- Round two maps all 1,328 source test functions to 1,328 destinations. It
-  reports no missing/new tests, attribute changes, effective cfg changes, or
-  missing module targets. 1,318 function bodies match exactly; ten body-token
-  differences were reviewed and confirmed equivalent after relocation and
-  formatting normalization. The ten comprise five optional trailing commas,
-  one closure-brace formatting change, two equivalent owner-local calls, and
-  two function-local syntax-type import changes. All signatures and parameter
-  annotations match, and assertions and literal expectations are preserved.
-- All 37 relocated test modules are inline beside an implementation/function
-  or in consecutive focused modules testing `SemAst::from_ast`; none lack an
-  inline destination. The 11 resolver suites above are part of this set. Two
-  upstream SQLite parser files are outside the migration's test-source set.
+- Round two mapped 1,328 source test functions to 1,328 destinations. It
+  reported no missing/new tests, attribute changes, effective cfg changes, or
+  missing module targets. 1,318 function bodies matched exactly; ten body-token
+  differences were reviewed as equivalent after relocation and formatting.
+  Round three has a separate exact test-identity map, summarized above.
+- The round-two placement audit found all 37 relocated test modules inline
+  beside an implementation/function or in focused modules testing
+  `SemAst::from_ast`; none lacked an inline destination. The 11 resolver suites
+  above are part of that historical set. Two upstream SQLite parser files are
+  outside the migration's test-source set.
 - A model audit matched all 988 struct, enum, and union definitions plus their
   adjacent attributes, including derive and serde attributes; it found no
   changed, removed, or added definitions. Global imports were normalized in
@@ -428,10 +566,12 @@ The latest source comparison uses correction baseline
   ten AST exports, zero semantic exports, and zero semantic imports of these
   types.
 
-These reports preserve source attributes, test identities, assertions, and
-reviewed body equivalence. They supplement the compiled reconciliations and
-standard flows above; they do not establish semantic behavior by themselves.
-No raw assertion text is copied into this inventory.
+The round-two source reports preserve source attributes, test identities,
+assertions, and reviewed body equivalence. The round-three source audit confirms
+current test bodies, attributes, signatures, and effective cfg, with the
+reviewed alias-only function differences summarized above. These audits do not
+establish semantic behavior or replace the compiled reconciliations and
+standard flows. No raw assertion text is copied into this inventory.
 
 ## Existing consumers and regression inventory
 
@@ -461,21 +601,21 @@ contributor workflow change is intended.
 
 The current conversion index and physical maps reflect these corrections:
 
-- All 318 expression/query implementation blocks and 120 DDL items are in the
-  defining type module or a descendant. The former `ast_conversion` and
-  `ddl_conversion` catch-all modules are removed. The independent implementation
-  owner audit found zero ownership violations in the new modules.
+- All 318 expression/query implementation blocks and 120 DDL items are in
+  the defining type module or a descendant. The former `ast_conversion` and `ddl_conversion`
+  catch-all modules are removed. The independent owner audit found zero
+  ownership violations after consolidation.
 - Table-function output name rules are owned by `TableFunctionOutput`.
   `OperatorExpr::table_output_name(&self)` maps to the constant
   `TableFunctionOutput::nullif_output_name()` and takes no AST argument.
   `TypedColumns::resolve_function_output` is replaced by
   `TableFunctionOutput::from_ast_typed_columns` in
-  `sem/data_source/function_columns/ast.rs`; callers pass the original AST list.
-- `FuncCallExpr` implementations are nested under
-  `sem/scalar_expr/func_call/implementation`; CTE conversion methods are in
-  `sem/cte/ast.rs`, and ALTER TABLE/view conversion is in
-  `sem/alter_table/ddl.rs`.
-- `SERIAL` syntax expansion remains the pure `ast/ddl/serial.rs` helper and is
+  `sem/data_source/function_columns.rs`; callers pass the original AST list.
+- `FuncCallExpr` AST implementations are in `sem/scalar_expr/func_call.rs`;
+  statement-specific CTE helpers are in their statement owner files, while
+  common CTE conversion remains in `sem/cte/ast.rs`. ALTER TABLE conversion is
+  in `sem/alter_table/ddl.rs`; view alteration remains with `AlterTable`.
+- `SERIAL` syntax expansion remains the pure `ast/ddl.rs` helper and is
   applied only to a temporary cloned column. Semantic resolution, validation,
   and sequence catalog effects are in `sem/create_table/serial.rs`.
 - Syntax-valued option definitions and parser conversions are owned by
@@ -484,28 +624,22 @@ The current conversion index and physical maps reflect these corrections:
   callers import the AST types directly. Type definitions and serialization
   remain unchanged.
 - Shared `AnalysisError` remains in root `src/error.rs`, including the
-  syntax-level dialect check. Semantic error construction is colocated with
-  `CreateCompositeType` and `TypeReference` in their owner descendants.
-- Semantic wildcard-projection expression implementations are in the
-  `sem/scalar_expr/**/wildcard_projection.rs` descendants. `WildcardExpansion`
-  continues to own staged statement rewriting. Three syntax synchronization
-  tests remain inline under `ast/public/wildcard.rs`.
+  syntax-level dialect check. Semantic error helpers are colocated with
+  `CreateCompositeType` and `TypeReference` in their owner files.
+- Semantic wildcard-projection implementations now live in their owner files:
+  `sem/scalar_expr.rs`, `sem/scalar_expr/cast_expr.rs`,
+  `sem/scalar_expr/coalesce.rs`, and `sem/scalar_expr/column_ref.rs`.
+  `WildcardExpansion` continues to own staged statement rewriting. Three syntax
+  synchronization tests remain inline under `ast/public/wildcard.rs`.
 - `ast/sqlite.rs` remains the AST-side SQLite syntax adapter. Semantic analysis
   now resides only with the relevant semantic owner types.
 
-At correction-2 planning, the worktree filesystem had 78 GiB available. The
-additional build/test estimate was 20 GiB, reusing the existing worktree's
-artifacts; the repository's 20 GiB minimum baseline was satisfied.
-
-Both post-correction compiled reconciliations and standard flows are complete
-as recorded above. Independent source ownership, module-placement, model, and
-AST-options export audits passed; the `check-test-flow` helper update is
-complete and no CI job definitions changed. Packaging and SemVer checks passed
-for implementation commit `3381e042`. Package layout, metadata, checksums, and
-executable identity were validated. Executables extracted from the generated tar
-archive passed all 3,064 SQL regression cases in 166 groups. Existing
-release-intent declarations and package versions were unchanged. Source counts
-and identity maps alone cannot establish semantic behavior or ownership.
+Round-two compiled reconciliations, standard flows, packaging, SemVer, and
+installed-distribution checks are historical evidence only. Round-three compiled
+reconciliations and both full standard flows passed as recorded above.
+Packaging, SemVer, and installed checks remain pending at this snapshot. Source identity, model preservation,
+and ownership maps alone do not establish semantic behavior or current
+validation.
 
 ## Final semantic entry-point index
 
@@ -728,7 +862,7 @@ unchanged.
 | `XmlTable` | `DataSource` | `resolve` → `from_ast_xml_table` |
 
 `TableFunctionOutput::from_ast_typed_columns` is defined in
-`sem/data_source/function_columns/ast.rs`. It consumes the original syntax
+`sem/data_source/function_columns.rs`. It consumes the original syntax
 list directly; no borrowed `TypedColumns` adapter remains. The NULLIF
 output-name helper is a constant and accepts no AST node because its caller
 already selected that semantic operation.

@@ -1,4 +1,3 @@
-mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::syn::sqlite::NotNullColumnConstraint;
 use crate::{
@@ -151,5 +150,20 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl ColumnNullabilityConstraint {
+    pub(in crate::sem::column_constraints) fn from_ast_parts(
+        _context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+        not_null: bool,
+        conflict: &Option<ConflictClause>,
+        validity: &Option<Validity>,
+    ) -> Self {
+        Self::new(table, column, not_null, conflict.clone(), validity.clone())
     }
 }

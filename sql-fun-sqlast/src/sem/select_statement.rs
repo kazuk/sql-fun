@@ -1,13 +1,12 @@
 mod ast;
-mod cte;
-
 mod result_column;
 mod set_operation;
 
 pub(crate) use self::result_column::ResultColumn;
-pub use self::result_column::ResultColumnCollection;
-pub use self::set_operation::{SetOperationKind, SetOperationQuery};
-
+pub use self::{
+    result_column::ResultColumnCollection,
+    set_operation::{SetOperationKind, SetOperationQuery},
+};
 use crate::{
     CacheContext,
     ast::{Query as AstQuery, TryFromWithTokens},
@@ -21,7 +20,6 @@ use crate::{
     },
     syn::{ScanToken, SelectStmt},
 };
-
 use ::sql_fun_core::IVec;
 
 /// select statement
@@ -276,7 +274,6 @@ mod test_scalar_scope {
         syn::Opt,
         test_helpers::{SynBuilder, TestParseContext, source_span},
     };
-
     use ::sql_fun_core::IVec;
 
     #[rstest::rstest]
@@ -498,5 +495,22 @@ impl SelectStatement {
             Self::Simple(node) => Some(&node.from_clause),
             _ => None,
         }
+    }
+}
+
+impl SelectStatement {
+    pub(crate) fn resolved_column(
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+        query: &Self,
+    ) -> Option<ColumnDefinition> {
+        let columns = query.result_columns();
+        let result = if let Some(index) = index {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, skip)
+        };
+        result.map(|column| column.create_column_definition())
     }
 }

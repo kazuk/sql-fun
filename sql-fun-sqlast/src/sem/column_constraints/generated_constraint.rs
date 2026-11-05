@@ -1,10 +1,9 @@
-mod ddl;
 #[cfg(feature = "sqlite")]
 use crate::{
     SqliteToken, syn::sqlite::GeneratedColumnConstraint as SqliteGeneratedColumnConstraint,
 };
 use crate::{
-    ast::GeneratedColumnMode,
+    ast::{Expr as AstExpr, GeneratedColumnMode},
     names::{ColumnName, TableName},
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnRename,
@@ -160,5 +159,24 @@ impl ColumnConstraint {
         } else {
             None
         }
+    }
+}
+
+// Analysis owned by the semantic definitions in this module.
+
+impl GeneratedColumnConstraint {
+    pub(in crate::sem::column_constraints) fn from_ast_expression(
+        context: &mut impl ParseContext,
+        table: &TableName,
+        column: &ColumnName,
+        expression: &AstExpr,
+        mode: &Option<GeneratedColumnMode>,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::new(
+            table,
+            column,
+            SemScalarExpr::from_ast_in(expression, context, &ScalarAnalysisContext::default())?,
+            mode.clone(),
+        ))
     }
 }

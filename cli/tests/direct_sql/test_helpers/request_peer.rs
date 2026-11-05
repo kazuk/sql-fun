@@ -24,7 +24,7 @@ pub(crate) async fn run_selection(
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let directory = prepare_inputs(listener.local_addr()?.port(), valid_default)?;
     let root = directory.path();
-    let peer = ::tokio::spawn(capture_requests(listener, Vec::new(), false, false));
+    let peer = ::tokio::spawn(capture_requests(listener, Vec::new(), false, false, false));
     let mut command = ::tokio::process::Command::new(cli_executable());
     command
         .current_dir(root)
@@ -66,7 +66,9 @@ pub(crate) async fn run_schema(
     let root = directory.path();
     let diagnostics = severities
         .iter()
-        .filter(|severity| **severity != "no_handle" && **severity != "fatal")
+        .filter(|severity| {
+            **severity != "no_handle" && **severity != "fatal" && **severity != "paged"
+        })
         .map(|severity| diagnostic(severity))
         .collect();
     let peer = ::tokio::spawn(capture_requests(
@@ -74,6 +76,7 @@ pub(crate) async fn run_schema(
         diagnostics,
         severities.contains(&"no_handle"),
         severities.contains(&"fatal"),
+        severities.contains(&"paged"),
     ));
     let output = ::tokio::process::Command::new(cli_executable())
         .current_dir(root)
@@ -177,6 +180,7 @@ async fn capture_requests(
     diagnostics: Vec<Value>,
     no_handle: bool,
     fatal: bool,
+    paged: bool,
 ) -> (Vec<Value>, Option<Value>) {
     let (stream, _) = listener.accept().await.unwrap();
     let mut stream = BufReader::new(stream);
@@ -207,9 +211,19 @@ async fn capture_requests(
             "initialize" => ::serde_json::json!("OK"),
             "initialize_schema_context" => {
                 initialization = Some(request["params"].clone());
+                let problems = if paged {
+                    ::serde_json::json!({"handle":"schema-diagnostics", "total_length":diagnostics.len(), "offset":0, "require_release":false, "items":[diagnostics[0].clone()]})
+                } else {
+                    page(&diagnostics)
+                };
                 ::serde_json::json!({
-                    "context_handle":if no_handle { None } else { Some("test") }, "schema_dump_hash":null, "problems":page(&diagnostics)
+                    "context_handle":if no_handle { None } else { Some("test") }, "schema_dump_hash":null, "problems":problems
                 })
+            }
+            "read_collection" if paged => {
+                let offset =
+                    usize::try_from(request["params"]["start_offset"].as_u64().unwrap()).unwrap();
+                ::serde_json::json!({"handle":"schema-diagnostics", "total_length":diagnostics.len(), "offset":offset, "require_release":false, "items":diagnostics[offset..]})
             }
             "analyze_query" => {
                 let query = request["params"]["query"]["Text"].as_str().unwrap();

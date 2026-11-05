@@ -181,6 +181,39 @@ async fn multiple_statement_failure_retains_diagnostic_positions() -> ::testresu
 }
 
 #[rstest::rstest]
+#[case::default(vec![], false)]
+#[case::warning(vec!["--ignore-schema-diagnostics", "warning"], false)]
+#[case::error(vec!["--ignore-schema-diagnostics", "error"], true)]
+#[tokio::test]
+async fn schema_gate_and_display_consider_later_diagnostic_pages(
+    #[case] args: Vec<&str>,
+    #[case] continues: bool,
+) -> ::testresult::TestResult {
+    let mut options = vec!["test", "cases.json"];
+    options.extend(args);
+    let (output, queries, report) =
+        test_helpers::request_peer::run_schema(&options, &["warning", "error", "paged"], "never")
+            .await?;
+    assert_eq!(output.status.success(), continues);
+    assert_eq!(queries.len(), if continues { 2 } else { 0 });
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_eq!(
+        stderr.matches("schema initialization").count(),
+        2,
+        "{stderr}"
+    );
+    assert!(
+        report.contains(if continues {
+            "errors=\"0\""
+        } else {
+            "errors=\"2\""
+        }),
+        "{report}"
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
 #[case::analyze_default(&["analyze", "--sql-file", "queries.json#$.queries"], None, None, "default")]
 #[case::test_default(&["test", "cases.json"], None, None, "default")]
 #[case::environment(&["analyze", "--sql-file", "queries.json#$.queries"], None, Some("products"), "products")]

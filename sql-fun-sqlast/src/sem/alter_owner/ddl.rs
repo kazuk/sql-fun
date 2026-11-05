@@ -127,3 +127,131 @@ impl RequestedIdentity {
         Ok(Self::new(&identity, &missing))
     }
 }
+
+#[cfg(test)]
+mod test_operator_identity_includes_none_operands {
+    use crate::{
+        ast::ObjectKind,
+        context::{OwnershipInfoRead, ParseContext},
+        names::FullName,
+        sem::{OwnedObjectDefinition, OwnershipIdentity, TypeReference},
+        test_helpers::ownership::{apply_ownership_sql, ownership_context},
+    };
+
+    #[rstest::rstest]
+    #[case::binary("OPERATOR public.+ (integer, integer)", &[Some(crate::sem::PgBuiltInType::int4()), Some(crate::sem::PgBuiltInType::int4())])]
+    #[case::unary("OPERATOR public.! (NONE, integer)", &[None, Some(crate::sem::PgBuiltInType::int4())])]
+    fn operator_identity_includes_none_operands(
+        #[case] target: &str,
+        #[case] arguments: &[Option<TypeReference>],
+    ) -> testresult::TestResult {
+        let mut context = ownership_context();
+        let symbol = if arguments[0].is_none() { "!" } else { "+" };
+        let identity = OwnershipIdentity::with_arguments(
+            ObjectKind::from(26),
+            &FullName::with_schema("public", symbol),
+            arguments,
+        );
+        context.insert_owned_object(&OwnedObjectDefinition::new(&identity, None));
+        let result = apply_ownership_sql(context, &format!("ALTER {target} OWNER TO bob"))?;
+        assert_eq!(
+            result.ast().ownership_change().unwrap().target().identity(),
+            Some(&identity)
+        );
+        assert_eq!(
+            result
+                .context()
+                .ownership_definitions(ObjectKind::from(26), identity.name())[0]
+                .owner(),
+            Some(result.ast().ownership_change().unwrap().owner())
+        );
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::out_argument(
+        "CREATE FUNCTION public.f(IN a integer, OUT b integer) LANGUAGE sql AS 'SELECT a'",
+        "FUNCTION public.f(integer)"
+    )]
+    #[case::named_signature(
+        "CREATE FUNCTION public.f(a integer) RETURNS integer LANGUAGE sql AS 'SELECT a'",
+        "FUNCTION public.f(IN a integer)"
+    )]
+    #[case::variadic_signature(
+        "CREATE FUNCTION public.f(VARIADIC a text[]) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+        "FUNCTION public.f(VARIADIC text[])"
+    )]
+    #[case::empty_signature(
+        "CREATE FUNCTION public.f() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+        "FUNCTION public.f()"
+    )]
+    #[case::unspecified_signature(
+        "CREATE FUNCTION public.f(integer) RETURNS integer LANGUAGE sql AS 'SELECT $1'",
+        "FUNCTION public.f"
+    )]
+    fn routine_signatures_use_input_identity(
+        #[case] create: &str,
+        #[case] target: &str,
+    ) -> testresult::TestResult {
+        let context = apply_ownership_sql(ownership_context(), create)?.into_context();
+        let result = apply_ownership_sql(context, &format!("ALTER {target} OWNER TO alice"))?;
+        assert!(
+            result.context().problems().is_empty(),
+            "{:?}",
+            result.context().problems()
+        );
+        assert!(
+            result
+                .ast()
+                .ownership_change()
+                .unwrap()
+                .target()
+                .identity()
+                .is_some()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn all_missing_argument_type_names_are_retained() -> testresult::TestResult {
+        let result = apply_ownership_sql(
+            ownership_context(),
+            "ALTER FUNCTION public.f(missing_one, missing_two) OWNER TO alice",
+        )?;
+        let outcome = result.ast().ownership_change().unwrap().target();
+        assert_eq!(
+            outcome.unresolved_argument_types(),
+            &[
+                FullName::from_local_name("missing_one"),
+                FullName::from_local_name("missing_two")
+            ]
+        );
+        assert_eq!(
+            result.context().problems()[0].code(),
+            "ownership_argument_type_not_found"
+        );
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::zero_argument("AGGREGATE public.total(*)", &[])]
+    #[case::ordered_set("AGGREGATE public.total(integer ORDER BY integer)", &[Some(crate::sem::PgBuiltInType::int4()), Some(crate::sem::PgBuiltInType::int4())])]
+    fn aggregate_signatures_identify_the_exact_definition(
+        #[case] target: &str,
+        #[case] arguments: &[Option<TypeReference>],
+    ) -> testresult::TestResult {
+        let mut context = ownership_context();
+        let identity = OwnershipIdentity::with_arguments(
+            ObjectKind::from(2),
+            &FullName::with_schema("public", "total"),
+            arguments,
+        );
+        context.insert_owned_object(&OwnedObjectDefinition::new(&identity, None));
+        let result = apply_ownership_sql(context, &format!("ALTER {target} OWNER TO alice"))?;
+        assert_eq!(
+            result.ast().ownership_change().unwrap().target().identity(),
+            Some(&identity)
+        );
+        Ok(())
+    }
+}

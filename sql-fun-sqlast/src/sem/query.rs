@@ -1074,6 +1074,35 @@ impl ResolvedOperator {
     }
 }
 
+#[cfg(test)]
+mod test_operator_preserves_implicit_input_range {
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType,
+        test_helpers::public_analysis::analyze,
+    };
+
+    #[rstest::rstest]
+    #[case::operator("select $1 + 1 as n")]
+    #[case::cte("with x as (select $1 as n) select n + 1 as total from x")]
+    #[case::derived("select n + 1 as total from (select $1 as n) x")]
+    #[case::scalar("select (select $1) + 1 as total")]
+    #[case::later_use("with x as (select $1 as n) select n, $1 + 1 as total from x")]
+    fn operator_preserves_implicit_input_range(#[case] sql: &str) {
+        let result = analyze(sql, Dialect::postgres()).unwrap();
+        let constraint = result
+            .context()
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint();
+        assert!(!constraint.is_any());
+        assert!(constraint.allows(&PgBuiltInType::int4()));
+        assert!(constraint.allows(&PgBuiltInType::int2()));
+        assert!(!constraint.allows(&PgBuiltInType::text()));
+        assert_eq!(result.context().reported_problem_count(), 0);
+    }
+}
+
 impl ResolvedOperator {
     fn arguments(
         left: Option<&SemScalarExpr>,

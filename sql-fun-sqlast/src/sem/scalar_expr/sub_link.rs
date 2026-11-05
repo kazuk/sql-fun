@@ -41,6 +41,45 @@ impl SemScalarExprNode for SubLinkExpr {
     }
 }
 
+#[cfg(test)]
+mod test_concrete_scalar_subquery_exposes_its_scalar_type {
+    use crate::{ast::Dialect, sem::PgBuiltInType, test_helpers::public_analysis::analyze};
+
+    #[test]
+    fn concrete_scalar_subquery_exposes_its_scalar_type() {
+        let result = analyze("select (select 1) + 1 as n", Dialect::postgres()).unwrap();
+        assert_eq!(result.context().reported_problem_count(), 0);
+        let query = result.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            query.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_scalar_subquery_remains_nullable_integer {
+    use crate::{
+        ast::Dialect,
+        names::ColumnName,
+        sem::PgBuiltInType,
+        test_helpers::query::{expression as projection, resolve},
+    };
+
+    #[test]
+    fn scalar_subquery_remains_nullable_integer() {
+        let (query, context) =
+            resolve("SELECT (SELECT 1 AS n) AS value", Dialect::postgres(), true).unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        let column = query
+            .get_result_column_def(&ColumnName::from("value"))
+            .unwrap();
+        assert_eq!(column.get_type_cloned(), Some(PgBuiltInType::int4()));
+        assert_eq!(column.is_not_null(), Some(false));
+        assert!(projection(&query).as_exists().is_none());
+    }
+}
+
 impl SubLinkExpr {
     pub(crate) fn walk<V: SemanticVisitorMut>(
         &mut self,

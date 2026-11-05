@@ -19,12 +19,48 @@ impl SemDropRule {
     }
 }
 
+impl SemDropRule {
+    pub(crate) fn from_ast_definition(
+        ast: &DropRule,
+        context: &impl ParseContext,
+    ) -> Result<Self, ResolutionFailure> {
+        let requested = FullName::from_ast_name(ast.name())?;
+        let requested_target = FullName::from_ast_name(ast.relation())?;
+        let behavior = match ast.behavior() {
+            DropBehavior::Cascade => DropDependencyBehavior::cascade(),
+            DropBehavior::Restrict => DropDependencyBehavior::restrict(),
+        };
+        let Some(target) = context.resolve_relation_name(&requested_target) else {
+            if ast.if_exists() {
+                return Ok(Self::new(
+                    &requested,
+                    &requested_target,
+                    None,
+                    false,
+                    true,
+                    behavior,
+                ));
+            }
+            return Err(ResolutionFailure::rule(&RuleProblem::target(
+                &requested_target,
+            )));
+        };
+        Self::from_ast_on(
+            ast,
+            context,
+            &requested,
+            &requested_target,
+            &target,
+            behavior,
+        )
+    }
+}
+
 #[cfg(test)]
-mod test_from_ast {
+mod test_resolved_drop_does_not_apply_until_requested {
     use crate::{
         context::{ParseContext, RuleInfoRead},
-        names::{FullName, SchemaName},
-        sem::{DropDependencyBehavior as SemDropDependencyBehavior, RuleIdentity, SemAst},
+        sem::{DropDependencyBehavior as SemDropDependencyBehavior, SemAst},
         test_helpers::{
             create_cache_context as test_helpers_create_cache_context, drop_rule as test_helpers,
             heavy::drop_rule as heavy,
@@ -60,38 +96,6 @@ mod test_from_ast {
         Ok(())
     }
 
-    #[test]
-    fn drop_masks_inherited_definition_and_recreation_replaces_the_tombstone()
-    -> testresult::TestResult {
-        let parent = heavy::catalog()?;
-        let child =
-            test_helpers::apply(test_helpers::layer(&parent), "DROP RULE audit ON item_view")?
-                .into_context()
-                .freeze();
-        assert!(child.rule(&test_helpers::identity()).is_none());
-        assert!(
-            test_helpers::layer(&child)
-                .rule(&test_helpers::identity())
-                .is_none()
-        );
-        assert!(parent.rule(&test_helpers::identity()).is_some());
-        assert!(
-            test_helpers::layer(&parent)
-                .rule(&test_helpers::identity())
-                .is_some()
-        );
-        assert_eq!(test_helpers::active_count(&parent), 2);
-        assert_eq!(test_helpers::active_count(&child), 1);
-        let grandchild =
-            test_helpers::apply(test_helpers::layer(&child), test_helpers::CREATE_AUDIT)?
-                .into_context()
-                .freeze();
-        assert!(grandchild.rule(&test_helpers::identity()).is_some());
-        assert_eq!(test_helpers::active_count(&grandchild), 2);
-        assert!(child.rule(&test_helpers::identity()).is_none());
-        Ok(())
-    }
-
     #[rstest::rstest]
     #[case::missing_rule("DROP RULE IF EXISTS missing ON item_view", true)]
     #[case::missing_relation("DROP RULE IF EXISTS audit ON absent", false)]
@@ -108,27 +112,54 @@ mod test_from_ast {
         assert_eq!(test_helpers::active_count(&pair.into_context().freeze()), 2);
         Ok(())
     }
+}
 
-    #[rstest::rstest]
-    #[case::missing_rule("DROP RULE missing ON item_view")]
-    #[case::missing_relation("DROP RULE audit ON absent")]
-    fn invalid_drop_leaves_named_definitions_and_links_intact(
-        #[case] sql: &str,
-    ) -> testresult::TestResult {
-        let parent = heavy::catalog()?;
-        let mut child = test_helpers::layer(&parent);
-        assert!(
-            SemAst::from_ast_node(
-                test_helpers::statement(sql).node(),
-                &mut child,
-                &mut crate::test_helpers::create_cache_context()
-            )
-            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
-        );
-        assert!(child.rule(&test_helpers::identity()).is_some());
-        assert_eq!(test_helpers::active_count(&child.freeze()), 2);
-        Ok(())
+impl SemDropRule {
+    pub(crate) fn from_ast_on(
+        ast: &DropRule,
+        context: &impl ParseContext,
+        requested: &FullName,
+        requested_target: &FullName,
+        target: &FullName,
+        behavior: DropDependencyBehavior,
+    ) -> Result<Self, ResolutionFailure> {
+        let identity = RuleIdentity::new(target, requested.name().as_str());
+        let found = context.rule(&identity).is_some();
+        if identity.name().name().as_str() == "_RETURN"
+            && context
+                .get_view(&ViewName::from_full_name(target))
+                .is_some()
+        {
+            return Err(ResolutionFailure::rule(&RuleProblem::definition(
+                &identity,
+                "the View requires its SELECT rule; drop the View instead",
+            )));
+        }
+        if !found && !ast.if_exists() {
+            return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
+        }
+        Ok(Self::new(
+            requested,
+            requested_target,
+            Some(&identity),
+            found,
+            ast.if_exists(),
+            behavior,
+        ))
     }
+}
+
+#[cfg(test)]
+mod test_relation_namespace_and_quoted_rule_names_remain_distinct {
+    use crate::{
+        context::{ParseContext, RuleInfoRead},
+        names::{FullName, SchemaName},
+        sem::{RuleIdentity, SemAst},
+        test_helpers::{
+            create_cache_context as test_helpers_create_cache_context, drop_rule as test_helpers,
+            heavy::drop_rule as heavy,
+        },
+    };
 
     #[test]
     fn relation_namespace_and_quoted_rule_names_remain_distinct() -> testresult::TestResult {
@@ -219,78 +250,6 @@ mod test_from_ast {
             if explicit { 3 } else { 2 }
         );
         Ok(())
-    }
-}
-
-impl SemDropRule {
-    pub(crate) fn from_ast_definition(
-        ast: &DropRule,
-        context: &impl ParseContext,
-    ) -> Result<Self, ResolutionFailure> {
-        let requested = FullName::from_ast_name(ast.name())?;
-        let requested_target = FullName::from_ast_name(ast.relation())?;
-        let behavior = match ast.behavior() {
-            DropBehavior::Cascade => DropDependencyBehavior::cascade(),
-            DropBehavior::Restrict => DropDependencyBehavior::restrict(),
-        };
-        let Some(target) = context.resolve_relation_name(&requested_target) else {
-            if ast.if_exists() {
-                return Ok(Self::new(
-                    &requested,
-                    &requested_target,
-                    None,
-                    false,
-                    true,
-                    behavior,
-                ));
-            }
-            return Err(ResolutionFailure::rule(&RuleProblem::target(
-                &requested_target,
-            )));
-        };
-        Self::from_ast_on(
-            ast,
-            context,
-            &requested,
-            &requested_target,
-            &target,
-            behavior,
-        )
-    }
-}
-
-impl SemDropRule {
-    pub(crate) fn from_ast_on(
-        ast: &DropRule,
-        context: &impl ParseContext,
-        requested: &FullName,
-        requested_target: &FullName,
-        target: &FullName,
-        behavior: DropDependencyBehavior,
-    ) -> Result<Self, ResolutionFailure> {
-        let identity = RuleIdentity::new(target, requested.name().as_str());
-        let found = context.rule(&identity).is_some();
-        if identity.name().name().as_str() == "_RETURN"
-            && context
-                .get_view(&ViewName::from_full_name(target))
-                .is_some()
-        {
-            return Err(ResolutionFailure::rule(&RuleProblem::definition(
-                &identity,
-                "the View requires its SELECT rule; drop the View instead",
-            )));
-        }
-        if !found && !ast.if_exists() {
-            return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
-        }
-        Ok(Self::new(
-            requested,
-            requested_target,
-            Some(&identity),
-            found,
-            ast.if_exists(),
-            behavior,
-        ))
     }
 }
 

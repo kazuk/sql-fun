@@ -70,7 +70,38 @@ impl JoinExprDataSource {
         );
         namespace
     }
+}
 
+#[cfg(test)]
+mod test_join_alias_hides_colliding_inner_occurrences {
+
+    use crate::{names::FullName, test_helpers::query::source_namespace_statement};
+
+    #[test]
+    fn join_alias_hides_colliding_inner_occurrences() {
+        let analyzed = source_namespace_statement("SELECT a.t.id FROM (a.t CROSS JOIN a.u) j, a.t");
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .expression()
+                .unwrap()
+                .table_column_reference()
+                .unwrap()
+                .relation(),
+            &FullName::with_schema("a", "t")
+        );
+    }
+}
+
+impl JoinExprDataSource {
     pub(super) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
@@ -193,7 +224,58 @@ impl JoinExprDataSource {
         };
         Ok((value, context))
     }
+}
 
+#[cfg(test)]
+mod test_joined_alias_keeps_its_exposed_column_name {
+
+    use crate::{sem::PgBuiltInType, test_helpers::query::source_namespace_statement};
+
+    #[rstest::rstest]
+    #[case::table("SELECT j.z FROM (a.t CROSS JOIN b.t) j(x,y,z,w)")]
+    #[case::view("SELECT j.z FROM (a.t CROSS JOIN b.v) j(x,y,z)")]
+    #[case::cte("WITH c AS (SELECT id FROM b.t) SELECT j.z FROM (a.t CROSS JOIN c) j(x,y,z)")]
+    #[case::derived("SELECT j.z FROM (a.t CROSS JOIN (SELECT id FROM b.t) s) j(x,y,z)")]
+    fn joined_alias_keeps_its_exposed_column_name(#[case] sql: &str) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        let column = query.result_columns().get_column_at(0).unwrap();
+        assert_eq!(column.column_name().as_ref().unwrap().to_string(), "z");
+        assert_eq!(column.expression().unwrap().get_column_name(), "z");
+        assert_eq!(column.col_type(), &Some(PgBuiltInType::int8()));
+    }
+
+    #[test]
+    fn a_join_alias_preserves_occurrence_identity() {
+        let analyzed = source_namespace_statement(
+            "SELECT j.only_a, t.only_a FROM (a.t CROSS JOIN a.u) j, a.t",
+        );
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        for (index, alias) in [(0, "j"), (1, "t")] {
+            let binding = query
+                .result_columns()
+                .get_column_at(index)
+                .unwrap()
+                .expression()
+                .unwrap()
+                .table_column_reference()
+                .unwrap();
+            assert_eq!(binding.alias().as_str(), alias);
+        }
+    }
+}
+
+impl JoinExprDataSource {
     pub(super) fn group_column_source<'a, C: ParseContext>(
         &'a self,
         column: &ColumnName,
@@ -410,6 +492,57 @@ impl JoinExprDataSource {
                 .map(|(index, _)| JoinColumnInput::right(index)),
         );
         JoinProjection { keys, output }
+    }
+}
+
+#[cfg(test)]
+mod test_sqlite_full_join_using_keeps_left_position_and_right_fallback {
+    #[cfg(feature = "sqlite")]
+    use crate::{ast::Dialect, test_helpers::query::resolve};
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::bare("SELECT * FROM (SELECT 1 AS id) l FULL JOIN (SELECT 2 AS id) r USING(id)")]
+    #[case::grouped(
+        "SELECT * FROM ((SELECT 1 AS id) l FULL JOIN (SELECT 2 AS id) r USING(id)) AS j"
+    )]
+    fn sqlite_full_join_using_keeps_left_position_and_right_fallback(#[case] sql: &str) {
+        let (query, context) = resolve(sql, Dialect::sqlite(), false).unwrap();
+        assert!(
+            context.reported_problems().is_empty(),
+            "{:?}",
+            context.reported_problems()
+        );
+        let columns = query.result_columns();
+        assert_eq!(columns.len(), 1);
+        let key = columns.get_column_at(0).unwrap();
+        assert!(key.expression().unwrap().as_coalesce().is_some());
+        assert_eq!(key.column_name().as_ref().unwrap().as_str(), "id");
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::qualified("j.id")]
+    #[case::unqualified("id")]
+    fn sqlite_grouped_full_join_key_keeps_both_inputs(#[case] key: &str) {
+        let (query, _) = resolve(
+            &format!(
+                "SELECT {key} FROM ((SELECT 1 AS id) l FULL JOIN (SELECT 2 AS id) r USING(id)) AS j"
+            ),
+            Dialect::sqlite(),
+            false,
+        )
+        .unwrap();
+        assert!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .expression()
+                .unwrap()
+                .as_coalesce()
+                .is_some()
+        );
     }
 }
 

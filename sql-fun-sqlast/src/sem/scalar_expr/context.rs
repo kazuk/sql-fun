@@ -278,6 +278,36 @@ impl<'a> ScalarAnalysisContext<'a> {
             None
         }
     }
+}
+
+#[cfg(test)]
+mod test_insert_returning_does_not_bind_enclosing_rule_rows {
+    use crate::test_helpers::{rule as test_helpers, statements};
+
+    #[rstest::rstest]
+    fn insert_returning_does_not_bind_enclosing_rule_rows(
+        #[values("15", "16", "17", "18")] version: &str,
+    ) {
+        let mut context = test_helpers::catalog_version(version);
+        statements::resolve_postgres(
+            "CREATE RULE r AS ON UPDATE TO items DO INSTEAD INSERT INTO sink VALUES(NEW.id) RETURNING OLD.id",
+            &mut context,
+        ).unwrap();
+        if version == "18" {
+            let mut has_boundary = false;
+            for problem in context.reported_problems() {
+                if let Some(rule) = problem.rule_problem() {
+                    has_boundary |= rule
+                        .definition_detail()
+                        .is_some_and(|detail| detail.contains("#621"));
+                }
+            }
+            assert!(has_boundary);
+        }
+    }
+}
+
+impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn with_clause(&self) -> &WithClause {
         &self.with_clause
     }
@@ -470,6 +500,45 @@ impl<'a> ScalarAnalysisContext<'a> {
         }
         Ok(name.replace_schema(schema))
     }
+}
+
+#[cfg(test)]
+mod test_sqlite_body_uses_trigger_database {
+    #[cfg(feature = "sqlite")]
+    use crate::{ast::Dialect, names::FullName, test_helpers::trigger as test_helpers};
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::read("CREATE TRIGGER aux.audit AFTER UPDATE ON items BEGIN SELECT id FROM other; END")]
+    #[case::write(
+        "CREATE TRIGGER aux.audit AFTER UPDATE ON items BEGIN UPDATE OTHER SET id = NEW.id; END"
+    )]
+    fn sqlite_body_uses_trigger_database(#[case] sql: &str) -> testresult::TestResult {
+        let oracle = test_helpers::sqlite_oracle()?;
+        oracle.execute_batch("ATTACH ':memory:' AS aux; CREATE TABLE aux.items(id INTEGER); CREATE TABLE aux.other(id INTEGER);")?;
+        oracle.execute_batch(sql)?;
+        let mut context = test_helpers::catalog(Dialect::sqlite());
+        test_helpers::add_tables(&mut context, "aux");
+        let statement = test_helpers::resolve(sql, &mut context)?;
+        let trigger = statement.trigger().unwrap();
+        assert_eq!(trigger.target(), &FullName::with_schema("aux", "items"));
+        assert!(
+            trigger
+                .dependencies()
+                .relations()
+                .contains(&FullName::with_schema("aux", "other"))
+        );
+        assert!(
+            !trigger
+                .dependencies()
+                .relations()
+                .contains(&FullName::with_schema("main", "other"))
+        );
+        Ok(())
+    }
+}
+
+impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn trigger_scope(&self) -> Option<&Self> {
         if self.qualified_only {
             Some(self)
@@ -644,7 +713,91 @@ impl<'a> ScalarAnalysisContext<'a> {
         self.postgres_returning = true;
         self.delete_returning_target = Some(target.clone());
     }
+}
 
+#[cfg(test)]
+mod test_cte_delete_returning_uses_its_destination_row_image_on_postgres18 {
+    use crate::{
+        names::FullName,
+        test_helpers::{rule as test_helpers, statements},
+    };
+
+    #[test]
+    fn cte_delete_returning_uses_its_destination_row_image_on_postgres18() -> testresult::TestResult
+    {
+        let mut context = test_helpers::catalog_version("18");
+        test_helpers::add_table_column(
+            &mut context,
+            &FullName::with_schema("public", "sink"),
+            "other",
+        );
+        statements::resolve_postgres(
+            "CREATE RULE r AS ON UPDATE TO items DO WITH x AS (DELETE FROM sink RETURNING OLD.other) SELECT other FROM x",
+            &mut context,
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_returning_row_images_use_configured_engine_version {
+    use crate::{
+        ast::Dialect,
+        test_helpers::{delete::resolve, delete_versions as test_helpers},
+    };
+
+    #[rstest::rstest]
+    #[case::postgres17("17", true)]
+    #[case::postgres18("18", false)]
+    #[case::custom("custom-engine", true)]
+    fn returning_row_images_use_configured_engine_version(
+        #[case] version: &str,
+        #[case] missing: bool,
+    ) {
+        let mut context = test_helpers::catalog_for_version(version);
+        let statement = resolve(
+            "DELETE FROM items RETURNING old.id,new.id",
+            &mut context,
+            Dialect::postgres(),
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count() > 0, missing);
+        if !missing {
+            let columns = statement.as_delete().unwrap().result_columns();
+            assert_eq!(columns.get_column_at(0).unwrap().is_not_null(), &Some(true));
+            assert_eq!(
+                columns.get_column_at(1).unwrap().is_not_null(),
+                &Some(false)
+            );
+        }
+    }
+
+    #[rstest::rstest]
+    fn explicit_old_alias_is_ordinary_source(#[values("17", "18")] version: &str) {
+        let mut context = test_helpers::catalog_for_version(version);
+        let result = resolve(
+            "DELETE FROM items AS old RETURNING old.id",
+            &mut context,
+            Dialect::postgres(),
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        assert!(
+            result
+                .as_delete()
+                .unwrap()
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .expression()
+                .unwrap()
+                .delete_row_reference()
+                .is_none()
+        );
+    }
+}
+
+impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn delete_row_target(
         &self,
         alias: &AliasName,
@@ -685,6 +838,29 @@ impl<'a> ScalarAnalysisContext<'a> {
             Err(()) => QueryNameResolution::ambiguous(),
         }
     }
+}
+
+#[cfg(test)]
+mod test_locking_a_short_ambiguous_source_retains_failure {
+
+    use crate::test_helpers::query::source_namespace_statement;
+
+    #[test]
+    fn locking_a_short_ambiguous_source_retains_failure() {
+        let analyzed = source_namespace_statement("SELECT a.t.id FROM a.t,b.t FOR UPDATE OF t");
+        assert!(
+            analyzed
+                .context()
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "query_reference_ambiguous"),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+    }
+}
+
+impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn with_window_names(&self, names: Vec<String>) -> Self {
         let mut scope = self.clone_scope();
         scope.windows = names;
@@ -719,6 +895,63 @@ impl<'a> ScalarAnalysisContext<'a> {
             QueryNameResolution::window(index)
         }
     }
+}
+
+#[cfg(test)]
+mod test_records_window_resolution {
+    use crate::{
+        ast::Dialect,
+        sem::{AnalysisError, QueryNameResolution, SemScalarExpr},
+        test_helpers::query::resolve,
+    };
+
+    #[rstest::rstest]
+    #[case::found(
+        "SELECT sum(1) OVER w WINDOW w AS ()",
+        QueryNameResolution::WindowAlias(0),
+        0
+    )]
+    #[case::missing("SELECT sum(1) OVER w", QueryNameResolution::NotFound, 1)]
+    #[case::ambiguous(
+        "SELECT sum(1) OVER w WINDOW w AS (), w AS ()",
+        QueryNameResolution::Ambiguous,
+        2
+    )]
+    fn records_window_resolution(
+        #[case] sql: &str,
+        #[case] expected: QueryNameResolution,
+        #[case] problems: usize,
+    ) {
+        let (mut query, context) = resolve(sql, Dialect::postgres(), false).unwrap();
+        assert_eq!(context.reported_problem_count(), problems);
+        struct Windows(Vec<QueryNameResolution>);
+        impl crate::sem::traversal::SemanticVisitorMut for Windows {
+            fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+                if let SemScalarExpr::FuncCall(call) = expression {
+                    self.0.push(
+                        call.modifiers()
+                            .over()
+                            .unwrap()
+                            .reference()
+                            .unwrap()
+                            .resolution()
+                            .clone(),
+                    );
+                    assert_matches::assert_matches!(
+                        call.name_resolution(),
+                        QueryNameResolution::Function(_)
+                    );
+                }
+                Ok(())
+            }
+        }
+        let mut windows = Windows(Vec::new());
+        query.walk(&mut windows).unwrap();
+        assert_eq!(windows.0, [expected]);
+    }
+}
+
+impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn inherited_ctes(&self) -> WithClause {
         self.with_clause.as_ref().clone()
     }
@@ -831,7 +1064,119 @@ impl ScalarAnalysisContext<'_> {
             }
         }
     }
+}
 
+#[cfg(test)]
+mod test_returning_distinguishes_rule_rows_from_action_destination {
+    use crate::{
+        names::FullName,
+        test_helpers::{rule as test_helpers, statements},
+    };
+
+    #[rstest::rstest]
+    #[case::update("UPDATE sink SET other=NEW.id RETURNING OLD.id", true)]
+    #[case::delete("DELETE FROM sink RETURNING OLD.id", true)]
+    #[case::update_wrong_relation("UPDATE sink SET other=NEW.id RETURNING OLD.other", false)]
+    #[case::delete_wrong_relation("DELETE FROM sink RETURNING OLD.other", false)]
+    fn returning_distinguishes_rule_rows_from_action_destination(
+        #[values("15", "16", "17", "18")] version: &str,
+        #[case] action: &str,
+        #[case] accepted: bool,
+    ) -> testresult::TestResult {
+        let mut context = test_helpers::catalog_version(version);
+        test_helpers::add_table_column(
+            &mut context,
+            &FullName::with_schema("public", "sink"),
+            "other",
+        );
+        let result = statements::resolve_postgres(
+            &format!("CREATE RULE r AS ON UPDATE TO items DO INSTEAD {action}"),
+            &mut context,
+        );
+        let statement = result?;
+        assert_eq!(
+            statement.rule().is_some(),
+            accepted,
+            "{version}: {statement:?}"
+        );
+        if accepted {
+            let reference = statement.rule().unwrap().actions()[0]
+                .rule_returning()
+                .unwrap()
+                .get_column_at(0)
+                .unwrap()
+                .expression()
+                .unwrap()
+                .table_column_reference()
+                .unwrap();
+            assert_eq!(
+                reference.relation(),
+                &FullName::with_schema("public", "items")
+            );
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_missing_local_column_does_not_bind_outer_source {
+
+    use crate::{
+        names::FullName,
+        test_helpers::{query::source_namespace_statement, query_source_namespace as test_helpers},
+    };
+
+    #[rstest::rstest]
+    #[case::qualified("SELECT (SELECT t.only_b FROM a.t) FROM b.t")]
+    #[case::star("SELECT (SELECT t.only_b FROM a.t) FROM b.t AS t")]
+    fn missing_local_column_does_not_bind_outer_source(#[case] sql: &str) {
+        let analyzed = source_namespace_statement(sql);
+        assert!(
+            analyzed
+                .context()
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "column_not_found_in_table")
+        );
+        let mut query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        let mut bindings = test_helpers::TableBindings::default();
+        query.walk(&mut bindings).unwrap();
+        bindings.assert_only_relation(&FullName::with_schema("a", "t"));
+        assert!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn an_unresolved_join_input_blocks_qualified_binding() {
+        let analyzed = source_namespace_statement(
+            "SELECT (SELECT j.id FROM (a.t CROSS JOIN missing.t) j) FROM b.t",
+        );
+        assert!(
+            analyzed
+                .context()
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "relation_not_found")
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        assert!(
+            query
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type()
+                .is_none()
+        );
+    }
+}
+
+impl ScalarAnalysisContext<'_> {
     /// Resolve a column reference in this scope, reporting missing or ambiguous names.
     ///
     /// An alias restricts lookup to that data source. Without an alias, the column
@@ -1131,7 +1476,352 @@ impl ScalarAnalysisContext<'_> {
         };
         self.bind_source(context, &alias, column)
     }
+}
 
+#[cfg(test)]
+mod test_source_columns_remain_visible_in_nested_scalar_expressions {
+    use crate::{
+        context::MutSourcePathWithSpan,
+        names::ColumnName,
+        sem::{PgBuiltInType, SourcePathWithSpan, select_statement::SelectStatementNode},
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext, source_span},
+    };
+
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    fn source_columns_remain_visible_in_nested_scalar_expressions(
+        source_span: SourcePathWithSpan,
+    ) -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        context.set_source_path_with_span(&source_span);
+        context.setup_type(PgBuiltInType::int4());
+        context.setup_type(PgBuiltInType::bool());
+        let syn = SynBuilder::new().parse(
+            "select case when true then coalesce(s.n) else n end as result \
+                 from (select 42 as n) s where s.n is not null",
+        );
+        let (select, context) = SelectStatementNode::analyze_select_node(
+            context,
+            syn.as_select_stmt().as_inner().expect("select statement"),
+            &IVec::default(),
+        )?;
+        let column = select
+            .get_result_column_def(&ColumnName::from("result"))
+            .expect("result column");
+        assert_eq!(column.get_type_cloned(), Some(PgBuiltInType::int4()));
+        assert_eq!(context.reported_problem_count(), 0);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case("n")]
+    #[case("missing")]
+    #[case("unknown.n")]
+    #[case("a.missing")]
+    fn unresolved_column_reports_a_problem(
+        source_span: SourcePathWithSpan,
+        #[case] expression: &str,
+    ) -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        context.set_source_path_with_span(&source_span);
+        let syn = SynBuilder::new().parse(&format!(
+            "select {expression} as result from (select 42 as n) a, (select 43 as n) b"
+        ));
+        let (select, context) = SelectStatementNode::analyze_select_node(
+            context,
+            syn.as_select_stmt().as_inner().expect("select statement"),
+            &IVec::default(),
+        )?;
+        let column = select
+            .get_result_column_def(&ColumnName::from("result"))
+            .expect("result column");
+        assert_eq!(column.get_type_cloned(), None);
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_retains_distinct_missing_and_ambiguous_lookup_outcomes {
+
+    use crate::{ast::Dialect, test_helpers::delete::analyze};
+
+    #[test]
+    fn retains_distinct_missing_and_ambiguous_lookup_outcomes() {
+        let (statement, _) = analyze(
+            "DELETE FROM items USING items AS other RETURNING id, absent",
+            Dialect::postgres(),
+        );
+        let columns = statement.as_delete().unwrap().result_columns();
+        let ambiguous = columns.get_column_at(0).unwrap().expression().unwrap();
+        let missing = columns.get_column_at(1).unwrap().expression().unwrap();
+        assert_matches::assert_matches!(
+            ambiguous,
+            crate::sem::SemScalarExpr::ColumnRef(
+                crate::sem::ColumnReferenceExpr::AmbiguousColumnRef(_)
+            )
+        );
+        assert_matches::assert_matches!(
+            missing,
+            crate::sem::SemScalarExpr::ColumnRef(crate::sem::ColumnReferenceExpr::UndefinedColumn(
+                _
+            ))
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_column_lookup_scope {
+    use crate::{
+        ast::Dialect,
+        sem::{AnalysisError, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr},
+        test_helpers::query::column_scope_query,
+    };
+
+    #[derive(Default, Debug)]
+    struct Bindings {
+        tables: Vec<String>,
+        unresolved: usize,
+        ambiguous: usize,
+        outputs: usize,
+    }
+
+    impl crate::sem::traversal::SemanticVisitorMut for Bindings {
+        fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+            if expression.output_index().is_some() {
+                self.outputs += 1;
+            }
+            if let SemScalarExpr::ColumnRef(reference) = expression {
+                if let Some(table) = reference.table_column_reference() {
+                    self.tables
+                        .push(table.relation().local_name().as_str().to_owned());
+                    assert_eq!(expression.get_type(), Some(PgBuiltInType::int4()));
+                } else if matches!(reference, ColumnReferenceExpr::AmbiguousColumnRef(_)) {
+                    self.ambiguous += 1;
+                    assert_eq!(expression.get_type(), None);
+                } else if matches!(
+                    reference,
+                    ColumnReferenceExpr::UndefinedColumn(_)
+                        | ColumnReferenceExpr::UndefinedTableOrView(_)
+                        | ColumnReferenceExpr::UndefinedAlias(_)
+                        | ColumnReferenceExpr::UndefinedFunction(_)
+                ) {
+                    self.unresolved += 1;
+                    assert_eq!(expression.get_type(), None);
+                }
+            }
+            Ok(())
+        }
+    }
+
+    #[rstest::rstest]
+    #[case::original("SELECT (SELECT id FROM missing.items) FROM outer_items;")]
+    #[case::competing_known("SELECT (SELECT id FROM known_items, missing.items) FROM outer_items")]
+    #[case::unknown_first("SELECT (SELECT id FROM missing.items, known_items) FROM outer_items")]
+    #[case::multiple_unknown(
+        "SELECT (SELECT id FROM missing.items a, missing.other b) FROM outer_items"
+    )]
+    #[case::join("SELECT (SELECT id FROM known_items CROSS JOIN missing.items) FROM outer_items")]
+    #[case::join_unknown_first(
+        "SELECT (SELECT id FROM missing.items CROSS JOIN known_items) FROM outer_items"
+    )]
+    #[case::nested_unknown("SELECT (SELECT (SELECT id) FROM missing.items) FROM outer_items")]
+    #[case::deep_unknown(
+        "SELECT (SELECT (SELECT id FROM missing.items) FROM local_items) FROM outer_items"
+    )]
+    #[case::shadowed_alias(
+        "SELECT (SELECT outer_items.id FROM missing.items outer_items) FROM outer_items"
+    )]
+    #[case::qualified_missing("SELECT (SELECT items.id FROM missing.items) FROM outer_items")]
+    fn unresolved_local_relation_blocks_outer_binding(#[case] sql: &str) {
+        let (mut query, context) = column_scope_query(sql, Dialect::postgres());
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert!(bindings.tables.is_empty(), "{bindings:?}");
+        assert_eq!(bindings.unresolved, 1, "{bindings:?}");
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "relation_not_found")
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::missing("SELECT (SELECT id FROM missing()) FROM outer_items")]
+    #[case::competing_known("SELECT (SELECT id FROM known_items, missing()) FROM outer_items")]
+    #[case::unknown_first("SELECT (SELECT id FROM missing(), known_items) FROM outer_items")]
+    #[case::join("SELECT (SELECT id FROM known_items CROSS JOIN missing()) FROM outer_items")]
+    #[case::nested("SELECT (SELECT (SELECT id) FROM missing()) FROM outer_items")]
+    fn unresolved_table_function_blocks_outer_binding(#[case] sql: &str) {
+        let (mut query, context) = column_scope_query(sql, Dialect::postgres());
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert!(bindings.tables.is_empty(), "{bindings:?}");
+        assert_eq!(bindings.unresolved, 1, "{bindings:?}");
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "table_function_not_found")
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::resolved_absence("SELECT (SELECT id FROM local_items) FROM outer_items", "outer_items")]
+    #[case::empty_from("SELECT (SELECT id) FROM outer_items", "outer_items")]
+    #[case::nested_absence(
+        "SELECT (SELECT (SELECT id FROM local_items)) FROM outer_items",
+        "outer_items"
+    )]
+    #[case::local_binding("SELECT (SELECT id FROM known_items) FROM outer_items", "known_items")]
+    #[case::local_shadowing(
+        "SELECT (SELECT outer_items.id FROM known_items outer_items) FROM outer_items",
+        "known_items"
+    )]
+    fn conclusive_lookup_preserves_binding(#[case] sql: &str, #[case] relation: &str) {
+        let (mut query, context) = column_scope_query(sql, Dialect::postgres());
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert_eq!(bindings.tables, [relation]);
+        assert_eq!(bindings.unresolved, 0);
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+
+    #[test]
+    fn explicit_outer_qualification_bypasses_unrelated_unknown_source() {
+        let (mut query, context) = column_scope_query(
+            "SELECT (SELECT outer_items.id FROM missing.items) FROM outer_items",
+            Dialect::postgres(),
+        );
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert_eq!(bindings.tables, ["outer_items"]);
+        assert_eq!(bindings.unresolved, 0);
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "relation_not_found")
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::known("known_items a, known_items b")]
+    #[case::unknown_first("missing.items, known_items a, known_items b")]
+    #[case::unknown_last("known_items a, known_items b, missing.items")]
+    #[case::join("known_items a CROSS JOIN known_items b CROSS JOIN missing.items")]
+    fn established_ambiguity_survives_unknown_sources(#[case] from: &str) {
+        let sql = format!("SELECT (SELECT id FROM {from}) FROM outer_items");
+        let (mut query, context) = column_scope_query(&sql, Dialect::postgres());
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert!(bindings.tables.is_empty());
+        assert_eq!(bindings.ambiguous, 1);
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "ambiguous_column")
+        );
+    }
+
+    #[test]
+    fn conclusive_missing_column_remains_unresolved() {
+        let (mut query, context) =
+            column_scope_query("SELECT absent FROM local_items", Dialect::postgres());
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert!(bindings.tables.is_empty());
+        assert_eq!(bindings.unresolved, 1);
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+
+    #[test]
+    fn unknown_input_does_not_bind_grouping_output_alias() {
+        let (mut query, _) = column_scope_query(
+            "SELECT 1 AS id FROM missing.items GROUP BY id",
+            Dialect::postgres(),
+        );
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert_eq!(bindings.unresolved, 1);
+        assert_eq!(bindings.outputs, 0);
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::group("SELECT (SELECT id FROM (missing_items) AS g) FROM outer_items")]
+    #[case::group_join(
+        "SELECT (SELECT id FROM (known_items CROSS JOIN missing_items) AS g) FROM outer_items"
+    )]
+    #[case::qualified_group(
+        "SELECT (SELECT g.id FROM (known_items CROSS JOIN missing_items) AS g) FROM outer_items"
+    )]
+    fn sqlite_group_preserves_inconclusive_lookup(#[case] sql: &str) {
+        let (mut query, context) = column_scope_query(sql, Dialect::sqlite());
+        let mut bindings = Bindings::default();
+        query.walk(&mut bindings).unwrap();
+        assert!(bindings.tables.is_empty());
+        assert_eq!(bindings.unresolved, 1);
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "relation_not_found")
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_preserves_failed_column_resolution {
+    use crate::{
+        ast::Dialect,
+        sem::{AnalysisError, ColumnReferenceExpr, SemScalarExpr},
+        test_helpers::query::resolve,
+    };
+
+    #[rstest::rstest]
+    #[case::missing_order("SELECT 1 ORDER BY missing", false)]
+    #[case::ambiguous_order("SELECT 1 AS x, 2 AS x ORDER BY x", true)]
+    #[case::having_has_no_alias("SELECT 1 AS x HAVING x IS NULL", false)]
+    fn preserves_failed_column_resolution(#[case] sql: &str, #[case] ambiguous: bool) {
+        let (mut query, context) = resolve(sql, Dialect::postgres(), false).unwrap();
+        assert!(context.reported_problem_count() > 0);
+        struct Failures {
+            missing: usize,
+            ambiguous: usize,
+        }
+        impl crate::sem::traversal::SemanticVisitorMut for Failures {
+            fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+                match expression {
+                    SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedColumn(_)) => {
+                        self.missing += 1
+                    }
+                    SemScalarExpr::ColumnRef(ColumnReferenceExpr::AmbiguousColumnRef(_)) => {
+                        self.ambiguous += 1
+                    }
+                    _ => {}
+                }
+                Ok(())
+            }
+        }
+        let mut failures = Failures {
+            missing: 0,
+            ambiguous: 0,
+        };
+        query.walk(&mut failures).unwrap();
+        if ambiguous {
+            assert_eq!(failures.ambiguous, 1);
+        } else {
+            assert_eq!(failures.missing, 1);
+        }
+    }
+}
+
+impl ScalarAnalysisContext<'_> {
     pub(crate) fn bind_source<'context, C: ParseContext>(
         &self,
         context: &'context mut C,
@@ -1233,5 +1923,87 @@ impl ScalarAnalysisContext<'_> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test_retains_failed_lookup {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::{
+            query::expression, query_whole_rows as test_helpers, query_whole_rows::catalog_query,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::missing(
+        "SELECT identity(missing.*) FROM pg_catalog.pg_type t",
+        "column_source_not_found"
+    )]
+    #[case::missing_relation("SELECT identity(x.*) FROM missing x", "column_source_not_found")]
+    #[case::hidden(
+        "SELECT identity(pg_catalog.pg_type.*) FROM pg_catalog.pg_type t",
+        "column_source_not_found"
+    )]
+    #[case::ambiguous(
+        "SELECT identity(t.*) FROM pg_catalog.pg_type t CROSS JOIN pg_catalog.pg_attribute t",
+        "column_source_ambiguous"
+    )]
+    fn retains_failed_lookup(#[case] sql: &str, #[case] code: &str) {
+        let (query, context) = catalog_query(sql);
+        let row = expression(&query).as_function_call().unwrap().args()[0]
+            .value()
+            .as_whole_row()
+            .unwrap();
+        assert_eq!(row.failure_code(), Some(code));
+        assert!(row.alias().is_none());
+        assert!(
+            expression(&query).as_function_call().unwrap().args()[0]
+                .value()
+                .get_type()
+                .is_none()
+        );
+        test_helpers::assert_problem(&context, code);
+    }
+
+    #[test]
+    fn correlation_records_the_selected_query_level() {
+        let (query, context) =
+            catalog_query("SELECT (SELECT record_arg(x.*)) FROM (SELECT 1 AS n) x");
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(test_helpers::row_levels(query), vec![1]);
+    }
+
+    #[test]
+    fn local_source_shadows_an_outer_source_with_the_same_alias() {
+        let (query, context) = catalog_query(
+            "SELECT (SELECT record_arg(x.*) FROM (SELECT 2 AS n) x) FROM (SELECT 1 AS n) x",
+        );
+        assert_eq!(context.reported_problem_count(), 0);
+        assert_eq!(test_helpers::row_levels(query), vec![0]);
+    }
+
+    #[rstest::rstest]
+    #[case::view("SELECT (SELECT (r.*).x) FROM v AS r(x)", 1)]
+    #[case::derived("SELECT (SELECT (r.*).x) FROM (SELECT 1 AS n) AS r(x)", 1)]
+    #[case::shadow("SELECT (SELECT (r.*).y FROM v AS r(y)) FROM v AS r(x)", 0)]
+    fn occurrence_aliases_follow_scope(#[case] sql: &str, #[case] level: usize) {
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(test_helpers::row_levels(query), vec![level]);
+    }
+
+    #[test]
+    fn occurrence_alias_hides_original_relation() {
+        let (query, context) = test_helpers::alias_query("SELECT (v.*).n FROM v AS r(x)");
+        assert_eq!(context.problems().len(), 1, "{:?}", context.problems());
+        assert_eq!(context.problems()[0].code(), "column_source_not_found");
+        assert!(expression(&query).get_type().is_none());
     }
 }

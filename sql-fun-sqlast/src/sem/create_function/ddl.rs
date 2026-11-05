@@ -22,38 +22,6 @@ impl CreateFunction {
     }
 }
 
-#[cfg(test)]
-mod test_function_null_input_semantics {
-    use crate::{
-        ast::{TryFromWithTokens, ddl::Function},
-        sem::CreateFunction,
-        syn::Opt,
-        test_helpers::{SynBuilder, TestParseContext},
-    };
-    use ::sql_fun_core::IVec;
-
-    #[rstest::rstest]
-    #[case::called_on_null("CALLED ON NULL INPUT", false)]
-    #[case::returns_null("RETURNS NULL ON NULL INPUT", true)]
-    #[case::strict("STRICT", true)]
-    fn honors_the_explicit_null_input_choice(#[case] option: &str, #[case] expected: bool) {
-        let syntax = SynBuilder::new().parse(&format!(
-            "CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'"
-        ));
-        let function = Function::try_from_with_tokens(
-            &syntax.as_create_function_stmt().as_inner().unwrap(),
-            &IVec::default(),
-        )
-        .unwrap();
-        let mut context = TestParseContext::default();
-        let resolved = CreateFunction::from_ast(&function, &mut context).unwrap();
-        assert_eq!(
-            expected,
-            resolved.overloads().get_at(0).unwrap().is_strict()
-        );
-    }
-}
-
 impl CreateFunction {
     pub(crate) fn from_ast_inner(
         ast: &AstFunction,
@@ -149,7 +117,42 @@ impl CreateFunction {
             &returning,
         ))
     }
+}
 
+#[cfg(test)]
+mod test_honors_the_explicit_null_input_choice {
+    use crate::{
+        ast::{TryFromWithTokens, ddl::Function},
+        sem::CreateFunction,
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext},
+    };
+
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::called_on_null("CALLED ON NULL INPUT", false)]
+    #[case::returns_null("RETURNS NULL ON NULL INPUT", true)]
+    #[case::strict("STRICT", true)]
+    fn honors_the_explicit_null_input_choice(#[case] option: &str, #[case] expected: bool) {
+        let syntax = SynBuilder::new().parse(&format!(
+            "CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'"
+        ));
+        let function = Function::try_from_with_tokens(
+            &syntax.as_create_function_stmt().as_inner().unwrap(),
+            &IVec::default(),
+        )
+        .unwrap();
+        let mut context = TestParseContext::default();
+        let resolved = CreateFunction::from_ast(&function, &mut context).unwrap();
+        assert_eq!(
+            expected,
+            resolved.overloads().get_at(0).unwrap().is_strict()
+        );
+    }
+}
+
+impl CreateFunction {
     pub(crate) fn from_ast_and_apply<TContext: ParseContext>(
         ast: &AstFunction,
         mut context: TContext,

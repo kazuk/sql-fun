@@ -461,7 +461,34 @@ impl ConstraintGraph {
         self.parameters.insert(position, node);
         node
     }
+}
 
+#[cfg(test)]
+mod test_distinct_inputs_and_gaps_remain_independent {
+    use crate::{ast::Dialect, context::ParseContext, test_helpers::public_analysis::analyze};
+
+    #[test]
+    fn distinct_inputs_and_gaps_remain_independent() {
+        let result = analyze(
+            "select $7 + 1 as n, $2 is null as missing, $7 is null as repeated",
+            Dialect::postgres(),
+        )
+        .unwrap();
+        let inputs = result.context().parameter_constraints();
+        assert_eq!(
+            inputs
+                .iter()
+                .map(crate::sem::ParameterConstraint::position)
+                .collect::<Vec<_>>(),
+            [2, 7]
+        );
+        assert!(inputs.parameter(2).unwrap().constraint().is_any());
+        assert!(!inputs.parameter(7).unwrap().constraint().is_any());
+        assert!(inputs.parameter(1).is_none());
+    }
+}
+
+impl ConstraintGraph {
     pub(crate) fn domain(&self, node: usize) -> &InputTypeConstraint {
         &self.domains[node]
     }

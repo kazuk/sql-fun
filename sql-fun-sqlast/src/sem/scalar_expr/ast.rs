@@ -206,6 +206,22 @@ impl SemScalarExpr {
     }
 }
 
+#[cfg(test)]
+mod test_row_star_in_scalar_argument_reports_placement {
+    use crate::test_helpers::query::table_function_query;
+
+    #[test]
+    fn row_star_in_scalar_argument_reports_placement() {
+        let (_, context) = table_function_query("SELECT identity((ROW(1)).*)", true);
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| { problem.code() == "query_invalid_star_projection_placement" })
+        );
+    }
+}
+
 impl SemScalarExpr {
     fn from_ast_parenthesized(
         items: &[Expr],
@@ -235,6 +251,42 @@ impl SemScalarExpr {
             fields.push(Self::from_ast_scalar_in(item, context, scope)?);
         }
         Ok(Self::row(&fields))
+    }
+}
+
+#[cfg(test)]
+mod test_every_row_field_retains_its_completed_binding {
+    use crate::{ast::Dialect, names::ColumnName, test_helpers::query::resolve};
+
+    #[test]
+    fn every_row_field_retains_its_completed_binding() {
+        let (query, context) = resolve(
+            "SELECT ROW(t.x, public.absent.x, t.x) FROM (SELECT 1 AS x) t",
+            Dialect::postgres(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count(), 1);
+        let row = query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_row()
+            .unwrap();
+        assert_eq!(
+            row.fields()[0].constraint_binding(),
+            Some(("t", &ColumnName::from("x")))
+        );
+        assert_eq!(
+            row.fields()[1].qualification_failure().unwrap().code(),
+            "column_source_not_found"
+        );
+        assert_eq!(
+            row.fields()[2].constraint_binding(),
+            Some(("t", &ColumnName::from("x")))
+        );
     }
 }
 
@@ -742,6 +794,17 @@ impl SemScalarExpr {
     }
 }
 
+#[cfg(test)]
+mod test_named_row_cast_does_not_accept_mismatched_field_count {
+    use crate::test_helpers::query::source_namespace_statement;
+
+    #[test]
+    fn named_row_cast_does_not_accept_mismatched_field_count() {
+        let analyzed = source_namespace_statement("SELECT (ROW(1)::a.mixed).id");
+        assert!(!analyzed.context().reported_problems().is_empty());
+    }
+}
+
 impl SemScalarExpr {
     pub(crate) fn from_ast_call(
         ast: &Call,
@@ -1029,6 +1092,65 @@ impl SemScalarExpr {
     }
 }
 
+#[cfg(test)]
+mod test_enforces_argument_limit {
+    use crate::{
+        ast::Dialect,
+        parse_statements,
+        sem::SemAst,
+        test_helpers::{
+            create_cache_context as test_helpers_create_cache_context,
+            grouping::groupings,
+            query::{grouping_table_context, resolve},
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::maximum(31, true)]
+    #[case::too_many(32, false)]
+    fn enforces_argument_limit(#[case] count: usize, #[case] valid: bool) {
+        let arguments = vec!["a"; count].join(",");
+        let (query, context) = resolve(
+            &format!("SELECT GROUPING({arguments}) FROM (SELECT 1 AS a) s GROUP BY a"),
+            Dialect::postgres(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(context.reported_problem_count(), usize::from(!valid));
+        let groupings = groupings(&query);
+        assert_eq!(groupings[0].arguments().len(), count);
+        assert_eq!(groupings[0].is_valid(), valid);
+    }
+
+    #[rstest::rstest]
+    #[case::insert_value("INSERT INTO t VALUES(GROUPING(1))")]
+    #[case::insert_returning("INSERT INTO t VALUES(1) RETURNING GROUPING(a)")]
+    #[case::update_value("UPDATE t SET a=GROUPING(a)")]
+    #[case::update_returning("UPDATE t SET a=1 RETURNING GROUPING(a)")]
+    #[case::delete_where("DELETE FROM t WHERE GROUPING(a) IS NULL")]
+    #[case::delete_returning("DELETE FROM t RETURNING GROUPING(a)")]
+    fn rejects_grouping_outside_select(#[case] sql: &str) {
+        let mut cache_context = test_helpers_create_cache_context();
+        let context = grouping_table_context();
+        let analysis = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .unwrap();
+        assert!(
+            analysis
+                .context()
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "query_invalid_grouping_placement")
+        );
+    }
+}
+
 impl SemScalarExpr {
     pub(crate) fn from_ast_collate(
         ast: &Collate,
@@ -1238,5 +1360,60 @@ impl SemScalarExpr {
             // Resolve against the compound's empty source scope, never an operand's.
         }
         Self::from_ast_in(ast, context, scope)
+    }
+}
+
+#[cfg(test)]
+mod test_grouping_prefers_the_selected_source_over_an_output_alias {
+
+    use crate::{
+        names::FullName,
+        test_helpers::{query::source_namespace_statement, query_source_namespace as test_helpers},
+    };
+
+    #[test]
+    fn grouping_prefers_the_selected_source_over_an_output_alias() {
+        let analyzed = source_namespace_statement(
+            "SELECT 1 AS z FROM (a.t CROSS JOIN b.t) j(x,y,z,w) GROUP BY z",
+        );
+        assert!(
+            analyzed.context().reported_problems().is_empty(),
+            "{:?}",
+            analyzed.context().reported_problems()
+        );
+        let mut query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        let mut bindings = test_helpers::TableBindings::default();
+        query.walk(&mut bindings).unwrap();
+        bindings.assert_only_relation(&FullName::with_schema("b", "t"));
+    }
+}
+
+#[cfg(test)]
+mod test_binds_aliases_and_ordinals {
+    use crate::{
+        ast::Dialect,
+        sem::QueryGrouping,
+        test_helpers::query::{output_index, resolve},
+    };
+
+    #[rstest::rstest]
+    #[case::order("SELECT n AS x FROM (SELECT 1 AS n) s ORDER BY x", Some(0))]
+    #[case::ordinal("SELECT 1 AS x ORDER BY 1", Some(0))]
+    #[case::input_precedence("SELECT 1 AS n FROM (SELECT true AS n) s GROUP BY n", None)]
+    fn binds_aliases_and_ordinals(#[case] sql: &str, #[case] expected: Option<usize>) {
+        let (query, context) = resolve(sql, Dialect::postgres(), false).unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        let query = query.query_clauses().unwrap();
+        let expression = if let Some(order) = query.order().first() {
+            order.expression()
+        } else {
+            let QueryGrouping::Expression(expression) =
+                &query.body().select_clauses().unwrap().group()[0]
+            else {
+                panic!("grouping expression");
+            };
+            expression
+        };
+        assert_eq!(output_index(expression), expected);
     }
 }

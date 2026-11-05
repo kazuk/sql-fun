@@ -280,7 +280,71 @@ impl MergeStatement {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_respects_versions {
+    use crate::test_helpers::{document_merge::catalog, statements::resolve_postgres as resolve};
+
+    #[rstest::rstest]
+    #[case::basic15(
+        15,
+        "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE",
+        true
+    )]
+    #[case::basic16(
+        16,
+        "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE",
+        true
+    )]
+    #[case::old14(
+        14,
+        "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE",
+        false
+    )]
+    #[case::returning16(
+        16,
+        "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING t.id",
+        false
+    )]
+    #[case::by_source16(
+        16,
+        "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED BY SOURCE THEN DELETE",
+        false
+    )]
+    #[case::cte16(
+        16,
+        "WITH m AS (MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE) SELECT 1",
+        false
+    )]
+    #[case::cte17(
+        17,
+        "WITH m AS (MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING t.id) SELECT id FROM m",
+        true
+    )]
+    #[case::old17(
+        17,
+        "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING old.id",
+        false
+    )]
+    #[case::old18(
+        18,
+        "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING old.id,new.id",
+        true
+    )]
+    fn respects_versions(#[case] version: u32, #[case] sql: &str, #[case] accepted: bool) {
+        let mut context = catalog(version);
+        let result = resolve(sql, &mut context);
+        assert_eq!(
+            result.is_ok() && context.reported_problem_count() == 0,
+            accepted,
+            "{result:?} {:?}",
+            context.reported_problems()
+        );
+    }
+}
+
+impl MergeStatement {
     pub(crate) fn new(
         target: &TableName,
         with: &[QueryCte],

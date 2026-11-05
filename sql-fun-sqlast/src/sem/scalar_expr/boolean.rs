@@ -222,6 +222,7 @@ impl BooleanExpr {
         ))
     }
 }
+
 impl NullTestExpr {
     pub(crate) fn collect_constraints(
         &self,
@@ -234,5 +235,39 @@ impl NullTestExpr {
             &InputTypeConstraint::exact(&PgBuiltInType::bool()),
             Some(true),
         ))
+    }
+}
+
+#[cfg(test)]
+mod test_null_test_infers_any {
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType,
+        test_helpers::public_analysis::analyze,
+    };
+
+    use std::collections::BTreeMap;
+
+    #[rstest::rstest]
+    #[case::postgres("select $7 is null", Dialect::postgres())]
+    #[cfg_attr(
+        feature = "sqlite",
+        case::sqlite("select ?7 is null", Dialect::sqlite())
+    )]
+    fn null_test_infers_any(#[case] sql: &str, #[case] dialect: Dialect) {
+        let result = analyze(sql, dialect).unwrap();
+        let inputs = result.context().parameter_constraints();
+        assert_eq!(
+            inputs
+                .iter()
+                .map(crate::sem::ParameterConstraint::position)
+                .collect::<Vec<_>>(),
+            [7]
+        );
+        assert!(inputs.parameter(7).unwrap().constraint().is_any());
+        assert!(inputs.allows(&BTreeMap::from([(7, PgBuiltInType::text())])));
+        let select = result.ast().clone().into_select_statemtnt().unwrap();
+        let output = select.result_columns().get_column_at(0).unwrap();
+        assert_eq!(output.col_type(), &Some(PgBuiltInType::bool()));
+        assert_eq!(output.is_not_null(), &Some(true));
     }
 }

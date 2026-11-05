@@ -453,6 +453,33 @@ mod implementation {
             )
         }
     }
+
+    #[cfg(test)]
+    mod test_aggregate_star_does_not_become_a_whole_row_argument {
+        use crate::test_helpers::{
+            query::expression, query_whole_rows as test_helpers, query_whole_rows::catalog_query,
+        };
+
+        #[test]
+        fn aggregate_star_does_not_become_a_whole_row_argument() {
+            let (query, context) = catalog_query("SELECT count(*) FROM pg_catalog.pg_type t");
+            assert_eq!(context.reported_problem_count(), 0);
+            assert_eq!(
+                expression(&query).as_function_call().unwrap().args().len(),
+                0
+            );
+        }
+
+        #[test]
+        fn a_bare_call_star_does_not_select_an_implicit_row() {
+            let (query, context) = catalog_query("SELECT identity(*) FROM pg_catalog.pg_type t");
+            test_helpers::assert_problem(&context, "function_overload_resolution_failed");
+            assert_eq!(
+                expression(&query).as_function_call().unwrap().args().len(),
+                0
+            );
+        }
+    }
 }
 
 pub use self::implementation::{FuncCallArgs, FuncCallExpr, FunctionBinding};

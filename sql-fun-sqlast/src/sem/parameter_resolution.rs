@@ -93,7 +93,47 @@ impl Output {
             domain,
         }
     }
+}
 
+#[cfg(test)]
+mod test_plain_projection_keeps_any_input_and_postgres_text_output {
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType,
+        test_helpers::public_analysis::analyze,
+    };
+
+    #[rstest::rstest]
+    #[case::direct("select $1")]
+    #[case::cte("with x as (select $1 as n) select n from x")]
+    fn plain_projection_keeps_any_input_and_postgres_text_output(#[case] sql: &str) {
+        let result = analyze(sql, Dialect::postgres()).unwrap();
+        assert!(
+            result
+                .context()
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .is_any()
+        );
+        assert_eq!(
+            result
+                .context()
+                .parameter_constraints()
+                .result_column(0)
+                .unwrap()
+                .admissible_types(),
+            Some([PgBuiltInType::text()].as_slice())
+        );
+        let select = result.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            select.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::text())
+        );
+    }
+}
+
+impl Output {
     fn constraint<'a>(&'a self, graph: &'a ConstraintGraph) -> &'a InputTypeConstraint {
         if let Some(node) = self.node {
             let domain = graph.domain(node);
@@ -231,7 +271,76 @@ impl<'cache> ParameterResolution<'cache> {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_conflicting_uses_report_recoverable_problem {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        names::OperatorName,
+        parse_statements,
+        sem::{BinaryOperatorDefinition, OperatorDefinition, PgBuiltInType, SemAst},
+        test_helpers::{
+            create_cache_context,
+            public_analysis::{analyze, context},
+        },
+    };
+
+    use std::collections::BTreeMap;
+
+    #[rstest::rstest]
+    #[case::direct("select $1 + 1 as n, lower($1) as s")]
+    #[case::cte("with x as (select $1 + 1 as n) select lower($1) as s from x")]
+    fn conflicting_uses_report_recoverable_problem(#[case] sql: &str) {
+        let analyzed =
+            analyze(sql, Dialect::postgres()).expect("analysis continues after a conflict");
+        let problems = analyzed.context().reported_problems();
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].code(), "parameter_constraint");
+        let metadata = problems[0].render_metadata().expect("parameter metadata");
+        assert!(metadata.message().contains("$1"));
+        assert!(
+            !analyzed
+                .context()
+                .parameter_constraints()
+                .allows(&BTreeMap::new())
+        );
+    }
+
+    #[test]
+    fn tied_best_overloads_are_not_accepted_as_a_type_range() {
+        let mut cache_context = create_cache_context();
+        let mut context = context();
+        let int = PgBuiltInType::int4();
+        let overloads = OperatorDefinition::binary(&[
+            BinaryOperatorDefinition::new(&int, &int, &int, true),
+            BinaryOperatorDefinition::new(&int, &int, &PgBuiltInType::text(), true),
+        ]);
+        context.set_get_operator_op_result(
+            &OperatorName::from_parts(None, "+"),
+            true,
+            true,
+            Some(&overloads),
+        );
+        let analyzed = SemAst::from_ast(
+            &parse_statements("select $1 + 1", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .expect("ambiguity is recoverable");
+        assert_eq!(analyzed.context().reported_problem_count(), 1);
+        assert_eq!(
+            analyzed.context().reported_problems()[0].code(),
+            "parameter_constraint"
+        );
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     fn complete(
         &self,
         context: &mut impl ParseContext,
@@ -269,6 +378,98 @@ impl<'cache> ParameterResolution<'cache> {
                 .restrict(node, &InputTypeConstraint::exact(&PgBuiltInType::text()));
         }
     }
+}
+
+#[cfg(test)]
+mod test_nested_returning_projection_fixes_its_unknown_parameter_before_outer_casts {
+
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType,
+        test_helpers::delete as test_helpers,
+    };
+
+    #[test]
+    fn nested_returning_projection_fixes_its_unknown_parameter_before_outer_casts() {
+        let mut context = test_helpers::catalog_with_text_integer_cast();
+        let statement = test_helpers::resolve(
+            "DELETE FROM items RETURNING (SELECT $1) AS label, $1::integer AS n",
+            &mut context,
+            Dialect::postgres(),
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let constraint = context
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint();
+        assert!(constraint.allows(&PgBuiltInType::text()));
+        assert!(!constraint.allows(&PgBuiltInType::int4()));
+        assert_eq!(
+            statement
+                .as_delete()
+                .unwrap()
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type(),
+            &Some(PgBuiltInType::text())
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_returning_parameter_defaults_to_text_before_merge_action_assignment {
+    use crate::{
+        sem::SemAst,
+        test_helpers::{
+            create_cache_context, document_merge::catalog, merge_statements::statement,
+        },
+    };
+
+    #[test]
+    fn returning_parameter_defaults_to_text_before_merge_action_assignment() {
+        let mut cache_context = create_cache_context();
+        let source = statement(
+            "MERGE INTO items AS t USING incoming AS s ON t.id = $2 WHEN MATCHED AND $3 THEN UPDATE SET id = $1 WHEN NOT MATCHED THEN INSERT (id) VALUES ($1) RETURNING $1 AS value",
+        );
+        let result = SemAst::from_ast(&source, catalog(17), &mut cache_context);
+        assert!(match result {
+            Err(_) => true,
+            Ok(analyzed) => analyzed.context().reported_problem_count() > 0,
+        });
+    }
+}
+
+#[cfg(test)]
+mod test_postgres_returning_defaults_unknown_parameters_to_text {
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType, test_helpers::update::analyze,
+    };
+
+    #[rstest::rstest]
+    #[case::returning("UPDATE items SET label=$1 RETURNING $1 n")]
+    #[case::cte("WITH u AS (UPDATE items SET id=1 RETURNING $1 n) SELECT n FROM u")]
+    fn postgres_returning_defaults_unknown_parameters_to_text(#[case] sql: &str) {
+        let (_, context) = analyze(sql, Dialect::postgres());
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let parameter = context.parameter_constraints().parameter(1).unwrap();
+        assert!(parameter.constraint().allows(&PgBuiltInType::text()));
+        assert!(!parameter.constraint().allows(&PgBuiltInType::int4()));
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn parameter(
         &mut self,
         position: u32,
@@ -401,7 +602,106 @@ impl<'cache> ParameterResolution<'cache> {
             .equal(source, result.constraint_node().expect("operation node"));
         result
     }
+}
 
+#[cfg(test)]
+mod test_parameter_field_remains_connected_to_its_source {
+    use crate::{
+        ast::Dialect, context::ParseContext, names::ColumnName, sem::PgBuiltInType,
+        test_helpers::query::resolve,
+    };
+
+    #[rstest::rstest]
+    #[case::later("SELECT (ROW($1, 2)).f1 AS value, $1::integer AS hint", 0)]
+    #[case::earlier("SELECT $1::integer AS hint, (ROW($1, 2)).f1 AS value", 1)]
+    #[case::record_cast("SELECT (ROW($1,2)::record).f1 AS value, $1::integer AS hint", 0)]
+    #[case::nested("SELECT ((ROW(2, ROW($1))).f2).f1 AS value, $1::integer AS hint", 0)]
+    fn parameter_field_remains_connected_to_its_source(#[case] sql: &str, #[case] output: usize) {
+        let (query, context) = resolve(sql, Dialect::postgres(), true).unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            query
+                .get_result_column_def(&ColumnName::from("value"))
+                .unwrap()
+                .get_type_cloned(),
+            None
+        );
+        assert_eq!(
+            context
+                .parameter_constraints()
+                .result_column(output)
+                .unwrap()
+                .admissible_types(),
+            Some([PgBuiltInType::int2(), PgBuiltInType::int4()].as_slice())
+        );
+        let expression = query
+            .result_columns()
+            .get_column_with_skip_count(&ColumnName::from("value"), 0)
+            .unwrap()
+            .expression()
+            .unwrap();
+        assert_eq!(expression.get_column_name(), "f1");
+        assert!(expression.as_indirection().is_some());
+        assert!(
+            context
+                .parameter_constraints()
+                .allows(&std::collections::BTreeMap::from([(
+                    1,
+                    PgBuiltInType::int4()
+                )]))
+        );
+        assert!(
+            !context
+                .parameter_constraints()
+                .allows(&std::collections::BTreeMap::from([(
+                    1,
+                    PgBuiltInType::bool()
+                )]))
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_renamed_parameter_fields_retain_constraints {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::{query::expression, query_whole_rows as test_helpers},
+    };
+
+    #[rstest::rstest]
+    #[case::member("SELECT (r.*).x FROM (SELECT $1::integer AS n) r(x)")]
+    #[case::star("SELECT (r.*).* FROM (SELECT $1::integer AS n) r(x)")]
+    fn renamed_parameter_fields_retain_constraints(#[case] sql: &str) {
+        use crate::context::ParseContext;
+        let (query, context) = test_helpers::alias_query(sql);
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        let constraint = context
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint();
+        assert!(constraint.allows(&PgBuiltInType::int4()));
+        let (_, control) =
+            test_helpers::alias_query("SELECT (r.*).n FROM (SELECT $1::integer AS n) r");
+        assert_eq!(
+            constraint,
+            control
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint(),
+        );
+        assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(test_helpers::row_levels(query), vec![0]);
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn member_access(&mut self, base: &SemScalarExpr, member: &str) -> SemScalarExpr {
         let source = self.input(base);
         let result = self.operation(
@@ -459,7 +759,35 @@ impl<'cache> ParameterResolution<'cache> {
         );
         result
     }
+}
 
+#[cfg(test)]
+mod test_synthetic_identity_function_consumes_array_subquery_result {
+    use crate::{
+        ast::Dialect,
+        sem::PgBuiltInType,
+        test_helpers::query::{expression as projection, resolve},
+    };
+
+    #[test]
+    fn synthetic_identity_function_consumes_array_subquery_result() {
+        let (query, context) = resolve(
+            "SELECT identity((ARRAY(SELECT 1))[1])",
+            Dialect::postgres(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(projection(&query).get_type(), Some(PgBuiltInType::int4()));
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn sqlite_operator(
         &mut self,
         _name: &OperatorName,
@@ -530,7 +858,44 @@ impl<'cache> ParameterResolution<'cache> {
             );
         }
     }
+}
 
+#[cfg(test)]
+mod test_boolean_context_constrains_input {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        parse_statements,
+        sem::{PgBuiltInType, SemAst},
+        test_helpers::{TestParseContext, create_cache_context},
+    };
+
+    #[rstest::rstest]
+    #[case::boolean("select $1 as flag where $1")]
+    #[case::not("select not $1 as flag")]
+    fn boolean_context_constrains_input(#[case] sql: &str) {
+        let mut cache_context = create_cache_context();
+        let result = SemAst::from_ast(
+            &parse_statements(sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap(),
+            TestParseContext::default(),
+            &mut cache_context,
+        )
+        .unwrap();
+        let input = result
+            .context()
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint();
+        assert!(input.allows(&PgBuiltInType::bool()));
+        assert!(!input.allows(&PgBuiltInType::int4()));
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn call(
         &mut self,
         catalog: &impl ParseContext,
@@ -866,7 +1231,64 @@ impl<'cache> ParameterResolution<'cache> {
         }
         (result, domain)
     }
+}
 
+#[cfg(test)]
+mod test_array_query_projection_preserves_both_source_shapes_and_correlations {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        sem::PgBuiltInType,
+        test_helpers::query::{expression as projection, resolve},
+    };
+
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn array_query_projection_preserves_both_source_shapes_and_correlations() {
+        let (query, context) = resolve(
+            "SELECT CASE WHEN true THEN ARRAY(SELECT $1) ELSE $2::integer[] END",
+            Dialect::postgres(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let constraints = context.parameter_constraints();
+        for input in [PgBuiltInType::int4(), PgBuiltInType::int4().array_type()] {
+            assert!(constraints.allows(&BTreeMap::from([(1, input)])));
+        }
+        assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+        assert_eq!(
+            projection(&query).get_type(),
+            Some(PgBuiltInType::int4().array_type())
+        );
+    }
+
+    #[test]
+    fn unconstrained_source_keeps_functional_array_relationship() {
+        let (query, context) =
+            resolve("SELECT ARRAY(SELECT $1)", Dialect::postgres(), true).unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        let constraints = context.parameter_constraints();
+        assert!(constraints.parameter(1).unwrap().constraint().is_any());
+        assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
+        assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4().array_type())])));
+        assert!(
+            projection(&query)
+                .as_array_subquery()
+                .unwrap()
+                .types()
+                .is_any()
+        );
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn scalar_result(&mut self, value: &SemScalarExpr) -> Option<SemScalarExpr> {
         let source = self.completed.scalar_node()?;
         let result = self.operation(
@@ -1547,6 +1969,96 @@ impl<'cache> ParameterResolution<'cache> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test_uses_clause_specific_constraints {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        names::OperatorName,
+        sem::{
+            PgBuiltInType, TypeReference as SemTypeReference,
+            parameter_resolution::ParameterResolution,
+        },
+        test_helpers::{
+            create_cache_context,
+            query::{output_type, resolve},
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::inherited_numeric(
+        "SELECT sum(1) OVER (w RANGE $7 PRECEDING) WINDOW w AS (ORDER BY 1)",
+        PgBuiltInType::int4()
+    )]
+    #[case::range_date(
+        "SELECT sum(1) OVER (ORDER BY $8::date RANGE $7 PRECEDING)",
+        crate::sem::TypeReference::from_master_type_name("interval")
+    )]
+    #[case::using("SELECT 1 ORDER BY $7 USING <", PgBuiltInType::int4())]
+    fn uses_clause_specific_constraints(#[case] sql: &str, #[case] ty: SemTypeReference) {
+        let (_, context) = resolve(sql, Dialect::postgres(), true).unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let domain = context
+            .parameter_constraints()
+            .parameter(7)
+            .unwrap()
+            .constraint();
+        assert!(!domain.is_any());
+        assert!(domain.allows(&ty));
+        assert!(!domain.allows(&PgBuiltInType::text()));
+    }
+
+    #[test]
+    fn values_refresh_result_metadata_after_inference() {
+        let (query, context) = resolve("VALUES ($1 + 1)", Dialect::postgres(), true).unwrap();
+        assert_eq!(context.reported_problem_count(), 0);
+        assert_eq!(output_type(&query, "column1"), Some(PgBuiltInType::int4()));
+    }
+
+    #[test]
+    fn inference_uses_captured_function_and_operator_bindings() {
+        let (mut query, mut catalog) = resolve(
+            "SELECT sum($1 + 1) FILTER (WHERE $2) ORDER BY $3 + 1",
+            Dialect::postgres(),
+            false,
+        )
+        .unwrap();
+        catalog.setup_function("sum", &[]);
+        catalog.set_get_operator_op_result(&OperatorName::from_parts(None, "+"), true, true, None);
+        catalog.begin_parameter_type_analysis();
+        let constraints =
+            ParameterResolution::infer_query(&mut query, &mut catalog, &mut create_cache_context())
+                .unwrap();
+        catalog.finish_analysis(Ok(())).unwrap();
+        assert_eq!(catalog.reported_problem_count(), 0);
+        assert!(
+            constraints
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .allows(&PgBuiltInType::int4())
+        );
+        assert!(!constraints.parameter(1).unwrap().constraint().is_any());
+        assert_eq!(
+            constraints
+                .parameter(2)
+                .unwrap()
+                .constraint()
+                .admissible_types(),
+            Some([PgBuiltInType::bool()].as_slice())
+        );
+        assert!(!constraints.parameter(3).unwrap().constraint().is_any());
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_insert(
         insert: &mut InsertStatement,
         context: &mut impl ParseContext,
@@ -1590,6 +2102,88 @@ impl<'cache> ParameterResolution<'cache> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test_infers_assignment_parameters {
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        parse_statements,
+        sem::{PgBuiltInType, SemAst},
+        test_helpers::{
+            create_cache_context as test_helpers_create_cache_context, insert as test_helpers,
+            insert::analyze,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case::cte("WITH c AS (SELECT $1 n) INSERT INTO items(id) SELECT n FROM c")]
+    #[case::value("INSERT INTO items(id) VALUES ($1) RETURNING id")]
+    #[case::select("INSERT INTO items(id) SELECT $1 RETURNING id")]
+    #[case::later_row("INSERT INTO items(id) VALUES (1), ($1) RETURNING id")]
+    #[case::repeated("INSERT INTO items(id) VALUES ($1), ($1) RETURNING id")]
+    #[case::compound("INSERT INTO items(id) SELECT $1 UNION ALL SELECT $1 RETURNING id")]
+    fn infers_assignment_parameters(#[case] sql: &str) {
+        let (_, context) = analyze(sql, Dialect::postgres());
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:#?}",
+            context.reported_problems()
+        );
+        let constraint = context
+            .parameter_constraints()
+            .parameter(1)
+            .expect("parameter");
+        assert!(constraint.constraint().allows(&PgBuiltInType::int4()));
+        assert!(!constraint.constraint().allows(&PgBuiltInType::text()));
+    }
+
+    #[rstest::rstest]
+    #[case::value("INSERT INTO items(id) VALUES($1)")]
+    #[case::subscript("INSERT INTO arrays(a[$1]) VALUES(1)")]
+    fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
+        use crate::sem::{CastContext, CastDefinition};
+        let mut context = test_helpers::catalog(Dialect::postgres());
+        context.setup_type(PgBuiltInType::int8());
+        context.set_get_implicit_cast_result(
+            &PgBuiltInType::int8(),
+            &PgBuiltInType::int4(),
+            Some(CastDefinition::new(CastContext::assignment())),
+        );
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        SemAst::from_ast_node(
+            statement.node(),
+            &mut context,
+            &mut test_helpers_create_cache_context(),
+        )
+        .unwrap();
+        assert!(
+            context
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .allows(&PgBuiltInType::int8())
+        );
+        assert!(
+            !crate::context::CastInfoRead::get_implicit_cast(
+                &context,
+                &PgBuiltInType::int8(),
+                &PgBuiltInType::int4()
+            )
+            .unwrap()
+            .use_in_implicit()
+        );
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_update(
         update: &mut UpdateStatement,
         context: &mut impl ParseContext,
@@ -1617,6 +2211,97 @@ impl<'cache> ParameterResolution<'cache> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test_infers_parameters {
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType, test_helpers::update::analyze,
+    };
+
+    #[rstest::rstest]
+    #[case::set("UPDATE items SET id=$1")]
+    #[case::cte("WITH s AS (SELECT $1::integer n) UPDATE items SET id=s.n FROM s")]
+    #[case::subquery("UPDATE items SET id=(SELECT $1::integer)")]
+    #[case::row_subquery("UPDATE items SET (id,label)=(SELECT $1::integer,'two')")]
+    #[case::cte_returning("WITH u AS (UPDATE items SET id=$1 RETURNING id) SELECT id FROM u")]
+    fn infers_parameters(#[case] sql: &str) {
+        let (_, context) = analyze(sql, Dialect::postgres());
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let constraint = context.parameter_constraints().parameter(1).unwrap();
+        assert!(constraint.constraint().allows(&PgBuiltInType::int4()));
+        assert!(!constraint.constraint().allows(&PgBuiltInType::bool()));
+    }
+}
+
+#[cfg(test)]
+mod test_synthetic_array_parameters_retain_assignment_compatibility {
+    use crate::{
+        ast::Dialect,
+        parse_statements,
+        sem::SemAst,
+        test_helpers::{create_cache_context, update_assignments as test_helpers},
+    };
+
+    #[test]
+    fn synthetic_array_parameters_retain_assignment_compatibility() {
+        let mut context = test_helpers::catalog();
+        let result = SemAst::from_ast_node(
+            parse_statements("UPDATE arrays SET a[$1]=$2", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap()
+                .node(),
+            &mut context,
+            &mut create_cache_context(),
+        );
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+#[cfg(test)]
+mod test_inferred_types_reach_stored_assignments_predicates_and_outputs {
+    use crate::{ast::Dialect, sem::PgBuiltInType, test_helpers::update::analyze};
+
+    #[test]
+    fn inferred_types_reach_stored_assignments_predicates_and_outputs() {
+        let (statement, context) = analyze(
+            "UPDATE items SET id=$1 WHERE $2 RETURNING id AS n",
+            Dialect::postgres(),
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let update = statement.as_update().unwrap();
+        assert_eq!(
+            update.assignments()[0]
+                .value()
+                .as_expression()
+                .unwrap()
+                .get_type(),
+            Some(PgBuiltInType::int4())
+        );
+        assert_eq!(
+            update.predicate().unwrap().get_type(),
+            Some(PgBuiltInType::bool())
+        );
+        assert_eq!(
+            update.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_delete(
         delete: &mut DeleteStatement,
         context: &mut impl ParseContext,
@@ -1644,6 +2329,57 @@ impl<'cache> ParameterResolution<'cache> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test_infers_parameters_delete_statement {
+
+    use crate::{
+        ast::Dialect, context::ParseContext, sem::PgBuiltInType, test_helpers::delete::analyze,
+    };
+
+    #[rstest::rstest]
+    #[case::where_parameter("DELETE FROM items WHERE $1", true)]
+    #[case::returning("DELETE FROM items RETURNING $1::integer", false)]
+    #[case::with(
+        "WITH s AS (SELECT $1::integer n) DELETE FROM items USING s RETURNING s.n",
+        false
+    )]
+    #[case::nested("DELETE FROM items RETURNING (SELECT $1::integer)", false)]
+    #[case::cte_returning(
+        "WITH d(n) AS (DELETE FROM items RETURNING $1::integer) SELECT n FROM d",
+        false
+    )]
+    fn infers_parameters(#[case] sql: &str, #[case] boolean: bool) {
+        let (_, context) = analyze(sql, Dialect::postgres());
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let constraint = context.parameter_constraints().parameter(1).unwrap();
+        assert_eq!(
+            constraint.constraint().allows(&PgBuiltInType::bool()),
+            boolean
+        );
+        assert_eq!(
+            constraint.constraint().allows(&PgBuiltInType::int4()),
+            !boolean
+        );
+    }
+
+    #[test]
+    fn synthetic_parameter_conflict_retains_its_diagnostic() {
+        let (_, context) = analyze(
+            "DELETE FROM items WHERE $1 RETURNING $1::integer",
+            Dialect::postgres(),
+        );
+        assert!(context.reported_problem_count() > 0);
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_merge(
         merge: &mut MergeStatement,
         context: &mut impl ParseContext,
@@ -1671,6 +2407,77 @@ impl<'cache> ParameterResolution<'cache> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test_infers_parameters_across_ordered_actions_and_returning {
+    use crate::{
+        context::ParseContext,
+        sem::{
+            PgBuiltInType,
+            parameter_resolution::inference_runs as parameter_resolution_inference_runs,
+        },
+        test_helpers::{document_merge::catalog, statements::resolve_postgres as resolve},
+    };
+
+    #[test]
+    fn infers_parameters_across_ordered_actions_and_returning() {
+        let mut context = catalog(17);
+        let before = parameter_resolution_inference_runs();
+        let statement = resolve("MERGE INTO items t USING incoming s ON $2 WHEN MATCHED AND $3 THEN UPDATE SET id=$1 WHEN NOT MATCHED THEN INSERT(id) VALUES($1) RETURNING $1::integer AS value", &mut context).unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            crate::sem::parameter_resolution::inference_runs(),
+            before + 1
+        );
+        assert!(
+            context
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .allows(&PgBuiltInType::int4())
+        );
+        assert!(
+            context
+                .parameter_constraints()
+                .parameter(2)
+                .unwrap()
+                .constraint()
+                .allows(&PgBuiltInType::bool())
+        );
+        assert_eq!(
+            statement
+                .as_merge()
+                .unwrap()
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_reports_parameter_conflicts_across_when_actions {
+    use crate::test_helpers::merge_assignments::assert_rejected;
+
+    #[test]
+    fn reports_parameter_conflicts_across_when_actions() {
+        assert_rejected(
+            "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET id=$1 WHEN NOT MATCHED THEN INSERT(label) VALUES($1)",
+            17,
+        );
+    }
+}
+
+impl<'cache> ParameterResolution<'cache> {
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
         context: &mut impl ParseContext,

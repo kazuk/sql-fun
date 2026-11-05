@@ -75,7 +75,62 @@ impl DataSourceRowFunctions {
             .filter_map(|function| function.source()?.resolved_function_name().cloned())
             .collect()
     }
+}
 
+#[cfg(test)]
+mod test_preserves_distinct_rows_function_names_with_equal_signatures {
+    use crate::test_helpers::query::table_function_query;
+
+    #[test]
+    fn preserves_distinct_rows_function_names_with_equal_signatures() {
+        use crate::{
+            names::{AliasName, FullName},
+            sem::{DataSource, QueryNameResolution},
+        };
+        let (query, context) = table_function_query(
+            "SELECT r.* FROM ROWS FROM(record_fun('') AS(a int),overloaded_record('') AS(b int)) r",
+            false,
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let source = query
+            .query_clauses()
+            .unwrap()
+            .body()
+            .source_scope()
+            .unwrap()
+            .resolve_alias(&AliasName::from("r"))
+            .unwrap()
+            .0;
+        let restored: DataSource =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        let DataSource::RowFunctions(rows) = &restored else {
+            panic!("ROWS FROM")
+        };
+        assert_eq!(
+            rows.resolved_function_names(),
+            vec![
+                crate::sem::QueryName::new(
+                    "record_fun",
+                    QueryNameResolution::function(&FullName::with_schema("public", "record_fun"))
+                ),
+                crate::sem::QueryName::new(
+                    "overloaded_record",
+                    QueryNameResolution::function(&FullName::with_schema(
+                        "public",
+                        "overloaded_record"
+                    ))
+                ),
+            ]
+        );
+    }
+}
+
+impl DataSourceRowFunctions {
     /// get alias name
     #[must_use]
     pub fn get_aliases(&self) -> Vec<AliasSpec> {
@@ -93,6 +148,26 @@ pub struct DataSourceRowsFromFunc {
 enum RowsFromSource {
     Invocation(Box<DataSource>),
     Expression(Box<RowsFromExpression>),
+}
+
+#[cfg(test)]
+mod test_preserves_existing_invocation_wire_shape {
+    use crate::{
+        sem::DataSourceRowsFromFunc,
+        test_helpers::{rows_from, sampling},
+    };
+
+    #[test]
+    fn preserves_existing_invocation_wire_shape() {
+        let mut context = sampling::context();
+        let query =
+            sampling::query("SELECT r.v FROM ROWS FROM(scalar507(1)) r(v)", &mut context).unwrap();
+        let source = rows_from::source(&query, "r");
+        let value = ::serde_json::to_value(&source.functions()[0]).unwrap();
+        assert!(value["source"].get("CallTableFunc").is_some());
+        let restored: DataSourceRowsFromFunc = ::serde_json::from_value(value).unwrap();
+        assert_eq!(&restored, &source.functions()[0]);
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -255,113 +330,27 @@ impl DataSourceRowsFromFunc {
     }
 }
 
-#[cfg(test)]
-mod test_expression_sources {
+impl DataSourceRowFunctions {
+    pub(crate) fn walk<V: SemanticVisitorMut>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        let mut functions = self.functions.to_vec();
+        for function in &mut functions {
+            function.walk(visitor)?;
+        }
+        self.functions = functions.into();
+        Ok(())
+    }
+}
 
+#[cfg(test)]
+mod test_visits_unselected_operands_and_preserves_parameter_domains {
     use crate::{
         context::ParseContext,
-        names::AliasName,
-        sem::{DataSourceRowFunctions, DataSourceRowsFromFunc, PgBuiltInType},
+        sem::PgBuiltInType,
         test_helpers::{rows_from, sampling},
     };
-
-    #[test]
-    fn retains_expression_binding_and_serialization() {
-        let mut context = sampling::context();
-        let query = sampling::query(
-            "SELECT r.v FROM ROWS FROM(CAST(1 AS int)) r(v)",
-            &mut context,
-        )
-        .unwrap();
-        assert_eq!(
-            context.reported_problem_count(),
-            0,
-            "{:?}",
-            context.reported_problems()
-        );
-        let source = rows_from::source(&query, "r");
-        assert!(source.functions()[0].source().is_none());
-        assert!(source.functions()[0].value().is_some());
-        let restored: DataSourceRowFunctions =
-            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
-        assert_eq!(&restored, source);
-        let column = query
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .expression()
-            .unwrap()
-            .as_source_column()
-            .unwrap();
-        assert_eq!(column.alias(), &AliasName::from("r"));
-        assert_eq!(column.name().as_str(), "v");
-        assert_eq!(column.value().get_type(), Some(PgBuiltInType::int4()));
-    }
-
-    #[rstest::rstest]
-    #[case::sql_value("CURRENT_DATE")]
-    #[case::coalesce("COALESCE(NULL::int,1)")]
-    #[case::cast("CAST(1 AS int)")]
-    fn legacy_entry_retains_special_expression(#[case] expression: &str) {
-        let source = rows_from::legacy_element(expression, sampling::context());
-        assert!(source.source().is_none());
-        assert!(source.value().is_some());
-        assert!(!source.has_invalid_expression());
-    }
-
-    #[test]
-    fn preserves_existing_invocation_wire_shape() {
-        let mut context = sampling::context();
-        let query =
-            sampling::query("SELECT r.v FROM ROWS FROM(scalar507(1)) r(v)", &mut context).unwrap();
-        let source = rows_from::source(&query, "r");
-        let value = ::serde_json::to_value(&source.functions()[0]).unwrap();
-        assert!(value["source"].get("CallTableFunc").is_some());
-        let restored: DataSourceRowsFromFunc = ::serde_json::from_value(value).unwrap();
-        assert_eq!(&restored, &source.functions()[0]);
-    }
-
-    #[test]
-    fn retains_rejected_expression_and_its_operands() {
-        let mut context = sampling::context();
-        let query = sampling::query(
-            "SELECT 1 FROM ROWS FROM(COALESCE(set507(1),0)) r",
-            &mut context,
-        )
-        .unwrap();
-        let source = rows_from::source(&query, "r");
-        assert!(source.functions()[0].has_invalid_expression());
-        assert!(matches!(
-            source.functions()[0].value().unwrap(),
-            crate::sem::SemScalarExpr::Coalesce(_)
-        ));
-        let restored: DataSourceRowFunctions =
-            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
-        assert_eq!(&restored, source);
-    }
-
-    #[rstest::rstest]
-    #[case::plain("1", false)]
-    #[case::nested_set("set507(1)", true)]
-    fn named_placement_resolves_signature_and_retains_known_violations(
-        #[case] argument: &str,
-        #[case] invalid: bool,
-    ) {
-        let mut context = rows_from::deferred_returns_context();
-        let query = sampling::query(
-            &format!("SELECT 1 FROM ROWS FROM(CAST(pending508(n => {argument}) AS int)) r"),
-            &mut context,
-        )
-        .unwrap();
-        let source = rows_from::source(&query, "r");
-        let element = &source.functions()[0];
-        assert!(!element.has_pending_placement());
-        assert_eq!(element.has_invalid_expression(), invalid);
-        assert_eq!(context.reported_problem_count(), usize::from(invalid));
-        let restored: DataSourceRowFunctions =
-            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
-        assert_eq!(&restored, source);
-    }
 
     #[test]
     fn visits_unselected_operands_and_preserves_parameter_domains() {
@@ -407,17 +396,6 @@ mod test_expression_sources {
 }
 
 impl DataSourceRowFunctions {
-    pub(crate) fn walk<V: SemanticVisitorMut>(
-        &mut self,
-        visitor: &mut V,
-    ) -> Result<(), AnalysisError> {
-        let mut functions = self.functions.to_vec();
-        for function in &mut functions {
-            function.walk(visitor)?;
-        }
-        self.functions = functions.into();
-        Ok(())
-    }
     pub(crate) fn visit<V: SemanticVisitor>(&self, visitor: &mut V) -> Result<(), AnalysisError> {
         visitor.enter_rows_functions();
         for function in self.functions.iter() {
@@ -480,6 +458,78 @@ impl DataSourceRowFunctions {
             Ok(columns)
         }
     }
+}
+
+#[cfg(test)]
+mod test_preserves_ordinality_and_join_nullability {
+    use crate::{
+        sem::PgBuiltInType,
+        test_helpers::query::{output_type, table_function_query},
+    };
+
+    #[rstest::rstest]
+    #[case::qualified(
+        "SELECT r.n FROM ROWS FROM(record_fun('') AS(a int)) WITH ORDINALITY r(a,n)",
+        Some(true)
+    )]
+    #[case::star(
+        "SELECT r.* FROM ROWS FROM(record_fun('') AS(a int)) WITH ORDINALITY r(a,n)",
+        Some(true)
+    )]
+    #[case::nullable(
+        "SELECT r.n FROM (SELECT 1 AS id) s LEFT JOIN ROWS FROM(record_fun('') AS(a int)) WITH ORDINALITY r(a,n) ON true",
+        Some(false)
+    )]
+    fn preserves_ordinality_and_join_nullability(
+        #[case] sql: &str,
+        #[case] not_null: Option<bool>,
+    ) {
+        let (query, context) = table_function_query(sql, false);
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(output_type(&query, "n"), Some(PgBuiltInType::int8()));
+        assert_eq!(
+            query
+                .get_result_column_def(&crate::names::ColumnName::from("n"))
+                .unwrap()
+                .is_not_null(),
+            not_null
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_composes_multiple_record_calls_in_written_order {
+    use crate::{sem::PgBuiltInType, test_helpers::query::table_function_query};
+
+    #[test]
+    fn composes_multiple_record_calls_in_written_order() {
+        let (query, context) = table_function_query(
+            "SELECT r.* FROM ROWS FROM(record_fun('') AS(a int),record_fun('') AS(b text)) r",
+            false,
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            query.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+        assert_eq!(
+            query.result_columns().get_column_at(1).unwrap().col_type(),
+            &Some(PgBuiltInType::text())
+        );
+    }
+}
+
+impl DataSourceRowFunctions {
     pub(super) fn column_names(
         &self,
         context: &impl ParseContext,
@@ -662,6 +712,56 @@ impl DataSourceRowsFromFunc {
     }
 }
 
+#[cfg(test)]
+mod test_retains_rejected_expression_and_its_operands {
+    use crate::{
+        sem::DataSourceRowFunctions,
+        test_helpers::{rows_from, sampling},
+    };
+
+    #[test]
+    fn retains_rejected_expression_and_its_operands() {
+        let mut context = sampling::context();
+        let query = sampling::query(
+            "SELECT 1 FROM ROWS FROM(COALESCE(set507(1),0)) r",
+            &mut context,
+        )
+        .unwrap();
+        let source = rows_from::source(&query, "r");
+        assert!(source.functions()[0].has_invalid_expression());
+        assert!(matches!(
+            source.functions()[0].value().unwrap(),
+            crate::sem::SemScalarExpr::Coalesce(_)
+        ));
+        let restored: DataSourceRowFunctions =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+    }
+
+    #[rstest::rstest]
+    #[case::plain("1", false)]
+    #[case::nested_set("set507(1)", true)]
+    fn named_placement_resolves_signature_and_retains_known_violations(
+        #[case] argument: &str,
+        #[case] invalid: bool,
+    ) {
+        let mut context = rows_from::deferred_returns_context();
+        let query = sampling::query(
+            &format!("SELECT 1 FROM ROWS FROM(CAST(pending508(n => {argument}) AS int)) r"),
+            &mut context,
+        )
+        .unwrap();
+        let source = rows_from::source(&query, "r");
+        let element = &source.functions()[0];
+        assert!(!element.has_pending_placement());
+        assert_eq!(element.has_invalid_expression(), invalid);
+        assert_eq!(context.reported_problem_count(), usize::from(invalid));
+        let restored: DataSourceRowFunctions =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+    }
+}
+
 impl DataSource {
     fn default_function_alias(&self) -> String {
         self.get_aliases()
@@ -733,5 +833,58 @@ impl DataSourceRowsFromFunc {
             TableFunctionOutput::ast_expression_name(ast, &value)?
         };
         Self::expression(&value, &name, context)
+    }
+}
+
+#[cfg(test)]
+mod test_retains_expression_binding_and_serialization {
+    use crate::{
+        names::AliasName,
+        sem::{DataSourceRowFunctions, PgBuiltInType},
+        test_helpers::{rows_from, sampling},
+    };
+
+    #[test]
+    fn retains_expression_binding_and_serialization() {
+        let mut context = sampling::context();
+        let query = sampling::query(
+            "SELECT r.v FROM ROWS FROM(CAST(1 AS int)) r(v)",
+            &mut context,
+        )
+        .unwrap();
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let source = rows_from::source(&query, "r");
+        assert!(source.functions()[0].source().is_none());
+        assert!(source.functions()[0].value().is_some());
+        let restored: DataSourceRowFunctions =
+            ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
+        assert_eq!(&restored, source);
+        let column = query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_source_column()
+            .unwrap();
+        assert_eq!(column.alias(), &AliasName::from("r"));
+        assert_eq!(column.name().as_str(), "v");
+        assert_eq!(column.value().get_type(), Some(PgBuiltInType::int4()));
+    }
+
+    #[rstest::rstest]
+    #[case::sql_value("CURRENT_DATE")]
+    #[case::coalesce("COALESCE(NULL::int,1)")]
+    #[case::cast("CAST(1 AS int)")]
+    fn legacy_entry_retains_special_expression(#[case] expression: &str) {
+        let source = rows_from::legacy_element(expression, sampling::context());
+        assert!(source.source().is_none());
+        assert!(source.value().is_some());
+        assert!(!source.has_invalid_expression());
     }
 }

@@ -37,6 +37,20 @@ impl UpdateStatement {
     }
 }
 
+#[cfg(test)]
+mod test_nested_update_cte_reports_a_query_problem {
+    use crate::{ast::Dialect, test_helpers::update::analyze};
+
+    #[test]
+    fn nested_update_cte_reports_a_query_problem() {
+        let (_, context) = analyze(
+            "SELECT (WITH u AS (UPDATE items SET id=1 RETURNING id) SELECT id FROM u)",
+            Dialect::postgres(),
+        );
+        assert!(context.reported_problem_count() > 0);
+    }
+}
+
 impl UpdateStatement {
     pub(crate) fn from_ast_trigger_command(
         ast: &Update,
@@ -83,343 +97,14 @@ impl UpdateStatement {
 }
 
 #[cfg(test)]
-mod test_from_ast {
+mod test_preserves_default_and_resets_parameters {
     use crate::{
         ast::Dialect,
         context::ParseContext,
         parse_statements,
-        sem::{
-            PgBuiltInType, SemAst,
-            parameter_resolution::inference_runs as parameter_resolution_inference_runs,
-        },
-        test_helpers::{
-            create_cache_context, update as test_helpers,
-            update::{analyze, catalog},
-        },
+        sem::SemAst,
+        test_helpers::{create_cache_context, update::catalog},
     };
-    mod assignments {
-        use crate::{
-            ast::Dialect,
-            parse_statements,
-            sem::SemAst,
-            test_helpers::{create_cache_context, update_assignments as test_helpers},
-        };
-
-        #[test]
-        fn synthetic_array_parameters_retain_assignment_compatibility() {
-            let mut context = test_helpers::catalog();
-            let result = SemAst::from_ast_node(
-                parse_statements("UPDATE arrays SET a[$1]=$2", Dialect::postgres())
-                    .next()
-                    .unwrap()
-                    .unwrap()
-                    .node(),
-                &mut context,
-                &mut create_cache_context(),
-            );
-            assert!(result.is_ok(), "{result:?}");
-            assert_eq!(context.reported_problem_count(), 0);
-        }
-    }
-    mod cursors {
-        use crate::{
-            ast::Dialect,
-            context::ParseContext,
-            names::{FullName, TableName},
-            sem::CursorInfo,
-            test_helpers::{statements::resolve_cursor as resolve, update::catalog},
-        };
-
-        #[rstest::rstest]
-        #[case::target(Some("items"), Some(true), false)]
-        #[case::unknown_target(None, Some(true), false)]
-        #[case::unknown_eligibility(Some("items"), None, false)]
-        #[case::unknown_facts(None, None, false)]
-        #[case::wrong_target(Some("other"), Some(true), true)]
-        #[case::read_only(Some("items"), Some(false), true)]
-        fn resolves_portal_in_current_context(
-            #[case] target: Option<&str>,
-            #[case] updatable: Option<bool>,
-            #[case] invalid: bool,
-        ) {
-            let mut context = catalog(Dialect::postgres());
-            let target = target.map(|name| TableName::from(FullName::with_schema("public", name)));
-            let info = CursorInfo::new(target.as_ref(), updatable);
-            context.bind_cursor("portal", &info);
-            let statement = resolve(
-                "UPDATE items AS i SET id=$1 WHERE CURRENT OF portal RETURNING i.id",
-                &mut context,
-            );
-            let update = statement.as_update().unwrap();
-            assert!(update.predicate().is_none());
-            let cursor = update.current_of().unwrap();
-            assert_eq!(cursor.name(), "portal");
-            assert_eq!(cursor.binding(), Some(&info));
-            assert_eq!(
-                context.reported_problem_count() > 0,
-                invalid,
-                "{:?}",
-                context.reported_problems()
-            );
-            assert!(
-                context
-                    .parameter_constraints()
-                    .parameter(1)
-                    .unwrap()
-                    .constraint()
-                    .allows(&crate::sem::PgBuiltInType::int4())
-            );
-        }
-
-        #[rstest::rstest]
-        #[case::empty_scope(false)]
-        #[case::different_portal(true)]
-        fn retains_missing_reference(#[case] other_binding: bool) {
-            let mut context = catalog(Dialect::postgres());
-            if other_binding {
-                context.bind_cursor("other", &CursorInfo::new(None, None));
-            }
-            let statement = resolve(
-                "UPDATE items SET id=1 WHERE CURRENT OF absent",
-                &mut context,
-            );
-            let cursor = statement.as_update().unwrap().current_of().unwrap();
-            assert_eq!(cursor.name(), "absent");
-            assert!(cursor.binding().is_none());
-            assert_eq!(context.reported_problem_count(), 1);
-            assert!(context.reported_problems()[0].update_problem().is_some());
-        }
-
-        #[test]
-        fn portal_scope_survives_statement_reset_and_can_be_replaced() {
-            let mut context = catalog(Dialect::postgres());
-            context.bind_cursor("portal", &CursorInfo::new(None, None));
-            let first = resolve(
-                "UPDATE items SET id=1 WHERE CURRENT OF portal",
-                &mut context,
-            );
-            let second = resolve(
-                "UPDATE items SET id=2 WHERE CURRENT OF portal",
-                &mut context,
-            );
-            assert!(
-                first
-                    .as_update()
-                    .unwrap()
-                    .current_of()
-                    .unwrap()
-                    .binding()
-                    .is_some()
-            );
-            assert!(
-                second
-                    .as_update()
-                    .unwrap()
-                    .current_of()
-                    .unwrap()
-                    .binding()
-                    .is_some()
-            );
-            let replacement = CursorInfo::new(None, Some(false));
-            context.bind_cursor("portal", &replacement);
-            let third = resolve(
-                "UPDATE items SET id=3 WHERE CURRENT OF portal",
-                &mut context,
-            );
-            assert_eq!(
-                third.as_update().unwrap().current_of().unwrap().binding(),
-                Some(&replacement)
-            );
-            // Semantic results are snapshots, independent of subsequent scope changes.
-            assert_eq!(
-                first
-                    .as_update()
-                    .unwrap()
-                    .current_of()
-                    .unwrap()
-                    .binding()
-                    .unwrap()
-                    .updatable(),
-                None
-            );
-            context.remove_cursor("portal");
-            let last = resolve(
-                "UPDATE items SET id=4 WHERE CURRENT OF portal",
-                &mut context,
-            );
-            assert!(
-                last.as_update()
-                    .unwrap()
-                    .current_of()
-                    .unwrap()
-                    .binding()
-                    .is_none()
-            );
-        }
-
-        #[rstest::rstest]
-        #[case::quoted(r#"UPDATE items SET id=1 WHERE CURRENT OF "Mixed""#, "Mixed", false)]
-        #[case::unquoted("UPDATE items SET id=1 WHERE CURRENT OF Mixed", "mixed", true)]
-        fn portal_names_follow_identifier_rules(
-            #[case] sql: &str,
-            #[case] name: &str,
-            #[case] missing: bool,
-        ) {
-            let mut context = catalog(Dialect::postgres());
-            context.bind_cursor("Mixed", &CursorInfo::new(None, None));
-            let statement = resolve(sql, &mut context);
-            let cursor = statement.as_update().unwrap().current_of().unwrap();
-            assert_eq!(cursor.name(), name);
-            assert_eq!(cursor.binding().is_none(), missing);
-        }
-    }
-    mod views {
-        use crate::{
-            ast::Dialect,
-            names::{ColumnName, FullName},
-            parse_statements,
-            sem::{CreateView, SemAst, ViewLike, ViewUpdateSupport},
-            test_helpers::{create_cache_context, update::catalog},
-        };
-
-        #[rstest::rstest]
-        #[case::writable("UPDATE writable_items SET id=$1 RETURNING *", true, true, true)]
-        #[case::cte_shadow(
-            "WITH writable_items AS (SELECT 2 other) UPDATE writable_items SET id=1 RETURNING *",
-            true,
-            true,
-            true
-        )]
-        #[case::read_only("UPDATE writable_items SET id=1", false, false, false)]
-        #[case::column("UPDATE writable_items SET label='one'", true, true, false)]
-        #[case::returning("UPDATE writable_items SET id=1 RETURNING id", true, false, false)]
-        fn respects_update_capabilities(
-            #[case] sql: &str,
-            #[case] writable: bool,
-            #[case] returning: bool,
-            #[case] valid: bool,
-        ) {
-            let mut context = catalog(Dialect::postgres());
-            let view_query = SemAst::from_ast_node(
-                parse_statements("SELECT id,label FROM items", Dialect::postgres())
-                    .next()
-                    .unwrap()
-                    .unwrap()
-                    .node(),
-                &mut context,
-                &mut create_cache_context(),
-            )
-            .unwrap()
-            .into_select_statemtnt()
-            .unwrap();
-            let name = FullName::with_schema("public", "writable_items");
-            let view = CreateView::new(&name, &view_query, &[], &None, false);
-            context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
-            let support = if writable {
-                ViewUpdateSupport::writable(
-                    &[view.get_column_def(&ColumnName::from("id")).unwrap()],
-                    returning,
-                )
-            } else {
-                ViewUpdateSupport::read_only()
-            };
-            context.set_view_update_support(&name, &support);
-            let result = SemAst::from_ast_node(
-                parse_statements(sql, Dialect::postgres())
-                    .next()
-                    .unwrap()
-                    .unwrap()
-                    .node(),
-                &mut context,
-                &mut create_cache_context(),
-            );
-            assert_eq!(
-                context.reported_problem_count() == 0,
-                valid,
-                "{:?}",
-                context.reported_problems()
-            );
-            if valid {
-                assert_eq!(
-                    result.unwrap().as_update().unwrap().target().to_string(),
-                    "public.writable_items"
-                );
-            }
-        }
-    }
-
-    #[cfg(feature = "sqlite")]
-    use crate::{sem::SemAst as SemSemAst, test_helpers::SqliteSynBuilder};
-
-    #[rstest::rstest]
-    #[case::literal("UPDATE items SET id=2 RETURNING *")]
-    #[case::only("UPDATE ONLY items SET id=2 RETURNING id")]
-    #[case::default("UPDATE items SET id=DEFAULT RETURNING id")]
-    #[case::alias("UPDATE items AS i SET id=i.id RETURNING i.id AS changed")]
-    #[case::simultaneous("UPDATE items SET id=id,label=label")]
-    #[case::row("UPDATE items SET (id,label)=(2,'two') RETURNING id")]
-    #[case::row_query("UPDATE items SET (id,label)=(SELECT 2,'two') RETURNING id")]
-    #[case::from("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING s.n")]
-    #[case::target_star("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING *")]
-    #[case::source_star("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING s.*")]
-    #[case::cte("WITH s AS (SELECT 2 n) UPDATE items SET id=s.n FROM s RETURNING id")]
-    #[case::subquery("UPDATE items SET id=(SELECT items.id)")]
-    fn retains_update_bindings(#[case] sql: &str) {
-        let (statement, context) = analyze(sql, Dialect::postgres());
-        assert_eq!(
-            context.reported_problem_count(),
-            0,
-            "{:?}",
-            context.reported_problems()
-        );
-        let update = statement.as_update().unwrap();
-        assert_eq!(update.target().to_string(), "public.items");
-        assert!(!update.assignments().is_empty());
-        assert!(update.assignments()[0].destination().get_type().is_some());
-    }
-
-    #[rstest::rstest]
-    #[case::set("UPDATE items SET id=$1")]
-    #[case::cte("WITH s AS (SELECT $1::integer n) UPDATE items SET id=s.n FROM s")]
-    #[case::subquery("UPDATE items SET id=(SELECT $1::integer)")]
-    #[case::row_subquery("UPDATE items SET (id,label)=(SELECT $1::integer,'two')")]
-    #[case::cte_returning("WITH u AS (UPDATE items SET id=$1 RETURNING id) SELECT id FROM u")]
-    fn infers_parameters(#[case] sql: &str) {
-        let (_, context) = analyze(sql, Dialect::postgres());
-        assert_eq!(
-            context.reported_problem_count(),
-            0,
-            "{:?}",
-            context.reported_problems()
-        );
-        let constraint = context.parameter_constraints().parameter(1).unwrap();
-        assert!(constraint.constraint().allows(&PgBuiltInType::int4()));
-        assert!(!constraint.constraint().allows(&PgBuiltInType::bool()));
-    }
-
-    #[rstest::rstest]
-    #[case::missing_relation("UPDATE absent SET id=1", false)]
-    #[case::missing_column("UPDATE items SET absent=1", false)]
-    #[case::row_width("UPDATE items SET (id,label)=(SELECT 1)", true)]
-    #[case::unreadable("WITH u AS (UPDATE items SET id=1) SELECT * FROM u", true)]
-    fn rejects_invalid_structure(#[case] sql: &str, #[case] fatal: bool) {
-        let mut context = catalog(Dialect::postgres());
-        let statement = parse_statements(sql, Dialect::postgres())
-            .next()
-            .unwrap()
-            .unwrap();
-        let result =
-            SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context());
-        if fatal {
-            assert!(result.is_err());
-        } else {
-            assert!(matches!(
-                result.unwrap(),
-                crate::sem::SemAst::UnresolvedStatement
-            ));
-            assert!(context.reported_problem_count() > 0);
-        }
-    }
 
     #[test]
     fn preserves_default_and_resets_parameters() {
@@ -441,201 +126,6 @@ mod test_from_ast {
                 assert!(context.parameter_constraints().parameter(1).is_none());
             }
         }
-    }
-
-    #[cfg(feature = "sqlite")]
-    #[rstest::rstest]
-    #[case::plain("UPDATE items SET id=1 RETURNING *")]
-    #[case::duplicate("UPDATE items SET id=1,id=2 RETURNING id")]
-    #[case::row("UPDATE items SET (id,label)=(2,'two') RETURNING id")]
-    #[case::from("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING id")]
-    #[case::original_name("UPDATE items AS i SET id=2 RETURNING items.id")]
-    #[case::conflict("UPDATE OR FAIL items SET id=2 RETURNING id")]
-    #[case::not_indexed("UPDATE items NOT INDEXED SET id=2 RETURNING id")]
-    fn sqlite_update(#[case] sql: &str) {
-        test_helpers::sqlite_accepts(sql);
-        let (statement, context) = analyze(sql, Dialect::sqlite());
-        assert_eq!(
-            context.reported_problem_count(),
-            0,
-            "{:?}",
-            context.reported_problems()
-        );
-        assert!(!statement.as_update().unwrap().result_columns().is_empty());
-    }
-
-    #[cfg(feature = "sqlite")]
-    #[rstest::rstest]
-    #[case::alias("UPDATE items AS i SET id=1 RETURNING i.id")]
-    #[case::from("UPDATE items SET id=s.n FROM (SELECT 1 n) s RETURNING s.n")]
-    #[case::qualified_star("UPDATE items SET id=1 RETURNING items.*")]
-    fn sqlite_invalid_returning(#[case] sql: &str) {
-        let (_, context) = analyze(sql, Dialect::sqlite());
-        assert!(context.reported_problem_count() > 0);
-    }
-
-    #[test]
-    fn public_postgres_entry_points_share_update_resolution() {
-        use crate::{
-            PostgresDialect,
-            sem::{SemAst, analyze_update_statement},
-            syn::{ListOpt, Opt},
-        };
-        let sql = "UPDATE items SET id=$1 RETURNING id";
-        let parsed = PostgresDialect::parse(sql).unwrap();
-        let tokens = PostgresDialect::scan(sql).unwrap();
-        let result = SemAst::semantic_analysis(
-            test_helpers::catalog(Dialect::postgres()),
-            parsed.clone(),
-            &tokens,
-        )
-        .unwrap();
-        assert_eq!(result.ast().as_update().unwrap().result_columns().len(), 1);
-        assert!(
-            result
-                .context()
-                .parameter_constraints()
-                .parameter(1)
-                .is_some()
-        );
-        let update = parsed
-            .get_stmts()
-            .get(0)
-            .get_stmt()
-            .as_update_stmt()
-            .as_inner()
-            .unwrap();
-        let (result, context) =
-            analyze_update_statement(test_helpers::catalog(Dialect::postgres()), &None, update)
-                .unwrap();
-        assert_eq!(result.as_update().unwrap().result_columns().len(), 1);
-        assert!(context.parameter_constraints().parameter(1).is_some());
-    }
-
-    #[cfg(feature = "sqlite")]
-    #[test]
-    fn public_sqlite_entry_point_analyzes_update() {
-        let syntax = SqliteSynBuilder
-            .parse_as_stmt("UPDATE OR IGNORE items NOT INDEXED SET id=?1 RETURNING id");
-        let result = SemSemAst::semantic_analysis_sqlite_stmt(
-            catalog(Dialect::sqlite()),
-            syntax,
-            &::sql_fun_core::IVec::default(),
-        )
-        .unwrap();
-        let update = result.ast().as_update().unwrap();
-        assert!(update.or_conflict().is_some());
-        assert!(update.not_indexed());
-        assert_eq!(update.result_columns().len(), 1);
-        assert!(
-            result
-                .context()
-                .parameter_constraints()
-                .parameter(1)
-                .is_some()
-        );
-    }
-
-    #[test]
-    fn unreferenced_update_cte_is_analyzed_in_one_inference_pass() {
-        let mut context = catalog(Dialect::postgres());
-        let statement = parse_statements(
-            "WITH u AS (UPDATE items SET id=$1) SELECT 1",
-            Dialect::postgres(),
-        )
-        .next()
-        .unwrap()
-        .unwrap();
-        let before = parameter_resolution_inference_runs();
-        SemAst::from_ast_node(statement.node(), &mut context, &mut create_cache_context()).unwrap();
-        assert_eq!(
-            crate::sem::parameter_resolution::inference_runs(),
-            before + 1
-        );
-        assert_eq!(context.reported_problem_count(), 0);
-        assert!(context.parameter_constraints().parameter(1).is_some());
-    }
-
-    #[test]
-    fn inferred_types_reach_stored_assignments_predicates_and_outputs() {
-        let (statement, context) = analyze(
-            "UPDATE items SET id=$1 WHERE $2 RETURNING id AS n",
-            Dialect::postgres(),
-        );
-        assert_eq!(
-            context.reported_problem_count(),
-            0,
-            "{:?}",
-            context.reported_problems()
-        );
-        let update = statement.as_update().unwrap();
-        assert_eq!(
-            update.assignments()[0]
-                .value()
-                .as_expression()
-                .unwrap()
-                .get_type(),
-            Some(PgBuiltInType::int4())
-        );
-        assert_eq!(
-            update.predicate().unwrap().get_type(),
-            Some(PgBuiltInType::bool())
-        );
-        assert_eq!(
-            update.result_columns().get_column_at(0).unwrap().col_type(),
-            &Some(PgBuiltInType::int4())
-        );
-    }
-
-    #[test]
-    fn row_assignment_retains_full_subquery_and_selected_output() {
-        let (statement, context) = analyze(
-            "UPDATE items SET (id,label)=(SELECT $1::integer,'two')",
-            Dialect::postgres(),
-        );
-        assert_eq!(context.reported_problem_count(), 0);
-        let update = statement.as_update().unwrap();
-        let value = update.assignments()[0].value().as_query().unwrap();
-        assert_eq!(value.index(), 0);
-        assert_eq!(value.query().result_columns().len(), 2);
-        assert_eq!(
-            value
-                .query()
-                .result_columns()
-                .get_column_at(0)
-                .unwrap()
-                .col_type(),
-            &Some(PgBuiltInType::int4())
-        );
-        assert_eq!(
-            update.assignments()[1].value().as_query().unwrap().index(),
-            1
-        );
-    }
-
-    #[rstest::rstest]
-    #[case::returning("UPDATE items SET label=$1 RETURNING $1 n")]
-    #[case::cte("WITH u AS (UPDATE items SET id=1 RETURNING $1 n) SELECT n FROM u")]
-    fn postgres_returning_defaults_unknown_parameters_to_text(#[case] sql: &str) {
-        let (_, context) = analyze(sql, Dialect::postgres());
-        assert_eq!(
-            context.reported_problem_count(),
-            0,
-            "{:?}",
-            context.reported_problems()
-        );
-        let parameter = context.parameter_constraints().parameter(1).unwrap();
-        assert!(parameter.constraint().allows(&PgBuiltInType::text()));
-        assert!(!parameter.constraint().allows(&PgBuiltInType::int4()));
-    }
-
-    #[test]
-    fn nested_update_cte_reports_a_query_problem() {
-        let (_, context) = analyze(
-            "SELECT (WITH u AS (UPDATE items SET id=1 RETURNING id) SELECT id FROM u)",
-            Dialect::postgres(),
-        );
-        assert!(context.reported_problem_count() > 0);
     }
 }
 
@@ -750,6 +240,62 @@ impl UpdateStatement {
     }
 }
 
+#[cfg(test)]
+mod test_retains_update_bindings {
+    #[cfg(feature = "sqlite")]
+    use crate::test_helpers::update as test_helpers;
+
+    use crate::{ast::Dialect, test_helpers::update::analyze};
+
+    #[rstest::rstest]
+    #[case::literal("UPDATE items SET id=2 RETURNING *")]
+    #[case::only("UPDATE ONLY items SET id=2 RETURNING id")]
+    #[case::default("UPDATE items SET id=DEFAULT RETURNING id")]
+    #[case::alias("UPDATE items AS i SET id=i.id RETURNING i.id AS changed")]
+    #[case::simultaneous("UPDATE items SET id=id,label=label")]
+    #[case::row("UPDATE items SET (id,label)=(2,'two') RETURNING id")]
+    #[case::row_query("UPDATE items SET (id,label)=(SELECT 2,'two') RETURNING id")]
+    #[case::from("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING s.n")]
+    #[case::target_star("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING *")]
+    #[case::source_star("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING s.*")]
+    #[case::cte("WITH s AS (SELECT 2 n) UPDATE items SET id=s.n FROM s RETURNING id")]
+    #[case::subquery("UPDATE items SET id=(SELECT items.id)")]
+    fn retains_update_bindings(#[case] sql: &str) {
+        let (statement, context) = analyze(sql, Dialect::postgres());
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        let update = statement.as_update().unwrap();
+        assert_eq!(update.target().to_string(), "public.items");
+        assert!(!update.assignments().is_empty());
+        assert!(update.assignments()[0].destination().get_type().is_some());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::plain("UPDATE items SET id=1 RETURNING *")]
+    #[case::duplicate("UPDATE items SET id=1,id=2 RETURNING id")]
+    #[case::row("UPDATE items SET (id,label)=(2,'two') RETURNING id")]
+    #[case::from("UPDATE items SET id=s.n FROM (SELECT 2 n) s RETURNING id")]
+    #[case::original_name("UPDATE items AS i SET id=2 RETURNING items.id")]
+    #[case::conflict("UPDATE OR FAIL items SET id=2 RETURNING id")]
+    #[case::not_indexed("UPDATE items NOT INDEXED SET id=2 RETURNING id")]
+    fn sqlite_update(#[case] sql: &str) {
+        test_helpers::sqlite_accepts(sql);
+        let (statement, context) = analyze(sql, Dialect::sqlite());
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert!(!statement.as_update().unwrap().result_columns().is_empty());
+    }
+}
+
 impl UpdateStatement {
     pub(crate) fn from_ast_destination(
         ast: &Update,
@@ -789,6 +335,82 @@ impl UpdateStatement {
             ))?;
         }
         Ok(table)
+    }
+}
+
+#[cfg(test)]
+mod test_respects_update_capabilities {
+    use crate::{
+        ast::Dialect,
+        names::{ColumnName, FullName},
+        parse_statements,
+        sem::{CreateView, SemAst, ViewLike, ViewUpdateSupport},
+        test_helpers::{create_cache_context, update::catalog},
+    };
+
+    #[rstest::rstest]
+    #[case::writable("UPDATE writable_items SET id=$1 RETURNING *", true, true, true)]
+    #[case::cte_shadow(
+        "WITH writable_items AS (SELECT 2 other) UPDATE writable_items SET id=1 RETURNING *",
+        true,
+        true,
+        true
+    )]
+    #[case::read_only("UPDATE writable_items SET id=1", false, false, false)]
+    #[case::column("UPDATE writable_items SET label='one'", true, true, false)]
+    #[case::returning("UPDATE writable_items SET id=1 RETURNING id", true, false, false)]
+    fn respects_update_capabilities(
+        #[case] sql: &str,
+        #[case] writable: bool,
+        #[case] returning: bool,
+        #[case] valid: bool,
+    ) {
+        let mut context = catalog(Dialect::postgres());
+        let view_query = SemAst::from_ast_node(
+            parse_statements("SELECT id,label FROM items", Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap()
+                .node(),
+            &mut context,
+            &mut create_cache_context(),
+        )
+        .unwrap()
+        .into_select_statemtnt()
+        .unwrap();
+        let name = FullName::with_schema("public", "writable_items");
+        let view = CreateView::new(&name, &view_query, &[], &None, false);
+        context.set_get_view_impl_result(&name, &Some(ViewLike::from(&view)));
+        let support = if writable {
+            ViewUpdateSupport::writable(
+                &[view.get_column_def(&ColumnName::from("id")).unwrap()],
+                returning,
+            )
+        } else {
+            ViewUpdateSupport::read_only()
+        };
+        context.set_view_update_support(&name, &support);
+        let result = SemAst::from_ast_node(
+            parse_statements(sql, Dialect::postgres())
+                .next()
+                .unwrap()
+                .unwrap()
+                .node(),
+            &mut context,
+            &mut create_cache_context(),
+        );
+        assert_eq!(
+            context.reported_problem_count() == 0,
+            valid,
+            "{:?}",
+            context.reported_problems()
+        );
+        if valid {
+            assert_eq!(
+                result.unwrap().as_update().unwrap().target().to_string(),
+                "public.writable_items"
+            );
+        }
     }
 }
 
@@ -912,6 +534,22 @@ impl UpdateStatement {
             ResultColumnCollection::resolve_for_update(ast.returning(), context, from, &scope)
                 .map_err(Into::into)
         }
+    }
+}
+
+#[cfg(test)]
+mod test_sqlite_invalid_returning {
+    #[cfg(feature = "sqlite")]
+    use crate::{ast::Dialect, test_helpers::update::analyze};
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::alias("UPDATE items AS i SET id=1 RETURNING i.id")]
+    #[case::from("UPDATE items SET id=s.n FROM (SELECT 1 n) s RETURNING s.n")]
+    #[case::qualified_star("UPDATE items SET id=1 RETURNING items.*")]
+    fn sqlite_invalid_returning(#[case] sql: &str) {
+        let (_, context) = analyze(sql, Dialect::sqlite());
+        assert!(context.reported_problem_count() > 0);
     }
 }
 
@@ -1059,6 +697,37 @@ impl UpdateValue {
             )
             .into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_row_assignment_retains_full_subquery_and_selected_output {
+    use crate::{ast::Dialect, sem::PgBuiltInType, test_helpers::update::analyze};
+
+    #[test]
+    fn row_assignment_retains_full_subquery_and_selected_output() {
+        let (statement, context) = analyze(
+            "UPDATE items SET (id,label)=(SELECT $1::integer,'two')",
+            Dialect::postgres(),
+        );
+        assert_eq!(context.reported_problem_count(), 0);
+        let update = statement.as_update().unwrap();
+        let value = update.assignments()[0].value().as_query().unwrap();
+        assert_eq!(value.index(), 0);
+        assert_eq!(value.query().result_columns().len(), 2);
+        assert_eq!(
+            value
+                .query()
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+        assert_eq!(
+            update.assignments()[1].value().as_query().unwrap().index(),
+            1
+        );
     }
 }
 

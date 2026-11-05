@@ -87,7 +87,47 @@ impl MergeDestination {
             materialized_view: false,
         })
     }
+}
 
+#[cfg(test)]
+mod test_automatic_view_requires_postgresql_17_and_preserves_returning_support {
+    use crate::test_helpers::{
+        document_merge::catalog,
+        merge_views::{automatic_support, install_view, view_catalog},
+        statements::resolve_postgres as resolve,
+    };
+
+    #[test]
+    fn automatic_view_requires_postgresql_17_and_preserves_returning_support() {
+        let support = automatic_support();
+        let mut context = view_catalog(17, &support);
+        let statement = resolve(
+            "MERGE INTO writable_items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING t.id",
+            &mut context,
+        )
+        .unwrap();
+        let merge = statement.as_merge().unwrap();
+
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:?}",
+            context.reported_problems()
+        );
+        assert_eq!(merge.result_columns().len(), 1);
+        assert_eq!(merge.view_support(), Some(&support));
+
+        let mut context = catalog(16);
+        install_view(&mut context, false);
+        let result = resolve(
+            "MERGE INTO writable_items t USING incoming s ON true WHEN MATCHED THEN DELETE",
+            &mut context,
+        );
+        assert!(result.is_err() || context.reported_problem_count() > 0);
+    }
+}
+
+impl MergeDestination {
     pub(crate) const fn name(&self) -> &TableName {
         &self.name
     }

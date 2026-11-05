@@ -211,6 +211,59 @@ impl TypeCastExpr {
     }
 }
 
+#[cfg(test)]
+mod test_sqlite_casts_do_not_require_postgres_casts {
+    #[cfg(feature = "sqlite")]
+    use crate::{
+        ast::Dialect,
+        context::ParseContext,
+        names::FullName,
+        parse_statements,
+        sem::{SemAst, TypeReference},
+        test_helpers::{TestParseContext, create_cache_context},
+    };
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::projection("select cast(?1 as integer) as n")]
+    #[case::cte("with x as (select cast(?1 as integer) as n) select n from x")]
+    fn sqlite_casts_do_not_require_postgres_casts(#[case] sql: &str) {
+        let mut cache_context = create_cache_context();
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
+        context.setup_type(TypeReference::from_full_name(FullName::from_local_name(
+            "integer",
+        )));
+        let result = SemAst::from_ast(
+            &parse_statements(sql, Dialect::sqlite())
+                .next()
+                .unwrap()
+                .unwrap(),
+            context,
+            &mut cache_context,
+        )
+        .unwrap();
+        assert!(
+            result
+                .context()
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .is_any()
+        );
+        assert_eq!(result.context().reported_problem_count(), 0);
+        let select = result.ast().clone().into_select_statemtnt().unwrap();
+        assert!(
+            select
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type()
+                .is_some()
+        );
+    }
+}
+
 impl ImplicitCastExpr {
     pub(crate) fn projection_expression(
         &self,

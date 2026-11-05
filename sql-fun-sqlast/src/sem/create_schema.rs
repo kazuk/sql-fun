@@ -76,7 +76,9 @@ impl CreateSchema {
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         context.apply_creation_group(|context| Self::from_ast_group(ast, context, cache))
     }
+}
 
+impl CreateSchema {
     pub(crate) fn from_ast_group<TContext: ParseContext>(
         ast: &Schema,
         mut context: TContext,

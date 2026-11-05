@@ -146,3 +146,59 @@ impl ResultShapeAssertions for ResultColumnCollection {
         }
     }
 }
+
+use crate::sem::{MergeRecordRole, ResultColumn};
+
+pub(crate) trait RetainedColumnsAssertions {
+    fn assert_retained_names(&self, expected: &str);
+    fn assert_merge_role(&self, expected: MergeRecordRole);
+}
+impl RetainedColumnsAssertions for [ResultColumn] {
+    fn assert_retained_names(&self, expected: &str) {
+        let names: Vec<_> = self
+            .iter()
+            .map(|column| column.column_name().as_ref().unwrap().as_str())
+            .collect();
+        assert_eq!(names.join(","), expected);
+        assert!(self.iter().all(|column| column.expression().is_some()));
+    }
+    fn assert_merge_role(&self, expected: MergeRecordRole) {
+        for column in self {
+            assert_eq!(
+                column
+                    .expression()
+                    .unwrap()
+                    .merge_record_reference()
+                    .unwrap()
+                    .role(),
+                expected
+            );
+        }
+    }
+}
+pub(crate) trait WildcardGroupsAssertions {
+    fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]);
+    fn assert_relation_schemas(&self, schemas: &[&str]);
+}
+impl WildcardGroupsAssertions for [WildcardExpansion] {
+    fn assert_groups(&self, locations: &[usize], dependencies: &[bool], names: &[&str]) {
+        for (index, group) in self.iter().enumerate() {
+            assert_eq!(group.location(), Some(locations[index]));
+            assert_eq!(group.is_table_dependent(), dependencies[index]);
+            group.columns().assert_retained_names(names[index]);
+        }
+    }
+    fn assert_relation_schemas(&self, schemas: &[&str]) {
+        for (index, group) in self.iter().enumerate() {
+            let reference = group.columns()[0]
+                .expression()
+                .unwrap()
+                .table_column_reference()
+                .unwrap();
+            assert_eq!(
+                reference.relation(),
+                &crate::names::FullName::with_schema(schemas[index], "t")
+            );
+        }
+    }
+}

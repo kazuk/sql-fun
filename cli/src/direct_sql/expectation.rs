@@ -69,7 +69,7 @@ impl std::fmt::Display for ExpectedNullability {
     }
 }
 
-fn code_list(codes: &[&String]) -> String {
+fn code_list(codes: &[String]) -> String {
     if codes.is_empty() {
         "    (none)".to_owned()
     } else {
@@ -81,7 +81,129 @@ fn code_list(codes: &[&String]) -> String {
     }
 }
 
+/// Structured assertion mismatches; formatting never determines equality.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Difference {
+    StatementCount(usize),
+    Diagnostics {
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+    },
+    ColumnCount {
+        expected: usize,
+        actual: usize,
+    },
+    ColumnField {
+        index: usize,
+        field: &'static str,
+        expected: String,
+        actual: String,
+    },
+    MissingColumn {
+        index: usize,
+        column: String,
+    },
+    UnexpectedColumn {
+        index: usize,
+        column: String,
+    },
+}
+
+impl Difference {
+    pub(super) fn includes_diagnostic(&self, code: &str) -> bool {
+        match self {
+            Self::StatementCount(_) => true,
+            Self::Diagnostics { unexpected, .. } => unexpected.iter().any(|item| item == code),
+            _ => false,
+        }
+    }
+
+    pub(super) fn format(&self, color: bool) -> String {
+        use ::owo_colors::OwoColorize;
+        let expected_value = |value: &str| {
+            if color {
+                value.green().to_string()
+            } else {
+                value.to_owned()
+            }
+        };
+        let actual_value = |value: &str| {
+            if color {
+                value.red().to_string()
+            } else {
+                value.to_owned()
+            }
+        };
+        match self {
+            Self::StatementCount(actual) => {
+                format!("expected exactly one statement result, actual {actual}")
+            }
+            Self::Diagnostics {
+                missing,
+                unexpected,
+            } => format!(
+                "Diagnostics:\n  Missing:\n{}\n  Unexpected:\n{}",
+                expected_value(&code_list(missing)),
+                actual_value(&code_list(unexpected))
+            ),
+            Self::ColumnCount { expected, actual } => {
+                format!("Result column count: expected {expected}, actual {actual}")
+            }
+            Self::ColumnField {
+                index,
+                field,
+                expected,
+                actual,
+            } => format!(
+                "Column {index} · {field}\n  Expected: {}\n  Actual:   {}",
+                expected_value(expected),
+                actual_value(actual)
+            ),
+            Self::MissingColumn { index, column } => format!(
+                "Column {index} · missing\n  Expected:\n{}",
+                expected_value(column)
+            ),
+            Self::UnexpectedColumn { index, column } => format!(
+                "Column {index} · unexpected\n  Actual:\n{}",
+                actual_value(column)
+            ),
+        }
+    }
+}
+
 impl ExpectedColumn {
+    fn add_differences(&self, actual: &Self, index: usize, differences: &mut Vec<Difference>) {
+        if self.name != actual.name {
+            differences.push(Difference::ColumnField {
+                index,
+                field: "name",
+                expected: format!("{:?}", self.name),
+                actual: format!("{:?}", actual.name),
+            });
+        }
+        if self.column_type != actual.column_type {
+            let display_type = |value: &Option<ExpectedType>| {
+                value
+                    .as_ref()
+                    .map_or_else(|| "absent".to_owned(), ToString::to_string)
+            };
+            differences.push(Difference::ColumnField {
+                index,
+                field: "type",
+                expected: display_type(&self.column_type),
+                actual: display_type(&actual.column_type),
+            });
+        }
+        if self.nullability != actual.nullability {
+            differences.push(Difference::ColumnField {
+                index,
+                field: "nullability",
+                expected: self.nullability.to_string(),
+                actual: actual.nullability.to_string(),
+            });
+        }
+    }
+
     fn from_api(column: &ResultSetColumn) -> Result<Self, ::anyhow::Error> {
         // Project only fields the API actually supplies; absence is not a wildcard.
         Ok(::serde_json::from_value(::serde_json::json!({
@@ -125,13 +247,10 @@ impl Expectation {
     pub(super) fn differences(
         &self,
         response: &AnalyzeQueryResponse,
-    ) -> Result<Vec<String>, ::anyhow::Error> {
+    ) -> Result<Vec<Difference>, ::anyhow::Error> {
         let items = response.queries().items();
         if items.len() != 1 {
-            return Ok(vec![format!(
-                "expected exactly one statement result, actual {}",
-                items.len()
-            )]);
+            return Ok(vec![Difference::StatementCount(items.len())]);
         }
         let item = &items[0];
         let actual: BTreeSet<_> = item
@@ -141,31 +260,40 @@ impl Expectation {
             .map(|diagnostic| diagnostic.code().to_owned())
             .collect();
         let mut differences = Vec::new();
-        let missing: Vec<_> = self.diagnostics.difference(&actual).collect();
-        let unexpected: Vec<_> = actual.difference(&self.diagnostics).collect();
+        let missing: Vec<_> = self.diagnostics.difference(&actual).cloned().collect();
+        let unexpected: Vec<_> = actual.difference(&self.diagnostics).cloned().collect();
         if !missing.is_empty() || !unexpected.is_empty() {
-            differences.push(format!(
-                "diagnostics:\n  missing:\n{}\n  unexpected:\n{}",
-                code_list(&missing),
-                code_list(&unexpected)
-            ));
+            differences.push(Difference::Diagnostics {
+                missing,
+                unexpected,
+            });
         }
         let mut columns: Vec<_> = item.result_columns().items().iter().collect();
         columns.sort_by_key(|column| *column.ordinal());
-        if columns.len() != self.columns.len() {
-            differences.push(format!(
-                "result column count: expected {}, actual {}",
-                self.columns.len(),
-                columns.len()
-            ));
+        let actual_columns = columns
+            .into_iter()
+            .map(ExpectedColumn::from_api)
+            .collect::<Result<Vec<_>, _>>()?;
+        if actual_columns.len() != self.columns.len() {
+            differences.push(Difference::ColumnCount {
+                expected: self.columns.len(),
+                actual: actual_columns.len(),
+            });
         }
-        for (index, (expected, actual)) in self.columns.iter().zip(columns).enumerate() {
-            let actual = ExpectedColumn::from_api(actual)?;
-            if *expected != actual {
-                differences.push(format!(
-                    "column {index}:\n  expected:\n{expected}\n  actual:\n{actual}"
-                ));
-            }
+        for (index, (expected, actual)) in self.columns.iter().zip(&actual_columns).enumerate() {
+            expected.add_differences(actual, index, &mut differences);
+        }
+        for (index, column) in self.columns.iter().enumerate().skip(actual_columns.len()) {
+            differences.push(Difference::MissingColumn {
+                index,
+                column: column.to_string(),
+            });
+        }
+        for (index, column) in actual_columns.iter().enumerate().skip(self.columns.len()) {
+            differences.push(Difference::UnexpectedColumn {
+                index,
+                column: column.to_string(),
+            });
         }
         Ok(differences)
     }
@@ -217,18 +345,19 @@ mod test_comparison {
             vec![test_helpers::column("actual_id", true, false, Some(true))],
         );
         assert_eq!(
-            expected.differences(&actual)?,
+            expected
+                .differences(&actual)?
+                .iter()
+                .map(|difference| difference.format(false))
+                .collect::<Vec<_>>(),
             vec![
                 concat!(
-                    "diagnostics:\n  missing:\n    \"missing_a\"\n    \"missing_b\"",
-                    "\n  unexpected:\n    \"unexpected_a\"\n    \"unexpected_b\""
+                    "Diagnostics:\n  Missing:\n    \"missing_a\"\n    \"missing_b\"",
+                    "\n  Unexpected:\n    \"unexpected_a\"\n    \"unexpected_b\""
                 ),
-                concat!(
-                    "column 0:\n  expected:\n    name: \"expected_id\"",
-                    "\n    type: \"app\".\"identifier\"[]\n    nullability: nullable",
-                    "\n  actual:\n    name: \"actual_id\"\n    type: \"pg_catalog\".\"int4\"",
-                    "\n    nullability: not_null"
-                ),
+                "Column 0 · name\n  Expected: \"expected_id\"\n  Actual:   \"actual_id\"",
+                "Column 0 · type\n  Expected: \"app\".\"identifier\"[]\n  Actual:   \"pg_catalog\".\"int4\"",
+                "Column 0 · nullability\n  Expected: nullable\n  Actual:   not_null",
             ]
         );
         Ok(())
@@ -246,9 +375,12 @@ mod test_comparison {
         );
         let differences = expected.differences(&actual)?;
         assert!(
-            differences[0].contains("missing:\n    (none)\n  unexpected:\n    \"warning_code\"")
+            differences[0]
+                .format(false)
+                .contains("Missing:\n    (none)\n  Unexpected:\n    \"warning_code\"")
         );
-        assert!(differences[1].contains("type: absent\n    nullability: unknown"));
+        assert!(differences[1].format(false).contains("Expected: absent"));
+        assert!(differences[2].format(false).contains("Expected: unknown"));
         Ok(())
     }
 
@@ -283,7 +415,10 @@ mod test_comparison {
             &[],
             vec![test_helpers::column("id", true, false, Some(true))],
         );
-        assert_ne!(expected.differences(&response)?, Vec::<String>::new());
+        assert_ne!(
+            expected.differences(&response)?,
+            Vec::<super::Difference>::new()
+        );
         Ok(())
     }
     #[rstest::rstest]
@@ -325,7 +460,7 @@ mod test_comparison {
                 &[],
                 vec![test_helpers::column("id", false, false, actual)]
             ))?,
-            Vec::<String>::new()
+            Vec::<super::Difference>::new()
         );
         Ok(())
     }

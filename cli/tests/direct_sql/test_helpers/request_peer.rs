@@ -24,7 +24,7 @@ pub(crate) async fn run_selection(
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let directory = prepare_inputs(listener.local_addr()?.port(), valid_default)?;
     let root = directory.path();
-    let peer = ::tokio::spawn(capture_requests(listener));
+    let peer = ::tokio::spawn(capture_requests(listener, Vec::new(), false, false));
     let mut command = ::tokio::process::Command::new(cli_executable());
     command
         .current_dir(root)
@@ -53,6 +53,59 @@ pub(crate) async fn run_selection(
     }
     let (queries, initialization) = peer.await?;
     Ok((output, queries, initialization))
+}
+
+/// Exercise schema gating with a real CLI and a deterministic RPC peer.
+pub(crate) async fn run_schema(
+    options: &[&str],
+    severities: &[&str],
+    color: &str,
+) -> ::testresult::TestResult<(Output, Vec<Value>, String)> {
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let directory = prepare_inputs(listener.local_addr()?.port(), Some(true))?;
+    let root = directory.path();
+    let diagnostics = severities
+        .iter()
+        .filter(|severity| **severity != "no_handle" && **severity != "fatal")
+        .map(|severity| diagnostic(severity))
+        .collect();
+    let peer = ::tokio::spawn(capture_requests(
+        listener,
+        diagnostics,
+        severities.contains(&"no_handle"),
+        severities.contains(&"fatal"),
+    ));
+    let output = ::tokio::process::Command::new(cli_executable())
+        .current_dir(root)
+        .env("USER", root.file_name().unwrap())
+        .env("SQL_FUN_SERVER", root.join("unused-server"))
+        .env_remove("SQL_FUN_SERVER_COMMAND")
+        .env_remove("SQL_FUN_METADATA_FILE")
+        .env_remove("SQL_FUN_DATASOURCE")
+        .env_remove("RUST_LOG")
+        .args([
+            "--term-color",
+            color,
+            "--metadata-file",
+            "metadata.toml",
+            "--datasource",
+            "products",
+        ])
+        .args(options)
+        .args(["--schema-level", "builtin", "--junit-xml", "report.xml"])
+        .kill_on_drop(true)
+        .output()
+        .await?;
+    if !root.join("report.xml").exists() {
+        peer.abort();
+        panic!(
+            "CLI did not write report: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let (queries, _) = peer.await?;
+    let report = std::fs::read_to_string(root.join("report.xml"))?;
+    Ok((output, queries, report))
 }
 
 fn prepare_inputs(
@@ -104,10 +157,27 @@ connector = "default-connector""#,
         root.join("cases.json"),
         r#"[{"name":"first","sql":"SELECT 1","expected":[]},{"name":"second","sql":"SELECT 2","expected":[]}]"#,
     )?;
+    std::fs::write(
+        root.join("diagnostic-cases.json"),
+        r#"[{"name":"expected","sql":"warning case","expected":["parameter_constraint"]},{"name":"expected-error","sql":"error case","expected":["parameter_constraint"]},{"name":"unexpected","sql":"warning case","expected":[]},{"name":"later","sql":"SELECT 2","expected":[]}]"#,
+    )?;
+    std::fs::write(
+        root.join("error-cases.json"),
+        r#"[{"name":"rpc-error","sql":"api_error","expected":[]}]"#,
+    )?;
+    std::fs::write(
+        root.join("multiple-cases.json"),
+        r#"[{"name":"multiple","sql":"mixed case","expected":[]}]"#,
+    )?;
     Ok(directory)
 }
 
-async fn capture_requests(listener: TcpListener) -> (Vec<Value>, Option<Value>) {
+async fn capture_requests(
+    listener: TcpListener,
+    diagnostics: Vec<Value>,
+    no_handle: bool,
+    fatal: bool,
+) -> (Vec<Value>, Option<Value>) {
     let (stream, _) = listener.accept().await.unwrap();
     let mut stream = BufReader::new(stream);
     let mut requests = Vec::new();
@@ -118,18 +188,34 @@ async fn capture_requests(listener: TcpListener) -> (Vec<Value>, Option<Value>) 
             break;
         }
         let request: Value = ::serde_json::from_str(&line).unwrap();
+        if (fatal && request["method"] == "initialize_schema_context")
+            || (request["method"] == "analyze_query"
+                && request["params"]["query"]["Text"] == "api_error")
+        {
+            if request["method"] == "analyze_query" {
+                requests.push(request["params"].clone());
+            }
+            let response = ::serde_json::json!({"jsonrpc":"2.0","id":request["id"],"error":{"code":-32603,"message":"injected internal failure"}});
+            stream
+                .get_mut()
+                .write_all(format!("{response}\n").as_bytes())
+                .await
+                .unwrap();
+            continue;
+        }
         let result = match request["method"].as_str().unwrap() {
             "initialize" => ::serde_json::json!("OK"),
             "initialize_schema_context" => {
                 initialization = Some(request["params"].clone());
                 ::serde_json::json!({
-                    "context_handle":"test", "schema_dump_hash":null, "problems":page(&[])
+                    "context_handle":if no_handle { None } else { Some("test") }, "schema_dump_hash":null, "problems":page(&diagnostics)
                 })
             }
             "analyze_query" => {
                 let query = request["params"]["query"]["Text"].as_str().unwrap();
                 let severities = match query {
                     "warning case" => vec![Some("warning")],
+                    "error case" => vec![Some("error")],
                     "mixed case" => vec![Some("warning"), Some("error")],
                     "advice case" => vec![Some("advice")],
                     _ => vec![None],
@@ -156,22 +242,7 @@ fn page(items: &[Value]) -> Value {
 
 fn statement(severity: Option<&str>) -> Value {
     let diagnostics = if let Some(severity) = severity {
-        let problem = ::sql_fun_core::analysis_problem::AnalysisProblem::parameter_constraint(
-            "unresolved parameter",
-        );
-        let severity = match severity {
-            "warning" => ::sql_fun_client::payloads::DiagnosticSeverity::warning(),
-            "error" => ::sql_fun_client::payloads::DiagnosticSeverity::error(),
-            _ => ::sql_fun_client::payloads::DiagnosticSeverity::advice(),
-        };
-        let diagnostic = ::sql_fun_client::payloads::AnalysisProbrem::new(
-            problem.code(),
-            severity,
-            std::path::Path::new("query"),
-            None,
-        )
-        .with_semantic_problem(&problem);
-        vec![::serde_json::to_value(diagnostic).unwrap()]
+        vec![diagnostic(severity)]
     } else {
         Vec::new()
     };
@@ -180,4 +251,23 @@ fn statement(severity: Option<&str>) -> Value {
         "complete":false, "probrems":page(&diagnostics), "parameters":page(&[]),
         "result_columns":page(&[]), "column_access":page(&[])
     })
+}
+
+fn diagnostic(severity: &str) -> Value {
+    let problem = ::sql_fun_core::analysis_problem::AnalysisProblem::parameter_constraint(
+        "unresolved parameter",
+    );
+    let severity = match severity {
+        "warning" => ::sql_fun_client::payloads::DiagnosticSeverity::warning(),
+        "error" => ::sql_fun_client::payloads::DiagnosticSeverity::error(),
+        _ => ::sql_fun_client::payloads::DiagnosticSeverity::advice(),
+    };
+    let diagnostic = ::sql_fun_client::payloads::AnalysisProbrem::new(
+        problem.code(),
+        severity,
+        std::path::Path::new("schema"),
+        None,
+    )
+    .with_semantic_problem(&problem);
+    ::serde_json::to_value(diagnostic).unwrap()
 }

@@ -157,13 +157,27 @@ statement diagnostic sets or result columns to match one expectation.
 The result reflects static analysis, including its unresolved types and
 nullability. It does not verify database contents or execute query effects.
 
+## Schema diagnostics
+
+Schema initialization diagnostics are always displayed, independently of the
+query case results. By default, error-level schema diagnostics stop the tests;
+warnings do not. To continue despite recoverable schema errors, pass
+`--ignore-schema-diagnostics error` after `test`. The loaded schema may be
+incomplete, so query results may reflect missing definitions. The value `warning`
+also permits warnings but does not permit errors, matching the default behavior.
+This option changes whether diagnostics stop testing; it does not hide them or
+bypass schema loading failures, missing contexts, or transport errors.
+
 ## Reports and exit status
 
 Console output identifies named cases as `<source-or-selector>::<case-name>`.
-SQL diagnostic context also includes the case's zero-based array index, for
-example `cases.json[0]::select-literal`. Legacy SQL sources retain their
-source/selector and array-index identities. Output shows assertion differences
-or execution errors and prints a final case count.
+Legacy SQL sources retain their source/selector and array-index identities.
+Passing cases print only `PASS` and their identity; expected query diagnostics are
+not displayed. Failed cases print `FAIL` before their expected/actual differences
+and relevant actual diagnostic context, including case and statement indices.
+Execution errors are reported as `ERROR`. A final case count is printed.
+`--term-color auto` enables colors for a terminal; `never` disables them and
+`ansi` explicitly enables them. Redirected automatic output is plain text.
 Independent cases continue after assertion failures and attributable API errors.
 
 `--junit-xml <PATH>` writes one testcase per selected SQL input, creates parent

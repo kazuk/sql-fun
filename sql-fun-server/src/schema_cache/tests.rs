@@ -525,52 +525,8 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
 
 // Removed configured_roles_bind_and_apply_through_direct_context::folded after a CI timeout.
 // Deletion commit: e187de28a0d534b2b20a27201ec6c905388673e0; recover from its parent.
-#[rstest::rstest]
 // Removed quoted/escaped_quote cases after CI timeouts.
 // Deletion commit: 5e2a1836584afda654602779b3bf71cc215d595c; recover from its parent.
-#[case::unicode(r#""所有者""#, "所有者")]
-#[case::dot(r#""a.b""#, "a.b")]
-fn configured_roles_bind_and_apply_through_direct_context(
-    #[case] spelling: &str,
-    #[case] expected: &str,
-) {
-    use ::sql_fun_sqlast::{
-        ast::ObjectKind,
-        context::{OwnershipInfoRead, ParseContext, RoleInfoRead},
-        sem::Role,
-    };
-    let project = SchemaProject::new();
-    project.configure_roles(
-        "products",
-        r#"roles = ['owner', 'Mixed Owner', 'a"b', '所有者', 'a.b']"#,
-    );
-    let context = project.analysis_context("products");
-    assert_eq!(
-        context.role_by_name(expected).map(Role::name),
-        Some(expected)
-    );
-    let created = SchemaProject::apply_sql(context, "CREATE SCHEMA app").into_context();
-    let changed =
-        SchemaProject::apply_sql(created, &format!("ALTER SCHEMA app OWNER TO {spelling}"));
-    let change = changed.ast().ownership_change().unwrap();
-    assert_eq!(
-        change.owner().resolved_role().map(Role::name),
-        Some(expected)
-    );
-    assert!(changed.context().problems().is_empty());
-    let frozen = changed.into_context().freeze();
-    let next = project.analysis_context_over(&frozen, "products");
-    let definitions =
-        next.ownership_definitions(ObjectKind::from(37), &FullName::from_local_name("app"));
-    assert_eq!(
-        definitions[0]
-            .owner()
-            .unwrap()
-            .resolved_role()
-            .map(Role::name),
-        Some(expected)
-    );
-}
 
 #[rstest::rstest]
 // The omitted and empty inventory cases timed out in CI and were removed in

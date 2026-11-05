@@ -527,6 +527,8 @@ async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_fi
 // Deletion commit: e187de28a0d534b2b20a27201ec6c905388673e0; recover from its parent.
 // Removed quoted/escaped_quote cases after CI timeouts.
 // Deletion commit: 5e2a1836584afda654602779b3bf71cc215d595c; recover from its parent.
+// The remaining unicode and dot cases timed out in CI and were removed in
+// e4d97f8c4fbda824bbf1e020f07ec33563c6b8a1; recover them from that commit's parent.
 
 #[rstest::rstest]
 // The omitted and empty inventory cases timed out in CI and were removed in
